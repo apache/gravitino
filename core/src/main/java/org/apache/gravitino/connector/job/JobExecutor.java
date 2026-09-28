@@ -20,6 +20,8 @@
 package org.apache.gravitino.connector.job;
 
 import java.io.Closeable;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -58,15 +60,45 @@ public interface JobExecutor extends Closeable {
   String submitJob(JobTemplate jobTemplate);
 
   /**
-   * Get the status of a job by its unique identifier. The status should be one of the values in
-   * {@link JobHandle.Status}. The implementors should query the external job runner to get the job
-   * status, and map the status to the values in {@link JobHandle.Status}.
+   * Get a snapshot of the job's execution state by its unique identifier, including its status and
+   * when the job actually started and finished. The implementors should query the external job
+   * runner to get the job state, and map the status to the values in {@link JobHandle.Status}.
+   *
+   * <p>Gravitino pulls the job state periodically, so a job may go through several statuses between
+   * two pulls, for example, from {@link JobHandle.Status#QUEUED} straight to {@link
+   * JobHandle.Status#SUCCEEDED}. The timestamps are attributes of the job, not of a particular
+   * status: once the job has started, the started time must be reported in every later snapshot,
+   * including the terminal ones. Once reported, a timestamp should not change.
+   *
+   * <ul>
+   *   <li>The started time is null if the job hasn't started executing, or if it is unknown to the
+   *       job executor.
+   *   <li>The finished time is only set for a terminal status, and is null if it is unknown to the
+   *       job executor.
+   * </ul>
+   *
+   * <p>If the job runner can't tell when a job started or finished, leave the time null. Gravitino
+   * then falls back to the time it observes the job running or finished, which can be off by up to
+   * the job status pull interval. A job that starts and finishes between two pulls is never
+   * observed running, so it has no started time in that case.
+   *
+   * @param jobId The unique identifier of the job.
+   * @return The execution snapshot of the job.
+   * @throws NoSuchJobException If the job with the given identifier does not exist.
+   */
+  JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException;
+
+  /**
+   * Get the status of a job by its unique identifier. It is a shortcut of {@link
+   * #getJobExecutionInfo(String)} that only returns the status.
    *
    * @param jobId The unique identifier of the job.
    * @return The status of the job.
    * @throws NoSuchJobException If the job with the given identifier does not exist.
    */
-  JobHandle.Status getJobStatus(String jobId) throws NoSuchJobException;
+  default JobHandle.Status getJobStatus(String jobId) throws NoSuchJobException {
+    return getJobExecutionInfo(jobId).status();
+  }
 
   /**
    * Cancel a job by its unique identifier. The job runner should stop the job if it is currently
@@ -80,4 +112,82 @@ public interface JobExecutor extends Closeable {
    * @throws NoSuchJobException If the job with the given identifier does not exist.
    */
   void cancelJob(String jobId) throws NoSuchJobException;
+
+  /**
+   * Whether the job with the given identifier is owned by this job executor instance, which means
+   * this instance is able to query and cancel it.
+   *
+   * <p>In a multi-node deployment every Gravitino server has its own job executor instance, and all
+   * of them see the same jobs from the shared metadata store. Gravitino only queries the status of,
+   * or cancels, a job through the executor instance that owns it. The default implementation
+   * returns {@code true}, which fits job executors backed by an external job runner that any
+   * Gravitino server can reach.
+   *
+   * @param jobId The unique identifier of the job.
+   * @return {@code true} if this executor instance owns the job, {@code false} otherwise.
+   */
+  default boolean ownsJob(String jobId) {
+    return true;
+  }
+
+  /**
+   * Whether the job state is only kept by the executor instance that owns the job, for example the
+   * processes launched on the local node. If so, only the owning instance can cancel the job, so a
+   * cancellation requested on another Gravitino server is carried out by the owner when it pulls
+   * the job status.
+   *
+   * <p>The default implementation returns {@code false}.
+   *
+   * @return {@code true} if the job state is local to the owning executor instance, {@code false}
+   *     otherwise.
+   */
+  default boolean isJobStateNodeLocal() {
+    return false;
+  }
+
+  /**
+   * Get the captured standard output of the job, as a list of lines.
+   *
+   * <p>The default implementation returns an empty list, so implementors that don't support output
+   * retrieval don't need to override this method. Unlike {@link
+   * #getJobExecutionInfo(String)}/{@link #cancelJob(String)}, this method never throws for a job
+   * the executor doesn't (or no longer) know about - the job entity itself may still exist even
+   * after the executor's own bookkeeping for its output has expired or been lost (e.g. when it's
+   * only kept in memory and the server restarts, or kept on storage this server can't reach), so
+   * "unknown to this executor" is reported as empty output, not as an error.
+   *
+   * @param jobId The unique identifier of the job.
+   * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxLines} configuration.
+   * @param maxBytes The maximum number of (most recent) bytes to read from the underlying output,
+   *     resolved by the caller from the {@code gravitino.job.outputMaxBytes} configuration. Bounds
+   *     both the read cost and the response size regardless of how the content is shaped.
+   * @return the stdout lines of the job, or an empty list if not available.
+   */
+  default List<String> getJobStdout(String jobId, int maxLines, int maxBytes) {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Get the captured standard error output of the job, as a list of lines.
+   *
+   * <p>The default implementation returns an empty list, so implementors that don't support output
+   * retrieval don't need to override this method. Unlike {@link
+   * #getJobExecutionInfo(String)}/{@link #cancelJob(String)}, this method never throws for a job
+   * the executor doesn't (or no longer) know about - the job entity itself may still exist even
+   * after the executor's own bookkeeping for its output has expired or been lost (e.g. when it's
+   * only kept in memory and the server restarts, or kept on storage this server can't reach), so
+   * "unknown to this executor" is reported as empty output, not as an error.
+   *
+   * @param jobId The unique identifier of the job.
+   * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxLines} configuration.
+   * @param maxBytes The maximum number of (most recent) bytes to read from the underlying output,
+   *     resolved by the caller from the {@code gravitino.job.outputMaxBytes} configuration. Bounds
+   *     both the read cost and the response size regardless of how the content is shaped.
+   * @return the stderr lines of the job, or an empty list if not available.
+   */
+  default List<String> getJobStderr(String jobId, int maxLines, int maxBytes) {
+    return Collections.emptyList();
+  }
 }

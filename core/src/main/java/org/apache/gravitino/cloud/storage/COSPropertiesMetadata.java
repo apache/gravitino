@@ -39,7 +39,7 @@ public class COSPropertiesMetadata {
                   "COS access key ID (Tencent Cloud SecretId)",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(
@@ -48,6 +48,46 @@ public class COSPropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_REGION,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_REGION,
+                  "Tencent Cloud COS region",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ENDPOINT,
+                  "Tencent Cloud COS endpoint",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ROLE_ARN,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ROLE_ARN,
+                  "Tencent Cloud COS role ARN for STS credential vending",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+                  "Tencent Cloud COS external ID for cross-account AssumeRole",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_APP_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_APP_ID,
+                  "Tencent Cloud COS application ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 
   private COSPropertiesMetadata() {}

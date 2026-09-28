@@ -214,6 +214,28 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
+  public void testDropSchemaKeepsPrivilegesWhenExternalDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      any(NameIdentifier.class), any(Entity.EntityType.class)))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hookDispatcher.dropSchema(ident, false));
+
+      // Nothing was dropped, so the schema that is still registered keeps its privileges.
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  @Test
   public void testDropSchemaRemovesPrivileges() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(true);
@@ -235,6 +257,23 @@ public class TestSchemaHookDispatcher {
           () ->
               AuthorizationUtils.authorizationPluginRemovePrivileges(
                   eq(ident), eq(Entity.EntityType.SCHEMA), eq(ImmutableList.of("/test"))));
+    }
+  }
+
+  @Test
+  public void testDropSchemaDoesNotRemovePrivilegesWhenSchemaDoesNotExist() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      boolean dropped = hookDispatcher.dropSchema(ident, false);
+
+      Assertions.assertFalse(dropped);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.SCHEMA, null),
+          Mockito.never());
     }
   }
 

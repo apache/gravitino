@@ -139,4 +139,19 @@ public class TestAuthorizationExpressionConverter {
             + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
         replaced);
   }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyViewTag() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_TAG");
+    Assertions.assertEquals(
+        "((ANY(VIEW_TAG, METALAKE, TAG)) && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))", replaced);
+  }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyViewPolicy() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_POLICY");
+    Assertions.assertEquals(
+        "((ANY(VIEW_POLICY, METALAKE, POLICY)) && !(ANY(DENY_VIEW_POLICY, METALAKE, POLICY)))",
+        replaced);
+  }
 }

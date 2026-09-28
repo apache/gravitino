@@ -121,12 +121,6 @@ public class OrphanedMetadataObjectRelationService {
                     metadataObjectType.name(),
                     deletedAt,
                     limit)
-                + mapper.softDeleteOrphanedPolicyRelations(
-                    entityTable.tableName,
-                    entityTable.idColumn,
-                    metadataObjectType.name(),
-                    deletedAt,
-                    limit)
                 + mapper.softDeleteOrphanedStatistics(
                     entityTable.tableName,
                     entityTable.idColumn,

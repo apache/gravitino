@@ -30,6 +30,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -49,28 +50,34 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
   private static final Logger LOG = Logger.get(CreateCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
-  private final String metalake;
+  @Nullable private final String configuredMetalake;
 
   /**
    * Constructs a new CreateCatalogStoredProcedure.
    *
    * @param catalogConnectorManager the catalog connector manager
-   * @param metalake the metalake name
+   * @param configuredMetalake the metalake name, or null when the connector is not configured with
+   *     one
    */
   public CreateCatalogStoredProcedure(
-      CatalogConnectorManager catalogConnectorManager, String metalake) {
+      CatalogConnectorManager catalogConnectorManager, @Nullable String configuredMetalake) {
     this.catalogConnectorManager = catalogConnectorManager;
-    this.metalake = metalake;
+    this.configuredMetalake = configuredMetalake;
   }
 
   @Override
   public Procedure createStoredProcedure() throws NoSuchMethodException, IllegalAccessException {
-    // call gravitino.system.create_catalog(catalog, provider, properties, ignore_exist)
+    // call gravitino.system.create_catalog(catalog, provider, properties, ignore_exist, metalake)
     MethodHandle createCatalog =
         MethodHandles.lookup()
             .unreflect(
                 CreateCatalogStoredProcedure.class.getMethod(
-                    "createCatalog", String.class, String.class, Map.class, boolean.class))
+                    "createCatalog",
+                    String.class,
+                    String.class,
+                    Map.class,
+                    boolean.class,
+                    String.class))
             .bindTo(this);
 
     List<Procedure.Argument> arguments =
@@ -79,7 +86,8 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
             new Procedure.Argument("PROVIDER", VARCHAR),
             new Procedure.Argument(
                 "PROPERTIES", new MapType(VARCHAR, VARCHAR, new TypeOperators())),
-            new Procedure.Argument("IGNORE_EXIST", BOOLEAN, false, false));
+            new Procedure.Argument("IGNORE_EXIST", BOOLEAN, false, false),
+            new Procedure.Argument(METALAKE_ARGUMENT, VARCHAR, false, null));
 
     return new Procedure(
         GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME, "create_catalog", arguments, createCatalog);
@@ -92,13 +100,17 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
    * @param provider the provider of the catalog
    * @param properties the properties of the catalog
    * @param ignoreExist whether to ignore if the catalog already exists
+   * @param metalakeArgument the metalake to create the catalog in, null to use the configured one
    * @throws TrinoException if the catalog already exists and ignoreExist is false
    */
   public void createCatalog(
-      String catalogName, String provider, Map<String, String> properties, boolean ignoreExist) {
-    boolean exists =
-        catalogConnectorManager.catalogConnectorExist(
-            catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+      String catalogName,
+      String provider,
+      Map<String, String> properties,
+      boolean ignoreExist,
+      @Nullable String metalakeArgument) {
+    String metalake = resolveMetalake(configuredMetalake, metalakeArgument);
+    boolean exists = catalogConnectorManager.getCatalogConnector(metalake, catalogName) != null;
     if (exists) {
       if (!ignoreExist) {
         throw new TrinoException(
@@ -115,12 +127,12 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
               catalogName, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
 
       catalogConnectorManager.loadMetalakeSync();
-      String trinoCatalogName = catalogConnectorManager.getTrinoCatalogName(metalake, catalogName);
-      if (!catalogConnectorManager.catalogConnectorExist(trinoCatalogName)) {
+      if (catalogConnectorManager.getCatalogConnector(metalake, catalogName) == null) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
             "Create catalog failed due to the loading process fails. "
-                + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
+                + catalogConnectorManager.describeRegistrationFailure(
+                    metalake, catalogConnectorManager.getTrinoCatalogName(metalake, catalogName)));
       }
 
       LOG.info("Create catalog %s in metalake %s successfully.", catalogName, metalake);

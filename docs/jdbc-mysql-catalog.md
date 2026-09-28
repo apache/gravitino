@@ -52,7 +52,18 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.      | `30000`       | No       |
 
 :::caution
-Download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
+Gravitino does not package the MySQL JDBC driver, because MySQL Connector/J is
+GPLv2 and cannot be redistributed. You must supply it yourself.
+
+Download MySQL Connector/J (`com.mysql:mysql-connector-j`, 8.0.16 or later; the
+`com.mysql.cj.jdbc.Driver` class) from
+[Maven Central](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/) and
+place the JAR in the `catalogs/jdbc-mysql/libs` directory.
+
+For container or Kubernetes deployments where you cannot copy into that
+directory directly, supply the driver through your deployment's mechanism for
+adding catalog libraries. The catalog fails fast at creation time with a clear
+message if the driver is absent.
 :::
 
 ### Driver Version Compatibility

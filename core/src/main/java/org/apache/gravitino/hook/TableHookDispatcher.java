@@ -104,10 +104,15 @@ public class TableHookDispatcher implements TableDispatcher {
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     TableChange.RenameTable lastRenameChange = null;
+    // Renames apply in order, so the last one that sets a schema decides the table's schema.
+    String newSchemaName = ident.namespace().level(2);
     List<String> locations = null;
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         lastRenameChange = (TableChange.RenameTable) change;
+        if (lastRenameChange.getNewSchemaName().isPresent()) {
+          newSchemaName = lastRenameChange.getNewSchemaName().get();
+        }
       }
     }
     if (lastRenameChange != null) {
@@ -116,9 +121,15 @@ public class TableHookDispatcher implements TableDispatcher {
     Table alteredTable = dispatcher.alterTable(ident, changes);
 
     if (lastRenameChange != null) {
-      // todo: support rename across different schemas
+      // The rename may also move the table to another schema.
+      NameIdentifier newIdent =
+          NameIdentifierUtil.ofTable(
+              ident.namespace().level(0),
+              ident.namespace().level(1),
+              newSchemaName,
+              lastRenameChange.getNewName());
       AuthorizationUtils.authorizationPluginRenamePrivileges(
-          ident, Entity.EntityType.TABLE, lastRenameChange.getNewName(), locations);
+          ident, Entity.EntityType.TABLE, newIdent, locations);
     }
 
     return alteredTable;
@@ -129,8 +140,12 @@ public class TableHookDispatcher implements TableDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
     boolean dropped = dispatcher.dropTable(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TABLE, locations);
+    // A false result means the external table was renamed or dropped out of band and the
+    // registration was kept; the entity alive under another name must keep its privileges too.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
     return dropped;
   }
 
@@ -139,8 +154,10 @@ public class TableHookDispatcher implements TableDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
     boolean purged = dispatcher.purgeTable(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TABLE, locations);
+    if (purged) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
     return purged;
   }
 

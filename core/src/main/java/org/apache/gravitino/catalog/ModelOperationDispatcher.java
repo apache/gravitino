@@ -97,9 +97,11 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         checkAndUpdateProperties(
             catalogIdent, properties, HasPropertyMetadata::modelPropertiesMetadata);
 
+    // Lock the model node, not the schema, so models in the same schema can be registered
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     Model registeredModel =
         TreeLockUtils.doWithTreeLock(
-            NameIdentifier.of(ident.namespace().levels()),
+            ident,
             LockType.WRITE,
             () ->
                 doWithCatalog(

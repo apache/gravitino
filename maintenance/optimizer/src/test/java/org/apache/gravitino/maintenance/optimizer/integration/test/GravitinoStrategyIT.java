@@ -62,8 +62,10 @@ public class GravitinoStrategyIT extends AbstractGravitinoOptimizerEnvIT {
     createTable(tableName);
     createPolicy("policy1", ImmutableMap.of("rule1", "value1"), "test");
     createPolicy("policy2", ImmutableMap.of("rule2", "value2"), "test");
-    associatePoliciesToTable("policy1", tableName);
-    associatePoliciesToTable("policy2", tableName);
+    createTagForPolicy("policy1");
+    createTagForPolicy("policy2");
+    associatePolicyTagToTable("policy1", tableName);
+    associatePolicyTagToTable("policy2", tableName);
 
     List<Strategy> strategies = strategyProvider.strategies(getTableIdentifier(tableName));
     Assertions.assertNotNull(strategies);

@@ -110,7 +110,7 @@ see [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 ### Table Capabilities
 
 - The Hive catalog supports creating, updating, and deleting tables in the HMS.
-- Doesn't support column default value.
+- Column `NOT NULL` and `DEFAULT` constraints are supported only when the connected HMS is Hive 3.x; on Hive 2.x they are rejected.
 
 ### Table Partitioning
 
@@ -222,12 +222,14 @@ As Gravitino has a separate interface for updating the comment of a table, the H
 
 ##### Alter column
 
-| Hive Alter Operation     | Gravitino Table Update Request    |
-|--------------------------|-----------------------------------|
-| `Change Column Name`     | `Rename a column`                 |
-| `Change Column Type`     | `Update the type of a column`     |
-| `Change Column Position` | `Update the position of a column` |
-| `Change Column Comment`  | `Update the column comment`       |
+| Hive Alter Operation        | Gravitino Table Update Request                         |
+|-----------------------------|--------------------------------------------------------|
+| `Change Column Name`        | `Rename a column`                                      |
+| `Change Column Type`        | `Update the type of a column`                          |
+| `Change Column Position`    | `Update the position of a column`                      |
+| `Change Column Comment`     | `Update the column comment`                            |
+| `Change Column Nullability` | `Update the nullability of a column` (Hive 3.x only)   |
+| `Change Column Default`     | `Update the default value of a column` (Hive 3.x only) |
 
 ##### Alter partition
 

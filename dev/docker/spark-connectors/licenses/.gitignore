@@ -1,0 +1,4 @@
+# LICENSE and NOTICE are copied from the repository root at build time
+# by build-docker.sh / the CI workflow. Do not commit generated copies.
+/LICENSE
+/NOTICE

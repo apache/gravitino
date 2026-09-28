@@ -24,7 +24,6 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.trino.spi.HostAddress;
 import io.trino.spi.TrinoException;
@@ -179,13 +178,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     } else {
       // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
       // using the connector configuration.
-      String metalake = config.getMetalake();
-      if (Strings.isNullOrEmpty(metalake)) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
-      }
       // Built per entry catalog, like the stored procedures: both are scoped to this catalog's
-      // metalake even though the underlying manager is shared.
+      // metalake even though the underlying manager is shared. Without a configured metalake
+      // they cover every metalake the manager loads.
+      String metalake = config.hasMetalake() ? config.getMetalake() : null;
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
       GravitinoSystemTableFactory systemTableFactory =
@@ -224,10 +220,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     trinoVersion = parseTrinoSpiVersion(spiVersion);
 
     // check catalog name with metalake are supported in this trino version
-    if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
+    if (config.catalogNameWithMetalake() && !supportCatalogNameWithMetalake()) {
       LOG.warn(
           "The trino-connector-%s-%s does not fully support catalog name with metalake. "
-              + "The DROP CATALOG operation may not work correctly in multi-metalake mode.",
+              + "The DROP CATALOG operation may not work correctly when catalog names carry the metalake.",
           getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
     }
 

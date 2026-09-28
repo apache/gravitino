@@ -11,7 +11,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The table maintenance service keeps tables healthy without anyone watching them. You attach a policy to a catalog, schema, or table; the service collects statistics, evaluates them against that policy, and submits a job when the policy says work is needed.
+The table maintenance service keeps tables healthy without anyone watching them. Associate a policy with a tag and assign that tag to a table or one of its ancestors. The service collects statistics, evaluates them against the table's derived policy, and submits a job when the policy says work is needed.
 
 The framework is generic. Metrics collection, policy evaluation, and job submission are not tied to any particular table format, and each is a Java ServiceLoader extension point. What ships built in is deliberately narrower, and in alpha that means Iceberg data file compaction on identity-partitioned tables.
 
@@ -21,7 +21,7 @@ The CLI binary, its configuration file, and its configuration keys carry the old
 
 Confirm your environment matches this list before starting an evaluation against the built-ins. Anything outside it needs a custom extension, which is covered in the [Extension Guide](./optimizer-extension-guide.md).
 
-- Compaction is the only built-in strategy. There is no built-in snapshot expiration, orphan file cleanup, or sort and cluster maintenance.
+- Compaction is the only built-in strategy. Snapshot expiration and orphan file cleanup are available as directly submitted built-in jobs, but do not yet have built-in scheduling strategies. Sort and cluster maintenance also require custom strategies.
 - Compaction applies to Iceberg tables only, and only where every partition uses an identity transform.
 - The service is driven through the CLI workflow rather than running on a schedule of its own.
 
@@ -41,7 +41,7 @@ Maintenance runs as four steps. Each is a separate command, so you can stop afte
 
 There are two ways in, and they differ in where the numbers come from rather than in what they do.
 
-The built-in workflow drives everything through the Gravitino server and its job templates, using the policy attached to a table to decide what runs. Use it for server-side operational runs.
+The built-in workflow drives everything through the Gravitino server and its job templates, using the policy derived from a table's effective tags to decide what runs. Use it for server-side operational runs.
 
 The local calculator reads a JSONL file you supply and updates statistics and metrics directly from it. Use it for testing and batch scripts, where you already have the numbers and want to feed them in without the server computing them.
 
@@ -57,9 +57,22 @@ Three identifiers look interchangeable and are not.
 
 `--strategy-name` takes the **policy name**, despite what it is called. Passing either of the other two reports no matching identifiers rather than naming the mistake.
 
+## Direct Orphan File Cleanup
+
+Submit `builtin-iceberg-remove-orphan-files` through the jobs REST API to reclaim
+unreferenced files. Start with `dry_run: "true"` and review the candidate paths
+in the job logs before allowing deletion. The default cutoff is three days ago;
+explicit cutoffs must be at least 24 hours old, including for dry runs. A custom
+scan location must remain within the target table's storage location.
+
+This is a directly submitted job, not a new scheduling strategy. See
+[Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for the
+submission example and [Configuration](./optimizer-configuration.md#orphan-file-cleanup-job-configuration)
+for the per-job options.
+
 ## Walkthrough
 
-This takes one Iceberg table through the whole workflow: create it, fill it with small files, attach a compaction policy, collect statistics, and let the service decide to compact it. It runs against a local Spark and takes about fifteen minutes.
+This takes one Iceberg table through the whole workflow: create it, fill it with small files, apply a compaction policy through a tag, collect statistics, and let the service decide to compact it. It runs against a local Spark and takes about fifteen minutes.
 
 Each step ends with a check. If a check fails, stop there, since every step depends on the one before it.
 
@@ -67,6 +80,17 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 
 - A running Gravitino server with a metalake. The examples use `test`.
 - Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- An Iceberg Spark runtime on that Spark classpath. Built-in Iceberg templates configure
+  `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
+  Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
+  stay under your control. A stock Spark distribution is not enough. Put a matching
+  `iceberg-spark-runtime-*` JAR on the job classpath — for example with `spark.jars` in
+  `spark_conf`, or by installing it into your Spark environment. Pick the artifact that matches
+  your Spark, Scala, and Iceberg versions. The jobs module is built and tested against Spark 3.5.x
+  and Iceberg 1.11.0 (for example
+  `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after
+  Spark starts with an error naming the missing Iceberg classes. See
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.
@@ -138,9 +162,10 @@ ${SPARK_HOME}/bin/spark-sql \
 
 Without `spark.hadoop.fs.defaultFS=file:///`, Spark reaches for `hdfs://localhost:9000` and fails.
 
-### Step 4: Attach a Compaction Policy
+### Step 4: Configure a Compaction Policy Through a Tag
 
-Creating the policy is not enough. It has to be attached to the table, and the attachment is what the service reads.
+Creating the policy is not enough. Associate it with a tag, then assign that tag to the table. The
+service resolves the table's effective policies from its effective tags.
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -156,11 +181,25 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -d '{"policiesToAdd": ["iceberg_compaction_default"]}' \
-  http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies
+  -d '{
+    "name": "iceberg_compaction",
+    "comment": "Tables eligible for automatic compaction",
+    "properties": {}
+  }' \
+  http://localhost:8090/api/metalakes/test/tags
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"selector": {"type": "ALL_VALUES"}}' \
+  http://localhost:8090/api/metalakes/test/tags/iceberg_compaction/policies/iceberg_compaction_default
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"tagsToAdd": ["iceberg_compaction"]}' \
+  http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/tags
 ```
 
-Confirm the attachment before moving on:
+Confirm the derived policy before moving on:
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
@@ -273,6 +312,23 @@ grep -E "Rewritten data files|Added data files|completed successfully" "${log_di
 `Rewritten data files: N` with `N` greater than zero means the workflow worked end to end. The staging path comes from `gravitino.job.stagingDir`, which defaults to `/tmp/gravitino/jobs/staging`.
 
 REST job status is polled rather than pushed, so it lags the real Spark process by up to one poll interval. That is why the prerequisites lower it to ten seconds.
+
+## Rewriting Iceberg Manifests
+
+`builtin-iceberg-rewrite-manifests` consolidates manifest metadata for one existing partition
+spec to improve scan planning. It leaves data files and other specs' manifests unchanged.
+Submit it directly with `POST /api/metalakes/{metalake}/jobs/runs`, setting
+`jobTemplateName` to `builtin-iceberg-rewrite-manifests` and providing `catalog_name`,
+`table_identifier`, and the Spark/catalog settings in `jobConf`.
+
+Omit `spec_id` to maintain the current partition spec, or supply an existing spec ID to
+maintain that spec. Optional `use_caching` controls Spark caching during the rewrite.
+See [Rewrite Manifests](./optimizer-cli-reference.md#rewrite-manifests) for the complete
+submission example and result checks, and [configuration](./optimizer-configuration.md#rewrite-manifests-job)
+for the job keys. Results appear in the job's `output.log`.
+
+Policy-driven manifest maintenance through Policy -> Strategy -> Adapter is a follow-up;
+`submit-strategy-jobs` does not yet select this job automatically.
 
 ## Related
 

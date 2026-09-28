@@ -90,7 +90,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "MySQL does not support distribution");
+        Distributions.isNone(distribution), "MySQL does not support distribution");
 
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();

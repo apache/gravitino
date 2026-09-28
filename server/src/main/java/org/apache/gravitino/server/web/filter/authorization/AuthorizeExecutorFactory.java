@@ -43,8 +43,6 @@ public class AuthorizeExecutorFactory {
           expression, metadataContext, pathParams, entityType);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
-      case ASSOCIATE_POLICY -> new AssociatePolicyAuthorizationExecutor(
-          expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
       case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);
@@ -60,6 +58,15 @@ public class AuthorizeExecutorFactory {
           allowCheckExistenceExpression);
       case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case TEST_CATALOG_CONNECTION -> new CatalogConnectionTestAuthorizationExecutor(
+          parameters,
+          args,
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
     };
   }
 }

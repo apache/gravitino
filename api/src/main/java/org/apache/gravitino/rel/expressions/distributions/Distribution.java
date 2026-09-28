@@ -18,11 +18,20 @@
  */
 package org.apache.gravitino.rel.expressions.distributions;
 
-import java.util.Arrays;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 
-/** An interface that defines how data is distributed across partitions. */
+/**
+ * An interface that defines how data is distributed across partitions.
+ *
+ * <p>This interface intentionally does not define a {@code boolean equals(Distribution)} overload.
+ * Such an overload would not override {@link Object#equals(Object)}, so it would be invisible to
+ * {@code HashSet}/{@code HashMap} and to any code comparing through {@code Object} references,
+ * which would make structural equality silently dispatch-dependent. Implementations must override
+ * {@link Object#equals(Object)} and {@link Object#hashCode()} themselves (both {@code
+ * DistributionImpl} and {@code DistributionDTO} do). Use {@link Distributions#isNone(Distribution)}
+ * to test for the NONE distribution across representations.
+ */
 @Evolving
 public interface Distribution extends Expression {
 
@@ -45,21 +54,5 @@ public interface Distribution extends Expression {
   @Override
   default Expression[] children() {
     return expressions();
-  }
-
-  /**
-   * Indicates whether some other object is "equal to" this one.
-   *
-   * @param distribution The reference distribution object with which to compare.
-   * @return returns true if this object is the same as the obj argument; false otherwise.
-   */
-  default boolean equals(Distribution distribution) {
-    if (distribution == null) {
-      return false;
-    }
-
-    return strategy().equals(distribution.strategy())
-        && number() == distribution.number()
-        && Arrays.equals(expressions(), distribution.expressions());
   }
 }

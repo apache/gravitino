@@ -575,4 +575,21 @@ public class TestSecurableObjects {
     Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.COLUMN));
   }
+
+  @Test
+  public void testHashCodeConsistentWithUnorderedPrivileges() {
+    SecurableObject one =
+        SecurableObjects.ofCatalog(
+            "catalog",
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.allow()));
+    SecurableObject another =
+        SecurableObjects.ofCatalog(
+            "catalog",
+            Lists.newArrayList(Privileges.CreateSchema.allow(), Privileges.UseCatalog.allow()));
+
+    // equals compares privileges as an unordered collection, so hashCode must agree
+    // regardless of the order the privileges were supplied in.
+    Assertions.assertEquals(one, another);
+    Assertions.assertEquals(one.hashCode(), another.hashCode());
+  }
 }

@@ -1,189 +1,116 @@
 ---
 title: "Policies"
 slug: "/policies"
-keyword: "policy, policies, governance, metadata object, Gravitino"
+keyword: "policy, policies, governance, tags, Gravitino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-A policy is a named set of rules that you create once in a metalake and attach to metadata objects.
-Attaching a policy to a catalog or schema applies it to everything beneath, so a setting that varies
-by table can be expressed once at the level where it holds and overridden where it does not.
+A policy is a named set of rules in a metalake. Associate it with a tag, then assign that tag to
+metadata objects. When a client reads an object's policies, Gravitino finds its effective tags and
+returns the enabled policies whose association selectors match. The policy remains a separate
+object: changing its rules updates every object where it applies.
 
-Tags and policies are close cousins, and the difference is what they carry. A tag classifies, and
-its content is its name. A policy prescribes, and its content is a set of rules something acts on.
-
-Policies come in two kinds. A built-in policy has a type that Gravitino defines and a consumer that
-acts on it. A custom policy carries rules of your own, which Gravitino stores, inherits, and serves
-back to whatever system you build around it.
-
-Common uses:
-
-- Setting table maintenance behavior for a whole catalog rather than table by table, and letting new
-  tables pick it up without further work
-- Recording a rule once against metadata that lives in several catalogs, so every engine reaching
-  those objects through Gravitino sees the same rule
-- Feeding an external enforcement or scheduling system that reads policies from Gravitino rather
-  than keeping its own copy of what applies where
+Policies come in two kinds. Built-in policy types have rules and consumers defined by Gravitino.
+Custom policies carry rules that your own system interprets. For example, the table maintenance
+service consumes the built-in Iceberg compaction policy.
 
 ## Quick Start
 
-**1. Create the policy.** Policies are created from the policy list in the UI, which creates custom
-policies. A policy needs a name, the object types it supports, and its rules. Built-in policies are
-created over REST.
+1. [Create a policy](./manage-policies-in-gravitino.md#create-a-policy) and
+   [create a tag](./manage-tags-in-gravitino.md#create-a-tag) in the same metalake.
+2. [Associate the policy with the tag](./manage-policies-in-gravitino.md#associate-a-policy-with-a-tag).
+   Choose `ALL_VALUES` to match tag presence or `TAG_VALUE` to match when an assignment contains
+   one specified value.
+3. [Assign the tag](./manage-tags-in-gravitino.md#object-operations) to an object or its ancestor.
+4. [List the object's policies](./manage-policies-in-gravitino.md#list-policies-on-an-object) to
+   confirm the result.
 
-**2. Attach it to an object.** Open the catalog, schema, table, fileset, topic, model, view, or function you want to
-govern and add the policy from its policy control. Only policies that already exist in the metalake
-are offered.
-
-**3. See where the policy is attached.** Selecting a policy name in the policy list shows the
-objects it is attached to directly.
+For example, associate `retention_30d` with `data_domain` using
+`TAG_VALUE("finance")`. A table with an effective `data_domain=finance` assignment receives the
+policy. A table with only `data_domain=risk` does not.
 
 ## The Policy Model
 
-### Policy Types
+### Policy Types and Content
 
-| Type                        | Rules                                | Consumed by               |
+| Type                        | Rules                                | Consumer                  |
 |-----------------------------|--------------------------------------|---------------------------|
 | `system_iceberg_compaction` | Compaction thresholds and scheduling | Table maintenance service |
-| `custom`                    | A free-form map you define           | A system you provide      |
+| `custom`                    | A free-form map that you define      | A system that you provide |
 
-A built-in type has a name beginning with `system_` and a content shape Gravitino defines. The
-compaction policy is documented in [Iceberg compaction policy](./iceberg-compaction-policy.md), and
-the service that acts on it in
-[Table maintenance service](./table-maintenance-service/optimizer.md).
+A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
+it does not interpret their names or values. Built-in types have a defined content shape. See
+[Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules and
+[Table maintenance service](./table-maintenance-service/optimizer.md) for a worked example.
 
-A custom policy has type `custom`, and Gravitino makes no attempt to interpret what is inside
-`customRules`. The rules are stored, inherited down the hierarchy, and returned to any client that
-asks.
+Policy content also has `properties` and `supportedObjectTypes`. Properties describe the policy
+itself, such as its owner or consumer. `supportedObjectTypes` is required when creating a custom
+policy. A custom policy content update replaces the whole content and can change this field; for a
+built-in policy, the field cannot be changed after creation. Object policy lookup does not filter
+by this field; each consumer decides whether a policy type applies to the object it is processing.
 
-The UI creates custom policies only. A built-in policy is created over REST with its own content
-shape.
+### Policy-to-Tag Associations
 
-### What Can Carry a Policy
+Each association connects one policy to one tag and stores a selector. The selector determines
+whether that association contributes the policy to an object's lookup result.
 
-A metadata object is identified by a type and a name, with each level below the catalog separated by
-a dot. Eight object types can carry a policy.
+| Selector     | When it matches                                                          |
+|--------------|--------------------------------------------------------------------------|
+| `ALL_VALUES` | The effective tag is present, including an assignment without a value.   |
+| `TAG_VALUE`  | One of the effective tag assignment values equals the specified value.   |
 
-| Object type | Name form                                     |
-|-------------|-----------------------------------------------|
-| `CATALOG`   | `{catalog_name}`                              |
-| `SCHEMA`    | `{catalog_name}.{schema_name}`                |
-| `TABLE`     | `{catalog_name}.{schema_name}.{table_name}`   |
-| `FILESET`   | `{catalog_name}.{schema_name}.{fileset_name}` |
-| `TOPIC`     | `{catalog_name}.{schema_name}.{topic_name}`   |
-| `MODEL`     | `{catalog_name}.{schema_name}.{model_name}`   |
-| `VIEW`      | `{catalog_name}.{schema_name}.{view_name}`    |
-| `FUNCTION`  | `{catalog_name}.{schema_name}.{function_name}`|
+A policy may be associated with multiple tags. Association listings show those direct relations
+and their selectors, even if no object currently matches them. An object policy lookup returns each
+matching policy once.
 
-Columns cannot carry a policy, which is narrower than
-[tags](./tags.md). A metalake cannot carry one either, so to reach every object
-in a catalog, attach the policy to the catalog.
+A selector cannot be changed in place. Remove the policy-to-tag association and add it again with
+the new selector. Removing an association leaves the policy, tag, and tag assignments intact.
+Deleting a policy removes its associations.
 
-Each policy also declares its own `supportedObjectTypes`, which narrows the list further for that
-policy.
+Object policy lookup covers `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`,
+`MODEL`, `MODEL_VERSION`, and `FUNCTION`. A model version cannot carry a tag directly, but it can
+inherit tags from its model and higher ancestors, so their policies appear in model version lookups.
+This also includes columns, which did not support direct policy associations.
+A tag assigned to a catalog or schema can therefore make its policies appear in descendant column
+lookups. Because lookup does not filter by `supportedObjectTypes`, a policy whose content lists
+only `TABLE` can still appear in a column lookup; consumers must enforce the intended scope.
 
-### Content
+### Effective Tags and Inheritance
 
-Policy content has three parts: the `supportedObjectTypes` list, the rules, and properties.
+An object receives tags assigned directly to it and tags inherited from its metadata object
+ancestors. Resolution starts at the object and walks upward, so the nearest assignment of a tag
+name wins, including its assignment values. A direct assignment therefore overrides every
+ancestor, and a schema assignment overrides the same tag assigned on its catalog for the schema's
+descendants. Tag names themselves are flat; tags do not inherit from other tags.
 
-`supportedObjectTypes` is fixed when the policy is created and cannot be changed afterward, so a
-policy meant for tables only stays that way for its lifetime.
+For example, a catalog with `data_domain=finance` gives its tables that effective assignment.
+A table assigned `data_domain=risk` instead uses `risk`, so a policy associated with
+`TAG_VALUE("finance")` no longer matches the table. `ALL_VALUES` still matches because the
+tag is present.
 
-The rules are what a consumer evaluates. For a custom policy they live under `customRules` as a map
-you define, where the name is yours and the value is any JSON value.
+Object policy lookup is read-only. To change its result, update the policy or its enabled state,
+change a policy-to-tag association, or change a tag assignment on the object or an ancestor.
+With `details=true`, the lookup includes an `inherited` field. It is `true` when the policy
+matches only through an inherited tag.
 
-```json
-"customRules": {
-  "retentionDays": 30,
-  "maxTableSizeGb": 500,
-  "requiresApproval": true
-}
-```
+### Enabled State
 
-Gravitino does not interpret those names or values. Whatever consumes the policy decides what
-`retentionDays` means and what to do about it.
+Disabling a policy preserves the policy and its tag associations, but excludes it from object
+policy lookup. Policy and association listings still show it. Enabling it makes matching object
+lookups include it again.
 
-A built-in policy has a rule set Gravitino defines, and the service that consumes it documents how
-those rules are applied. The compaction policy carries `minDataFileMse`, `minDeleteFileNumber`,
-`dataFileMseWeight`, `deleteFileNumberWeight`, `max-partition-num`, and a trigger and score
-expression, plus any `job.options.` entries passed through to the job. Those names and their
-meanings are covered in [Iceberg compaction policy](./iceberg-compaction-policy.md).
+## Managing Policies
 
-Properties describe the policy itself rather than the behavior it asks for. Rules change as you
-adjust thresholds, and properties stay stable. The compaction policy uses properties for its
-strategy type and job template name, which tell the table maintenance service what to run, and those
-are set by Gravitino rather than by you. For a custom policy, properties are yours, and suit facts
-such as which team owns the policy, which system consumes it, or which version of a rule set it
-represents. Anything evaluated against an object belongs in rules instead.
+The UI supports policy lifecycle operations such as creating custom policies, editing their
+content, and changing their enabled state. Use the REST API or Java client to manage
+policy-to-tag associations and to read the resulting object policies. The
+[Manage Policies](./manage-policies-in-gravitino.md) guide has requests and examples.
+For existing direct object policy associations, see
+[Migration Guide](./migration-guide.md).
 
-Properties sit on the policy rather than on an attachment, so every object carrying the policy sees
-the same values.
-
-### The Enabled Flag
-
-The `enabled` flag marks a policy as active or inactive for readers. Gravitino does not act on it,
-so disabling a policy does not detach it or change what a consumer receives. Treat it as a signal to
-whoever reads the policy, useful for holding a policy through review without deleting it.
-
-### Inheritance
-
-An object shows the policies attached to it plus the policies attached to each of its ancestors, so
-a policy on a catalog applies to every schema, table, fileset, topic, model, view, and function beneath it. For
-catalogs that support multi-level schemas, the intermediate schemas are ancestors too.
-
-Each policy appears once, whether it reaches the object through one ancestor or several. A policy
-attached directly to the object counts as direct even when an ancestor carries it too.
-
-Direct and inherited attachments are distinguishable. In the UI an inherited policy is marked with a
-lock icon. Over REST, a policy listing requested with `details=true` carries an `inherited` field on
-each policy, which a plain listing of names does not.
-
-A policy that reaches an object only by inheritance cannot be removed there. Detach it from the
-ancestor that carries it, which affects every other object beneath that ancestor as well.
-
-Inheritance is resolved when the object is read rather than stored on the object, so attaching a
-policy to a catalog takes effect immediately for tables created afterward.
-
-## Working With Policies in the UI
-
-### Managing the Policy Set
-
-The policy list holds every policy in the metalake and can be searched. A policy can be renamed, its
-comment and rules edited, and its enabled flag switched from there. Policies created over REST,
-including built-in ones, appear in the list alongside the rest.
-
-Deleting a policy removes it from every object it was attached to, with no warning about how many
-objects that affects and no way to recover the attachments.
-
-### Attaching and Detaching
-
-Policies attach from the object rather than from the policy, so open the object and use the policy
-control there. Inherited policies carry no remove control. Detaching removes the direct attachment
-only, so an object still shows a policy it inherits from an ancestor.
-
-### Finding Where a Policy Is Used
-
-Selecting a policy name opens a view listing the objects the policy is attached to directly.
-Inherited reach is not included, so a policy attached to one catalog lists that catalog rather than
-the tables under it.
-
-## Permissions
-
-Policy permissions are held on the policy, and apply in addition to permissions on the objects being
-governed.
-
-| Privilege       | Grantable on                 | What it allows                                 |
-|-----------------|------------------------------|------------------------------------------------|
-| `CREATE_POLICY` | Metalake                     | Creating policies in the metalake              |
-| `APPLY_POLICY`  | Metalake, or a single policy | Reading a policy and attaching or detaching it |
-
-Altering and deleting a policy are reserved for the metalake owner and the policy owner. Attaching a
-policy also requires access to the object being governed. Policy listings show only the policies
-that user is allowed to read.
-
-## Using the API
-
-Policies can be created, attached, and read over REST and through the Java client. Endpoints, payload
-shapes, and worked examples are in [Manage Policies](./manage-policies-in-gravitino.md).
+To add or remove an association, a user must own the metalake or have the required access to both
+the tag and the policy (`APPLY_TAG` and `APPLY_POLICY`, or ownership of each). Object policy
+reads also respect the caller's access to the returned policies. `VIEW_TAG` and `VIEW_POLICY`
+grant read-only access to tags and policies; `APPLY_TAG` and `APPLY_POLICY` also allow reads.

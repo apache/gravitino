@@ -142,6 +142,22 @@ public class TestJobTemplate {
   }
 
   @Test
+  public void testReplacePlaceholdersWithSpecialCharacters() {
+    // Replacement values containing '$' and '\' must be treated as literal text,
+    // not as Matcher replacement syntax (group references and escapes).
+    String template = "config={{conf}}";
+
+    Map<String, String> replacements = ImmutableMap.of("conf", "path=C:\\tmp and cost=$5");
+    String result = JobManager.replacePlaceholder(template, replacements);
+    Assertions.assertEquals("config=path=C:\\tmp and cost=$5", result);
+
+    // A '$' followed by a digit must not substitute the placeholder's own group
+    replacements = ImmutableMap.of("conf", "p$1x");
+    result = JobManager.replacePlaceholder(template, replacements);
+    Assertions.assertEquals("config=p$1x", result);
+  }
+
+  @Test
   public void testFetchFilesFromUir() throws IOException {
     File testFile1 = Files.createTempFile(tempDir.toPath(), "testFile1", ".txt").toFile();
     String result =

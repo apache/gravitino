@@ -26,15 +26,30 @@ import org.apache.gravitino.job.SparkJobTemplate;
 
 public abstract class LocalProcessBuilder {
 
+  /** The name of the file that captures the job process's standard output. */
+  public static final String STDOUT_FILE_NAME = "output.log";
+
+  /** The name of the file that captures the job process's standard error. */
+  public static final String STDERR_FILE_NAME = "error.log";
+
   protected final JobTemplate jobTemplate;
 
   protected final File workingDirectory;
 
   protected LocalProcessBuilder(JobTemplate jobTemplate, Map<String, String> configs) {
     this.jobTemplate = jobTemplate;
-    // Executable should be in the working directory, so we can figure out the working directory
-    // from the executable path.
-    this.workingDirectory = new File(jobTemplate.executable()).getAbsoluteFile().getParentFile();
+    this.workingDirectory = resolveWorkingDirectory(jobTemplate);
+  }
+
+  /**
+   * Resolves the working directory for a job template. The executable is expected to be in the
+   * working directory, so the working directory can be derived from the executable's path.
+   *
+   * @param jobTemplate the job template to resolve the working directory for
+   * @return the working directory for the job template
+   */
+  public static File resolveWorkingDirectory(JobTemplate jobTemplate) {
+    return new File(jobTemplate.executable()).getAbsoluteFile().getParentFile();
   }
 
   public abstract Process start();
