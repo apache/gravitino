@@ -37,6 +37,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -300,6 +301,26 @@ public class TestIcebergTableOperationExecutor {
                     oversizedCommentRequest));
     Assertions.assertEquals(
         "The comment of the column must not exceed 4096 characters", commentException.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRejectsOversizedTableNameBeforeStagedCreateCommit() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+            Collections.emptyList());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                executor.updateTable(
+                    mockContext, TableIdentifier.of("test_namespace", oversizedName), request));
+
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", exception.getMessage());
     verifyNoInteractions(mockCatalogWrapper);
   }
 

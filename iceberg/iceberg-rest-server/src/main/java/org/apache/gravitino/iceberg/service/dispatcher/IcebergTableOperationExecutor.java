@@ -39,6 +39,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -118,6 +119,10 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
+    if (updateTableRequest.requirements().stream()
+        .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance)) {
+      TableEntity.NAME.validate(tableIdentifier.name(), Entity.EntityType.TABLE);
+    }
     IcebergColumnFieldValidator.validateUpdate(updateTableRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
