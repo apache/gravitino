@@ -129,7 +129,10 @@ fun registerCoreTestTask(
 
   inputs.property("coreTestSuite", backend ?: "unit")
   inputs.property("coreTestBackend", backend ?: "none")
-  inputs.property("includeDockerTaggedTests", backend != null)
+  // Distinct from the extensions.extraProperties["includeDockerTaggedTests"] flag set below,
+  // which is a different mechanism (read by root build.gradle.kts's shared test-environment
+  // setup to decide JUnit tag filtering) - this is only a Gradle up-to-date-check input.
+  inputs.property("coreTestIncludesDockerTaggedTests", backend != null)
   reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/$taskName"))
   reports.html.outputLocation.set(
     rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")

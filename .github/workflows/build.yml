@@ -159,7 +159,7 @@ jobs:
         java-version: [ 17 ]
         # Shards are defined in dev/ci/test-shards.sh.
         shard: ${{ fromJSON(needs.changes.outputs.build_shards) }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     steps:

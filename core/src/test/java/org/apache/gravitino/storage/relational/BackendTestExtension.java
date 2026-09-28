@@ -145,7 +145,10 @@ public class BackendTestExtension
 
     @Override
     public String getDisplayName(int invocationIndex) {
-      return String.format("%s()[%s Backend]", testMethodName, backendType.toUpperCase());
+      // No trailing "()" here: @TestTemplate methods can declare parameters (e.g. an injected
+      // DatabaseTestContext), and a hardcoded empty parameter list would misrepresent the
+      // method's actual signature in JUnit XML/HTML reports.
+      return String.format("%s[%s Backend]", testMethodName, backendType.toUpperCase());
     }
 
     @Override
