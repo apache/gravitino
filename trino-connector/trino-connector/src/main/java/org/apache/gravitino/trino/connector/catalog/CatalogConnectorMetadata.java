@@ -87,7 +87,7 @@ public class CatalogConnectorMetadata {
    */
   public CatalogConnectorMetadata(
       GravitinoMetalake metalake, NameIdentifier catalogIdentifier, GravitinoConfig config) {
-    this.singleMetalakeMode = config.singleMetalakeMode();
+    this.singleMetalakeMode = !config.catalogNameWithMetalake();
     try {
       this.catalogName = catalogIdentifier.name();
       Catalog catalog = metalake.loadCatalog(catalogName);
