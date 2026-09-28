@@ -1342,7 +1342,9 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-481:copyLibs")
+    // Frontend integration tests use the default Trino version from docker-compose, whose connector
+    // directory defaults to the matching segment module. Keep this target in sync with that default.
+    dependsOn("trino-connector:trino-connector-473-479:copyLibs")
     group = "gravitino distribution"
   }
 
@@ -1356,6 +1358,7 @@ tasks {
       ":trino-connector:trino-connector-473-479:assembleTrinoConnector",
       ":trino-connector:trino-connector-480:assembleTrinoConnector",
       ":trino-connector:trino-connector-481:assembleTrinoConnector",
+      ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )
