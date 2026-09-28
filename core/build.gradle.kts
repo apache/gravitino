@@ -106,10 +106,10 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-val coreDatabaseTestTag = "gravitino-core-database-test"
-// Backend name -> JUnit tag that pins a database test class to that backend. A database test
-// class with none of these tags runs under every backend lane. Adding a backend here is enough
-// to teach the lane filtering below about it.
+// Backend name -> JUnit tag that admits a test class to that backend's lane. A class runs under
+// exactly the backends it is tagged with: the @AllBackendsTest composed annotation in the core
+// test sources expands to all three tags, and a class with none of them is a unit test. Adding
+// a backend here is enough to teach the lane filtering below about it.
 val coreBackendTestTags =
   linkedMapOf(
     "h2" to "gravitino-core-h2-test",
@@ -150,18 +150,16 @@ fun registerCoreTestTask(
 
   useJUnitPlatform {
     if (backend == null) {
-      excludeTags(coreDatabaseTestTag, "gravitino-docker-test")
+      // Whatever carries no backend tag (and no Docker tag) is the unit suite.
+      excludeTags(*coreBackendTestTags.values.toTypedArray(), "gravitino-docker-test")
     } else {
       val ownBackendTag =
         coreBackendTestTags[backend]
           ?: throw GradleException("Unsupported core test backend: $backend")
-      val otherBackendTags = coreBackendTestTags.values.filter { it != ownBackendTag }
-      includeTags(coreDatabaseTestTag)
-      // JUnit tag expression, still applied at discovery time like a plain tag list, so
-      // excluded classes never show up in this lane's JUnit XML. Exclude a class only when
-      // it is pinned to another backend and NOT to this one: a class tagged for several
-      // backends then runs under each of them instead of being dropped from all lanes.
-      excludeTags("!$ownBackendTag & (${otherBackendTags.joinToString(" | ")})")
+      // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
+      // backend never show up in this lane's JUnit XML. A class tagged for several backends
+      // runs under each of them.
+      includeTags(ownBackendTag)
     }
   }
 

@@ -81,11 +81,10 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-@Tag("gravitino-core-database-test")
+@AllBackendsTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith({
   BackendTestExtension.class,
