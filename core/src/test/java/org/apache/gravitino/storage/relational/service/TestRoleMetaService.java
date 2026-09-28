@@ -92,10 +92,107 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 class TestRoleMetaService extends TestJDBCBackend {
 
   private static final String METALAKE_NAME = "metalake_for_role_test";
+
+  /** Verifies privilege replacement locks its endpoint before deleting the old relation. */
+  @TestTemplate
+  public void testPrivilegeUpdateDoesNotDeadlockWithTargetDelete() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "role_update_delete_catalog");
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role_update_delete",
+            AUDIT_INFO,
+            catalog.name());
+    RoleMetaService service = RoleMetaService.getInstance();
+    service.insertRole(role, false);
+    RolePO beforeUpdate = getRolePO(role.name());
+    CountDownLatch targetDeleted = new CountDownLatch(1);
+    CountDownLatch endpointLockRequested = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Boolean> deletion =
+          executor.submit(
+              () -> {
+                // Pause the real delete after its catalog CAS, before relation cleanup. Static
+                // mocks are thread-local; every intercepted operation still executes its SQL.
+                try (MockedStatic<OccWriteSupport> ignored =
+                    Mockito.mockStatic(
+                        OccWriteSupport.class,
+                        invocation -> {
+                          Object result = invocation.callRealMethod();
+                          if (invocation.getMethod().getName().equals("deleteWithVersion")) {
+                            targetDeleted.countDown();
+                            assertTrue(endpointLockRequested.await(30, TimeUnit.SECONDS));
+                          }
+                          return result;
+                        })) {
+                  return CatalogMetaService.getInstance()
+                      .deleteCatalog(catalog.nameIdentifier(), false);
+                }
+              });
+      assertTrue(targetDeleted.await(30, TimeUnit.SECONDS));
+      Future<Throwable> update =
+          executor.submit(
+              () -> {
+                try (MockedStatic<LiveEndpointService> ignored =
+                    Mockito.mockStatic(
+                        LiveEndpointService.class,
+                        invocation -> {
+                          if (invocation.getMethod().getName().equals("lockLiveEndpoint")
+                              && invocation.getArgument(1) == Entity.EntityType.CATALOG) {
+                            // The old implementation has already locked the old relation here.
+                            // Cleanup then waits for that relation while the fence waits for the
+                            // catalog. The fixed implementation has not touched the relation yet.
+                            endpointLockRequested.countDown();
+                          }
+                          return invocation.callRealMethod();
+                        })) {
+                  service.updateRole(
+                      role.nameIdentifier(),
+                      (RoleEntity current) ->
+                          createRoleEntity(
+                              current.id(),
+                              current.namespace(),
+                              current.name(),
+                              current.auditInfo(),
+                              List.of(
+                                  SecurableObjects.ofCatalog(
+                                      catalog.name(),
+                                      List.of(
+                                          Privileges.UseCatalog.allow(),
+                                          Privileges.CreateSchema.allow()))),
+                              ImmutableMap.of("update", "must-roll-back")));
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      assertTrue(deletion.get(30, TimeUnit.SECONDS));
+      Throwable failure = update.get(30, TimeUnit.SECONDS);
+      Assertions.assertInstanceOf(NoSuchEntityException.class, failure, String.valueOf(failure));
+    } finally {
+      endpointLockRequested.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+
+    // The failed grant must roll back the role CAS and properties. Deletion must still remove
+    // the old relation, and no replacement relation may survive for the deleted endpoint.
+    assertEquals(beforeUpdate, getRolePO(role.name()));
+    assertTrue(RoleMetaService.listSecurableObjectsByRoleId(role.id()).isEmpty());
+    assertTrue(service.getRoleByIdentifier(role.nameIdentifier()).securableObjects().isEmpty());
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> CatalogMetaService.getInstance().getCatalogByIdentifier(catalog.nameIdentifier()));
+  }
 
   /** Verifies role privilege writes share the tag-before-policy order of policy relations. */
   @TestTemplate

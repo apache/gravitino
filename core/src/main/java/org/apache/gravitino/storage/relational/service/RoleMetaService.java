@@ -290,6 +290,10 @@ public class RoleMetaService {
               throw roleWriteFailure(identifier, rolePO);
             }
           },
+          // Target deletion locks the endpoint before cleaning its privilege relations. Fence
+          // every added endpoint before touching old relations to keep the same lock order when
+          // replacing the privileges on an existing endpoint.
+          () -> endpointLocks.forEach(Runnable::run),
           () -> {
             if (deleteSecurableObjectPOs.isEmpty()) {
               return;
@@ -304,7 +308,6 @@ public class RoleMetaService {
               return;
             }
 
-            endpointLocks.forEach(Runnable::run);
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));
