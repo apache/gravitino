@@ -56,6 +56,9 @@ public final class AccessControlContent implements PolicyContent {
    * It holds only privileges that act on the tagged object itself. Privileges that hand out access,
    * create entities, change what other principals execute, or open a path to untagged objects are
    * excluded.
+   *
+   * <p>The {@code AccessControlContent} schema in {@code docs/open-api/policies.yaml} mirrors this
+   * list as an enum; change both together.
    */
   public static final Set<Privilege.Name> PERMITTED_PRIVILEGES =
       ImmutableSet.of(
