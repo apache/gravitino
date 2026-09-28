@@ -21,9 +21,7 @@
 Gradle writes one JUnit XML directory per Test task.  This tool turns those
 reports into stable, backend-neutral identity multisets so the H2, MySQL, and
 PostgreSQL lanes can prove that they exercised the same test contract.  It also
-records status counts and elapsed test time for CI artifacts.  A separate
-legacy comparison proves that the four split lanes preserve the exact test
-multiset previously exercised by ``:core:test``.
+records status counts and elapsed test time for CI artifacts.
 """
 
 import argparse
@@ -41,7 +39,7 @@ import xml.etree.ElementTree as ET
 SCHEMA_VERSION = 1
 LANES = ("unit", "h2", "mysql", "postgresql")
 DATABASE_LANES = LANES[1:]
-MANIFEST_LANES = LANES + ("legacy",)
+MANIFEST_LANES = LANES
 STATUS_KEYS = ("passed", "skipped", "failures", "errors")
 
 BACKEND_NAME_PATTERN = r"h2|mysql|postgresql"
@@ -400,14 +398,6 @@ def _load_split_manifests(manifest_files):
     return by_lane, counters
 
 
-def _combine_counters(counters):
-    """Combine identity Counters without changing their inputs."""
-    combined = Counter()
-    for counter in counters:
-        combined.update(counter)
-    return combined
-
-
 def _lane_summary(manifest, identities):
     """Return the evidence retained for one successfully loaded lane."""
     return {
@@ -471,49 +461,6 @@ def reconcile_manifests(manifest_files):
     }
 
 
-def compare_legacy_partition(legacy_manifest_file, split_manifest_files):
-    """Prove that legacy core:test equals the exact sum of the split lanes."""
-    legacy_lane, legacy_manifest, legacy_identities = _load_manifest(
-        legacy_manifest_file
-    )
-    if legacy_lane != "legacy":
-        raise ManifestError(
-            f"Expected a legacy manifest, got lane {legacy_lane} from {legacy_manifest_file}"
-        )
-
-    reconciliation = reconcile_manifests(split_manifest_files)
-    split_manifests, split_counters = _load_split_manifests(split_manifest_files)
-    split_identities = _combine_counters(split_counters[lane] for lane in LANES)
-    if legacy_identities != split_identities:
-        difference = _format_identity_difference(legacy_identities, split_identities)
-        raise ManifestError(f"Legacy/split identity mismatch: {difference}")
-
-    split_statuses = {
-        key: sum(split_manifests[lane]["status_counts"][key] for lane in LANES)
-        for key in STATUS_KEYS
-    }
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "successful": True,
-        "partition_equal": True,
-        "legacy": _lane_summary(legacy_manifest, legacy_identities),
-        "split": {
-            "test_count": sum(split_identities.values()),
-            "unique_identity_count": len(split_identities),
-            "duration_seconds": reconciliation["combined_duration_seconds"],
-            "status_counts": split_statuses,
-            "source_file_count": sum(
-                len(split_manifests[lane]["source_files"]) for lane in LANES
-            ),
-            "source_files": {
-                lane: split_manifests[lane]["source_files"] for lane in LANES
-            },
-            "identity_digest": _identity_digest(split_identities),
-        },
-        "lanes": reconciliation["lanes"],
-    }
-
-
 def _create_argument_parser():
     """Create the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -539,27 +486,6 @@ def _create_argument_parser():
     reconcile_parser.add_argument(
         "--output", required=True, type=Path, help="Combined JSON summary to write"
     )
-
-    comparison_parser = subparsers.add_parser(
-        "compare-legacy",
-        help="Compare a legacy core:test manifest with the four split lanes",
-    )
-    comparison_parser.add_argument(
-        "--legacy-manifest",
-        required=True,
-        type=Path,
-        help="Manifest generated from the legacy :core:test results",
-    )
-    comparison_parser.add_argument(
-        "--split-manifests",
-        required=True,
-        nargs="+",
-        type=Path,
-        help="The unit, H2, MySQL, and PostgreSQL manifests",
-    )
-    comparison_parser.add_argument(
-        "--output", required=True, type=Path, help="Partition comparison JSON to write"
-    )
     return parser
 
 
@@ -570,12 +496,8 @@ def main(argv=None):
     try:
         if args.command == "manifest":
             document = build_manifest(args.lane, args.results)
-        elif args.command == "reconcile":
-            document = reconcile_manifests(args.manifests)
         else:
-            document = compare_legacy_partition(
-                args.legacy_manifest, args.split_manifests
-            )
+            document = reconcile_manifests(args.manifests)
         write_json(document, args.output)
     except ManifestError as error:
         print(f"error: {error}", file=sys.stderr)
