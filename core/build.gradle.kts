@@ -245,7 +245,25 @@ tasks.named<JacocoReport>("jacocoTestReport") {
   }
 }
 
+// :core:test is the java plugin's built-in `test` task, kept registered (and working) only for
+// backward compatibility - IDEs and other tooling may still target it by convention. It is
+// deprecated in place, not removed:
+//  - Dev CUJ: a contributor running tests locally should target one of the four lanes registered
+//    above (coreUnitTest / coreH2Test / coreMySQLTest / corePostgreSQLTest), never :core:test -
+//    it predates the lane split and does not correspond to any CI lane. Check where a class runs
+//    with `./gradlew :core:coreTestLaneOf -PclassName=...` instead of guessing.
+//  - CI CUJ: no change needed here. CI never invokes :core:test - dev/ci/test-shards.sh emits
+//    `-x :core:test` for the `others` shard, so the warning below only ever fires for a developer
+//    running it directly.
 tasks.test {
+  doFirst {
+    logger.warn(
+      "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
+        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead - run " +
+        "./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName> to check which " +
+        "one(s) a class belongs to."
+    )
+  }
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
     environment("GRAVITINO_HOME", project.rootDir.path)
