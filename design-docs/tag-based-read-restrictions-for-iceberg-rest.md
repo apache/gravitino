@@ -30,8 +30,9 @@ reader applies a required row filter and required column projections before retu
 provides a standard enforcement boundary for portable restrictions.
 
 This design adds tag-based row-filter and column-mask policies and resolves them into Iceberg REST
-`read-restrictions`. The first implementation is experimental while Iceberg reader support is
-maturing. It is disabled by default and requires an explicit client opt-in.
+`read-restrictions`. The implementation is compiled into the normal Iceberg REST distribution. It
+is disabled by default and requires an explicit client capability declaration while reader support
+is maturing.
 
 ## Goals
 
@@ -41,8 +42,8 @@ maturing. It is disabled by default and requires an explicit client opt-in.
 4. Bind authored expressions to the authenticated subject and an Iceberg table schema.
 5. Return only closed, typed Iceberg expressions and standard Iceberg mask actions.
 6. Fail closed when an applicable restriction cannot be resolved or enforced.
-7. Provide an experimental end-to-end path that can later move to official Iceberg runtime types
-   without changing policy content.
+7. Provide an end-to-end path in the normal Iceberg REST build that can later move to official
+   Iceberg runtime types without changing policy content.
 8. Reserve a fail-closed extension model for UDF references.
 
 ## Non-Goals
@@ -72,8 +73,8 @@ Policy and tag administration
 Authorization runs before restriction resolution. A restriction only reduces data visible through
 an already-authorized read. It never changes an authorization deny into an allow.
 
-The first experimental implementation runs only where the Iceberg REST service has the trusted end
-user in its request context and can resolve Gravitino policies, tags, users, and groups directly.
+The first implementation runs only where the Iceberg REST service has the trusted end user in its
+request context and can resolve Gravitino policies, tags, users, and groups directly.
 
 ## Policy Model
 
@@ -435,10 +436,9 @@ When restrictions resolve successfully, the server adds the standard `read-restr
 the Iceberg load-table response. The response contains at most one required row filter and at most
 one required projection per field ID.
 
-The experimental implementation may use Gravitino-owned DTOs and serializers, but its JSON must
-match the merged Iceberg REST schema exactly. Experimental Java types use the
-`org.apache.gravitino.iceberg.experimental.restrictions` namespace and must not add classes under
-`org.apache.iceberg`.
+The implementation may use Gravitino-owned DTOs and serializers, but its JSON must match the merged
+Iceberg REST schema exactly. Compatibility types live under normal Gravitino Iceberg packages in
+the existing module and must not add classes under `org.apache.iceberg`.
 
 Response reconstruction for credentials, snapshot filtering, federation, and other load-table
 features must preserve read restrictions.
@@ -458,15 +458,16 @@ The existing metadata-location-only conditional-GET fast path must not return `3
 before restriction resolution. A response resolved for one subject must never be reused for another
 subject.
 
-## Experimental Delivery
+## Delivery
 
-The first implementation is delivered by the
-`iceberg:iceberg-read-restrictions-experimental` module and is not a stable public API. It is
-disabled by default.
+The implementation is compiled into the existing `iceberg:iceberg-rest-server` module and normal
+Gravitino distribution. It does not introduce a separate module, artifact, Java package, or
+configuration name with an `experimental` prefix. Gravitino-owned compatibility types remain
+internal implementation details rather than a stable public API.
 
-An operator enables the feature with an experimental configuration, and a client opts in with the
-`read-restrictions` experiment token. Both are required. The client token is capability negotiation,
-not authorization.
+An operator enables the feature with normal server configuration, and a client declares the
+`read-restrictions` capability. Both are required while reader support is maturing. The client
+declaration is capability negotiation, not authorization.
 
 When an active restriction applies:
 
@@ -474,10 +475,11 @@ When an active restriction applies:
 - a missing, unsupported, or malformed restriction is rejected;
 - the server never assumes that an unknown client enforces an unknown response field.
 
-The experimental reader package pins the Iceberg implementation revision used for compatibility
-tests. It is not published as a stable Iceberg replacement. When official Iceberg runtime support is
-available, Gravitino replaces the experimental DTO and reader integration with official types and
-runs the same conformance fixtures against both implementations.
+The compatible reader build pins the Iceberg implementation revision used for compatibility tests
+and uses normal artifact and package names. It is not published as an alternative Iceberg project.
+When official Iceberg runtime support is available, Gravitino replaces its compatibility DTOs and
+reader integration with official types and runs the same conformance fixtures against both
+implementations.
 
 ## Persistence and Administration
 
@@ -487,7 +489,7 @@ Resolved field IDs, identity values, and load-table responses are request-scoped
 as policy content.
 
 Administrators should create a policy disabled, associate it with a tag, preview representative
-subjects and tables, verify that the experimental reader is deployed, and then enable it. Enabling a
+subjects and tables, verify that a compatible reader is deployed, and then enable it. Enabling a
 policy does not make an incompatible reader safe.
 
 Explain output should include selected policies, matching tags, selected conditional branches,
@@ -518,7 +520,7 @@ source
   -> subject and schema binding
   -> canonical Iceberg predicate and actions
   -> loadTable JSON
-  -> experimental reader result or fail-closed error
+  -> compatible reader result or fail-closed error
 ```
 
 Coverage includes:
@@ -540,19 +542,21 @@ Coverage includes:
 - table and column effective-tag selection;
 - renamed, missing, required, and unsupported fields;
 - subject, policy, tag, schema, and metadata cache changes;
-- old-client rejection and experimental capability negotiation; and
+- old-client rejection and capability negotiation; and
 - row filtering before masking in an end-to-end reader test.
 
 ## Implementation Plan
 
 1. Add the restricted Rego parser, conditional lowering, and typed row-filter and column-mask
    content; reject unsupported function content explicitly.
-2. Add an experimental Iceberg read-restriction model and exact wire serializer.
+2. Add a Gravitino-owned Iceberg read-restriction model and exact wire serializer to the existing
+   Iceberg REST server module.
 3. Implement policy-on-tag selection, subject binding, schema binding, canonicalization, and conflict
    detection.
 4. Integrate restriction resolution with load-table responses and restriction-aware ETags.
-5. Build the pinned experimental reader package and end-to-end conformance tests.
-6. Replace experimental protocol and reader classes with official Iceberg types when available.
+5. Build the pinned compatible reader through the normal packaging flow and add end-to-end
+   conformance tests.
+6. Replace compatibility protocol and reader classes with official Iceberg types when available.
 
 ## References
 
