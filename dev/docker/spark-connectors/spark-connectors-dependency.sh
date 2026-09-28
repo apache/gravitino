@@ -177,10 +177,16 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
-# the image ships the real texts (not drifting copies committed in-tree).
-cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
-cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+# The image ships the shaded runtime jars, so /licenses must describe what those
+# jars bundle, not the source tree. Each jar already carries that LICENSE and
+# NOTICE in META-INF, generated from the resolved dependency set, and keeps the
+# per-component licence texts it references alongside them inside the jar.
+license_jar="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort | head -1)"
+[ -n "${license_jar}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
+unzip -p "${license_jar}" META-INF/LICENSE > "${conn_dir}/licenses/LICENSE" \
+  || { echo "ERROR: ${license_jar} has no META-INF/LICENSE" >&2; exit 1; }
+unzip -p "${license_jar}" META-INF/NOTICE > "${conn_dir}/licenses/NOTICE" \
+  || { echo "ERROR: ${license_jar} has no META-INF/NOTICE" >&2; exit 1; }
 
 echo ""
 echo "=== Spark connectors prepared (${copied} combination(s)) ==="

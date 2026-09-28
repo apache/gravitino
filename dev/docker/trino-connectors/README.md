@@ -41,13 +41,13 @@ Build locally from the repository root with the shared image build script:
 ```
 
 The script builds the connector bands (`trino-connectors-dependency.sh`),
-stages the repository-root `LICENSE`/`NOTICE` into `licenses/`, injects
+stages the plugin distribution's `LICENSE`/`NOTICE` into `licenses/`, injects
 `IMAGE_VERSION` from `gradle.properties`, and runs the multi-arch buildx build.
 
 This image contains open source software only. The Apache Gravitino connector
 code is licensed under the Apache License 2.0; each plugin band also bundles
-third-party open source dependency jars under their own licenses. See the
-`LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt` files under `/licenses` in
+third-party open source dependency jars under their own licenses. Every bundled
+component is declared in the `LICENSE` and `NOTICE` files under `/licenses` in
 the image.
 
 ## Server compatibility

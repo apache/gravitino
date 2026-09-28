@@ -89,10 +89,19 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
-# the image ships the real texts (not drifting copies committed in-tree).
-cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
-cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+# The image ships the connector plugin jars, so /licenses must describe what
+# those jars bundle, not the source tree. Each plugin band already carries that
+# LICENSE and NOTICE (built from LICENSE.trino/NOTICE.trino), and keeps the
+# licence texts they reference in its own licenses/ directory.
+license_src="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -type d | sort | head -1)"
+[ -n "${license_src}" ] || { echo "ERROR: no staged connector band to take licenses from" >&2; exit 1; }
+[ -s "${license_src}/LICENSE" ] && [ -s "${license_src}/NOTICE" ] || {
+  echo "ERROR: ${license_src} has no LICENSE or NOTICE" >&2
+  exit 1
+}
+
+cp "${license_src}/LICENSE" "${conn_dir}/licenses/LICENSE"
+cp "${license_src}/NOTICE" "${conn_dir}/licenses/NOTICE"
 
 echo ""
 echo "=== Trino connectors prepared (${copied} version range(s)) ==="

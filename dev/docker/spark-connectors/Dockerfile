@@ -22,7 +22,7 @@
 # Contains the Apache Gravitino Spark connector runtime jars for every
 # supported Spark version and Scala variant present in the source tree. The
 # connector code is Apache-2.0; the shaded runtime jar bundles third-party open
-# source components (see licenses/THIRD_PARTY_LICENSES.txt).
+# source components, declared in licenses/LICENSE and licenses/NOTICE.
 # Used as a Kubernetes init-container to inject connector jars into Spark pods.
 #
 # The set of Spark version / Scala combinations is discovered at build time
@@ -36,7 +36,7 @@
 # Red Hat UBI / certification-oriented properties:
 #   - Based on UBI 10 (registry.access.redhat.com)
 #   - Required LABELs present
-#   - /licenses directory with LICENSE, NOTICE and THIRD_PARTY_LICENSES.txt
+#   - /licenses directory with LICENSE and NOTICE
 #   - Runs as non-root user (UID 1000, GID 0) with a passwd entry
 #   - OpenShift arbitrary UID compatible (GID 0 group permissions)
 # ==============================================================================

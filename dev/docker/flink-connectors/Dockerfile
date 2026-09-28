@@ -23,7 +23,7 @@
 # supported Flink version present in the source tree (Scala 2.12; Flink does
 # not support Scala 2.13). The connector code is Apache-2.0; the shaded runtime
 # jar bundles third-party open source components (see
-# licenses/THIRD_PARTY_LICENSES.txt).
+# licenses/LICENSE and licenses/NOTICE).
 # Used as a Kubernetes init-container to inject connector jars into Flink pods.
 #
 # The set of Flink versions is discovered at build time from the Gravitino
@@ -35,7 +35,7 @@
 # Red Hat UBI / certification-oriented properties:
 #   - Based on UBI 10 (registry.access.redhat.com)
 #   - Required LABELs present
-#   - /licenses directory with LICENSE, NOTICE and THIRD_PARTY_LICENSES.txt
+#   - /licenses directory with LICENSE and NOTICE
 #   - Runs as non-root user (UID 1000, GID 0) with a passwd entry
 #   - OpenShift arbitrary UID compatible (GID 0 group permissions)
 # ==============================================================================
