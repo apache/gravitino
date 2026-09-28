@@ -63,6 +63,7 @@ include(
 // in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("iceberg:iceberg-rest-experimental-server")
 include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
