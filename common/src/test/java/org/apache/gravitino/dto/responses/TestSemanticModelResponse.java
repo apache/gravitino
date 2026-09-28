@@ -86,7 +86,7 @@ public class TestSemanticModelResponse {
         "semanticModel 'name' must not be null or empty",
         assertThrows(IllegalArgumentException.class, missingName::validate).getMessage());
     assertEquals(
-        "definition must not be null",
+        "semanticModel 'definition' must not be null",
         assertThrows(IllegalArgumentException.class, missingDefinition::validate).getMessage());
     assertEquals(
         "semanticModel 'audit' must not be null",
