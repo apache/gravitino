@@ -106,10 +106,22 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Backend name -> JUnit tag that admits a test class to that backend's lane. A class runs under
-// exactly the backends it is tagged with: the @AllBackendsTest composed annotation in the core
-// test sources expands to all three tags, and a class with none of them is a unit test. Adding
-// a backend here is enough to teach the lane filtering below about it.
+// Core's tests run in one of four Gradle lanes: coreUnitTest (default, no Docker) and
+// coreH2Test/coreMySQLTest/corePostgreSQLTest (one per backend, coreMySQLTest and
+// corePostgreSQLTest need Docker). Lane membership is decided purely by which of the three
+// backend tags below a test class carries - see CoreBackend in
+// core/src/test/java/org/apache/gravitino/storage/relational/CoreBackend.java for the typed
+// annotations (@CoreBackend.H2/.MySQL/.PostgreSQL/.All) that set them, instead of writing raw
+// @Tag("...") strings by hand:
+//   @CoreBackend.H2                        -> runs only in coreH2Test
+//   @CoreBackend.H2 @CoreBackend.MySQL     -> runs in coreH2Test and coreMySQLTest
+//   @CoreBackend.All                       -> runs in all three backend lanes
+//   (no CoreBackend annotation at all)     -> a plain unit test, runs in coreUnitTest
+// A class needing Docker but carrying no backend tag runs in no lane at all - check locally
+// with `./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName>`.
+//
+// Backend name -> JUnit tag that admits a test class to that backend's lane. Adding a backend
+// here is enough to teach the lane filtering below about it; also add it to CoreBackend.java.
 val coreBackendTestTags =
   linkedMapOf(
     "h2" to "gravitino-core-h2-test",
@@ -187,6 +199,22 @@ registerCoreTestTask("coreUnitTest")
 registerCoreTestTask("coreH2Test", "h2")
 registerCoreTestTask("coreMySQLTest", "mysql")
 registerCoreTestTask("corePostgreSQLTest", "postgresql")
+
+tasks.register<JavaExec>("coreTestLaneOf") {
+  group = "verification"
+  description = "Prints which core database test lane(s) a class runs in, from its tags, " +
+    "without running anything. Usage: -PclassName=<fully.qualified.ClassName>"
+  dependsOn(tasks.named("testClasses"))
+  classpath = sourceSets["test"].runtimeClasspath
+  mainClass.set("org.apache.gravitino.storage.relational.CoreTestLaneOf")
+  doFirst {
+    val className = project.findProperty("className") as? String
+      ?: throw GradleException(
+        "Usage: ./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName>"
+      )
+    args(className)
+  }
+}
 
 val coreSuiteCoverage =
   providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)

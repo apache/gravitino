@@ -93,8 +93,8 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.storage.relational.AllBackendsTest;
 import org.apache.gravitino.storage.relational.BackendTestSelector;
+import org.apache.gravitino.storage.relational.CoreBackend;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
@@ -110,7 +110,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@AllBackendsTest
+@CoreBackend.All
 abstract class AbstractEntityStorageTest {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractEntityStorageTest.class);
 

@@ -58,6 +58,7 @@ import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.gravitino.storage.relational.CoreBackend;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -586,7 +587,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** MySQL-specific tests using Docker container. */
   @Nested
-  @Tag("gravitino-core-mysql-test")
+  @CoreBackend.MySQL
   @Tag("gravitino-docker-test")
   static class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -657,7 +658,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** PostgreSQL-specific tests using Docker container. */
   @Nested
-  @Tag("gravitino-core-postgresql-test")
+  @CoreBackend.PostgreSQL
   @Tag("gravitino-docker-test")
   static class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -731,7 +732,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** H2-specific tests using embedded in-memory database. */
   @Nested
-  @Tag("gravitino-core-h2-test")
+  @CoreBackend.H2
   static class H2Test extends BaseJdbcPartitionStatisticStorageTest {
 
     private static final String H2_JDBC_URL =
