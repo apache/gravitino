@@ -102,13 +102,35 @@ The server-level `gravitino.fetchFile.blockUnsafeRemoteUri` configuration contro
 
 #### Auxiliary Service
 
-| Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required |
-|------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                      | (none)        | Yes      |
-| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service; includes the directory containing jars and configuration. It supports both absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf` | (none)        | Yes      |
+| Configuration item                              | Description                                                                                                                                                                                                                                           | Default value | Required    |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------|
+| `gravitino.auxService.names`                    | The auxiliary services to start. Select either `iceberg-rest` or `iceberg-rest-experimental`, but not both.                                                                                                                                           | (none)        | Yes         |
+| `gravitino.iceberg-rest.classpath`              | The stable Iceberg REST service classpath. It supports absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf`.                                                                                                | (none)        | Conditional |
+| `gravitino.iceberg-rest-experimental.classpath` | The experimental Iceberg REST service classpath. It supports absolute and relative paths, for example, `iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf`.                                                                | (none)        | Conditional |
 
 These settings apply only to `gravitino.conf`.
 Do not add them to the standalone server configuration.
+
+The experimental service inherits the regular `gravitino.iceberg-rest.*` settings. A setting under
+`gravitino.iceberg-rest-experimental.*` overrides the corresponding regular setting. Usually only
+the auxiliary service name and classpath need to change:
+
+```properties
+gravitino.auxService.names = iceberg-rest-experimental
+gravitino.iceberg-rest-experimental.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
+```
+
+The stable and experimental services use separate isolated classloaders and library directories.
+Build the experimental directory against an Iceberg snapshot published to a configured Maven
+repository by setting the `icebergExperimentalVersion` Gradle property:
+
+```shell
+./gradlew compileDistribution -PicebergExperimentalVersion=<snapshot-version>
+```
+
+If the property is omitted, the experimental module falls back to the repository's regular Iceberg
+version so that normal development and CI builds remain reproducible before the snapshot is
+available.
 
 #### HTTP Server
 
