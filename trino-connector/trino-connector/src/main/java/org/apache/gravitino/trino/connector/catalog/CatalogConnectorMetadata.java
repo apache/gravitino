@@ -647,6 +647,18 @@ public class CatalogConnectorMetadata {
                 view.getDefaultSchema(),
                 view.getComment()));
         changes.addAll(computePropertyChanges(existingView.properties(), view.getProperties()));
+        if (existingView
+                .properties()
+                .containsKey(CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY)
+            && !view.getProperties()
+                .containsKey(CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY)) {
+          // computePropertyChanges never removes properties (see its Javadoc), but a replace that
+          // switches the view from SECURITY DEFINER back to SECURITY INVOKER must still clear the
+          // stale owner, or it would incorrectly keep reporting SECURITY DEFINER on reload.
+          changes.add(
+              ViewChange.removeProperty(
+                  CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY));
+        }
         viewCatalog.alterView(identifier, changes.toArray(new ViewChange[0]));
       } else {
         viewCatalog.createView(

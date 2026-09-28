@@ -23,6 +23,8 @@ import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorPageSourceProviderFactory;
 import io.trino.spi.connector.ConnectorSplitManager;
+import io.trino.spi.session.PropertyMetadata;
+import java.util.List;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
@@ -63,5 +65,10 @@ public class GravitinoConnector452 extends GravitinoConnector {
     return () ->
         new GravitinoDataSourceProvider(
             internalConnectorPageSourceProviderFactory.createPageSourceProvider());
+  }
+
+  @Override
+  public List<PropertyMetadata<?>> getViewProperties() {
+    return catalogConnectorContext.getViewProperties();
   }
 }

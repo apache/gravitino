@@ -306,6 +306,34 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
+  public void testCreateViewReplaceRemovesStaleOwnerPropertyWhenSwitchingToInvoker() {
+    // computePropertyChanges never removes properties, but replacing a SECURITY DEFINER view with
+    // a SECURITY INVOKER one must still clear the stale owner, or SHOW CREATE VIEW would keep
+    // reporting SECURITY DEFINER after reload.
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenReturn(true);
+    View existingView = createView(Dialects.TRINO, "select 1");
+    when(existingView.properties()).thenReturn(Map.of("trino.internal.view.owner", "alice"));
+    when(viewCatalog.loadView(any())).thenReturn(existingView);
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    GravitinoView view = createGravitinoView("db", "v1", "select 1");
+    metadata.createView(view, true);
+
+    ArgumentCaptor<ViewChange[]> captor = ArgumentCaptor.forClass(ViewChange[].class);
+    verify(viewCatalog, times(1)).alterView(eq(NameIdentifier.of("db", "v1")), captor.capture());
+    List<ViewChange> changes = Arrays.asList(captor.getValue());
+
+    assertTrue(
+        changes.stream()
+            .anyMatch(
+                c ->
+                    c instanceof ViewChange.RemoveProperty
+                        && "trino.internal.view.owner"
+                            .equals(((ViewChange.RemoveProperty) c).getProperty())));
+  }
+
+  @Test
   public void testCreateViewReplaceRejectsWhenOtherDialectRepresentationsPresent() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(true);

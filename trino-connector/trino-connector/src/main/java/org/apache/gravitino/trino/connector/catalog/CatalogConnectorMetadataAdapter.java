@@ -59,8 +59,12 @@ public class CatalogConnectorMetadataAdapter {
    * SECURITY DEFINER} owner through {@code createView}/{@code getViewDefinition}; it is stripped
    * from and never settable via caller-supplied {@code viewProperties} ({@code WITH (...)}) so it
    * cannot be spoofed. Its absence means the view is {@code SECURITY INVOKER}.
+   *
+   * <p>Package-visible so {@link CatalogConnectorMetadata#createView} can explicitly remove it on
+   * {@code CREATE OR REPLACE VIEW} when the new definition has no owner, since {@code
+   * computePropertyChanges} only ever adds/updates properties and never removes them.
    */
-  private static final String RESERVED_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
+  static final String RESERVED_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
 
   /** The list of schema properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> schemaProperties;
