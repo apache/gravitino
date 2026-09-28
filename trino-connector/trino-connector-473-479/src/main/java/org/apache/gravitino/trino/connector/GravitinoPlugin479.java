@@ -21,18 +21,18 @@ package org.apache.gravitino.trino.connector;
 import org.apache.gravitino.client.GravitinoAdminClient;
 
 /** Trino plugin endpoint, using java spi mechanism */
-public class GravitinoPlugin478 extends GravitinoPlugin {
+public class GravitinoPlugin479 extends GravitinoPlugin {
 
-  public GravitinoPlugin478() {
+  public GravitinoPlugin479() {
     super();
   }
 
-  public GravitinoPlugin478(GravitinoAdminClient client) {
+  public GravitinoPlugin479(GravitinoAdminClient client) {
     super(client);
   }
 
   @Override
   protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
-    return new GravitinoConnectorFactory478(client);
+    return new GravitinoConnectorFactory479(client);
   }
 }

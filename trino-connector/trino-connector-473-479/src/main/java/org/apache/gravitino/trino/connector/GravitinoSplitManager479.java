@@ -24,37 +24,46 @@ import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorSplitSource;
 
-public class GravitinoSplitManager478 extends GravitinoSplitManager {
+/**
+ * Trino 478-479 split manager that wraps internal splits so Gravitino can unwrap them on the
+ * workers.
+ */
+public class GravitinoSplitManager479 extends GravitinoSplitManager {
 
-  public GravitinoSplitManager478(ConnectorSplitManager internalSplitManager) {
+  /**
+   * Constructs a new GravitinoSplitManager479.
+   *
+   * @param internalSplitManager the internal connector split manager
+   */
+  public GravitinoSplitManager479(ConnectorSplitManager internalSplitManager) {
     super(internalSplitManager);
   }
 
   @Override
   protected ConnectorSplitSource createSplitSource(ConnectorSplitSource splits) {
-    return new GravitinoSplitSource478(splits);
+    return new GravitinoSplitSource479(splits);
   }
 
-  static class GravitinoSplitSource478 extends GravitinoSplitSource {
+  static class GravitinoSplitSource479 extends GravitinoSplitSource {
 
-    GravitinoSplitSource478(ConnectorSplitSource connectorSplitSource) {
+    GravitinoSplitSource479(ConnectorSplitSource connectorSplitSource) {
       super(connectorSplitSource);
     }
 
     @Override
     protected ConnectorSplit createSplit(ConnectorSplit split) {
-      return new GravitinoSplit478(split);
+      return new GravitinoSplit479(split);
     }
   }
 
-  public static class GravitinoSplit478 extends GravitinoSplit {
+  public static class GravitinoSplit479 extends GravitinoSplit {
 
     @JsonCreator
-    public GravitinoSplit478(@JsonProperty(HANDLE_STRING) String handleString) {
+    public GravitinoSplit479(@JsonProperty(HANDLE_STRING) String handleString) {
       super(handleString);
     }
 
-    public GravitinoSplit478(ConnectorSplit split) {
+    public GravitinoSplit479(ConnectorSplit split) {
       super(split);
     }
   }

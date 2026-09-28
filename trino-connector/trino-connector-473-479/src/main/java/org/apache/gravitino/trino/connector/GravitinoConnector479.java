@@ -27,9 +27,15 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
-public class GravitinoConnector478 extends GravitinoConnector {
+/** The Trino 478-479 variant of the Gravitino connector, wiring the 478+ adapter classes. */
+public class GravitinoConnector479 extends GravitinoConnector {
 
-  public GravitinoConnector478(CatalogConnectorContext connectorContext) {
+  /**
+   * Constructs a new GravitinoConnector479.
+   *
+   * @param connectorContext the catalog connector context
+   */
+  public GravitinoConnector479(CatalogConnectorContext connectorContext) {
     super(connectorContext);
   }
 
@@ -38,21 +44,21 @@ public class GravitinoConnector478 extends GravitinoConnector {
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
-    return new GravitinoMetadata478(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+    return new GravitinoMetadata479(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 
   @Override
   public ConnectorSplitManager getSplitManager() {
     ConnectorSplitManager splitManager =
         catalogConnectorContext.getInternalConnector().getSplitManager();
-    return new GravitinoSplitManager478(splitManager);
+    return new GravitinoSplitManager479(splitManager);
   }
 
   @Override
   public ConnectorNodePartitioningProvider getNodePartitioningProvider() {
     ConnectorNodePartitioningProvider nodePartitioningProvider =
         catalogConnectorContext.getInternalConnector().getNodePartitioningProvider();
-    return new GravitinoNodePartitioningProvider478(nodePartitioningProvider);
+    return new GravitinoNodePartitioningProvider479(nodePartitioningProvider);
   }
 
   @Override

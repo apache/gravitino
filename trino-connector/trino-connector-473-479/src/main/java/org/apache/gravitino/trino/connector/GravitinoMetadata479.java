@@ -25,6 +25,7 @@ import io.trino.spi.connector.ColumnPosition;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
+import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
@@ -43,12 +44,23 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 
-public class GravitinoMetadata478 extends GravitinoMetadata {
+/**
+ * The Trino 478-479 metadata adapter; carries the table-execute overrides whose SPI signatures
+ * differ across versions.
+ */
+public class GravitinoMetadata479 extends GravitinoMetadata {
 
-  public GravitinoMetadata478(
+  /**
+   * Constructs a new GravitinoMetadata479.
+   *
+   * @param catalogConnectorMetadata the catalog connector metadata
+   * @param metadataAdapter the catalog connector metadata adapter
+   * @param internalMetadata the internal connector metadata
+   */
+  public GravitinoMetadata479(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
-      io.trino.spi.connector.ConnectorMetadata internalMetadata) {
+      ConnectorMetadata internalMetadata) {
     super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 
@@ -88,6 +100,20 @@ public class GravitinoMetadata478 extends GravitinoMetadata {
         .map(GravitinoTableExecuteHandle::new);
   }
 
+  @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
+  // Known inherited limitation: ConnectorMetadata.executeTableExecute changed from void to
+  // Map<String,Long> in Trino 478, and the two descriptors cannot coexist in one class, so on Trino
+  // 473-477 runtimes engine dispatch resolves to the SPI default no-op and table-execute
+  // (procedures) are silently skipped. Same behavior as the previous 473-478 segment module.
   @Override
   public Map<String, Long> executeTableExecute(
       ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
