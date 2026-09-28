@@ -59,6 +59,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -66,6 +67,7 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -117,6 +119,16 @@ public class TestAccessControlManager {
           .withVersion(SchemaVersion.V_0_1)
           .build();
 
+  private static BaseMetalake disabledMetalakeEntity =
+      BaseMetalake.builder()
+          .withId(3L)
+          .withName("metalake_disabled")
+          .withProperties(ImmutableMap.of(Metalake.PROPERTY_IN_USE, "false"))
+          .withAuditInfo(
+              AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+          .withVersion(SchemaVersion.V_0_1)
+          .build();
+
   @BeforeAll
   public static void setUp() throws Exception {
     File dbDir = new File(DB_DIR);
@@ -156,6 +168,7 @@ public class TestAccessControlManager {
 
     entityStore.put(metalakeEntity, true);
     entityStore.put(listMetalakeEntity, true);
+    entityStore.put(disabledMetalakeEntity, true);
 
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
@@ -244,6 +257,137 @@ public class TestAccessControlManager {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testBulkAddUsers() {
+    List<BulkItemResult<User>> results =
+        accessControlManager.addUsers(
+            METALAKE,
+            Lists.newArrayList(
+                new UserAdd("bulk_user_1"),
+                new UserAdd("bulk_user_2"),
+                new UserAdd("bulk_user_1")));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_user_1", results.get(0).value().get().name());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof UserAlreadyExistsException);
+  }
+
+  @Test
+  public void testBulkRemoveUsers() {
+    accessControlManager.addUser(METALAKE, "bulk_remove_user");
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.removeUsers(
+            METALAKE,
+            Lists.newArrayList("bulk_remove_user", "missing_bulk_user", "metalake_owner"),
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "metalake_owner";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.USER;
+                  }
+                }));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_remove_user", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchUserException);
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
+  }
+
+  @Test
+  public void testBulkAddGroups() {
+    List<BulkItemResult<Group>> results =
+        accessControlManager.addGroups(
+            METALAKE,
+            Lists.newArrayList(
+                new GroupAdd("bulk_group_1"),
+                new GroupAdd("bulk_group_2"),
+                new GroupAdd("bulk_group_1")));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_group_1", results.get(0).value().get().name());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof GroupAlreadyExistsException);
+  }
+
+  @Test
+  public void testBulkRemoveGroups() {
+    accessControlManager.addGroup(METALAKE, "bulk_remove_group");
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.removeGroups(
+            METALAKE,
+            Lists.newArrayList("bulk_remove_group", "missing_bulk_group", "metalake_owner_group"),
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "metalake_owner_group";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.GROUP;
+                  }
+                }));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_remove_group", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchGroupException);
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
+  }
+
+  @Test
+  public void testAddRemoveUserGroupChecksMetalakeExists() {
+    // add/remove user/group against a nonexistent metalake must surface the
+    // documented NoSuchMetalakeException, not a raw storage error.
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addGroup("nope", "g1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeGroup("nope", "g1"));
+  }
+
+  @Test
+  public void testAddRemoveUserGroupRejectsDisabledMetalake() {
+    // add/remove user/group against a disabled (not-in-use) metalake must surface
+    // MetalakeNotInUseException, consistent with the count/list siblings.
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.addUser("metalake_disabled", "u1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.addGroup("metalake_disabled", "g1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.removeUser("metalake_disabled", "u1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.removeGroup("metalake_disabled", "g1"));
+  }
+
+  @Test
+>>>>>>> 9526d8cfb ([#13519] fix(core): surface NoSuchMetalakeException when adding or removing users and groups (#13524))
   public void testListUsers() {
     accessControlManager.addUser("metalake_list", "testList1");
     accessControlManager.addUser("metalake_list", "testList2");
