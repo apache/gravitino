@@ -28,6 +28,11 @@ import java.util.Objects;
  * the external call; the store checks the current version when committing the delete. Without it, a
  * store write that resolves the name again after the external call can land on an entity that was
  * re-created under the same name in between.
+ *
+ * <p>The observed version is informational, not a delete precondition. An update to the same id
+ * during the external call is allowed; the store uses the current row version for its atomic
+ * delete. This identity fence cannot distinguish an external replacement that retains the same
+ * identifier from an update to the original object.
  */
 public final class EntityVersion {
 

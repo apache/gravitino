@@ -85,6 +85,8 @@ import org.apache.gravitino.storage.EntityVersion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
@@ -425,6 +427,126 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     } finally {
       FieldUtils.writeField(testCatalog, "ops", realOps, true);
     }
+  }
+
+  /**
+   * A delayed create must preserve a newer registration, whether or not a stale row existed before
+   * its external call.
+   *
+   * @param staleRegistration whether the name initially has a stale registration
+   * @throws Exception if the test setup or catalog operation fails
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDelayedCreateKeepsRegistrationOfNewerTable(boolean staleRegistration)
+      throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDelayedCreate" + staleRegistration);
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    if (staleRegistration) {
+      tableOperationDispatcher.createTable(
+          tableIdent, new Column[0], "stale", props, new Transform[0]);
+      Assertions.assertTrue(realOps.dropTable(tableIdent));
+    }
+    TestCatalogOperations ops = spy(realOps);
+    AtomicBoolean replaced = new AtomicBoolean();
+    doAnswer(
+            invocation -> {
+              Object created = invocation.callRealMethod();
+              if (replaced.compareAndSet(false, true)) {
+                // Another node drops and re-creates the external table before this create writes
+                // its registration. The older create must not replace the newer registration.
+                Assertions.assertTrue(realOps.dropTable(tableIdent));
+                tableOperationDispatcher.createTable(
+                    tableIdent, new Column[0], "newer", props, new Transform[0]);
+              }
+              return created;
+            })
+        .when(ops)
+        .createTable(eq(tableIdent), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      tableOperationDispatcher.createTable(
+          tableIdent, new Column[0], "older", props, new Transform[0]);
+
+      long currentId =
+          StringIdentifier.fromProperties(realOps.loadTable(tableIdent).properties()).id();
+      Assertions.assertEquals(
+          currentId, entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  /**
+   * A create whose object was already imported must preserve subsequent registration updates.
+   *
+   * @throws IOException if the store operation fails
+   */
+  @Test
+  public void testCreatedEntityKeepsUpdatesToAlreadyImportedRegistration() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCreateAlreadyImported");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    tableOperationDispatcher.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0]);
+    TableEntity imported = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    TableEntity updated =
+        entityStore.update(
+            tableIdent,
+            TableEntity.class,
+            TABLE,
+            current ->
+                TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withColumns(current.columns())
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator("newer")
+                            .withCreateTime(Instant.now())
+                            .build())
+                    .build());
+
+    tableOperationDispatcher.putCreatedEntity(imported, false, null);
+
+    Assertions.assertEquals(updated, entityStore.get(tableIdent, TABLE, TableEntity.class));
+    verify(entityStore, never()).put(any(TableEntity.class), eq(true));
+  }
+
+  /**
+   * An unsupported registration read must stop a create before the external table is created.
+   *
+   * @throws IOException if the test setup fails
+   */
+  @Test
+  public void testCreateTableFailsBeforeExternalCreateWhenVersionReadIsUnsupported()
+      throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCreateUnsupportedVersion");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    doThrow(new UnsupportedOperationException("versions unsupported"))
+        .when(entityStore)
+        .getVersion(tableIdent, TABLE);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableOperationDispatcher.createTable(
+                tableIdent, new Column[0], "comment", props, new Transform[0]));
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    Assertions.assertFalse(((TestCatalogOperations) testCatalog.ops()).tableExists(tableIdent));
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
   }
 
   /**

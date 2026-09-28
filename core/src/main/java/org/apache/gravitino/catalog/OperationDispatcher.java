@@ -264,7 +264,7 @@ public abstract class OperationDispatcher {
    * version-checked write. Throwing here therefore aborts the transaction with nothing written,
    * which is what a post-write id comparison cannot do.
    *
-   * @param expectedId the id read from the external catalog
+   * @param expectedId the expected id of the entity being updated
    * @param updater the update to apply when the ids match
    * @param <E> the entity type
    * @return the guarded updater
@@ -377,21 +377,23 @@ public abstract class OperationDispatcher {
   /**
    * Stores the registration of an entity that the external catalog has just created.
    *
-   * <p>A successful external create proves that no object currently lives under the name, so a
-   * registration still stored there with another id is stale: its object was dropped out of band,
-   * or by a drop on another server that has not reached the store yet. An upsert by name would keep
-   * that row's id and hand its owner, tags, and grants to the new object, and the pending drop's
-   * identity fence would then pass and delete the new registration. The stale row is replaced
-   * instead: deleted fenced on its own id, then the new registration is inserted.
+   * <p>A successful external create means a registration observed before the create with another id
+   * is stale: its object was dropped out of band, or by a drop on another server that has not
+   * reached the store yet. A registration first observed after the create may belong to a newer
+   * object, so it must be kept. An upsert by name would keep that row's id and hand its owner,
+   * tags, and grants to the new object, and the pending drop's identity fence would then pass and
+   * delete the new registration. The stale row is replaced instead: deleted fenced on its own id,
+   * then the new registration is inserted.
    *
    * @param entity the registration of the newly created object
    * @param cascade whether a stale registration is deleted with its children
+   * @param observed the registration read before the external create, or null if none existed
    * @param <E> the entity type
    * @throws IOException if a store operation fails
    * @throws OptimisticLockException if the stale registration changed while it was replaced
    */
-  protected <E extends Entity & HasIdentifier> void putCreatedEntity(E entity, boolean cascade)
-      throws IOException {
+  protected <E extends Entity & HasIdentifier> void putCreatedEntity(
+      E entity, boolean cascade, @Nullable EntityVersion observed) throws IOException {
     try {
       store.put(entity, false /* overwrite */);
       return;
@@ -402,18 +404,22 @@ public abstract class OperationDispatcher {
     NameIdentifier ident = entity.nameIdentifier();
     EntityVersion existing = observeRegistration(ident, entity.type());
     if (existing != null && existing.id() == entity.id()) {
-      // The same object is already registered, for example by a retried create.
-      store.put(entity, true /* overwrite */);
+      // Another node already imported this object. Keep any updates it has made since then.
       return;
     }
     if (existing != null) {
+      if (observed == null || existing.id() != observed.id()) {
+        throw new OptimisticLockException(
+            "The registration of %s changed during create; keeping the newer registration %s",
+            ident, existing);
+      }
       LOG.warn(
           "Replacing the stale {} registration {} of {} with the newly created object {}",
           entity.type().name().toLowerCase(Locale.ROOT),
           existing,
           ident,
           entity.id());
-      store.delete(ident, entity.type(), cascade, existing);
+      store.delete(ident, entity.type(), cascade, observed);
     }
     store.put(entity, false /* overwrite */);
   }

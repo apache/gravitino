@@ -380,6 +380,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, properties);
 
+    boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+    EntityVersion observed = isManagedView ? null : observeRegistration(ident, VIEW);
     View catalogView =
         doWithCatalog(
             catalogIdent,
@@ -398,7 +400,6 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             ViewAlreadyExistsException.class);
 
     // If the view is managed by Gravitino, we don't need to create ViewEntity and store it again.
-    boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
     if (isManagedView) {
       return EntityCombinedView.of(catalogView)
           .withHiddenProperties(
@@ -429,7 +430,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .build();
 
     try {
-      putCreatedEntity(viewEntity, false /* cascade */);
+      putCreatedEntity(viewEntity, false /* cascade */, observed);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedView.of(catalogView)

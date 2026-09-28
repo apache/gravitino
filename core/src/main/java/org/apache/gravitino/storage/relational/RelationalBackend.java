@@ -158,8 +158,10 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
   }
 
   /**
-   * Soft deletes the entity under the identifier only if it still carries the expected id and
-   * version.
+   * Soft deletes the entity under the identifier only if it still carries the expected id.
+   *
+   * <p>The observed version is informational. Implementations use the current row version when
+   * committing the delete to protect against concurrent store writes.
    *
    * @param ident the identifier of the entity
    * @param entityType the entity type
