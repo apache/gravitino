@@ -89,8 +89,8 @@ public class TestBackendTestSelector {
     String secondDisplayName =
         selectedInvocation(extension, "secondTemplateMethod").getDisplayName(1);
 
-    assertEquals("firstTemplateMethod()[MYSQL Backend]", firstDisplayName);
-    assertEquals("secondTemplateMethod()[MYSQL Backend]", secondDisplayName);
+    assertEquals("firstTemplateMethod[MYSQL Backend]", firstDisplayName);
+    assertEquals("secondTemplateMethod[MYSQL Backend]", secondDisplayName);
     assertNotEquals(firstDisplayName, secondDisplayName);
   }
 
