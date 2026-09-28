@@ -24,15 +24,13 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
- * Catalog property keys that appear in {@link Credential#credentialInfo()}.
+ * Catalog entity property keys that also appear in {@link Credential#credentialInfo()} and are
+ * delivered via {@link SupportsCredentials#getCredentials()}, not {@code getSecrets()}.
  *
- * <p>These keys are delivered to clients via {@link SupportsCredentials#getCredentials()}, not via
- * {@code getSecrets()}. {@code getSecrets()} must not recover them as inline plaintext or secret
- * URNs so the two APIs do not overlap.
- *
- * <p>Excludes IRSA session field names ({@code access-key-id}, {@code secret-access-key}, {@code
- * session-token}) and the GCS credential field {@code token}, which are not catalog entity property
- * keys.
+ * <p>Omits fields that exist only in vended credential payloads and are never catalog properties
+ * (for example {@code s3-session-token}, {@code oss-security-token}, {@code cos-security-token},
+ * {@code adls-sas-token}, GCS {@code token}, and AWS IRSA {@code access-key-id} / {@code
+ * secret-access-key} / {@code session-token}).
  */
 public final class CredentialPropertyKeys {
 
@@ -40,29 +38,25 @@ public final class CredentialPropertyKeys {
 
   static {
     Set<String> keys = new HashSet<>();
-    // S3 secret-key / token
+    // S3 static pair (also reused as session AK/SK field names in s3-token payloads)
     keys.add(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID);
     keys.add(S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY);
-    keys.add(S3TokenCredential.GRAVITINO_S3_TOKEN);
-    // OSS secret-key / token
+    // OSS static pair
     keys.add(OSSSecretKeyCredential.GRAVITINO_OSS_STATIC_ACCESS_KEY_ID);
     keys.add(OSSSecretKeyCredential.GRAVITINO_OSS_STATIC_SECRET_ACCESS_KEY);
-    keys.add(OSSTokenCredential.GRAVITINO_OSS_TOKEN);
-    // COS secret-key / token
+    // COS static pair
     keys.add(COSSecretKeyCredential.GRAVITINO_COS_STATIC_ACCESS_KEY_ID);
     keys.add(COSSecretKeyCredential.GRAVITINO_COS_STATIC_SECRET_ACCESS_KEY);
-    keys.add(COSTokenCredential.GRAVITINO_COS_SESSION_TOKEN);
-    // Azure account key / ADLS token
+    // Azure account key pair
     keys.add(AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
     keys.add(AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    keys.add(ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN);
     // JDBC
     keys.add(JdbcCredential.GRAVITINO_JDBC_USER);
     keys.add(JdbcCredential.GRAVITINO_JDBC_PASSWORD);
     // Glue AWS API credentials
     keys.add(AwsSecretKeyCredential.GRAVITINO_AWS_ACCESS_KEY_ID);
     keys.add(AwsSecretKeyCredential.GRAVITINO_AWS_SECRET_ACCESS_KEY);
-    // Paimon DLF credentials
+    // Paimon DLF (dlf-security-token is an optional catalog property, not vended-only)
     keys.add(DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID);
     keys.add(DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_SECRET);
     keys.add(DlfSecretKeyCredential.GRAVITINO_DLF_SECURITY_TOKEN);
@@ -72,10 +66,11 @@ public final class CredentialPropertyKeys {
   private CredentialPropertyKeys() {}
 
   /**
-   * Returns whether {@code key} is a credential-info property key.
+   * Returns whether {@code key} is a catalog property key delivered via {@link
+   * SupportsCredentials}.
    *
    * @param key the property key
-   * @return true when the key is delivered via {@link SupportsCredentials}
+   * @return true when the key must not be recovered via {@code getSecrets()}
    */
   public static boolean isCredentialPropertyKey(@Nullable String key) {
     return key != null && KEYS.contains(key);

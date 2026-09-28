@@ -24,17 +24,19 @@ import org.junit.jupiter.api.Test;
 class TestCredentialPropertyKeys {
 
   @Test
-  void testKnownCredentialKeys() {
+  void testCatalogPropertyCredentialKeys() {
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("s3-access-key-id"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("s3-secret-access-key"));
-    Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("s3-session-token"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("oss-access-key-id"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("oss-secret-access-key"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("cos-access-key-id"));
-    Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("jdbc-password"));
-    Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("jdbc-user"));
+    Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("cos-secret-access-key"));
+    Assertions.assertTrue(
+        CredentialPropertyKeys.isCredentialPropertyKey("azure-storage-account-name"));
     Assertions.assertTrue(
         CredentialPropertyKeys.isCredentialPropertyKey("azure-storage-account-key"));
+    Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("jdbc-user"));
+    Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("jdbc-password"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("aws-access-key-id"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("aws-secret-access-key"));
     Assertions.assertTrue(CredentialPropertyKeys.isCredentialPropertyKey("dlf-access-key-id"));
@@ -43,11 +45,18 @@ class TestCredentialPropertyKeys {
   }
 
   @Test
-  void testNonCredentialKeys() {
+  void testVendedOnlyAndNonCredentialKeys() {
     Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey(null));
-    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("custom-token"));
-    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("credential-providers"));
+    // Vended-only — not PropertiesMetadata / catalog entity properties.
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("s3-session-token"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("oss-security-token"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("cos-security-token"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("adls-sas-token"));
     Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("token"));
     Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("access-key-id"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("secret-access-key"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("session-token"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("custom-token"));
+    Assertions.assertFalse(CredentialPropertyKeys.isCredentialPropertyKey("credential-providers"));
   }
 }
