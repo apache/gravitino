@@ -19,9 +19,13 @@
 package org.apache.gravitino.trino.connector;
 
 import io.airlift.slice.Slice;
+import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ColumnPosition;
+import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
+import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
@@ -35,24 +39,82 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 
-public class GravitinoMetadata452 extends GravitinoMetadata {
+/**
+ * The Trino 481+ metadata adapter; carries the table-execute overrides whose SPI signatures differ
+ * across versions.
+ */
+public class GravitinoMetadata481 extends GravitinoMetadata {
 
-  public GravitinoMetadata452(
+  /**
+   * Constructs a new GravitinoMetadata481.
+   *
+   * @param catalogConnectorMetadata the catalog connector metadata
+   * @param metadataAdapter the catalog connector metadata adapter
+   * @param internalMetadata the internal connector metadata
+   */
+  public GravitinoMetadata481(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
-      io.trino.spi.connector.ConnectorMetadata internalMetadata) {
+      ConnectorMetadata internalMetadata) {
     super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 
   @Override
   public void addColumn(
-      ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      ColumnMetadata column,
+      ColumnPosition position) {
+    TableChange.ColumnPosition columnPosition = TableChange.ColumnPosition.defaultPos();
+    if (position instanceof ColumnPosition.First) {
+      columnPosition = TableChange.ColumnPosition.first();
+    }
+    if (position instanceof ColumnPosition.After after) {
+      columnPosition = TableChange.ColumnPosition.after(after.columnName());
+    }
     GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
-    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
+    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn, columnPosition);
+  }
+
+  @Override
+  public Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+      ConnectorSession session,
+      ConnectorAccessControl accessControl,
+      ConnectorTableHandle tableHandle,
+      String procedureName,
+      Map<String, Object> executeProperties,
+      RetryMode retryMode) {
+    return internalMetadata
+        .getTableHandleForExecute(
+            session,
+            accessControl,
+            GravitinoHandle.unWrap(tableHandle),
+            procedureName,
+            executeProperties,
+            retryMode)
+        .map(GravitinoTableExecuteHandle::new);
+  }
+
+  @Override
+  public Map<String, Long> finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    return internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
+  @Override
+  public Map<String, Long> executeTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    return internalMetadata.executeTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle));
   }
 
   @Override
@@ -65,7 +127,9 @@ public class GravitinoMetadata452 extends GravitinoMetadata {
     return internalMetadata.finishInsert(
         session,
         GravitinoHandle.unWrap(insertHandle),
-        sourceTableHandles.stream().map(GravitinoHandle::unWrap).collect(Collectors.toList()),
+        sourceTableHandles.stream()
+            .map(GravitinoHandle::unWrap)
+            .collect(Collectors.toUnmodifiableList()),
         fragments,
         computedStatistics);
   }
@@ -83,44 +147,24 @@ public class GravitinoMetadata452 extends GravitinoMetadata {
   }
 
   @Override
-  public Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+  public ConnectorMergeTableHandle beginMerge(
       ConnectorSession session,
       ConnectorTableHandle tableHandle,
-      String procedureName,
-      Map<String, Object> executeProperties,
+      Map<Integer, Collection<ColumnHandle>> updateCaseColumns,
       RetryMode retryMode) {
-    return internalMetadata
-        .getTableHandleForExecute(
-            session,
-            GravitinoHandle.unWrap(tableHandle),
-            procedureName,
-            executeProperties,
-            retryMode)
-        .map(GravitinoTableExecuteHandle::new);
-  }
+    Map<Integer, Collection<ColumnHandle>> unWrapUpdateCaseColumns =
+        updateCaseColumns.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    entry ->
+                        entry.getValue().stream()
+                            .map(GravitinoHandle::unWrap)
+                            .collect(Collectors.toUnmodifiableList())));
 
-  @Override
-  public void finishTableExecute(
-      ConnectorSession session,
-      ConnectorTableExecuteHandle tableExecuteHandle,
-      Collection<Slice> fragments,
-      List<Object> tableExecuteState) {
-    internalMetadata.finishTableExecute(
-        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
-  }
-
-  @Override
-  public void executeTableExecute(
-      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
-    internalMetadata.executeTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle));
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public ConnectorMergeTableHandle beginMerge(
-      ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode) {
     ConnectorMergeTableHandle connectorMergeTableHandle =
-        internalMetadata.beginMerge(session, GravitinoHandle.unWrap(tableHandle), retryMode);
+        internalMetadata.beginMerge(
+            session, GravitinoHandle.unWrap(tableHandle), unWrapUpdateCaseColumns, retryMode);
     SchemaTableName tableName = getTableName(tableHandle);
 
     return new GravitinoMergeTableHandle(
@@ -137,7 +181,9 @@ public class GravitinoMetadata452 extends GravitinoMetadata {
     internalMetadata.finishMerge(
         session,
         GravitinoHandle.unWrap(mergeTableHandle),
-        sourceTableHandles.stream().map(GravitinoHandle::unWrap).collect(Collectors.toList()),
+        sourceTableHandles.stream()
+            .map(GravitinoHandle::unWrap)
+            .collect(Collectors.toUnmodifiableList()),
         fragments,
         computedStatistics);
   }
