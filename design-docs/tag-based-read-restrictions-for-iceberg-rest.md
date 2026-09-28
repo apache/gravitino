@@ -27,8 +27,9 @@ which rows or column values are visible after access is granted.
 
 The Iceberg REST specification defines `read-restrictions` in a load-table response. A conforming
 reader applies a required row filter and required column projections before returning data. This
-provides a standard enforcement boundary without putting engine-specific expressions in Gravitino
-policy content.
+provides a standard enforcement boundary for portable restrictions. Some engines also support
+native filter expressions or functions that cannot be represented by the common Iceberg profile,
+so policy content must distinguish portable definitions from explicitly engine-scoped ones.
 
 This design adds tag-based row-filter and column-mask policies and resolves them into Iceberg REST
 `read-restrictions`. The first implementation is experimental while Iceberg reader support is
@@ -38,17 +39,18 @@ maturing. It is disabled by default and requires an explicit client opt-in.
 
 1. Define typed row-filter and column-mask policy content.
 2. Select policies through the policy-on-tag model and effective tags.
-3. Support a small, deterministic authoring language for row predicates and rule conditions.
+3. Support a small, deterministic common authoring language for row predicates.
 4. Bind authored expressions to the authenticated subject and an Iceberg table schema.
 5. Return only closed, typed Iceberg expressions and standard Iceberg mask actions.
 6. Fail closed when an applicable restriction cannot be resolved or enforced.
 7. Provide an experimental end-to-end path that can later move to official Iceberg runtime types
    without changing policy content.
+8. Reserve an explicit, fail-closed extension model for engine expressions and UDF references.
 
 ## Non-Goals
 
 1. Replacing table-level authorization or granting access through a read-restriction policy.
-2. Supporting arbitrary expressions, user-defined functions, subqueries, or engine-specific syntax.
+2. Executing arbitrary engine expressions or UDFs through the first Iceberg REST implementation.
 3. Supporting nested-field masks, roles, identity attributes, nested groups, or general attribute
    expressions in the first version.
 4. Defining a new direct policy-to-metadata-object association model.
@@ -89,75 +91,132 @@ from effective tags. Row-filter resolution consumes effective policies for a tab
 resolution consumes effective policies for each top-level column. Direct policy
 associations are not used.
 
-Policy content stores authored source and logical mask action names. It does not store a resolved
-subject, group membership snapshot, table schema, field ID, or serialized load-table response.
+Policy content stores one restriction definition and its declared language or action profile. It
+does not store a resolved subject, group membership snapshot, table schema, field ID, or serialized
+load-table response.
+
+Policy selection and policy effect are separate. Tags and policy-on-tag selectors decide whether a
+policy is applicable; a row-filter or column-mask definition states what the selected policy does.
+The effect content has no ordered rules and no `when` field. This follows the same separation used
+by Databricks ABAC, where policy applicability is distinct from the row-filter or mask function and
+its bound inputs. A future principal-aware selector belongs to the selection model, not inside a
+restriction definition.
 
 ### Row-filter content
 
-A row-filter policy contains a non-empty ordered list of rules. Each rule has a required
-`expression` and an optional context-only `when` condition.
+A row-filter policy contains exactly one `filter`. The common form has `kind` set to `expression`,
+uses the `gravitino-filter-v1` language, and omits `engine`.
 
 ```json
 {
   "name": "restrict_orders",
-  "comment": "Auditors see US orders; other users see their own orders",
+  "comment": "Users see only their own orders",
   "policyType": "system_row_filter",
   "enabled": false,
   "content": {
-    "rules": [
-      {
-        "when": "is_group_member(\"auditors\")",
-        "expression": "col(\"region\") == \"US\""
-      },
-      {
-        "expression": "col(\"owner\") == session_user()"
-      }
-    ]
+    "filter": {
+      "kind": "expression",
+      "language": "gravitino-filter-v1",
+      "expression": "col(\"owner\") == session_user()"
+    }
   }
 }
 ```
 
-Conditions are evaluated in authored order against one identity snapshot. The first matching rule
-selects its expression and later rules are not evaluated. A rule without `when` is unconditional.
-If no rule matches in a selected policy, the policy contributes a constant-false predicate and
-denies every row.
+An expression may use trusted request context, including `session_user()` and
+`is_group_member(...)`, but context does not select another rule. If different subjects need
+different policy applicability, the selection layer must express that distinction. Until a
+principal-aware selector is designed, authors can express a Boolean distinction in one row
+predicate, but should not use an ordered rule list as a substitute for selection semantics. The
+first policy-on-tag selector version does not select by principal.
 
 ### Column-mask content
 
-A column-mask policy contains a non-empty list of rules. Each rule has a required `action` and an
-optional context-only `when` condition.
+A column-mask policy contains exactly one `mask`. The first version supports the portable
+`iceberg-action-v1` profile.
 
 ```json
 {
   "name": "mask_phone_number",
-  "comment": "Auditors see the final four characters",
+  "comment": "Show only the final four characters",
   "policyType": "system_column_mask",
   "enabled": false,
   "content": {
-    "rules": [
-      {
-        "when": "is_group_member(\"auditors\")",
-        "action": "show-last-4"
-      },
-      {
-        "when": "not is_group_member(\"auditors\")",
-        "action": "replace-with-null"
-      }
+    "mask": {
+      "kind": "action",
+      "profile": "iceberg-action-v1",
+      "action": "show-last-4"
+    }
+  }
+}
+```
+
+If more than one selected policy defines a different mask for the same field, resolution fails as a
+conflict. Subject-dependent mask applicability requires a principal-aware policy selector; it is
+not encoded as a mask condition.
+
+### Restriction definition variants
+
+The `kind` discriminator prevents an engine expression or function reference from being
+misinterpreted as a common expression. The content model reserves these variants:
+
+| Kind | Scope | First Iceberg REST implementation |
+| --- | --- | --- |
+| `expression` without `engine` | Common, portable profile named by `language` | Supports `gravitino-filter-v1` for row filters. |
+| `expression` with `engine` | Exact engine and language pair | Rejected unless the selected adapter advertises that exact pair and produces a closed common result. |
+| `function` | Versioned function reference and typed argument bindings | Reserved; rejected by the first implementation. |
+| `action` | Named portable action profile | Supports `iceberg-action-v1` for column masks. |
+
+An engine-scoped row-filter definition is explicit:
+
+```json
+{
+  "filter": {
+    "kind": "expression",
+    "engine": "spark",
+    "language": "spark-sql-3.5",
+    "expression": "owner = current_user()"
+  }
+}
+```
+
+`engine` and `language` are non-empty, case-sensitive identifiers defined by an adapter capability;
+the language identifier must include a compatibility version. An omitted `engine` means common,
+and the literal engine name `common` is invalid. An engine-scoped definition is opaque to the
+common parser, is never sent to a different engine, and must not fall back to a common or differently
+versioned language. It is valid only when the adapter can validate it, bind all identifiers and
+context, and lower it to the closed Iceberg predicate profile before an Iceberg REST response is
+returned. Raw engine text never crosses the Iceberg `read-restrictions` boundary.
+
+A future UDF-backed definition uses a stable function reference rather than inline implementation
+source:
+
+```json
+{
+  "filter": {
+    "kind": "function",
+    "engine": "databricks",
+    "functionReference": "governance.filters.filter_by_region@v3",
+    "arguments": [
+      { "kind": "column", "name": "region" },
+      { "kind": "literal", "type": "string", "value": "EMEA" }
     ]
   }
 }
 ```
 
-Every mask condition is evaluated against the same identity snapshot. False conditions are omitted.
-Equal active actions are deduplicated. More than one distinct active action for one field is a
-conflict. A policy with no active mask rule contributes no mask.
+The shape is modeled after Databricks ABAC's row-filter UDF and argument binding. Before enabling
+this variant, a separate profile must define function identity and versioning, resolution
+authority, argument types, context arguments, execution privileges, determinism, null behavior,
+and target capabilities. A row-filter function must return Boolean, and its profile must define how
+a null result is handled. A mask function must return a value compatible with the masked field. A
+missing, changed, or unsupported function fails closed; it never falls back to an unrestricted
+read. Tagged-column matching and context argument bindings can be added as new argument kinds
+without changing the function variant.
 
-Subject-dependent behavior is expressed through `when`.
+## Common Expression Profile
 
-## Expression Profile
-
-The `gravitino-filter-v1` profile is the authoring language for row-filter expressions and `when`
-conditions. A `when` condition uses the same grammar but cannot contain `col(...)`.
+The `gravitino-filter-v1` profile is the portable authoring language for row-filter expressions.
 
 The grammar is:
 
@@ -183,6 +242,30 @@ nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 Strings use JSON double-quoted syntax. Comments, exponent notation, leading `+`, leading zeroes,
 trailing decimal points, chained comparisons, arbitrary functions, and bare non-Boolean roots are
 invalid.
+
+### Keywords, identifiers, and escaping
+
+The reserved, lowercase keywords are `and`, `or`, `not`, `in`, `true`, `false`, and `null`. The
+reserved built-in function identifiers are `col`, `session_user`, and `is_group_member`. They are
+case-sensitive and are recognized only as complete tokens; for example, `notebook` is not `not`
+followed by an identifier. Bare identifiers are not part of `gravitino-filter-v1`, so an unknown
+word is always invalid rather than an implicit column reference or function call.
+
+Column names, group names, and string values appear only as JSON string literals. A name equal to a
+keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
+single quotes, SQL delimited identifiers, and backslash escaping outside a JSON string are invalid.
+
+There are two syntactic JSON layers in an API request. The HTTP JSON parser decodes the outer
+`expression` field once, and the expression parser decodes each inner JSON string literal once. For
+example, the request fragment `"expression": "col(\"and\") == \"open\""` becomes the source
+`col("and") == "open"`, whose decoded column name is `and`. No layer performs an additional or
+implicit unescape.
+
+After decoding, identifiers and values are preserved exactly. Gravitino performs no Unicode
+normalization, case folding, whitespace trimming, environment expansion, URL decoding, or SQL
+quoting. Adapters must bind typed AST nodes or parameters and must not concatenate decoded names or
+values into engine text. Canonical serialization applies JSON escaping; it does not change the
+logical value.
 
 Supported operand shapes are:
 
@@ -297,8 +380,9 @@ For one authenticated subject and table load:
 
 1. Resolve effective tags for the table and all top-level columns.
 2. Resolve enabled policy-on-tag matches.
-3. Select row-filter rules in authored order and evaluate every mask condition.
-4. Bind the selected row expression and active masks to the table schema and Iceberg field IDs.
+3. Check each selected definition's kind, language, engine scope, and adapter capability.
+4. Bind each common or safely lowered row expression and each selected mask to the table schema and
+   Iceberg field IDs.
 5. Canonicalize resolved restrictions and compute signatures.
 6. Deduplicate equal signatures while retaining policy and tag provenance.
 7. Reject multiple distinct row-filter signatures for one table.
@@ -364,7 +448,8 @@ runs the same conformance fixtures against both implementations.
 
 ## Persistence and Administration
 
-Policy revisions store the authored rule list, enabled state, and normal policy audit information.
+Policy revisions store the single authored restriction definition, enabled state, and normal policy
+audit information.
 Resolved field IDs, identity values, and load-table responses are request-scoped and are not stored
 as policy content.
 
@@ -372,9 +457,9 @@ Administrators should create a policy disabled, associate it with a tag, preview
 subjects and tables, verify that the experimental reader is deployed, and then enable it. Enabling a
 policy does not make an incompatible reader safe.
 
-Explain output should include selected policies, matching tags, selected rules, canonical
-signatures, omission reasons, and conflicts. Query users receive a stable error code and request ID;
-policy details remain subject to policy-view authorization.
+Explain output should include selected policies, matching tags, definition kinds and profiles,
+canonical signatures, omission reasons, and conflicts. Query users receive a stable error code and
+request ID; policy details remain subject to policy-view authorization.
 
 ## Failure and Security Requirements
 
@@ -387,6 +472,10 @@ policy details remain subject to policy-view authorization.
    the corresponding metadata privileges.
 5. Unknown groups and identity lookup failures do not become non-membership.
 6. An old client that may ignore `read-restrictions` is not a trusted enforcement target.
+7. An engine-scoped expression is accepted only for an exact engine, language, and adapter
+   capability match; no implicit translation or fallback is allowed.
+8. A `function` definition remains invalid until its complete function profile and enforcement
+   capability are enabled.
 
 ## Testing
 
@@ -407,8 +496,10 @@ Coverage includes:
 - Unicode, escaping, negative zero, temporal precision, and null semantics;
 - source limits and invalid operand shapes;
 - session user, group membership, unknown groups, and identity lookup failure;
-- first-match row-filter rules and unmatched deny-all behavior;
-- inactive, duplicate, and conflicting mask rules;
+- common keyword boundaries, nested JSON escaping, keyword-named columns, and invalid identifiers;
+- engine and language mismatch, unsupported adapters, and prohibited fallback;
+- reserved function definitions, missing function versions, and invalid argument bindings;
+- duplicate and conflicting row-filter definitions and mask actions;
 - all nine mask actions and unsupported action/type pairs;
 - table and column effective-tag selection;
 - renamed, missing, required, and unsupported fields;
@@ -418,7 +509,8 @@ Coverage includes:
 
 ## Implementation Plan
 
-1. Add the expression parser and typed row-filter and column-mask policy content.
+1. Add the common expression parser and typed row-filter and column-mask definition variants;
+   reject unsupported engine and function variants explicitly.
 2. Add an experimental Iceberg read-restriction model and exact wire serializer.
 3. Implement policy-on-tag selection, subject binding, schema binding, canonicalization, and conflict
    detection.
@@ -433,3 +525,5 @@ Coverage includes:
 - [Pinned Iceberg REST schema](https://github.com/apache/iceberg/blob/6dec25e430b33a8b4f623b14940110d459581826/open-api/rest-catalog-open-api.yaml)
 - [Iceberg read-restriction actions implementation](https://github.com/apache/iceberg/pull/16198)
 - [Iceberg generic reader implementation](https://github.com/apache/iceberg/pull/16131)
+- [Databricks ABAC core concepts](https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts)
+- [Databricks ABAC policy management](https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies)
