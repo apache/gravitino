@@ -29,6 +29,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
 import org.apache.gravitino.testing.CoreDatabaseConcurrency
+import org.apache.gravitino.testing.SharedDbContainerService
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
@@ -81,6 +82,18 @@ val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
 ) {
   maxParallelUsages.set(1)
 }
+
+// Owns one shared MySQL container and one shared PostgreSQL container for the whole build (see
+// org.apache.gravitino.testing.SharedDbContainerService in buildSrc), so the Core database test
+// tasks no longer have to start a fresh container per test-worker fork. Registered here, at the
+// root, so a single instance is shared by every project that opts in via `usesService`. Stored on
+// rootProject.extra so subproject build scripts (for example core/build.gradle.kts) can look up
+// the same registration by name.
+val sharedDbContainerService = gradle.sharedServices.registerIfAbsent(
+  "sharedDbContainerService",
+  SharedDbContainerService::class
+) {}
+rootProject.extra["sharedDbContainerService"] = sharedDbContainerService
 
 /** Packages the legal documents for one Maven artifact, retaining dependency provenance. */
 @CacheableTask

@@ -26,6 +26,9 @@ repositories {
 }
 
 dependencies {
+  // SharedDbContainerService is a Gradle BuildService. Inside the main build Gradle adds its API
+  // to buildSrc implicitly; `./gradlew -p buildSrc test` builds buildSrc on its own and needs it.
+  implementation(gradleApi())
   compileOnly("com.google.code.findbugs:jsr305:3.0.2")
   testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
   testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.1")
