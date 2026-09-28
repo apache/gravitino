@@ -573,6 +573,55 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     assertEquals(0, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
   }
 
+  @TestTemplate
+  public void testDeleteCatalogCascadeRemovesTableVersions() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_with_table_versions",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "schema_with_table_versions",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    Namespace objectNamespace = Namespace.of(metalakeName, catalog.name(), schema.name());
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column_with_version")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_with_version")
+            .withNamespace(objectNamespace)
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // The insert wrote an active version row for the table.
+    assertTrue(countActiveTableVersionRows(table.id()) > 0);
+
+    assertTrue(CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true));
+
+    // The catalog cascade must soft-delete the version rows too; otherwise they keep
+    // deleted_at = 0 forever and never become eligible for legacy-timeline cleanup.
+    assertEquals(0, countActiveTableVersionRows(table.id()));
+  }
+
   private List<Throwable> insertCatalogsConcurrently(CatalogEntity first, CatalogEntity second)
       throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -652,6 +701,25 @@ public class TestCatalogMetaService extends TestJDBCBackend {
         return rs.getInt(1);
       }
       throw new RuntimeException("No result for countActiveTagRelForMetadataObject");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  private int countActiveTableVersionRows(Long tableId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM table_version_info WHERE table_id = %d AND deleted_at = 0",
+                    tableId))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }

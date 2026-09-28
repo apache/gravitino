@@ -89,6 +89,8 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -130,6 +132,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValueConstraint;
@@ -319,6 +322,22 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a {@link SemanticModel} implementation to a {@link SemanticModelDTO}.
+   *
+   * @param semanticModel The Semantic Model implementation.
+   * @return The Semantic Model DTO.
+   */
+  public static SemanticModelDTO toDTO(SemanticModel semanticModel) {
+    return SemanticModelDTO.builder()
+        .withName(semanticModel.name())
+        .withComment(semanticModel.comment())
+        .withDefinition(SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()))
+        .withProperties(semanticModel.properties())
+        .withAudit(toDTO(semanticModel.auditInfo()))
+        .build();
+  }
+
+  /**
    * Converts a {@link Representation} implementation to a {@link RepresentationDTO}.
    *
    * @param representation The representation implementation.
@@ -368,7 +387,7 @@ public class DTOConverters {
    * @return The distribution DTO.
    */
   public static DistributionDTO toDTO(Distribution distribution) {
-    if (Distributions.NONE.equals(distribution) || null == distribution) {
+    if (Distributions.isNone(distribution)) {
       return DistributionDTO.NONE;
     }
 

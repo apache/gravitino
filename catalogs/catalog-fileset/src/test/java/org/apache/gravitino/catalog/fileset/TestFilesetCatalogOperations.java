@@ -66,17 +66,23 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -89,6 +95,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
@@ -101,6 +108,7 @@ import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -487,6 +495,26 @@ public class TestFilesetCatalogOperations {
             + FilesetCatalogPropertiesMetadata.LOCATION
             + " must not be blank",
         exception.getMessage());
+  }
+
+  @Test
+  public void testCreateSchemaWithTooLongComment() throws IOException {
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    String schemaPath = TEST_ROOT_PATH + "/" + name;
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createSchema(name, tooLongComment, null, schemaPath));
+    Assertions.assertEquals(
+        "The comment of the schema must not exceed 256 characters", exception.getMessage());
+
+    // The schema directory must not be created for a rejected schema.
+    Path path = new Path(schemaPath);
+    FileSystem fs = path.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(path));
   }
 
   @Test
@@ -996,6 +1024,55 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  /** Checks independent catalog instances cannot both create the same fileset. */
+  @Test
+  public void testConcurrentCreateAcrossIndependentNodesPreservesWinner() throws Exception {
+    long testId = generateTestId();
+    String schemaName = "schema" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/catalog" + testId;
+    createSchema(schemaName, "comment", catalogPath, null, true);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "concurrent");
+    CountDownLatch checkedAbsent = new CountDownLatch(2);
+    EntityStore firstStore = independentNodeStore(ident, checkedAbsent);
+    EntityStore secondStore = independentNodeStore(ident, checkedAbsent);
+    String firstPath = catalogPath + "/" + schemaName + "/first";
+    String secondPath = catalogPath + "/" + schemaName + "/second";
+    long firstId = idGenerator.nextId();
+    long secondId = idGenerator.nextId();
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try (FilesetCatalogOperations firstOps =
+            new FilesetCatalogOperations(firstStore, secretManager);
+        FilesetCatalogOperations secondOps =
+            new FilesetCatalogOperations(secondStore, secretManager)) {
+      firstOps.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      secondOps.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      Future<Boolean> first =
+          executor.submit(
+              () -> createConcurrentFileset(firstOps, ident, firstPath, "first", firstId));
+      Future<Boolean> second =
+          executor.submit(
+              () -> createConcurrentFileset(secondOps, ident, secondPath, "second", secondId));
+      boolean firstWon = first.get(30, TimeUnit.SECONDS);
+      boolean secondWon = second.get(30, TimeUnit.SECONDS);
+      Assertions.assertNotEquals(firstWon, secondWon);
+      FilesetEntity actual = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+      Assertions.assertEquals(firstWon ? firstId : secondId, actual.id());
+      Assertions.assertEquals(firstWon ? "first" : "second", actual.comment());
+      Assertions.assertEquals(
+          actual.id(), StringIdentifier.fromProperties(actual.properties()).id());
+      String winnerPath = firstWon ? firstPath : secondPath;
+      try (FileSystem fs = FileSystem.newInstance(new Configuration())) {
+        Assertions.assertTrue(fs.exists(new Path(winnerPath)));
+        Assertions.assertEquals(
+            new Path(winnerPath).makeQualified(fs.getUri(), fs.getWorkingDirectory()).toString(),
+            new Path(actual.storageLocations().values().iterator().next()).toString());
+      }
+    } finally {
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+  }
+
   @Test
   public void testCreateFilesetMapsSchemaDeletionDuringStoreWrite() throws IOException {
     long testId = generateTestId();
@@ -1010,7 +1087,7 @@ public class TestFilesetCatalogOperations {
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "schema", schemaName);
     Mockito.doThrow(deletedSchema)
         .when(racingStore)
-        .put(Mockito.any(FilesetEntity.class), Mockito.eq(true));
+        .put(Mockito.any(FilesetEntity.class), Mockito.eq(false));
 
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(racingStore, secretManager)) {
       ops.initialize(
@@ -1358,6 +1435,58 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
       Assertions.assertEquals(comment + "_new", fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
+    }
+  }
+
+  @Test
+  public void testCreateFilesetWithTooLongComment() throws IOException {
+    final long testId = generateTestId();
+    final String schemaName = "schema" + testId;
+    final String name = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "comment", null, schemaPath);
+
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createFileset(name, schemaName, tooLongComment, Fileset.Type.MANAGED, null, null));
+    Assertions.assertEquals(
+        "The comment of the fileset must not exceed 256 characters", exception.getMessage());
+
+    // The fileset directory must not be created for a rejected fileset.
+    Path filesetPath = new Path(schemaPath, name);
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(filesetPath));
+
+    createFileset(name, schemaName, "comment", Fileset.Type.MANAGED, null, null);
+    Assertions.assertTrue(fs.exists(filesetPath));
+  }
+
+  @Test
+  public void testUpdateFilesetCommentTooLong() throws IOException {
+    final long testId = generateTestId();
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String name = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+
+    createSchema(schemaName, comment, null, schemaPath);
+    createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    String tooLongComment = StringUtils.repeat("a", EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.alterFileset(filesetIdent, FilesetChange.updateComment(tooLongComment)));
+      Assertions.assertEquals(
+          "The comment of the fileset must not exceed 256 characters", exception.getMessage());
+      Assertions.assertEquals(comment, ops.loadFileset(filesetIdent).comment());
     }
   }
 
@@ -3878,5 +4007,43 @@ public class TestFilesetCatalogOperations {
             SecretConstants.ATTR_ENTITY_TYPE, entityType,
             SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
             SecretConstants.ATTR_PROPERTY_KEY, key));
+  }
+
+  private EntityStore independentNodeStore(NameIdentifier ident, CountDownLatch checkedAbsent)
+      throws Exception {
+    RelationalEntityStore node = new RelationalEntityStore();
+    FieldUtils.writeField(node, "backend", FieldUtils.readField(store, "backend", true), true);
+    FieldUtils.writeField(node, "cache", new NoOpsCache(Mockito.mock(Config.class)), true);
+    EntityStore racingStore = Mockito.spy(node);
+    Mockito.doAnswer(
+            invocation -> {
+              boolean exists = (boolean) invocation.callRealMethod();
+              Assertions.assertFalse(exists);
+              checkedAbsent.countDown();
+              Assertions.assertTrue(checkedAbsent.await(30, TimeUnit.SECONDS));
+              return exists;
+            })
+        .when(racingStore)
+        .exists(ident, Entity.EntityType.FILESET);
+    return racingStore;
+  }
+
+  private boolean createConcurrentFileset(
+      FilesetCatalogOperations ops,
+      NameIdentifier ident,
+      String location,
+      String comment,
+      long id) {
+    try {
+      ops.createMultipleLocationFileset(
+          ident,
+          comment,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("default", location),
+          ImmutableMap.of(StringIdentifier.ID_KEY, StringIdentifier.fromId(id).toString()));
+      return true;
+    } catch (FilesetAlreadyExistsException expected) {
+      return false;
+    }
   }
 }

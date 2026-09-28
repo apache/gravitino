@@ -210,7 +210,9 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DecimalType decimalType) {
       return String.format("%s(%s,%s)", DECIMAL, decimalType.precision(), decimalType.scale());
     } else if (type instanceof Types.VarCharType) {
-      return STRING;
+      throw new IllegalArgumentException(
+          "ClickHouse does not support varchar(n) length limits; use string for unlimited text "
+              + "or fixedchar(n) for a fixed-length value");
     } else if (type instanceof Types.FixedCharType fixedCharType) {
       return FIXEDSTRING + "(" + fixedCharType.length() + ")";
     } else if (type instanceof Types.BooleanType) {

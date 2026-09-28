@@ -31,6 +31,7 @@ import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -222,6 +223,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    */
   protected final Object authorizeMethod(Method method, Object[] args, MethodInvoker methodInvoker)
       throws Throwable {
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      return authorizeMethodInScope(method, args, methodInvoker, scope);
+    }
+  }
+
+  private Object authorizeMethodInScope(
+      Method method, Object[] args, MethodInvoker methodInvoker, AuthorizationRequestScope scope)
+      throws Throwable {
     try {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
@@ -316,6 +325,9 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
             throw new ForbiddenException(notAuthzMessage);
           }
         }
+        // A skipped standard check authorized nothing that list filtering could reuse.
+        scope.bindIfRead(
+            method, skipStandardCheck ? null : metalakeIdent, authorizationRequestContext);
       }
     } catch (Exception ex) {
       if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {

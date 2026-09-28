@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.authentication;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -55,6 +56,8 @@ public class AuthenticationFilter implements Filter {
 
   private final List<Authenticator> filterAuthenticators;
 
+  private final ObjectMapper objectMapper;
+
   /**
    * The matcher used to identify health check paths that bypass authentication. Subclasses may
    * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
@@ -62,12 +65,32 @@ public class AuthenticationFilter implements Filter {
   protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
 
   public AuthenticationFilter() {
-    filterAuthenticators = null;
+    this(null, ObjectMapperProvider.objectMapper());
+  }
+
+  /**
+   * Creates an authentication filter with explicit error stack-trace response behavior.
+   *
+   * @param includeErrorStackTrace whether authentication error responses should include diagnostic
+   *     stack traces
+   */
+  public AuthenticationFilter(boolean includeErrorStackTrace) {
+    this(null, ObjectMapperProvider.objectMapper(includeErrorStackTrace));
   }
 
   @VisibleForTesting
   AuthenticationFilter(List<Authenticator> authenticators) {
+    this(authenticators, ObjectMapperProvider.objectMapper());
+  }
+
+  @VisibleForTesting
+  AuthenticationFilter(List<Authenticator> authenticators, boolean includeErrorStackTrace) {
+    this(authenticators, ObjectMapperProvider.objectMapper(includeErrorStackTrace));
+  }
+
+  private AuthenticationFilter(List<Authenticator> authenticators, ObjectMapper objectMapper) {
     this.filterAuthenticators = authenticators;
+    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -83,74 +106,26 @@ public class AuthenticationFilter implements Filter {
       chain.doFilter(request, response);
       return;
     }
+    HttpServletRequest req = (HttpServletRequest) request;
+    HttpServletResponse resp = (HttpServletResponse) response;
     try {
-      List<Authenticator> authenticators;
-      if (filterAuthenticators == null || filterAuthenticators.isEmpty()) {
-        authenticators = ServerAuthenticator.getInstance().authenticators();
-      } else {
-        authenticators = filterAuthenticators;
-      }
-      HttpServletRequest req = (HttpServletRequest) request;
-      Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
-      byte[] authData = null;
-      if (headerData.hasMoreElements()) {
-        authData = headerData.nextElement().getBytes(StandardCharsets.UTF_8);
-      }
-
-      // If token is supported by multiple authenticators, use the first by default.
-      Principal principal = null;
-      for (Authenticator authenticator : authenticators) {
-        if (authenticator.supportsToken(authData) && authenticator.isDataFromToken()) {
-          principal = authenticator.authenticateToken(authData);
-          if (principal != null) {
-            break;
-          }
-        }
-      }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "uri={} hasAuthHeader={} principal={}",
-            req.getRequestURI(),
-            authData != null,
-            principal == null ? "null" : principal.getName());
-      }
-      if (principal == null) {
-        throw new UnauthorizedException("The provided credentials did not support");
-      }
-      // Role assumption: parse the header (syntactic only; malformed -> 400) and, only when
-      // narrowed, attach the roles to the principal. Membership 403 is checked later.
-      ActiveRoles activeRoles =
-          ActiveRolesParser.parse(req.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER));
-      if (!activeRoles.isAll() && principal instanceof UserPrincipal) {
-        principal = ((UserPrincipal) principal).withActiveRoles(activeRoles);
-      }
-      // Publish the finalized principal (already carrying any narrowed roles) so downstream
-      // re-binds from the attribute (e.g. Utils.doAs) see the same identity and roles.
-      request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
-      PrincipalUtils.doAs(
-          principal,
-          () -> {
-            chain.doFilter(request, response);
-            return null;
-          });
+      Principal principal = authenticate(req);
+      runAsPrincipal(principal, req, resp, chain);
     } catch (UnauthorizedException ue) {
       health.recordFailure(ue);
-      HttpServletResponse resp = (HttpServletResponse) response;
-      if (!ue.getChallenges().isEmpty()) {
-        // For some authentication, HTTP response can provide some challenge information
-        // to let client to create correct authenticated request.
-        // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
-        for (String challenge : ue.getChallenges()) {
-          if (!challenge.toLowerCase().startsWith("basic")) {
-            resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
-          }
-        }
-      }
-      sendAuthErrorResponse(resp, ue);
-    } catch (Exception e) {
-      health.recordFailure(e);
-      HttpServletResponse resp = (HttpServletResponse) response;
-      sendAuthErrorResponse(resp, e);
+      sendUnauthorizedResponse(resp, ue);
+    } catch (IllegalActiveRolesException | ForbiddenException clientError) {
+      health.recordFailure(clientError);
+      sendAuthErrorResponse(resp, clientError);
+    } catch (RuntimeException unexpected) {
+      health.recordFailure(unexpected);
+      // The response may omit the stack trace, so keep the cause in the server log.
+      LOG.error("Unexpected error while processing request to {}", req.getRequestURI(), unexpected);
+      sendAuthErrorResponse(resp, unexpected);
+    } catch (Exception checked) {
+      health.recordFailure(checked);
+      // Only the downstream chain throws checked exceptions, and PrincipalUtils.doAs logs them.
+      sendAuthErrorResponse(resp, checked);
     }
   }
 
@@ -188,7 +163,7 @@ public class AuthenticationFilter implements Filter {
     response.setStatus(httpStatus);
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    ObjectMapperProvider.objectMapper().writeValue(response.getWriter(), errorResponse);
+    objectMapper.writeValue(response.getWriter(), errorResponse);
   }
 
   /**
@@ -207,4 +182,88 @@ public class AuthenticationFilter implements Filter {
 
   @Override
   public void destroy() {}
+
+  private Principal authenticate(HttpServletRequest request) {
+    return applyActiveRoles(request, resolvePrincipal(request));
+  }
+
+  private Principal resolvePrincipal(HttpServletRequest request) {
+    byte[] authData = authorizationData(request);
+    Principal principal = null;
+    // If token is supported by multiple authenticators, use the first by default.
+    for (Authenticator authenticator : authenticators()) {
+      if (authenticator.supportsToken(authData) && authenticator.isDataFromToken()) {
+        principal = authenticator.authenticateToken(authData);
+        if (principal != null) {
+          break;
+        }
+      }
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "uri={} hasAuthHeader={} principal={}",
+          request.getRequestURI(),
+          authData != null,
+          principal == null ? "null" : principal.getName());
+    }
+    if (principal == null) {
+      throw new UnauthorizedException("The provided credentials did not support");
+    }
+    return principal;
+  }
+
+  private List<Authenticator> authenticators() {
+    if (filterAuthenticators == null || filterAuthenticators.isEmpty()) {
+      return ServerAuthenticator.getInstance().authenticators();
+    }
+    return filterAuthenticators;
+  }
+
+  private static byte[] authorizationData(HttpServletRequest request) {
+    Enumeration<String> headerData = request.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
+    return headerData.hasMoreElements()
+        ? headerData.nextElement().getBytes(StandardCharsets.UTF_8)
+        : null;
+  }
+
+  // Role assumption: parse the header (syntactic only; malformed -> 400) and, only when narrowed,
+  // attach the roles to the principal. Membership 403 is checked later.
+  private static Principal applyActiveRoles(HttpServletRequest request, Principal principal) {
+    ActiveRoles activeRoles =
+        ActiveRolesParser.parse(request.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER));
+    if (!activeRoles.isAll() && principal instanceof UserPrincipal) {
+      return ((UserPrincipal) principal).withActiveRoles(activeRoles);
+    }
+    return principal;
+  }
+
+  private static void runAsPrincipal(
+      Principal principal,
+      HttpServletRequest request,
+      HttpServletResponse response,
+      FilterChain chain)
+      throws Exception {
+    // Publish the finalized principal (already carrying any narrowed roles) so downstream
+    // re-binds from the attribute (e.g. Utils.doAs) see the same identity and roles.
+    request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
+    PrincipalUtils.doAs(
+        principal,
+        () -> {
+          chain.doFilter(request, response);
+          return null;
+        });
+  }
+
+  private void sendUnauthorizedResponse(HttpServletResponse response, UnauthorizedException ue)
+      throws IOException {
+    // For some authentication, HTTP response can provide some challenge information
+    // to let client to create correct authenticated request.
+    // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
+    for (String challenge : ue.getChallenges()) {
+      if (!challenge.toLowerCase().startsWith("basic")) {
+        response.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+      }
+    }
+    sendAuthErrorResponse(response, ue);
+  }
 }

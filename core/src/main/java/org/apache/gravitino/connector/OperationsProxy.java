@@ -19,6 +19,7 @@
 package org.apache.gravitino.connector;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
@@ -54,9 +55,16 @@ public class OperationsProxy<T> implements InvocationHandler {
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    return plugin.doAs(
-        PrincipalUtils.getCurrentPrincipal(),
-        () -> method.invoke(ops, args),
-        Collections.emptyMap());
+    try {
+      return plugin.doAs(
+          PrincipalUtils.getCurrentPrincipal(),
+          () -> method.invoke(ops, args),
+          Collections.emptyMap());
+    } catch (InvocationTargetException e) {
+      // Surface the operation's own exception instead of the reflective wrapper, so
+      // callers dispatching on exception type (e.g. REST status mapping) keep working.
+      Throwable cause = e.getCause();
+      throw cause != null ? cause : e;
+    }
   }
 }

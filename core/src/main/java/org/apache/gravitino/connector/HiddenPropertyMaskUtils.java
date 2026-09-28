@@ -111,7 +111,7 @@ public final class HiddenPropertyMaskUtils {
         keysToOmit.add(key);
       } else if (hidden
           || SecretPropertyUtils.isSecretProperty(key, value)
-          || SecretPropertyUtils.isSensitivePropertyKey(key)) {
+          || (!metadata.containsProperty(key) && SecretPropertyUtils.isSensitivePropertyKey(key))) {
         keysToMask.add(key);
       }
     }

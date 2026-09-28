@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -63,6 +65,8 @@ public class IcebergRESTServiceOperations {
   // The post-strip key used by the Iceberg REST server itself; see
   // IcebergConstants.GRAVITINO_METALAKE and DynamicIcebergConfigProvider.
   private static final String SERVED_METALAKE_KEY = "gravitino-metalake";
+  // Overrides the listener-derived endpoint; see docs/iceberg-rest-service.md.
+  private static final String ADVERTISED_URI_KEY = "advertised-uri";
   private static final String HOST_KEY = "host";
   private static final String HTTP_PORT_KEY = "httpPort";
   private static final String HTTPS_PORT_KEY = "httpsPort";
@@ -90,9 +94,18 @@ public class IcebergRESTServiceOperations {
   @Timed(name = "iceberg-rest-service." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg-rest-service", absolute = true)
   public Response getIcebergRestServiceUri(@QueryParam("metalake") String metalake) {
+    String uri;
+    try {
+      uri = resolveUri(metalake);
+    } catch (IllegalStateException e) {
+      // A misconfiguration, re-reported on every discovery poll until fixed; the message alone
+      // identifies it, so the stack trace is omitted from both the log and the response.
+      LOG.error("Failed to resolve the Iceberg REST service endpoint: {}", e.getMessage());
+      return Utils.internalError(e.getMessage());
+    }
     // The reported host can depend on the caller's own Host header (see resolveUri), so this
     // response must never be cached and replayed to a different caller.
-    return Response.fromResponse(Utils.ok(new IcebergRESTServiceResponse(resolveUri(metalake))))
+    return Response.fromResponse(Utils.ok(new IcebergRESTServiceResponse(uri)))
         .header("Cache-Control", "no-store")
         .build();
   }
@@ -147,6 +160,11 @@ public class IcebergRESTServiceOperations {
       return null;
     }
 
+    String advertisedUri = StringUtils.trimToNull(config.get(ADVERTISED_URI_KEY));
+    if (advertisedUri != null) {
+      return checkAdvertisedUri(advertisedUri);
+    }
+
     String host = config.getOrDefault(HOST_KEY, DEFAULT_HOST);
     if (isWildcardHost(host)) {
       // The Iceberg REST server binds to all interfaces, so it has no single externally
@@ -164,6 +182,31 @@ public class IcebergRESTServiceOperations {
             enableHttps ? HTTPS_PORT_KEY : HTTP_PORT_KEY,
             enableHttps ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT);
     return String.format("%s://%s:%d/iceberg", scheme, bracketIfIPv6(host), port);
+  }
+
+  private static String checkAdvertisedUri(String value) {
+    boolean valid;
+    try {
+      URI uri = new URI(value);
+      // URI accepts any non-negative integer as a port; -1 means no explicit port.
+      int port = uri.getPort();
+      valid =
+          StringUtils.equalsAnyIgnoreCase(uri.getScheme(), "http", "https")
+              && StringUtils.isNotBlank(uri.getHost())
+              && (port == -1 || (port >= 1 && port <= 65535))
+              && uri.getQuery() == null
+              && uri.getFragment() == null;
+    } catch (URISyntaxException e) {
+      valid = false;
+    }
+    if (!valid) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid Iceberg REST service %s '%s': expected an absolute http(s) URI with a "
+                  + "host, a port in 1-65535 if present, and no query or fragment",
+              ADVERTISED_URI_KEY, value));
+    }
+    return value;
   }
 
   // An IPv6 literal host (e.g. "::1", from an explicit config value or from

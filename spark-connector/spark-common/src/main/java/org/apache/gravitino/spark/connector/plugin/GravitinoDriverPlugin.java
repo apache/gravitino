@@ -173,6 +173,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
                 return;
               }
+              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+              if (sparkConf.contains(sparkCatalogConfigName)) {
+                LOG.info(
+                    "Skip registering catalog {} because it is already configured in Spark.",
+                    catalogName);
+                return;
+              }
               try {
                 registerCatalog(sparkConf, catalogName, kind);
               } catch (Exception e) {

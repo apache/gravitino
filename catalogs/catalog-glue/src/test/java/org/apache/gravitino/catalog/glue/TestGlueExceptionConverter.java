@@ -72,6 +72,23 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
+  public void testIsAuthenticationFailureMatchesAwsErrorCode() {
+    GlueException e = invalidCredentialsException();
+
+    assertTrue(GlueExceptionConverter.isAuthenticationFailure(e));
+  }
+
+  @Test
+  public void testIsAuthenticationFailureRejectsAuthorizationError() {
+    AccessDeniedException e =
+        AccessDeniedException.builder()
+            .awsErrorDetails(AwsErrorDetails.builder().errorCode("AccessDeniedException").build())
+            .build();
+
+    assertFalse(GlueExceptionConverter.isAuthenticationFailure(e));
+  }
+
+  @Test
   public void testToCredentialExceptionIncludesContextAndPropertyNames() {
     SdkClientException cause =
         SdkClientException.create("Unable to load credentials from any of the providers");
@@ -82,6 +99,18 @@ public class TestGlueExceptionConverter {
     assertTrue(ex.getMessage().contains("table mydb.mytbl"));
     assertTrue(ex.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
     assertTrue(ex.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  public void testRejectedCredentialsIncludePropertyNamesAndAwsError() {
+    GlueException cause = invalidCredentialsException();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "listing schemas");
+
+    assertSame(cause, converted.getCause());
+    assertTrue(converted.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertTrue(converted.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+    assertTrue(converted.getMessage().contains("UnrecognizedClientException"));
   }
 
   @Test
@@ -217,5 +246,17 @@ public class TestGlueExceptionConverter {
     assertInstanceOf(
         IllegalArgumentException.class,
         GlueExceptionConverter.toTableException(invalid, "table ctas_test"));
+  }
+
+  private static GlueException invalidCredentialsException() {
+    return (GlueException)
+        GlueException.builder()
+            .message("The security token included in the request is invalid")
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("UnrecognizedClientException")
+                    .errorMessage("The security token included in the request is invalid")
+                    .build())
+            .build();
   }
 }

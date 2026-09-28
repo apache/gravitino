@@ -25,14 +25,9 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREF
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
-import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
+import org.apache.gravitino.cloud.storage.CloudPropertiesMetadata;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class FilesetSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -73,12 +68,7 @@ public class FilesetSchemaPropertiesMetadata extends BasePropertiesMetadata {
                   false /* reserved */))
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
-          .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
-          .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES)
           .build();
 
   @Override

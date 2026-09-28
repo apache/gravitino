@@ -30,12 +30,11 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Gravitino Iceberg Catalog. */
-public class GravitinoIcebergCatalog extends BaseCatalog {
+public abstract class GravitinoIcebergCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoIcebergCatalog.class);
 
@@ -94,11 +93,25 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
       }
       this.icebergCatalog =
           asAbstractCatalog(
-              new FlinkCatalogFactory()
-                  .createCatalog(icebergCatalogName, mutableIcebergProperties));
+              createInnerIcebergCatalog(icebergCatalogName, mutableIcebergProperties));
     }
     super.open();
   }
+
+  /**
+   * Creates the inner Iceberg {@code FlinkCatalogFactory}-backed catalog. Subclasses for different
+   * Flink versions implement this because {@code FlinkCatalogFactory.createCatalog}'s signature has
+   * changed across Flink major versions (e.g. Flink 2.x removed the public 2-arg {@code
+   * createCatalog(String, Map)} overload used by Flink 1.x and made the 3-arg {@code
+   * createCatalog(String, Map, Configuration)} overload protected, leaving only the public {@code
+   * createCatalog(Context)} overload usable from outside the iceberg-flink package).
+   *
+   * @param catalogName the Iceberg catalog name
+   * @param properties the Iceberg catalog properties
+   * @return the created inner catalog
+   */
+  protected abstract Object createInnerIcebergCatalog(
+      String catalogName, Map<String, String> properties);
 
   @Override
   public Optional<Factory> getFactory() {

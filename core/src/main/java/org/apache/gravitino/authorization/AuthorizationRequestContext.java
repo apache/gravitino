@@ -51,9 +51,11 @@ import org.apache.gravitino.utils.PrincipalUtils;
  *   <li>per-request role loading happens at most once via {@link #loadRole(Runnable)}.
  * </ul>
  *
- * <p>Instances are not intended to outlive a request and are not reusable across threads beyond the
- * request handling thread; the internal maps are {@link ConcurrentHashMap} purely to tolerate any
- * incidental fan-out (e.g. async listeners) within the same request scope.
+ * <p>Instances must not outlive a request or be reused across principals, active-role selections or
+ * metalakes. Entry authorization and list filtering of one read-only request may share an instance:
+ * list workers receive it explicitly, which is why the internal maps are {@link ConcurrentHashMap}.
+ * Role selection must be fixed before workers start, and a mutation must not reuse decisions made
+ * before it.
  */
 public class AuthorizationRequestContext {
 

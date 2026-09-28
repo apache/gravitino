@@ -121,8 +121,10 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
             DATAFILE_MSE + "/100 + " + DELETE_FILE_NUM + " * 100"),
         CompactionStrategyHandler.NAME);
 
-    associatePoliciesToSchema(policyForSmallFile, TEST_SCHEMA);
-    associatePoliciesToSchema(policyForDelete, TEST_SCHEMA);
+    createTagForPolicy(policyForSmallFile);
+    createTagForPolicy(policyForDelete);
+    associatePolicyTagToSchema(policyForSmallFile, TEST_SCHEMA);
+    associatePolicyTagToSchema(policyForDelete, TEST_SCHEMA);
 
     statisticsUpdater.updateTableStatistics(
         getTableIdentifier(tableWithSmallFile),
@@ -186,8 +188,9 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
             StrategyUtils.SCORE_EXPR,
             DELETE_FILE_NUM + " * 100 + " + DATAFILE_MSE),
         CompactionStrategyHandler.NAME);
-    associatePoliciesToTable(policyName, tableName);
-    associatePoliciesToTable(policyName, tableName2);
+    createTagForPolicy(policyName);
+    associatePolicyTagToTable(policyName, tableName);
+    associatePolicyTagToTable(policyName, tableName2);
 
     List<PartitionEntry> partition1 =
         Arrays.asList(new PartitionEntryImpl("col1", "1"), new PartitionEntryImpl("col2", "3"));

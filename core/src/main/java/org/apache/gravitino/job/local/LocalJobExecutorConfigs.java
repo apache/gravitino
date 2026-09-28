@@ -37,4 +37,10 @@ public class LocalJobExecutorConfigs {
   public static final long DEFAULT_JOB_STATUS_KEEP_TIME_MS = 60 * 60 * 1000; // 1 hour
 
   public static final String SPARK_HOME = "sparkHome";
+
+  /**
+   * The job staging directory, set by Gravitino from {@code gravitino.job.stagingDir} rather than
+   * by users. A value configured under the local job executor's prefix is overridden.
+   */
+  public static final String STAGING_DIR = "stagingDir";
 }

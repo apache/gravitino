@@ -40,6 +40,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
 import org.apache.gravitino.lance.service.rest.LanceNamespaceOperations;
 import org.apache.gravitino.lance.service.rest.LanceTableOperations;
@@ -120,6 +121,24 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
         interceptor.invoke(
             invocation(namespaceMethod("describeNamespace"), CATALOG + "." + SCHEMA, "."));
     assertErrorResponse(describe, Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testForbiddenResponseOmitsStackTraceWhenDisabled() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
+    when(authorizer.deny(any(), any(), any(), any(), any())).thenReturn(true);
+    try {
+      LanceExceptionMapper.setIncludeErrorStackTrace(false);
+      Object result =
+          interceptor.invoke(
+              invocation(namespaceMethod("namespaceExists"), CATALOG + "$" + SCHEMA, "$"));
+
+      assertErrorResponse(result, Response.Status.FORBIDDEN);
+      ErrorResponse entity = (ErrorResponse) ((Response) result).getEntity();
+      assertEquals("", entity.getDetail());
+    } finally {
+      LanceExceptionMapper.setIncludeErrorStackTrace(true);
+    }
   }
 
   @Test

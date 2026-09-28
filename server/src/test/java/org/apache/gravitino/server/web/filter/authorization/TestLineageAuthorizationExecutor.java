@@ -113,7 +113,7 @@ class TestLineageAuthorizationExecutor {
   }
 
   @Test
-  void testInterceptorRejectsUserOutsideDynamicMetalake() throws Throwable {
+  void testMissingAndInaccessibleDynamicMetalakeHaveSameResponse() throws Throwable {
     MethodInvocation invocation = invocation(event());
 
     try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
@@ -126,38 +126,24 @@ class TestLineageAuthorizationExecutor {
               () ->
                   AuthorizationUtils.checkCurrentUser(
                       eq(METALAKE), eq("tester"), any(AuthorizationRequestContext.class)))
+          .thenThrow(new NoSuchMetalakeException("Metalake does not exist"))
           .thenThrow(new ForbiddenException("User tester is not a member"));
-
-      Response response = (Response) lineageInterceptor().invoke(invocation);
-
-      Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      verify(invocation, never()).proceed();
-    }
-  }
-
-  @Test
-  void testRejectNonexistentDynamicMetalakeAsBadRequest() throws Throwable {
-    MethodInvocation invocation = invocation(event());
-
-    try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
-        MockedStatic<AuthorizationUtils> authorizationUtils =
-            mockStatic(AuthorizationUtils.class)) {
-      principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal());
-      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
       authorizationUtils
-          .when(
-              () ->
-                  AuthorizationUtils.checkCurrentUser(
-                      eq(METALAKE), eq("tester"), any(AuthorizationRequestContext.class)))
-          .thenThrow(new NoSuchMetalakeException("Metalake does not exist"));
+          .when(() -> AuthorizationUtils.metalakeMembershipFailureMessage("metalake", "tester"))
+          .thenCallRealMethod();
 
-      Response response = (Response) lineageInterceptor().invoke(invocation);
+      MethodInterceptor interceptor = lineageInterceptor();
+      Response missingResponse = (Response) interceptor.invoke(invocation);
+      Response inaccessibleResponse = (Response) interceptor.invoke(invocation);
 
-      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-      Assertions.assertTrue(
-          errorResponse.getMessage().contains("job.namespace"),
-          "The response should identify the invalid field");
+      Assertions.assertEquals(
+          Response.Status.FORBIDDEN.getStatusCode(), missingResponse.getStatus());
+      Assertions.assertEquals(missingResponse.getStatus(), inaccessibleResponse.getStatus());
+      ErrorResponse missingError = (ErrorResponse) missingResponse.getEntity();
+      ErrorResponse inaccessibleError = (ErrorResponse) inaccessibleResponse.getEntity();
+      Assertions.assertEquals(missingError.getCode(), inaccessibleError.getCode());
+      Assertions.assertEquals(missingError.getType(), inaccessibleError.getType());
+      Assertions.assertEquals(missingError.getMessage(), inaccessibleError.getMessage());
       verify(invocation, never()).proceed();
     }
   }

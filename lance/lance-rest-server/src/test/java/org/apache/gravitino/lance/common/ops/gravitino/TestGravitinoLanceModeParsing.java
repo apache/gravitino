@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -206,6 +207,8 @@ class TestGravitinoLanceModeParsing {
             Map.of(
                 LANCE_LOCATION,
                 "/tmp/table",
+                Table.PROPERTY_TABLE_FORMAT,
+                LANCE_TABLE_FORMAT,
                 LANCE_TABLE_DECLARED,
                 "true",
                 LANCE_STORAGE_OPTIONS_PREFIX + "region",

@@ -91,8 +91,10 @@ public class JobHookDispatcher implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
-    return jobOperationDispatcher.getJob(metalake, jobId);
+  public JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException {
+    return jobOperationDispatcher.getJob(metalake, jobId, includeOutput, maxLines, maxBytes);
   }
 
   @Override

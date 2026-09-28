@@ -53,7 +53,6 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -588,12 +587,6 @@ public class TagMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper ->
-                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          tagId, MetadataObject.Type.TAG.name())),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,

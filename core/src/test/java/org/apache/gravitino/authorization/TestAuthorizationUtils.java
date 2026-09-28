@@ -40,6 +40,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -55,6 +56,24 @@ import org.mockito.Mockito;
 class TestAuthorizationUtils {
 
   String metalake = "metalake";
+
+  @Test
+  void testCheckCurrentUserUsesNeutralMembershipMessage() {
+    try (MockedStatic<GravitinoEnv> envMock = Mockito.mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+      GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+      envMock.when(GravitinoEnv::getInstance).thenReturn(env);
+      Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+
+      ForbiddenException exception =
+          Assertions.assertThrows(
+              ForbiddenException.class,
+              () -> AuthorizationUtils.checkCurrentUser(metalake, "tester"));
+      Assertions.assertEquals(
+          "Current user tester is not a member of metalake metalake, or the metalake does not exist",
+          exception.getMessage());
+    }
+  }
 
   @Test
   void testCreateNameIdentifier() {
@@ -422,6 +441,42 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(MetadataObject.Type.TABLE, renameChange.newMetadataObject().type());
     Assertions.assertEquals(
         "catalog.schema.renamed_table", renameChange.newMetadataObject().fullName());
+    Assertions.assertEquals(locations, renameChange.locations());
+  }
+
+  @Test
+  void testRenameTableAcrossSchemasNotifiesAuthorizationPluginWithNewSchema() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "new_schema", "new_table");
+    List<String> locations = Lists.newArrayList("/warehouse/schema/table");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, baseCatalog);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.TABLE, newIdent, locations);
+    }
+
+    ArgumentCaptor<MetadataObjectChange[]> changesCaptor =
+        ArgumentCaptor.forClass(MetadataObjectChange[].class);
+    Mockito.verify(authorizationPlugin).onMetadataUpdated(changesCaptor.capture());
+    MetadataObjectChange.RenameMetadataObject renameChange =
+        Assertions.assertInstanceOf(
+            MetadataObjectChange.RenameMetadataObject.class, changesCaptor.getValue()[0]);
+    Assertions.assertEquals("catalog.schema.table", renameChange.metadataObject().fullName());
+    Assertions.assertEquals(
+        "catalog.new_schema.new_table", renameChange.newMetadataObject().fullName());
     Assertions.assertEquals(locations, renameChange.locations());
   }
 

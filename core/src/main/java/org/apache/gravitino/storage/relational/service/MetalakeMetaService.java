@@ -54,9 +54,12 @@ import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
@@ -231,6 +234,10 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    TableVersionMapper.class,
+                    mapper -> mapper.softDeleteTableVersionsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     TableColumnMapper.class,
                     mapper -> mapper.softDeleteColumnsByMetalakeId(metalakeId)),
             () ->
@@ -331,7 +338,15 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ViewVersionInfoMapper.class,
-                    mapper -> mapper.softDeleteViewVersionsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteViewVersionsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SemanticModelMetaMapper.class,
+                    mapper -> mapper.softDeleteSemanticModelMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SemanticModelVersionInfoMapper.class,
+                    mapper -> mapper.softDeleteSemanticModelVersionsByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
@@ -414,6 +429,19 @@ public class MetalakeMetaService {
                 MetalakeMetaMapper.class,
                 mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion)),
         () -> metalakeWriteFailure(identifier, metalakeId, identifier.name()));
+  }
+
+  /** Locks and validates a metalake while inserting a child in the current transaction. */
+  void lockMetalakeForChildWrite(String name, Long metalakeId) {
+    OccWriteSupport.lockParentForChildWrite(
+        name,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), name));
   }
 
   private RuntimeException metalakeWriteFailure(

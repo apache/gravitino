@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.storage.AWSProperties;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.GCSProperties;
@@ -52,12 +53,12 @@ public class TestFilesetCloudPropertiesMetadata {
   @ParameterizedTest
   @MethodSource("filesetPropertiesMetadata")
   void testCloudCredentialsAreHidden(PropertiesMetadata metadata) {
-    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
     assertTrue(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
-    assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
   }
 
@@ -84,11 +85,22 @@ public class TestFilesetCloudPropertiesMetadata {
         HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
 
     assertEquals("s3a://bucket/path", response.get(FilesetCatalogPropertiesMetadata.LOCATION));
-    assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE,
-        response.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertEquals("AKIATEST", response.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         response.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testAwsAccessKeyIsDeclaredOnlyOnTheFilesetCatalog() {
+    assertTrue(
+        new FilesetCatalogPropertiesMetadata()
+            .containsProperty(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertFalse(
+        new FilesetSchemaPropertiesMetadata()
+            .containsProperty(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
+    assertFalse(
+        new FilesetPropertiesMetadata()
+            .containsProperty(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
   }
 }

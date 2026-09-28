@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Auditable;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -148,28 +147,4 @@ public interface Policy extends Auditable {
    *     the policy is not associated with any object.
    */
   Optional<Boolean> inherited();
-
-  /**
-   * @return The associated objects of the policy.
-   */
-  default AssociatedObjects associatedObjects() {
-    throw new UnsupportedOperationException("The associatedObjects method is not supported.");
-  }
-
-  /** The interface of the associated objects of the policy. */
-  interface AssociatedObjects {
-
-    /**
-     * @return The number of objects that are associated with this policy
-     */
-    default int count() {
-      MetadataObject[] objects = objects();
-      return objects == null ? 0 : objects.length;
-    }
-
-    /**
-     * @return The list of objects that are associated with this policy.
-     */
-    MetadataObject[] objects();
-  }
 }
