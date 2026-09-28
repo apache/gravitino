@@ -73,6 +73,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+// The local job executor still implements the deprecated submitJob(JobTemplate).
+@SuppressWarnings("deprecation")
 public class TestLocalJobExecutor {
 
   private static final int DEFAULT_TEST_MAX_BYTES = 1_000_000;

@@ -297,6 +297,9 @@ public class LocalJobExecutor implements JobExecutor {
     }
   }
 
+  // Still receives the localized job template through the default submitJob(JobContext,
+  // JobTemplate), until the local job executor handles the job context itself.
+  @SuppressWarnings("deprecation")
   @Override
   public String submitJob(JobTemplate jobTemplate) {
     // Validate the job can be launched before queueing it, so that a misconfiguration is reported
