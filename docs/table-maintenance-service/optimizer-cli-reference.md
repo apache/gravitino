@@ -41,8 +41,8 @@ directory. Use `--conf-path` only when you need a custom config file.
 | `--action-time` | Action timestamp in epoch seconds used as evaluation anchor. | `monitor-metrics` |
 | `--range-seconds` | Time window (seconds) for monitor evaluation. Default is `86400` (24h). | `monitor-metrics` |
 | `--partition-path` | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier. | `monitor-metrics`, `list-table-metrics` |
-| `--update-mode` | Controls what built-in update job updates: `stats`, `manifests`, `metrics`, or `all` (default). | `submit-update-stats-job` |
-| `--updater-options` | Flat JSON map passed to updater logic. For `stats`/`manifests`/`all`, include `gravitino_uri` and `metalake`. | `submit-update-stats-job` |
+| `--update-mode` | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default). | `submit-update-stats-job` |
+| `--updater-options` | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`. | `submit-update-stats-job` |
 | `--spark-conf` | Flat JSON map of Spark and Iceberg catalog configs used by the job. | `submit-update-stats-job` |
 
 Global option:
@@ -237,7 +237,7 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Five job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
+Six Iceberg job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
 | Job template                          | What it does                             |
 |---------------------------------------|-------------------------------------------|
@@ -246,6 +246,7 @@ Five job templates ship with the service, and they are complementary rather than
 | `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
 | `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
 | `builtin-iceberg-rewrite-manifests`   | Consolidates small manifest files         |
+| `builtin-iceberg-update-manifest-stats` | Collects manifest statistics for one spec |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
@@ -271,9 +272,9 @@ ones they intentionally disable or leave at a documented default, rather than om
 
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
 
-### Manifest statistics by partition spec
+## Update Manifest Statistics
 
-In `manifests`, `stats` and `all` modes, `builtin-iceberg-update-stats` also collects two table-level
+`builtin-iceberg-update-manifest-stats` is a separate Spark job that collects two table-level
 statistics, including for partitioned tables:
 
 | Statistic | Object entry for each decimal spec ID |
@@ -281,16 +282,44 @@ statistics, including for partitioned tables:
 | `custom-manifest-number-by-spec` | Long manifest count |
 | `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
 
-Use `--update-mode manifests` for manifest-only collection. This avoids scanning data-file
-statistics and works after partition evolution, where the file-statistics path may reject null
-values for partition fields absent from older specs. `stats` and `all` also collect file statistics.
+The job reads manifest metadata without scanning file statistics. It works after partition
+evolution, including for specs whose partition fields are absent from older files.
+`builtin-iceberg-update-stats` and the `submit-update-stats-job` CLI retain their existing behavior;
+they do not collect manifest statistics. Submit the new template directly through the jobs API.
 
 Set `spec_id` in the job template's `jobConf` (`--spec-id` for the Spark main class) to collect
 an existing non-negative partition spec ID. Omission resolves the table's current default once.
 The collector reads data and delete manifests from one current Iceberg snapshot and filters by
 that resolved spec. A defined spec with no manifests, including a table without a snapshot,
-produces count `0` and average `0.0`. An unknown spec ID fails collection. Metrics-only mode
-does not collect these object-valued statistics.
+produces count `0` and average `0.0`. An unknown spec ID fails collection.
+
+The new template accepts `catalog_name`, `table_identifier`, optional `spec_id`,
+`updater_options`, and optional `spark_conf`, alongside the standard Spark template settings.
+`updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
+a `statistics_updater` that implements atomic merging. The template has no `update_mode`.
+For example:
+
+```bash
+curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jobTemplateName": "builtin-iceberg-update-manifest-stats",
+    "jobConf": {
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
+      "spec_id": "1",
+      "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+      "spark_master": "local[2]",
+      "spark_executor_instances": "1",
+      "spark_executor_cores": "1",
+      "spark_executor_memory": "1g",
+      "spark_driver_memory": "1g",
+      "catalog_type": "rest",
+      "catalog_uri": "http://localhost:9001/iceberg",
+      "warehouse_location": ""
+    }
+  }'
+```
 
 For example, collecting spec `1` can produce logical object values `{"0": 620, "1": 120}`
 and `{"0": 10485760.0, "1": 4194304.0}`. It replaces only spec `1`; spec `0` remains intact.

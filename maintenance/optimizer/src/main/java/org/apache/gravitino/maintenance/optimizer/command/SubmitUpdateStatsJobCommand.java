@@ -220,11 +220,8 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     String normalized =
         StringUtils.isBlank(value) ? DEFAULT_UPDATE_MODE : value.trim().toLowerCase(Locale.ROOT);
     Preconditions.checkArgument(
-        "stats".equals(normalized)
-            || "manifests".equals(normalized)
-            || "metrics".equals(normalized)
-            || "all".equals(normalized),
-        "Invalid --update-mode: %s. Supported values are: stats, manifests, metrics, all",
+        "stats".equals(normalized) || "metrics".equals(normalized) || "all".equals(normalized),
+        "Invalid --update-mode: %s. Supported values are: stats, metrics, all",
         value);
     return normalized;
   }
@@ -275,9 +272,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
   private static void validateUpdaterOptions(
       String updateMode, Map<String, String> updaterOptions) {
-    if (!"stats".equals(updateMode)
-        && !"manifests".equals(updateMode)
-        && !"all".equals(updateMode)) {
+    if (!"stats".equals(updateMode) && !"all".equals(updateMode)) {
       return;
     }
     String gravitinoUri = StringUtils.trimToNull(updaterOptions.get("gravitino_uri"));
@@ -287,13 +282,13 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
         "Option --updater-options (or config key "
             + OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX
             + "updater_options) "
-            + "must contain 'gravitino_uri' when update_mode is stats, manifests or all");
+            + "must contain 'gravitino_uri' when update_mode is stats or all");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake),
         "Option --updater-options (or config key "
             + OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX
             + "updater_options) "
-            + "must contain 'metalake' when update_mode is stats, manifests or all");
+            + "must contain 'metalake' when update_mode is stats or all");
   }
 
   private static void validateSparkConfigs(

@@ -504,24 +504,6 @@ class TestOptimizerCmd {
   }
 
   @Test
-  void testSubmitManifestStatisticsJobDryRun() throws Exception {
-    Path confPath = createOptimizerConfForSubmitUpdateStatsJob();
-    String[] output =
-        runCommand(
-            "--type",
-            "submit-update-stats-job",
-            "--identifiers",
-            "ab.t1",
-            "--update-mode",
-            "manifests",
-            "--dry-run",
-            "--conf-path",
-            confPath.toString());
-    Assertions.assertTrue(output[1].isEmpty(), output[1]);
-    Assertions.assertTrue(output[0].contains("update_mode=manifests"));
-  }
-
-  @Test
   void testSubmitUpdateStatsJobRejectsInvalidUpdateMode() throws Exception {
     Path confPath = createOptimizerConfForSubmitUpdateStatsJob();
     String[] output =
