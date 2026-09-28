@@ -638,14 +638,11 @@ public class CatalogConnectorMetadata {
                   + view.getName()
                   + " because it has SQL representations in other dialects");
         }
+        // Property changes must precede ReplaceView: Hive's ReplaceView handling encodes the new
+        // native Trino view payload (including the owner) from whatever properties have been
+        // applied so far in this array, so the owner update needs to land before ReplaceView reads
+        // it, not after.
         List<ViewChange> changes = new ArrayList<>();
-        changes.add(
-            ViewChange.replaceView(
-                view.getRawColumns(),
-                representations,
-                view.getDefaultCatalog(),
-                view.getDefaultSchema(),
-                view.getComment()));
         changes.addAll(computePropertyChanges(existingView.properties(), view.getProperties()));
         if (existingView
                 .properties()
@@ -659,6 +656,13 @@ public class CatalogConnectorMetadata {
               ViewChange.removeProperty(
                   CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY));
         }
+        changes.add(
+            ViewChange.replaceView(
+                view.getRawColumns(),
+                representations,
+                view.getDefaultCatalog(),
+                view.getDefaultSchema(),
+                view.getComment()));
         viewCatalog.alterView(identifier, changes.toArray(new ViewChange[0]));
       } else {
         viewCatalog.createView(

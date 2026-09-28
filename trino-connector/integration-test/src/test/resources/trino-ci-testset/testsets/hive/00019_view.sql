@@ -43,5 +43,17 @@ SHOW TABLES FROM gt_hive.gt_hive_view_db;
 SELECT * FROM gt_hive.gt_hive_view_db.native_v01 ORDER BY id;
 DROP VIEW native_hive.gt_hive_view_db.native_v01;
 
+-- reverse direction: a view created through gt_hive is persisted to Hive Metastore using Trino's
+-- own native "Presto View" format, so it is directly visible and queryable through Trino's native
+-- Hive connector (native_hive) without going through Gravitino at all, including a timestamp(3)
+-- output column.
+CREATE TABLE gt_hive.gt_hive_view_db.t02 (id integer, name varchar, created_at timestamp(3));
+INSERT INTO gt_hive.gt_hive_view_db.t02 VALUES (1, 'alice', TIMESTAMP '2024-01-01 00:00:00.000'), (2, 'bob', TIMESTAMP '2024-01-02 00:00:00.000');
+CREATE VIEW gt_hive.gt_hive_view_db.v04 AS SELECT id, name, created_at FROM gt_hive.gt_hive_view_db.t02 WHERE id = 2;
+SHOW CREATE VIEW native_hive.gt_hive_view_db.v04;
+SELECT * FROM native_hive.gt_hive_view_db.v04 ORDER BY id;
+DROP VIEW gt_hive.gt_hive_view_db.v04;
+DROP TABLE gt_hive.gt_hive_view_db.t02;
+
 DROP TABLE gt_hive.gt_hive_view_db.t01;
 DROP SCHEMA gt_hive.gt_hive_view_db;

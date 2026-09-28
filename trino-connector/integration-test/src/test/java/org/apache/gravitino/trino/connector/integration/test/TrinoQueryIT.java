@@ -487,6 +487,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
+    sqls = removeSqlComments(sqls);
     String resultFileName = path.replace(".sql", ".txt");
     FileOutputStream outputStream = new FileOutputStream(resultFileName);
 

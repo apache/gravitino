@@ -1062,10 +1062,84 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testAlterViewReplaceRejectsExistingNonDefaultOwner() throws Exception {
-    // Gravitino's view model has no owner concept; replacing a native Trino view that has a
-    // non-null owner (a SECURITY DEFINER view) would silently turn it into an ownerless view.
-    assertReplaceRejectsUnrepresentableNativeView(
+  void testAlterViewReplacePropagatesNewOwnerProperty() throws Exception {
+    // The owner round-trips through the TRINO_VIEW_OWNER_PROPERTY reserved property: a SetProperty
+    // change alongside ReplaceView must land in the re-encoded native Trino payload as the new
+    // SECURITY DEFINER owner.
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    String encoded =
+        TrinoNativeViewCodec.encode(
+            new TrinoNativeViewCodec.ViewDefinition(
+                "SELECT 1",
+                null,
+                null,
+                List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
+                null,
+                null,
+                true,
+                List.of()));
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_hive"),
+        ViewChange.setProperty(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY, "alice"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertEquals("alice", decoded.owner);
+    Assertions.assertFalse(decoded.runAsInvoker);
+  }
+
+  @Test
+  void testAlterViewReplaceClearsOwnerWhenPropertyRemoved() throws Exception {
+    // Replacing a SECURITY DEFINER view with RemoveProperty(owner) alongside ReplaceView must
+    // clear the owner in the re-encoded payload, downgrading it to SECURITY INVOKER.
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    String encoded =
         TrinoNativeViewCodec.encode(
             new TrinoNativeViewCodec.ViewDefinition(
                 "SELECT 1",
@@ -1074,25 +1148,56 @@ class TestHiveCatalogOperations {
                 List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
                 null,
                 "alice",
-                true,
-                List.of())));
-  }
-
-  @Test
-  void testAlterViewReplaceRejectsExistingRunAsInvokerFalse() throws Exception {
-    // runAsInvoker=false means SECURITY DEFINER; Gravitino always writes runAsInvoker=true, so
-    // replacing such a view would silently downgrade it to SECURITY INVOKER.
-    assertReplaceRejectsUnrepresentableNativeView(
-        TrinoNativeViewCodec.encode(
-            new TrinoNativeViewCodec.ViewDefinition(
-                "SELECT 1",
-                null,
-                null,
-                List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
-                null,
-                null,
                 false,
-                List.of())));
+                List.of()));
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true",
+                        HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY,
+                        "alice")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_hive"),
+        ViewChange.removeProperty(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertNull(decoded.owner);
+    Assertions.assertTrue(decoded.runAsInvoker);
   }
 
   @Test

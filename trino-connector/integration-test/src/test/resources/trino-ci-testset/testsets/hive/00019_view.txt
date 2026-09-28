@@ -57,6 +57,27 @@ CREATE VIEW
 
 DROP VIEW
 
+CREATE TABLE
+
+INSERT: 2 rows
+
+CREATE VIEW
+
+"CREATE VIEW native_hive.gt_hive_view_db.v04 SECURITY DEFINER AS
+SELECT
+  id
+, name
+, created_at
+FROM
+  gt_hive.gt_hive_view_db.t02
+WHERE (id = 2)"
+
+"2","bob","2024-01-02 00:00:00.000"
+
+DROP VIEW
+
+DROP TABLE
+
 DROP TABLE
 
 DROP SCHEMA
