@@ -37,6 +37,8 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
 /**
@@ -49,6 +51,9 @@ import org.apache.thrift.TException;
  * whichever methods behave differently for that version.
  */
 public abstract class HiveShim {
+
+  /** Marker used by Hive when column types must be resolved from the table SerDe. */
+  protected static final String TYPE_FROM_DESERIALIZER = "<derived from deserializer>";
 
   protected static final String RETRYING_META_STORE_CLIENT_CLASS =
       "org.apache.hadoop.hive.metastore.RetryingMetaStoreClient";
@@ -168,7 +173,10 @@ public abstract class HiveShim {
 
   public HiveTable getTable(String catalogName, String databaseName, String tableName) {
     try {
-      var tb = client.getTable(databaseName, tableName);
+      Table tb = client.getTable(databaseName, tableName);
+      if (hasDerivedColumnTypes(tb)) {
+        replaceDerivedColumns(tb, client.getFields(databaseName, tableName));
+      }
       return HiveTableConverter.fromHiveTable(tb);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
@@ -333,5 +341,38 @@ public abstract class HiveShim {
   protected EnvironmentContext doNotUpdateStatsContext() {
     return new EnvironmentContext(
         Collections.singletonMap(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE));
+  }
+
+  /**
+   * Returns whether a table contains column types that Hive expects its SerDe to resolve.
+   *
+   * @param table The Hive metastore table.
+   * @return {@code true} if at least one storage column has a derived type marker.
+   */
+  protected static boolean hasDerivedColumnTypes(Table table) {
+    return table.getSd() != null
+        && table.getSd().getCols() != null
+        && table.getSd().getCols().stream()
+            .anyMatch(field -> TYPE_FROM_DESERIALIZER.equals(field.getType()));
+  }
+
+  /**
+   * Replaces storage columns containing Hive's derived type marker with columns resolved by the
+   * table SerDe.
+   *
+   * @param table The Hive metastore table to update in memory.
+   * @param resolvedColumns The storage columns resolved by the Hive metastore.
+   */
+  protected static void replaceDerivedColumns(Table table, List<FieldSchema> resolvedColumns) {
+    if (resolvedColumns == null
+        || resolvedColumns.isEmpty()
+        || resolvedColumns.stream()
+            .anyMatch(field -> TYPE_FROM_DESERIALIZER.equals(field.getType()))) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Hive Metastore did not resolve SerDe-derived column types for table %s.%s",
+              table.getDbName(), table.getTableName()));
+    }
+    table.getSd().setCols(resolvedColumns);
   }
 }
