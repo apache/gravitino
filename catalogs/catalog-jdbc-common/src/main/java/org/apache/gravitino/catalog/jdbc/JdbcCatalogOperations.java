@@ -404,17 +404,14 @@ public class JdbcCatalogOperations
   /**
    * {@inheritDoc}
    *
-   * <p>Delegates to {@link TableOperation#resolveTableName(String, String, String)}; the default
-   * backend implementation returns the normalized name unchanged, so this is a no-op unless a
-   * backend overrides it.
+   * <p>Delegates to {@link TableOperation#resolveTableName(String, String)}; the default backend
+   * implementation returns the normalized name unchanged, so this is a no-op unless a backend
+   * overrides it.
    */
   @Override
-  public NameIdentifier resolveTableName(
-      NameIdentifier requestedIdent, NameIdentifier normalizedIdent) {
+  public NameIdentifier resolveTableName(NameIdentifier normalizedIdent) {
     String databaseName = NameIdentifier.of(normalizedIdent.namespace().levels()).name();
-    String resolved =
-        tableOperation.resolveTableName(
-            databaseName, requestedIdent.name(), normalizedIdent.name());
+    String resolved = tableOperation.resolveTableName(databaseName, normalizedIdent.name());
     return resolved.equals(normalizedIdent.name())
         ? normalizedIdent
         : NameIdentifier.of(normalizedIdent.namespace(), resolved);

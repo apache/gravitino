@@ -321,7 +321,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
 
     // Resolver maps normalized "PHYSICAL_NAME" -> stored "physical_Name"; identity otherwise.
     SupportsTableNameResolution resolver =
-        (requestedIdent, normalizedIdent) ->
+        normalizedIdent ->
             "PHYSICAL_NAME".equals(normalizedIdent.name()) ? resolved : normalizedIdent;
     TableNormalizeDispatcher dispatcher =
         newResolvingDispatcher(mockDispatcher, resolvingCatalogOps(resolver));
@@ -336,9 +336,9 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testPhysicalNameResolutionReceivesRequestedAndNormalizedNames() throws Exception {
-    // The resolver sees both the original requested name and the normalized one, so it can honor a
-    // case-sensitive name supplied verbatim.
+  public void testPhysicalNameResolutionReceivesNormalizedName() throws Exception {
+    // The resolver receives the normalized identifier (a quoted "MixedCase" normalizes to the
+    // unquoted, case-preserved MixedCase), which already encodes the caller's case intent.
     Namespace tableNs = Namespace.of(metalake, catalog, "schema");
     NameIdentifier requested = NameIdentifier.of(tableNs, "\"MixedCase\"");
 
@@ -346,9 +346,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Mockito.when(mockDispatcher.loadTable(Mockito.any())).thenReturn(Mockito.mock(Table.class));
 
     SupportsTableNameResolution resolver =
-        (requestedIdent, normalizedIdent) -> {
-          // requested is the raw caller input (still quoted); normalized is the unquoted form.
-          Assertions.assertEquals("\"MixedCase\"", requestedIdent.name());
+        normalizedIdent -> {
           Assertions.assertEquals("MixedCase", normalizedIdent.name());
           return normalizedIdent;
         };
@@ -373,7 +371,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Mockito.when(mockDispatcher.tableExists(Mockito.any())).thenReturn(false);
 
     SupportsTableNameResolution resolver =
-        (requestedIdent, normalizedIdent) -> normalizedIdent; // keep normalized (ambiguous/absent)
+        normalizedIdent -> normalizedIdent; // keep normalized (ambiguous/absent)
     TableNormalizeDispatcher dispatcher =
         newResolvingDispatcher(mockDispatcher, resolvingCatalogOps(resolver));
 
@@ -467,10 +465,8 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         Mockito.mock(
             CatalogOperations.class,
             Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
-    Mockito.when(((SupportsTableNameResolution) ops).resolveTableName(Mockito.any(), Mockito.any()))
-        .thenAnswer(
-            invocation ->
-                resolver.resolveTableName(invocation.getArgument(0), invocation.getArgument(1)));
+    Mockito.when(((SupportsTableNameResolution) ops).resolveTableName(Mockito.any()))
+        .thenAnswer(invocation -> resolver.resolveTableName(invocation.getArgument(0)));
     return ops;
   }
 }

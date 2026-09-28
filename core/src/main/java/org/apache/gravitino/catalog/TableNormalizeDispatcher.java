@@ -21,14 +21,12 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.connector.CatalogOperations;
-import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -39,7 +37,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Note on list operations: names returned by list methods (e.g. {@link #listTables(Namespace)}) are
@@ -66,7 +63,8 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadTable(resolvePhysicalName(ident, normalizeCaseSensitive(ident)));
+    return dispatcher.loadTable(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager));
   }
 
   @Override
@@ -99,25 +97,28 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     return dispatcher.alterTable(
         // The constraints of the name spec may be more strict than underlying catalog,
         // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        resolvePhysicalName(ident, normalizeCaseSensitive(ident)),
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager),
         applyCapabilities(capability, changes));
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return dispatcher.dropTable(resolvePhysicalName(ident, normalizeNameIdentifier(ident)));
+    return dispatcher.dropTable(
+        resolvePhysicalTableName(normalizeNameIdentifier(ident), catalogManager));
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return dispatcher.purgeTable(resolvePhysicalName(ident, normalizeNameIdentifier(ident)));
+    return dispatcher.purgeTable(
+        resolvePhysicalTableName(normalizeNameIdentifier(ident), catalogManager));
   }
 
   @Override
   public boolean tableExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.tableExists(resolvePhysicalName(ident, normalizeCaseSensitive(ident)));
+    return dispatcher.tableExists(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager));
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
@@ -133,37 +134,5 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {
     Capability capability = getCapability(tableIdent, catalogManager);
     return applyCapabilities(tableIdent, Capability.Scope.TABLE, capability);
-  }
-
-  /**
-   * Maps a normalized table identifier to the identifier under which the table is physically stored
-   * by the catalog's backend, when the catalog implements the connector-side {@link
-   * SupportsTableNameResolution} capability; otherwise returns {@code normalizedIdent} unchanged.
-   *
-   * <p>Resolving here — above the hook and operation dispatchers — lets the resolved identifier
-   * drive the downstream authorization hooks, the underlying catalog call and the Gravitino entity
-   * store key consistently. Both the originally requested identifier and the normalized identifier
-   * are passed so the resolver can honor a case-sensitive name supplied verbatim and refuse to
-   * guess on an ambiguous one (see the {@link SupportsTableNameResolution} contract).
-   *
-   * <p>The vast majority of catalogs do not implement the capability, so this returns {@code
-   * normalizedIdent} unchanged. Resolution takes no lock: it is best-effort and the subsequent
-   * locked operation re-checks existence, so a concurrent rename/recreate surfaces as the normal
-   * {@code NoSuchTableException} rather than an action on a different object. Typed exceptions from
-   * the catalog access (e.g. {@link NoSuchCatalogException}) propagate unchanged.
-   */
-  private NameIdentifier resolvePhysicalName(
-      NameIdentifier requestedIdent, NameIdentifier normalizedIdent) {
-    NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(normalizedIdent);
-    return catalogManager.doWithCatalog(
-        catalogIdent,
-        catalog -> {
-          CatalogOperations catalogOps = catalog.ops();
-          if (catalogOps instanceof SupportsTableNameResolution) {
-            return ((SupportsTableNameResolution) catalogOps)
-                .resolveTableName(requestedIdent, normalizedIdent);
-          }
-          return normalizedIdent;
-        });
   }
 }

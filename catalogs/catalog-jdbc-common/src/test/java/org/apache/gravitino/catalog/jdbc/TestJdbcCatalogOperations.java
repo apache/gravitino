@@ -100,8 +100,7 @@ public class TestJdbcCatalogOperations {
     SqliteTableOperations resolvingTableOps =
         new SqliteTableOperations() {
           @Override
-          public String resolveTableName(
-              String databaseName, String requestedName, String normalizedName) {
+          public String resolveTableName(String databaseName, String normalizedName) {
             Assertions.assertEquals("db", databaseName);
             return "PHYSICAL_NAME".equals(normalizedName) ? "physical_Name" : normalizedName;
           }
@@ -114,9 +113,8 @@ public class TestJdbcCatalogOperations {
             resolvingTableOps,
             new SqliteColumnDefaultValueConverter())) {
       NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "db", "PHYSICAL_NAME");
-      NameIdentifier requested = NameIdentifier.of("metalake", "catalog", "db", "physical_name");
 
-      NameIdentifier resolved = catalogOperations.resolveTableName(requested, normalized);
+      NameIdentifier resolved = catalogOperations.resolveTableName(normalized);
 
       // Delegates the leaf name to TableOperation and keeps the original namespace.
       Assertions.assertEquals("physical_Name", resolved.name());
@@ -124,7 +122,7 @@ public class TestJdbcCatalogOperations {
 
       // When the backend returns the name unchanged, the same normalized identifier is returned.
       NameIdentifier unchanged = NameIdentifier.of("metalake", "catalog", "db", "ALREADY_PHYSICAL");
-      Assertions.assertSame(unchanged, catalogOperations.resolveTableName(unchanged, unchanged));
+      Assertions.assertSame(unchanged, catalogOperations.resolveTableName(unchanged));
     }
   }
 }
