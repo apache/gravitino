@@ -23,18 +23,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -188,5 +192,39 @@ public class TestIcebergTableOperationExecutor {
     Assertions.assertFalse(
         requestCaptor.getValue().stageCreate(),
         "stageCreate=false must remain false when rebuilding request");
+  }
+
+  @Test
+  public void testRejectsOversizedTableNameBeforeCreate() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName(oversizedName).withSchema(TABLE_SCHEMA).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.createTable(mockContext, Namespace.of("test_namespace"), request));
+
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", exception.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRejectsOversizedTableNameBeforeRename() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    RenameTableRequest request =
+        RenameTableRequest.builder()
+            .withSource(TableIdentifier.of("test_namespace", "source"))
+            .withDestination(TableIdentifier.of("test_namespace", oversizedName))
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> executor.renameTable(mockContext, request));
+
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", exception.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
   }
 }

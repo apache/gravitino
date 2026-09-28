@@ -119,6 +119,16 @@ public class TestEntityFieldLimits {
 
   private static Stream<Arguments> nameBuilders() {
     return Stream.of(
+        Arguments.of(
+            "table",
+            (Function<String, Entity>)
+                name ->
+                    TableEntity.builder()
+                        .withId(1L)
+                        .withName(name)
+                        .withNamespace(NAMESPACE)
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build()),
         Arguments.of("tag", (Function<String, Entity>) name -> tagBuilder(name, null)),
         Arguments.of(
             "policy",

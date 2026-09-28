@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -29,12 +30,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
@@ -189,6 +192,21 @@ public class TestIcebergNamespaceOperationExecutor {
 
     verify(mockCatalogWrapper).registerView(ns, mockRequest);
     Assertions.assertEquals(mockResponse, result);
+  }
+
+  @Test
+  public void testRejectsOversizedTableNameBeforeRegister() {
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.registerTable(mockContext, Namespace.of("test_namespace"), request));
+
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", exception.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
   }
 
   @Test

@@ -34,6 +34,7 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -70,6 +71,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
+    TableEntity.NAME.validate(createTableRequest.name(), Entity.EntityType.TABLE);
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, createTableRequest.name());
 
@@ -189,6 +191,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
+    TableEntity.NAME.validate(renameTableRequest.destination().name(), Entity.EntityType.TABLE);
     icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .renameTable(renameTableRequest);

@@ -221,6 +221,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
+    TableEntity.NAME.validate(ident.name(), TABLE);
+
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
@@ -278,6 +280,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         TableChange.RenameTable rename = (TableChange.RenameTable) change;
+        TableEntity.NAME.validate(rename.getNewName(), TABLE);
         if (rename.getNewSchemaName().isPresent()
             && !rename.getNewSchemaName().get().equals(schemaName)) {
           nameIdentifierForLock = getCatalogIdentifier(ident);

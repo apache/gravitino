@@ -52,6 +52,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -596,6 +597,56 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           return null;
         });
     reset(entityStore);
+  }
+
+  @Test
+  public void testRejectsOversizedTableNameBeforeExternalChange() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_table_name_limit");
+    NameIdentifier validTableIdent = NameIdentifier.of(tableNs, "valid_table");
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    NameIdentifier oversizedTableIdent = NameIdentifier.of(tableNs, oversizedName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    IllegalArgumentException createException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    oversizedTableIdent, columns, "comment", props, new Transform[0]));
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", createException.getMessage());
+
+    tableOperationDispatcher.createTable(
+        validTableIdent, columns, "comment", props, new Transform[0]);
+    IllegalArgumentException renameException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    validTableIdent, TableChange.rename(oversizedName)));
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", renameException.getMessage());
+
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadTable(validTableIdent));
+          Assertions.assertThrows(
+              NoSuchTableException.class,
+              () -> testCatalogOperations.loadTable(oversizedTableIdent));
+          return null;
+        });
   }
 
   @Test
