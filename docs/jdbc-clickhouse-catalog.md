@@ -177,16 +177,20 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine and connector-owned property changes after creation; mixing table setting changes with schema changes; auto-increment columns.                                                                                                                                                                                                                                                                                                                                    |
 
-Projection definitions on MergeTree-family engines supported by the ClickHouse catalog are
-preserved through table load and recreate when the ClickHouse server provides `system.projections`
-(24.9 or later). The current catalog supports `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`,
-`AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, and
-`GraphiteMergeTree`; replicated MergeTree engines are not currently supported for projection
-round-trips. ClickHouse 24.9 does not expose the system table's optional `settings` column; when a
-newer server exposes it, safely reconstructable projection settings are preserved too. ClickHouse
-24.8 projection round-trip is deferred, while ordinary catalog metadata loading remains supported.
-Projection data is not copied or materialized, and Gravitino does not manage projection
-`ALTER TABLE` operations.
+Projection round-trip requires `system.projections` (ClickHouse 24.9 or later) and supports
+safely reconstructable `Normal` and `Aggregate` definitions on these non-replicated MergeTree-family
+engines: `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`,
+`CollapsingMergeTree`, `VersionedCollapsingMergeTree`, and `GraphiteMergeTree`. Projection-level
+`WHERE` filters, lightweight `_part_offset` projections, and compact `PROJECTION ... INDEX` syntax
+are outside this scope. If projection validation rejects any definition or setting, `loadTable` logs
+a warning and omits the entire `clickhouse.projections` property while loading the other table
+metadata. Recreating a table from that metadata omits all source projections, including otherwise
+supported ones.
+
+ClickHouse 24.9 does not expose the system table's optional `settings` column; when a newer server
+exposes it, safely reconstructable projection settings are preserved. ClickHouse 24.8 projection
+round-trip is deferred, while ordinary catalog metadata loading remains supported. Projection data
+is not copied or materialized, and Gravitino does not manage projection `ALTER TABLE` operations.
 
 ### Table Column Types
 

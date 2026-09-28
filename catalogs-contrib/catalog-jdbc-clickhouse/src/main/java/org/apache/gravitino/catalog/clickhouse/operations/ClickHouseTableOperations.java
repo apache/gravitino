@@ -1038,11 +1038,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       statement.setString(2, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
         while (resultSet.next()) {
-          Map<String, String> settings =
-              hasSettingsColumn
-                  ? ClickHouseTableSqlUtils.parseProjectionSettings(
-                      resultSet.getString("settings_json"))
-                  : Collections.emptyMap();
+          Map<String, String> settings;
+          try {
+            settings =
+                hasSettingsColumn
+                    ? ClickHouseTableSqlUtils.parseProjectionSettings(
+                        resultSet.getString("settings_json"))
+                    : Collections.emptyMap();
+          } catch (IllegalArgumentException e) {
+            LOG.warn(
+                "Skip projection metadata of {}.{}: {}", databaseName, tableName, e.getMessage());
+            return null;
+          }
           definitions.add(
               new ClickHouseTableSqlUtils.ProjectionDefinition(
                   resultSet.getString("name"),
@@ -1052,9 +1059,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         }
       }
     }
-    return definitions.isEmpty()
-        ? null
-        : ClickHouseTableSqlUtils.serializeProjectionDefinitions(definitions);
+    if (definitions.isEmpty()) {
+      return null;
+    }
+    try {
+      return ClickHouseTableSqlUtils.serializeProjectionDefinitions(definitions);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Skip projection metadata of {}.{}: {}", databaseName, tableName, e.getMessage());
+      return null;
+    }
   }
 
   @Override

@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
@@ -65,6 +66,7 @@ public class CatalogClickHouseProjectionIT extends BaseIT {
   private static final String SOURCE_TABLE = "projection_source";
   private static final String TARGET_TABLE = "projection_target";
   private static final String NO_PROJECTION_TABLE = "no_projection_source";
+  private static final String UNSUPPORTED_PROJECTION_TABLE = "unsupported_projection_source";
 
   private GravitinoMetalake metalake;
   private String metalakeName;
@@ -175,6 +177,15 @@ public class CatalogClickHouseProjectionIT extends BaseIT {
             tableCatalog.loadTable(NameIdentifier.of(DATABASE, NO_PROJECTION_TABLE));
         Assertions.assertFalse(
             withoutProjections.properties().containsKey(CLICKHOUSE_PROJECTIONS_KEY));
+        if (withProjectionSettings) {
+          Table withUnsupportedProjection =
+              tableCatalog.loadTable(NameIdentifier.of(DATABASE, UNSUPPORTED_PROJECTION_TABLE));
+          Assertions.assertEquals(2, withUnsupportedProjection.columns().length);
+          Assertions.assertEquals(
+              "MergeTree", withUnsupportedProjection.properties().get(TableConstants.ENGINE));
+          Assertions.assertFalse(
+              withUnsupportedProjection.properties().containsKey(CLICKHOUSE_PROJECTIONS_KEY));
+        }
       } finally {
         metalake.disableCatalog(catalogName);
         metalake.dropCatalog(catalogName, true);
@@ -231,6 +242,15 @@ public class CatalogClickHouseProjectionIT extends BaseIT {
       statement.execute(createTable);
       statement.execute(addProjection);
       statement.execute(createTableWithoutProjections);
+      if (withProjectionSettings) {
+        statement.execute(
+            "CREATE TABLE "
+                + DATABASE
+                + "."
+                + UNSUPPORTED_PROJECTION_TABLE
+                + " (a UInt64, b String, PROJECTION p (SELECT _part_offset ORDER BY b))"
+                + " ENGINE = MergeTree ORDER BY a");
+      }
     }
   }
 
