@@ -25,7 +25,6 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
@@ -819,16 +818,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
             tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
   }
 
-  @Override
-  public void finishTableExecute(
-      ConnectorSession session,
-      ConnectorTableExecuteHandle tableExecuteHandle,
-      Collection<Slice> fragments,
-      List<Object> tableExecuteState) {
-    internalMetadata.finishTableExecute(
-        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
-  }
-
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
     return ((GravitinoTableHandle) tableHandle).toSchemaTableName();
   }
@@ -866,19 +855,16 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     if (!catalogConnectorMetadata.supportsFunctions()) {
       return List.of();
     }
+    String schemaName = SchemaFunctionNames.schemaName(name);
+    String functionName = SchemaFunctionNames.functionName(name);
     try {
-      Function function =
-          catalogConnectorMetadata.getFunction(
-              SchemaFunctionNames.schemaName(name), SchemaFunctionNames.functionName(name));
+      Function function = catalogConnectorMetadata.getFunction(schemaName, functionName);
       if (function == null) {
         return List.of();
       }
       return toLanguageFunctions(function);
     } catch (NoSuchFunctionException e) {
-      LOG.debug(
-          "Function %s not found in schema %s",
-          SchemaFunctionNames.functionName(name),
-          SchemaFunctionNames.schemaName(name));
+      LOG.debug("Function %s not found in schema %s", functionName, schemaName);
       return List.of();
     }
   }
