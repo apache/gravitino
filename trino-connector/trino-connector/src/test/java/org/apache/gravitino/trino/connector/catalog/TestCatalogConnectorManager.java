@@ -1515,6 +1515,32 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testConnectorContextToleratesMissingCredentialsEndpoint() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1"));
+    when(catalog.supportsSecrets().getSecrets()).thenReturn(Map.of());
+    when(catalog.supportsCredentials().getCredentials())
+        .thenThrow(new RESTException("simulated: older server lacks /credentials"));
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    assertDoesNotThrow(
+        () ->
+            manager.createCatalogConnectorContext(
+                "memory",
+                createConnectorConfig(
+                    GravitinoCatalog.toJson(
+                        new GravitinoCatalog(
+                            "test", "memory", "memory", Map.of("visible", "v1"), 0L))),
+                mockContext()));
+
+    ArgumentCaptor<GravitinoCatalog> built = ArgumentCaptor.forClass(GravitinoCatalog.class);
+    verify(fixture.catalogFactory).createCatalogConnectorContextBuilder(built.capture());
+    assertEquals("v1", built.getValue().getProperties().get("visible"));
+  }
+
+  @Test
   public void testVisiblePropsHandlesNullProperties() {
     Catalog catalog = mock(Catalog.class);
     when(catalog.properties()).thenReturn(null);

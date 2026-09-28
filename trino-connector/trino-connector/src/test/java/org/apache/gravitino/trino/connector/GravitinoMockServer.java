@@ -53,6 +53,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.rel.Column;
@@ -248,6 +250,9 @@ public class GravitinoMockServer implements AutoCloseable {
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(supportsSecrets.getSecrets()).thenReturn(Map.of());
     when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[0]);
+    when(catalog.supportsCredentials()).thenReturn(supportsCredentials);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("gravitino");

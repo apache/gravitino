@@ -46,6 +46,8 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
@@ -1087,6 +1089,8 @@ public class CatalogConnectorManager {
       if (secrets != null && !secrets.isEmpty()) {
         properties.putAll(secrets);
       }
+    } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {
+      // Catalog may not support secrets, or older servers lack /secrets.
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
@@ -1104,8 +1108,8 @@ public class CatalogConnectorManager {
           }
         }
       }
-    } catch (UnsupportedOperationException ignored) {
-      // Catalog does not support credential vending.
+    } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {
+      // Catalog may not support credential vending, or older servers lack /credentials.
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
