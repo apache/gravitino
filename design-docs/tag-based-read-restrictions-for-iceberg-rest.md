@@ -97,38 +97,38 @@ load-table response.
 
 Policy selection and policy effect are separate. Tags and policy-on-tag selectors decide whether a
 policy is applicable; a row-filter or column-mask definition states what the selected policy does.
-The effect content has no ordered rules and no `when` field. This follows the same separation used
-by Databricks ABAC, where policy applicability is distinct from the row-filter or mask function and
-its bound inputs. A future principal-aware selector belongs to the selection model, not inside a
-restriction definition.
+The effect content has no `rules` list and no `when` field. Conditional filter results are written
+inside one restricted Rego expression. This follows the Databricks ABAC pattern in which a single
+row-filter UDF can use conditional logic to return its Boolean result, while policy applicability
+and function input binding remain separate. A future principal-aware selector belongs to the
+selection model, not inside a restriction definition.
 
 ### Row-filter content
 
 A row-filter policy contains exactly one `filter`. The common form has `kind` set to `expression`,
-uses the `gravitino-filter-v1` language, and omits `engine`.
+uses the `restricted-rego-v1` language, and omits `engine`.
 
 ```json
 {
   "name": "restrict_orders",
-  "comment": "Users see only their own orders",
+  "comment": "Auditors see US orders; other users see their own orders",
   "policyType": "system_row_filter",
   "enabled": false,
   "content": {
     "filter": {
       "kind": "expression",
-      "language": "gravitino-filter-v1",
-      "expression": "col(\"owner\") == session_user()"
+      "language": "restricted-rego-v1",
+      "expression": "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
     }
   }
 }
 ```
 
-An expression may use trusted request context, including `session_user()` and
-`is_group_member(...)`, but context does not select another rule. If different subjects need
-different policy applicability, the selection layer must express that distinction. Until a
-principal-aware selector is designed, authors can express a Boolean distinction in one row
-predicate, but should not use an ordered rule list as a substitute for selection semantics. The
-first policy-on-tag selector version does not select by principal.
+The expression is one complete rule whose result is the row predicate. In the example, the Rego
+assignment means “if the subject is an auditor, then use the region predicate; otherwise use the
+owner predicate.” It does not select another policy rule. The expression may use trusted request
+context and row values in either conditions or results. The first policy-on-tag selector version
+does not select by principal, so subject-dependent filtering can remain inside this one expression.
 
 ### Column-mask content
 
@@ -162,7 +162,7 @@ misinterpreted as a common expression. The content model reserves these variants
 
 | Kind | Scope | First Iceberg REST implementation |
 | --- | --- | --- |
-| `expression` without `engine` | Common, portable profile named by `language` | Supports `gravitino-filter-v1` for row filters. |
+| `expression` without `engine` | Common, portable profile named by `language` | Supports `restricted-rego-v1` for row filters. |
 | `expression` with `engine` | Exact engine and language pair | Rejected unless the selected adapter advertises that exact pair and produces a closed common result. |
 | `function` | Versioned function reference and typed argument bindings | Reserved; rejected by the first implementation. |
 | `action` | Named portable action profile | Supports `iceberg-action-v1` for column masks. |
@@ -214,13 +214,21 @@ missing, changed, or unsupported function fails closed; it never falls back to a
 read. Tagged-column matching and context argument bindings can be added as new argument kinds
 without changing the function variant.
 
-## Common Expression Profile
+## Common Restricted Rego Profile
 
-The `gravitino-filter-v1` profile is the portable authoring language for row-filter expressions.
+The `restricted-rego-v1` profile is the portable authoring language for row-filter expressions. It
+uses Rego conditional-assignment syntax, but deliberately supports only one complete rule named
+`filter`; it is not an arbitrary Rego module. The rule result, every conditional result, and every
+condition must be Boolean.
 
 The grammar is:
 
 ```text
+program     := unconditionalRule | conditionalRule
+unconditionalRule := "filter" ":=" expr
+conditionalRule := "filter" ":=" expr "if" expr conditionalElse* finalElse
+conditionalElse := "else" ":=" expr "if" expr
+finalElse   := "else" ":=" expr
 expr        := orExpr
 orExpr      := andExpr ("or" andExpr)*
 andExpr     := notExpr ("and" notExpr)*
@@ -239,17 +247,24 @@ digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 ```
 
-Strings use JSON double-quoted syntax. Comments, exponent notation, leading `+`, leading zeroes,
-trailing decimal points, chained comparisons, arbitrary functions, and bare non-Boolean roots are
-invalid.
+`filter := result if condition else := fallback` has the semantic reading “if condition, then
+result, otherwise fallback.” Conditional branches are evaluated from left to right and the first
+true condition selects its result. A conditional rule requires an unconditional final `else`, so a
+selected policy never becomes undefined. An unconditional filter uses `filter := expression`.
+
+Strings use JSON double-quoted syntax. Packages, imports, additional rules, variables, rule bodies
+in braces, comments, exponent notation, leading `+`, leading zeroes, trailing decimal points,
+chained comparisons, arbitrary functions, and bare non-Boolean roots are invalid.
 
 ### Keywords, identifiers, and escaping
 
-The reserved, lowercase keywords are `and`, `or`, `not`, `in`, `true`, `false`, and `null`. The
-reserved built-in function identifiers are `col`, `session_user`, and `is_group_member`. They are
-case-sensitive and are recognized only as complete tokens; for example, `notebook` is not `not`
-followed by an identifier. Bare identifiers are not part of `gravitino-filter-v1`, so an unknown
-word is always invalid rather than an implicit column reference or function call.
+The reserved, lowercase keywords are `filter`, `if`, `else`, `and`, `or`, `not`, `in`, `true`,
+`false`, and `null`. `:=` is the rule-result assignment operator; `then` is not a literal token in
+Rego syntax because the result precedes `if`. The reserved built-in function identifiers are `col`,
+`session_user`, and `is_group_member`. They are case-sensitive and are recognized only as complete
+tokens; for example, `notebook` is not `not` followed by an identifier. Bare identifiers are not
+part of `restricted-rego-v1`, so an unknown word is always invalid rather than an implicit column
+reference or function call.
 
 Column names, group names, and string values appear only as JSON string literals. A name equal to a
 keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
@@ -257,9 +272,10 @@ single quotes, SQL delimited identifiers, and backslash escaping outside a JSON 
 
 There are two syntactic JSON layers in an API request. The HTTP JSON parser decodes the outer
 `expression` field once, and the expression parser decodes each inner JSON string literal once. For
-example, the request fragment `"expression": "col(\"and\") == \"open\""` becomes the source
-`col("and") == "open"`, whose decoded column name is `and`. No layer performs an additional or
-implicit unescape.
+example, the request fragment
+`"expression": "filter := col(\"and\") == \"open\""` becomes the source
+`filter := col("and") == "open"`, whose decoded column name is `and`. No layer performs an
+additional or implicit unescape.
 
 After decoding, identifiers and values are preserved exactly. Gravitino performs no Unicode
 normalization, case folding, whitespace trimming, environment expansion, URL decoding, or SQL
@@ -312,6 +328,29 @@ expansion is not performed.
 Each column name is bound exactly once against the concrete table schema and converted to its stable
 Iceberg field ID. Missing or ambiguous columns, incompatible types, schema drift, or unsupported
 field-ID mapping fail closed.
+
+All conditional results and conditions are parsed and type-checked before request binding. The
+resolver then binds their context, columns, and literals and lowers an `if`/`else` chain to one
+Boolean predicate. For example:
+
+```text
+filter := result1 if condition1
+else := result2 if condition2
+else := fallback
+```
+
+is lowered to:
+
+```text
+(condition1 and result1)
+or (not condition1 and condition2 and result2)
+or (not condition1 and not condition2 and fallback)
+```
+
+Request-context-only conditions are folded before the final predicate is built, but every branch
+must still parse and type-check. The conditional assignment, `if`, and `else` nodes never appear in
+the Iceberg wire expression. This lowering preserves the first-matching-branch semantics of Rego's
+`else` chain while producing the one closed Boolean predicate required by Iceberg.
 
 The first version supports these value predicates:
 
@@ -497,6 +536,8 @@ Coverage includes:
 - source limits and invalid operand shapes;
 - session user, group membership, unknown groups, and identity lookup failure;
 - common keyword boundaries, nested JSON escaping, keyword-named columns, and invalid identifiers;
+- unconditional filters, context and row-dependent conditions, multi-branch `else` chains, missing
+  final fallbacks, and deterministic conditional lowering;
 - engine and language mismatch, unsupported adapters, and prohibited fallback;
 - reserved function definitions, missing function versions, and invalid argument bindings;
 - duplicate and conflicting row-filter definitions and mask actions;
@@ -509,8 +550,8 @@ Coverage includes:
 
 ## Implementation Plan
 
-1. Add the common expression parser and typed row-filter and column-mask definition variants;
-   reject unsupported engine and function variants explicitly.
+1. Add the restricted Rego parser, conditional lowering, and typed row-filter and column-mask
+   definition variants; reject unsupported engine and function variants explicitly.
 2. Add an experimental Iceberg read-restriction model and exact wire serializer.
 3. Implement policy-on-tag selection, subject binding, schema binding, canonicalization, and conflict
    detection.
@@ -527,3 +568,5 @@ Coverage includes:
 - [Iceberg generic reader implementation](https://github.com/apache/iceberg/pull/16131)
 - [Databricks ABAC core concepts](https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts)
 - [Databricks ABAC policy management](https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies)
+- [Databricks row-filter performance and conditional UDF examples](https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/performance)
+- [Open Policy Agent Rego policy language](https://www.openpolicyagent.org/docs/policy-language)
