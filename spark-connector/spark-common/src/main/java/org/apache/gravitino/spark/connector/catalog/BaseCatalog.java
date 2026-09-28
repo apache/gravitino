@@ -34,6 +34,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -725,7 +726,26 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   private static Map<String, String> propsWithSecrets(Catalog catalog) {
     Map<String, String> props =
         new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-    props.putAll(catalog.supportsSecrets().getSecrets());
+    try {
+      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
+      if (secrets != null) {
+        props.putAll(secrets);
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support secret property operations.
+    }
+    try {
+      Credential[] credentials = catalog.supportsCredentials().getCredentials();
+      if (credentials != null) {
+        for (Credential credential : credentials) {
+          if (credential != null && credential.credentialInfo() != null) {
+            props.putAll(credential.credentialInfo());
+          }
+        }
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support credential vending.
+    }
     return props;
   }
 

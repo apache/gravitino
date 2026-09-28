@@ -500,9 +500,10 @@ class BaseGVFSOperations(ABC):
     ) -> Dict[str, str]:
         """Merge properties from catalog, schema, fileset, options, and configs.
 
-        Combines default load*.properties() with get_secrets() so every secret URN
-        (including keys that may also appear in credential vending) becomes plaintext
-        for FS access. Typed credentials remain available via get_credentials.
+        Combines default load*.properties() with get_secrets() for non-credential
+        secrets, and catalog get_credentials().credential_info() for cloud/JDBC
+        credential fields. Typed path credentials remain available via get_credentials
+        on the fileset when credential vending is enabled.
 
         :param fileset_ident: The fileset identifier
         :param actual_location: The actual storage location
@@ -517,6 +518,7 @@ class BaseGVFSOperations(ABC):
         )
         fileset_props = dict(catalog.properties() or {})
         fileset_props.update(catalog.get_secrets())
+        self._merge_catalog_credentials(fileset_props, catalog)
         fileset_props.update(schema.properties() or {})
         fileset_props.update(schema.get_secrets())
         fileset_props.update(fileset.properties() or {})
@@ -528,6 +530,18 @@ class BaseGVFSOperations(ABC):
         user_defined_configs = self._get_user_defined_configs(actual_location)
         fileset_props.update(user_defined_configs)
         return fileset_props
+
+    @staticmethod
+    def _merge_catalog_credentials(fileset_props: Dict[str, str], catalog) -> None:
+        """Overlay catalog credential_info into fileset_props when supported."""
+        try:
+            supports_credentials = catalog.support_credentials()
+            for credential in supports_credentials.get_credentials() or []:
+                info = credential.credential_info()
+                if info:
+                    fileset_props.update(info)
+        except (AttributeError, NotImplementedError, TypeError):
+            pass
 
     def _get_actual_filesystem_by_location_name(
         self, fileset_ident: NameIdentifier, location_name: str

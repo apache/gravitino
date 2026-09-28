@@ -73,6 +73,7 @@ import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -974,6 +975,7 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
+    putCredentialInfo(all, catalog);
     putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
     putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
     all.putAll(extractNonDefaultConfig(conf));
@@ -987,6 +989,31 @@ public abstract class BaseGVFSOperations implements Closeable {
     }
     if (secrets != null) {
       target.putAll(secrets.getSecrets());
+    }
+  }
+
+  /**
+   * Merges {@link Credential#credentialInfo()} from catalog-level credential vending into GVFS
+   * configuration. Static cloud keys (for example {@code s3-access-key-id}) are recovered here
+   * rather than via {@code getSecrets()}.
+   */
+  private static void putCredentialInfo(Map<String, String> target, Catalog catalog) {
+    try {
+      SupportsCredentials supportsCredentials = catalog.supportsCredentials();
+      if (supportsCredentials == null) {
+        return;
+      }
+      Credential[] credentials = supportsCredentials.getCredentials();
+      if (credentials == null) {
+        return;
+      }
+      for (Credential credential : credentials) {
+        if (credential != null && credential.credentialInfo() != null) {
+          target.putAll(credential.credentialInfo());
+        }
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support credential vending.
     }
   }
 

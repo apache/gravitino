@@ -23,6 +23,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -40,35 +43,67 @@ public class PropertyUtils {
 
   /**
    * Merges masked entity {@code properties} with plaintext from {@link
-   * SupportsSecrets#getSecrets()}.
+   * SupportsSecrets#getSecrets()} and {@link Credential#credentialInfo()} from {@link
+   * SupportsCredentials#getCredentials()}.
    *
-   * <p>When secrets are unavailable — stubs that do not implement {@link SupportsSecrets}, or older
-   * Gravitino servers that return {@link NotFoundException} / {@link RESTException} for {@code
-   * /secrets} — returns a mutable copy of {@code properties} unchanged so list/get still works.
+   * <p>When secrets or credentials are unavailable — stubs that do not implement the interfaces, or
+   * older Gravitino servers that return {@link NotFoundException} / {@link RESTException} — returns
+   * a mutable copy of {@code properties} with whatever overlays succeeded so list/get still works.
    *
    * @param properties masked or raw properties (may be null)
    * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}, typically {@code
    *     entity::supportsSecrets}
-   * @return a new mutable map with secrets overlaid when available
+   * @return a new mutable map with secrets and credential info overlaid when available
    */
   public static Map<String, String> propertiesWithSecrets(
       Map<String, String> properties, Supplier<SupportsSecrets> supportsSecretsSupplier) {
+    return propertiesWithSecretsAndCredentials(properties, supportsSecretsSupplier, null);
+  }
+
+  /**
+   * Merges masked entity {@code properties} with {@code getSecrets()} and {@code
+   * getCredentials().credentialInfo()}.
+   *
+   * @param properties masked or raw properties (may be null)
+   * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}
+   * @param supportsCredentialsSupplier supplier of {@link SupportsCredentials}, or null to skip
+   * @return a new mutable map with overlays when available
+   */
+  public static Map<String, String> propertiesWithSecretsAndCredentials(
+      Map<String, String> properties,
+      Supplier<SupportsSecrets> supportsSecretsSupplier,
+      @Nullable Supplier<SupportsCredentials> supportsCredentialsSupplier) {
     Map<String, String> merged =
         new HashMap<>(properties == null ? Collections.emptyMap() : properties);
-    if (supportsSecretsSupplier == null) {
-      return merged;
+    if (supportsSecretsSupplier != null) {
+      try {
+        SupportsSecrets supportsSecrets = supportsSecretsSupplier.get();
+        if (supportsSecrets != null) {
+          Map<String, String> secrets = supportsSecrets.getSecrets();
+          if (secrets != null && !secrets.isEmpty()) {
+            merged.putAll(secrets);
+          }
+        }
+      } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {
+        // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+      }
     }
-    try {
-      SupportsSecrets supportsSecrets = supportsSecretsSupplier.get();
-      if (supportsSecrets == null) {
-        return merged;
+    if (supportsCredentialsSupplier != null) {
+      try {
+        SupportsCredentials supportsCredentials = supportsCredentialsSupplier.get();
+        if (supportsCredentials != null) {
+          Credential[] credentials = supportsCredentials.getCredentials();
+          if (credentials != null) {
+            for (Credential credential : credentials) {
+              if (credential != null && credential.credentialInfo() != null) {
+                merged.putAll(credential.credentialInfo());
+              }
+            }
+          }
+        }
+      } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {
+        // Stubs may not implement SupportsCredentials; older servers lack /credentials.
       }
-      Map<String, String> secrets = supportsSecrets.getSecrets();
-      if (secrets != null && !secrets.isEmpty()) {
-        merged.putAll(secrets);
-      }
-    } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {
-      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
     }
     return merged;
   }

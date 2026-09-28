@@ -23,7 +23,6 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +37,7 @@ import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -108,8 +107,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("Catalog %s is not an Iceberg catalog", catalog.name()));
 
-    // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
-    // then JdbcCredential overlays so credentials win.
+    // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets for
+    // non-credential secrets, then getCredentials().credentialInfo() for cloud/JDBC fields.
     if (catalog instanceof BaseCatalog) {
       BaseCatalog<?> baseCatalog = (BaseCatalog<?>) catalog;
       Map<String, String> props =
@@ -133,16 +132,20 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     } catch (UnsupportedOperationException ignored) {
       // Catalog does not support secret property operations.
     }
-    if (catalog instanceof SupportsCredentials) {
-      Arrays.stream(((SupportsCredentials) catalog).getCredentials())
-          .filter(c -> c instanceof JdbcCredential)
-          .map(c -> (JdbcCredential) c)
-          .findFirst()
-          .ifPresent(
-              jdbc -> {
-                props.put(IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
-                props.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
-              });
+    try {
+      SupportsCredentials supportsCredentials = catalog.supportsCredentials();
+      if (supportsCredentials != null) {
+        Credential[] credentials = supportsCredentials.getCredentials();
+        if (credentials != null) {
+          for (Credential credential : credentials) {
+            if (credential != null && credential.credentialInfo() != null) {
+              props.putAll(credential.credentialInfo());
+            }
+          }
+        }
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support credential vending.
     }
     return props;
   }

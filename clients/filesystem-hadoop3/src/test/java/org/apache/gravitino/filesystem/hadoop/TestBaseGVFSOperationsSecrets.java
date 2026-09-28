@@ -30,6 +30,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -226,7 +229,8 @@ public class TestBaseGVFSOperationsSecrets {
   }
 
   @Test
-  public void testRecoversAccessKeyIdFromGetSecretsWhenPropertiesAreMasked() throws Exception {
+  public void testRecoversAccessKeyPairFromGetCredentialsWhenPropertiesAreMasked()
+      throws Exception {
     Configuration conf = new Configuration();
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(
@@ -239,6 +243,7 @@ public class TestBaseGVFSOperationsSecrets {
     SupportsSchemas schemas = mock(SupportsSchemas.class);
     FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
     SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
+    SupportsCredentials catalogCredentials = mock(SupportsCredentials.class);
 
     when(catalog.properties())
         .thenReturn(
@@ -250,13 +255,11 @@ public class TestBaseGVFSOperationsSecrets {
                 "s3-endpoint",
                 "http://s3.example.com"));
     when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
-    when(catalogSecrets.getSecrets())
+    when(catalogSecrets.getSecrets()).thenReturn(Map.of());
+    when(catalog.supportsCredentials()).thenReturn(catalogCredentials);
+    when(catalogCredentials.getCredentials())
         .thenReturn(
-            Map.of(
-                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                "AKIATEST",
-                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                "secret-from-getSecrets"));
+            new Credential[] {new S3SecretKeyCredential("AKIATEST", "secret-from-getCredentials")});
     when(catalog.asSchemas()).thenReturn(schemas);
     when(schemas.loadSchema("schema")).thenReturn(schema);
     when(schema.properties()).thenReturn(Map.of());
@@ -274,12 +277,13 @@ public class TestBaseGVFSOperationsSecrets {
         ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
 
     assertEquals("AKIATEST", all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    assertEquals("secret-from-getSecrets", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    assertEquals(
+        "secret-from-getCredentials", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
     assertEquals("http://s3.example.com", all.get("s3-endpoint"));
   }
 
   @Test
-  public void testKeepsPlaintextAccessKeyIdFromRestProperties() throws Exception {
+  public void testCredentialsOverrideMaskedRestProperties() throws Exception {
     Configuration conf = new Configuration();
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(
@@ -292,6 +296,7 @@ public class TestBaseGVFSOperationsSecrets {
     SupportsSchemas schemas = mock(SupportsSchemas.class);
     FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
     SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
+    SupportsCredentials catalogCredentials = mock(SupportsCredentials.class);
 
     when(catalog.properties())
         .thenReturn(
@@ -303,8 +308,11 @@ public class TestBaseGVFSOperationsSecrets {
                 "s3-endpoint",
                 "http://s3.example.com"));
     when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
-    when(catalogSecrets.getSecrets())
-        .thenReturn(Map.of(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "secret-from-getSecrets"));
+    when(catalogSecrets.getSecrets()).thenReturn(Map.of());
+    when(catalog.supportsCredentials()).thenReturn(catalogCredentials);
+    when(catalogCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {new S3SecretKeyCredential("AKIATEST", "secret-from-getCredentials")});
     when(catalog.asSchemas()).thenReturn(schemas);
     when(schemas.loadSchema("schema")).thenReturn(schema);
     when(schema.properties()).thenReturn(Map.of());
@@ -322,7 +330,8 @@ public class TestBaseGVFSOperationsSecrets {
         ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
 
     assertEquals("AKIATEST", all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    assertEquals("secret-from-getSecrets", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    assertEquals(
+        "secret-from-getCredentials", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
     assertEquals("http://s3.example.com", all.get("s3-endpoint"));
   }
 

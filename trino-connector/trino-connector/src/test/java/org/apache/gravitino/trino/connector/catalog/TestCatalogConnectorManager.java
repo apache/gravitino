@@ -47,6 +47,9 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
@@ -1456,7 +1459,7 @@ public class TestCatalogConnectorManager {
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
     when(catalog.supportsSecrets().getSecrets())
-        .thenReturn(Map.of("jdbc-password", "hunter2", "shared", "from-secret"));
+        .thenReturn(Map.of("custom-token", "hunter2", "shared", "from-secret"));
     fixture.withCatalogs(catalog);
 
     CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
@@ -1469,7 +1472,7 @@ public class TestCatalogConnectorManager {
     Map<String, String> properties = registered.getValue().getProperties();
     assertEquals("v1", properties.get("visible"));
     assertEquals("from-props", properties.get("shared"));
-    assertFalse(properties.containsKey("jdbc-password"));
+    assertFalse(properties.containsKey("custom-token"));
     assertFalse(properties.toString().contains("hunter2"));
   }
 
@@ -1479,7 +1482,9 @@ public class TestCatalogConnectorManager {
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
     when(catalog.supportsSecrets().getSecrets())
-        .thenReturn(Map.of("jdbc-password", "hunter2", "shared", "from-secret"));
+        .thenReturn(Map.of("custom-token", "hunter2", "shared", "from-secret"));
+    when(catalog.supportsCredentials().getCredentials())
+        .thenReturn(new Credential[] {new JdbcCredential("u", "jdbc-secret")});
     fixture.withCatalogs(catalog);
     CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
 
@@ -1503,8 +1508,10 @@ public class TestCatalogConnectorManager {
     verify(fixture.catalogFactory).createCatalogConnectorContextBuilder(built.capture());
     Map<String, String> properties = built.getValue().getProperties();
     assertEquals("v1", properties.get("visible"));
-    assertEquals("hunter2", properties.get("jdbc-password"));
+    assertEquals("hunter2", properties.get("custom-token"));
     assertEquals("from-secret", properties.get("shared"));
+    assertEquals("jdbc-secret", properties.get("jdbc-password"));
+    assertEquals("u", properties.get("jdbc-user"));
   }
 
   @Test
@@ -1592,6 +1599,9 @@ public class TestCatalogConnectorManager {
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(supportsSecrets.getSecrets()).thenReturn(Map.of());
     when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[0]);
+    when(catalog.supportsCredentials()).thenReturn(supportsCredentials);
     Audit audit = mock(Audit.class);
     when(audit.createTime()).thenReturn(Instant.now());
     when(audit.lastModifiedTime()).thenReturn(null);

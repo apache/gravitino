@@ -44,6 +44,41 @@ import org.junit.jupiter.api.Test;
 public class TestBaseCatalogCredentialSecrets {
 
   @Test
+  void testS3SecretKeyAutoDetectedWithoutExplicitProviders() {
+    Map<String, String> entityProps =
+        Map.of(
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
+            "AKIATEST",
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+            "secret-sk");
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(2L)
+            .withName("s3-static-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(Catalog.Type.FILESET)
+            .withProvider("test")
+            .withProperties(entityProps)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    TestCatalog catalog = new TestCatalog().withCatalogEntity(entity).withCatalogConf(entityProps);
+
+    Map<String, String> withProviders = catalog.propertiesWithCredentialProviders();
+    Assertions.assertTrue(
+        withProviders
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS)
+            .contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
+    Assertions.assertEquals(
+        "AKIATEST", withProviders.get(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "secret-sk",
+        withProviders.get(S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY));
+  }
+
+  @Test
   void testPropertiesWithCredentialProvidersResolvesEntityUrn() throws Exception {
     try (SecretManager secretManager = memorySecretManager()) {
       SecretUrn urn =

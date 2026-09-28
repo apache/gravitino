@@ -26,15 +26,16 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
- * Gravitino property keys for cloud static <em>secret</em> credentials.
+ * Gravitino property keys for cloud static credentials that must not be taken from REST {@code
+ * properties()} responses.
  *
- * <p>GVFS must not consume static <em>secret</em> keys from REST catalog/schema/fileset {@code
- * properties()} responses (which may be masked as {@code ******}). Plaintext for hidden static
- * credentials, including {@code s3-access-key-id}, is recovered via {@code getSecrets()}. Masked
- * placeholders are dropped by {@link #omitStaticCredentialProperties} so clients must merge {@code
- * getSecrets()} (or local Hadoop {@code Configuration}, or {@code getCredentials()} when credential
- * vending is enabled). Non-credential configuration such as {@code gcs-service-account-file} (path,
- * not a secret half) may still appear in {@code properties()}.
+ * <p>GVFS must not consume static credential keys from REST catalog/schema/fileset {@code
+ * properties()} responses (which may be masked as {@code ******}). Plaintext for S3/OSS/COS access
+ * key pairs and Azure storage account keys is recovered via {@code getCredentials()}. Masked
+ * placeholders are dropped by {@link #omitStaticCredentialProperties}. Non-credential configuration
+ * such as {@code gcs-service-account-file} may still appear in {@code properties()}. Azure client
+ * secrets that are not credential-vending keys remain omitted here; recover them via {@code
+ * getSecrets()} when needed.
  */
 public final class CloudStorageCredentialPropertyKeys {
 
@@ -42,16 +43,19 @@ public final class CloudStorageCredentialPropertyKeys {
   public static final String MASKED_PROPERTY_VALUE = "******";
 
   /**
-   * Secret-bearing static credential keys only. Access key IDs are declared {@code hidden} and are
-   * not listed here; they are omitted when masked as {@code ******} and recovered via {@code
-   * getSecrets()}. GCS service-account file paths are non-secret configuration and pass through.
+   * Static cloud credential property keys omitted from REST {@code properties()} merges. Access key
+   * IDs and secret halves that belong to credential vending are recovered via {@code
+   * getCredentials()}.
    */
   private static final Set<String> STATIC_CREDENTIAL_KEYS =
       ImmutableSet.of(
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
           S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
           AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
           COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
 
   private CloudStorageCredentialPropertyKeys() {}

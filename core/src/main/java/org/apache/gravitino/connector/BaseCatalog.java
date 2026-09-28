@@ -560,6 +560,30 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Appends {@code credentialType} to {@link CredentialConstants#CREDENTIAL_PROVIDERS} when it is
+   * not already listed. Used by subclasses that must keep catalog-specific providers available even
+   * when the property was set explicitly (so {@link #addCatalogSpecificCredentialProviders} was
+   * skipped).
+   *
+   * @param props mutable catalog properties
+   * @param credentialType provider type name to ensure
+   */
+  protected static void ensureCredentialProviderListed(
+      Map<String, String> props, String credentialType) {
+    String providers = props.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    if (StringUtils.isBlank(providers)) {
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialType);
+      return;
+    }
+    for (String part : providers.split(",")) {
+      if (credentialType.equals(part.trim())) {
+        return;
+      }
+    }
+    props.put(CredentialConstants.CREDENTIAL_PROVIDERS, providers + "," + credentialType);
+  }
+
+  /**
    * Returns whether hidden credentials should be backfilled into catalog properties for backward
    * compatibility with connectors that do not support credential vending. Controlled by
    * server-level config {@code gravitino.catalog.credential.backfillToProperties}.

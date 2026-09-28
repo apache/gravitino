@@ -30,6 +30,9 @@ import java.util.Properties;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
@@ -91,35 +94,47 @@ public class TestBaseCatalogSecrets {
   void testMergeMemorySecrets() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
-      entityProps.put("jdbc-user", "root");
+      entityProps.put("custom-token", "placeholder");
       List<SecretMaterial> writes =
           sm.assembleSecretMaterials(
-              Map.of("jdbc-user", "root"),
+              Map.of(),
               entityProps,
               "catalog",
               1L,
-              Map.of("jdbc-password", new SecretBinding("memory", "from-memory")),
+              Map.of("custom-token", new SecretBinding("memory", "from-memory")),
               Map.of());
       sm.writeSecrets(writes);
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
-      setUpCatalog(Map.of("jdbc-url", "jdbc:mysql://localhost/db"), secrets);
+      setUpCatalog(
+          Map.of("jdbc-url", "jdbc:mysql://localhost/db"),
+          secrets,
+          new Credential[] {new JdbcCredential("root", "jdbc-pwd")});
       catalog.initialize("jdbc", new CaseInsensitiveStringMap(Map.of()));
 
       assertEquals("jdbc:mysql://localhost/db", catalog.lastProperties.get("jdbc-url"));
-      assertEquals("from-memory", catalog.lastProperties.get("jdbc-password"));
+      assertEquals("from-memory", catalog.lastProperties.get("custom-token"));
+      assertEquals("jdbc-pwd", catalog.lastProperties.get("jdbc-password"));
     }
   }
 
   private void setUpCatalog(Map<String, String> properties, Map<String, String> secrets) {
+    setUpCatalog(properties, secrets, new Credential[0]);
+  }
+
+  private void setUpCatalog(
+      Map<String, String> properties, Map<String, String> secrets, Credential[] credentials) {
     Catalog gravitinoCatalog = mock(Catalog.class);
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
     TableCatalog sparkCatalog = mock(TableCatalog.class);
     when(gravitinoCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     when(gravitinoCatalog.provider()).thenReturn("hive");
     when(gravitinoCatalog.properties()).thenReturn(properties);
     when(gravitinoCatalog.supportsSecrets()).thenReturn(supportsSecrets);
     when(supportsSecrets.getSecrets()).thenReturn(secrets);
+    when(gravitinoCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(credentials);
     when(gravitinoClient.loadCatalog(any())).thenReturn(gravitinoCatalog);
     // Catalog info is cached; recreate the manager so each test loads the new mock.
     GravitinoCatalogManager.get().close();
