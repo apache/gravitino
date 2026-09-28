@@ -35,6 +35,9 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -42,7 +45,10 @@ import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -210,6 +216,21 @@ public class TestIcebergNamespaceOperationExecutor {
   }
 
   @Test
+  public void testRejectsOversizedColumnNameAfterRegister() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    Schema schema = new Schema(NestedField.required(1, oversizedName, StringType.get()));
+    assertRegisterRejectsSchema(schema, "The name of the column must not exceed 128 characters");
+  }
+
+  @Test
+  public void testRejectsOversizedColumnCommentAfterRegister() {
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    Schema schema = new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment));
+    assertRegisterRejectsSchema(
+        schema, "The comment of the column must not exceed 4096 characters");
+  }
+
+  @Test
   public void testDropNestedNamespacePassesCorrectLevels() {
     Namespace nestedNs = Namespace.of("A", "B", "C");
 
@@ -277,5 +298,24 @@ public class TestIcebergNamespaceOperationExecutor {
 
     verify(mockCatalogWrapper).namespaceExists(ns);
     Assertions.assertFalse(exists);
+  }
+
+  private void assertRegisterRejectsSchema(Schema schema, String expectedMessage) {
+    Namespace namespace = Namespace.of("test_namespace");
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("test_table");
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "file:/tmp/table", Collections.emptyMap());
+    LoadTableResponse response = LoadTableResponse.builder().withTableMetadata(metadata).build();
+    when(mockCatalogWrapper.registerTable(namespace, request, false)).thenReturn(response);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
+    verify(mockCatalogWrapper).registerTable(namespace, request, false);
   }
 }

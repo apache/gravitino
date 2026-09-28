@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -34,11 +35,13 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -226,5 +229,82 @@ public class TestIcebergTableOperationExecutor {
     Assertions.assertEquals(
         "The name of the table must not exceed 128 characters", exception.getMessage());
     verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRejectsOversizedColumnFieldsBeforeCreate() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    Schema oversizedNameSchema =
+        new Schema(NestedField.required(1, oversizedName, StringType.get()));
+    CreateTableRequest oversizedNameRequest =
+        CreateTableRequest.builder().withName("test_table").withSchema(oversizedNameSchema).build();
+
+    IllegalArgumentException nameException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                executor.createTable(
+                    mockContext, Namespace.of("test_namespace"), oversizedNameRequest));
+    Assertions.assertEquals(
+        "The name of the column must not exceed 128 characters", nameException.getMessage());
+
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    Schema oversizedCommentSchema =
+        new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment));
+    CreateTableRequest oversizedCommentRequest =
+        CreateTableRequest.builder()
+            .withName("test_table")
+            .withSchema(oversizedCommentSchema)
+            .build();
+
+    IllegalArgumentException commentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                executor.createTable(
+                    mockContext, Namespace.of("test_namespace"), oversizedCommentRequest));
+    Assertions.assertEquals(
+        "The comment of the column must not exceed 4096 characters", commentException.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRejectsOversizedColumnFieldsBeforeUpdate() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    UpdateTableRequest oversizedNameRequest =
+        updateRequest(new Schema(NestedField.required(1, oversizedName, StringType.get())));
+
+    IllegalArgumentException nameException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                executor.updateTable(
+                    mockContext,
+                    TableIdentifier.of("test_namespace", "test_table"),
+                    oversizedNameRequest));
+    Assertions.assertEquals(
+        "The name of the column must not exceed 128 characters", nameException.getMessage());
+
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    UpdateTableRequest oversizedCommentRequest =
+        updateRequest(
+            new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment)));
+
+    IllegalArgumentException commentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                executor.updateTable(
+                    mockContext,
+                    TableIdentifier.of("test_namespace", "test_table"),
+                    oversizedCommentRequest));
+    Assertions.assertEquals(
+        "The comment of the column must not exceed 4096 characters", commentException.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  private static UpdateTableRequest updateRequest(Schema schema) {
+    return new UpdateTableRequest(
+        Collections.emptyList(), Collections.singletonList(new MetadataUpdate.AddSchema(schema)));
   }
 }

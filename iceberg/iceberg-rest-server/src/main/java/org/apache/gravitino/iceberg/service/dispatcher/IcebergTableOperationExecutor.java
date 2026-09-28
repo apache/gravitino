@@ -72,6 +72,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     TableEntity.NAME.validate(createTableRequest.name(), Entity.EntityType.TABLE);
+    IcebergColumnFieldValidator.validateSchema(createTableRequest.schema());
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, createTableRequest.name());
 
@@ -117,6 +118,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
+    IcebergColumnFieldValidator.validateUpdate(updateTableRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .updateTable(tableIdentifier, updateTableRequest);

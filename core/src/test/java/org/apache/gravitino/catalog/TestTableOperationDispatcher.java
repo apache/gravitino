@@ -650,6 +650,129 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testRejectsOversizedColumnFieldsBeforeExternalChange() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_column_field_limits");
+    NameIdentifier validTableIdent = NameIdentifier.of(tableNs, "valid_table");
+    NameIdentifier invalidNameTableIdent = NameIdentifier.of(tableNs, "invalid_column_name");
+    NameIdentifier invalidCommentTableIdent = NameIdentifier.of(tableNs, "invalid_column_comment");
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column validColumn =
+        TestColumn.builder()
+            .withName("col1")
+            .withPosition(0)
+            .withType(Types.StringType.get())
+            .withComment("comment")
+            .build();
+
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    IllegalArgumentException createNameException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    invalidNameTableIdent,
+                    new Column[] {
+                      TestColumn.builder()
+                          .withName(oversizedName)
+                          .withPosition(0)
+                          .withType(Types.StringType.get())
+                          .build()
+                    },
+                    "comment",
+                    props,
+                    new Transform[0]));
+    Assertions.assertEquals(
+        "The name of the column must not exceed 128 characters", createNameException.getMessage());
+
+    IllegalArgumentException createCommentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    invalidCommentTableIdent,
+                    new Column[] {
+                      TestColumn.builder()
+                          .withName("col1")
+                          .withPosition(0)
+                          .withType(Types.StringType.get())
+                          .withComment(oversizedComment)
+                          .build()
+                    },
+                    "comment",
+                    props,
+                    new Transform[0]));
+    Assertions.assertEquals(
+        "The comment of the column must not exceed 4096 characters",
+        createCommentException.getMessage());
+
+    tableOperationDispatcher.createTable(
+        validTableIdent, new Column[] {validColumn}, "comment", props, new Transform[0]);
+
+    IllegalArgumentException addNameException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    validTableIdent,
+                    TableChange.addColumn(new String[] {oversizedName}, Types.StringType.get())));
+    Assertions.assertEquals(
+        "The name of the column must not exceed 128 characters", addNameException.getMessage());
+
+    IllegalArgumentException addCommentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    validTableIdent,
+                    TableChange.addColumn(
+                        new String[] {"col2"}, Types.StringType.get(), oversizedComment)));
+    Assertions.assertEquals(
+        "The comment of the column must not exceed 4096 characters",
+        addCommentException.getMessage());
+
+    IllegalArgumentException renameException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    validTableIdent,
+                    TableChange.renameColumn(new String[] {"col1"}, oversizedName)));
+    Assertions.assertEquals(
+        "The name of the column must not exceed 128 characters", renameException.getMessage());
+
+    IllegalArgumentException updateCommentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    validTableIdent,
+                    TableChange.updateColumnComment(new String[] {"col1"}, oversizedComment)));
+    Assertions.assertEquals(
+        "The comment of the column must not exceed 4096 characters",
+        updateCommentException.getMessage());
+
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertThrows(
+              NoSuchTableException.class,
+              () -> testCatalogOperations.loadTable(invalidNameTableIdent));
+          Assertions.assertThrows(
+              NoSuchTableException.class,
+              () -> testCatalogOperations.loadTable(invalidCommentTableIdent));
+          Column[] catalogColumns = testCatalogOperations.loadTable(validTableIdent).columns();
+          Assertions.assertEquals(1, catalogColumns.length);
+          Assertions.assertEquals(validColumn.name(), catalogColumns[0].name());
+          Assertions.assertEquals(validColumn.comment(), catalogColumns[0].comment());
+          return null;
+        });
+  }
+
+  @Test
   public void testCreateAndDropTable() throws IOException {
     NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema71", "table31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

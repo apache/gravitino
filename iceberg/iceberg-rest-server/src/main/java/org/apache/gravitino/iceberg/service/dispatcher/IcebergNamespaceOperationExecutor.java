@@ -134,9 +134,12 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, registerTableRequest.name());
 
-    return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.catalogName())
-        .registerTable(namespace, registerTableRequest, context.requestCredentialVending());
+    LoadTableResponse response =
+        icebergCatalogWrapperManager
+            .getCatalogWrapper(context.catalogName())
+            .registerTable(namespace, registerTableRequest, context.requestCredentialVending());
+    IcebergColumnFieldValidator.validateSchema(response.tableMetadata().schema());
+    return response;
   }
 
   @Override
