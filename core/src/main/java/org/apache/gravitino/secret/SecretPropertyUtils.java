@@ -89,8 +89,10 @@ public final class SecretPropertyUtils {
    *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
    *       catalog does not expose properties metadata for the entity type.
    *   <li>otherwise: recover only undeclared keys or declared {@code hidden} keys. Declared
-   *       non-hidden configuration (for example {@code credential-providers}, {@code
-   *       s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   *       non-hidden configuration (for example {@code credential-providers}) stays in {@code
+   *       properties()} and is excluded here. Declared hidden static access key IDs (for example
+   *       {@code s3-access-key-id}) are included in {@code getSecrets()} when present as inline
+   *       plaintext.
    * </ul>
    *
    * <p>Callers that need historical fuzzy recovery without real metadata should pass an empty

@@ -28,12 +28,13 @@ import javax.annotation.Nullable;
 /**
  * Gravitino property keys for cloud static <em>secret</em> credentials.
  *
- * <p>GVFS must not consume these keys from REST catalog/schema/fileset {@code properties()}
- * responses (which may be masked as {@code ******}). Secret plaintext is recovered via {@code
- * getSecrets()}. Non-secret identifiers such as {@code s3-access-key-id} / {@code
- * gcs-service-account-file} remain in {@code properties()} and are merged normally. Clients may
- * also supply credentials via local Hadoop {@code Configuration} or {@code getCredentials()} when
- * credential vending is enabled.
+ * <p>GVFS must not consume static <em>secret</em> keys from REST catalog/schema/fileset {@code
+ * properties()} responses (which may be masked as {@code ******}). Plaintext for hidden static
+ * credentials, including {@code s3-access-key-id}, is recovered via {@code getSecrets()}. Masked
+ * placeholders are dropped by {@link #omitStaticCredentialProperties} so clients must merge {@code
+ * getSecrets()} (or local Hadoop {@code Configuration}, or {@code getCredentials()} when credential
+ * vending is enabled). Non-credential configuration such as {@code gcs-service-account-file} (path,
+ * not a secret half) may still appear in {@code properties()}.
  */
 public final class CloudStorageCredentialPropertyKeys {
 
@@ -41,9 +42,9 @@ public final class CloudStorageCredentialPropertyKeys {
   public static final String MASKED_PROPERTY_VALUE = "******";
 
   /**
-   * Secret-bearing static credential keys only. Access key IDs and GCS service-account file paths
-   * are intentionally excluded: they are declared non-hidden and must stay available from {@code
-   * properties()}.
+   * Secret-bearing static credential keys only. Access key IDs are declared {@code hidden} and are
+   * not listed here; they are omitted when masked as {@code ******} and recovered via {@code
+   * getSecrets()}. GCS service-account file paths are non-secret configuration and pass through.
    */
   private static final Set<String> STATIC_CREDENTIAL_KEYS =
       ImmutableSet.of(
