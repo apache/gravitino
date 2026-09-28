@@ -26,9 +26,9 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import java.util.function.ToIntFunction;
 
 /** Trino NodePartitioningProvider implementation with the new split bucket function signature. */
-public class GravitinoNodePartitioningProvider478 extends GravitinoNodePartitioningProvider {
+public class GravitinoNodePartitioningProvider479 extends GravitinoNodePartitioningProvider {
 
-  public GravitinoNodePartitioningProvider478(
+  public GravitinoNodePartitioningProvider479(
       ConnectorNodePartitioningProvider nodePartitioningProvider) {
     super(nodePartitioningProvider);
   }

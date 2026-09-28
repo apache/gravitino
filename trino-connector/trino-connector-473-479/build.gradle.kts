@@ -27,9 +27,9 @@ plugins {
   `maven-publish`
 }
 
-// This module supports Trino versions 473-478
+// This module supports Trino versions 473-479
 val minTrinoVersion = 473
-val maxTrinoVersion = 478
+val maxTrinoVersion = 479
 val otelSemconvVersion = "1.32.0"
 
 val trinoVersion = providers.gradleProperty("trinoVersion")
@@ -45,19 +45,19 @@ check(trinoVersion in minTrinoVersion..maxTrinoVersion) {
 }
 
 java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
+  toolchain.languageVersion.set(JavaLanguageVersion.of(25))
 }
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.airlift.json)
+  implementation(libs.airlift.log)
+  implementation(libs.slf4j.jdk14)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
   runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv:$otelSemconvVersion")
-  implementation(libs.airlift.log)
-  implementation(libs.slf4j.jdk14)
   compileOnly(libs.airlift.resolver)
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")
@@ -99,7 +99,7 @@ plugins.withId("com.diffplug.spotless") {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-  // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
+  // Error Prone is incompatible with the JDK 25 toolchain required by this Trino range.
   options.errorprone.isEnabled.set(false)
   options.release.set(17)
 }
@@ -108,6 +108,8 @@ tasks.withType<Test>().configureEach {
   extensions
     .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
     ?.isEnabled = false
+  // Trino 479+ requires the JDK Vector API incubator module for SIMD block encoding.
+  jvmArgs("--add-modules=jdk.incubator.vector")
 }
 
 tasks {
