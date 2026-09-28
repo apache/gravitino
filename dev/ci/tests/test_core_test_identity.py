@@ -290,6 +290,51 @@ class TestCoreTestIdentity(unittest.TestCase):
             ):
                 core_test_identity.reconcile_manifests(manifest_files)
 
+    def test_compare_legacy_partition_requires_exact_split_multiset(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_directory = Path(temp_dir)
+            split_manifest_files = []
+            for lane in core_test_identity.LANES:
+                manifest = core_test_identity.build_manifest(lane, FIXTURES / lane)
+                manifest_file = output_directory / f"{lane}.json"
+                core_test_identity.write_json(manifest, manifest_file)
+                split_manifest_files.append(manifest_file)
+
+            legacy = core_test_identity.build_manifest(
+                "legacy", FIXTURES / "legacy"
+            )
+            legacy_file = output_directory / "legacy.json"
+            core_test_identity.write_json(legacy, legacy_file)
+            comparison = core_test_identity.compare_legacy_partition(
+                legacy_file, split_manifest_files
+            )
+
+            self.assertTrue(comparison["successful"])
+            self.assertTrue(comparison["partition_equal"])
+            self.assertEqual(comparison["legacy"]["test_count"], 21)
+            self.assertEqual(comparison["split"]["test_count"], 21)
+            self.assertEqual(
+                comparison["legacy"]["identity_digest"],
+                comparison["split"]["identity_digest"],
+            )
+            self.assertEqual(
+                comparison["legacy"]["source_files"], ["TEST-legacy.xml"]
+            )
+
+            mismatched = copy.deepcopy(legacy)
+            mismatched["identities"][0]["name"] += "-different"
+            mismatched["identity_digest"] = core_test_identity._identity_digest(
+                identity_counter(mismatched)
+            )
+            mismatched_file = output_directory / "legacy-mismatched.json"
+            core_test_identity.write_json(mismatched, mismatched_file)
+            with self.assertRaisesRegex(
+                core_test_identity.ManifestError, "Legacy/split identity mismatch"
+            ):
+                core_test_identity.compare_legacy_partition(
+                    mismatched_file, split_manifest_files
+                )
+
     def test_cli_writes_manifest_and_reconciliation_output(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_directory = Path(temp_dir)
@@ -325,6 +370,37 @@ class TestCoreTestIdentity(unittest.TestCase):
             with summary_file.open(encoding="utf-8") as source:
                 summary = json.load(source)
             self.assertTrue(summary["database_identities_equal"])
+
+            legacy_manifest_file = output_directory / "legacy.json"
+            return_code = core_test_identity.main(
+                [
+                    "manifest",
+                    "--lane",
+                    "legacy",
+                    "--results",
+                    str(FIXTURES / "legacy"),
+                    "--output",
+                    str(legacy_manifest_file),
+                ]
+            )
+            self.assertEqual(return_code, 0)
+
+            comparison_file = output_directory / "legacy-comparison.json"
+            return_code = core_test_identity.main(
+                [
+                    "compare-legacy",
+                    "--legacy-manifest",
+                    str(legacy_manifest_file),
+                    "--split-manifests",
+                    *(str(path) for path in manifest_files),
+                    "--output",
+                    str(comparison_file),
+                ]
+            )
+            self.assertEqual(return_code, 0)
+            with comparison_file.open(encoding="utf-8") as source:
+                comparison = json.load(source)
+            self.assertTrue(comparison["partition_equal"])
 
 
 if __name__ == "__main__":

@@ -107,9 +107,15 @@ artifacts {
 }
 
 val coreDatabaseTestTag = "gravitino-core-database-test"
-val coreH2TestTag = "gravitino-core-h2-test"
-val coreMySQLTestTag = "gravitino-core-mysql-test"
-val corePostgreSQLTestTag = "gravitino-core-postgresql-test"
+// Backend name -> JUnit tag that pins a database test class to that backend. A database test
+// class with none of these tags runs under every backend lane. Adding a backend here is enough
+// to teach the lane filtering below about it.
+val coreBackendTestTags =
+  linkedMapOf(
+    "h2" to "gravitino-core-h2-test",
+    "mysql" to "gravitino-core-mysql-test",
+    "postgresql" to "gravitino-core-postgresql-test"
+  )
 val coreTestBackendProperty = "gravitino.core.test.backend"
 
 fun registerCoreTestTask(
@@ -146,13 +152,16 @@ fun registerCoreTestTask(
     if (backend == null) {
       excludeTags(coreDatabaseTestTag, "gravitino-docker-test")
     } else {
+      val ownBackendTag =
+        coreBackendTestTags[backend]
+          ?: throw GradleException("Unsupported core test backend: $backend")
+      val otherBackendTags = coreBackendTestTags.values.filter { it != ownBackendTag }
       includeTags(coreDatabaseTestTag)
-      when (backend) {
-        "h2" -> excludeTags(coreMySQLTestTag, corePostgreSQLTestTag)
-        "mysql" -> excludeTags(coreH2TestTag, corePostgreSQLTestTag)
-        "postgresql" -> excludeTags(coreH2TestTag, coreMySQLTestTag)
-        else -> throw GradleException("Unsupported core test backend: $backend")
-      }
+      // JUnit tag expression, still applied at discovery time like a plain tag list, so
+      // excluded classes never show up in this lane's JUnit XML. Exclude a class only when
+      // it is pinned to another backend and NOT to this one: a class tagged for several
+      // backends then runs under each of them instead of being dropped from all lanes.
+      excludeTags("!$ownBackendTag & (${otherBackendTags.joinToString(" | ")})")
     }
   }
 
