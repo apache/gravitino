@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -42,7 +43,10 @@ import org.apache.gravitino.connector.PropertyEntry;
 public final class SecretPropertyUtils {
 
   private static final Set<String> WRITE_THROUGH_ENTITY_TYPES =
-      Set.of("catalog", "schema", "fileset");
+      Set.of(
+          Entity.EntityType.CATALOG.name().toLowerCase(Locale.ROOT),
+          Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
+          Entity.EntityType.FILESET.name().toLowerCase(Locale.ROOT));
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
