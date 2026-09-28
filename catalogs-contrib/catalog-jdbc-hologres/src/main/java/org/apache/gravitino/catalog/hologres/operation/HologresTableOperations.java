@@ -227,7 +227,7 @@ public class HologresTableOperations extends JdbcTableOperations
     List<String> withEntries = new ArrayList<>();
 
     // Add distribution_key from Distribution parameter
-    if (!Distributions.NONE.equals(distribution)) {
+    if (!Distributions.isNone(distribution)) {
       validateDistribution(distribution);
       String distributionColumns =
           Arrays.stream(distribution.expressions())

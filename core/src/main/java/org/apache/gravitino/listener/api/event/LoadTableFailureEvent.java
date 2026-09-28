@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
@@ -34,7 +35,20 @@ public final class LoadTableFailureEvent extends TableFailureEvent {
    *     insight into the issues encountered.
    */
   public LoadTableFailureEvent(String user, NameIdentifier identifier, Exception exception) {
-    super(user, identifier, exception);
+    this(user, identifier, exception, null);
+  }
+
+  /**
+   * Constructs a {@code LoadTableFailureEvent} with optional audit extras.
+   *
+   * @param user The user who initiated the table loading operation.
+   * @param identifier The identifier of the table that the loading attempt was made for.
+   * @param exception The exception that was thrown during the table loading operation.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  public LoadTableFailureEvent(
+      String user, NameIdentifier identifier, Exception exception, Map<String, String> customInfo) {
+    super(user, identifier, exception, customInfo);
   }
 
   /**

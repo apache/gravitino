@@ -20,6 +20,7 @@ from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -89,3 +90,8 @@ class Model(Auditable):
             UnsupportedOperationException: If this model does not support role operations.
         """
         raise UnsupportedOperationException("Model does not support role operations.")
+
+    def support_secrets(self) -> SupportsSecrets:
+        raise UnsupportedOperationException(
+            "Model does not support secret property operations."
+        )

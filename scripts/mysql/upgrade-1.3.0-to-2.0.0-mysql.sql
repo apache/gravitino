@@ -17,15 +17,8 @@
 -- under the License.
 --
 
-ALTER TABLE `user_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`,
-    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `external_id`;
-
-ALTER TABLE `group_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`;
-
-CREATE UNIQUE INDEX `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`);
-CREATE UNIQUE INDEX `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`);
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
 
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
@@ -39,8 +32,42 @@ ALTER TABLE `tag_relation_meta`
 ALTER TABLE `tag_relation_meta`
     ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
 
+ALTER TABLE `idp_user_meta`
+    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
+
 ALTER TABLE `idp_group_meta`
     ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
+
+-- add audit_info as nullable first for MySQL 5.7 compatibility (TEXT cannot have defaults)
+ALTER TABLE `idp_user_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp user audit info' AFTER `enabled`;
+
+UPDATE `idp_user_meta`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `idp_user_meta`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user audit info' AFTER `enabled`;
+
+ALTER TABLE `idp_group_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp group audit info' AFTER `group_comment`;
+
+UPDATE `idp_group_meta`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `idp_group_meta`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp group audit info' AFTER `group_comment`;
+
+ALTER TABLE `idp_user_group_rel`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp user group relation audit info' AFTER `group_id`;
+
+UPDATE `idp_user_group_rel`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `idp_user_group_rel`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user group relation audit info' AFTER `group_id`;
 
 CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
@@ -70,11 +97,14 @@ ALTER TABLE `group_role_rel` RENAME INDEX `idx_rid` TO `group_role_rel_idx_rid`;
 ALTER TABLE `tag_relation_meta` RENAME INDEX `idx_mid` TO `tag_relation_meta_idx_mid`;
 ALTER TABLE `model_meta` RENAME INDEX `idx_mid` TO `model_meta_idx_mid`;
 ALTER TABLE `model_meta` RENAME INDEX `idx_cid` TO `model_meta_idx_cid`;
+
+ALTER TABLE `model_meta`
+    ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`,
+    ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_mid` TO `model_version_info_idx_mid`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_cid` TO `model_version_info_idx_cid`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_sid` TO `model_version_info_idx_sid`;
 ALTER TABLE `policy_version_info` RENAME INDEX `idx_mid` TO `policy_version_info_idx_mid`;
-ALTER TABLE `policy_relation_meta` RENAME INDEX `idx_mid` TO `policy_relation_meta_idx_mid`;
 ALTER TABLE `function_meta` RENAME INDEX `uk_sid_fn_del` TO `function_meta_uk_sid_fn_del`;
 ALTER TABLE `function_meta` RENAME INDEX `idx_mid` TO `function_meta_idx_mid`;
 ALTER TABLE `function_meta` RENAME INDEX `idx_cid` TO `function_meta_idx_cid`;
@@ -114,6 +144,9 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
 
+ALTER TABLE `job_run_meta`
+    ADD COLUMN `runtime_job_template` MEDIUMTEXT DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
+
 CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name',
@@ -149,3 +182,18 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
+
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
+UPDATE `owner_meta` o
+    JOIN (
+        SELECT `metadata_object_id`, `metadata_object_type`, MAX(`id`) AS keep_id
+        FROM `owner_meta`
+        WHERE `deleted_at` = 0
+        GROUP BY `metadata_object_id`, `metadata_object_type`
+        HAVING COUNT(*) > 1
+    ) d ON o.`metadata_object_id` = d.`metadata_object_id`
+       AND o.`metadata_object_type` = d.`metadata_object_type`
+    SET o.`deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
+        o.`updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+    WHERE o.`deleted_at` = 0 AND o.`id` <> d.keep_id;

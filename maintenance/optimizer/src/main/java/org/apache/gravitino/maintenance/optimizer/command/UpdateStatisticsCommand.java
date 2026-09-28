@@ -38,7 +38,7 @@ public class UpdateStatisticsCommand implements OptimizerCommandExecutor {
       } else {
         summary =
             updater.update(
-                context.calculatorName(), context.parsedIdentifiers(), UpdateType.STATISTICS);
+                context.calculatorName(), context.parsedTableIdentifiers(), UpdateType.STATISTICS);
       }
       OptimizerOutputPrinter.printUpdateSummary(context.output(), summary);
     }

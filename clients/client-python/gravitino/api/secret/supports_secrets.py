@@ -20,9 +20,19 @@ from typing import Dict
 
 
 class SupportsSecrets(ABC):
-    """Interface to retrieve secret-manager plaintext properties."""
+    """Interface to retrieve plaintext secret properties.
+
+    Returns secret-URN values (resolved) and plaintext for sensitive-named keys.
+    Properties that are only declared hidden, without a sensitive-looking name or
+    secret URN, are masked as ****** on list/get and are not returned by
+    get_secrets().
+    """
 
     @abstractmethod
     def get_secrets(self) -> Dict[str, str]:
-        """Return secret-manager plaintext properties for this metadata object."""
+        """Return plaintext secret properties for this metadata object.
+
+        Does not recover values for properties that are only metadata-hidden
+        without a sensitive-looking name or a secret URN.
+        """
         pass

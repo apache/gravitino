@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -36,6 +38,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,6 +94,22 @@ public class VersioningFilter implements Filter {
       Pattern.compile("application/vnd\\.gravitino\\.v(\\d+)\\+json");
   private static final String ACCEPT_VERSION_HEADER = "Accept";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
+
+  private final ObjectMapper objectMapper;
+
+  /** Creates a versioning filter with the backward-compatible error response behavior. */
+  public VersioningFilter() {
+    this.objectMapper = ObjectMapperProvider.objectMapper();
+  }
+
+  /**
+   * Creates a versioning filter with explicit error stack-trace response behavior.
+   *
+   * @param includeErrorStackTrace whether error responses should include diagnostic stack traces
+   */
+  public VersioningFilter(boolean includeErrorStackTrace) {
+    this.objectMapper = ObjectMapperProvider.objectMapper(includeErrorStackTrace);
+  }
 
   private static String getAcceptVersion(int version) {
     return String.format("application/vnd.gravitino.v%d+json", version);
@@ -149,15 +168,23 @@ public class VersioningFilter implements Filter {
     return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
   }
 
-  private static boolean isUnsupportedVersion(int version, ServletResponse response)
-      throws IOException {
+  private boolean isUnsupportedVersion(int version, ServletResponse response) throws IOException {
     if (ApiVersion.isSupportedVersion(version)) {
       return false;
     }
 
     LOG.error("Unsupported version v{} in request header.", version);
+    String message = String.format("Unsupported version v%d in request header", version);
+    ErrorResponse errorResponse = ErrorResponse.illegalArguments(message);
+
+    // Write the JSON ErrorResponse directly instead of calling HttpServletResponse#sendError, so
+    // this filter -- which runs before Jersey ever sees the request -- doesn't fall through to
+    // Jetty's default HTML error page.
     HttpServletResponse resp = (HttpServletResponse) response;
-    resp.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+    resp.setContentType("application/json");
+    resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    objectMapper.writeValue(resp.getWriter(), errorResponse);
     return true;
   }
 

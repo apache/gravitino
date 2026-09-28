@@ -29,6 +29,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -85,6 +86,30 @@ public class TestIcebergCatalog {
           throw new UnsupportedOperationException("Does not support model version properties");
         }
       };
+
+  @Test
+  void testCatalogPropertiesMaskAzureClientSecret() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    Map<String, String> properties =
+        Map.of(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, "azure-client-secret");
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("azure-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .withProperties(properties)
+            .build();
+    IcebergCatalog catalog =
+        new IcebergCatalog().withCatalogConf(properties).withCatalogEntity(entity);
+
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        catalog.properties().get(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
+  }
 
   @Test
   public void testListDatabases() {

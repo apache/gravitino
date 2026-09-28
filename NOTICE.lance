@@ -92,9 +92,18 @@ That code is available under an MIT license <https://github.com/wrandelshofer/Fa
 under the following copyright.
 
 Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+Copyright © 2024 Werner Randelshofer, Switzerland. MIT License.
 
-See FastDoubleParser-NOTICE for details of other source code included in FastDoubleParser
-and the licenses and copyrights that apply to that code.
+FastDoubleParser includes code derived from the following projects:
+
+  fast_double_parser, Copyright (c) 2022 Daniel Lemire. Boost Software License 1.0.
+  <https://github.com/lemire/fast_double_parser>
+
+  fast_float, Copyright (c) 2021 The fast_float authors. MIT License.
+  <https://github.com/fastfloat/fast_float>
+
+  bigint, Copyright 2020 Tim Buktu. 2-clause BSD License.
+  <https://github.com/tbuktu/bigint>
 
 ## Base64 implementation
 
@@ -290,3 +299,44 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 This product includes software developed as part of the
 Ocelli project by Netflix Inc. (https://github.com/Netflix/ocelli/).
+
+The binary distribution of this product bundles binaries of
+Jetty 9.4.58.v20250814,
+which has the following notices:
+ * ==============================================================
+    Jetty Web Container
+    Copyright 1995-2018 Mort Bay Consulting Pty Ltd.
+   ==============================================================
+
+   The Jetty Web Container is Copyright Mort Bay Consulting Pty Ltd
+   unless otherwise noted.
+
+   Jetty is dual licensed under both
+
+     * The Apache 2.0 License
+       http://www.apache.org/licenses/LICENSE-2.0.html
+
+         and
+
+     * The Eclipse Public 1.0 License
+       http://www.eclipse.org/legal/epl-v10.html
+
+   Jetty may be distributed under either license.
+
+Metrics code included in Jersey Server
+org.glassfish.jersey.server.internal.monitoring.core
+Copyright (c) 2015-2018 Oracle and/or its affiliates. All rights reserved.
+Copyright 2010-2013 Coda Hale and Yammer, Inc.
+
+Google Guava Version 18.0 included in Jersey Common
+Copyright (C) 2009 The Guava Authors
+
+Jackson JAX-RS Providers version 2.15.2 included in Jersey
+Copyright (c) 2009-2023 FasterXML, LLC. All rights reserved unless otherwise indicated.
+
+The UnixCrypt.java code implements the one way cryptography used by
+Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
+modified April 2001  by Iris Van den Broeke, Daniel Deville.
+Permission to use, copy, modify and distribute UnixCrypt
+for non-commercial or commercial purposes and without fee is
+granted provided that the copyright notice appears in all copies.

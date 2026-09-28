@@ -409,18 +409,64 @@ public class TestGravitinoPaimonCatalog {
 
     TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
+    org.apache.flink.table.api.Schema schema =
+        org.apache.flink.table.api.Schema.newBuilder().column("id", DataTypes.INT()).build();
+    // The existing table carries an old comment so the alter produces a real TableChange
+    // (comment update) rather than a no-op.
+    CatalogTable existingFlinkTable =
+        CatalogTable.of(schema, "old comment", Collections.emptyList(), Collections.emptyMap());
     CatalogTable newTable =
-        CatalogTable.of(
-            org.apache.flink.table.api.Schema.newBuilder().column("id", DataTypes.INT()).build(),
-            "new comment",
-            Collections.emptyList(),
-            Collections.emptyMap());
-    when(mockFlinkCatalog.getTable(path)).thenReturn(newTable);
+        CatalogTable.of(schema, "new comment", Collections.emptyList(), Collections.emptyMap());
+    when(mockFlinkCatalog.getTable(path)).thenReturn(existingFlinkTable);
 
     cat.alterTable(path, newTable, false);
 
     verify(mockTableCatalog).alterTable(any(), any());
     verify(mockInnerCatalog).invalidateTable(Identifier.create("mydb", "mytable"));
+  }
+
+  /**
+   * Verifies that a no-op Paimon alterTable (existing and new tables identical) neither forwards
+   * the alter to Gravitino nor invalidates the native cache.
+   */
+  @Test
+  public void testAlterTableNoOpDoesNotInvalidateNativeCache() throws Exception {
+    org.apache.paimon.catalog.Catalog mockInnerCatalog =
+        mock(org.apache.paimon.catalog.Catalog.class);
+    FlinkCatalog mockFlinkCatalog = mock(FlinkCatalog.class);
+    when(mockFlinkCatalog.catalog()).thenReturn(mockInnerCatalog);
+
+    Catalog mockCatalog = mock(Catalog.class);
+    TableCatalog mockTableCatalog = mock(TableCatalog.class);
+    when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
+
+    Table existingTable = mock(Table.class);
+    org.apache.gravitino.rel.Column existingColumn =
+        org.apache.gravitino.rel.Column.of(
+            "id", org.apache.gravitino.rel.types.Types.IntegerType.get());
+    when(existingTable.columns())
+        .thenReturn(new org.apache.gravitino.rel.Column[] {existingColumn});
+    when(existingTable.index()).thenReturn(new Index[0]);
+    when(existingTable.properties()).thenReturn(Collections.emptyMap());
+    when(existingTable.distribution()).thenReturn(null);
+    when(existingTable.partitioning()).thenReturn(Transforms.EMPTY_TRANSFORM);
+    when(existingTable.comment()).thenReturn("same comment");
+    when(mockTableCatalog.loadTable(any())).thenReturn(existingTable);
+
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
+    ObjectPath path = new ObjectPath("mydb", "mytable");
+    org.apache.flink.table.api.Schema schema =
+        org.apache.flink.table.api.Schema.newBuilder().column("id", DataTypes.INT()).build();
+    // The existing table and the alter target share the same comment, so no TableChange is
+    // produced and the alter must be skipped.
+    CatalogTable sameTable =
+        CatalogTable.of(schema, "same comment", Collections.emptyList(), Collections.emptyMap());
+    when(mockFlinkCatalog.getTable(path)).thenReturn(sameTable);
+
+    cat.alterTable(path, sameTable, false);
+
+    verify(mockTableCatalog, never()).alterTable(any(), any());
+    verify(mockInnerCatalog, never()).invalidateTable(any());
   }
 
   /** Verifies that successful Paimon dropTable invalidates the native cache. */

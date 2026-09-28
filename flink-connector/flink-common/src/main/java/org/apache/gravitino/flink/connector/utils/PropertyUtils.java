@@ -21,7 +21,11 @@ package org.apache.gravitino.flink.connector.utils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.utils.HadoopUtils;
@@ -33,6 +37,41 @@ public class PropertyUtils {
   public static final String HADOOP_PREFIX = "hadoop.";
   public static final String FS_PREFIX = "fs.";
   public static final String DFS_PREFIX = "dfs.";
+
+  /**
+   * Merges masked entity {@code properties} with plaintext from {@link
+   * SupportsSecrets#getSecrets()}.
+   *
+   * <p>When secrets are unavailable — stubs that do not implement {@link SupportsSecrets}, or older
+   * Gravitino servers that return {@link NotFoundException} / {@link RESTException} for {@code
+   * /secrets} — returns a mutable copy of {@code properties} unchanged so list/get still works.
+   *
+   * @param properties masked or raw properties (may be null)
+   * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}, typically {@code
+   *     entity::supportsSecrets}
+   * @return a new mutable map with secrets overlaid when available
+   */
+  public static Map<String, String> propertiesWithSecrets(
+      Map<String, String> properties, Supplier<SupportsSecrets> supportsSecretsSupplier) {
+    Map<String, String> merged =
+        new HashMap<>(properties == null ? Collections.emptyMap() : properties);
+    if (supportsSecretsSupplier == null) {
+      return merged;
+    }
+    try {
+      SupportsSecrets supportsSecrets = supportsSecretsSupplier.get();
+      if (supportsSecrets == null) {
+        return merged;
+      }
+      Map<String, String> secrets = supportsSecrets.getSecrets();
+      if (secrets != null && !secrets.isEmpty()) {
+        merged.putAll(secrets);
+      }
+    } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {
+      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+    }
+    return merged;
+  }
 
   /**
    * Gets Hadoop and Hive properties.

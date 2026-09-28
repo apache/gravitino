@@ -1,0 +1,94 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.cloud.storage;
+
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.storage.COSProperties;
+
+/**
+ * Shared Tencent COS credential {@link PropertyEntry} definitions for catalog properties metadata.
+ */
+public class COSPropertiesMetadata {
+
+  public static final Map<String, PropertyEntry<?>> PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .put(
+              COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+                  "COS access key ID (Tencent Cloud SecretId)",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+                  "COS secret access key (Tencent Cloud SecretKey)",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_REGION,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_REGION,
+                  "Tencent Cloud COS region",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ENDPOINT,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ENDPOINT,
+                  "Tencent Cloud COS endpoint",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_ROLE_ARN,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_ROLE_ARN,
+                  "Tencent Cloud COS role ARN for STS credential vending",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_EXTERNAL_ID,
+                  "Tencent Cloud COS external ID for cross-account AssumeRole",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              COSProperties.GRAVITINO_COS_APP_ID,
+              stringOptionalPropertyEntry(
+                  COSProperties.GRAVITINO_COS_APP_ID,
+                  "Tencent Cloud COS application ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .build();
+
+  private COSPropertiesMetadata() {}
+}

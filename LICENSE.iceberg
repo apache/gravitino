@@ -238,7 +238,14 @@
    DataNucleus
    Apache Derby
    Dropwizard Hadoop Metrics
-   Error Pront Annotations
+   Dropwizard Metrics Annotation
+   Dropwizard Metrics Core
+   Dropwizard Metrics Healthchecks
+   Dropwizard Metrics JMX
+   Dropwizard Metrics JSON
+   Dropwizard Metrics JVM
+   Dropwizard Metrics Servlets
+   Error Prone Annotations
    AWS EventStream for Java
    Guava Failure Access
    Apache Gravitino
@@ -249,6 +256,10 @@
    Apache Hadoop
    Apache Hive
    Apache HTrace
+   Google HTTP Client
+   Google HTTP Client GSON
+   gRPC API
+   gRPC Context
    Apache HttpComponents Client
    Apache HttpClient
    Apache HttpCore
@@ -282,7 +293,6 @@
    Apache Kerby
    Apache Thrift
    Apache Log4j
-   Metrics
    MyBatis
    The Netty Project
    Nimbus JOSE + JWT
@@ -313,6 +323,10 @@
    Apache Avro
    Apache Yetus - Audience Annotations
    ASM
+   OGNL (shaded in MyBatis 3.5.6)
+   bigint
+   Google auth Credentials
+   Google auth HTTP
    Javolution
    JLine
    JSch
@@ -326,8 +340,16 @@
    MIT license
 
    Checker Framework
+   FastDoubleParser
+   fast_float
    Reactive Streams
+   Schubfach
    SLF4J
+
+   This product bundles various third-party components also under the
+   Boost Software License 1.0
+
+   fast_double_parser
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
@@ -385,3 +407,11 @@
 
    AOP Alliance
 
+
+
+   For the FastDoubleParser license text, see licenses/FastDoubleParser.txt.
+   Third-party license texts for code included in FastDoubleParser are in
+   licenses/FastDoubleParser-thirdparty.txt.
+   For the Schubfach license text, see licenses/Schubfach.txt.
+
+For the BSD license of OGNL shaded in MyBatis, see licenses/mybatis-ognl.txt.

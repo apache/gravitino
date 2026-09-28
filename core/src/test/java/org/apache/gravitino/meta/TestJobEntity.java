@@ -318,4 +318,90 @@ public class TestJobEntity {
     Assertions.assertNotEquals(notFinished, finished);
     Assertions.assertNotEquals(notFinished.hashCode(), finished.hashCode());
   }
+
+  @Test
+  public void testRuntimeJobTemplateDefaultsToNullWhenNotSet() {
+    // Unlike startedAt/finishedAt, runtimeJobTemplate is optional - jobs run before this field
+    // was introduced have no resolved template to backfill, so building without it must not
+    // throw.
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    Assertions.assertNull(jobEntity.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testRuntimeJobTemplate() {
+    String runtimeJobTemplateJson = "{\"jobType\":\"shell\",\"name\":\"test-job-template\"}";
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .build();
+
+    Assertions.assertEquals(runtimeJobTemplateJson, jobEntity.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testEqualsAndHashCodeIncludeRuntimeJobTemplate() {
+    JobEntity withoutTemplate =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    JobEntity sameWithoutTemplate =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    Assertions.assertEquals(withoutTemplate, sameWithoutTemplate);
+    Assertions.assertEquals(withoutTemplate.hashCode(), sameWithoutTemplate.hashCode());
+
+    // Same identity/status/audit but a resolved runtime template must not compare equal.
+    JobEntity withTemplate =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate("{\"jobType\":\"shell\",\"name\":\"test-job-template\"}")
+            .build();
+
+    Assertions.assertNotEquals(withoutTemplate, withTemplate);
+    Assertions.assertNotEquals(withoutTemplate.hashCode(), withTemplate.hashCode());
+  }
 }

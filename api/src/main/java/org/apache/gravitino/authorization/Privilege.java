@@ -157,7 +157,14 @@ public interface Privilege {
     /** The privilege to view a tag. */
     VIEW_TAG(0L, 1L << 34),
     /** The privilege to view a policy. */
-    VIEW_POLICY(0L, 1L << 35);
+    VIEW_POLICY(0L, 1L << 35),
+    /** The privilege to list configured secrets providers. */
+    VIEW_SECRET_PROVIDERS(0L, 1L << 36),
+    /**
+     * The privilege to retrieve plaintext secrets and vend credentials for a metadata object via
+     * {@code getSecrets} / {@code getCredentials}.
+     */
+    USE_SECRET(0L, 1L << 37);
 
     private final long highBits;
     private final long lowBits;

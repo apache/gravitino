@@ -18,9 +18,12 @@
 import unittest
 from unittest.mock import MagicMock
 
+from gravitino.api.catalog_change import CatalogChange
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.constants.error import ErrorConstants
 from gravitino.dto.metalake_dto import MetalakeDTO
+from gravitino.dto.requests.catalog_update_request import CatalogUpdateRequest
+from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.exceptions.base import (
     ConnectionFailedException,
@@ -41,6 +44,24 @@ class TestMetalake(unittest.TestCase):
 
         rest_client.post.assert_called_once_with(
             "api/metalakes/metalake/catalogs/catalog%2Fname/testConnection",
+            error_handler=CATALOG_ERROR_HANDLER,
+        )
+
+    def test_existing_catalog_connection_with_changes(self):
+        rest_client = MagicMock()
+        rest_client.post.return_value.body = b'{"code":0}'
+        metalake = GravitinoMetalake(
+            MetalakeDTO("metalake", None, {}, None), rest_client
+        )
+
+        metalake.test_connection("catalog", CatalogChange.set_property("key", "value"))
+
+        expected_request = CatalogUpdatesRequest(
+            [CatalogUpdateRequest.SetCatalogPropertyRequest("key", "value")]
+        )
+        rest_client.post.assert_called_once_with(
+            "api/metalakes/metalake/catalogs/catalog/testConnection",
+            json=expected_request,
             error_handler=CATALOG_ERROR_HANDLER,
         )
 

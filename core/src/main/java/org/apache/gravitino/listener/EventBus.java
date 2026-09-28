@@ -31,6 +31,7 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.utils.RequestContext;
 import org.slf4j.Logger;
@@ -126,7 +127,25 @@ public class EventBus {
     return eventListeners;
   }
 
+  /**
+   * Dispatches a success event to listeners.
+   *
+   * <p>For every success event that is <em>not</em> an {@link HttpRequestEvent}, this method also
+   * sets {@link RequestContext#markOperationSuccessFired()} on the current thread. This lets {@code
+   * HttpAuditFilter} detect that an operation-layer success event has already been dispatched and
+   * skip emitting a redundant HTTP-level fallback event for the same request. Tracked independently
+   * from the failure-side flag so an operation that succeeds but whose HTTP response delivery later
+   * fails still produces both a success and a failure audit entry.
+   *
+   * @param postEvent the success event to dispatch
+   */
   private void dispatchPostEvent(Event postEvent) {
+    // Mark the request thread so HttpAuditFilter skips emitting its own fallback event.
+    // HttpRequestEvent is exempt — it IS the HTTP-layer fallback event and must not set the flag,
+    // otherwise it would suppress itself on the next pass through the finally block.
+    if (!(postEvent instanceof HttpRequestEvent)) {
+      RequestContext.markOperationSuccessFired();
+    }
     eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
   }
 

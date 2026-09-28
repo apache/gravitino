@@ -472,6 +472,13 @@ public class MetadataObjectService {
 
     columnPOs.forEach(
         columnPO -> {
+          // A dropped column keeps a live row whose op type is DELETE, so it must be reported as
+          // deleted instead of returning its last name.
+          if (columnPO.getColumnOpType() == ColumnPO.ColumnOpType.DELETE.value()) {
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
           // since the table can be deleted, we need to check the null value,
           // and when the table is deleted, we will set fullName of column to
           // null

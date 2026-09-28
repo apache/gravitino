@@ -53,15 +53,16 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -297,6 +298,10 @@ public class SchemaMetaService {
                   mapper -> mapper.softDeleteTableMetasBySchemaIds(schemaIds.get())),
           () ->
               SessionUtils.doWithoutCommit(
+                  TableVersionMapper.class,
+                  mapper -> mapper.softDeleteTableVersionsBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
                   TableColumnMapper.class,
                   mapper -> mapper.softDeleteColumnsBySchemaIds(schemaIds.get())),
           () ->
@@ -333,10 +338,6 @@ public class SchemaMetaService {
                   mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaIds(schemaIds.get())),
           () ->
               SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaIds(schemaIds.get())),
-          () ->
-              SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
                   mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaIds(schemaIds.get())),
           () ->
@@ -354,7 +355,11 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class,
-                  mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds.get())));
+                  mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ViewVersionInfoMapper.class,
+                  mapper -> mapper.softDeleteViewVersionsBySchemaIds(schemaIds.get())));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -388,13 +393,7 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper ->
-                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          schemaId, MetadataObject.Type.SCHEMA.name())));
+                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)));
     }
     return true;
   }
@@ -404,15 +403,14 @@ public class SchemaMetaService {
    * lost the race must not delete a schema it never looked at.
    */
   private void deleteSchemaWithVersion(NameIdentifier identifier, SchemaPO observedSchemaPO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper ->
-                mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
-                    observedSchemaPO.getSchemaId(), observedSchemaPO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw schemaWriteFailure(identifier, observedSchemaPO);
-    }
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                        observedSchemaPO.getSchemaId(), observedSchemaPO.getCurrentVersion())),
+        () -> schemaWriteFailure(identifier, observedSchemaPO));
   }
 
   @Monitored(
@@ -465,21 +463,20 @@ public class SchemaMetaService {
    */
   private void lockCatalogForSchemaCreate(
       CatalogPO observedCatalogPO, boolean createsImplicitAncestors) {
-    CatalogPO currentCatalogPO =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper ->
-                createsImplicitAncestors
-                    ? mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId())
-                    : mapper.selectCatalogMetaByIdForShare(observedCatalogPO.getCatalogId()));
-    if (currentCatalogPO == null
-        || !Objects.equals(currentCatalogPO.getCatalogName(), observedCatalogPO.getCatalogName())
-        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedCatalogPO.getMetalakeId())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          observedCatalogPO.getCatalogName());
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        observedCatalogPO.getCatalogName(),
+        Entity.EntityType.CATALOG,
+        () ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class,
+                mapper ->
+                    createsImplicitAncestors
+                        ? mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId())
+                        : mapper.selectCatalogMetaByIdForShare(observedCatalogPO.getCatalogId())),
+        null,
+        current ->
+            Objects.equals(current.getCatalogName(), observedCatalogPO.getCatalogName())
+                && Objects.equals(current.getMetalakeId(), observedCatalogPO.getMetalakeId()));
   }
 
   /**
@@ -489,45 +486,85 @@ public class SchemaMetaService {
    * two overlapping cascades cannot deadlock.
    */
   private void lockCatalogForSchemaDelete(NameIdentifier identifier, SchemaPO observedSchemaPO) {
-    CatalogPO currentCatalogPO =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedSchemaPO.getCatalogId()));
-    if (currentCatalogPO == null
-        || !Objects.equals(currentCatalogPO.getCatalogName(), identifier.namespace().level(1))
-        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedSchemaPO.getMetalakeId())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.namespace().level(1));
-    }
+    String catalogName = identifier.namespace().level(1);
+    OccWriteSupport.lockParentForChildWrite(
+        catalogName,
+        Entity.EntityType.CATALOG,
+        () ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class,
+                mapper -> mapper.selectCatalogMetaByIdForUpdate(observedSchemaPO.getCatalogId())),
+        null,
+        current ->
+            Objects.equals(current.getCatalogName(), catalogName)
+                && Objects.equals(current.getMetalakeId(), observedSchemaPO.getMetalakeId()));
   }
 
   /**
-   * Holds the parent schema row while a table, view, fileset, function, model, model version, or
-   * topic is written, so a child cannot be added below a schema that is going away. The lock is
-   * shared, so children of the same schema can still be written in parallel; dropping the schema
-   * takes the row exclusively and therefore waits for them.
+   * Runs schema-scoped writes while holding a shared lock on their parent schema.
+   *
+   * <p>This method owns the transaction boundary on purpose. If callers locked the schema in one
+   * transaction and wrote the child in another, the lock would be released too early and a schema
+   * deletion could slip between those two steps. Keeping the lock and every supplied operation in
+   * the same transaction makes that mistake impossible for callers of this entry point.
    */
+  void doWithSchemaWriteLock(
+      NameIdentifier entityIdentifier,
+      Long observedSchemaId,
+      Long observedCatalogId,
+      Long observedMetalakeId,
+      Runnable... entityWriteOperations) {
+    Runnable[] transactionOperations = new Runnable[entityWriteOperations.length + 1];
+    transactionOperations[0] =
+        () ->
+            lockSchemaForEntityWrite(
+                entityIdentifier, observedSchemaId, observedCatalogId, observedMetalakeId);
+    System.arraycopy(
+        entityWriteOperations, 0, transactionOperations, 1, entityWriteOperations.length);
+    SessionUtils.doMultipleWithCommit(transactionOperations);
+  }
+
+  /**
+   * Takes a shared lock on the parent catalog row before a cross-schema child move.
+   *
+   * <p>A cascade schema delete holds an exclusive catalog lock before any schema lock. Taking the
+   * same shared catalog lock here first ensures that a cross-schema child move blocks the cascade
+   * delete until both schema locks are acquired, and a cascade delete blocks new cross-schema moves
+   * until it finishes. Without this catalog fence, a move that holds schema A could deadlock
+   * against a cascade that holds the catalog and is waiting for schema A.
+   */
+  void lockCatalogForEntityWrite(NameIdentifier entityIdentifier, Long catalogId, Long metalakeId) {
+    String catalogName = entityIdentifier.namespace().level(1);
+    OccWriteSupport.lockParentForChildWrite(
+        catalogName,
+        Entity.EntityType.CATALOG,
+        () ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaByIdForShare(catalogId)),
+        null,
+        current ->
+            Objects.equals(current.getCatalogName(), catalogName)
+                && Objects.equals(current.getMetalakeId(), metalakeId));
+  }
+
   void lockSchemaForEntityWrite(
       NameIdentifier entityIdentifier,
       Long observedSchemaId,
       Long observedCatalogId,
       Long observedMetalakeId) {
     NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(entityIdentifier);
-    SchemaPO currentSchemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByIdForShare(observedSchemaId));
-    if (currentSchemaPO != null) {
-      currentSchemaPO = physicalToLogicalSchemaPO(currentSchemaPO);
-    }
-    if (currentSchemaPO == null
-        || !Objects.equals(currentSchemaPO.getSchemaName(), schemaIdentifier.name())
-        || !Objects.equals(currentSchemaPO.getCatalogId(), observedCatalogId)
-        || !Objects.equals(currentSchemaPO.getMetalakeId(), observedMetalakeId)) {
-      throw noSuchSchemaException(schemaIdentifier);
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        schemaIdentifier.name(),
+        Entity.EntityType.SCHEMA,
+        () ->
+            SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.selectSchemaMetaByIdForShare(observedSchemaId)),
+        SchemaMetaService::physicalToLogicalSchemaPO,
+        current ->
+            Objects.equals(current.getSchemaName(), schemaIdentifier.name())
+                && Objects.equals(current.getCatalogId(), observedCatalogId)
+                && Objects.equals(current.getMetalakeId(), observedMetalakeId));
   }
 
   /**
@@ -537,32 +574,18 @@ public class SchemaMetaService {
    */
   private RuntimeException schemaWriteFailure(
       NameIdentifier identifier, SchemaPO observedSchemaPO) {
-    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
-    // The locking read additionally waits for a writer that is still in flight, so a delete or
-    // rename that has not committed yet is reported as a missing schema instead of as a stale
-    // version conflict. The lock is taken on the error path of a transaction that is about to roll
-    // back.
-    SchemaPO currentSchemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByIdForUpdate(observedSchemaPO.getSchemaId()));
-    if (currentSchemaPO == null) {
-      return noSuchSchemaException(identifier);
-    }
-    currentSchemaPO = physicalToLogicalSchemaPO(currentSchemaPO);
-    if (!Objects.equals(currentSchemaPO.getSchemaName(), observedSchemaPO.getSchemaName())
-        || !Objects.equals(currentSchemaPO.getCatalogId(), observedSchemaPO.getCatalogId())
-        || !Objects.equals(currentSchemaPO.getMetalakeId(), observedSchemaPO.getMetalakeId())) {
-      return noSuchSchemaException(identifier);
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
-  }
-
-  private NoSuchEntityException noSuchSchemaException(NameIdentifier identifier) {
-    return new NoSuchEntityException(
-        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-        Entity.EntityType.SCHEMA.name().toLowerCase(),
-        identifier.name());
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.SCHEMA,
+        () ->
+            SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.selectSchemaMetaByIdForUpdate(observedSchemaPO.getSchemaId())),
+        SchemaMetaService::physicalToLogicalSchemaPO,
+        current ->
+            Objects.equals(current.getSchemaName(), observedSchemaPO.getSchemaName())
+                && Objects.equals(current.getCatalogId(), observedSchemaPO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedSchemaPO.getMetalakeId()));
   }
 
   /**
@@ -571,63 +594,29 @@ public class SchemaMetaService {
    */
   private void deleteDescendantSchemasWithVersions(
       NameIdentifier schemaIdentifier, List<SchemaPO> descendants) {
-    if (descendants.isEmpty()) {
-      return;
-    }
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(descendants));
-    // A smaller count means one of these schemas was altered by a request that did not take the
-    // catalog lock. Never commit half a cascade: roll the whole transaction back instead.
-    if (deleted != descendants.size()) {
-      throw ExceptionUtils.concurrentChildModification(
-          Entity.EntityType.SCHEMA, Entity.EntityType.SCHEMA, schemaIdentifier);
-    }
+    OccWriteSupport.deleteChildrenWithVersions(
+        schemaIdentifier,
+        Entity.EntityType.SCHEMA,
+        Entity.EntityType.SCHEMA,
+        descendants,
+        children ->
+            SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.softDeleteSchemaMetasWithVersion(children)));
   }
 
-  /**
-   * Checks that nothing is left under the schema. Views and functions are included: they used to be
-   * missing here, which let a non-cascade drop leave their rows behind with no parent.
-   */
+  /** Checks that no active schema or metadata object is left below the schema. */
   private void checkSchemaIsEmpty(NameIdentifier identifier, SchemaPO schemaPO) {
     boolean hasDescendantSchemas = !listDescendantSchemaPOs(schemaPO).isEmpty();
-    boolean hasTables =
-        !SessionUtils.getWithoutCommit(
-                TableMetaMapper.class,
-                mapper -> mapper.listTablePOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasFilesets =
-        !SessionUtils.getWithoutCommit(
-                FilesetMetaMapper.class,
-                mapper -> mapper.listFilesetPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasModels =
-        !SessionUtils.getWithoutCommit(
-                ModelMetaMapper.class,
-                mapper -> mapper.listModelPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasTopics =
-        !SessionUtils.getWithoutCommit(
-                TopicMetaMapper.class,
-                mapper -> mapper.listTopicPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasViews =
-        !SessionUtils.getWithoutCommit(
-                ViewMetaMapper.class,
-                mapper -> mapper.listViewPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasFunctions =
-        !SessionUtils.getWithoutCommit(
-                FunctionMetaMapper.class,
-                mapper -> mapper.listFunctionPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    if (hasDescendantSchemas
-        || hasTables
-        || hasFilesets
-        || hasModels
-        || hasTopics
-        || hasViews
-        || hasFunctions) {
+    // A non-cascade delete only needs to know whether any direct child exists. Asking the database
+    // for one literal avoids building every child PO and loading its version details while the
+    // schema delete lock is held.
+    boolean hasDirectChild =
+        SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.selectActiveChildBySchemaId(schemaPO.getSchemaId()))
+            != null;
+    if (hasDescendantSchemas || hasDirectChild) {
       throw new NonEmptyEntityException(
           "Entity %s has sub-entities, you should remove sub-entities first", identifier);
     }

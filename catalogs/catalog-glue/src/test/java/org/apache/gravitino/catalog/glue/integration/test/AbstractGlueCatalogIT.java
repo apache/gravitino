@@ -36,8 +36,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.glue.GlueCatalogOperations;
+import org.apache.gravitino.catalog.glue.GlueClientProvider;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -61,6 +63,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.GetTableRequest;
+import software.amazon.awssdk.services.glue.model.StorageDescriptor;
+import software.amazon.awssdk.services.glue.model.TableInput;
 
 /**
  * Abstract base class for Glue catalog integration tests.
@@ -73,6 +80,7 @@ abstract class AbstractGlueCatalogIT {
 
   protected GlueCatalogOperations ops;
   private String currentSchema;
+  private GlueClient rawGlueClient;
 
   private static final Namespace SCHEMA_NS = Namespace.of("ml", "cat");
 
@@ -86,6 +94,9 @@ abstract class AbstractGlueCatalogIT {
 
   @AfterAll
   void closeOps() throws Exception {
+    if (rawGlueClient != null) {
+      rawGlueClient.close();
+    }
     if (ops != null) {
       ops.close();
     }
@@ -171,6 +182,38 @@ abstract class AbstractGlueCatalogIT {
         new SortOrder[0],
         new Index[0]);
     return ops.loadTable(tableIdent(schema, table)).supportPartitions();
+  }
+
+  private GlueClient glueClient() {
+    if (rawGlueClient == null) {
+      rawGlueClient = GlueClientProvider.buildClient(catalogConfig());
+    }
+    return rawGlueClient;
+  }
+
+  /** Creates a Presto/Athena style view directly through the Glue API. */
+  private void createGlueView(String schema, String name) {
+    glueClient()
+        .createTable(
+            CreateTableRequest.builder()
+                .databaseName(schema)
+                .tableInput(
+                    TableInput.builder()
+                        .name(name)
+                        .tableType(GlueConstants.VIRTUAL_VIEW_TABLE_TYPE)
+                        .viewOriginalText("/* Presto View: dGVzdA== */")
+                        .viewExpandedText("/* Presto View */")
+                        .parameters(Map.of("presto_view", "true"))
+                        .storageDescriptor(
+                            StorageDescriptor.builder()
+                                .columns(
+                                    software.amazon.awssdk.services.glue.model.Column.builder()
+                                        .name("id")
+                                        .type("int")
+                                        .build())
+                                .build())
+                        .build())
+                .build());
   }
 
   private Partition identityPartition(String dateValue) {
@@ -330,6 +373,50 @@ abstract class AbstractGlueCatalogIT {
 
     assertTrue(ops.dropTable(tableIdent(schema, "droptbl")));
     assertFalse(ops.dropTable(tableIdent(schema, "droptbl")));
+  }
+
+  // -------------------------------------------------------------------------
+  // View tests: Glue keeps views alongside tables, the table APIs must skip them
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testListTablesExcludesViews() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    createHiveTable(schema, "base_tbl");
+    createGlueView(schema, "a_view");
+
+    List<String> names =
+        Arrays.stream(ops.listTables(tableNs(schema)))
+            .map(NameIdentifier::name)
+            .collect(Collectors.toList());
+    assertTrue(names.contains("base_tbl"));
+    assertFalse(names.contains("a_view"));
+  }
+
+  @Test
+  void testLoadTableRejectsView() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    createGlueView(schema, "load_view");
+
+    assertThrows(NoSuchTableException.class, () -> ops.loadTable(tableIdent(schema, "load_view")));
+  }
+
+  @Test
+  void testDropTableRejectsView() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    createGlueView(schema, "drop_view");
+
+    assertThrows(NoSuchTableException.class, () -> ops.dropTable(tableIdent(schema, "drop_view")));
+    assertEquals(
+        GlueConstants.VIRTUAL_VIEW_TABLE_TYPE,
+        glueClient()
+            .getTable(GetTableRequest.builder().databaseName(schema).name("drop_view").build())
+            .table()
+            .tableType(),
+        "the view must survive the rejected drop");
   }
 
   // -------------------------------------------------------------------------

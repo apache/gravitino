@@ -21,13 +21,20 @@ package org.apache.gravitino.job;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +42,12 @@ import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -48,12 +58,19 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -72,16 +89,26 @@ public class JobManager implements JobOperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(JobManager.class);
 
+  // How far a time reported by the job executor may be ahead of Gravitino's clock. It tolerates the
+  // clock of the job runner being ahead, while dropping obviously invalid times.
+  private static final Duration MAX_REPORTED_TIME_AHEAD = Duration.ofDays(1);
+
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
 
-  private static final String JOB_STAGING_DIR =
-      File.separator
-          + "%s"
-          + File.separator
-          + "%s"
-          + File.separator
-          + JobHandle.JOB_ID_PREFIX
-          + "%s";
+  // A job's staging directory is <stagingDir>/job-runs/job-<id>, derived from the job id alone:
+  // template and metalake names can change after the job runs, so a path built from them can't be
+  // rebuilt at cleanup time. The name contains '-', which metalake names can't, so it never
+  // collides with a metalake directory of the legacy <stagingDir>/<metalake>/<template>/job-<id>
+  // layout.
+  private static final String JOB_RUNS_DIR_NAME = "job-runs";
+
+  private static final Pattern JOB_DIR_PATTERN =
+      Pattern.compile(Pattern.quote(JobHandle.JOB_ID_PREFIX) + "\\d+");
+
+  // Bounds how deep a legacy staging directory is looked up below a job template's first path
+  // element. A template name nested deeper than this keeps its directory, which is better than
+  // walking an unrelated directory tree an operator put in the staging directory.
+  private static final int LEGACY_JOB_STAGING_DIR_MAX_DEPTH = 16;
 
   private static final long JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS = 600 * 1000L; // 10 minute
 
@@ -98,6 +125,10 @@ public class JobManager implements JobOperationDispatcher {
   private final IdGenerator idGenerator;
 
   private final long jobStagingDirKeepTimeInMs;
+
+  private final int jobOutputMaxLines;
+
+  private final int jobOutputMaxBytes;
 
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
@@ -144,6 +175,9 @@ public class JobManager implements JobOperationDispatcher {
           jobStagingDirKeepTimeInMs,
           JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS);
     }
+
+    this.jobOutputMaxLines = config.get(Configs.JOB_OUTPUT_MAX_LINES);
+    this.jobOutputMaxBytes = config.get(Configs.JOB_OUTPUT_MAX_BYTES);
 
     this.cleanUpExecutor =
         Executors.newSingleThreadScheduledExecutor(
@@ -222,6 +256,8 @@ public class JobManager implements JobOperationDispatcher {
             throw new JobTemplateAlreadyExistsException(
                 "Job template with name %s under metalake %s already exists",
                 jobTemplateEntity.name(), metalake);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
           }
@@ -263,44 +299,47 @@ public class JobManager implements JobOperationDispatcher {
       return false;
     }
 
-    boolean hasActiveJobs =
-        jobs.stream()
-            .anyMatch(
-                job ->
-                    job.status() != JobHandle.Status.CANCELLED
-                        && job.status() != JobHandle.Status.SUCCEEDED
-                        && job.status() != JobHandle.Status.FAILED);
+    boolean hasActiveJobs = jobs.stream().anyMatch(job -> !isFinishedStatus(job.status()));
     if (hasActiveJobs) {
       throw new InUseException(
           "Job template %s under metalake %s has active jobs associated with it",
           jobTemplateName, metalake);
     }
 
-    // Delete all the job staging directories associated with the job template.
-    String jobTemplateStagingPath =
-        stagingDir.getAbsolutePath() + File.separator + metalake + File.separator + jobTemplateName;
-    File jobTemplateStagingDir = new File(jobTemplateStagingPath);
-    if (jobTemplateStagingDir.exists()) {
+    // Delete the job template entity as well as all the jobs associated with it.
+    boolean deleted =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake).levels()),
+            LockType.WRITE,
+            () -> {
+              try {
+                return entityStore.delete(
+                    NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
+                    Entity.EntityType.JOB_TEMPLATE);
+              } catch (NonEmptyEntityException e) {
+                throw new InUseException(
+                    "Job template %s under metalake %s has active jobs associated with it",
+                    jobTemplateName, metalake);
+              } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+              }
+            });
+    if (!deleted) {
+      return false;
+    }
+
+    // Only remove directories belonging to the observed jobs. A same-name template can be
+    // recreated after the metadata transaction commits, so a legacy template directory is not ours
+    // to delete.
+    for (JobEntity job : jobs) {
       try {
-        FileUtils.deleteDirectory(jobTemplateStagingDir);
+        deleteJobStagingDir(job);
       } catch (IOException e) {
-        LOG.error("Failed to delete job template staging directory: {}", jobTemplateStagingPath, e);
+        LOG.error("Failed to delete the staging directory of job {}", job.name(), e);
       }
     }
 
-    // Delete the job template entity as well as all the jobs associated with it.
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake).levels()),
-        LockType.WRITE,
-        () -> {
-          try {
-            return entityStore.delete(
-                NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
-                Entity.EntityType.JOB_TEMPLATE);
-          } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-          }
-        });
+    return true;
   }
 
   @Override
@@ -331,9 +370,7 @@ public class JobManager implements JobOperationDispatcher {
                     updateJobTemplateEntity(jobTemplateIdent, jobTemplateEntity, changes));
           } catch (NoSuchEntityException e) {
             throw new NoSuchJobTemplateException(
-                "Job template with name %s under metalake %s does not exist, this could be due to"
-                    + " the job template not existing or updated concurrently. For the latter case"
-                    + " please retry the operation.",
+                "Job template with name %s under metalake %s does not exist",
                 jobTemplateName, metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
@@ -398,23 +435,69 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
+  public JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, jobId);
-    return TreeLockUtils.doWithTreeLock(
-        jobIdent,
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore.get(jobIdent, Entity.EntityType.JOB, JobEntity.class);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchJobException(
-                "Job with ID %s under metalake %s does not exist", jobId, metalake);
-          } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-          }
-        });
+    JobEntity entity =
+        TreeLockUtils.doWithTreeLock(
+            jobIdent,
+            LockType.READ,
+            () -> {
+              try {
+                return entityStore.get(jobIdent, Entity.EntityType.JOB, JobEntity.class);
+              } catch (NoSuchEntityException e) {
+                throw new NoSuchJobException(
+                    "Job with ID %s under metalake %s does not exist", jobId, metalake);
+              } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+              }
+            });
+
+    if (!includeOutput) {
+      return entity;
+    }
+
+    // maxLines/maxBytes are only meaningful (and only validated) when output is actually
+    // requested - per the documented contract, they're ignored entirely when includeOutput is
+    // false, so an invalid value must not fail a plain getJob call that never uses them.
+    Preconditions.checkArgument(
+        maxLines == null || maxLines > 0, "maxLines must be positive if specified");
+    Preconditions.checkArgument(
+        maxBytes == null || maxBytes > 0, "maxBytes must be positive if specified");
+
+    // A caller-specified maxLines/maxBytes can only narrow the globally configured cap, never
+    // widen it - the global configuration remains a hard upper bound on read cost/response size.
+    int effectiveMaxLines = clampToGlobalMax(maxLines, jobOutputMaxLines);
+    int effectiveMaxBytes = clampToGlobalMax(maxBytes, jobOutputMaxBytes);
+
+    // The job entity's existence was already confirmed above via the entity store, which is the
+    // durable source of truth. The executor's own bookkeeping for a job's output is best-effort
+    // and can legitimately be unavailable while the entity still exists (e.g. LocalJobExecutor
+    // can't reach the output of a job that ran on a server not sharing its staging directory),
+    // so JobExecutor#getJobStdout/getJobStderr report a job unknown to the executor as
+    // empty output rather than an error - it never means "job does not exist" at this point.
+    List<String> stdout =
+        jobExecutor.getJobStdout(entity.jobExecutionId(), effectiveMaxLines, effectiveMaxBytes);
+    List<String> stderr =
+        jobExecutor.getJobStderr(entity.jobExecutionId(), effectiveMaxLines, effectiveMaxBytes);
+    if (stdout.isEmpty() && stderr.isEmpty() && LOG.isDebugEnabled()) {
+      LOG.debug(
+          "No output available for job {} under metalake {} - either it produced none, or the "
+              + "job executor no longer has a record of it",
+          jobId,
+          metalake);
+    }
+    return entity.withOutput(stdout, stderr);
+  }
+
+  // A caller-specified value can only narrow the globally configured cap, never widen it -
+  // null means "use the global default", and any non-null value is clamped to at most that
+  // default so the global configuration always remains a hard upper bound.
+  private static int clampToGlobalMax(Integer requested, int globalMax) {
+    return requested == null ? globalMax : Math.min(requested, globalMax);
   }
 
   @Override
@@ -427,10 +510,7 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create staging directory.
     long jobId = idGenerator.nextId();
-    String jobStagingPath =
-        stagingDir.getAbsolutePath()
-            + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
-    File jobStagingDir = new File(jobStagingPath);
+    File jobStagingDir = jobStagingDir(jobId);
     try {
       Files.createDirectories(jobStagingDir.toPath());
     } catch (IOException e) {
@@ -443,11 +523,35 @@ public class JobManager implements JobOperationDispatcher {
     // also downloading any necessary files from the URIs specified in the job template.
     JobTemplate jobTemplate = createRuntimeJobTemplate(jobTemplateEntity, jobConf, jobStagingDir);
 
+    // Serialize the resolved (placeholder-replaced) job template so callers can later see exactly
+    // what was submitted for execution, not just the original template. This is done before
+    // submission so that a serialization failure never leaves a job running on the executor
+    // without a corresponding JobEntity.
+    JobTemplateDTO runtimeJobTemplateDTO =
+        DTOConverters.toDTO(jobTemplate, DTOConverters.toDTO(jobTemplateEntity.auditInfo()));
+    String runtimeJobTemplateJson;
+    try {
+      runtimeJobTemplateJson = JsonUtils.anyFieldMapper().writeValueAsString(runtimeJobTemplateDTO);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize the runtime job template", e);
+    }
+
+    // The job is queued once it is submitted. Take the time before the submission, so that it is
+    // never later than the time the job executor reports the job started, which can happen right
+    // after the job is submitted.
+    Instant queuedAt = Instant.now();
+
     // Submit the job template to the job executor
     String jobExecutionId;
     try {
       jobExecutionId = jobExecutor.submitJob(jobTemplate);
+    } catch (IllegalArgumentException e) {
+      // The job executor rejects the job because it cannot be launched, for example, a required
+      // configuration is missing. Rethrow it as is so the caller gets the original reason.
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
+      throw e;
     } catch (Exception e) {
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw new RuntimeException(
           String.format("Failed to submit job template %s for execution", jobTemplate), e);
     }
@@ -463,15 +567,30 @@ public class JobManager implements JobOperationDispatcher {
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
+                    .withCreateTime(queuedAt)
                     .build())
             // A newly submitted job is queued, not started or finished yet.
             .withStartedAt(0L)
             .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
             .build();
 
     try {
       entityStore.put(jobEntity, false /* overwrite */);
+    } catch (NoSuchEntityException e) {
+      LOG.error(
+          "Job {} was submitted as execution {} but could not be registered because its template "
+              + "{} or metalake {} no longer exists",
+          jobEntity.name(),
+          jobExecutionId,
+          jobTemplateName,
+          metalake,
+          e);
+      throw new NoSuchJobTemplateException(
+          e,
+          "Job template with name %s under metalake %s does not exist",
+          jobTemplateName,
+          metalake);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }
@@ -484,7 +603,7 @@ public class JobManager implements JobOperationDispatcher {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
-    JobEntity jobEntity = getJob(metalake, jobId);
+    JobEntity jobEntity = getJob(metalake, jobId, false);
 
     if (jobEntity.status() == JobHandle.Status.CANCELLING
         || jobEntity.status() == JobHandle.Status.CANCELLED
@@ -495,12 +614,32 @@ public class JobManager implements JobOperationDispatcher {
       return jobEntity;
     }
 
-    // Cancel the job using the job executor
-    try {
-      jobExecutor.cancelJob(jobEntity.jobExecutionId());
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to cancel job with ID %s under metalake %s", jobId, metalake), e);
+    // Cancel the job using the job executor if this server owns the job. Otherwise, the job runs
+    // on another server, so only mark it as CANCELLING below, and the owning server cancels it
+    // when it pulls the job status next time.
+    if (jobExecutor.ownsJob(jobEntity.jobExecutionId())) {
+      try {
+        jobExecutor.cancelJob(jobEntity.jobExecutionId());
+      } catch (NoSuchJobException e) {
+        // The job is lost by the job executor, mark it as CANCELLING and the status pull will
+        // settle it as CANCELLED.
+        LOG.warn(
+            "Job {} with execution id {} under metalake {} is not found in the job executor, "
+                + "marking it as CANCELLING",
+            jobId,
+            jobEntity.jobExecutionId(),
+            metalake);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Failed to cancel job with ID %s under metalake %s", jobId, metalake), e);
+      }
+    } else {
+      LOG.info(
+          "Job {} with execution id {} under metalake {} is owned by another job executor "
+              + "instance, marking it as CANCELLING for the owner to cancel it",
+          jobId,
+          jobEntity.jobExecutionId(),
+          metalake);
     }
 
     // Update the job status to CANCELING
@@ -509,40 +648,59 @@ public class JobManager implements JobOperationDispatcher {
         LockType.WRITE,
         () -> {
           try {
-            // Re-fetch under the lock rather than reusing the snapshot taken before the
-            // (potentially slow) external cancel call above - a concurrent status poll could
-            // have persisted a real startedAt/finishedAt in that gap, and carrying forward the
-            // stale snapshot would clobber it back to the sentinel.
-            JobEntity latestJobEntity = getJob(metalake, jobId);
-            JobEntity newJobEntity =
-                JobEntity.builder()
-                    .withId(latestJobEntity.id())
-                    .withJobExecutionId(latestJobEntity.jobExecutionId())
-                    .withJobTemplateName(latestJobEntity.jobTemplateName())
-                    .withStatus(JobHandle.Status.CANCELLING)
-                    .withNamespace(latestJobEntity.namespace())
-                    .withAuditInfo(
-                        AuditInfo.builder()
-                            .withCreator(latestJobEntity.auditInfo().creator())
-                            .withCreateTime(latestJobEntity.auditInfo().createTime())
-                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                            .withLastModifiedTime(Instant.now())
-                            .build())
-                    // CANCELLING is not a terminal state; carry forward whatever
-                    // startedAt/finishedAt the job already had.
-                    .withStartedAt(latestJobEntity.startedAt())
-                    .withFinishedAt(latestJobEntity.finishedAt())
-                    .build();
-
-            // Update the job entity in the entity store
-            entityStore.put(newJobEntity, true /* overwrite */);
-            return newJobEntity;
+            // entityStore.update() re-fetches the latest entity itself right before applying the
+            // updater, rather than reusing the snapshot taken before the (potentially slow)
+            // external cancel call above - a concurrent status poll could have persisted a real
+            // startedAt/finishedAt in that gap, and carrying forward the stale snapshot would
+            // clobber it back to the sentinel.
+            return entityStore.update(
+                NameIdentifierUtil.ofJob(metalake, jobId),
+                JobEntity.class,
+                Entity.EntityType.JOB,
+                this::toCancellingJobEntity);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchJobException(
+                "Job with ID %s under metalake %s does not exist, this could be due to the job "
+                    + "not existing or being deleted concurrently.",
+                jobId, metalake);
           } catch (IOException e) {
             throw new RuntimeException(
                 String.format("Failed to update job entity for job %s to CANCELING status", jobId),
                 e);
           }
         });
+  }
+
+  private JobEntity toCancellingJobEntity(JobEntity latestJobEntity) {
+    // The external cancel call happens before this locked update, so a concurrent status poll
+    // can persist a terminal status (or another cancelJob() call can already have moved the job
+    // to CANCELLING) in the gap between the pre-cancel snapshot and this re-fetch. Never regress
+    // the latest entity out of a terminal state, or overwrite an already-CANCELLING one.
+    if (isFinishedStatus(latestJobEntity.status())
+        || latestJobEntity.status() == JobHandle.Status.CANCELLING) {
+      return latestJobEntity;
+    }
+
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(latestJobEntity.jobExecutionId())
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        .withStatus(JobHandle.Status.CANCELLING)
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(latestJobEntity.auditInfo().creator())
+                .withCreateTime(latestJobEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        // CANCELLING is not a terminal state; carry forward whatever startedAt/finishedAt the
+        // job already had.
+        .withStartedAt(latestJobEntity.startedAt())
+        .withFinishedAt(latestJobEntity.finishedAt())
+        // The runtime job template is fixed at job creation and never changes.
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
+        .build();
   }
 
   @Override
@@ -572,100 +730,23 @@ public class JobManager implements JobOperationDispatcher {
 
       activeJobs.forEach(
           job -> {
-            JobHandle.Status newStatus = job.status();
+            // Only the job executor instance owning the job can query its status. The jobs
+            // owned by other servers are skipped, and the jobs left behind by a server that has
+            // exited are settled by cleanUpStagingDirs() once they expire.
+            if (!jobExecutor.ownsJob(job.jobExecutionId())) {
+              return;
+            }
+            // An exception escaping this scheduled task would cancel all its later runs, so a
+            // failure on one job must never stop the status pull of the others.
             try {
-              newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
-            } catch (NoSuchJobException e) {
-              // If the job is not found in the external job executor, we assume the job is
-              // FAILED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
-              if (job.status() == JobHandle.Status.CANCELLING) {
-                newStatus = JobHandle.Status.CANCELLED;
-              } else {
-                newStatus = JobHandle.Status.FAILED;
-              }
-              LOG.warn(
-                  "Job {} with execution id {} under metalake {} is not found in the "
-                      + "external job executor, marking it as {}. This could be due to the job "
-                      + "being deleted by the external job executor. Please check the external job "
-                      + "executor to know more details.",
+              pullAndUpdateOwnedJobStatus(metalake, job);
+            } catch (RuntimeException e) {
+              LOG.error(
+                  "Failed to update the status of job {} with execution id {} under metalake {}",
                   job.name(),
                   job.jobExecutionId(),
                   metalake,
-                  newStatus);
-            } catch (Exception e) {
-              LOG.error(
-                  "Failed to get job status for job {} by execution id {}",
-                  job.name(),
-                  job.jobExecutionId(),
                   e);
-            }
-
-            if (newStatus != job.status()) {
-              boolean isStarted = newStatus == JobHandle.Status.STARTED;
-              boolean isFinished =
-                  newStatus == JobHandle.Status.SUCCEEDED
-                      || newStatus == JobHandle.Status.FAILED
-                      || newStatus == JobHandle.Status.CANCELLED;
-
-              // Only a directly-observed STARTED transition is trustworthy evidence of when a
-              // job started. SUCCEEDED/FAILED do not prove the job ever reached STARTED: FAILED
-              // in particular can be reached directly from QUEUED (e.g. NoSuchJobException from
-              // the executor, or LocalJobExecutor failing before it records STARTED), and even
-              // for SUCCEEDED, backfilling startedAt from the queued time would understate queue
-              // latency and overstate execution duration in any derived metric. So startedAt is
-              // left unset unless a STARTED transition was actually observed.
-              //
-              // Only stamp startedAt on the first STARTED observation (job.startedAt() <= 0).
-              // A CANCELLING job already carries forward a real startedAt from cancelJob, and
-              // since cancellation is asynchronous, a poll can still observe STARTED while
-              // cancellation is in flight - overwriting the recorded start time with this later
-              // poll timestamp would lose the accurate value.
-              long startedAt =
-                  isStarted && job.startedAt() <= 0
-                      ? Instant.now().toEpochMilli()
-                      : job.startedAt();
-
-              JobEntity newJobEntity =
-                  JobEntity.builder()
-                      .withId(job.id())
-                      .withJobExecutionId(job.jobExecutionId())
-                      .withJobTemplateName(job.jobTemplateName())
-                      .withStatus(newStatus)
-                      .withNamespace(job.namespace())
-                      .withAuditInfo(
-                          AuditInfo.builder()
-                              .withCreator(job.auditInfo().creator())
-                              .withCreateTime(job.auditInfo().createTime())
-                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                              .withLastModifiedTime(Instant.now())
-                              .build())
-                      .withStartedAt(startedAt)
-                      .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : job.finishedAt())
-                      .build();
-
-              // Update the job entity with new status.
-              JobHandle.Status finalNewStatus = newStatus;
-              TreeLockUtils.doWithTreeLock(
-                  NameIdentifierUtil.ofJob(metalake, job.name()),
-                  LockType.WRITE,
-                  () -> {
-                    try {
-                      entityStore.put(newJobEntity, true /* overwrite */);
-                      return null;
-                    } catch (IOException e) {
-                      throw new RuntimeException(
-                          String.format(
-                              "Failed to update job entity %s to status %s",
-                              newJobEntity, finalNewStatus),
-                          e);
-                    }
-                  });
-
-              LOG.info(
-                  "Updated the job {} with execution id {} status to {}",
-                  job.name(),
-                  job.jobExecutionId(),
-                  newStatus);
             }
           });
     }
@@ -676,34 +757,39 @@ public class JobManager implements JobOperationDispatcher {
     List<String> metalakes = MetalakeManager.listInUseMetalakes(entityStore);
 
     for (String metalake : metalakes) {
-      List<JobEntity> finishedJobs =
-          listJobs(metalake, Optional.empty()).stream()
-              .filter(
-                  job ->
-                      job.status() == JobHandle.Status.CANCELLED
-                          || job.status() == JobHandle.Status.SUCCEEDED
-                          || job.status() == JobHandle.Status.FAILED)
-              .filter(
-                  job ->
-                      job.finishedAt() > 0
-                          && job.finishedAt() + jobStagingDirKeepTimeInMs
-                              < System.currentTimeMillis())
-              .toList();
+      long now = System.currentTimeMillis();
+      List<JobEntity> expiredJobs = new ArrayList<>();
+      for (JobEntity job : listJobs(metalake, Optional.empty())) {
+        if (isFinishedStatus(job.status())) {
+          if (job.finishedAt() > 0 && job.finishedAt() + jobStagingDirKeepTimeInMs < now) {
+            expiredJobs.add(job);
+          }
+        } else if (jobExecutor.isJobStateNodeLocal() && isStaleActiveJob(job, now)) {
+          // The state of a node local job is lost when the Gravitino server running it exits, so
+          // an active job that has not been updated for the whole retention time is considered
+          // left behind. Mark it as finished, and it is cleaned up once it expires as a finished
+          // job. Jobs of other job executors can be tracked by any server, so they never expire.
+          try {
+            expireStaleActiveJob(metalake, job, now);
+          } catch (RuntimeException e) {
+            LOG.error("Failed to expire job {} under metalake {}", job.name(), metalake, e);
+          }
+        }
+      }
 
-      finishedJobs.forEach(
+      expiredJobs.forEach(
           job -> {
             try {
               entityStore.delete(
                   NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
-
-              String jobStagingPath =
-                  stagingDir.getAbsolutePath()
-                      + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
-              File jobStagingDir = new File(jobStagingPath);
-              if (jobStagingDir.exists()) {
-                FileUtils.deleteDirectory(jobStagingDir);
-                LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
-              }
+              deleteJobStagingDir(job);
+            } catch (OptimisticLockException e) {
+              // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
+              // job and checks retention eligibility again; this batch can process other jobs.
+              LOG.info(
+                  "Job {} under metalake {} changed concurrently; deferring cleanup",
+                  job.name(),
+                  metalake);
             } catch (IOException e) {
               LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
             }
@@ -824,7 +910,7 @@ public class JobManager implements JobOperationDispatcher {
       String key = matcher.group(1);
       String replacement = replacements.get(key);
       if (replacement != null) {
-        matcher.appendReplacement(result, replacement);
+        matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
       } else {
         // If no replacement is found, keep the placeholder as is
         matcher.appendReplacement(result, matcher.group(0));
@@ -975,7 +1061,471 @@ public class JobManager implements JobOperationDispatcher {
         .build();
   }
 
+  @VisibleForTesting
+  File jobStagingDir(long jobId) {
+    return new File(new File(stagingDir, JOB_RUNS_DIR_NAME), JobHandle.JOB_ID_PREFIX + jobId);
+  }
+
+  /**
+   * Finds the staging directory of a job submitted by an earlier Gravitino version, which used the
+   * {@code <stagingDir>/<metalake>/<template>/job-<id>} layout. It's looked up by the job id rather
+   * than rebuilt from the current names, because the template or metalake may have been renamed
+   * since the job ran. The job id is unique, so there is at most one match in practice. Called only
+   * for a job without a directory in the current layout, which after an upgrade are the jobs of the
+   * earlier version until they expire.
+   */
+  @VisibleForTesting
+  List<File> findLegacyJobStagingDirs(long jobId) throws IOException {
+    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
+    List<File> legacyJobStagingDirs = new ArrayList<>();
+    try (DirectoryStream<Path> metalakeDirs = Files.newDirectoryStream(stagingDir.toPath())) {
+      for (Path metalakeDir : metalakeDirs) {
+        String name = metalakeDir.getFileName().toString();
+        // Metalake names can't start with '.', so hidden entries, e.g. the job output index
+        // directory, are not metalake directories. Symbolic links are never followed, so nothing
+        // outside the staging directory can be deleted.
+        if (name.equals(JOB_RUNS_DIR_NAME)
+            || name.startsWith(".")
+            || !Files.isDirectory(metalakeDir, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+
+        // An unreadable directory, e.g. "lost+found" when the staging directory is the root of a
+        // file system, must not prevent finding the job under the other directories.
+        try (DirectoryStream<Path> templateDirs = Files.newDirectoryStream(metalakeDir)) {
+          for (Path templateDir : templateDirs) {
+            if (Files.isDirectory(templateDir, LinkOption.NOFOLLOW_LINKS)) {
+              collectLegacyJobStagingDirs(
+                  templateDir, jobDirName, LEGACY_JOB_STAGING_DIR_MAX_DEPTH, legacyJobStagingDirs);
+            }
+          }
+        } catch (IOException | DirectoryIteratorException e) {
+          LOG.warn(
+              "Failed to look up the legacy staging directory of job {} under {}, skip it",
+              jobDirName,
+              metalakeDir,
+              e);
+        }
+      }
+    }
+    return legacyJobStagingDirs;
+  }
+
+  // The legacy layout put the template name in the path as is, and a template name may contain
+  // '/', so the job directory can be nested deeper than <metalake>/<template>/job-<id>, e.g. under
+  // a template named "team/etl". The staging directory of another job is never descended into: its
+  // contents are that job's own files.
+  private static void collectLegacyJobStagingDirs(
+      Path dir, String jobDirName, int remainingDepth, List<File> legacyJobStagingDirs)
+      throws IOException {
+    try (DirectoryStream<Path> children = Files.newDirectoryStream(dir)) {
+      for (Path child : children) {
+        if (!Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+
+        String name = child.getFileName().toString();
+        if (name.equals(jobDirName)) {
+          legacyJobStagingDirs.add(child.toFile());
+        } else if (remainingDepth > 0 && !JOB_DIR_PATTERN.matcher(name).matches()) {
+          collectLegacyJobStagingDirs(child, jobDirName, remainingDepth - 1, legacyJobStagingDirs);
+        }
+      }
+    }
+  }
+
+  private void deleteJobStagingDir(JobEntity job) throws IOException {
+    File jobStagingDir = jobStagingDir(job.id());
+    if (jobStagingDir.exists()) {
+      FileUtils.deleteDirectory(jobStagingDir);
+      LOG.info("Deleted job staging directory {} for job {}", jobStagingDir, job.name());
+      return;
+    }
+
+    for (File legacyJobStagingDir : findLegacyJobStagingDirs(job.id())) {
+      FileUtils.deleteDirectory(legacyJobStagingDir);
+      LOG.info(
+          "Deleted legacy job staging directory {} for job {}", legacyJobStagingDir, job.name());
+    }
+  }
+
+  private void deleteStagingDirOfUnsubmittedJob(File jobStagingDir, long jobId) {
+    // The job is not tracked by any job entity, so the periodic cleanup will never remove its
+    // staging directory. A cleanup failure must not mask the original submission failure.
+    try {
+      FileUtils.deleteDirectory(jobStagingDir);
+    } catch (IOException e) {
+      LOG.warn(
+          "Failed to delete staging directory {} of job {} whose submission failed",
+          jobStagingDir,
+          jobId,
+          e);
+    }
+  }
+
   private <T> T updatedValue(T currentValue, Optional<T> newValue) {
     return newValue.orElse(currentValue);
+  }
+
+  private void pullAndUpdateOwnedJobStatus(String metalake, JobEntity job) {
+    JobExecutionInfo observed;
+    try {
+      observed = jobExecutor.getJobExecutionInfo(job.jobExecutionId());
+      // The job was marked as CANCELLING by another server, which can't cancel it itself, so
+      // cancel it here as the owner. This only applies to node local job state, other job
+      // executors are cancelled directly by the server handling the request, and they may keep
+      // reporting the job as running while cancelling it asynchronously.
+      if (jobExecutor.isJobStateNodeLocal()
+          && job.status() == JobHandle.Status.CANCELLING
+          && (observed.status() == JobHandle.Status.QUEUED
+              || observed.status() == JobHandle.Status.STARTED)) {
+        observed = cancelOwnedJob(metalake, job);
+      }
+      observed = sanitizeExecutionInfo(job, observed);
+    } catch (NoSuchJobException e) {
+      // If the job is not found in the external job executor, we assume the job is
+      // FAILED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
+      observed =
+          JobExecutionInfo.of(
+              job.status() == JobHandle.Status.CANCELLING
+                  ? JobHandle.Status.CANCELLED
+                  : JobHandle.Status.FAILED);
+      LOG.warn(
+          "Job {} with execution id {} under metalake {} is not found in the "
+              + "external job executor, marking it as {}. This could be due to the job "
+              + "being deleted by the external job executor. Please check the external job "
+              + "executor to know more details.",
+          job.name(),
+          job.jobExecutionId(),
+          metalake,
+          observed.status());
+    } catch (Exception e) {
+      // Keep the job unchanged, and retry it in the next poll.
+      LOG.error(
+          "Failed to pull or cancel job {} by execution id {}",
+          job.name(),
+          job.jobExecutionId(),
+          e);
+      return;
+    }
+
+    // Besides the status, the job executor may report the timestamps of the job later than its
+    // status, so the job is also updated when only its timestamps change. The job is not written
+    // at all when nothing changes.
+    if (!changesJob(job, observed)) {
+      return;
+    }
+
+    // Update the job entity with new status. entityStore.update() re-fetches the
+    // latest entity itself right before applying the updater, so the transition below
+    // is derived from latestJobEntity - the state as of right before the write - rather
+    // than the possibly-stale `job` snapshot taken by listJobs() above. A concurrent
+    // writer (e.g. cancelJob(), or another poll run) may have already moved the job to
+    // a terminal state, into CANCELLING, or recorded a real startedAt/finishedAt in the
+    // gap between that snapshot and this point; the updater must not regress any of
+    // that using the stale snapshot's view of the world.
+    JobExecutionInfo finalObserved = observed;
+    updateJobEntity(
+            metalake,
+            job,
+            latestJobEntity -> toUpdatedStatusJobEntity(latestJobEntity, finalObserved))
+        .ifPresent(
+            updated ->
+                LOG.info(
+                    "Updated the job {} with execution id {} status to {}",
+                    job.name(),
+                    job.jobExecutionId(),
+                    updated.status()));
+  }
+
+  private JobExecutionInfo cancelOwnedJob(String metalake, JobEntity job) {
+    LOG.info(
+        "Cancelling job {} with execution id {} under metalake {} as it is marked as CANCELLING",
+        job.name(),
+        job.jobExecutionId(),
+        metalake);
+    jobExecutor.cancelJob(job.jobExecutionId());
+    return jobExecutor.getJobExecutionInfo(job.jobExecutionId());
+  }
+
+  // Drops or corrects the timestamps reported by the job executor that are unusable, or
+  // inconsistent
+  // with the status or with each other. A faulty job executor never fails the status pull. The
+  // corrections are only logged at debug level, as the same report is corrected on every pull.
+  private JobExecutionInfo sanitizeExecutionInfo(JobEntity job, JobExecutionInfo observed) {
+    Instant startedAt = usableTime(job, "started", observed.startedAt());
+    Instant finishedAt = usableTime(job, "finished", observed.finishedAt());
+
+    if (startedAt != null && observed.status() == JobHandle.Status.QUEUED) {
+      LOG.debug(
+          "Job {} with execution id {} is reported as QUEUED with a started time {}, ignoring "
+              + "the started time",
+          job.name(),
+          job.jobExecutionId(),
+          startedAt);
+      startedAt = null;
+    }
+    if (finishedAt != null && !isFinishedStatus(observed.status())) {
+      LOG.debug(
+          "Job {} with execution id {} is reported as {} with a finished time {}, ignoring the "
+              + "finished time",
+          job.name(),
+          job.jobExecutionId(),
+          observed.status(),
+          finishedAt);
+      finishedAt = null;
+    }
+
+    startedAt = notBeforeQueuedAt(job, "started", startedAt);
+    finishedAt = notBeforeQueuedAt(job, "finished", finishedAt);
+
+    if (startedAt != null && finishedAt != null && finishedAt.isBefore(startedAt)) {
+      // The finished time is kept, as the cleanup of finished jobs relies on it.
+      LOG.debug(
+          "Job {} with execution id {} is reported to finish at {} before it started at {}, "
+              + "ignoring the started time",
+          job.name(),
+          job.jobExecutionId(),
+          finishedAt,
+          startedAt);
+      startedAt = null;
+    }
+
+    return observed.toBuilder().withStartedAt(startedAt).withFinishedAt(finishedAt).build();
+  }
+
+  // A reported time is stored in epoch milliseconds, so a time that doesn't fit is dropped. So is a
+  // time far in the future, e.g. a sentinel like Instant.MAX, which would otherwise keep a finished
+  // job from ever being cleaned up.
+  @Nullable
+  private static Instant usableTime(JobEntity job, String event, @Nullable Instant reportedTime) {
+    if (reportedTime == null) {
+      return null;
+    }
+    boolean usable;
+    try {
+      reportedTime.toEpochMilli();
+      usable = !reportedTime.isAfter(Instant.now().plus(MAX_REPORTED_TIME_AHEAD));
+    } catch (ArithmeticException e) {
+      usable = false;
+    }
+    if (!usable) {
+      LOG.debug(
+          "Job {} with execution id {} is reported to be {} at an unusable time {}, ignoring it",
+          job.name(),
+          job.jobExecutionId(),
+          event,
+          reportedTime);
+      return null;
+    }
+    return reportedTime;
+  }
+
+  // The job executor may run on another host whose clock is behind Gravitino's, so a reported time
+  // can be earlier than when Gravitino queued the job. Such a time is raised to the queued time.
+  @Nullable
+  private Instant notBeforeQueuedAt(JobEntity job, String event, @Nullable Instant reportedTime) {
+    Instant queuedAt = job.auditInfo() == null ? null : job.auditInfo().createTime();
+    if (reportedTime == null || queuedAt == null || !reportedTime.isBefore(queuedAt)) {
+      return reportedTime;
+    }
+    LOG.debug(
+        "Job {} with execution id {} is reported to be {} at {}, before it was queued at {}, "
+            + "using the queued time instead",
+        job.name(),
+        job.jobExecutionId(),
+        event,
+        reportedTime,
+        queuedAt);
+    return queuedAt;
+  }
+
+  // Whether applying the observed execution info changes the recorded status or timestamps of the
+  // job. It is derived by the same logic as the update, so a value that the update corrects is not
+  // seen as a change on every poll.
+  private boolean changesJob(JobEntity job, JobExecutionInfo observed) {
+    JobEntity updated = toUpdatedStatusJobEntity(job, observed);
+    return updated.status() != job.status()
+        || timeInMs(updated.startedAt()) != timeInMs(job.startedAt())
+        || timeInMs(updated.finishedAt()) != timeInMs(job.finishedAt());
+  }
+
+  private JobEntity toUpdatedStatusJobEntity(JobEntity latestJobEntity, JobExecutionInfo observed) {
+    JobHandle.Status currentStatus = latestJobEntity.status();
+    JobHandle.Status observedStatus = observed.status();
+
+    // Never regress a job out of a terminal state, and never move a CANCELLING job back to a
+    // non-terminal state - both would only be possible here because the executor status was
+    // observed against a stale snapshot of the job.
+    if (isFinishedStatus(currentStatus)
+        || (currentStatus == JobHandle.Status.CANCELLING && !isFinishedStatus(observedStatus))) {
+      return latestJobEntity;
+    }
+
+    long startedAt = resolveStartedAt(latestJobEntity, observed);
+    long finishedAt = resolveFinishedAt(latestJobEntity, observed);
+    if (startedAt > 0 && finishedAt > 0 && finishedAt < startedAt) {
+      // The started time recorded by an earlier poll is later than the finished time reported by
+      // the job executor, so it can't be right. The finished time is kept, as the cleanup of
+      // finished jobs relies on it.
+      LOG.debug(
+          "Dropping the started time of job {} as it is later than its finished time",
+          latestJobEntity.name());
+      startedAt = 0L;
+    }
+
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(latestJobEntity.jobExecutionId())
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        .withStatus(observedStatus)
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(latestJobEntity.auditInfo().creator())
+                .withCreateTime(latestJobEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .withStartedAt(startedAt)
+        .withFinishedAt(finishedAt)
+        // The runtime job template is fixed at job creation and never changes.
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
+        .build();
+  }
+
+  private static long resolveStartedAt(JobEntity latestJobEntity, JobExecutionInfo observed) {
+    // The time reported by the job executor is when the job actually started, so it also replaces
+    // a time recorded by an earlier poll.
+    if (observed.startedAt() != null) {
+      return observed.startedAt().toEpochMilli();
+    }
+
+    // The job executor doesn't report when the job started. Only a directly-observed STARTED
+    // transition is then trustworthy evidence of when a job started. SUCCEEDED/FAILED do not prove
+    // the job ever reached STARTED: FAILED in particular can be reached directly from QUEUED (e.g.
+    // NoSuchJobException from the executor), and even for SUCCEEDED, backfilling startedAt from
+    // the queued time would understate queue latency and overstate execution duration in any
+    // derived metric. So startedAt is left unset unless a STARTED transition was actually
+    // observed, and it is only stamped on the first STARTED observation.
+    long recordedStartedAt = timeInMs(latestJobEntity.startedAt());
+    if (observed.status() == JobHandle.Status.STARTED && recordedStartedAt <= 0) {
+      return Instant.now().toEpochMilli();
+    }
+    return recordedStartedAt;
+  }
+
+  private static long resolveFinishedAt(JobEntity latestJobEntity, JobExecutionInfo observed) {
+    long recordedFinishedAt = timeInMs(latestJobEntity.finishedAt());
+    if (!isFinishedStatus(observed.status())) {
+      return recordedFinishedAt;
+    }
+    if (observed.finishedAt() != null) {
+      return observed.finishedAt().toEpochMilli();
+    }
+
+    // The job executor doesn't report when the job finished. Preserve an already-recorded
+    // finishedAt (e.g. stamped by a concurrent writer) instead of overwriting it with a later
+    // poll's timestamp.
+    return recordedFinishedAt > 0 ? recordedFinishedAt : Instant.now().toEpochMilli();
+  }
+
+  private Optional<JobEntity> updateJobEntity(
+      String metalake, JobEntity job, Function<JobEntity, JobEntity> updater) {
+    try {
+      return Optional.of(
+          TreeLockUtils.doWithTreeLock(
+              NameIdentifierUtil.ofJob(metalake, job.name()),
+              LockType.WRITE,
+              () -> {
+                try {
+                  return entityStore.update(
+                      NameIdentifierUtil.ofJob(metalake, job.name()),
+                      JobEntity.class,
+                      Entity.EntityType.JOB,
+                      updater);
+                } catch (IOException e) {
+                  throw new RuntimeException(
+                      String.format("Failed to update job entity %s", job.name()), e);
+                }
+              }));
+    } catch (OptimisticLockException e) {
+      // A later poll re-reads both executor state and metadata. Never stop the scheduled
+      // task or replay external submission/cancellation because a metadata CAS lost.
+      LOG.info(
+          "Job {} under metalake {} changed concurrently; deferring status update",
+          job.name(),
+          metalake);
+      return Optional.empty();
+    } catch (NoSuchEntityException e) {
+      // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
+      // in the gap between the listJobs() snapshot above and this update. Skip it rather
+      // than letting the exception escape this scheduled task, which would silently
+      // cancel all future status-pull runs (ScheduledExecutorService semantics).
+      LOG.warn(
+          "Job {} under metalake {} no longer exists, skipping the update. This could be due "
+              + "to the job being deleted concurrently.",
+          job.name(),
+          metalake);
+      return Optional.empty();
+    }
+  }
+
+  private void expireStaleActiveJob(String metalake, JobEntity job, long now) {
+    AtomicBoolean expired = new AtomicBoolean(false);
+    updateJobEntity(
+            metalake,
+            job,
+            latestJobEntity -> {
+              // The job may have been updated since the listJobs() snapshot.
+              if (!isStaleActiveJob(latestJobEntity, now)) {
+                return latestJobEntity;
+              }
+              expired.set(true);
+              // The expired job gets the current time as its finished time, so it's kept for
+              // another retention time like any other finished job before being cleaned up.
+              return toUpdatedStatusJobEntity(
+                  latestJobEntity,
+                  JobExecutionInfo.of(
+                      latestJobEntity.status() == JobHandle.Status.CANCELLING
+                          ? JobHandle.Status.CANCELLED
+                          : JobHandle.Status.FAILED));
+            })
+        .filter(expiredJob -> expired.get())
+        .ifPresent(
+            expiredJob ->
+                LOG.warn(
+                    "Job {} with execution id {} under metalake {} has not been updated for more "
+                        + "than {} ms, marking it as {}. This could be due to the Gravitino server "
+                        + "running the job having exited.",
+                    job.name(),
+                    job.jobExecutionId(),
+                    metalake,
+                    jobStagingDirKeepTimeInMs,
+                    expiredJob.status()));
+  }
+
+  private boolean isStaleActiveJob(JobEntity job, long now) {
+    return !isFinishedStatus(job.status())
+        && lastUpdatedTimeInMs(job) + jobStagingDirKeepTimeInMs < now;
+  }
+
+  private static long lastUpdatedTimeInMs(JobEntity job) {
+    AuditInfo auditInfo = job.auditInfo();
+    Instant lastUpdatedTime =
+        auditInfo.lastModifiedTime() != null
+            ? auditInfo.lastModifiedTime()
+            : auditInfo.createTime();
+    return lastUpdatedTime == null ? 0L : lastUpdatedTime.toEpochMilli();
+  }
+
+  private static boolean isFinishedStatus(JobHandle.Status status) {
+    return status == JobHandle.Status.SUCCEEDED
+        || status == JobHandle.Status.FAILED
+        || status == JobHandle.Status.CANCELLED;
+  }
+
+  private static long timeInMs(@Nullable Long time) {
+    return time == null ? 0L : time;
   }
 }

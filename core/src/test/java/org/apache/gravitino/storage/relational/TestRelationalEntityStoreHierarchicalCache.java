@@ -40,10 +40,13 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -63,6 +66,8 @@ public class TestRelationalEntityStoreHierarchicalCache {
   private RelationalEntityStore store;
   private String dbPath;
   private Object previousConfig;
+  private Object previousMetricsSystem;
+  private boolean replacedMetricsSystem;
 
   @AfterEach
   void tearDown() throws Exception {
@@ -75,6 +80,42 @@ public class TestRelationalEntityStoreHierarchicalCache {
       dbPath = null;
     }
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+    if (replacedMetricsSystem) {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "metricsSystem", previousMetricsSystem, true);
+    }
+  }
+
+  @Test
+  void testChangeLogMetricsRegistrationAndUnregistration() throws Exception {
+    MetricsSystem metricsSystem = new MetricsSystem();
+    replaceMetricsSystem(metricsSystem);
+    initStore(":");
+
+    MetricsSource source = metricsSystem.getMetricsSource("entity-change-log");
+    Assertions.assertNotNull(source);
+    Assertions.assertNotNull(
+        metricsSystem.getMetricRegistry().getGauges().get("entity-change-log.record-lag"));
+
+    store.close();
+    store = null;
+    Assertions.assertNull(metricsSystem.getMetricsSource("entity-change-log"));
+    Assertions.assertFalse(
+        metricsSystem.getMetricRegistry().getMetrics().containsKey("entity-change-log.record-lag"));
+  }
+
+  @Test
+  void testChangeLogMetricsWithoutMetricsSystem() throws Exception {
+    replaceMetricsSystem(null);
+    initStore(":");
+
+    Assertions.assertNotNull(FieldUtils.readField(store, "changeLogMetrics", true));
+  }
+
+  private void replaceMetricsSystem(MetricsSystem metricsSystem) throws IllegalAccessException {
+    previousMetricsSystem = FieldUtils.readField(GravitinoEnv.getInstance(), "metricsSystem", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "metricsSystem", metricsSystem, true);
+    replacedMetricsSystem = true;
   }
 
   @ParameterizedTest

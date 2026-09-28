@@ -25,10 +25,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -338,21 +338,16 @@ public class PolicyTagRelService {
 
   private static TagPO lockTag(NameIdentifier tagIdentifier) {
     String metalake = tagIdentifier.namespace().level(0);
-    return SessionUtils.getWithoutCommit(
-        TagMetaMapper.class,
-        mapper -> {
-          TagPO observed = mapper.selectTagMetaByMetalakeAndName(metalake, tagIdentifier.name());
-          if (observed == null) {
-            throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
-          }
-          TagPO locked = mapper.selectTagByTagIdForUpdate(observed.getTagId());
-          if (locked == null
-              || !Objects.equals(locked.getTagName(), tagIdentifier.name())
-              || !Objects.equals(locked.getMetalakeId(), observed.getMetalakeId())) {
-            throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
-          }
-          return locked;
-        });
+    TagPO observed =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.selectTagMetaByMetalakeAndName(metalake, tagIdentifier.name()));
+    if (observed == null) {
+      throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
+    }
+    // The tag row is locked before any policy row, so every path through this service takes its
+    // locks in the same tag-then-policy order.
+    return TagMetaService.lockTags(Collections.singletonList(observed)).get(observed.getTagId());
   }
 
   private static Map<String, Long> resolvePolicyIds(
@@ -365,7 +360,9 @@ public class PolicyTagRelService {
         .map(target -> target.nameIdentifier().name())
         .forEach(policyNames::add);
     if (policyNames.isEmpty()) {
-      return Collections.emptyMap();
+      // A mutable map, like the one built below: returning Collections.emptyMap() here would mix
+      // mutable and immutable return values, which Error Prone rejects.
+      return new LinkedHashMap<>();
     }
 
     List<PolicyPO> policies =
@@ -374,8 +371,13 @@ public class PolicyTagRelService {
             mapper ->
                 mapper.listPolicyPOsByMetalakeAndPolicyNames(
                     metalake, new ArrayList<>(policyNames)));
-    Map<String, Long> policyIds =
-        policies.stream().collect(Collectors.toMap(PolicyPO::getPolicyName, PolicyPO::getPolicyId));
+    // Lock the policy rows in policy-ID order so that two relation changes touching the same
+    // policies queue up instead of deadlocking. The tag row is locked before this, so every path
+    // through this service takes its locks in the same tag-then-policy order.
+    Map<String, Long> policyIds = new LinkedHashMap<>();
+    PolicyMetaService.lockPolicies(policies)
+        .values()
+        .forEach(policy -> policyIds.put(policy.getPolicyName(), policy.getPolicyId()));
 
     for (String policyName : policyNames) {
       if (!policyIds.containsKey(policyName)) {

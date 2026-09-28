@@ -21,6 +21,8 @@ package org.apache.gravitino.dto.responses;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -49,6 +51,7 @@ import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
+import org.apache.gravitino.dto.secret.SecretProviderDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -230,6 +233,33 @@ public class TestResponses {
   void testIllegalArgumentsErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.illegalArguments("illegal arguments error");
     error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testThrowableErrorResponsesRetainStackTrace() throws IllegalArgumentException {
+    Throwable throwable = new RuntimeException("private error details");
+    String message = "public error message";
+    ErrorResponse[] responses = {
+      ErrorResponse.illegalArguments(message, throwable),
+      ErrorResponse.connectionFailed(message, throwable),
+      ErrorResponse.notFound("error type", message, throwable),
+      ErrorResponse.internalError(message, throwable),
+      ErrorResponse.alreadyExists("error type", message, throwable),
+      ErrorResponse.notInUse("error type", message, throwable),
+      ErrorResponse.inUse("error type", message, throwable),
+      ErrorResponse.nonEmpty("error type", message, throwable),
+      ErrorResponse.unsupportedOperation(message, throwable),
+      ErrorResponse.forbidden(message, throwable),
+      ErrorResponse.unauthorized("error type", message, throwable)
+    };
+
+    for (ErrorResponse response : responses) {
+      response.validate();
+      assertEquals(message, response.getMessage());
+      assertNotNull(response.getStack());
+      assertTrue(
+          response.getStack().stream().anyMatch(line -> line.contains("private error details")));
+    }
   }
 
   @Test
@@ -526,16 +556,18 @@ public class TestResponses {
 
   @Test
   void testAuthMeResponse() throws JsonProcessingException {
-    AuthMeResponse response = new AuthMeResponse("test-user");
+    AuthMeResponse response = new AuthMeResponse("test-user", true);
     response.validate();
     assertEquals(0, response.getCode());
     assertEquals("test-user", response.getPrincipal());
+    assertTrue(response.isServiceAdmin());
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     AuthMeResponse deserResponse =
         JsonUtils.objectMapper().readValue(serJson, AuthMeResponse.class);
     assertEquals(response.getCode(), deserResponse.getCode());
     assertEquals(response.getPrincipal(), deserResponse.getPrincipal());
+    assertEquals(response.isServiceAdmin(), deserResponse.isServiceAdmin());
   }
 
   @Test
@@ -543,6 +575,30 @@ public class TestResponses {
     AuthMeResponse response = new AuthMeResponse();
     assertDoesNotThrow(response::validate);
     assertNull(response.getPrincipal());
+    assertFalse(response.isServiceAdmin());
+  }
+
+  @Test
+  void testSecretProviderListResponse() throws JsonProcessingException {
+    SecretProviderListResponse response =
+        new SecretProviderListResponse(
+            new SecretProviderDTO[] {
+              SecretProviderDTO.builder().withName("memory").withType("memory").build()
+            });
+    response.validate();
+    assertEquals(0, response.getCode());
+    assertEquals(1, response.getProviders().length);
+    assertEquals("memory", response.getProviders()[0].getName());
+    assertEquals("memory", response.getProviders()[0].getType());
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    assertFalse(serJson.contains("uri"));
+    SecretProviderListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, SecretProviderListResponse.class);
+    assertEquals(response, deserResponse);
+
+    SecretProviderListResponse empty = new SecretProviderListResponse();
+    assertThrows(IllegalArgumentException.class, empty::validate);
   }
 
   @Test

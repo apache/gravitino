@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -31,13 +32,19 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
 
   public FunctionPOStorageOps() {}
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Overwrite is not supported here. {@link FunctionMetaService} replaces an existing function
+   * by locking its root row and advancing it with a version compare-and-set, which keeps the stored
+   * ID and the version sequence identical on every database. A database-specific upsert would
+   * bypass that and is rejected instead of silently taking a second code path.
+   */
   @Override
   public void insertPO(FunctionMetaMapper mapper, FunctionPO functionPO, boolean overwrite) {
-    if (overwrite) {
-      mapper.insertFunctionMetaOnDuplicateKeyUpdate(functionPO);
-    } else {
-      mapper.insertFunctionMeta(functionPO);
-    }
+    Preconditions.checkArgument(
+        !overwrite, "Function overwrite is handled by FunctionMetaService, not by an upsert");
+    mapper.insertFunctionMeta(functionPO);
   }
 
   @Override

@@ -35,7 +35,9 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -44,6 +46,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -51,6 +54,7 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -58,6 +62,8 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final EntityStore entityStore = mock(EntityStore.class);
+  private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+  private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -77,6 +83,26 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+  }
+
+  @BeforeEach
+  public void resetMocks() throws IOException {
+    Mockito.reset(manager, entityStore, metalakeDispatcher, tableDispatcher);
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    mockInUseMetalake();
+  }
+
+  private static void mockInUseMetalake() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
   }
 
   @Override
@@ -159,5 +185,26 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testListRoleNamesChecksTableObjectBeforeListing() throws IOException {
+    when(manager.listRoleNamesByObject(any(), any())).thenReturn(new String[0]);
+
+    Response resp =
+        target("/metalakes/metalake1/objects/table/catalog1.schema1.table1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    NameListResponse listResponse = resp.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, listResponse.getCode());
+    Assertions.assertEquals(0, listResponse.getNames().length);
+
+    Mockito.verify(tableDispatcher)
+        .tableExists(NameIdentifier.of("metalake1", "catalog1", "schema1", "table1"));
+    Mockito.verify(manager).listRoleNamesByObject(any(), any());
   }
 }

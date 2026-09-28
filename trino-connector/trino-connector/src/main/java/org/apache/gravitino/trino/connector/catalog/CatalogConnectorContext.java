@@ -48,6 +48,8 @@ public class CatalogConnectorContext {
   // Internal connector communicates with data storage
   private final Connector internalConnector;
 
+  private final Map<String, String> internalConnectorConfig;
+
   private final CatalogConnectorAdapter adapter;
 
   private final GravitinoConfig config;
@@ -58,6 +60,8 @@ public class CatalogConnectorContext {
    * @param catalog the Gravitino catalog
    * @param metalake the Gravitino metalake
    * @param internalConnector the internal connector
+   * @param internalConnectorConfig the effective configuration used to create the internal
+   *     connector
    * @param adapter the catalog connector adapter
    * @param config the Gravitino connector configuration
    */
@@ -65,11 +69,13 @@ public class CatalogConnectorContext {
       GravitinoCatalog catalog,
       GravitinoMetalake metalake,
       Connector internalConnector,
+      Map<String, String> internalConnectorConfig,
       CatalogConnectorAdapter adapter,
       GravitinoConfig config) {
     this.catalog = catalog;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
+    this.internalConnectorConfig = Map.copyOf(internalConnectorConfig);
     this.adapter = adapter;
     this.config = config;
   }
@@ -117,6 +123,15 @@ public class CatalogConnectorContext {
    */
   public Connector getInternalConnector() {
     return internalConnector;
+  }
+
+  /**
+   * Returns the effective configuration used to create the internal connector.
+   *
+   * @return the immutable internal connector configuration
+   */
+  public Map<String, String> getInternalConnectorConfig() {
+    return internalConnectorConfig;
   }
 
   /**
@@ -271,7 +286,8 @@ public class CatalogConnectorContext {
       Connector connector =
           GravitinoConnectorPluginManager.instance(context.getClass().getClassLoader())
               .createConnector(internalConnectorName, connectorConfig, context);
-      return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter, config);
+      return new CatalogConnectorContext(
+          catalog, metalake, connector, connectorConfig, connectorAdapter, config);
     }
   }
 }

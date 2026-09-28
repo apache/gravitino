@@ -58,6 +58,13 @@ final class JcasbinAuthorizationCacheKeys {
         parts.add(MetadataObject.Type.COLUMN.name());
         parts.add(names[names.length - 1]);
         break;
+      case MODEL_VERSION:
+        appendCatalogAndSchemas(parts, names, names.length - 2);
+        parts.add(MetadataObject.Type.MODEL.name());
+        parts.add(names[names.length - 2]);
+        parts.add(MetadataObject.Type.MODEL_VERSION.name());
+        parts.add(names[names.length - 1]);
+        break;
       case VIEW:
       case TOPIC:
       case FILESET:

@@ -215,16 +215,22 @@ components:
             - REGISTER_MODEL
             - LINK_MODEL_VERSION
             - USE_MODEL
+            - USE_SECRET
             - REGISTER_FUNCTION
             - EXECUTE_FUNCTION
             - MODIFY_FUNCTION
             - CREATE_TAG
             - APPLY_TAG
+            - VIEW_TAG
             - CREATE_POLICY
             - APPLY_POLICY
+            - VIEW_POLICY
+            - VIEW_SECRET_PROVIDERS
             - REGISTER_JOB_TEMPLATE
             - USE_JOB_TEMPLATE
             - RUN_JOB
+            - CREATE_VIEW
+            - SELECT_VIEW
           description: The name of the privilege
         condition:
           type: string

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import org.apache.gravitino.storage.AWSProperties;
+
 /** Constant keys for the AWS Glue Data Catalog connector configuration and table properties. */
 public final class GlueConstants {
 
@@ -34,11 +36,14 @@ public final class GlueConstants {
    */
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
 
-  /** AWS access key ID for static credential authentication (optional, sensitive). */
-  public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
+  /**
+   * AWS access key ID for static credential authentication (optional, not hidden). This is an
+   * account identifier, not a secret; {@link #AWS_SECRET_ACCESS_KEY} is the hidden half.
+   */
+  public static final String AWS_ACCESS_KEY_ID = AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID;
 
   /** AWS secret access key for static credential authentication (optional, sensitive). */
-  public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
+  public static final String AWS_SECRET_ACCESS_KEY = AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY;
 
   /**
    * Custom Glue endpoint URL (optional). Used for VPC endpoints or LocalStack testing. Example:
@@ -66,8 +71,10 @@ public final class GlueConstants {
 
   /**
    * Base storage path used as a warehouse when no explicit {@code location} is given at table
-   * creation time. The table location is derived as {@code warehouse/database/table}. Example:
-   * {@code s3://my-bucket/gravitino-warehouse}.
+   * creation time and the Glue database declares no {@code LocationUri}. The table location is
+   * derived as {@code warehouse/database/table}.
+   *
+   * <p>Example warehouse: {@code s3://my-bucket/gravitino-warehouse}.
    */
   public static final String WAREHOUSE = "warehouse";
 
@@ -145,6 +152,13 @@ public final class GlueConstants {
 
   /** Glue {@code tableType} value for external tables. */
   public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
+
+  /**
+   * Glue {@code tableType} value for views. Both Hive-compatible views (whose definition lives in
+   * {@code Table.viewOriginalText()}) and Glue multi-dialect views (whose definition lives in
+   * {@code Table.viewDefinition()}) carry this type.
+   */
+  public static final String VIRTUAL_VIEW_TABLE_TYPE = "VIRTUAL_VIEW";
 
   private GlueConstants() {}
 }

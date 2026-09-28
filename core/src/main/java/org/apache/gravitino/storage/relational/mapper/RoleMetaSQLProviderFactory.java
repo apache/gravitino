@@ -48,11 +48,27 @@ public class RoleMetaSQLProviderFactory {
 
   static class RoleMetaMySQLProvider extends RoleMetaBaseSQLProvider {}
 
-  static class RoleMetaH2Provider extends RoleMetaBaseSQLProvider {}
+  static class RoleMetaH2Provider extends RoleMetaBaseSQLProvider {
+    @Override
+    public String selectRoleMetaByIdForShare(Long roleId) {
+      // H2 has no shared row-lock syntax, matching the other parent-fencing providers.
+      return selectRoleMetaByIdForUpdate(roleId);
+    }
+  }
 
   public static String selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
     return getProvider().selectRoleMetaByMetalakeIdAndName(metalakeId, roleName);
+  }
+
+  /** Returns SQL that selects an active role by ID and locks it for shared access. */
+  public static String selectRoleMetaByIdForShare(@Param("roleId") Long roleId) {
+    return getProvider().selectRoleMetaByIdForShare(roleId);
+  }
+
+  /** Returns SQL that selects and locks an active role by ID. */
+  public static String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return getProvider().selectRoleMetaByIdForUpdate(roleId);
   }
 
   public static String selectRoleIdByMetalakeIdAndName(
@@ -90,8 +106,9 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().updateRoleMeta(newRolePO, oldRolePO);
   }
 
-  public static String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
-    return getProvider().softDeleteRoleMetaByRoleId(roleId);
+  public static String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteRoleMetaByRoleId(roleId, currentVersion);
   }
 
   public static String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

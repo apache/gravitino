@@ -299,7 +299,8 @@ policy_tag_relation_meta
 Constraints and indexes:
 
 1. Active rows are unique by `(policy_id, tag_id)`. A policy can be associated with a tag at most
-   once, and updating `selector` updates that relation.
+   once. Adding an existing pair conflicts regardless of its selector. To change the selector,
+   clients must remove the existing relation and then create a new one.
 2. Index `tag_id` for object policy lookup from tags.
 3. Index `policy_id` for impact analysis from policies.
 4. Policy and tag must belong to the same metalake.
@@ -311,12 +312,15 @@ Constraints and indexes:
 
 `selector` rules:
 
-1. `selector` is required and must not be null.
+1. New associations require a non-null `selector`. Persisted null selector values are read as
+   `ALL_VALUES` for storage compatibility.
 2. `ALL_VALUES` matches whenever the effective tag assignment exists.
 3. `TAG_VALUE` matches when the effective tag assignment contains the same value as
    `selector.value`.
 4. `TAG_VALUE` contains one non-blank `value` string.
-5. If the tag defines allowed values, the selector value must be one of the allowed values.
+5. `TAG_VALUE` selector validation is syntactic only and is independent of the tag's current
+   allowed values. A selector that cannot match a current effective assignment remains valid but
+   does not select the policy.
 6. Selector JSON is canonicalized before storage and comparison.
 7. The first version supports `ALL_VALUES` and `TAG_VALUE`. It does not support value absence,
    negative matching, principals, scopes, or general expressions. Future versions can add new
@@ -455,7 +459,7 @@ policy-to-tag relation. The caller must have `VIEW_TAG` on the requested tag. Re
 filtered by `VIEW_POLICY`; `APPLY_TAG` and `APPLY_POLICY` imply their corresponding view privileges.
 Returns `404 Not Found` if the tag does not exist.
 
-#### New: `PUT /api/metalakes/{metalake}/tags/{tag}/policies/{policy}`
+#### New: `POST /api/metalakes/{metalake}/tags/{tag}/policies/{policy}`
 
 **Request:**
 
@@ -472,7 +476,7 @@ Returns `404 Not Found` if the tag does not exist.
 }
 ```
 
-**Response:** `200 OK`
+**Response:** `201 Created`
 
 ```json
 {
@@ -485,9 +489,9 @@ Returns `404 Not Found` if the tag does not exist.
 }
 ```
 
-**Behavior:** Creates one policy-to-tag relation or replaces the selector on the existing relation.
-The policy and tag must exist in the same metalake, and the selector must be valid for the tag.
-Repeating the same request is an idempotent no-op.
+**Behavior:** Creates one policy-to-tag relation. The policy and tag must exist in the same
+metalake, and the selector must be valid for the tag. If the relation already exists, the request
+returns `409 Conflict` regardless of whether the existing selector matches the requested selector.
 
 #### New: `DELETE /api/metalakes/{metalake}/tags/{tag}/policies/{policy}`
 
@@ -564,17 +568,23 @@ corresponding view privileges.
       "name": "iceberg_compaction_standard",
       "policyType": "system_iceberg_compaction",
       "enabled": true,
+      "inherited": true,
       "content": {}
     }
   ]
 }
 ```
 
-**Behavior:** Resolves object policies for one metadata object from its effective tags. Returns
+**Behavior:** Resolves object policies for one metadata object from its effective tags and includes
+legacy direct policy relations during the compatibility window. Returns
 `404 Not Found` if the metadata object does not exist. This endpoint is read-only and does not
 modify policy objects or object-policy relationships. The caller must be authorized to access the
 metadata object. Resolved policies for which the caller lacks `VIEW_POLICY` are filtered from both
 response shapes. `APPLY_POLICY` implies `VIEW_POLICY` for backward compatibility.
+With `details=true`, `inherited` is `true` when every source of the policy comes from an ancestor
+metadata object, whether through inherited effective tags or legacy direct policy relations. It is
+`false` when at least one source is a tag assignment or legacy direct policy relation on the
+requested object.
 
 A single policy can be associated with multiple effective tags on the same object. The resolver
 deduplicates by policy entity and current version, not by equivalent policy content. Different
@@ -596,21 +606,25 @@ the requested metadata object; if no direct relation exists, it searches parent 
 marks a parent result as inherited. The current post API atomically adds and removes direct policy
 relations on the requested metadata object using `policiesToAdd` and `policiesToRemove`.
 
-**New behavior:** `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies` becomes a
-read-only derived object policy lookup API. It does not read direct policy relations and does not
-modify policy objects or object-policy relationships.
+**Compatibility behavior:** During the compatibility window, object-policy GET APIs merge policies
+resolved from the requested object's effective tags with legacy direct policy relations on the
+requested object and its ancestors. Tag-derived policies are resolved exactly once for the
+requested object. Results are deduplicated by policy entity ID, and a direct result on the requested
+object takes precedence over an inherited result. The deprecated POST remains readable through the
+same GET APIs, so an acknowledged legacy write is not silently ignored.
 
-Direct object policy mutation and direct object-policy-detail APIs are removed from the target
-model:
+Direct object policy mutation and direct object-policy-detail APIs will be removed after the
+compatibility window:
 
 ```http
 GET  /api/metalakes/{metalake}/objects/{type}/{fullName}/policies/{policy}
 POST /api/metalakes/{metalake}/objects/{type}/{fullName}/policies
 ```
 
-**Migration impact:** Callers must use policy-to-tag association APIs and read object policies from
-`GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`. Object-side policy association
-calls must be replaced with tag assignment calls.
+**Migration impact:** Callers should move to policy-to-tag association APIs and read object policies
+from `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`. Object-side policy
+association calls must be replaced with tag assignment calls before the compatibility APIs are
+removed.
 
 ### Client API Changes
 
@@ -618,7 +632,7 @@ calls must be replaced with tag assignment calls.
 |------|---------|---------|
 | Object policy association | `SupportsPolicies.associatePolicies(String[] add, String[] remove)` | Removed from metadata object mixins in the target model |
 | Object policy listing | `SupportsPolicies.listPolicies()` | Reinterpreted as read-only derived object policy lookup |
-| Tag policy association | None | New single-relation APIs such as setPolicyForTag(tagName, policyName, selector) and removePolicyFromTag(tagName, policyName) |
+| Tag policy association | None | New single-relation APIs such as addPolicyForTag(tagName, policyName, selector) and removePolicyFromTag(tagName, policyName) |
 | Policy impact analysis | `Policy.associatedObjects()` | Replaced or supplemented by Policy.associatedTags() |
 
 The exact Java and Python method names can be finalized during implementation, but the API shape
@@ -661,10 +675,12 @@ The new privileges follow the existing allow and deny model. A grant on a metala
 policies or tags in that metalake. A grant on one policy or tag applies only to that entity. Metalake
 owners and entity owners retain view access.
 
-For backward compatibility, an effective `APPLY_POLICY` grant implies `VIEW_POLICY`, and an
-effective `APPLY_TAG` grant implies `VIEW_TAG`. Existing roles with apply privileges therefore keep
-their current read access without a grant migration. A corresponding explicit deny of the view
-privilege blocks response visibility but does not change server-side policy enforcement.
+For backward compatibility, an effective `APPLY_POLICY` grant provides policy read access, and an
+effective `APPLY_TAG` grant provides tag read access. Existing roles with apply privileges therefore
+keep their current read access without a grant migration. View and apply denies are evaluated
+independently: `DENY_VIEW_POLICY` does not revoke read access provided by an effective
+`APPLY_POLICY` grant, and `DENY_APPLY_POLICY` does not revoke access provided by an effective
+`VIEW_POLICY` grant. The same rules apply to `VIEW_TAG` and `APPLY_TAG`.
 
 Recommended authorization rules:
 
@@ -705,12 +721,17 @@ assignment changes.
 
 ### Event Listener
 
-Policy-to-tag relation creation, selector update, and deletion must be exposed through the event
-listener framework, matching the existing policy and tag lifecycle event pattern. Each operation
-has pre-event, success-event, and failure-event types. Event payloads include the metalake, tag
-name, policy name, previous and requested selector as applicable, actor, and request context. A
-successful PUT event includes the resulting relation, and a successful DELETE event includes the
-removed relation.
+Policy-to-tag relation creation and deletion must be exposed through the event listener framework,
+matching the existing policy and tag lifecycle event pattern. Each operation has pre-event,
+success-event, and failure-event types. Pre-events describe only the mutation intent and run before
+business access. Add events include the metalake, tag name, policy name, requested selector, actor,
+and request context. Remove events include the metalake, tag name, policy name, actor, and request
+context; because removal is idempotent, a success event does not distinguish a deleted association
+from a missing-association no-op.
+
+The v2 audit payload includes `policyName` for both operations and the requested `selector` for
+add. The deprecated v1 audit format has no custom-information field and therefore identifies only
+the tag resource.
 
 Object policy lookup is a read-only derived operation and does not create policy-relation events. It
 may still be covered by normal REST access logs or audit logs if the project records read events.
@@ -721,9 +742,9 @@ may still be covered by normal REST access logs or audit logs if the project rec
 deduplication. It does not make allow or deny decisions for row filters, column masks, or other
 engine-enforced policy types.
 
-The resolver must also detect mixed selector results for the same policy. This conflict exists when
-one metadata object has multiple effective tags associated with the same policy and evaluation of
-those policy-to-tag relation selectors produces at least one match and at least one non-match.
+When one policy is associated with multiple effective tags, each relation selector independently
+determines whether that relation selects the policy. The policy is selected if at least one relation
+matches. Non-matching relations do not negate matching relations.
 
 For example:
 
@@ -736,10 +757,9 @@ object effective tags:
   data_domain = ["risk"]       -> not match
 ```
 
-For this object, `mask_policy` is both selected and not selected through different effective tag
-relations, so the resolver detects a selector conflict. Relations for tags that are not in the
-object's effective tag set do not participate in this detection. This design identifies the
-conflict but does not define a precedence or merge rule for it.
+For this object, the `classification` relation selects `mask_policy`; the non-matching
+`data_domain` relation is ignored. Relations for tags that are not in the object's effective tag
+set do not participate in selection.
 
 For row filter and column mask policies, enforcement consumers must fail closed if multiple
 distinct effective policies of the same kind apply to the same evaluation target. The system should
@@ -769,7 +789,9 @@ Rules:
 2. If a system iceberg compaction policy appears in the object policy result, TMS uses its content.
 3. A system iceberg compaction policy uses `ALL_VALUES` for tag-presence behavior or a simple
    `TAG_VALUE` selector when maintenance behavior should depend on assignment values.
-4. TMS does not read direct object policy relations.
+4. During the compatibility window, TMS may receive legacy direct object policies through the
+   merged object-policy result. After direct policy APIs are retired, only tag-derived policies
+   remain.
 
 ### User Process
 
@@ -817,8 +839,8 @@ tag handling, direct-assignment override behavior, value grouping, and determini
 
 ### Migration Process
 
-This design is a breaking model change. The target runtime does not read direct object policy
-relations.
+This design is a breaking model change. The compatibility runtime reads direct object policy
+relations together with tag-derived policies; the target runtime does not read direct relations.
 
 1. Inventory existing direct policy relations from `policy_relation_meta`, including inherited
    relations that users depend on through parent metadata objects.
@@ -865,7 +887,7 @@ objectTagMappings:
       resolution, and plan its removal according to the API evolution policy.
 - [ ] Implement `ObjectPolicyResolver` to resolve object policies from effective tags and value
       selectors.
-- [ ] Add single-relation PUT and DELETE endpoints for tag policy association, plus policy tag
+- [ ] Add single-relation POST and DELETE endpoints for tag policy association, plus policy tag
       listing with selector payloads.
 - [ ] Change object policy REST APIs to read-only derived lookup and remove direct object policy
       mutation behavior.

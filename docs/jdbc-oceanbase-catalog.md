@@ -50,8 +50,20 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                     | `30000`       | No       |
 
 :::caution
-Before using the OceanBase Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-oceanbase/libs` directory.
-Gravitino doesn't package the JDBC driver for OceanBase due to licensing issues.
+Gravitino does not package the OceanBase JDBC driver due to licensing, so you
+must supply it yourself. OceanBase speaks the MySQL wire protocol, so either
+driver works: OceanBase Connector/J (`com.oceanbase:oceanbase-client`, 2.4.18
+or later; the `com.oceanbase.jdbc.Driver` class) or MySQL Connector/J
+(`com.mysql:mysql-connector-j`, 8.0.16 or later; the `com.mysql.cj.jdbc.Driver`
+class). Download it from Maven Central
+([OceanBase](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/),
+[MySQL](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/)) and place
+the JAR in the `catalogs/jdbc-oceanbase/libs` directory.
+
+For container or Kubernetes deployments where you cannot copy into that
+directory directly, supply the driver through your deployment's mechanism for
+adding catalog libraries. The catalog fails fast at creation time with a clear
+message if the driver is absent.
 :::
 
 ### Driver Version Compatibility
@@ -87,7 +99,7 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
 :::
 
 ## Schema

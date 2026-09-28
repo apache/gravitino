@@ -18,17 +18,36 @@
  */
 package org.apache.gravitino.client;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.secret.SupportsSecrets;
 
-class GenericModelVersion implements ModelVersion {
+class GenericModelVersion implements ModelVersion, SupportsSecrets {
 
   private final ModelVersionDTO modelVersionDTO;
 
-  GenericModelVersion(ModelVersionDTO modelVersionDTO) {
+  private final MetadataObjectSecretOperations objectSecretOperations;
+
+  GenericModelVersion(
+      ModelVersionDTO modelVersionDTO, RESTClient restClient, NameIdentifier modelFullIdent) {
     this.modelVersionDTO = modelVersionDTO;
+    MetadataObject modelVersionObject =
+        MetadataObjects.of(
+            Arrays.asList(
+                modelFullIdent.namespace().level(1),
+                modelFullIdent.namespace().level(2),
+                modelFullIdent.name(),
+                String.valueOf(modelVersionDTO.version())),
+            MetadataObject.Type.MODEL_VERSION);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(
+            modelFullIdent.namespace().level(0), modelVersionObject, restClient);
   }
 
   @Override
@@ -59,6 +78,16 @@ class GenericModelVersion implements ModelVersion {
   @Override
   public Audit auditInfo() {
     return modelVersionDTO.auditInfo();
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

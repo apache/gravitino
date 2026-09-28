@@ -108,7 +108,7 @@ public class ModelVersionInfo {
       Map<String, String> properties,
       String[] aliases,
       Audit auditInfo) {
-    this.uris = uris;
+    this.uris = uris == null ? Collections.emptyMap() : ImmutableMap.copyOf(uris);
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.comment = Optional.ofNullable(comment);
     this.audit = Optional.ofNullable(auditInfo);

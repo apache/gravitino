@@ -19,12 +19,12 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWNER_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.ibatis.annotations.Param;
 
 /** Provides SQL for collecting orphaned metadata-object relations. */
@@ -41,16 +41,6 @@ public class OrphanedMetadataObjectRelationSQLProvider {
       @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
     return softDeleteOrphans(
         TAG_METADATA_OBJECT_RELATION_TABLE_NAME,
-        "metadata_object_type",
-        entityTable,
-        entityIdColumn);
-  }
-
-  /** Returns SQL that soft-deletes orphaned policy relations. */
-  public static String softDeleteOrphanedPolicyRelations(
-      @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
-    return softDeleteOrphans(
-        POLICY_METADATA_OBJECT_RELATION_TABLE_NAME,
         "metadata_object_type",
         entityTable,
         entityIdColumn);
@@ -90,7 +80,25 @@ public class OrphanedMetadataObjectRelationSQLProvider {
         + entityTable
         + " entity WHERE entity."
         + entityIdColumn
-        + " = rel.metadata_object_id AND entity.deleted_at = 0)"
+        + " = rel.metadata_object_id AND entity.deleted_at = 0"
+        + liveEntityCondition(entityTable)
+        + ")"
         + " LIMIT #{limit}) orphan_ids)";
+  }
+
+  private static String liveEntityCondition(String entityTable) {
+    if (!TableColumnMapper.COLUMN_TABLE_NAME.equals(entityTable)) {
+      return "";
+    }
+
+    // A dropped column keeps its rows and only gets a newer DELETE row, so a column is live only
+    // when a non-DELETE row is its latest row.
+    return " AND entity.column_op_type <> "
+        + ColumnPO.ColumnOpType.DELETE.value()
+        + " AND NOT EXISTS (SELECT 1 FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " newer WHERE newer.table_id = entity.table_id"
+        + " AND newer.column_id = entity.column_id AND newer.deleted_at = 0"
+        + " AND newer.table_version > entity.table_version)";
   }
 }

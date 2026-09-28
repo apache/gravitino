@@ -17,7 +17,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from dataclasses_json import config, DataClassJsonMixin
 
@@ -27,10 +27,23 @@ from gravitino.dto.audit_dto import (
     _deserialize_datetime,
     _serialize_datetime,
 )
+from gravitino.dto.job.job_template_dto import JobTemplateDTO
+
+
+def _serialize_runtime_job_template(
+    value: Optional[JobTemplateDTO],
+) -> Optional[Dict]:
+    return None if value is None else value.to_dict()
+
+
+def _deserialize_runtime_job_template(
+    value: Optional[Dict],
+) -> Optional[JobTemplateDTO]:
+    return None if value is None else JobTemplateDTO.from_dict_by_type(value)
 
 
 @dataclass
-class JobDTO(DataClassJsonMixin):
+class JobDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attributes
     """Data transfer object representing a Job."""
 
     _job_id: str = field(metadata=config(field_name="jobId"))
@@ -66,6 +79,20 @@ class JobDTO(DataClassJsonMixin):
             encoder=_serialize_datetime,
             decoder=_deserialize_datetime,
         ),
+    )
+    _runtime_job_template: Optional[JobTemplateDTO] = field(
+        default=None,
+        metadata=config(
+            field_name="runtimeJobTemplate",
+            encoder=_serialize_runtime_job_template,
+            decoder=_deserialize_runtime_job_template,
+        ),
+    )
+    _stdout: Optional[List[str]] = field(
+        default=None, metadata=config(field_name="stdout")
+    )
+    _stderr: Optional[List[str]] = field(
+        default=None, metadata=config(field_name="stderr")
     )
 
     def __post_init__(self) -> None:
@@ -104,6 +131,24 @@ class JobDTO(DataClassJsonMixin):
         execution yet.
         """
         return self._finished_at
+
+    def runtime_job_template(self) -> Optional[JobTemplateDTO]:
+        """Returns the resolved job template that was actually submitted for execution, or
+        ``None`` for jobs run before this field was introduced.
+        """
+        return self._runtime_job_template
+
+    def stdout(self) -> Optional[List[str]]:
+        """Returns the captured standard output of the job, as a list of lines, or ``None`` if
+        output was not requested.
+        """
+        return self._stdout
+
+    def stderr(self) -> Optional[List[str]]:
+        """Returns the captured standard error output of the job, as a list of lines, or ``None``
+        if output was not requested.
+        """
+        return self._stderr
 
     def validate(self) -> None:
         """Validates the JobDTO, ensuring required fields are present and non-empty."""

@@ -19,8 +19,12 @@
 package org.apache.gravitino.client;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.dto.job.JobDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
 
 /** Represents a generic job handle. */
 public class GenericJobHandle implements JobHandle {
@@ -59,5 +63,22 @@ public class GenericJobHandle implements JobHandle {
   @Override
   public Instant finishedAt() {
     return jobDTO.finishedAt();
+  }
+
+  @Override
+  public JobTemplate runtimeJobTemplate() {
+    return jobDTO.runtimeJobTemplate() == null
+        ? null
+        : DTOConverters.fromDTO(jobDTO.runtimeJobTemplate());
+  }
+
+  @Override
+  public List<String> stdout() {
+    return jobDTO.stdout() == null ? Collections.emptyList() : jobDTO.stdout();
+  }
+
+  @Override
+  public List<String> stderr() {
+    return jobDTO.stderr() == null ? Collections.emptyList() : jobDTO.stderr();
   }
 }

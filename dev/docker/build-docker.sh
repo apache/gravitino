@@ -27,7 +27,7 @@ usage() {
   cat << EOF
 Usage:
 
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|kerberos-hive|trino|doris|ranger|iceberg-rest-server|lance-rest-server|mcp-server] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|kerberos-hive|trino|doris|ranger|iceberg-rest-server|lance-rest-server|mcp-server|trino-connectors|flink-connectors|spark-connectors] --image {image_name} --tag {tag_name} --latest
 
 Notice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image.
 EOF
@@ -119,6 +119,23 @@ elif [ "${component_type}" == "mcp-server" ]; then
   . ${script_dir}/mcp-server/mcp-server-dependency.sh
 elif [ "${component_type}" == "lance-rest-server" ]; then
   . ${script_dir}/lance-rest-server/lance-rest-server-dependency.sh
+elif [ "${component_type}" == "trino-connectors" ] || \
+     [ "${component_type}" == "flink-connectors" ] || \
+     [ "${component_type}" == "spark-connectors" ]; then
+  # Connector init-container images. Read the project version from
+  # gradle.properties so the Red Hat version LABEL is not hard-coded and stays
+  # correct across branches (main, branch-1.3, ...).
+  gravitino_root="$(cd "${script_dir}/../.." >/dev/null; pwd)"
+  image_version="$(grep -E '^version[[:space:]]*=' "${gravitino_root}/gradle.properties" | head -n1 | sed 's/.*=[[:space:]]*//' | tr -d '[:space:]')"
+  if [ -z "${image_version}" ]; then
+    echo "ERROR : cannot read version from ${gravitino_root}/gradle.properties"
+    exit 1
+  fi
+  echo "INFO : IMAGE_VERSION=${image_version} (from gradle.properties)"
+  # Build the connector jars, stage them under packages/, and copy the
+  # repository-root LICENSE/NOTICE into licenses/ (done by the dependency script).
+  . "${script_dir}/${component_type}/${component_type}-dependency.sh"
+  build_args="--build-arg IMAGE_VERSION=${image_version}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage
