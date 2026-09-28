@@ -127,6 +127,14 @@ and `s` is between 0 and `p`. Other constrained declarations, such as `numeric(3
 `numeric(2,-3)`, and `numeric(3,5)`, map to External Types preserving their precision and scale.
 A `Numeric(p)` column follows the same rules with scale 0.
 
+The Spark JDBC, Trino PostgreSQL, and Flink connectors map these External Types to strings
+(`StringType`, unbounded `VARCHAR`, and `STRING`, respectively), using the fallback added in
+[PR #13042](https://github.com/apache/gravitino/pull/13042). This keeps schema type conversion
+from failing, but does not expose native decimal semantics in those engines. Consumers needing
+numeric operations must choose an explicit conversion compatible with their data and engine;
+Gravitino does not clamp precision or round scale to fit `Decimal`. Supported `Numeric(p, s)`
+columns continue to map to native decimal types.
+
 PostgreSQL array elements always accept NULL and cannot be declared otherwise, so an `Array` column is always
 mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and
 produces an ordinary array whose elements accept NULL.
