@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +35,17 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Test;
 
 public class TestBuiltInJobTemplateProvider {
+
+  /** Ensures manifest rewriting is discoverable exactly once through the built-in provider. */
+  @Test
+  public void testRewriteManifestsTemplateRegistered() {
+    assertEquals(
+        1L,
+        new BuiltInJobTemplateProvider()
+            .jobTemplates().stream()
+                .filter(template -> template.name().equals("builtin-iceberg-rewrite-manifests"))
+                .count());
+  }
 
   @Test
   public void testJobTemplatesReturnsNonEmptyList() {
