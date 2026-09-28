@@ -60,6 +60,12 @@ public class TestJcasbinAuthorizationCacheKeys {
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "COLUMN", "col1"),
         columnKey);
 
+    MetadataObject model =
+        MetadataObjects.of(Arrays.asList("cat1", "sch1", "model1"), MetadataObject.Type.MODEL);
+    String modelKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", model);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "MODEL", "model1", ""), modelKey);
+
     MetadataObject modelVersion =
         MetadataObjects.of(
             Arrays.asList("cat1", "sch1", "model1", "0"), MetadataObject.Type.MODEL_VERSION);
@@ -78,6 +84,14 @@ public class TestJcasbinAuthorizationCacheKeys {
     Assertions.assertTrue(tableKey.startsWith(schemaKey));
     Assertions.assertTrue(columnKey.startsWith(tableKey));
     Assertions.assertFalse(viewKey.startsWith(tableKey));
+    Assertions.assertTrue(modelVersionKey.startsWith(modelKey));
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+                "ml1",
+                MetadataObjects.of(
+                    Arrays.asList("cat1", "sch1", "model10", "0"),
+                    MetadataObject.Type.MODEL_VERSION))
+            .startsWith(modelKey));
   }
 
   @Test
@@ -90,6 +104,11 @@ public class TestJcasbinAuthorizationCacheKeys {
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.SCHEMA));
     Assertions.assertTrue(
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.TABLE));
+
+    Assertions.assertTrue(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.MODEL_VERSION));
 
     Assertions.assertFalse(
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.VIEW));

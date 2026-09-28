@@ -97,7 +97,8 @@ final class JcasbinAuthorizationCacheKeys {
     return type == MetadataObject.Type.METALAKE
         || type == MetadataObject.Type.CATALOG
         || type == MetadataObject.Type.SCHEMA
-        || type == MetadataObject.Type.TABLE;
+        || type == MetadataObject.Type.TABLE
+        || type == MetadataObject.Type.MODEL;
   }
 
   static String joinKeyParts(String... parts) {
