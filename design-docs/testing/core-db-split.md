@@ -258,6 +258,24 @@ Contributor-facing documentation for the lanes lives in this document (Appendix 
 `docs/how-to-test.md`, which is a repo-wide doc unrelated to this split (it only documents the
 root `./gradlew test` task and does not mention `core` or its lanes) - no edit there was needed.
 
+Found and fixed during review, before merge: `TestCoreDatabaseLaneAnnotations`'s
+`@ParameterizedTest` used the default display name, which embeds each case's expected-tags
+argument (e.g. `[gravitino-core-h2-test]`) into its own JUnit XML - since that test carries no
+`@CoreBackend.*` annotation itself, it runs in `coreUnitTest`, and `manifest`'s unit-lane check
+rejects any standalone backend token there as a foreign marker. Reproduced directly
+(`./gradlew :core:coreUnitTest --tests ...TestCoreDatabaseLaneAnnotations` then `manifest --lane
+unit` failed with "contains an explicit backend marker ['h2']"), fixed by naming on the class
+under test only (`@ParameterizedTest(name = "{index}: {0}")`), re-verified clean, and confirmed
+by scanning all 1968 `coreUnitTest` testcases through the real `normalize_identity` function with
+zero marker errors.
+
+**Optional follow-up, not required to ship:** `STATS_BACKEND_CLASS_RE` (B.2/B.3) is hard-coded to
+one outer class name, so it does not generalize to a second nested-per-backend class without
+editing the regex. Appendix C now tells contributors to prefer `@CoreBackend.All` and flags this
+constraint explicitly rather than silently teaching a pattern that fails `reconcile`; generalizing
+the regex to any outer class name is a real improvement but touches CI-wired parsing logic and
+needs its own fixtures/tests, so it was left out of this pass.
+
 **Remaining, in scope, not yet done:**
 
 - Reply to the open review thread on #13517 and update the PR description to match the final
@@ -620,20 +638,26 @@ Pick the annotation that matches where the class needs to run, from
 `org.apache.gravitino.storage.relational.CoreBackend`:
 
 ```java
-@CoreBackend.H2                          // only against H2
-public class MyPlainDbTest { ... }
-
-@CoreBackend.H2
-@CoreBackend.MySQL                       // against H2 and MySQL, not PostgreSQL
-public class MyPartialTest { ... }
-
-@CoreBackend.All                         // against all three backends
+@CoreBackend.All                         // against all three backends - the default choice
 public abstract class MyMultiBackendTest { ... }
+
+@CoreBackend.H2                          // only against H2 - a genuinely H2-only test
+public class MyH2OnlyTest { ... }
 ```
 
-No annotation at all means the class is a plain unit test and runs only in `coreUnitTest`. See
-A.1's usage-pattern table for the three concrete shapes already in the codebase
-(parameter-provider, `@TestTemplate`, and one `@Nested` class per backend).
+No annotation at all means the class is a plain unit test and runs only in `coreUnitTest`.
+
+**Use `@CoreBackend.All` unless the class is genuinely single-backend.** Stacking a subset (e.g.
+`@CoreBackend.H2 @CoreBackend.MySQL`) compiles and each lane it names runs the class, but CI's
+`reconcile` step then requires a *normalized sibling* in every backend lane it omits (Appendix
+A.1/A.4, `CoreBackend`'s Javadoc) - today the only shape that satisfies that is one `@Nested`
+class per backend under a shared outer class, following
+`TestJdbcPartitionStatisticStorageIT`'s `H2Test`/`MySQLTest`/`PostgreSQLTest` pattern exactly
+(`core_test_identity.py`'s normalization is hard-coded to that one outer class name - see B.3). A
+standalone partial-backend class without that sibling structure passes locally in the lanes it
+runs in and then fails `reconcile` in CI with "Database identity mismatch". If in doubt, use
+`@CoreBackend.All`. See A.1's usage-pattern table for the three concrete shapes already in the
+codebase (parameter-provider, `@TestTemplate`, and one `@Nested` class per backend).
 
 ### Checking where a class lands, before running anything
 
