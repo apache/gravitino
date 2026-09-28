@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -526,6 +527,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   }
 
   private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+    EntityVersion observed = observeRegistration(ident, VIEW);
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {
@@ -575,8 +577,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(viewEntity, true /* overwrite */);
-    } catch (EntityAlreadyExistsException e) {
+      putCreatedEntity(viewEntity, false, observed);
+    } catch (EntityAlreadyExistsException | OptimisticLockException e) {
       LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
       throw new UnsupportedOperationException(
           "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "

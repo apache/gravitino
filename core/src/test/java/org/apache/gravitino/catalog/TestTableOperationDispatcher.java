@@ -35,6 +35,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
@@ -359,10 +360,15 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
    * between its external drop and its store delete. The relational store's overwrite (ON DUPLICATE
    * KEY UPDATE on MySQL and H2) keeps the stored id when the name matches, so an overwrite would
    * hand the new table the observed id and the drop's identity fence would delete it.
+   *
+   * @param imported whether the replacement is created externally and then imported
+   * @throws Exception if the catalog or store operation fails
    */
-  @Test
-  public void testTableRecreatedDuringDropKeepsItsOwnRegistration() throws Exception {
-    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRecreate");
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTableRecreatedDuringDropKeepsItsOwnRegistration(boolean imported)
+      throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRecreate" + imported);
     Map<String, String> props = ImmutableMap.of("k1", "v1");
     schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
@@ -409,8 +415,22 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             invocation -> {
               Object dropped = invocation.callRealMethod();
               // The other node re-creates t before this drop reaches the store.
-              tableOperationDispatcher.createTable(
-                  tableIdent, columns, "recreated", props, new Transform[0]);
+              if (imported) {
+                realOps.createTable(
+                    tableIdent,
+                    columns,
+                    "recreated",
+                    StringIdentifier.newPropertiesWithId(
+                        StringIdentifier.fromId(droppedId + 1), props),
+                    new Transform[0],
+                    null,
+                    null,
+                    null);
+                tableOperationDispatcher.loadTable(tableIdent);
+              } else {
+                tableOperationDispatcher.createTable(
+                    tableIdent, columns, "recreated", props, new Transform[0]);
+              }
               return dropped;
             })
         .when(ops)
@@ -628,6 +648,26 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testDropTableReportsExternalSuccessWhenFencedDeleteRetriesAreExhausted()
+      throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRetryExhausted");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    tableOperationDispatcher.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0]);
+    reset(entityStore);
+    doThrow(new OptimisticLockException("concurrent update"))
+        .when(entityStore)
+        .delete(eq(tableIdent), eq(TABLE), eq(false), any(EntityVersion.class));
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    verify(entityStore, times(3))
+        .delete(eq(tableIdent), eq(TABLE), eq(false), any(EntityVersion.class));
+  }
+
+  @Test
   public void testDropTableDeletesTheObservedRegistration() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropObserved");
     Map<String, String> props = ImmutableMap.of("k1", "v1");
@@ -795,6 +835,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
     // thrown).
     reset(entityStore);
+    doThrow(new NoSuchEntityException("not observed"))
+        .doReturn(EntityVersion.of(mismatchedTableEntity.id(), 0L))
+        .when(entityStore)
+        .getVersion(tableIdent, TABLE);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedTableEntity)
@@ -1012,8 +1056,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doThrow(new OptimisticLockException("mock conflict"))
         .when(entityStore)
         .delete(any(), any(), anyBoolean());
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
   }
 
   @Test
@@ -1065,7 +1109,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testPurgeTablePropagatesOptimisticLockConflict() throws IOException {
+  public void testPurgeTableReportsExternalSuccessAfterOptimisticLockConflicts()
+      throws IOException {
     NameIdentifier tableIdent =
         NameIdentifier.of(metalake, catalog, "schema_purge_occ", "table_purge_occ");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -1086,8 +1131,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .when(entityStore)
         .delete(any(), any(), anyBoolean());
 
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> tableOperationDispatcher.purgeTable(tableIdent));
+    Assertions.assertTrue(tableOperationDispatcher.purgeTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
   }
 
   @Test

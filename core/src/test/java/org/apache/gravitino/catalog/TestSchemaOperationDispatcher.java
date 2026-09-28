@@ -72,6 +72,8 @@ import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
@@ -282,6 +284,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
     // thrown).
     reset(entityStore);
+    doThrow(new NoSuchEntityException("not observed"))
+        .doReturn(EntityVersion.of(mismatchedSchemaEntity.id(), 0L))
+        .when(entityStore)
+        .getVersion(schemaIdent, SCHEMA);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedSchemaEntity)
@@ -443,6 +449,73 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     try {
       Assertions.assertTrue(dispatcher.dropSchema(schemaIdent, true));
       Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+      Assertions.assertTrue(entityStore.exists(child.nameIdentifier(), TABLE));
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  @Test
+  void testStaleSchemaReplacementInsertFailureCanBeRepairedByLoad() throws IOException {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_replace_failure");
+    dispatcher.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"));
+    SchemaEntity stale = entityStore.get(ident, SCHEMA, SchemaEntity.class);
+    SchemaEntity child =
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name() + ":child")
+            .withNamespace(stale.namespace())
+            .withAuditInfo(stale.auditInfo())
+            .build();
+    entityStore.put(child, false);
+    SchemaEntity replacement =
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(stale.name())
+            .withNamespace(stale.namespace())
+            .withProperties(stale.properties())
+            .withAuditInfo(stale.auditInfo())
+            .build();
+    doThrow(new EntityAlreadyExistsException("stale registration"))
+        .doThrow(new IOException("insert failed"))
+        .when(entityStore)
+        .put(replacement, false);
+
+    Assertions.assertThrows(
+        IOException.class,
+        () ->
+            dispatcher.putCreatedEntity(replacement, true, entityStore.getVersion(ident, SCHEMA)));
+    Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(child.nameIdentifier(), SCHEMA));
+    dispatcher.loadSchema(ident);
+    Assertions.assertTrue(entityStore.exists(ident, SCHEMA));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testSuccessfulSchemaDropKeepsSubtreeWhenAbsenceCannotBeConfirmed(boolean probeFails)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_drop_probe" + probeFails);
+    dispatcher.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"));
+    TableEntity child =
+        TestUtil.getTestTableEntity(
+            idGenerator.nextId(), "child", Namespace.of(metalake, catalog, ident.name()));
+    entityStore.put(child, false);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    TestCatalogOperations ops = spy(realOps);
+    if (probeFails) {
+      doThrow(new RuntimeException("existence probe unavailable")).when(ops).schemaExists(ident);
+    } else {
+      doReturn(true).when(ops).schemaExists(ident);
+    }
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      Assertions.assertTrue(dispatcher.dropSchema(ident, true));
+      Assertions.assertFalse(realOps.schemaExists(ident));
+      Assertions.assertTrue(entityStore.exists(ident, SCHEMA));
       Assertions.assertTrue(entityStore.exists(child.nameIdentifier(), TABLE));
     } finally {
       FieldUtils.writeField(testCatalog, "ops", realOps, true);

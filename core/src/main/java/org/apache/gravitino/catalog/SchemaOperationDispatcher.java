@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -586,11 +587,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           if (droppedFromCatalog || cascade) {
             // The cascade removes every child registered under the observed row, including one
             // registered after the observation, which the identity fence on the schema cannot
-            // tell apart. A child can only be created while the schema exists in the catalog, so
-            // if it exists again the name was re-created meanwhile: keep its registrations.
+            // tell apart. A positive existence check may mean re-creation or an asynchronous
+            // drop that is not yet visible. In either case, conservatively keep the subtree.
             if (schemaRecreatedInCatalog(catalogIdent, ident)) {
               LOG.warn(
-                  "Schema {} exists in the catalog again after it was dropped; keeping its"
+                  "Schema {} could not be confirmed absent after its drop; keeping its"
                       + " registration and children instead of deleting them",
                   ident);
             } else {
@@ -635,6 +636,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   }
 
   private void importSchema(NameIdentifier identifier) {
+    EntityVersion observed = observeRegistration(identifier, SCHEMA);
     EntityCombinedSchema schema = internalLoadSchema(identifier);
     if (schema.imported()) {
       return;
@@ -678,7 +680,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
+      putCreatedEntity(schemaEntity, true, observed);
+    } catch (OptimisticLockException e) {
+      // Let the existing concurrent-import path reload the winning registration.
+      throw new EntityAlreadyExistsException(
+          e, "Registration changed while importing %s", identifier);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
@@ -689,7 +695,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
   /**
    * Checks whether a dropped schema exists in the catalog again. A failed check is treated as "not
-   * re-created", so the store delete proceeds as it did before this check existed.
+   * safe to delete", so its registration and children are kept.
    */
   private boolean schemaRecreatedInCatalog(NameIdentifier catalogIdent, NameIdentifier ident) {
     try {
@@ -697,7 +703,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           catalogIdent, c -> c.doWithSchemaOps(s -> s.schemaExists(ident)), RuntimeException.class);
     } catch (RuntimeException e) {
       LOG.warn("Failed to check whether schema {} was re-created after its drop", ident, e);
-      return false;
+      return true;
     }
   }
 

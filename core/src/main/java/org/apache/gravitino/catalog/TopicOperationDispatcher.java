@@ -264,6 +264,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
   }
 
   private void importTopic(NameIdentifier identifier) {
+    EntityVersion observed = observeRegistration(identifier, TOPIC);
 
     EntityCombinedTopic topic = internalLoadTopic(identifier);
 
@@ -308,7 +309,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      store.put(topicEntity, true);
+      putCreatedEntity(topicEntity, false, observed);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);

@@ -320,7 +320,6 @@ public abstract class OperationDispatcher {
    * @param observed the id and version read before the external call, or null when there was no
    *     registration to delete
    * @return true if the observed registration was deleted
-   * @throws OptimisticLockException if the observed entity kept changing on every attempt
    * @throws UnsupportedOperationException if the store cannot delete with a version check
    */
   protected boolean deleteObservedRegistration(
@@ -358,7 +357,13 @@ public abstract class OperationDispatcher {
           return false;
         }
         if (attempt >= MAX_FENCED_DELETE_ATTEMPTS) {
-          throw e;
+          LOG.warn(
+              "Leaving the {} registration of {} after {} concurrent delete conflicts; the external"
+                  + " drop has already succeeded",
+              type.name().toLowerCase(Locale.ROOT),
+              ident,
+              attempt);
+          return false;
         }
         LOG.info(
             "The {} registration of {} was updated concurrently; retrying the delete (attempt {})",
@@ -375,19 +380,21 @@ public abstract class OperationDispatcher {
   }
 
   /**
-   * Stores the registration of an entity that the external catalog has just created.
+   * Stores the registration of an entity that the external catalog has just created or loaded.
    *
-   * <p>A successful external create means a registration observed before the create with another id
-   * is stale: its object was dropped out of band, or by a drop on another server that has not
-   * reached the store yet. A registration first observed after the create may belong to a newer
-   * object, so it must be kept. An upsert by name would keep that row's id and hand its owner,
-   * tags, and grants to the new object, and the pending drop's identity fence would then pass and
-   * delete the new registration. The stale row is replaced instead: deleted fenced on its own id,
-   * then the new registration is inserted.
+   * <p>A newly created or loaded external entity means a registration observed before the external
+   * call with another id is stale: its object was dropped out of band, or by a drop on another
+   * server that has not reached the store yet. A registration first observed after the call may
+   * belong to a newer object, so it must be kept. An upsert by name would keep that row's id and
+   * hand its owner, tags, and grants to the new object, and the pending drop's identity fence would
+   * then pass and delete the new registration. The stale row is replaced instead: deleted fenced on
+   * its own id, then the new registration is inserted. These are separate store calls; if insertion
+   * fails, a later load must import the external object again.
    *
-   * @param entity the registration of the newly created object
+   * @param entity the registration of the newly created or loaded object
    * @param cascade whether a stale registration is deleted with its children
-   * @param observed the registration read before the external create, or null if none existed
+   * @param observed the registration read before the external create or load, or null if none
+   *     existed
    * @param <E> the entity type
    * @throws IOException if a store operation fails
    * @throws OptimisticLockException if the stale registration changed while it was replaced

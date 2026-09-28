@@ -59,6 +59,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -513,6 +514,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
+    EntityVersion observed = observeRegistration(identifier, TABLE);
     EntityCombinedTable table = internalLoadTable(identifier);
 
     if (table.imported()) {
@@ -559,7 +561,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
+      putCreatedEntity(tableEntity, false, observed);
+    } catch (OptimisticLockException e) {
+      // Let the existing concurrent-import path reload the winning registration.
+      throw new EntityAlreadyExistsException(
+          e, "Registration changed while importing %s", identifier);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
