@@ -36,9 +36,12 @@ import org.junit.jupiter.api.Tag;
  *
  * <ul>
  *   <li>{@link H2}, {@link MySQL}, {@link PostgreSQL} pin a class to one lane; stack more than one
- *       to run under several lanes, e.g. {@code @CoreBackend.H2 @CoreBackend.MySQL}.
+ *       to run under several lanes, e.g. {@code @CoreBackend.H2 @CoreBackend.MySQL}. A class tagged
+ *       for some but not all backends must satisfy the CI-legality constraint below.
  *   <li>{@link All} runs a class under all three lanes.
- *   <li>A class with none of these is a unit test and runs in {@code coreUnitTest}.
+ *   <li>A class with none of these is a unit test and runs in {@code coreUnitTest} - unless it also
+ *       carries {@code @Tag("gravitino-docker-test")}, in which case it runs in no lane at all.
+ *       Check with {@code ./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName>}.
  * </ul>
  *
  * <p>Each is a plain JUnit composed annotation: meta-annotated with {@link Tag} and nothing else,
@@ -49,12 +52,13 @@ import org.junit.jupiter.api.Tag;
  * involved. {@link #H2_TAG}, {@link #MYSQL_TAG}, and {@link #POSTGRESQL_TAG} must stay in sync with
  * {@code coreBackendTestTags} in {@code core/build.gradle.kts}.
  *
- * <p>Because {@code core/build.gradle.kts}'s {@code reconcile} step (via {@code
- * dev/ci/core_test_identity.py}) requires the h2/mysql/postgresql lanes to run the exact same set
- * of normalized test identities, a single- or multi- (but not all-) backend class is only CI-legal
- * as a normalized sibling of matching classes in the other backend(s) it omits - see {@code
- * TestJdbcPartitionStatisticStorageIT}'s {@code H2Test}/{@code MySQLTest}/{@code PostgreSQLTest}
- * nested classes for the pattern this currently requires.
+ * <p>Because {@code dev/ci/core_test_identity.py}'s {@code reconcile} step (invoked from {@code
+ * .github/workflows/build.yml}, not from {@code core/build.gradle.kts}) requires the
+ * h2/mysql/postgresql lanes to run the exact same set of normalized test identities, a single- or
+ * multi- (but not all-) backend class is only CI-legal as a normalized sibling of matching classes
+ * in the other backend(s) it omits - see {@code TestJdbcPartitionStatisticStorageIT}'s {@code
+ * H2Test}/{@code MySQLTest}/{@code PostgreSQLTest} nested classes for the pattern this currently
+ * requires.
  */
 public final class CoreBackend {
 

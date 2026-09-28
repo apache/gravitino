@@ -57,7 +57,13 @@ class TestCoreDatabaseLaneAnnotations {
         });
   }
 
-  @ParameterizedTest
+  // Default JUnit display names include argument toStrings - for expectedTags that would print a
+  // tag string like "[gravitino-core-h2-test]" into this class's own JUnit XML, which is itself
+  // part of the coreUnitTest lane, and core_test_identity.py's manifest step rejects any standalone
+  // backend token there as a foreign-lane marker. Naming on {0} (the class under test) only avoids
+  // that: its simple name (e.g. H2Annotated) has no such token, since "h2"/"mysql"/"postgresql" is
+  // never followed by a non-letter there.
+  @ParameterizedTest(name = "{index}: {0}")
   @MethodSource("annotationsAndExpectedTags")
   void testExpandsToExpectedTags(Class<?> annotatedClass, List<String> expectedTags) {
     assertEquals(expectedTags, tagsOf(annotatedClass));
