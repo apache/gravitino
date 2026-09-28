@@ -30,9 +30,8 @@ reader applies a required row filter and required column projections before retu
 provides a standard enforcement boundary for portable restrictions.
 
 This design adds tag-based row-filter and column-mask policies and resolves them into Iceberg REST
-`read-restrictions`. The implementation is compiled into the normal Iceberg REST distribution. It
-is disabled by default and requires an explicit client capability declaration while reader support
-is maturing.
+`read-restrictions`. It is disabled by default and requires an explicit client capability
+declaration while reader support is maturing.
 
 ## Goals
 
@@ -42,8 +41,8 @@ is maturing.
 4. Bind authored expressions to the authenticated subject and an Iceberg table schema.
 5. Return only closed, typed Iceberg expressions and standard Iceberg mask actions.
 6. Fail closed when an applicable restriction cannot be resolved or enforced.
-7. Provide an end-to-end path in the normal Iceberg REST build that can later move to official
-   Iceberg runtime types without changing policy content.
+7. Provide an end-to-end path that can later move to official Iceberg runtime types without
+   changing policy content.
 8. Reserve a fail-closed extension model for UDF references.
 
 ## Non-Goals
@@ -437,8 +436,7 @@ the Iceberg load-table response. The response contains at most one required row 
 one required projection per field ID.
 
 The implementation may use Gravitino-owned DTOs and serializers, but its JSON must match the merged
-Iceberg REST schema exactly. Compatibility types live under normal Gravitino Iceberg packages in
-the existing module and must not add classes under `org.apache.iceberg`.
+Iceberg REST schema exactly and must not add classes under `org.apache.iceberg`.
 
 Response reconstruction for credentials, snapshot filtering, federation, and other load-table
 features must preserve read restrictions.
@@ -460,10 +458,7 @@ subject.
 
 ## Delivery
 
-The implementation is compiled into the existing `iceberg:iceberg-rest-server` module and normal
-Gravitino distribution. It does not introduce a separate module, artifact, Java package, or
-configuration name with an `experimental` prefix. Gravitino-owned compatibility types remain
-internal implementation details rather than a stable public API.
+The implementation ships through the normal Gravitino Iceberg REST build and distribution.
 
 An operator enables the feature with normal server configuration, and a client declares the
 `read-restrictions` capability. Both are required while reader support is maturing. The client
@@ -475,11 +470,9 @@ When an active restriction applies:
 - a missing, unsupported, or malformed restriction is rejected;
 - the server never assumes that an unknown client enforces an unknown response field.
 
-The compatible reader build pins the Iceberg implementation revision used for compatibility tests
-and uses normal artifact and package names. It is not published as an alternative Iceberg project.
-When official Iceberg runtime support is available, Gravitino replaces its compatibility DTOs and
-reader integration with official types and runs the same conformance fixtures against both
-implementations.
+Compatibility tests pin the Iceberg implementation revision. When official Iceberg runtime support
+is available, Gravitino replaces its compatibility DTOs and reader integration with official types
+and runs the same conformance fixtures against both implementations.
 
 ## Persistence and Administration
 
@@ -549,13 +542,11 @@ Coverage includes:
 
 1. Add the restricted Rego parser, conditional lowering, and typed row-filter and column-mask
    content; reject unsupported function content explicitly.
-2. Add a Gravitino-owned Iceberg read-restriction model and exact wire serializer to the existing
-   Iceberg REST server module.
+2. Add a Gravitino-owned Iceberg read-restriction model and exact wire serializer.
 3. Implement policy-on-tag selection, subject binding, schema binding, canonicalization, and conflict
    detection.
 4. Integrate restriction resolution with load-table responses and restriction-aware ETags.
-5. Build the pinned compatible reader through the normal packaging flow and add end-to-end
-   conformance tests.
+5. Build the pinned compatible reader and add end-to-end conformance tests.
 6. Replace compatibility protocol and reader classes with official Iceberg types when available.
 
 ## References
