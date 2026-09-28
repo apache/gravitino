@@ -23,29 +23,29 @@ import io.trino.spi.connector.ConnectorPageSource;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorSplit;
+import io.trino.spi.connector.ConnectorTableCredentials;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
 import java.util.List;
+import java.util.Optional;
 
-/** This class provides a ConnectorPageSource for Trino read data from internal connector. */
-// This shared shape serves Trino 440-481, where the split-based createPageSource below is the SPI
-// entry point (deprecated for removal since Trino 481). Trino 480 added a credential-aware variant
-// that GravitinoConnector480/481 wire through GravitinoDataSourceProvider480/481; Trino 482
-// removed the split-based variant entirely, so the 482-483 segment replaces this class at compile
-// time with a same-named local copy (the shared file is excluded from its source set).
-@SuppressWarnings("removal")
-public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
-
-  ConnectorPageSourceProvider internalPageSourceProvider;
+/**
+ * Trino 480 introduced a {@code createPageSource} variant that takes an {@code
+ * Optional<ConnectorTableCredentials>}; from Trino 481 the older variant without credentials is
+ * deprecated and its default implementation throws, so the connector must delegate through the
+ * credential-aware variant. {@code ConnectorTableCredentials} does not exist before Trino 480, so
+ * this version-specific subclass lives in the version-segment module rather than the shared source.
+ */
+public class GravitinoDataSourceProvider480 extends GravitinoDataSourceProvider {
 
   /**
-   * Constructs a new GravitinoDataSourceProvider with the specified page source provider.
+   * Constructs a new GravitinoDataSourceProvider480 with the specified page source provider.
    *
    * @param pageSourceProvider the internal connector page source provider
    */
-  public GravitinoDataSourceProvider(ConnectorPageSourceProvider pageSourceProvider) {
-    this.internalPageSourceProvider = pageSourceProvider;
+  public GravitinoDataSourceProvider480(ConnectorPageSourceProvider pageSourceProvider) {
+    super(pageSourceProvider);
   }
 
   @Override
@@ -54,6 +54,7 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
       ConnectorSession session,
       ConnectorSplit split,
       ConnectorTableHandle table,
+      Optional<ConnectorTableCredentials> tableCredentials,
       List<ColumnHandle> columns,
       DynamicFilter dynamicFilter) {
     return internalPageSourceProvider.createPageSource(
@@ -61,6 +62,7 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
         session,
         GravitinoHandle.unWrap(split),
         GravitinoHandle.unWrap(table),
+        tableCredentials,
         GravitinoHandle.unWrap(columns),
         new GravitinoDynamicFilter(dynamicFilter));
   }
