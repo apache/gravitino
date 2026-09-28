@@ -24,7 +24,7 @@
 #
 # The set of Flink runtime modules is DISCOVERED from the Gradle project, so
 # this script does not hard-code which versions exist. Whatever the checked-out
-# branch supports (for example 1.18/1.19/1.20) is built automatically.
+# branch supports (for example 1.19/1.20/2.1) is built automatically.
 #
 # Output layout:
 #   packages/connectors/flink-<ver>/gravitino-flink-connector-runtime-<ver>_2.12-*.jar

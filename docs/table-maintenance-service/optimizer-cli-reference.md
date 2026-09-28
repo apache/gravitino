@@ -237,7 +237,7 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Six Iceberg job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
+The following Iceberg job templates ship with the service. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
 | Job template                          | What it does                             |
 |---------------------------------------|-------------------------------------------|

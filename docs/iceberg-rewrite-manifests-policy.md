@@ -8,8 +8,9 @@ license: "This software is licensed under the Apache License version 2."
 ## Behavior
 
 `system_iceberg_rewrite_manifests` evaluates manifest statistics for one resolved partition
-spec and submits `builtin-iceberg-rewrite-manifests`. It supports catalog, schema, and table
-attachments through the existing [policy API](./manage-policies-in-gravitino.md).
+spec and submits `builtin-iceberg-rewrite-manifests`. Associate the policy with a tag and
+assign that tag to a catalog, schema, or table through the existing
+[policy API](./manage-policies-in-gravitino.md). Tables inherit tags from their ancestors.
 The strategy type is `iceberg-rewrite-manifests`; its handler and job adapter are built in.
 
 | Content field | Default | Meaning |
@@ -50,8 +51,8 @@ curl -X POST -H 'Content-Type: application/json' \
   http://localhost:8090/api/metalakes/test/policies
 ```
 
-Attach `rewrite_manifests` to the table using the policy API, configure the optimizer's
-Gravitino providers and Spark submission settings as described in
+Associate `rewrite_manifests` with a tag using the `ALL_VALUES` selector, then assign that tag
+to the table. Configure the optimizer's Gravitino providers and Spark submission settings as described in
 [Optimizer configuration](./table-maintenance-service/optimizer-configuration.md), then preview:
 
 ```shell
