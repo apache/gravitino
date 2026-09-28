@@ -66,6 +66,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.exceptions.InUseException;
@@ -893,7 +894,7 @@ public class TestJobManager {
     Assertions.assertEquals(Lists.newArrayList("Hello!"), runtimeJobTemplateDTO.arguments());
     Assertions.assertEquals(jobTemplateEntity.name(), runtimeJobTemplateDTO.name());
     Assertions.assertEquals(jobTemplateEntity.comment(), runtimeJobTemplateDTO.comment());
-    // JobTemplateResolver#resolve() also resolves the executable by fetching it into the job's
+    // JobManager also resolves the executable by fetching it into the job's
     // staging directory, so it ends up as a local staging-dir path rather than the original
     // "/bin/echo" - just confirm it was actually resolved to something under that directory.
     Assertions.assertTrue(
@@ -1726,8 +1727,10 @@ public class TestJobManager {
 
     try {
       JobTemplate jobTemplate =
-          new JobTemplateResolver(newShellJobTemplateEntity("shell_job", "echo"))
-              .resolve(Collections.emptyMap(), jobStagingDir);
+          JobResourceUtils.localizeJobTemplate(
+              new JobTemplateResolver(newShellJobTemplateEntity("shell_job", "echo"))
+                  .resolve(Collections.emptyMap()),
+              jobStagingDir);
       String executionId = ownerExecutor.submitJob(jobTemplate);
       Awaitility.await()
           .atMost(1, TimeUnit.MINUTES)

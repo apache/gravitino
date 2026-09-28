@@ -56,6 +56,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
@@ -517,10 +518,11 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and
-    // also downloading any necessary files from the URIs specified in the job template.
+    // fetch the files it refers to into the job's staging directory.
     JobTemplate jobTemplate;
     try {
-      jobTemplate = jobTemplateResolver.resolve(jobConf, jobStagingDir);
+      jobTemplate =
+          JobResourceUtils.localizeJobTemplate(jobTemplateResolver.resolve(jobConf), jobStagingDir);
     } catch (RuntimeException e) {
       deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw e;
