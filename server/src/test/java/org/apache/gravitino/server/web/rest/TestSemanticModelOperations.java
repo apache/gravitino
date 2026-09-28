@@ -18,15 +18,20 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -86,6 +91,7 @@ import org.mockito.ArgumentCaptor;
 public class TestSemanticModelOperations extends BaseOperationsTest {
 
   private static final String VND_V1_JSON = "application/vnd.gravitino.v1+json";
+  private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -530,6 +536,160 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         "sales changed in this transaction");
   }
 
+  @Test
+  void testImportOssieYamlAndJsonDocuments() {
+    NameIdentifier salesIdent = semanticModelIdentifier("sales");
+    NameIdentifier inventoryIdent = semanticModelIdentifier("inventory");
+    when(dispatcher.createSemanticModel(
+            eq(salesIdent),
+            eq("Sales definitions"),
+            any(SemanticModelDefinition.class),
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION))))
+        .thenReturn(semanticModel("sales", "Sales definitions"));
+    when(dispatcher.createSemanticModel(
+            eq(inventoryIdent),
+            eq(null),
+            any(SemanticModelDefinition.class),
+            eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version"))))
+        .thenReturn(semanticModel("inventory", null));
+
+    String yaml =
+        """
+        version: 0.2.0.dev0
+        name: sales
+        description: Sales definitions
+        datasets:
+          - name: orders
+            source: semantic_model_catalog.semantic_model_schema.orders
+            primary_key: [order_id]
+            fields:
+              - name: order_id
+                expression:
+                  dialects:
+                    - dialect: ANSI_SQL
+                      expression: orders.order_id
+                datatype: String
+        custom_extensions:
+          - vendor_name: GRAVITINO
+            data: '{"_apache_gravitino_interchange":{"version":1,"properties":{"domain":"sales"}}}'
+        """;
+    Response yamlResponse = postDocument(semanticModelPath() + "/ossie", yaml, "application/yaml");
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), yamlResponse.getStatus());
+    SemanticModelResponse yamlBody = yamlResponse.readEntity(SemanticModelResponse.class);
+    yamlBody.validate();
+    Assertions.assertEquals("sales", yamlBody.getSemanticModel().name());
+
+    String json =
+        """
+        {
+          "version": "future-version",
+          "name": "inventory",
+          "datasets": [
+            {
+              "name": "orders",
+              "source": "semantic_model_catalog.semantic_model_schema.orders",
+              "fields": []
+            }
+          ]
+        }
+        """;
+    Response jsonResponse =
+        postDocument(semanticModelPath() + "/ossie", json, MediaType.APPLICATION_JSON);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), jsonResponse.getStatus());
+    SemanticModelResponse jsonBody = jsonResponse.readEntity(SemanticModelResponse.class);
+    jsonBody.validate();
+    Assertions.assertEquals("inventory", jsonBody.getSemanticModel().name());
+
+    ArgumentCaptor<SemanticModelDefinition> definitionCaptor =
+        ArgumentCaptor.forClass(SemanticModelDefinition.class);
+    verify(dispatcher)
+        .createSemanticModel(
+            eq(salesIdent),
+            eq("Sales definitions"),
+            definitionCaptor.capture(),
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION)));
+    Assertions.assertEquals(
+        NameIdentifier.of(catalog, schema, "orders"),
+        definitionCaptor.getValue().datasets()[0].source());
+    Assertions.assertEquals(
+        Dialects.ANSI_SQL,
+        definitionCaptor.getValue().datasets()[0].fields()[0].expression().dialects()[0].dialect());
+    verify(dispatcher)
+        .createSemanticModel(
+            eq(inventoryIdent),
+            eq(null),
+            any(SemanticModelDefinition.class),
+            eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version")));
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testExportOssieYamlAndJsonDocuments() throws Exception {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    when(dispatcher.loadSemanticModel(ident))
+        .thenReturn(semanticModel("sales", "Sales definitions"));
+
+    Response yamlResponse = getOssie(semanticModelPath() + "/sales/ossie");
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), yamlResponse.getStatus());
+    Assertions.assertEquals("application/yaml", yamlResponse.getMediaType().toString());
+    Assertions.assertEquals(
+        "attachment; filename=\"sales.ossie.yaml\"",
+        yamlResponse.getHeaderString("Content-Disposition"));
+    String yaml = yamlResponse.readEntity(String.class);
+    Assertions.assertTrue(yaml.contains("version:"));
+    Assertions.assertTrue(yaml.contains("name:"));
+    Assertions.assertFalse(yaml.contains("semantic_model:"));
+    Assertions.assertFalse(yaml.contains("definition:"));
+
+    Response jsonResponse =
+        target(semanticModelPath() + "/sales/ossie").queryParam("format", "json").request().get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), jsonResponse.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON, jsonResponse.getMediaType().toString());
+    Assertions.assertEquals(
+        "attachment; filename=\"sales.ossie.json\"",
+        jsonResponse.getHeaderString("Content-Disposition"));
+    JsonNode json = JSON_MAPPER.readTree(jsonResponse.readEntity(String.class));
+    Assertions.assertEquals("0.2.0.dev0", json.path("version").textValue());
+    Assertions.assertEquals("sales", json.path("name").textValue());
+    Assertions.assertEquals(
+        "semantic_model_catalog.semantic_model_schema.orders",
+        json.at("/datasets/0/source").textValue());
+    Assertions.assertFalse(json.has("semantic_model"));
+    Assertions.assertFalse(json.has("definition"));
+    verify(dispatcher, times(2)).loadSemanticModel(ident);
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testOssieConversionErrorsDoNotCallDispatcher() {
+    String querySource =
+        """
+        version: 0.2.0.dev0
+        name: sales
+        datasets:
+          - name: orders
+            source: SELECT * FROM orders
+        """;
+    assertError(
+        postDocument(semanticModelPath() + "/ossie", querySource, "application/x-yaml"),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalSemanticModelException.class.getSimpleName(),
+        "query sources are not supported");
+
+    assertError(
+        target(semanticModelPath() + "/sales/ossie").queryParam("format", "csv").request().get(),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "expected yaml or json");
+    verifyNoMoreInteractions(dispatcher);
+  }
+
   private SemanticModelCreateRequest createRequest(
       String name, String comment, SemanticModelDefinition definition) {
     return new SemanticModelCreateRequest(
@@ -643,6 +803,17 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   private Response delete(String path) {
     return target(path).request(MediaType.APPLICATION_JSON_TYPE).accept(VND_V1_JSON).delete();
+  }
+
+  private Response postDocument(String path, String document, String mediaType) {
+    return target(path)
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept(VND_V1_JSON)
+        .post(Entity.entity(document, mediaType));
+  }
+
+  private Response getOssie(String path) {
+    return target(path).request().get();
   }
 
   private static ErrorResponse assertError(

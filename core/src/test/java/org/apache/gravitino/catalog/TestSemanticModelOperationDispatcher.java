@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -109,7 +111,52 @@ public class TestSemanticModelOperationDispatcher {
 
     assertEquals("sales_model", created.name());
     assertEquals(2, created.definition().datasets().length);
+    assertEquals(DEFAULT_OSSIE_VERSION, created.properties().get(PROPERTY_OSSIE_VERSION));
     assertSame(created, dispatcher.loadSemanticModel(MODEL_IDENT));
+  }
+
+  @Test
+  public void testCreatePreservesExplicitOssieVersion() {
+    SemanticModel created =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT,
+            "Sales",
+            validDefinition(),
+            Map.of(PROPERTY_OSSIE_VERSION, "future-version"));
+
+    assertEquals("future-version", created.properties().get(PROPERTY_OSSIE_VERSION));
+  }
+
+  @Test
+  public void testCreateRejectsBlankOssieVersionBeforeCatalogLookup() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createSemanticModel(
+                MODEL_IDENT, null, validDefinition(), Map.of(PROPERTY_OSSIE_VERSION, " ")));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testAlterRejectsBlankOssieVersionBeforeCatalogLookup() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                MODEL_IDENT, SemanticModelChange.setProperty(PROPERTY_OSSIE_VERSION, " ")));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testAlterCanRemoveOssieVersion() {
+    dispatcher.createSemanticModel(
+        MODEL_IDENT, "Sales", validDefinition(), Map.of(PROPERTY_OSSIE_VERSION, "future-version"));
+
+    SemanticModel altered =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT, SemanticModelChange.removeProperty(PROPERTY_OSSIE_VERSION));
+
+    assertFalse(altered.properties().containsKey(PROPERTY_OSSIE_VERSION));
   }
 
   @Test
@@ -146,7 +193,9 @@ public class TestSemanticModelOperationDispatcher {
             SemanticModelChange.rename("renamed_sales_model"),
             SemanticModelChange.updateComment("Updated"));
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, renamed.name());
-    assertEquals(Map.of("owner", "analytics"), propertyUpdated.properties());
+    assertEquals(
+        Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION),
+        propertyUpdated.properties());
     assertEquals("Updated", renamed.comment());
 
     SemanticModel replaced =
