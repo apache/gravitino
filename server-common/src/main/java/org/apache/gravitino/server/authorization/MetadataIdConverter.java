@@ -103,6 +103,10 @@ public class MetadataIdConverter {
     }
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
+    if (scope == Capability.Scope.SEMANTIC_MODEL) {
+      return NameIdentifier.of(
+          CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
+    }
     return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
   }
 

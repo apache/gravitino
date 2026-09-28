@@ -144,6 +144,10 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.internalFunctionDispatcher());
       assertNotNull(env.internalViewDispatcher());
       assertDispatcherChain(
+          env.internalSemanticModelDispatcher(),
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelOperationDispatcher.class);
+      assertDispatcherChain(
           env.semanticModelDispatcher(),
           SemanticModelNormalizeDispatcher.class,
           SemanticModelOperationDispatcher.class);
@@ -269,6 +273,10 @@ class TestGravitinoEnvMetadataComponents {
           FunctionNormalizeDispatcher.class,
           FunctionHookDispatcher.class,
           FunctionOperationDispatcher.class);
+      assertDispatcherChain(
+          env.internalSemanticModelDispatcher(),
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelOperationDispatcher.class);
       assertDispatcherChain(
           env.semanticModelDispatcher(),
           SemanticModelNormalizeDispatcher.class,

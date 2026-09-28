@@ -305,7 +305,7 @@ public class MetadataObjectUtil {
       case SEMANTIC_MODEL:
         NameIdentifierUtil.checkSemanticModel(identifier);
         check(
-            env.semanticModelDispatcher().semanticModelExists(identifier),
+            env.internalSemanticModelDispatcher().semanticModelExists(identifier),
             exceptionToThrowSupplier);
         break;
 

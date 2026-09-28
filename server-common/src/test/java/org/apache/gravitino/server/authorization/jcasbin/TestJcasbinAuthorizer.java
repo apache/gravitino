@@ -83,12 +83,16 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
@@ -2197,6 +2201,59 @@ public class TestJcasbinAuthorizer {
 
     // Verify it's removed from the cache
     assertFalse(loadedRoles.getIfPresent(testRoleId).isPresent());
+  }
+
+  @Test
+  public void testSemanticModelRenameDropAndNameReuseInvalidateLocalCache() throws Exception {
+    GravitinoCache<String, Long> cache = getMetadataIdCache(jcasbinAuthorizer);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(cache, getOwnerRelCache(jcasbinAuthorizer));
+    NameIdentifier oldIdent = NameIdentifier.of(METALAKE, "catalog", "schema", "SalesModel");
+    NameIdentifier newIdent = NameIdentifier.of(oldIdent.namespace(), "RenamedModel");
+    MetadataObject oldObject =
+        NameIdentifierUtil.toMetadataObject(oldIdent, Entity.EntityType.SEMANTIC_MODEL);
+    MetadataObject newObject =
+        NameIdentifierUtil.toMetadataObject(newIdent, Entity.EntityType.SEMANTIC_MODEL);
+    cache.put(JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, oldObject), 100L);
+    cache.put(JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, newObject), 200L);
+    SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+    SemanticModel renamed = mock(SemanticModel.class);
+    when(renamed.name()).thenReturn(newIdent.name());
+    SemanticModelChange rename = SemanticModelChange.rename(newIdent.name());
+    when(dispatcher.alterSemanticModel(oldIdent, rename)).thenReturn(renamed);
+    when(dispatcher.dropSemanticModel(newIdent)).thenReturn(true);
+    when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);
+    SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher, () -> null);
+    try {
+      hook.alterSemanticModel(oldIdent, rename);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .thenReturn(Optional.empty());
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .thenReturn(Optional.of(100L));
+      assertEquals(
+          Optional.empty(),
+          lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+      hook.dropSemanticModel(newIdent);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .thenReturn(Optional.of(300L));
+      assertEquals(
+          Optional.of(300L),
+          lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .thenReturn(Optional.of(400L));
+      assertEquals(
+          Optional.of(400L),
+          lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+    } finally {
+      when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(null);
+    }
   }
 
   @Test

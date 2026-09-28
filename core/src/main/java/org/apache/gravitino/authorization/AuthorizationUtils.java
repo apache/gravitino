@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -227,6 +228,12 @@ public class AuthorizationUtils {
     Set<String> catalogsAlreadySet = Sets.newHashSet();
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
+      List<Privilege> privileges = connectorPrivileges(securableObject);
+      if (privileges.isEmpty()) {
+        continue;
+      }
+      securableObject =
+          SecurableObjects.parse(securableObject.fullName(), securableObject.type(), privileges);
       if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
         NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
         for (NameIdentifier catalog : catalogs) {
@@ -258,7 +265,8 @@ public class AuthorizationUtils {
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
-        if (privilege.canBindTo(MetadataObject.Type.CATALOG)) {
+        if (!SEMANTIC_MODEL_PRIVILEGES.contains(privilege.name())
+            && privilege.canBindTo(MetadataObject.Type.CATALOG)) {
           return true;
         }
       }
@@ -464,6 +472,12 @@ public class AuthorizationUtils {
     List<SecurableObject> securableObjects = role.securableObjects();
     List<SecurableObject> filteredSecurableObjects = Lists.newArrayList();
     for (SecurableObject securableObject : securableObjects) {
+      List<Privilege> privileges = connectorPrivileges(securableObject);
+      if (privileges.isEmpty()) {
+        continue;
+      }
+      securableObject =
+          SecurableObjects.parse(securableObject.fullName(), securableObject.type(), privileges);
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalakeName, securableObject);
       if (securableObject.type() == MetadataObject.Type.METALAKE) {
         filteredSecurableObjects.add(securableObject);
@@ -484,6 +498,15 @@ public class AuthorizationUtils {
         .withSecurableObjects(filteredSecurableObjects)
         .withProperties(role.properties())
         .build();
+  }
+
+  private static List<Privilege> connectorPrivileges(SecurableObject object) {
+    if (object.type() != MetadataObject.Type.METALAKE && SKIP_APPLY_TYPES.contains(object.type())) {
+      return List.of();
+    }
+    return object.privileges().stream()
+        .filter(privilege -> !SEMANTIC_MODEL_PRIVILEGES.contains(privilege.name()))
+        .collect(Collectors.toList());
   }
 
   private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {

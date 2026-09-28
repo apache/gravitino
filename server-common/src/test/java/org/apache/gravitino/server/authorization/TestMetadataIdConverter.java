@@ -41,7 +41,9 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
@@ -57,11 +59,13 @@ import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMetadataIdConverter {
@@ -92,6 +96,45 @@ public class TestMetadataIdConverter {
     initTestNameIdentifier();
     initTestEntities();
     initMockCache();
+  }
+
+  @Test
+  void testSemanticModelLookupPreservesLeafCase() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return CapabilityResult.unsupported("lowercase");
+          }
+        };
+    when(catalog.capability()).thenReturn(capability);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    SemanticModelEntity model = mock(SemanticModelEntity.class);
+    when(model.id()).thenReturn(91L);
+    NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "schema", "SalesModel");
+    when(store.get(normalized, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class))
+        .thenReturn(model);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(91L),
+          MetadataIdConverter.getID(
+              MetadataObjects.parse(
+                  "catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL),
+              "metalake"));
+    }
   }
 
   @Test

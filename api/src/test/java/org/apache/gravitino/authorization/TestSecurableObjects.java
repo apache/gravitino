@@ -431,6 +431,7 @@ public class TestSecurableObjects {
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.VIEW));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.MODEL));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.FUNCTION));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.COLUMN));
 

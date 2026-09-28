@@ -162,6 +162,7 @@ public class GravitinoEnv {
   private FunctionDispatcher internalFunctionDispatcher;
 
   private SemanticModelDispatcher semanticModelDispatcher;
+  private SemanticModelDispatcher internalSemanticModelDispatcher;
 
   private ViewDispatcher viewDispatcher;
   private ViewDispatcher internalViewDispatcher;
@@ -416,6 +417,15 @@ public class GravitinoEnv {
    */
   public SemanticModelDispatcher semanticModelDispatcher() {
     return semanticModelDispatcher;
+  }
+
+  /**
+   * Returns the Semantic Model dispatcher for infrastructure operations without hooks or events.
+   *
+   * @return the internal Semantic Model dispatcher
+   */
+  public SemanticModelDispatcher internalSemanticModelDispatcher() {
+    return internalSemanticModelDispatcher;
   }
 
   /**
@@ -1008,8 +1018,9 @@ public class GravitinoEnv {
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
-    this.semanticModelDispatcher =
+    this.internalSemanticModelDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
+    this.semanticModelDispatcher = internalSemanticModelDispatcher;
   }
 
   private void initInternalAuthorizationComponents() {
