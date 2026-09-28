@@ -155,11 +155,15 @@ public final class SparkBindings {
     /**
      * Builds the bindings, failing if this build left one out.
      *
+     * <p>Before validating, merges in any {@link SparkCatalogExtension} discovered on the classpath
+     * for a kind this build did not already bind at compile time.
+     *
      * @return the bindings
      */
     public SparkBindings build() {
       Preconditions.checkState(
           authorizationExtension != null, "No authorization session extension was bound");
+      SparkCatalogExtensionLoader.registerDiscoveredCatalogs(this);
       Set<SparkCatalogKind> missing = EnumSet.copyOf(REQUIRED_KINDS);
       missing.removeAll(catalogClassNames.keySet());
       Preconditions.checkState(missing.isEmpty(), "No catalog was bound for %s", missing);

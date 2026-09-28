@@ -14,6 +14,9 @@ Gravitino 0.7.0 schema. Before attempting this project we
 strongly recommend that you read through all of the steps in this
 document and familiarize yourself with the required tools.
 
+For version-specific behavior and API changes, see the
+[Migration Guide](./migration-guide.md) before upgrading.
+
 ## Upgrade Steps
 
 ### Step 1: Shut Down the Gravitino Instance
@@ -171,7 +174,7 @@ you will want to compare your schema dump against the contents of
 
 :::note
 The Gravitino Helm chart does not currently support automatic schema migration. Before running
-`helm upgrade`, you must manually back up your database (see [Step 2](#step-2-backup-your-gravitino-instance))
+`helm upgrade`, you must manually back up your database (see [Step 2](#step-2-back-up-the-gravitino-instance))
 and apply the appropriate SQL upgrade scripts (see [Step 5](#step-5-apply-the-upgrade-scripts)).
 :::
 

@@ -112,6 +112,29 @@ your Spark, Scala, and Iceberg versions. Details are under
 
 `warehouse_location` may be empty for local filesystem testing. Set it to the warehouse URI for HDFS or cloud object storage.
 
+### Rewrite Manifests Job
+
+Submit `builtin-iceberg-rewrite-manifests` directly through
+`POST /api/metalakes/{metalake}/jobs/runs`. Its `jobConf` uses these job-specific keys:
+
+| Key                | Meaning                                               | Default                                       |
+| ------------------ | ----------------------------------------------------- | --------------------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                   | Required                                      |
+| `table_identifier` | Table identifier, for example `db.t1`                 | Required                                      |
+| `spec_id`          | Existing partition spec whose manifests to rewrite    | Current table spec                            |
+| `use_caching`      | `true` or `false` to control caching during rewriting | Installed Iceberg default (`false` in 1.11.0) |
+| `spark_conf`       | JSON string containing additional Spark settings      | None                                          |
+
+Include the Spark and catalog template settings shown in the
+[submission example](./optimizer-cli-reference.md#submitting-the-job), and make the matching
+Iceberg Spark runtime available as described above. For this job, omitted, blank, or
+unresolved optional argument placeholders are treated as absent. Required catalog/table
+arguments cannot be blank or unresolved. `spec_id` must be a non-negative integer identifying
+an existing spec; it does not repartition data or migrate manifests between specs.
+
+This job currently supports direct submission. Policy -> Strategy -> Adapter integration
+for automatic manifest maintenance will follow separately.
+
 ## Running Against a Local Filesystem
 
 On a machine with no HDFS, Spark still defaults to `hdfs://localhost:9000` and fails. Set the default filesystem explicitly, in `spark_conf` for job submissions and in the CLI `spark_conf` value:
@@ -125,7 +148,7 @@ spark.hadoop.fs.defaultFS=file:///
 Four things are worth confirming before assuming a configuration problem is a code problem.
 
 - `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files` appear in the job template list.
-- The policy is attached to the target table, not merely created.
+- The policy is associated with a tag assigned to the target table or one of its ancestors.
 - `submit-strategy-jobs` prints `SUBMIT` lines rather than nothing.
 - The rewrite log shows `Rewritten data files: N` with `N` greater than zero for a non-empty table.
 
@@ -135,3 +158,30 @@ Four things are worth confirming before assuming a configuration problem is a co
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
+
+## Orphan File Cleanup Job Configuration
+
+Submit `builtin-iceberg-remove-orphan-files` with the same Spark and catalog
+settings described above. Its job-specific `jobConf` keys are:
+
+| Key                | Meaning                                                                               | Default                          |
+| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
+| `older_than`       | Timestamp in the Spark session time zone; must be at least 24 hours old               | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
+
+For direct template submission, supply `older_than: ""` and `location: ""` to
+use the defaults, `dry_run: "false"` (or `"true"` to preview), and
+`spark_conf: "{}"` when no overrides are needed.
+
+Keep the three-day default unless your workload needs a longer retention window.
+The 24-hour minimum also applies to dry runs; passing the current timestamp is
+not supported. For a secured Iceberg REST catalog, supply its authentication
+settings explicitly in `spark_conf`, as described above.
+
+See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for a
+complete submission example. Orphan cleanup has no built-in scheduling policy
+in this release.

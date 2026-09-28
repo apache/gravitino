@@ -231,11 +231,18 @@ public class SegmentedLock {
    * across their whole critical section, and the write lock acquired here waits for all of them.
    *
    * <p>Must not be called from inside a {@code withLock} action on the same instance: the read lock
-   * cannot upgrade to the write lock, so such a call would deadlock.
+   * cannot upgrade to the write lock. Such a call fails immediately instead of deadlocking.
    *
    * @param action The clearing action to execute
+   * @throws IllegalStateException if the current thread holds this lock's read lock or another
+   *     global operation is in progress
    */
   public void withGlobalLock(Runnable action) {
+    if (globalGate.getReadHoldCount() > 0) {
+      throw new IllegalStateException(
+          "Cannot start a global operation while holding a segment lock");
+    }
+
     // Mark the global operation in progress, fail if another one is already running
     if (!clearing.compareAndSet(false, true)) {
       throw new IllegalStateException("Global operation already in progress");

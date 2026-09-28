@@ -13,6 +13,9 @@ import TabItem from '@theme/TabItem';
 This page covers the Gravitino API for tags. For what a tag is, which object types can carry one, how inheritance
 resolves, and how to work with tags in the UI, see [Tags](./tags.md).
 
+Policies can be associated with tags to govern objects carrying those tags. See
+[Policy-to-Tag Associations](./manage-policies-in-gravitino.md#policy-to-tag-associations).
+
 ## Tag Operations
 
 ### Create a Tag
