@@ -51,6 +51,42 @@ class TestCoreDatabaseShardTelemetryExtension {
   }
 
   @Test
+  void jsonRecordMirrorsTextRecordFieldsAndOmitsUnsetOptionalFields() {
+    ClassStatistics statistics = new ClassStatistics("example.TestStorage", 1_000_000L);
+    statistics.recordPassed();
+    statistics.recordPassed();
+    statistics.recordFailed();
+    statistics.recordSkipped();
+    statistics.recordSkipped();
+
+    String json = statistics.toJsonRecord("postgresql", "2", 9_000_000L, null, null);
+
+    assertEquals(true, json.contains("\"schemaVersion\":1"));
+    assertEquals(true, json.contains("\"backend\":\"postgresql\""));
+    assertEquals(true, json.contains("\"worker\":\"2\""));
+    assertEquals(true, json.contains("\"class\":\"example.TestStorage\""));
+    assertEquals(true, json.contains("\"tests\":5"));
+    assertEquals(true, json.contains("\"passed\":2"));
+    assertEquals(true, json.contains("\"failed\":1"));
+    assertEquals(true, json.contains("\"skipped\":2"));
+    assertEquals(true, json.contains("\"durationMs\":8"));
+    // runId/gitCommit were not supplied -- must be omitted entirely, not emitted as null.
+    assertEquals(false, json.contains("runId"));
+    assertEquals(false, json.contains("gitCommit"));
+  }
+
+  @Test
+  void jsonRecordIncludesOptionalRunIdAndGitCommitWhenProvided() {
+    ClassStatistics statistics = new ClassStatistics("example.TestStorage", 1_000_000L);
+    statistics.recordPassed();
+
+    String json = statistics.toJsonRecord("mysql", "1", 2_000_000L, "run-42", "abc123def");
+
+    assertEquals(true, json.contains("\"runId\":\"run-42\""));
+    assertEquals(true, json.contains("\"gitCommit\":\"abc123def\""));
+  }
+
+  @Test
   void recordsExtensionCallbacksInWorkerFile(@TempDir Path temporaryDirectory) throws Exception {
     String originalOutputDirectory =
         System.getProperty(CoreDatabaseShardTelemetryExtension.OUTPUT_DIRECTORY_PROPERTY);
@@ -84,6 +120,19 @@ class TestCoreDatabaseShardTelemetryExtension {
               + " tests=4 passed=1 failed=1 skipped=2 durationMs=8"
               + System.lineSeparator(),
           Files.readString(temporaryDirectory.resolve("worker-worker_7.log")));
+
+      String jsonLine =
+          Files.readString(temporaryDirectory.resolve("worker-worker_7.jsonl")).trim();
+      assertEquals(true, jsonLine.contains("\"schemaVersion\":1"));
+      assertEquals(true, jsonLine.contains("\"backend\":\"h2\""));
+      assertEquals(true, jsonLine.contains("\"worker\":\"worker/7\""));
+      assertEquals(
+          true, jsonLine.contains("\"class\":\"" + SampleDatabaseTest.class.getName() + "\""));
+      assertEquals(true, jsonLine.contains("\"tests\":4"));
+      assertEquals(true, jsonLine.contains("\"passed\":1"));
+      assertEquals(true, jsonLine.contains("\"failed\":1"));
+      assertEquals(true, jsonLine.contains("\"skipped\":2"));
+      assertEquals(true, jsonLine.contains("\"durationMs\":8"));
     } finally {
       restoreProperty(
           CoreDatabaseShardTelemetryExtension.OUTPUT_DIRECTORY_PROPERTY, originalOutputDirectory);
