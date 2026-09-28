@@ -113,7 +113,7 @@ The content of a row-filter policy contains exactly one `expression`.
   "policyType": "system_row_filter",
   "enabled": false,
   "content": {
-    "expression": "result := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
+    "expression": "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
   }
 }
 ```
@@ -136,16 +136,17 @@ Iceberg mask action name.
   "policyType": "system_column_mask",
   "enabled": false,
   "content": {
-    "expression": "result := \"show-last-4\" if is_group_member(\"auditors\") else := \"replace-with-null\""
+    "expression": "mask := action(\"show-last-4\") if is_group_member(\"auditors\") else := action(\"replace-with-null\")"
   }
 }
 ```
 
-The rule result is an action name, and each condition must use the context-only expression subset.
-It cannot contain `col(...)` because an Iceberg projection selects one action for the complete
-column, not a different action per row. Conditional results are resolved before the response is
-serialized. If more than one selected policy resolves to a different mask for the same field,
-resolution fails as a conflict.
+The rule result is an explicit `action("name")` value, and each condition must use the context-only
+expression subset. A bare string is not a mask action and is invalid. A condition cannot contain
+`col(...)` because an Iceberg projection selects one action for the complete column, not a different
+action per row. Conditional results are resolved before the response is serialized. If more than
+one selected policy resolves to a different mask for the same field, resolution fails as a
+conflict.
 
 ### Future function reference
 
@@ -164,22 +165,30 @@ source. It replaces `expression`; exactly one of `expression` and `function` can
 }
 ```
 
-The shape is modeled after Databricks ABAC's row-filter UDF and argument binding. Before enabling
-this form, a separate design must define function identity and versioning, resolution authority,
-argument types, context arguments, execution privileges, determinism, null behavior, and target
-capabilities. A row-filter function must return Boolean, and its contract must define how a null
-result is handled. A mask function must return a value compatible with the masked field. A missing,
-changed, or unsupported function fails closed; it never falls back to an unrestricted read.
-Tagged-column matching and context argument bindings can be added later without changing the
-expression form.
+The shape is modeled after Databricks ABAC's row-filter UDF and argument binding. `reference`
+identifies an immutable function revision. Each argument is explicitly a column or a typed literal;
+future schemas can add context and tagged-column bindings without changing existing expression
+content.
+
+Before enabling this form, a separate design must define function resolution authority, execution
+privileges, determinism, null behavior, and enforcement capabilities. A row-filter function must
+return Boolean. A column-mask function must return the exact logical type required for the masked
+field. Function arguments and results do not use implicit conversion: every bound argument must
+exactly match the declared function signature. A missing, changed, type-mismatched, or unsupported
+function fails closed and never falls back to an unrestricted read.
+
+The first Iceberg REST implementation rejects `function`. Future support may enable it only when
+the resolver can compile the function to a closed standard Iceberg restriction or when a separately
+specified enforcement path declares native function support. A raw function reference never enters
+an Iceberg `read-restrictions` response.
 
 ## Restricted Rego Expressions
 
 Both built-in policy types use the restricted Rego subset defined below. Its version is part of the
 policy content schema rather than a field repeated in every policy. The subset supports only one
-complete rule named `result`; it is not an arbitrary Rego module. The policy type determines the
-rule's result type. A row-filter result and its conditions must be Boolean. A column-mask result
-must be a string naming a supported Iceberg action, and its condition must be Boolean and
+complete rule named `filter` or `mask`; it is not an arbitrary Rego module. A row-filter policy
+requires `filter`, whose result and conditions must be Boolean. A column-mask policy requires
+`mask`, whose result must be an explicit action value and whose condition must be Boolean and
 context-only.
 
 The grammar is:
@@ -187,15 +196,16 @@ The grammar is:
 ```text
 program     := filterRule | maskRule
 filterRule  := unconditionalFilter | conditionalFilter
-unconditionalFilter := "result" ":=" expr
-conditionalFilter := "result" ":=" expr "if" expr filterElse* filterFallback
+unconditionalFilter := "filter" ":=" expr
+conditionalFilter := "filter" ":=" expr "if" expr filterElse* filterFallback
 filterElse  := "else" ":=" expr "if" expr
 filterFallback := "else" ":=" expr
 maskRule    := unconditionalMask | conditionalMask
-unconditionalMask := "result" ":=" string
-conditionalMask := "result" ":=" string "if" contextExpr maskElse* maskFallback
-maskElse    := "else" ":=" string "if" contextExpr
-maskFallback := "else" ":=" string
+unconditionalMask := "mask" ":=" maskAction
+conditionalMask := "mask" ":=" maskAction "if" contextExpr maskElse* maskFallback
+maskElse    := "else" ":=" maskAction "if" contextExpr
+maskFallback := "else" ":=" maskAction
+maskAction  := "action" "(" string ")"
 contextExpr := expr
 expr        := orExpr
 orExpr      := andExpr ("or" andExpr)*
@@ -215,28 +225,30 @@ digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 ```
 
-`result := value-a if condition else := value-b` has the semantic reading “if condition, then
-value-a, otherwise value-b.” Conditional branches are evaluated from left to right and the first
-true condition selects its value. A conditional rule requires an unconditional final `else`, so a
-selected policy never becomes undefined. Unconditional forms omit `if` and `else`.
-
-The `result :=` rule head is required to keep the stored text valid Rego conditional-assignment
-syntax. It is intentionally generic: `policyType`, rather than the rule name, determines whether
-the value is a row predicate or a column-mask action.
+`filter := value-a if condition else := value-b` and
+`mask := action("action-a") if condition else := action("action-b")` have the semantic reading “if
+condition, then value-a, otherwise value-b.” Conditional branches are evaluated from left to right
+and the first true condition selects its value. A conditional rule requires an unconditional final
+`else`, so a selected policy never becomes undefined. Unconditional forms omit `if` and `else`.
 
 Strings use JSON double-quoted syntax. Packages, imports, additional rules, variables, rule bodies
 in braces, comments, exponent notation, leading `+`, leading zeroes, trailing decimal points,
-chained comparisons, arbitrary functions, and bare non-Boolean roots are invalid.
+chained comparisons, and arbitrary functions are invalid. A row-filter root must be Boolean, and a
+column-mask root must be an explicit `action(...)` value.
 
 ### Keywords, identifiers, and escaping
 
-The reserved, lowercase keywords are `result`, `if`, `else`, `and`, `or`, `not`, `in`,
-`true`, `false`, and `null`. `:=` is the rule-result assignment operator; `then` is not a literal
-token in Rego syntax because the result precedes `if`. The reserved built-in function identifiers
-are `col`, `session_user`, and `is_group_member`. They are case-sensitive and are recognized only
-as complete tokens; for example, `notebook` is not `not` followed by an identifier. Bare identifiers
-are not part of the restricted subset, so an unknown word is always invalid rather than an implicit
-column reference or function call.
+The restricted syntax reserves the lowercase keywords `filter`, `mask`, `if`, `else`, `and`, `or`,
+`not`, `in`, `true`, `false`, and `null`. `:=` is the rule-result assignment operator; `then` is not
+a literal token in Rego syntax because the result precedes `if`. The reserved built-in function
+identifiers are `col`, `session_user`, and `is_group_member`. They are case-sensitive and are
+recognized only as complete tokens. `action` is the reserved mask-action constructor. For example,
+`notebook` is not `not` followed by an identifier. Bare identifiers are not part of the restricted
+subset, so an unknown word is always invalid rather than an implicit column reference or function
+call.
+
+`filter` and `mask` are Gravitino restricted-syntax keywords, not standard Rego keywords. `filter`
+is valid only as the row-filter rule head, and `mask` is valid only as the column-mask rule head.
 
 Column names, group names, and string values appear only as JSON string literals. A name equal to a
 keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
@@ -245,8 +257,8 @@ single quotes, SQL delimited identifiers, and backslash escaping outside a JSON 
 There are two syntactic JSON layers in an API request. The HTTP JSON parser decodes the outer
 `expression` field once, and the expression parser decodes each inner JSON string literal once. For
 example, the request fragment
-`"expression": "result := col(\"and\") == \"open\""` becomes the source
-`result := col("and") == "open"`, whose decoded column name is `and`. No layer performs an
+`"expression": "filter := col(\"and\") == \"open\""` becomes the source
+`filter := col("and") == "open"`, whose decoded column name is `and`. No layer performs an
 additional or implicit unescape.
 
 After decoding, identifiers and values are preserved exactly. Gravitino performs no Unicode
@@ -306,7 +318,7 @@ resolver then binds their context, columns, and literals and lowers an `if`/`els
 Boolean predicate. For example:
 
 ```text
-result := result1 if condition1
+filter := result1 if condition1
 else := result2 if condition2
 else := fallback
 ```
@@ -341,8 +353,12 @@ The first version supports these value predicates:
 | `TIMESTAMP(6)` without timezone or unset precision | `timestamp` | Equality, ordering, and `in` |
 | `STRING` | `string` | Equality, ordering, and `in` |
 
-Null tests may apply to any nullable top-level field with a stable field ID. No implicit numeric,
-temporal, collation, signedness, or timezone coercion is allowed.
+Null tests may apply to any nullable top-level field with a stable field ID. No implicit conversion
+is allowed, including numeric widening or narrowing, string-to-number conversion, temporal
+conversion, collation changes, signedness changes, or timezone assumptions. A source literal is
+assigned its expected type once from the comparison's column operand; this is literal typing, not a
+conversion from a runtime string or numeric value. A literal that cannot represent that exact type
+without reinterpretation, rounding, or loss is invalid.
 
 All context functions and named references are removed before a resolved predicate is serialized.
 The Iceberg wire expression contains only Boolean constants, logical operators, supported
@@ -379,6 +395,10 @@ The action vocabulary is defined by Iceberg read restrictions:
 Applicable types, fixed values, output encodings, Unicode behavior, and null behavior follow the
 pinned Iceberg specification. Unknown actions and unsupported action/type pairs fail closed.
 `replace-with-null` is invalid for a required field.
+
+`action("name")` constructs a typed mask action during parsing. It is not a runtime UDF and does not
+convert a string result into an action. A bare string, unknown action name, or action with an
+unsupported input type is invalid.
 
 The server returns the logical Iceberg action, and the reader owns execution. For
 `sha-256-query-local`, the reader also owns generation and lifecycle of the per-query salt defined
@@ -508,11 +528,13 @@ Coverage includes:
 - source limits and invalid operand shapes;
 - session user, group membership, unknown groups, and identity lookup failure;
 - common keyword boundaries, nested JSON escaping, keyword-named columns, and invalid identifiers;
+- exact literal typing and rejection of every implicit-conversion path;
 - unconditional filters, context and row-dependent conditions, multi-branch `else` chains, missing
   final fallbacks, and deterministic conditional lowering;
 - unconditional masks, context-dependent mask branches, row-dependent mask-condition rejection,
-  invalid action names, and deterministic action selection;
-- reserved function definitions, missing function versions, and invalid argument bindings;
+  bare-string results, invalid action names, and deterministic action selection;
+- reserved function definitions, missing function versions, exact argument and result types, and
+  invalid argument bindings;
 - duplicate and conflicting row-filter definitions and mask actions;
 - all nine mask actions and unsupported action/type pairs;
 - table and column effective-tag selection;
