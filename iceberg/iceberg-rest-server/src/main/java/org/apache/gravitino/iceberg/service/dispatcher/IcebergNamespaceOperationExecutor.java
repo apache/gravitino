@@ -22,11 +22,15 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -126,11 +130,16 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       IcebergRequestContext context,
       Namespace namespace,
       RegisterTableRequest registerTableRequest) {
+    TableEntity.NAME.validate(registerTableRequest.name(), Entity.EntityType.TABLE);
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, registerTableRequest.name());
 
-    return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.catalogName())
-        .registerTable(namespace, registerTableRequest, context.requestCredentialVending());
+    CatalogWrapperForREST catalogWrapper =
+        icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
+    TableMetadata metadata =
+        catalogWrapper.loadTableMetadataFromLocation(registerTableRequest.metadataLocation());
+    IcebergColumnFieldValidator.validateSchema(metadata.schema());
+    return catalogWrapper.registerTable(
+        namespace, registerTableRequest, context.requestCredentialVending());
   }
 }

@@ -29,6 +29,7 @@ import lombok.ToString;
 import lombok.experimental.Accessors;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -46,7 +47,8 @@ import org.apache.gravitino.utils.CollectionUtils;
 public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The table's unique identifier");
-  public static final Field NAME = Field.required("name", String.class, "The table's name");
+  public static final Field NAME =
+      Field.required("name", "The table's name", EntityFieldLimits.MAX_NAME_LENGTH);
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the table");
   public static final Field COLUMNS =

@@ -74,15 +74,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     // metadata.json file at the given location), so build a mock LoadTableResponse here.
     // Honor cloud URIs (e.g. s3://) in metadataLocation so credential vending tests can
     // verify the vended path; default to /mock otherwise for existing tests.
-    String location =
-        request.metadataLocation().contains("://") ? request.metadataLocation() : "/mock";
-    Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
-    TableMetadata baseMetadata =
-        TableMetadata.newTableMetadata(
-            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
-    String json = TableMetadataParser.toJson(baseMetadata);
-    TableMetadata tableMetadata =
-        TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
+    TableMetadata tableMetadata = mockTableMetadata(request.metadataLocation());
     LoadTableResponse loadTableResponse =
         LoadTableResponse.builder()
             .withTableMetadata(tableMetadata)
@@ -105,12 +97,66 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     return loadTableResponse;
   }
 
+<<<<<<< HEAD
+=======
+  @Override
+  public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
+    return mockTableMetadata(metadataLocation);
+  }
+
+  @Override
+  public LoadViewResponse registerView(Namespace namespace, RegisterViewRequest request) {
+    if (request.name().contains("fail")) {
+      throw new AlreadyExistsException("Already exits exception for test");
+    }
+
+    // The in-memory test catalog tracks namespaces but cannot natively registerView (that would
+    // need a real view metadata.json file at the given location). Reproduce the production check
+    // that the target namespace must exist, then synthesize a mock LoadViewResponse below.
+    if (!namespaceExists(namespace)) {
+      throw new NoSuchNamespaceException("Namespace does not exist: %s", namespace);
+    }
+    String location =
+        request.metadataLocation().contains("://") ? request.metadataLocation() : "/mock";
+    Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+    ViewVersion viewVersion =
+        ImmutableViewVersion.builder()
+            .versionId(1)
+            .timestampMillis(System.currentTimeMillis())
+            .schemaId(mockSchema.schemaId())
+            .defaultNamespace(namespace)
+            .addRepresentations(
+                ImmutableSQLViewRepresentation.builder().sql("select 1").dialect("spark").build())
+            .build();
+    ViewMetadata viewMetadata =
+        ViewMetadata.builder()
+            .setLocation(location)
+            .addSchema(mockSchema)
+            .setCurrentVersion(viewVersion, mockSchema)
+            .build();
+    return ImmutableLoadViewResponse.builder()
+        .metadata(viewMetadata)
+        .metadataLocation(location + "/metadata/v1.metadata.json")
+        .build();
+  }
+
+>>>>>>> 8e9ca0009 ([#13565] fix: Validate table and column field lengths (#13551))
   private boolean shouldGeneratePlanTasksData(CreateTableRequest request) {
     if (request.properties() == null) {
       return false;
     }
     return Boolean.parseBoolean(
         request.properties().getOrDefault(GENERATE_PLAN_TASKS_DATA_PROP, Boolean.FALSE.toString()));
+  }
+
+  private static TableMetadata mockTableMetadata(String metadataLocation) {
+    String location = metadataLocation.contains("://") ? metadataLocation : "/mock";
+    Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+    TableMetadata baseMetadata =
+        TableMetadata.newTableMetadata(
+            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
+    String json = TableMetadataParser.toJson(baseMetadata);
+    return TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
   }
 
   private void appendSampleData(Namespace namespace, String tableName) {
