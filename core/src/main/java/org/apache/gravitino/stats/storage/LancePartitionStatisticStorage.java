@@ -313,7 +313,9 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   @Override
   public void close() throws IOException {
-    session.close();
+    if (session != null) {
+      session.close();
+    }
     if (allocator != null) {
       allocator.close();
     }
