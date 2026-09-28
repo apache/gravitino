@@ -85,7 +85,6 @@ import org.slf4j.LoggerFactory;
  *   <li>Database-specific SQL syntax (MySQL ON DUPLICATE KEY vs PostgreSQL ON CONFLICT)
  * </ul>
  */
-@Tag("gravitino-core-database-test")
 @Tag("gravitino-docker-test")
 public class TestJdbcPartitionStatisticStorageIT {
 
@@ -94,9 +93,9 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /**
    * Abstract base class containing all test logic. Each database-specific test class extends this
-   * and implements the database setup.
+   * and implements the database setup. Each subclass carries the tag of the one backend lane it
+   * runs in.
    */
-  @Tag("gravitino-core-database-test")
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   abstract static class BaseJdbcPartitionStatisticStorageTest {
 
