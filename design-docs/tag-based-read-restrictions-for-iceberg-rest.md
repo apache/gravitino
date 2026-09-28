@@ -27,9 +27,7 @@ which rows or column values are visible after access is granted.
 
 The Iceberg REST specification defines `read-restrictions` in a load-table response. A conforming
 reader applies a required row filter and required column projections before returning data. This
-provides a standard enforcement boundary for portable restrictions. Some engines also support
-native filter expressions or functions that cannot be represented by the common Iceberg profile,
-so policy content must distinguish portable definitions from explicitly engine-scoped ones.
+provides a standard enforcement boundary for portable restrictions.
 
 This design adds tag-based row-filter and column-mask policies and resolves them into Iceberg REST
 `read-restrictions`. The first implementation is experimental while Iceberg reader support is
@@ -39,18 +37,18 @@ maturing. It is disabled by default and requires an explicit client opt-in.
 
 1. Define typed row-filter and column-mask policy content.
 2. Select policies through the policy-on-tag model and effective tags.
-3. Support a small, deterministic common authoring language for row predicates.
+3. Support small, deterministic expression syntax for row predicates and mask selection.
 4. Bind authored expressions to the authenticated subject and an Iceberg table schema.
 5. Return only closed, typed Iceberg expressions and standard Iceberg mask actions.
 6. Fail closed when an applicable restriction cannot be resolved or enforced.
 7. Provide an experimental end-to-end path that can later move to official Iceberg runtime types
    without changing policy content.
-8. Reserve an explicit, fail-closed extension model for engine expressions and UDF references.
+8. Reserve a fail-closed extension model for UDF references.
 
 ## Non-Goals
 
 1. Replacing table-level authorization or granting access through a read-restriction policy.
-2. Executing arbitrary engine expressions or UDFs through the first Iceberg REST implementation.
+2. Executing arbitrary expressions or UDFs through the first Iceberg REST implementation.
 3. Supporting nested-field masks, roles, identity attributes, nested groups, or general attribute
    expressions in the first version.
 4. Defining a new direct policy-to-metadata-object association model.
@@ -91,9 +89,10 @@ from effective tags. Row-filter resolution consumes effective policies for a tab
 resolution consumes effective policies for each top-level column. Direct policy
 associations are not used.
 
-Policy content stores one restriction definition and its declared language or action profile. It
-does not store a resolved subject, group membership snapshot, table schema, field ID, or serialized
-load-table response.
+First-version policy content stores one expression. It does not store parser names,
+action-vocabulary names, resolved subjects, group membership snapshots, table schemas, field IDs,
+or serialized load-table responses. The built-in policy type determines how the expression is
+parsed.
 
 Policy selection and policy effect are separate. Tags and policy-on-tag selectors decide whether a
 policy is applicable; a row-filter or column-mask definition states what the selected policy does.
@@ -105,8 +104,7 @@ selection model, not inside a restriction definition.
 
 ### Row-filter content
 
-A row-filter policy contains exactly one `filter`. The common form has `kind` set to `expression`,
-uses the `restricted-rego-v1` language, and omits `engine`.
+The content of a row-filter policy contains exactly one `expression`.
 
 ```json
 {
@@ -115,11 +113,7 @@ uses the `restricted-rego-v1` language, and omits `engine`.
   "policyType": "system_row_filter",
   "enabled": false,
   "content": {
-    "filter": {
-      "kind": "expression",
-      "language": "restricted-rego-v1",
-      "expression": "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
-    }
+    "expression": "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
   }
 }
 ```
@@ -132,103 +126,76 @@ does not select by principal, so subject-dependent filtering can remain inside t
 
 ### Column-mask content
 
-A column-mask policy contains exactly one `mask`. The first version supports the portable
-`iceberg-action-v1` profile.
+The content of a column-mask policy also contains exactly one `expression`. Its result is an
+Iceberg mask action name.
 
 ```json
 {
   "name": "mask_phone_number",
-  "comment": "Show only the final four characters",
+  "comment": "Auditors see the final four characters; other users see null",
   "policyType": "system_column_mask",
   "enabled": false,
   "content": {
-    "mask": {
-      "kind": "action",
-      "profile": "iceberg-action-v1",
-      "action": "show-last-4"
-    }
+    "expression": "mask := \"show-last-4\" if is_group_member(\"auditors\") else := \"replace-with-null\""
   }
 }
 ```
 
-If more than one selected policy defines a different mask for the same field, resolution fails as a
-conflict. Subject-dependent mask applicability requires a principal-aware policy selector; it is
-not encoded as a mask condition.
+The rule result is an action name, and each condition must use the context-only expression subset.
+It cannot contain `col(...)` because an Iceberg projection selects one action for the complete
+column, not a different action per row. Conditional results are resolved before the response is
+serialized. If more than one selected policy resolves to a different mask for the same field,
+resolution fails as a conflict.
 
-### Restriction definition variants
-
-The `kind` discriminator prevents an engine expression or function reference from being
-misinterpreted as a common expression. The content model reserves these variants:
-
-| Kind | Scope | First Iceberg REST implementation |
-| --- | --- | --- |
-| `expression` without `engine` | Common, portable profile named by `language` | Supports `restricted-rego-v1` for row filters. |
-| `expression` with `engine` | Exact engine and language pair | Rejected unless the selected adapter advertises that exact pair and produces a closed common result. |
-| `function` | Versioned function reference and typed argument bindings | Reserved; rejected by the first implementation. |
-| `action` | Named portable action profile | Supports `iceberg-action-v1` for column masks. |
-
-An engine-scoped row-filter definition is explicit:
-
-```json
-{
-  "filter": {
-    "kind": "expression",
-    "engine": "spark",
-    "language": "spark-sql-3.5",
-    "expression": "owner = current_user()"
-  }
-}
-```
-
-`engine` and `language` are non-empty, case-sensitive identifiers defined by an adapter capability;
-the language identifier must include a compatibility version. An omitted `engine` means common,
-and the literal engine name `common` is invalid. An engine-scoped definition is opaque to the
-common parser, is never sent to a different engine, and must not fall back to a common or differently
-versioned language. It is valid only when the adapter can validate it, bind all identifiers and
-context, and lower it to the closed Iceberg predicate profile before an Iceberg REST response is
-returned. Raw engine text never crosses the Iceberg `read-restrictions` boundary.
+### Future function reference
 
 A future UDF-backed definition uses a stable function reference rather than inline implementation
-source:
+source. It replaces `expression`; exactly one of `expression` and `function` can be present.
 
 ```json
 {
-  "filter": {
-    "kind": "function",
-    "engine": "databricks",
-    "functionReference": "governance.filters.filter_by_region@v3",
+  "function": {
+    "reference": "governance.filters.filter_by_region@v3",
     "arguments": [
-      { "kind": "column", "name": "region" },
-      { "kind": "literal", "type": "string", "value": "EMEA" }
+      { "column": "region" },
+      { "literal": { "type": "string", "value": "EMEA" } }
     ]
   }
 }
 ```
 
 The shape is modeled after Databricks ABAC's row-filter UDF and argument binding. Before enabling
-this variant, a separate profile must define function identity and versioning, resolution
-authority, argument types, context arguments, execution privileges, determinism, null behavior,
-and target capabilities. A row-filter function must return Boolean, and its profile must define how
-a null result is handled. A mask function must return a value compatible with the masked field. A
-missing, changed, or unsupported function fails closed; it never falls back to an unrestricted
-read. Tagged-column matching and context argument bindings can be added as new argument kinds
-without changing the function variant.
+this form, a separate design must define function identity and versioning, resolution authority,
+argument types, context arguments, execution privileges, determinism, null behavior, and target
+capabilities. A row-filter function must return Boolean, and its contract must define how a null
+result is handled. A mask function must return a value compatible with the masked field. A missing,
+changed, or unsupported function fails closed; it never falls back to an unrestricted read.
+Tagged-column matching and context argument bindings can be added later without changing the
+expression form.
 
-## Common Restricted Rego Profile
+## Restricted Rego Expressions
 
-The `restricted-rego-v1` profile is the portable authoring language for row-filter expressions. It
-uses Rego conditional-assignment syntax, but deliberately supports only one complete rule named
-`filter`; it is not an arbitrary Rego module. The rule result, every conditional result, and every
-condition must be Boolean.
+Both built-in policy types use the restricted Rego subset defined below. Its version is part of the
+policy content schema rather than a field repeated in every policy. The subset supports only one
+complete rule named `filter` or `mask`; it is not an arbitrary Rego module. A filter result and its
+conditions must be Boolean. A mask result must be a string naming a supported Iceberg action, and a
+mask condition must be Boolean and context-only.
 
 The grammar is:
 
 ```text
-program     := unconditionalRule | conditionalRule
-unconditionalRule := "filter" ":=" expr
-conditionalRule := "filter" ":=" expr "if" expr conditionalElse* finalElse
-conditionalElse := "else" ":=" expr "if" expr
-finalElse   := "else" ":=" expr
+program     := filterRule | maskRule
+filterRule  := unconditionalFilter | conditionalFilter
+unconditionalFilter := "filter" ":=" expr
+conditionalFilter := "filter" ":=" expr "if" expr filterElse* filterFallback
+filterElse  := "else" ":=" expr "if" expr
+filterFallback := "else" ":=" expr
+maskRule    := unconditionalMask | conditionalMask
+unconditionalMask := "mask" ":=" string
+conditionalMask := "mask" ":=" string "if" contextExpr maskElse* maskFallback
+maskElse    := "else" ":=" string "if" contextExpr
+maskFallback := "else" ":=" string
+contextExpr := expr
 expr        := orExpr
 orExpr      := andExpr ("or" andExpr)*
 andExpr     := notExpr ("and" notExpr)*
@@ -247,10 +214,11 @@ digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 ```
 
-`filter := result if condition else := fallback` has the semantic reading “if condition, then
+`filter := result if condition else := fallback` and
+`mask := "action-a" if condition else := "action-b"` have the semantic reading “if condition, then
 result, otherwise fallback.” Conditional branches are evaluated from left to right and the first
 true condition selects its result. A conditional rule requires an unconditional final `else`, so a
-selected policy never becomes undefined. An unconditional filter uses `filter := expression`.
+selected policy never becomes undefined. Unconditional forms omit `if` and `else`.
 
 Strings use JSON double-quoted syntax. Packages, imports, additional rules, variables, rule bodies
 in braces, comments, exponent notation, leading `+`, leading zeroes, trailing decimal points,
@@ -258,13 +226,13 @@ chained comparisons, arbitrary functions, and bare non-Boolean roots are invalid
 
 ### Keywords, identifiers, and escaping
 
-The reserved, lowercase keywords are `filter`, `if`, `else`, `and`, `or`, `not`, `in`, `true`,
-`false`, and `null`. `:=` is the rule-result assignment operator; `then` is not a literal token in
-Rego syntax because the result precedes `if`. The reserved built-in function identifiers are `col`,
-`session_user`, and `is_group_member`. They are case-sensitive and are recognized only as complete
-tokens; for example, `notebook` is not `not` followed by an identifier. Bare identifiers are not
-part of `restricted-rego-v1`, so an unknown word is always invalid rather than an implicit column
-reference or function call.
+The reserved, lowercase keywords are `filter`, `mask`, `if`, `else`, `and`, `or`, `not`, `in`,
+`true`, `false`, and `null`. `:=` is the rule-result assignment operator; `then` is not a literal
+token in Rego syntax because the result precedes `if`. The reserved built-in function identifiers
+are `col`, `session_user`, and `is_group_member`. They are case-sensitive and are recognized only
+as complete tokens; for example, `notebook` is not `not` followed by an identifier. Bare identifiers
+are not part of the restricted subset, so an unknown word is always invalid rather than an implicit
+column reference or function call.
 
 Column names, group names, and string values appear only as JSON string literals. A name equal to a
 keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
@@ -280,7 +248,7 @@ additional or implicit unescape.
 After decoding, identifiers and values are preserved exactly. Gravitino performs no Unicode
 normalization, case folding, whitespace trimming, environment expansion, URL decoding, or SQL
 quoting. Adapters must bind typed AST nodes or parameters and must not concatenate decoded names or
-values into engine text. Canonical serialization applies JSON escaping; it does not change the
+values into rendered text. Canonical serialization applies JSON escaping; it does not change the
 logical value.
 
 Supported operand shapes are:
@@ -314,7 +282,7 @@ oversized expression valid.
 
 ## Context and Schema Binding
 
-The first expression profile provides two request-stable context functions:
+The expression subset provides two request-stable context functions:
 
 | Function | Result | Binding |
 | --- | --- | --- |
@@ -348,9 +316,11 @@ or (not condition1 and not condition2 and fallback)
 ```
 
 Request-context-only conditions are folded before the final predicate is built, but every branch
-must still parse and type-check. The conditional assignment, `if`, and `else` nodes never appear in
-the Iceberg wire expression. This lowering preserves the first-matching-branch semantics of Rego's
-`else` chain while producing the one closed Boolean predicate required by Iceberg.
+must still parse and type-check. For a column mask, all conditions are context-only: the resolver
+evaluates them in order and selects the first action whose condition is true, or the final fallback
+action. The conditional assignment, `if`, and `else` nodes never appear in the Iceberg wire
+expression or projection. This preserves the first-matching-branch semantics of Rego's `else`
+chain while producing the one closed Boolean predicate or one column action required by Iceberg.
 
 The first version supports these value predicates:
 
@@ -390,7 +360,7 @@ exclude nulls must add `col("region") != null`.
 
 ## Column Masks
 
-The action vocabulary is the Iceberg read-restriction action profile:
+The action vocabulary is defined by Iceberg read restrictions:
 
 - `mask-alphanum`;
 - `mask-to-fixed-value`;
@@ -419,9 +389,9 @@ For one authenticated subject and table load:
 
 1. Resolve effective tags for the table and all top-level columns.
 2. Resolve enabled policy-on-tag matches.
-3. Check each selected definition's kind, language, engine scope, and adapter capability.
-4. Bind each common or safely lowered row expression and each selected mask to the table schema and
-   Iceberg field IDs.
+3. Parse and type-check the expression required by each selected policy type.
+4. Bind and resolve each row-filter expression and column-mask expression against the request
+   context, table schema, and Iceberg field IDs.
 5. Canonicalize resolved restrictions and compute signatures.
 6. Deduplicate equal signatures while retaining policy and tag provenance.
 7. Reject multiple distinct row-filter signatures for one table.
@@ -432,8 +402,8 @@ parsing, context, schema, type, action, or conflict error aborts the governed lo
 
 Canonicalization binds context and literals, normalizes comparisons with the field reference first,
 rewrites null comparisons, folds Boolean constants, sorts and deduplicates commutative children and
-`in` values, and validates the final closed Iceberg profile. Canonicalization is deterministic and
-idempotent.
+`in` values, and validates the final closed Iceberg expression. Canonicalization is deterministic
+and idempotent.
 
 ## Iceberg REST Response
 
@@ -496,7 +466,7 @@ Administrators should create a policy disabled, associate it with a tag, preview
 subjects and tables, verify that the experimental reader is deployed, and then enable it. Enabling a
 policy does not make an incompatible reader safe.
 
-Explain output should include selected policies, matching tags, definition kinds and profiles,
+Explain output should include selected policies, matching tags, selected conditional branches,
 canonical signatures, omission reasons, and conflicts. Query users receive a stable error code and
 request ID; policy details remain subject to policy-view authorization.
 
@@ -511,10 +481,8 @@ request ID; policy details remain subject to policy-view authorization.
    the corresponding metadata privileges.
 5. Unknown groups and identity lookup failures do not become non-membership.
 6. An old client that may ignore `read-restrictions` is not a trusted enforcement target.
-7. An engine-scoped expression is accepted only for an exact engine, language, and adapter
-   capability match; no implicit translation or fallback is allowed.
-8. A `function` definition remains invalid until its complete function profile and enforcement
-   capability are enabled.
+7. A `function` definition remains invalid until its complete contract and enforcement capability
+   are enabled.
 
 ## Testing
 
@@ -538,7 +506,8 @@ Coverage includes:
 - common keyword boundaries, nested JSON escaping, keyword-named columns, and invalid identifiers;
 - unconditional filters, context and row-dependent conditions, multi-branch `else` chains, missing
   final fallbacks, and deterministic conditional lowering;
-- engine and language mismatch, unsupported adapters, and prohibited fallback;
+- unconditional masks, context-dependent mask branches, row-dependent mask-condition rejection,
+  invalid action names, and deterministic action selection;
 - reserved function definitions, missing function versions, and invalid argument bindings;
 - duplicate and conflicting row-filter definitions and mask actions;
 - all nine mask actions and unsupported action/type pairs;
@@ -551,7 +520,7 @@ Coverage includes:
 ## Implementation Plan
 
 1. Add the restricted Rego parser, conditional lowering, and typed row-filter and column-mask
-   definition variants; reject unsupported engine and function variants explicitly.
+   content; reject unsupported function content explicitly.
 2. Add an experimental Iceberg read-restriction model and exact wire serializer.
 3. Implement policy-on-tag selection, subject binding, schema binding, canonicalization, and conflict
    detection.
