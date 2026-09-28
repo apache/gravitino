@@ -106,11 +106,10 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Must match DatabaseTest.TAG (core/src/test/java/.../storage/relational/DatabaseTest.java) -
-// build scripts can't see a project's own test-source classes at configuration time, so this
-// string is kept in sync by hand; TestDatabaseTestClassificationCheck pins the literal.
 val coreDatabaseTestTag = "gravitino-core-database-test"
-val coreSupportedBackends = setOf("h2", "mysql", "postgresql")
+val coreH2TestTag = "gravitino-core-h2-test"
+val coreMySQLTestTag = "gravitino-core-mysql-test"
+val corePostgreSQLTestTag = "gravitino-core-postgresql-test"
 val coreTestBackendProperty = "gravitino.core.test.backend"
 
 fun registerCoreTestTask(
@@ -147,16 +146,17 @@ fun registerCoreTestTask(
     if (backend == null) {
       excludeTags(coreDatabaseTestTag, "gravitino-docker-test")
     } else {
-      // Lane membership only; which backend(s) a @DatabaseTest class actually runs under is
-      // decided per-class by BackendLaneCondition, reading the system property set below.
       includeTags(coreDatabaseTestTag)
+      when (backend) {
+        "h2" -> excludeTags(coreMySQLTestTag, corePostgreSQLTestTag)
+        "mysql" -> excludeTags(coreH2TestTag, corePostgreSQLTestTag)
+        "postgresql" -> excludeTags(coreH2TestTag, coreMySQLTestTag)
+        else -> throw GradleException("Unsupported core test backend: $backend")
+      }
     }
   }
 
   if (backend != null) {
-    if (backend !in coreSupportedBackends) {
-      throw GradleException("Unsupported core test backend: $backend")
-    }
     systemProperty(coreTestBackendProperty, backend)
     extensions.extraProperties["includeDockerTaggedTests"] = true
 

@@ -58,8 +58,6 @@ import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
-import org.apache.gravitino.storage.relational.DatabaseBackend;
-import org.apache.gravitino.storage.relational.DatabaseTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -87,8 +85,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Database-specific SQL syntax (MySQL ON DUPLICATE KEY vs PostgreSQL ON CONFLICT)
  * </ul>
  */
-// Not itself a @DatabaseTest: this class holds no @Test methods of its own, only the @Nested
-// classes below, each of which declares its own single-backend @DatabaseTest.
+@Tag("gravitino-core-database-test")
+@Tag("gravitino-docker-test")
 public class TestJdbcPartitionStatisticStorageIT {
 
   private static final Logger LOG =
@@ -96,8 +94,9 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /**
    * Abstract base class containing all test logic. Each database-specific test class extends this
-   * and implements the database setup, declaring its own single-backend {@code @DatabaseTest}.
+   * and implements the database setup.
    */
+  @Tag("gravitino-core-database-test")
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   abstract static class BaseJdbcPartitionStatisticStorageTest {
 
@@ -588,7 +587,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** MySQL-specific tests using Docker container. */
   @Nested
-  @DatabaseTest(backends = DatabaseBackend.MYSQL)
+  @Tag("gravitino-core-mysql-test")
   @Tag("gravitino-docker-test")
   static class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -659,7 +658,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** PostgreSQL-specific tests using Docker container. */
   @Nested
-  @DatabaseTest(backends = DatabaseBackend.POSTGRESQL)
+  @Tag("gravitino-core-postgresql-test")
   @Tag("gravitino-docker-test")
   static class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -733,7 +732,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** H2-specific tests using embedded in-memory database. */
   @Nested
-  @DatabaseTest(backends = DatabaseBackend.H2)
+  @Tag("gravitino-core-h2-test")
   static class H2Test extends BaseJdbcPartitionStatisticStorageTest {
 
     private static final String H2_JDBC_URL =
