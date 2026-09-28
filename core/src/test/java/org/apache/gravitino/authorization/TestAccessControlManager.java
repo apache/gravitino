@@ -59,6 +59,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -66,7 +67,9 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -117,6 +120,16 @@ public class TestAccessControlManager {
           .withVersion(SchemaVersion.V_0_1)
           .build();
 
+  private static BaseMetalake disabledMetalakeEntity =
+      BaseMetalake.builder()
+          .withId(3L)
+          .withName("metalake_disabled")
+          .withProperties(ImmutableMap.of(Metalake.PROPERTY_IN_USE, "false"))
+          .withAuditInfo(
+              AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+          .withVersion(SchemaVersion.V_0_1)
+          .build();
+
   @BeforeAll
   public static void setUp() throws Exception {
     File dbDir = new File(DB_DIR);
@@ -156,6 +169,7 @@ public class TestAccessControlManager {
 
     entityStore.put(metalakeEntity, true);
     entityStore.put(listMetalakeEntity, true);
+    entityStore.put(disabledMetalakeEntity, true);
 
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
@@ -317,6 +331,38 @@ public class TestAccessControlManager {
     // Test to remove non-existed group
     boolean removed1 = accessControlManager.removeGroup(METALAKE, "no-exist");
     Assertions.assertFalse(removed1);
+  }
+
+  @Test
+  public void testAddRemoveUserGroupChecksMetalakeExists() {
+    // add/remove user/group against a nonexistent metalake must surface the
+    // documented NoSuchMetalakeException, not a raw storage error.
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addGroup("nope", "g1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeGroup("nope", "g1"));
+  }
+
+  @Test
+  public void testAddRemoveUserGroupRejectsDisabledMetalake() {
+    // add/remove user/group against a disabled (not-in-use) metalake must surface
+    // MetalakeNotInUseException, consistent with the count/list siblings.
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.addUser("metalake_disabled", "u1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.addGroup("metalake_disabled", "g1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.removeUser("metalake_disabled", "u1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.removeGroup("metalake_disabled", "g1"));
   }
 
   @Test
