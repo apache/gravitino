@@ -35,6 +35,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.ColumnComments;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 
 /**
@@ -138,7 +139,7 @@ public class CatalogConnectorMetadataAdapter {
               column.getName(),
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
-              column.getComment(),
+              ColumnComments.read(column),
               column.isNullable(),
               false,
               column.getProperties()));
@@ -285,7 +286,7 @@ public class CatalogConnectorMetadataAdapter {
         column.getName(),
         dataTypeTransformer.getGravitinoType(column.getType()),
         -1,
-        column.getComment(),
+        ColumnComments.read(column),
         column.isNullable(),
         false,
         column.getProperties());
