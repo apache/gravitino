@@ -41,6 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -281,7 +282,12 @@ public class RoleMetaService {
       NameIdentifier nameIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
 
-      objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(nameIdentifier, entityType));
+      try {
+        objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(nameIdentifier, entityType));
+      } catch (NoSuchEntityException nse) {
+        throw new NoSuchMetadataObjectException(
+            nse, "Metadata object %s type %s doesn't exist", object.fullName(), object.type());
+      }
       securableObjectPOs.add(objectBuilder.build());
     }
     return securableObjectPOs;
