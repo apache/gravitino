@@ -49,6 +49,8 @@ import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -371,7 +373,12 @@ public class Recommender implements AutoCloseable {
    * {@code COMPACTION}) to {@link StrategyHandler} implementations.
    */
   private String getStrategyHandlerClassName(String strategyType) {
-    return optimizerEnv.config().getStrategyHandlerClassName(strategyType);
+    String configured = optimizerEnv.config().getStrategyHandlerClassName(strategyType);
+    if (StringUtils.isBlank(configured)
+        && IcebergRewriteManifestsContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
+      return ManifestRewriteStrategyHandler.class.getName();
+    }
+    return configured;
   }
 
   private Map<String, List<NameIdentifier>> getIdentifiersByStrategyName(

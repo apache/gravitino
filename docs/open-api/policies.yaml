@@ -371,6 +371,39 @@ components:
                 rule1: "rule1"
                 rule2: 123
 
+    IcebergRewriteManifestsContent:
+      type: object
+      description: Thresholds for one resolved Iceberg partition spec. Supports catalog, schema, and table policies.
+      properties:
+        manifest_count_critical:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 500
+          description: Inclusive count trigger, regardless of size. Must be at least manifest_count_warning.
+        manifest_count_warning:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 100
+          description: Inclusive minimum count for the average-size trigger.
+        avg_manifest_size_threshold_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 8388608
+          description: Exclusive average manifest size threshold in bytes.
+        spec_id:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: Existing partition spec. Required for standalone evaluation of persisted statistics; a collection cycle may supply its resolved ID instead.
+        use_caching:
+          type: boolean
+          nullable: true
+          description: Optional caching setting. Omission preserves the Iceberg runtime default.
+
     PolicyBase:
       type: object
       description: A basic policy without content
@@ -412,15 +445,31 @@ components:
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
+    IcebergRewriteManifestsPolicy:
+      description: Iceberg manifest rewrite policy.
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required:
+            - content
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_rewrite_manifests]
+            content:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
     Policy:
       type: object
       description: A basic policy without content
       oneOf:
         - $ref: '#/components/schemas/CustomPolicy'
+        - $ref: '#/components/schemas/IcebergRewriteManifestsPolicy'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicy'
+          system_iceberg_rewrite_manifests: '#/components/schemas/IcebergRewriteManifestsPolicy'
 
     PolicyListResponse:
       type: object
@@ -491,15 +540,31 @@ components:
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
+    IcebergRewriteManifestsPolicyCreateRequest:
+      description: Iceberg manifest rewrite policy.
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required:
+            - content
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_rewrite_manifests]
+            content:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
     PolicyCreateRequest:
       description: A request to create a policy.
       type: object
       oneOf:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
+          system_iceberg_rewrite_manifests: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
 
 
     PolicyUpdatesRequest:
@@ -586,10 +651,12 @@ components:
           description: The new content of the policy, its structure depends on the 'policyType'.
           oneOf:
               - $ref: '#/components/schemas/CustomPolicyContent'
+              - $ref: '#/components/schemas/IcebergRewriteManifestsContent'
           discriminator:
             propertyName: policyType
             mapping:
               custom: '#/components/schemas/CustomPolicyContent'
+              system_iceberg_rewrite_manifests: '#/components/schemas/IcebergRewriteManifestsContent'
       example: {
         "@type": "updateContent",
         "policyType": "custom",

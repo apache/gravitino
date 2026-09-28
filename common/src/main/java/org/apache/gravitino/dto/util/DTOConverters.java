@@ -105,6 +105,7 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -685,6 +686,17 @@ public class DTOConverters {
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .build();
+    }
+
+    if (policyContent instanceof IcebergRewriteManifestsContent) {
+      IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withManifestCountCritical(content.manifestCountCritical())
+          .withManifestCountWarning(content.manifestCountWarning())
+          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withSpecId(content.specId())
+          .withUseCaching(content.useCaching())
           .build();
     }
 
@@ -1542,6 +1554,17 @@ public class DTOConverters {
           icebergCompactionContentDTO.deleteFileNumberWeight(),
           icebergCompactionContentDTO.maxPartitionNum(),
           icebergCompactionContentDTO.rewriteOptions());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
+      PolicyContentDTO.IcebergRewriteManifestsContentDTO content =
+          (PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO;
+      return PolicyContents.icebergRewriteManifests(
+          content.manifestCountCritical(),
+          content.manifestCountWarning(),
+          content.avgManifestSizeThresholdBytes(),
+          content.specId(),
+          content.useCaching());
     }
 
     throw new IllegalArgumentException(

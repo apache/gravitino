@@ -100,6 +100,23 @@ public class StatisticEventDispatcher implements StatisticDispatcher {
   }
 
   @Override
+  public void mergeStatistics(
+      String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new UpdateStatisticsPreEvent(user, identifier, statistics));
+
+    try {
+      dispatcher.mergeStatistics(metalake, metadataObject, statistics);
+      eventBus.dispatchEvent(new UpdateStatisticsEvent(user, identifier, statistics));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new UpdateStatisticsFailureEvent(user, identifier, e, statistics));
+      throw e;
+    }
+  }
+
+  @Override
   public boolean dropStatistics(
       String metalake, MetadataObject metadataObject, List<String> statistics) {
     NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
