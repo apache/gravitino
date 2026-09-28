@@ -194,6 +194,18 @@ public class TestJobExecutorFactory {
   }
 
   @Test
+  public void testRejectLocalJobExecutorSubclassOverridingDeprecatedSubmitJob() {
+    Assertions.assertDoesNotThrow(
+        () -> JobExecutorFactory.checkJobExecutorClass(CustomLocalJobExecutor.class));
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobExecutorFactory.checkJobExecutorClass(LegacyLocalJobExecutor.class));
+    Assertions.assertTrue(e.getMessage().contains("LocalJobExecutor"), e.getMessage());
+  }
+
+  @Test
   public void testRejectJobExecutorWithoutSubmitJob() {
     // Either submit method is enough: the old one through the default of the new one.
     Assertions.assertDoesNotThrow(
@@ -321,6 +333,15 @@ public class TestJobExecutorFactory {
 
   /** A user's subclass of the local job executor, inheriting its initialization. */
   public static class CustomLocalJobExecutor extends LocalJobExecutor {}
+
+  // Overrides the deprecated submit method, which LocalJobExecutor no longer calls.
+  @SuppressWarnings("deprecation")
+  public static class LegacyLocalJobExecutor extends LocalJobExecutor {
+    @Override
+    public String submitJob(JobTemplate jobTemplate) {
+      throw new UnsupportedOperationException();
+    }
+  }
 
   /** A job executor that only records the configurations it's initialized with. */
   // Implements the deprecated submitJob(JobTemplate), like a job executor built for an earlier

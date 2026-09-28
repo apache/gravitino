@@ -125,14 +125,31 @@ public class JobExecutorFactory {
         "Job executor %s implements neither JobExecutor#submitJob(JobContext, JobTemplate) nor "
             + "JobExecutor#submitJob(JobTemplate), implement one of them to submit jobs.",
         jobExecutorClass.getName());
+
+    // LocalJobExecutor submits jobs through submitJob(JobContext, JobTemplate) and never calls the
+    // deprecated submitJob(JobTemplate), so a subclass that overrides only the latter would have
+    // its override silently skipped.
+    Preconditions.checkArgument(
+        !LocalJobExecutor.class.isAssignableFrom(jobExecutorClass)
+            || !implementsMethod(jobExecutorClass, "submitJob", JobTemplate.class)
+            || declaringClassOf(jobExecutorClass, "submitJob", JobContext.class, JobTemplate.class)
+                != LocalJobExecutor.class,
+        "Job executor %s extends LocalJobExecutor and overrides the deprecated "
+            + "JobExecutor#submitJob(JobTemplate), which LocalJobExecutor never calls. Override "
+            + "submitJob(JobContext, JobTemplate) instead.",
+        jobExecutorClass.getName());
   }
 
   private static boolean implementsMethod(
       Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
+    // An inherited default method of the interface is declared by the interface itself.
+    return declaringClassOf(jobExecutorClass, name, parameterTypes) != JobExecutor.class;
+  }
+
+  private static Class<?> declaringClassOf(
+      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
     try {
-      // An inherited default method of the interface is declared by the interface itself.
-      return jobExecutorClass.getMethod(name, parameterTypes).getDeclaringClass()
-          != JobExecutor.class;
+      return jobExecutorClass.getMethod(name, parameterTypes).getDeclaringClass();
     } catch (NoSuchMethodException e) {
       // Never happens for a JobExecutor, as the interface declares the method.
       throw new IllegalArgumentException(e);

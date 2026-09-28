@@ -32,8 +32,9 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShellProcessBuilder.class);
 
-  protected ShellProcessBuilder(ShellJobTemplate shellJobTemplate, Map<String, String> configs) {
-    super(shellJobTemplate, configs);
+  protected ShellProcessBuilder(
+      ShellJobTemplate shellJobTemplate, File workingDirectory, Map<String, String> configs) {
+    super(shellJobTemplate, workingDirectory, configs);
   }
 
   @Override

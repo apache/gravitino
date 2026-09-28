@@ -67,7 +67,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
-import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.exceptions.InUseException;
@@ -1773,11 +1772,10 @@ public class TestJobManager {
 
     try {
       JobTemplate jobTemplate =
-          JobResourceUtils.localizeJobTemplate(
-              new JobTemplateResolver(newShellJobTemplateEntity("shell_job", "echo"))
-                  .resolve(Collections.emptyMap()),
-              jobStagingDir);
-      String executionId = ownerExecutor.submitJob(jobTemplate);
+          new JobTemplateResolver(newShellJobTemplateEntity("shell_job", "echo"))
+              .resolve(Collections.emptyMap());
+      String executionId =
+          ownerExecutor.submitJob(new JobContext(1L, metalake, jobStagingDir), jobTemplate);
       Awaitility.await()
           .atMost(1, TimeUnit.MINUTES)
           .until(() -> ownerExecutor.getJobStatus(executionId) == JobHandle.Status.SUCCEEDED);
