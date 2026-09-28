@@ -54,6 +54,21 @@ public interface SupportsCatalogs {
   Catalog[] listCatalogsInfo() throws NoSuchMetalakeException;
 
   /**
+   * List all catalogs with their information in the metalake.
+   *
+   * <p>Implementations may omit catalog properties when {@code includeProperties} is {@code false}.
+   * The default implementation preserves compatibility by returning the complete catalog
+   * information.
+   *
+   * @param includeProperties whether to include resolved catalog properties
+   * @return The list of catalog's information.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  default Catalog[] listCatalogsInfo(boolean includeProperties) throws NoSuchMetalakeException {
+    return listCatalogsInfo();
+  }
+
+  /**
    * Load a catalog by its name.
    *
    * @param catalogName the name of the catalog.

@@ -61,6 +61,23 @@ public interface SupportsCatalogs {
   Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException;
 
   /**
+   * List all catalogs with their information in the metalake under the namespace {@link Namespace}.
+   *
+   * <p>Implementations may omit catalog properties when {@code includeProperties} is {@code false}.
+   * The default implementation preserves compatibility by returning the complete catalog
+   * information.
+   *
+   * @param namespace The namespace to list the catalogs under it.
+   * @param includeProperties whether to include resolved catalog properties
+   * @return The list of catalog's information.
+   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
+   */
+  default Catalog[] listCatalogsInfo(Namespace namespace, boolean includeProperties)
+      throws NoSuchMetalakeException {
+    return listCatalogsInfo(namespace);
+  }
+
+  /**
    * Load a catalog by its identifier.
    *
    * @param ident the identifier of the catalog.

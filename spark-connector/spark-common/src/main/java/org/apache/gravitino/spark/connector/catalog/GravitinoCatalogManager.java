@@ -162,19 +162,18 @@ public class GravitinoCatalogManager {
   }
 
   /**
-   * Loads the relational catalogs visible to the application identity. This runs at driver init,
-   * before any Spark session exists, so it never consults session state.
+   * Loads lightweight descriptors for the relational catalogs visible to the application identity.
+   * This runs at driver init, before any Spark session exists, so it never consults session state.
+   * Complete catalog information is loaded and cached when a catalog is first used.
    */
   public void loadRelationalCatalogs() {
     GravitinoIdentity identity = applicationIdentity();
-    Catalog[] catalogs = getClient(identity).listCatalogsInfo();
+    Catalog[] catalogs = getClient(identity).listCatalogsInfo(false);
     Map<String, Catalog> relationalCatalogs =
         Arrays.stream(catalogs)
             .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
             .collect(
                 Collectors.toMap(Catalog::name, catalog -> catalog, (first, second) -> second));
-    relationalCatalogs.forEach(
-        (name, catalog) -> gravitinoCatalogs.put(cacheKey(identity, name), catalog));
     this.applicationCatalogs = ImmutableMap.copyOf(relationalCatalogs);
   }
 
