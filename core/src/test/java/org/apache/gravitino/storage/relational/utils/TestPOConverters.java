@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.utils;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -869,6 +871,35 @@ public class TestPOConverters {
     assertEquals(8, updatePO3.getLastVersion());
     assertEquals(2, updatePO3.getOccVersion());
     assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
+  }
+
+  @Test
+  public void testUpdateFilesetPOVersionComparesPropertiesByValue() throws JsonProcessingException {
+    // The stored snapshot keeps this key order. For these keys a HashMap iterates differently.
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("team", "data");
+    properties.put("retention", "7d");
+    properties.put("gravitino.identifier", "id");
+    Map<String, String> reordered = new HashMap<>(properties);
+    assertNotEquals(
+        JsonUtils.anyFieldMapper().writeValueAsString(properties),
+        JsonUtils.anyFieldMapper().writeValueAsString(reordered));
+
+    Namespace namespace = NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema");
+    FilesetEntity filesetEntity =
+        createFileset(1L, "test", namespace, "this is test", "hdfs://localhost/test", properties);
+    FilesetEntity renamedFileset =
+        createFileset(1L, "test1", namespace, "this is test", "hdfs://localhost/test", reordered);
+
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
+
+    // Same properties in a different order: the rename writes no snapshot.
+    FilesetPO renamedPO = POConverters.updateFilesetPOWithVersion(initPO, renamedFileset, null);
+    assertEquals(2, renamedPO.getOccVersion());
+    assertEquals(1, renamedPO.getCurrentVersion());
+    assertTrue(renamedPO.getFilesetVersionPOs().isEmpty());
   }
 
   @Test

@@ -234,8 +234,8 @@ public class FilesetMetaBaseSQLProvider {
   /**
    * Returns the active fileset metadata row selected by its natural key.
    *
-   * <p>An overwrite may match the natural key instead of the incoming ID. Reading the stored row
-   * after the upsert tells dependent version rows which ID and database-generated version to use.
+   * <p>An overwrite may match the natural key instead of the incoming ID. The overwrite locks the
+   * stored row with this select, then updates it in place, keeping the stored ID.
    *
    * @param schemaId the schema ID
    * @param filesetName the fileset name
@@ -275,40 +275,6 @@ public class FilesetMetaBaseSQLProvider {
         + " )";
   }
 
-  public String insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO) {
-    return "INSERT INTO "
-        + META_TABLE_NAME
-        + " (fileset_id, fileset_name, metalake_id,"
-        + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, occ_version, deleted_at)"
-        + " VALUES ("
-        + " #{filesetMeta.filesetId},"
-        + " #{filesetMeta.filesetName},"
-        + " #{filesetMeta.metalakeId},"
-        + " #{filesetMeta.catalogId},"
-        + " #{filesetMeta.schemaId},"
-        + " #{filesetMeta.type},"
-        + " #{filesetMeta.auditInfo},"
-        + " #{filesetMeta.currentVersion},"
-        + " #{filesetMeta.lastVersion},"
-        + " #{filesetMeta.occVersion},"
-        + " #{filesetMeta.deletedAt}"
-        + " )"
-        + " ON DUPLICATE KEY UPDATE"
-        + " fileset_name = #{filesetMeta.filesetName},"
-        + " metalake_id = #{filesetMeta.metalakeId},"
-        + " catalog_id = #{filesetMeta.catalogId},"
-        + " schema_id = #{filesetMeta.schemaId},"
-        + " type = #{filesetMeta.type},"
-        + " audit_info = #{filesetMeta.auditInfo},"
-        // An overwrite is also a write observed by OCC. Advance the OCC token from the stored
-        // value instead of resetting the row to the initial version carried by the incoming
-        // create request. The history version is left alone: it is the join key into
-        // fileset_version_info, and this statement writes no snapshot to move it to.
-        + " occ_version = occ_version + 1,"
-        + " deleted_at = #{filesetMeta.deletedAt}";
-  }
-
   /**
    * Returns SQL that updates a fileset only while its OCC version is unchanged, and, when the alter
    * allocates a new snapshot, only while that snapshot version is free.
@@ -346,13 +312,7 @@ public class FilesetMetaBaseSQLProvider {
             + " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
             + " AND occ_version = #{oldFilesetMeta.occVersion}"
             + " AND deleted_at = 0";
-    // Null POs only reach this method from SQL-text probes. Keep the stricter guard then,
-    // rather than emit a statement that skips a check the caller may have needed.
-    boolean allocatesSnapshot =
-        newFilesetPO == null
-            || oldFilesetPO == null
-            || !Objects.equals(newFilesetPO.getCurrentVersion(), oldFilesetPO.getCurrentVersion());
-    if (allocatesSnapshot) {
+    if (!Objects.equals(newFilesetPO.getCurrentVersion(), oldFilesetPO.getCurrentVersion())) {
       sql +=
           " AND NOT EXISTS (SELECT 1 FROM "
               + VERSION_TABLE_NAME

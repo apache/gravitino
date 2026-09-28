@@ -23,7 +23,6 @@ import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.M
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
 public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
@@ -78,47 +77,5 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " WHERE fileset_id IN (SELECT fileset_id FROM "
         + META_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
-  }
-
-  @Override
-  public String insertFilesetMetaOnDuplicateKeyUpdate(FilesetPO filesetPO) {
-    return "INSERT INTO "
-        + META_TABLE_NAME
-        + " (fileset_id, fileset_name, metalake_id,"
-        + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, occ_version, deleted_at)"
-        + " VALUES ("
-        + " #{filesetMeta.filesetId},"
-        + " #{filesetMeta.filesetName},"
-        + " #{filesetMeta.metalakeId},"
-        + " #{filesetMeta.catalogId},"
-        + " #{filesetMeta.schemaId},"
-        + " #{filesetMeta.type},"
-        + " #{filesetMeta.auditInfo},"
-        + " #{filesetMeta.currentVersion},"
-        + " #{filesetMeta.lastVersion},"
-        + " #{filesetMeta.occVersion},"
-        + " #{filesetMeta.deletedAt}"
-        + " )"
-        // Overwrite is selected by name, and a create request normally carries a newly generated
-        // ID. Target the natural key so PostgreSQL preserves the ID of the row being replaced, the
-        // same behavior that MySQL and H2 provide for their duplicate-key upsert.
-        + " ON CONFLICT(schema_id, fileset_name, deleted_at) DO UPDATE SET"
-        + " fileset_name = #{filesetMeta.filesetName},"
-        + " metalake_id = #{filesetMeta.metalakeId},"
-        + " catalog_id = #{filesetMeta.catalogId},"
-        + " schema_id = #{filesetMeta.schemaId},"
-        + " type = #{filesetMeta.type},"
-        + " audit_info = #{filesetMeta.auditInfo},"
-        // An overwrite is a write observed by OCC, so it advances the OCC token from the stored
-        // value instead of resetting the row to the initial version the create request carries.
-        // The history version is left alone: it is the join key into fileset_version_info, and
-        // this statement writes no snapshot to move it to.
-        //
-        // PostgreSQL requires the stored row to be qualified on the update side of ON CONFLICT.
-        + " occ_version = "
-        + META_TABLE_NAME
-        + ".occ_version + 1,"
-        + " deleted_at = #{filesetMeta.deletedAt}";
   }
 }

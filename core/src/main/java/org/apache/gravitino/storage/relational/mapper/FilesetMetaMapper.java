@@ -237,11 +237,6 @@ public interface FilesetMetaMapper {
   @InsertProvider(type = FilesetMetaSQLProviderFactory.class, method = "insertFilesetMeta")
   void insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO);
 
-  @InsertProvider(
-      type = FilesetMetaSQLProviderFactory.class,
-      method = "insertFilesetMetaOnDuplicateKeyUpdate")
-  void insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO);
-
   @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "updateFilesetMeta")
   Integer updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,

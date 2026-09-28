@@ -781,10 +781,9 @@ public class POConverters {
   /**
    * Tells whether an alter leaves every field {@code fileset_version_info} stores untouched.
    *
-   * <p>Compares exactly the persisted columns: comment, the serialized properties, and the storage
-   * locations. Comparing the serialized properties rather than the map keeps the answer aligned
-   * with what a snapshot would actually hold, so a map that serializes identically is correctly
-   * reported as unchanged. This decides only whether to write a snapshot, never whether a
+   * <p>Compares exactly the persisted columns: comment, properties, and the storage locations.
+   * Properties are compared by value, because the same map can serialize in a different key order
+   * after a read/write round trip. This decides only whether to write a snapshot, never whether a
    * concurrent write happened, which is what the OCC version is for; a wrong {@code false} costs
    * one redundant snapshot, the behaviour every alter used to have.
    *
@@ -812,7 +811,25 @@ public class POConverters {
         .allMatch(
             version ->
                 Objects.equals(version.getFilesetComment(), newFileset.comment())
-                    && Objects.equals(version.getProperties(), newProperties));
+                    && filesetPropertiesUnchanged(
+                        version.getProperties(), newProperties, newFileset.properties()));
+  }
+
+  private static boolean filesetPropertiesUnchanged(
+      String storedProperties, String newProperties, Map<String, String> newPropertyMap) {
+    if (Objects.equals(storedProperties, newProperties)) {
+      return true;
+    }
+
+    // The alter path copies properties into a HashMap, so the same map can serialize in a
+    // different key order than the stored snapshot. Compare the maps so a rename does not
+    // allocate a redundant snapshot.
+    try {
+      return Objects.equals(
+          JsonUtils.anyFieldMapper().readValue(storedProperties, Map.class), newPropertyMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize fileset properties:", e);
+    }
   }
 
   /**

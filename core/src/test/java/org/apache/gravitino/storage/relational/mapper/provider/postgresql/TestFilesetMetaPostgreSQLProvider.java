@@ -18,28 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestFilesetMetaPostgreSQLProvider {
-
-  @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = new FilesetMetaPostgreSQLProvider().insertFilesetMetaOnDuplicateKeyUpdate(null);
-    String conflictClause = sql.substring(sql.indexOf(" ON CONFLICT"));
-
-    Assertions.assertTrue(
-        conflictClause.startsWith(" ON CONFLICT(schema_id, fileset_name, deleted_at)"));
-    // The overwrite advances the OCC token only. The history version is the join key into
-    // fileset_version_info and this statement writes no snapshot to move it to.
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "occ_version = " + FilesetMetaMapper.META_TABLE_NAME + ".occ_version + 1"));
-    Assertions.assertFalse(conflictClause.contains("current_version ="));
-    Assertions.assertFalse(conflictClause.contains("last_version ="));
-    Assertions.assertFalse(conflictClause.contains("#{filesetMeta.occVersion}"));
-  }
 
   @Test
   void testDirectDeleteUsesVersionCas() {

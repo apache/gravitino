@@ -106,11 +106,6 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().insertFilesetMeta(filesetPO);
   }
 
-  public static String insertFilesetMetaOnDuplicateKeyUpdate(
-      @Param("filesetMeta") FilesetPO filesetPO) {
-    return getProvider().insertFilesetMetaOnDuplicateKeyUpdate(filesetPO);
-  }
-
   public static String updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO) {

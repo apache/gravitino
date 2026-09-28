@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,6 +34,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,6 +55,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -509,6 +512,67 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     assertEquals("comment-v2", readBack.comment());
     assertEquals("/tmp-a", readBack.storageLocations().get("first"));
     assertEquals("/tmp-b", readBack.storageLocations().get("second"));
+  }
+
+  @TestTemplate
+  public void testRenameWithReorderedPropertiesWritesNoSnapshot() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_reordered_props");
+    NameIdentifier filesetIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
+    // FilesetCatalogOperations copies the stored properties into a HashMap before an alter. For
+    // these keys the HashMap iterates in a different order than the stored one.
+    Map<String, String> properties =
+        ImmutableMap.of("team", "data", "retention", "7d", "gravitino.identifier", "id");
+    Map<String, String> reordered = new HashMap<>(properties);
+    assertNotEquals(
+        JsonUtils.anyFieldMapper().writeValueAsString(properties),
+        JsonUtils.anyFieldMapper().writeValueAsString(reordered),
+        "The test needs keys whose HashMap order differs from the stored order");
+
+    FilesetEntity fileset =
+        FilesetEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(filesetName)
+            .withNamespace(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName))
+            .withFilesetType(Fileset.Type.MANAGED)
+            .withStorageLocations(ImmutableMap.of("first", "/tmp-a", "second", "/tmp-b"))
+            .withComment("comment")
+            .withProperties(properties)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    FilesetMetaService.getInstance().insertFileset(fileset, false);
+    FilesetPO initialPO = getFilesetPO(fileset.id());
+
+    String renamed = filesetName + "_renamed";
+    FilesetMetaService.getInstance()
+        .updateFileset(
+            filesetIdent,
+            entity -> {
+              FilesetEntity current = (FilesetEntity) entity;
+              return FilesetEntity.builder()
+                  .withId(current.id())
+                  .withName(renamed)
+                  .withNamespace(current.namespace())
+                  .withFilesetType(current.filesetType())
+                  .withStorageLocations(current.storageLocations())
+                  .withComment(current.comment())
+                  .withProperties(new HashMap<>(current.properties()))
+                  .withAuditInfo(current.auditInfo())
+                  .build();
+            });
+
+    FilesetPO afterRename = getFilesetPO(fileset.id());
+    assertEquals(renamed, afterRename.getFilesetName());
+    assertEquals(initialPO.getOccVersion() + 1, afterRename.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), afterRename.getCurrentVersion());
+    assertEquals(1, listFilesetVersions(fileset.id()).size());
+    assertEquals(2, countFilesetVersionRows(fileset.id()));
+    assertEquals(
+        properties,
+        FilesetMetaService.getInstance()
+            .getFilesetByIdentifier(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, renamed))
+            .properties());
   }
 
   @TestTemplate

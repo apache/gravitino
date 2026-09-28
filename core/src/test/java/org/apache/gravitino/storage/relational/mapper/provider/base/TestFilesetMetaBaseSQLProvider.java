@@ -28,21 +28,14 @@ class TestFilesetMetaBaseSQLProvider {
   private static final FilesetMetaBaseSQLProvider PROVIDER = new FilesetMetaBaseSQLProvider();
 
   @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = PROVIDER.insertFilesetMetaOnDuplicateKeyUpdate(null);
-    String updateClause = sql.substring(sql.indexOf(" ON DUPLICATE KEY UPDATE"));
-
-    // The overwrite advances the OCC token only. The history version is the join key into
-    // fileset_version_info and this statement writes no snapshot to move it to.
-    Assertions.assertTrue(updateClause.contains("occ_version = occ_version + 1"));
-    Assertions.assertFalse(updateClause.contains("current_version ="));
-    Assertions.assertFalse(updateClause.contains("last_version ="));
-    Assertions.assertFalse(updateClause.contains("occ_version = #{filesetMeta.occVersion}"));
-  }
-
-  @Test
   void testUpdateUsesVersionCasAndRejectsAnOccupiedSnapshotVersion() {
-    String sql = PROVIDER.updateFilesetMeta(null, null);
+    // An alter that allocates a new version keeps the snapshot check.
+    FilesetPO allocating = Mockito.mock(FilesetPO.class);
+    Mockito.when(allocating.getCurrentVersion()).thenReturn(4L);
+    FilesetPO stored = Mockito.mock(FilesetPO.class);
+    Mockito.when(stored.getCurrentVersion()).thenReturn(3L);
+
+    String sql = PROVIDER.updateFilesetMeta(allocating, stored);
     String whereClause = sql.substring(sql.indexOf(" WHERE"));
 
     Assertions.assertEquals(

@@ -48,7 +48,6 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
-import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -199,6 +198,8 @@ public class FilesetMetaService {
                                 FilesetVersionMapper.class,
                                 versionMapper ->
                                     versionMapper.selectMaxFilesetVersion(storedPO.getFilesetId()));
+                        // storedPO carries no snapshot rows, so an overwrite always allocates a
+                        // new version and writes its snapshot.
                         FilesetPO replacementPO =
                             POConverters.updateFilesetPOWithVersion(
                                 storedPO, replacement, maxStoredVersion);
@@ -210,16 +211,11 @@ public class FilesetMetaService {
                             po.getSchemaId());
                         persistedPO.set(replacementPO);
                       }),
-              () -> {
-                // An overwrite that replaces a row with identical stored content allocates no
-                // snapshot, and an empty batch insert is not valid SQL.
-                List<FilesetVersionPO> versionPOs = persistedPO.get().getFilesetVersionPOs();
-                if (versionPOs.isEmpty()) {
-                  return;
-                }
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class, mapper -> mapper.insertFilesetVersions(versionPOs));
-              });
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetVersionMapper.class,
+                      mapper ->
+                          mapper.insertFilesetVersions(persistedPO.get().getFilesetVersionPOs())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
