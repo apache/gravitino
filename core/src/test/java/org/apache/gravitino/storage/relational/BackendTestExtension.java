@@ -209,27 +209,33 @@ public class BackendTestExtension
       Mockito.when(config.get(Configs.ENTITY_STORE)).thenReturn(Configs.RELATIONAL_ENTITY_STORE);
       Mockito.when(config.get(Configs.ENTITY_RELATIONAL_STORE))
           .thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+      // On the shared-container path, several test-JVM forks may hold a connection pool against
+      // the same physical server at once, so the Gradle 'core' test task publishes a smaller,
+      // shared-safe pool size (see SharedCoreDatabaseProvisioner.POOL_MAX_CONNECTIONS_PROPERTY)
+      // instead of the much larger per-fork-container default.
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS))
-          .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
+          .thenReturn(
+              Integer.getInteger(
+                  SharedCoreDatabaseProvisioner.POOL_MAX_CONNECTIONS_PROPERTY,
+                  DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
 
       Mockito.when(config.get(CACHE_ENABLED)).thenReturn(true);
       RelationalBackend backend = new JDBCBackend();
-      if ("mysql".equals(backendType)) {
-        String url = baseIT.startAndInitMySQLBackend();
+      if ("mysql".equals(backendType) || "postgresql".equals(backendType)) {
+        String url =
+            SharedCoreDatabaseProvisioner.isEnabled(backendType)
+                ? SharedCoreDatabaseProvisioner.provision(backendType)
+                : "mysql".equals(backendType)
+                    ? baseIT.startAndInitMySQLBackend()
+                    : baseIT.startAndInitPGBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(url);
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
-            .thenReturn("com.mysql.cj.jdbc.Driver");
-      } else if ("postgresql".equals(backendType)) {
-        String url = baseIT.startAndInitPGBackend();
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(url);
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
-            .thenReturn("org.postgresql.Driver");
+            .thenReturn(
+                "mysql".equals(backendType) ? "com.mysql.cj.jdbc.Driver" : "org.postgresql.Driver");
       } else {
         // H2 Logic
         String uuid = UUID.randomUUID().toString().replace("-", "");

@@ -22,10 +22,8 @@ import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
-import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -112,19 +110,8 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    try (Connection connection =
-            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
-        Statement statement = connection.createStatement()) {
-
-      String query = format("CREATE DATABASE \"%s\"", testDatabaseName);
-      statement.execute(query);
-      LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
-    } catch (SQLException e) {
-      if (e.getMessage()
-          .equals(String.format("ERROR: database \"%s\" already exists", testDatabaseName))) {
-        LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
-      } else throw new RuntimeException(e);
-    }
+    DatabaseProvisioning.createDatabaseIfAbsent(
+        getJdbcUrl(), getUsername(), getPassword(), testDatabaseName.toString());
   }
 
   public String getUsername() {

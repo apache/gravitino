@@ -2,6 +2,9 @@ import com.sun.management.OperatingSystemMXBean
 import net.ltgt.gradle.errorprone.errorprone
 import org.apache.gravitino.testing.CoreDatabaseConcurrency
 import org.apache.gravitino.testing.CoreDatabaseConcurrency.DetectedCapacity
+import org.apache.gravitino.testing.DbConnectionInfo
+import org.apache.gravitino.testing.SharedDbContainerService
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoReport
@@ -181,6 +184,12 @@ val macDockerConnectorFixedNetwork =
     CoreDatabaseConcurrency.MAC_DOCKER_CONNECTOR_FIXED_NETWORK_EXTRA
   ] as? Boolean ?: false
 
+// Connection pool budget for the shared-container path: several test-JVM forks may briefly hold
+// connections against the same physical server at once, so this stays well under MySQL's default
+// max_connections=151 / PostgreSQL's default max_connections=100 even with a handful of forks and
+// classes active concurrently, while remaining far larger than any single test actually needs.
+val sharedDbTestConnectionPoolSize = 20
+
 fun registerCoreTestTask(
   taskName: String,
   backend: String? = null
@@ -315,6 +324,35 @@ fun registerCoreTestTask(
           throw GradleException(
             "$path requires Docker; use -PskipDockerTests=false with Docker running."
           )
+        }
+      }
+
+      // Contract with SharedCoreDatabaseProvisioner (core/src/test/java/.../storage/relational)
+      // and its ADMIN_PROPERTY_PREFIX/POOL_MAX_CONNECTIONS_PROPERTY constants - kept as literal
+      // strings on both sides rather than importing that class here, since a main build script
+      // cannot see a project's own test-source classes at configuration time (they are compiled
+      // by a task, not on the script's own classpath).
+      val sharedDbAdminPropertyPrefix = "gravitino.test.db."
+      systemProperty(sharedDbAdminPropertyPrefix + "pool.maxConnections", sharedDbTestConnectionPoolSize)
+
+      // Must match root build.gradle.kts's own dockerTest wiring exactly (rootProject.extra
+      // only, not e.g. System.getenv("dockerTest")): it unconditionally sets this task's
+      // dockerTest environment variable from rootProject.extra["dockerTest"], overriding
+      // anything a developer exported in their shell, which is what BackendTestExtension
+      // actually reads at test-JVM runtime. Gating shared-container startup on anything looser
+      // here could start it even when the forked test JVM will never see dockerTest=true and so
+      // never use it.
+      if (rootProject.extra["dockerTest"] == true) {
+        @Suppress("UNCHECKED_CAST")
+        val sharedDbContainerService =
+          rootProject.extra["sharedDbContainerService"] as Provider<SharedDbContainerService>
+        usesService(sharedDbContainerService)
+
+        doFirst {
+          val connectionInfo: DbConnectionInfo = sharedDbContainerService.get().connectionInfo(backend)
+          systemProperty(sharedDbAdminPropertyPrefix + backend + ".adminUrl", connectionInfo.adminJdbcUrl)
+          systemProperty(sharedDbAdminPropertyPrefix + backend + ".user", connectionInfo.user)
+          systemProperty(sharedDbAdminPropertyPrefix + backend + ".password", connectionInfo.password)
         }
       }
     }
