@@ -94,12 +94,6 @@ public class SemanticModelPOStorageOps
   }
 
   @Override
-  public List<SemanticModelPO> listPOs(
-      SemanticModelMetaMapper mapper, List<Long> semanticModelIds) {
-    return mapper.listSemanticModelPOsBySemanticModelIds(semanticModelIds);
-  }
-
-  @Override
   public List<SemanticModelPO> listPOsByNSFullName(
       SemanticModelMetaMapper mapper, Namespace namespace) {
     List<SemanticModelPO> pos =

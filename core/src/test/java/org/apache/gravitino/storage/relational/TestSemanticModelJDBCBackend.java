@@ -303,6 +303,8 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     SemanticModelPO byFullName = readSemanticModelPO(semanticModel.nameIdentifier(), false);
     assertEquals(semanticModel.id(), byParentId.getSemanticModelId());
     assertEquals(semanticModel.id(), byFullName.getSemanticModelId());
+    assertEquals(List.of(persisted), listSemanticModelPOs(namespace, true));
+    assertEquals(List.of(persisted), listSemanticModelPOs(namespace, false));
 
     RelationalEntityStoreIdResolver resolver = new RelationalEntityStoreIdResolver();
     NamespacedEntityId resolved =
@@ -312,17 +314,38 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
     String schema = namespace.level(2);
+    String emptySchema = "empty_schema";
+    createAndInsertSchema(metalake, catalog, emptySchema);
+    assertTrue(
+        listSemanticModelPOs(NamespaceUtil.ofSemanticModel(metalake, catalog, emptySchema), false)
+            .isEmpty());
+
+    Namespace missingCatalogNamespace =
+        NamespaceUtil.ofSemanticModel(metalake, "missing_catalog", schema);
+    NoSuchEntityException missingCatalog =
+        assertThrows(
+            NoSuchEntityException.class,
+            () -> listSemanticModelPOs(missingCatalogNamespace, false));
+    assertEquals(
+        String.format(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "catalog", "missing_catalog"),
+        missingCatalog.getMessage());
+
+    Namespace missingSchemaNamespace =
+        NamespaceUtil.ofSemanticModel(metalake, catalog, "missing_schema");
+    NoSuchEntityException missingSchema =
+        assertThrows(
+            NoSuchEntityException.class, () -> listSemanticModelPOs(missingSchemaNamespace, false));
+    assertEquals(
+        String.format(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "schema", "missing_schema"),
+        missingSchema.getMessage());
+
     List<NameIdentifier> missingParents =
         List.of(
             NameIdentifier.of(
                 NamespaceUtil.ofSemanticModel("missing_metalake", catalog, schema),
                 semanticModel.name()),
-            NameIdentifier.of(
-                NamespaceUtil.ofSemanticModel(metalake, "missing_catalog", schema),
-                semanticModel.name()),
-            NameIdentifier.of(
-                NamespaceUtil.ofSemanticModel(metalake, catalog, "missing_schema"),
-                semanticModel.name()));
+            NameIdentifier.of(missingCatalogNamespace, semanticModel.name()),
+            NameIdentifier.of(missingSchemaNamespace, semanticModel.name()));
     for (NameIdentifier missing : missingParents) {
       assertThrows(NoSuchEntityException.class, () -> readSemanticModelPO(missing, true));
       assertThrows(NoSuchEntityException.class, () -> readSemanticModelPO(missing, false));
@@ -620,6 +643,18 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
             POStorageReadRouting.getPO(
                 mapper,
                 identifier,
+                SemanticModelMetaService.getInstance().ops(),
+                Entity.EntityType.SEMANTIC_MODEL,
+                cacheEnabled));
+  }
+
+  private List<SemanticModelPO> listSemanticModelPOs(Namespace namespace, boolean cacheEnabled) {
+    return SessionUtils.getWithoutCommit(
+        SemanticModelMetaMapper.class,
+        mapper ->
+            POStorageReadRouting.listPOs(
+                mapper,
+                namespace,
                 SemanticModelMetaService.getInstance().ops(),
                 Entity.EntityType.SEMANTIC_MODEL,
                 cacheEnabled));

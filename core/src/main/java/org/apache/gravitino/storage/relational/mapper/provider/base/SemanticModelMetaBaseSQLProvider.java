@@ -170,25 +170,6 @@ public class SemanticModelMetaBaseSQLProvider {
         + " AND smvi.deleted_at = 0)";
   }
 
-  /** Returns SQL for listing current Semantic Model snapshots by stable IDs. */
-  public String listSemanticModelPOsBySemanticModelIds(
-      @Param("semanticModelIds") List<Long> semanticModelIds) {
-    return "<script>"
-        + "SELECT"
-        + CURRENT_SNAPSHOT_COLUMNS
-        + " FROM "
-        + TABLE_NAME
-        + " smm INNER JOIN "
-        + VERSION_TABLE_NAME
-        + " smvi ON smm.semantic_model_id = smvi.semantic_model_id"
-        + " AND smm.current_version = smvi.version"
-        + " WHERE smm.semantic_model_id IN "
-        + "<foreach item='semanticModelId' collection='semanticModelIds'"
-        + " open='(' separator=',' close=')'>#{semanticModelId}</foreach>"
-        + " AND smm.deleted_at = 0 AND smvi.deleted_at = 0"
-        + "</script>";
-  }
-
   /** Returns SQL for soft-deleting a Semantic Model identity with an optimistic version check. */
   public String softDeleteSemanticModelMetasBySemanticModelId(
       @Param("semanticModelId") Long semanticModelId,

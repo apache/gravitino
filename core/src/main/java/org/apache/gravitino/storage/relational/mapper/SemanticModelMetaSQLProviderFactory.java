@@ -72,12 +72,6 @@ public class SemanticModelMetaSQLProviderFactory {
     return getProvider().selectSemanticModelIdBySchemaIdAndName(schemaId, semanticModelName);
   }
 
-  /** Provides SQL for listing Semantic Models by stable IDs. */
-  public static String listSemanticModelPOsBySemanticModelIds(
-      @Param("semanticModelIds") List<Long> semanticModelIds) {
-    return getProvider().listSemanticModelPOsBySemanticModelIds(semanticModelIds);
-  }
-
   /** Provides SQL for selecting a Semantic Model by schema ID and name. */
   public static String selectSemanticModelMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {

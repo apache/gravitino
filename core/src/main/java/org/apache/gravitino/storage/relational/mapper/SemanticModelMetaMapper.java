@@ -106,14 +106,6 @@ public interface SemanticModelMetaMapper {
   Long selectSemanticModelIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName);
 
-  /** Lists current Semantic Model snapshots by stable IDs. */
-  @ResultMap("semanticModelPOResultMap")
-  @SelectProvider(
-      type = SemanticModelMetaSQLProviderFactory.class,
-      method = "listSemanticModelPOsBySemanticModelIds")
-  List<SemanticModelPO> listSemanticModelPOsBySemanticModelIds(
-      @Param("semanticModelIds") List<Long> semanticModelIds);
-
   /** Selects a current Semantic Model snapshot by schema ID and name. */
   @ResultMap("semanticModelPOResultMap")
   @SelectProvider(
