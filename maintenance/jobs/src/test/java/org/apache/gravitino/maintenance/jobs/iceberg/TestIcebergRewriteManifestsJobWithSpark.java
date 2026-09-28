@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -193,18 +195,26 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     if (caching != null) {
       jobConf.put("use_caching", caching);
     }
-    // Model JobManager's template substitution, including unresolved optional values.
+    // Model JobManager's template substitution: a parameter takes its value from the job
+    // configuration, and otherwise the default value the placeholder declares.
     return new IcebergRewriteManifestsJob()
         .jobTemplate().arguments().stream()
-            .map(
-                value -> {
-                  String resolved = value;
-                  for (Map.Entry<String, String> entry : jobConf.entrySet()) {
-                    resolved = resolved.replace("{{" + entry.getKey() + "}}", entry.getValue());
-                  }
-                  return resolved;
-                })
+            .map(value -> substitute(value, jobConf))
             .toArray(String[]::new);
+  }
+
+  private static String substitute(String value, Map<String, String> jobConf) {
+    Matcher matcher = Pattern.compile("\\{\\{([\\w.-]+)(?::-(.*?))?}}").matcher(value);
+    StringBuilder resolved = new StringBuilder();
+    while (matcher.find()) {
+      String replacement = jobConf.get(matcher.group(1));
+      if (replacement == null) {
+        replacement = matcher.group(2) == null ? matcher.group() : matcher.group(2);
+      }
+      matcher.appendReplacement(resolved, Matcher.quoteReplacement(replacement));
+    }
+    matcher.appendTail(resolved);
+    return resolved.toString();
   }
 
   private void startSpark() {
