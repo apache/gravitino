@@ -47,6 +47,7 @@ import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
@@ -161,6 +162,21 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testLoadSemanticModelNotInUse() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    doThrow(new MetalakeNotInUseException("metalake is not in use"))
+        .when(dispatcher)
+        .loadSemanticModel(ident);
+
+    assertError(
+        get(semanticModelPath() + "/sales"),
+        Response.Status.CONFLICT,
+        ErrorConstants.NOT_IN_USE_CODE,
+        MetalakeNotInUseException.class.getSimpleName(),
+        "metalake is not in use");
+  }
+
+  @Test
   void testCreateSemanticModelConvertsStructuredDefinition() {
     NameIdentifier ident = semanticModelIdentifier("sales");
     SemanticModelDefinition definition = semanticModelDefinition("TRINO");
@@ -196,6 +212,28 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         NameIdentifier.of(catalog, schema, "orders"),
         definitionCaptor.getValue().datasets()[0].source());
+  }
+
+  @Test
+  void testCreateSemanticModelDefaultsOmittedProperties() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    SemanticModelCreateRequest request =
+        new SemanticModelCreateRequest(
+            "sales",
+            "Sales definitions",
+            SemanticModelDefinitionDTO.fromDefinition(semanticModelDefinition()),
+            null);
+    SemanticModel semanticModel = semanticModel("sales", "Sales definitions");
+    when(dispatcher.createSemanticModel(
+            eq(ident), eq("Sales definitions"), any(SemanticModelDefinition.class), eq(Map.of())))
+        .thenReturn(semanticModel);
+
+    Response response = post(semanticModelPath(), request);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(dispatcher)
+        .createSemanticModel(
+            eq(ident), eq("Sales definitions"), any(SemanticModelDefinition.class), eq(Map.of()));
   }
 
   @Test

@@ -82,6 +82,15 @@ public class SemanticModelDTO implements SemanticModel {
     return comment;
   }
 
+  /**
+   * Returns whether this DTO contains a Semantic Model definition.
+   *
+   * @return {@code true} if the definition is present, otherwise {@code false}.
+   */
+  public boolean hasDefinition() {
+    return definition != null;
+  }
+
   @Override
   public SemanticModelDefinition definition() {
     Preconditions.checkArgument(definition != null, "definition must not be null");
@@ -177,20 +186,14 @@ public class SemanticModelDTO implements SemanticModel {
      * Builds a Semantic Model DTO.
      *
      * @return The Semantic Model DTO.
-     * @throws IllegalArgumentException If a required field or nested DTO is invalid.
+     * @throws IllegalArgumentException If a required field is missing.
      */
     public SemanticModelDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(definition != null, "definition cannot be null");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      SemanticModelDefinition convertedDefinition = definition.toDefinition();
-      return new SemanticModelDTO(
-          name,
-          comment,
-          SemanticModelDefinitionDTO.fromDefinition(convertedDefinition),
-          properties,
-          audit);
+      return new SemanticModelDTO(name, comment, definition, properties, audit);
     }
   }
 

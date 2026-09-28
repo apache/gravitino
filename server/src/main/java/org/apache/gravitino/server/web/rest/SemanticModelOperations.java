@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Collections;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -36,6 +37,7 @@ import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -90,11 +92,17 @@ public class SemanticModelOperations {
               throw new IllegalArgumentException("Request body must not be null");
             }
             request.validate();
+            SemanticModelDefinition definition = request.toDefinition();
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, request.getName());
             SemanticModel semanticModel =
                 dispatcher.createSemanticModel(
-                    ident, request.getComment(), request.toDefinition(), request.getProperties());
+                    ident,
+                    request.getComment(),
+                    definition,
+                    request.getProperties() == null
+                        ? Collections.emptyMap()
+                        : request.getProperties());
             LOG.info(
                 "Semantic Model created: {}.{}.{}.{}",
                 metalake,

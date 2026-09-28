@@ -58,7 +58,7 @@ public class SemanticModelResponse extends BaseResponse {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(semanticModel.name()),
         "semanticModel 'name' must not be null or empty");
-    semanticModel.definition();
+    Preconditions.checkArgument(semanticModel.hasDefinition(), "definition must not be null");
     Preconditions.checkArgument(
         semanticModel.auditInfo() != null, "semanticModel 'audit' must not be null");
   }
