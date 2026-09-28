@@ -19,6 +19,7 @@
 package org.apache.gravitino.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,6 +81,27 @@ public class TestNameIdentifierUtil {
             IllegalNamespaceException.class, () -> NameIdentifierUtil.checkModelVersion(abcd));
     assertTrue(
         excep5.getMessage().contains("Model version namespace must be non-null and have 4 levels"));
+  }
+
+  @Test
+  public void testHasThreeLevelNamespace() {
+    assertFalse(NameIdentifierUtil.hasThreeLevelNamespace(null));
+    assertFalse(NameIdentifierUtil.hasThreeLevelNamespace(NameIdentifier.of("metalake")));
+    assertFalse(
+        NameIdentifierUtil.hasThreeLevelNamespace(NameIdentifier.of("metalake", "catalog")));
+    assertFalse(
+        NameIdentifierUtil.hasThreeLevelNamespace(
+            NameIdentifier.of("metalake", "catalog", "schema")));
+    // Fileset, topic, and model share the three-level namespace shape.
+    assertTrue(
+        NameIdentifierUtil.hasThreeLevelNamespace(
+            NameIdentifier.of("metalake", "catalog", "schema", "fileset")));
+    assertTrue(
+        NameIdentifierUtil.hasThreeLevelNamespace(
+            NameIdentifier.of("metalake", "catalog", "schema", "topic")));
+    assertTrue(
+        NameIdentifierUtil.hasThreeLevelNamespace(
+            NameIdentifier.of("metalake", "catalog", "schema", "model")));
   }
 
   @Test

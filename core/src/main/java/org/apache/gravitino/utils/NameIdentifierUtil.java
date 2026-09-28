@@ -553,6 +553,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Returns whether {@code ident} has a three-level namespace ({@code metalake.catalog.schema} +
+   * entity name). Fileset, topic, and model identifiers share this shape.
+   *
+   * @param ident identifier to test (may be null)
+   * @return true if the identifier is non-null and its namespace has length 3
+   */
+  public static boolean hasThreeLevelNamespace(NameIdentifier ident) {
+    return ident != null && ident.namespace() != null && ident.namespace().length() == 3;
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a topic identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *

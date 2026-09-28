@@ -1067,8 +1067,9 @@ public class CatalogConnectorManager {
    * <p>Resolved here, on the node that is about to build the connector, rather than once at
    * registration time: the registered definition travels through a CREATE CATALOG statement that
    * Trino persists as a catalog properties file, and a secret placed in it would be readable there
-   * for as long as the catalog exists. Cloud/JDBC credential fields come from {@code
-   * getCredentials()}; other secrets come from {@code getSecrets()}.
+   * for as long as the catalog exists. Static cloud/JDBC credential fields come from {@code
+   * getCredentials()} ({@code expireTimeInMs() == 0} only); other secrets come from {@code
+   * getSecrets()}.
    */
   private GravitinoCatalog withResolvedSecrets(
       GravitinoCatalog catalog, GravitinoMetalake metalake) {
@@ -1103,9 +1104,13 @@ public class CatalogConnectorManager {
       Credential[] credentials = loaded.supportsCredentials().getCredentials();
       if (credentials != null) {
         for (Credential credential : credentials) {
-          if (credential != null && credential.credentialInfo() != null) {
-            properties.putAll(credential.credentialInfo());
+          // Skip expiring credentials: connector config is built once and cached.
+          if (credential == null
+              || credential.expireTimeInMs() != 0
+              || credential.credentialInfo() == null) {
+            continue;
           }
+          properties.putAll(credential.credentialInfo());
         }
       }
     } catch (UnsupportedOperationException | NotFoundException | RESTException ignored) {

@@ -370,7 +370,7 @@ public class TestIcebergCatalog {
   }
 
   @Test
-  void testExplicitCredentialProvidersStillGetsJdbc() {
+  void testExplicitCredentialProvidersNotForceAppendedJdbc() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -397,8 +397,7 @@ public class TestIcebergCatalog {
     Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
-    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertEquals("custom-provider", credentialProviders);
   }
 
   @Test

@@ -120,6 +120,132 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["f-secret"], "fs")
         self.assertEqual(len(merged), 3)
 
+    def test_fileset_static_credentials_override_catalog(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090", metalake_name="ml", options={}
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {}
+        catalog.get_secrets.return_value = {}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        fileset.properties.return_value = {}
+        fileset.get_secrets.return_value = {}
+        fileset_cred = MagicMock()
+        fileset_cred.expire_time_in_ms.return_value = 0
+        fileset_cred.credential_info.return_value = {
+            "s3-access-key-id": "fileset-ak",
+            "s3-secret-access-key": "fileset-sk",
+        }
+        fileset.support_credentials.return_value.get_credentials.return_value = [
+            fileset_cred
+        ]
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                merged = operations._merge_fileset_properties(
+                    NameIdentifier.of("ml", "catalog", "schema", "fs"),
+                    "s3://bucket/data",
+                )
+
+        self.assertEqual(merged["s3-access-key-id"], "fileset-ak")
+        self.assertEqual(merged["s3-secret-access-key"], "fileset-sk")
+
+    def test_does_not_merge_catalog_static_when_fileset_token_only(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090", metalake_name="ml", options={}
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {}
+        catalog.get_secrets.return_value = {}
+        catalog_cred = MagicMock()
+        catalog_cred.expire_time_in_ms.return_value = 0
+        catalog_cred.credential_info.return_value = {
+            "s3-access-key-id": "catalog-ak",
+            "s3-secret-access-key": "catalog-sk",
+        }
+        catalog.support_credentials.return_value.get_credentials.return_value = [
+            catalog_cred
+        ]
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        fileset.properties.return_value = {}
+        fileset.get_secrets.return_value = {}
+        token_cred = MagicMock()
+        token_cred.expire_time_in_ms.return_value = 1_700_000_000_000
+        token_cred.credential_info.return_value = {
+            "s3-access-key-id": "tok-ak",
+            "s3-secret-access-key": "tok-sk",
+        }
+        fileset.support_credentials.return_value.get_credentials.return_value = [
+            token_cred
+        ]
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                merged = operations._merge_fileset_properties(
+                    NameIdentifier.of("ml", "catalog", "schema", "fs"),
+                    "s3://bucket/data",
+                )
+
+        self.assertNotIn("s3-access-key-id", merged)
+        self.assertNotIn("s3-secret-access-key", merged)
+
+    def test_skips_expiring_credentials_in_property_merge(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090", metalake_name="ml", options={}
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {}
+        catalog.get_secrets.return_value = {}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        fileset.properties.return_value = {}
+        fileset.get_secrets.return_value = {}
+        token_cred = MagicMock()
+        token_cred.expire_time_in_ms.return_value = 1_700_000_000_000
+        token_cred.credential_info.return_value = {
+            "s3-access-key-id": "token-ak",
+            "s3-secret-access-key": "token-sk",
+        }
+        fileset.support_credentials.return_value.get_credentials.return_value = [
+            token_cred
+        ]
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                merged = operations._merge_fileset_properties(
+                    NameIdentifier.of("ml", "catalog", "schema", "fs"),
+                    "s3://bucket/data",
+                )
+
+        self.assertNotIn("s3-access-key-id", merged)
+        self.assertNotIn("s3-secret-access-key", merged)
+
 
 if __name__ == "__main__":
     unittest.main()

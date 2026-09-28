@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -28,6 +29,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.S3Properties;
@@ -70,7 +72,7 @@ public class TestGlueCatalogCredentials {
   }
 
   @Test
-  void testExplicitCredentialProvidersStillGetsAwsAndS3() {
+  void testExplicitCredentialProvidersNotForceAppended() {
     Map<String, String> props =
         Map.of(
             GlueConstants.AWS_ACCESS_KEY_ID,
@@ -80,7 +82,7 @@ public class TestGlueCatalogCredentials {
             GlueConstants.AWS_REGION,
             "us-east-1",
             CredentialConstants.CREDENTIAL_PROVIDERS,
-            "custom-provider");
+            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
 
     CatalogEntity entity =
         CatalogEntity.builder()
@@ -97,10 +99,19 @@ public class TestGlueCatalogCredentials {
     GlueCatalog catalog = new GlueCatalog().withCatalogEntity(entity).withCatalogConf(props);
     Map<String, String> withProviders = catalog.propertiesWithCredentialProviders();
 
-    String providers = withProviders.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    assertTrue(providers.contains("custom-provider"));
-    assertTrue(providers.contains(AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE));
-    assertTrue(providers.contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
+    // Explicit list wins; aws→s3 remap still applies for keys the listed providers may read.
+    assertEquals(
+        S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+        withProviders.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(
+        withProviders
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS)
+            .contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
+    assertFalse(
+        withProviders
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS)
+            .contains(AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE));
     assertEquals("AKIA", withProviders.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertEquals("secret", withProviders.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
   }
 }

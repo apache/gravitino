@@ -26,7 +26,6 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AwsSecretKeyCredential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.storage.S3Properties;
 
 /**
@@ -90,20 +89,14 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
   @Override
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> props = super.propertiesWithCredentialProviders();
-    // super() skips addCatalogSpecificCredentialProviders() when credential-providers is already
-    // set, so the aws-* → s3-* key mapping never runs. Apply it unconditionally here so that
-    // S3SecretKeyProvider.initialize() can read s3-access-key-id regardless of how the catalog
-    // was configured. Also ensure aws-secret-key is listed so Glue API keys remain available via
-    // getCredentials after getSecrets stopped returning them.
+    // Remap aws-* → s3-* even when credential-providers is explicit (super skips
+    // addCatalogSpecificCredentialProviders). Do not force-append providers: an explicit list
+    // (e.g. s3-token) must win per BaseCatalog / credential-vending docs.
     String accessKeyId = props.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretAccessKey = props.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKeyId) && StringUtils.isNotBlank(secretAccessKey)) {
       props.putIfAbsent(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId);
       props.putIfAbsent(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey);
-      ensureCredentialProviderListed(props, AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE);
-      // Remap creates s3-* keys; register s3-secret-key so getCredentials can vend them even when
-      // credential-providers was already set (super skips auto-detect).
-      ensureCredentialProviderListed(props, S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
     }
     return props;
   }

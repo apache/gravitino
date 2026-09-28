@@ -1904,15 +1904,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Fileset fileset = loadFileset(filesetIdentifier);
     String path = getTargetLocation(fileset);
 
+    // Resolve schema/fileset secret URNs to plaintext before inferring providers (same as
+    // BaseCatalog.propertiesWithCredentialProviders). Catalog conf is already plaintext.
     Set<String> providers =
-        CredentialUtils.getCredentialProvidersByOrder(
-            fileset::properties,
+        CredentialUtils.getCredentialProvidersByOrderOrInfer(
+            () -> secretManager.toPlaintextProperties(fileset.properties()),
             () -> {
               Namespace namespace = filesetIdentifier.namespace();
               NameIdentifier schemaIdentifier =
                   NameIdentifierUtil.ofSchema(
                       namespace.level(0), namespace.level(1), namespace.level(2));
-              return loadSchema(schemaIdentifier).properties();
+              return secretManager.toPlaintextProperties(loadSchema(schemaIdentifier).properties());
             },
             () -> conf);
     return providers.stream()

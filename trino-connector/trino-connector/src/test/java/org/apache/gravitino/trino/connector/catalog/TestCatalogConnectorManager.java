@@ -49,6 +49,7 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -1512,6 +1513,39 @@ public class TestCatalogConnectorManager {
     assertEquals("from-secret", properties.get("shared"));
     assertEquals("jdbc-secret", properties.get("jdbc-password"));
     assertEquals("u", properties.get("jdbc-user"));
+  }
+
+  @Test
+  public void testConnectorContextSkipsExpiringCredentials() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1"));
+    when(catalog.supportsSecrets().getSecrets()).thenReturn(Map.of());
+    when(catalog.supportsCredentials().getCredentials())
+        .thenReturn(
+            new Credential[] {
+              new S3TokenCredential(
+                  "tok-ak", "tok-sk", "session", System.currentTimeMillis() + 60_000),
+              new JdbcCredential("u", "jdbc-secret")
+            });
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    manager.createCatalogConnectorContext(
+        "memory",
+        createConnectorConfig(
+            GravitinoCatalog.toJson(
+                new GravitinoCatalog("test", "memory", "memory", Map.of("visible", "v1"), 0L))),
+        mockContext());
+
+    ArgumentCaptor<GravitinoCatalog> built = ArgumentCaptor.forClass(GravitinoCatalog.class);
+    verify(fixture.catalogFactory).createCatalogConnectorContextBuilder(built.capture());
+    Map<String, String> properties = built.getValue().getProperties();
+    assertEquals("jdbc-secret", properties.get("jdbc-password"));
+    assertEquals("u", properties.get("jdbc-user"));
+    assertFalse(properties.containsKey("s3-access-key-id"));
+    assertFalse(properties.containsKey("s3-secret-access-key"));
+    assertFalse(properties.containsKey("s3-session-token"));
   }
 
   @Test

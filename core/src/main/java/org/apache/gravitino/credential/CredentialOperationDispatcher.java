@@ -19,9 +19,13 @@
 
 package org.apache.gravitino.credential;
 
+import static org.apache.gravitino.Entity.EntityType.FILESET;
+import static org.apache.gravitino.Entity.EntityType.SCHEMA;
+
 import com.google.common.collect.ImmutableSet;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +41,8 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -85,30 +91,17 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
           .getCredential(entry.getKey(), contextOptional.get())
           .ifPresent(credentials::add);
     }
+    // Path-based (fileset) requests: catalog CredentialProviders are initialized with catalog
+    // properties only. For static secret-key types already selected for this request, rebuild from
+    // fileset→schema→catalog merged plaintext so schema/fileset AK/SK overrides win. Do not
+    // introduce static types omitted from the effective credential-providers list (e.g. s3-token
+    // only). Fileset/topic/model share a three-level namespace; this dispatcher is used from
+    // fileset catalogs for path-based credentials.
+    if (NameIdentifierUtil.hasThreeLevelNamespace(nameIdentifier)) {
+      return overlayFilesetStaticCredentials(
+          baseCatalog, nameIdentifier, credentials, contexts.keySet());
+    }
     return credentials;
-  }
-
-  private Map<String, CredentialContext> getCredentialContexts(
-      BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
-    if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
-      return getCatalogCredentialContexts(baseCatalog.propertiesWithCredentialProviders());
-    }
-
-    if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {
-      List<PathContext> pathContexts =
-          ((SupportsPathBasedCredentials) baseCatalog.ops()).getPathContext(nameIdentifier);
-      return getPathBasedCredentialContexts(privilege, pathContexts);
-    }
-    throw new NotSupportedException(
-        String.format("Catalog %s doesn't support generate credentials", baseCatalog.name()));
-  }
-
-  private Map<String, CredentialContext> getCatalogCredentialContexts(
-      Map<String, String> catalogProperties) {
-    CatalogCredentialContext context =
-        new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
-    Set<String> providers = CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
-    return providers.stream().collect(Collectors.toMap(provider -> provider, provider -> context));
   }
 
   public static Map<String, CredentialContext> getPathBasedCredentialContexts(
@@ -155,6 +148,56 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
     return Optional.of(
         new PathBasedCredentialContext(
             pathBasedCredentialContext.getUserName(), supportedWritePaths, supportedReadPaths));
+  }
+
+  private Map<String, CredentialContext> getCredentialContexts(
+      BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
+    if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
+      return getCatalogCredentialContexts(baseCatalog.propertiesWithCredentialProviders());
+    }
+
+    if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {
+      List<PathContext> pathContexts =
+          ((SupportsPathBasedCredentials) baseCatalog.ops()).getPathContext(nameIdentifier);
+      return getPathBasedCredentialContexts(privilege, pathContexts);
+    }
+    throw new NotSupportedException(
+        String.format("Catalog %s doesn't support generate credentials", baseCatalog.name()));
+  }
+
+  private Map<String, CredentialContext> getCatalogCredentialContexts(
+      Map<String, String> catalogProperties) {
+    CatalogCredentialContext context =
+        new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
+    Set<String> providers = CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
+    return providers.stream().collect(Collectors.toMap(provider -> provider, provider -> context));
+  }
+
+  private List<Credential> overlayFilesetStaticCredentials(
+      BaseCatalog baseCatalog,
+      NameIdentifier filesetIdent,
+      List<Credential> credentials,
+      Set<String> selectedProviderTypes) {
+    Map<String, String> merged = mergeFilesetPlaintextProperties(baseCatalog, filesetIdent);
+    if (merged.isEmpty()) {
+      return credentials;
+    }
+    return StaticSecretKeyCredentialFactory.overlay(credentials, merged, selectedProviderTypes);
+  }
+
+  private Map<String, String> mergeFilesetPlaintextProperties(
+      BaseCatalog baseCatalog, NameIdentifier filesetIdent) {
+    Map<String, String> merged = new HashMap<>(baseCatalog.propertiesWithCredentialProviders());
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(filesetIdent);
+    SchemaEntity schemaEntity = getEntity(schemaIdent, SCHEMA, SchemaEntity.class);
+    if (schemaEntity != null) {
+      merged.putAll(secretManager.toPlaintextProperties(schemaEntity.properties()));
+    }
+    FilesetEntity filesetEntity = getEntity(filesetIdent, FILESET, FilesetEntity.class);
+    if (filesetEntity != null) {
+      merged.putAll(secretManager.toPlaintextProperties(filesetEntity.properties()));
+    }
+    return merged;
   }
 
   private static boolean isPathSupported(CredentialProvider credentialProvider, String path) {

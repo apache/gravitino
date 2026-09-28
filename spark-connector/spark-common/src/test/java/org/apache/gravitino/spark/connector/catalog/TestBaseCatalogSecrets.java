@@ -32,6 +32,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
@@ -116,6 +117,23 @@ public class TestBaseCatalogSecrets {
       assertEquals("from-memory", catalog.lastProperties.get("custom-token"));
       assertEquals("jdbc-pwd", catalog.lastProperties.get("jdbc-password"));
     }
+  }
+
+  @Test
+  void testSkipsExpiringCredentials() {
+    setUpCatalog(
+        Map.of("jdbc-url", "jdbc:mysql://localhost/db"),
+        Map.of(),
+        new Credential[] {
+          new S3TokenCredential("tok-ak", "tok-sk", "session", System.currentTimeMillis() + 60_000),
+          new JdbcCredential("root", "jdbc-pwd")
+        });
+    catalog.initialize("jdbc", new CaseInsensitiveStringMap(Map.of()));
+
+    assertEquals("jdbc-pwd", catalog.lastProperties.get("jdbc-password"));
+    assertEquals("root", catalog.lastProperties.get("jdbc-user"));
+    assertEquals(false, catalog.lastProperties.containsKey("s3-access-key-id"));
+    assertEquals(false, catalog.lastProperties.containsKey("s3-session-token"));
   }
 
   private void setUpCatalog(Map<String, String> properties, Map<String, String> secrets) {

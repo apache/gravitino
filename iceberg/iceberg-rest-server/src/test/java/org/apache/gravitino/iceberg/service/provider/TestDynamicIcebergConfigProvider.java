@@ -40,6 +40,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -695,6 +696,62 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertEquals("cred-user", icebergProps.get(IcebergConstants.GRAVITINO_JDBC_USER));
     Assertions.assertEquals("cred-pwd", icebergProps.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
     Assertions.assertEquals("from-secret", icebergProps.get("shared"));
+  }
+
+  @Test
+  public void testSkipsExpiringCredentialsInCachedConfig() {
+    String metalakeName = "test_metalake";
+    String catalogName = "token_catalog";
+
+    Catalog mockCatalog =
+        Mockito.mock(
+            Catalog.class,
+            Mockito.withSettings()
+                .extraInterfaces(SupportsCredentials.class, SupportsSecrets.class));
+    SupportsSecrets supportsSecrets = (SupportsSecrets) mockCatalog;
+    SupportsCredentials supportsCredentials = (SupportsCredentials) mockCatalog;
+
+    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Mockito.when(mockCatalog.properties())
+        .thenReturn(
+            new HashMap<String, String>() {
+              {
+                put(IcebergConstants.CATALOG_BACKEND, "jdbc");
+                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+                put(IcebergConstants.URI, "jdbc:sqlite::memory:");
+                put(IcebergConstants.WAREHOUSE, "s3://bucket/wh");
+              }
+            });
+    Mockito.when(mockCatalog.supportsSecrets()).thenReturn(supportsSecrets);
+    Mockito.when(supportsSecrets.getSecrets()).thenReturn(Map.of());
+    Mockito.when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    Mockito.when(supportsCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {
+              new S3TokenCredential(
+                  "tok-ak", "tok-sk", "session", System.currentTimeMillis() + 60_000),
+              new JdbcCredential("static-user", "static-pwd")
+            });
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+    setMockCatalogFetcher(provider, Map.of(catalogName, mockCatalog));
+
+    Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
+    Assertions.assertTrue(config.isPresent());
+    Map<String, String> icebergProps = config.get().getIcebergCatalogProperties();
+    Assertions.assertEquals("static-user", icebergProps.get(IcebergConstants.GRAVITINO_JDBC_USER));
+    Assertions.assertEquals(
+        "static-pwd", icebergProps.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+    Assertions.assertFalse(
+        icebergProps.containsKey(S3TokenCredential.GRAVITINO_S3_SESSION_ACCESS_KEY_ID));
+    Assertions.assertFalse(
+        icebergProps.containsKey(S3TokenCredential.GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(icebergProps.containsKey(S3TokenCredential.GRAVITINO_S3_TOKEN));
   }
 
   @Test

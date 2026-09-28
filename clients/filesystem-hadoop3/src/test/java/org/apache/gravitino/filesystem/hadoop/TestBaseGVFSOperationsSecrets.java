@@ -243,7 +243,7 @@ public class TestBaseGVFSOperationsSecrets {
     SupportsSchemas schemas = mock(SupportsSchemas.class);
     FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
     SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
-    SupportsCredentials catalogCredentials = mock(SupportsCredentials.class);
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
 
     when(catalog.properties())
         .thenReturn(
@@ -256,10 +256,6 @@ public class TestBaseGVFSOperationsSecrets {
                 "http://s3.example.com"));
     when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
     when(catalogSecrets.getSecrets()).thenReturn(Map.of());
-    when(catalog.supportsCredentials()).thenReturn(catalogCredentials);
-    when(catalogCredentials.getCredentials())
-        .thenReturn(
-            new Credential[] {new S3SecretKeyCredential("AKIATEST", "secret-from-getCredentials")});
     when(catalog.asSchemas()).thenReturn(schemas);
     when(schemas.loadSchema("schema")).thenReturn(schema);
     when(schema.properties()).thenReturn(Map.of());
@@ -268,6 +264,10 @@ public class TestBaseGVFSOperationsSecrets {
     when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
     when(fileset.properties()).thenReturn(Map.of());
     when(fileset.supportsSecrets()).thenReturn(null);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    when(filesetCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {new S3SecretKeyCredential("AKIATEST", "secret-from-getCredentials")});
 
     GravitinoClient client = mock(GravitinoClient.class);
     when(client.loadCatalog("catalog")).thenReturn(catalog);
@@ -280,6 +280,147 @@ public class TestBaseGVFSOperationsSecrets {
     assertEquals(
         "secret-from-getCredentials", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
     assertEquals("http://s3.example.com", all.get("s3-endpoint"));
+  }
+
+  @Test
+  public void testDoesNotMergeCatalogStaticCredentialsWhenFilesetIsTokenOnly() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsCredentials catalogCredentials = mock(SupportsCredentials.class);
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
+
+    when(catalog.properties()).thenReturn(Map.of());
+    when(catalog.supportsSecrets()).thenReturn(null);
+    when(catalog.supportsCredentials()).thenReturn(catalogCredentials);
+    when(catalogCredentials.getCredentials())
+        .thenReturn(new Credential[] {new S3SecretKeyCredential("catalog-ak", "catalog-sk")});
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of());
+    when(schema.supportsSecrets()).thenReturn(null);
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of());
+    when(fileset.supportsSecrets()).thenReturn(null);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    Credential token = mock(Credential.class);
+    when(token.expireTimeInMs()).thenReturn(System.currentTimeMillis() + 60_000);
+    when(token.credentialInfo())
+        .thenReturn(
+            Map.of(
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                "tok-ak",
+                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "tok-sk"));
+    when(filesetCredentials.getCredentials()).thenReturn(new Credential[] {token});
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    TestOps ops = new TestOps(conf, client);
+    Map<String, String> all =
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+
+    assertFalse(all.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(all.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  public void testFilesetCredentialsOverrideCatalogStaticPair() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
+
+    when(catalog.properties()).thenReturn(Map.of());
+    when(catalog.supportsSecrets()).thenReturn(null);
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of());
+    when(schema.supportsSecrets()).thenReturn(null);
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of());
+    when(fileset.supportsSecrets()).thenReturn(null);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    when(filesetCredentials.getCredentials())
+        .thenReturn(new Credential[] {new S3SecretKeyCredential("fileset-ak", "fileset-sk")});
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    TestOps ops = new TestOps(conf, client);
+    Map<String, String> all =
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+
+    assertEquals("fileset-ak", all.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertEquals("fileset-sk", all.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  public void testSkipsExpiringCredentialsInPropertyMerge() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
+
+    Credential expiring = mock(Credential.class);
+    when(expiring.expireTimeInMs()).thenReturn(System.currentTimeMillis() + 60_000);
+    when(expiring.credentialInfo())
+        .thenReturn(
+            Map.of(
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                "token-ak",
+                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "token-sk"));
+
+    when(catalog.properties()).thenReturn(Map.of());
+    when(catalog.supportsSecrets()).thenReturn(null);
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of());
+    when(schema.supportsSecrets()).thenReturn(null);
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of());
+    when(fileset.supportsSecrets()).thenReturn(null);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    when(filesetCredentials.getCredentials()).thenReturn(new Credential[] {expiring});
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    TestOps ops = new TestOps(conf, client);
+    Map<String, String> all =
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+
+    assertFalse(all.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(all.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
   }
 
   @Test
@@ -296,7 +437,7 @@ public class TestBaseGVFSOperationsSecrets {
     SupportsSchemas schemas = mock(SupportsSchemas.class);
     FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
     SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
-    SupportsCredentials catalogCredentials = mock(SupportsCredentials.class);
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
 
     when(catalog.properties())
         .thenReturn(
@@ -309,10 +450,6 @@ public class TestBaseGVFSOperationsSecrets {
                 "http://s3.example.com"));
     when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
     when(catalogSecrets.getSecrets()).thenReturn(Map.of());
-    when(catalog.supportsCredentials()).thenReturn(catalogCredentials);
-    when(catalogCredentials.getCredentials())
-        .thenReturn(
-            new Credential[] {new S3SecretKeyCredential("AKIATEST", "secret-from-getCredentials")});
     when(catalog.asSchemas()).thenReturn(schemas);
     when(schemas.loadSchema("schema")).thenReturn(schema);
     when(schema.properties()).thenReturn(Map.of());
@@ -321,6 +458,10 @@ public class TestBaseGVFSOperationsSecrets {
     when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
     when(fileset.properties()).thenReturn(Map.of());
     when(fileset.supportsSecrets()).thenReturn(null);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    when(filesetCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {new S3SecretKeyCredential("AKIATEST", "secret-from-getCredentials")});
 
     GravitinoClient client = mock(GravitinoClient.class);
     when(client.loadCatalog("catalog")).thenReturn(catalog);

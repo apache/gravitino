@@ -110,19 +110,8 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
     Map<String, String> props = super.propertiesWithCredentialProviders();
     // Iceberg is security-first: disable s3:ListBucket on bare location prefix so a vended
     // credential cannot enumerate sibling keys. This is catalog-type policy, not user-configurable.
+    // Do not force-append jdbc (or other) providers when credential-providers is already set.
     props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
-    // super() skips addCatalogSpecificCredentialProviders when credential-providers is already
-    // set; ensure jdbc stays listed so getCredentials can vend after getSecrets stopped returning
-    // jdbc keys.
-    String catalogBackend = props.get(IcebergConstants.CATALOG_BACKEND);
-    if (catalogBackend != null
-        && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
-      String jdbcUser = props.get(IcebergConstants.GRAVITINO_JDBC_USER);
-      String jdbcPassword = props.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
-      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
-        ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
-      }
-    }
     return props;
   }
 

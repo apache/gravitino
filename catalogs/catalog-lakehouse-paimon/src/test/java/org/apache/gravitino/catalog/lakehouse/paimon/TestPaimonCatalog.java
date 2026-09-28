@@ -423,7 +423,7 @@ public class TestPaimonCatalog {
   }
 
   @Test
-  void testExplicitCredentialProvidersStillGetsJdbc() {
+  void testExplicitCredentialProvidersNotForceAppendedJdbc() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -451,12 +451,11 @@ public class TestPaimonCatalog {
     Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
-    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertEquals("custom-provider", credentialProviders);
   }
 
   @Test
-  void testExplicitCredentialProvidersStillGetsDlf() {
+  void testExplicitCredentialProvidersNotForceAppendedDlf() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -483,9 +482,7 @@ public class TestPaimonCatalog {
     Map<String, String> properties = dlfCatalog.propertiesWithCredentialProviders();
 
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
-    Assertions.assertTrue(
-        credentialProviders.contains(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE));
+    Assertions.assertEquals("custom-provider", credentialProviders);
   }
 
   private PaimonCatalog newPaimonCatalog(String catalogName) {

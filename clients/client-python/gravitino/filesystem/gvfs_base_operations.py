@@ -501,9 +501,11 @@ class BaseGVFSOperations(ABC):
         """Merge properties from catalog, schema, fileset, options, and configs.
 
         Combines default load*.properties() with get_secrets() for non-credential
-        secrets, and catalog get_credentials().credential_info() for cloud/JDBC
-        credential fields. Typed path credentials remain available via get_credentials
-        on the fileset when credential vending is enabled.
+        secrets, and fileset get_credentials().credential_info() (static, expire==0
+        only). Catalog get_credentials is skipped: it ignores fileset/schema
+        credential-providers (e.g. token-only) and must not inject catalog AK/SK.
+        Typed path token credentials remain available via fileset get_credentials
+        when credential vending is enabled.
 
         :param fileset_ident: The fileset identifier
         :param actual_location: The actual storage location
@@ -518,11 +520,12 @@ class BaseGVFSOperations(ABC):
         )
         fileset_props = dict(catalog.properties() or {})
         fileset_props.update(catalog.get_secrets())
-        self._merge_catalog_credentials(fileset_props, catalog)
         fileset_props.update(schema.properties() or {})
         fileset_props.update(schema.get_secrets())
         fileset_props.update(fileset.properties() or {})
         fileset_props.update(fileset.get_secrets())
+        # Recover static keys via fileset get_credentials only (respects effective providers).
+        self._merge_static_credentials(fileset_props, fileset)
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location
@@ -532,11 +535,16 @@ class BaseGVFSOperations(ABC):
         return fileset_props
 
     @staticmethod
-    def _merge_catalog_credentials(fileset_props: Dict[str, str], catalog) -> None:
-        """Overlay catalog credential_info into fileset_props when supported."""
+    def _merge_static_credentials(fileset_props: Dict[str, str], holder) -> None:
+        """Overlay static (non-expiring) credential_info into fileset_props when supported."""
         try:
-            supports_credentials = catalog.support_credentials()
+            supports_credentials = holder.support_credentials()
             for credential in supports_credentials.get_credentials() or []:
+                if credential is None:
+                    continue
+                # Skip expiring credentials; only static (expire == 0) keys go into props.
+                if credential.expire_time_in_ms() != 0:
+                    continue
                 info = credential.credential_info()
                 if info:
                     fileset_props.update(info)

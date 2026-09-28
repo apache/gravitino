@@ -19,6 +19,9 @@
 package org.apache.gravitino.flink.connector.utils;
 
 import java.util.Map;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -75,5 +78,25 @@ public class TestPropertyUtils {
     Map<String, String> merged =
         PropertyUtils.propertiesWithSecrets(null, () -> () -> Map.of("secret", "x"));
     Assertions.assertEquals("x", merged.get("secret"));
+  }
+
+  @Test
+  void testSkipsExpiringCredentials() {
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecretsAndCredentials(
+            Map.of("visible", "ok"),
+            () -> () -> Map.of(),
+            () ->
+                () ->
+                    new Credential[] {
+                      new S3TokenCredential(
+                          "tok-ak", "tok-sk", "session", System.currentTimeMillis() + 60_000),
+                      new JdbcCredential("u", "jdbc-secret")
+                    });
+    Assertions.assertEquals("jdbc-secret", merged.get("jdbc-password"));
+    Assertions.assertEquals("u", merged.get("jdbc-user"));
+    Assertions.assertFalse(merged.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(merged.containsKey("s3-session-token"));
+    Assertions.assertEquals("ok", merged.get("visible"));
   }
 }

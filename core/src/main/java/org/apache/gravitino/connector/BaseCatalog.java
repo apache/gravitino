@@ -40,23 +40,14 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.AzureAccountKeyCredential;
-import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.GCSTokenCredential;
-import org.apache.gravitino.credential.OSSSecretKeyCredential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.COSProperties;
-import org.apache.gravitino.storage.GCSProperties;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -560,30 +551,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * Appends {@code credentialType} to {@link CredentialConstants#CREDENTIAL_PROVIDERS} when it is
-   * not already listed. Used by subclasses that must keep catalog-specific providers available even
-   * when the property was set explicitly (so {@link #addCatalogSpecificCredentialProviders} was
-   * skipped).
-   *
-   * @param props mutable catalog properties
-   * @param credentialType provider type name to ensure
-   */
-  protected static void ensureCredentialProviderListed(
-      Map<String, String> props, String credentialType) {
-    String providers = props.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    if (StringUtils.isBlank(providers)) {
-      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialType);
-      return;
-    }
-    for (String part : providers.split(",")) {
-      if (credentialType.equals(part.trim())) {
-        return;
-      }
-    }
-    props.put(CredentialConstants.CREDENTIAL_PROVIDERS, providers + "," + credentialType);
-  }
-
-  /**
    * Returns whether hidden credentials should be backfilled into catalog properties for backward
    * compatibility with connectors that do not support credential vending. Controlled by
    * server-level config {@code gravitino.catalog.credential.backfillToProperties}.
@@ -596,37 +563,18 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         && Boolean.TRUE.equals(serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES));
   }
 
+  /**
+   * Appends inferred storage credential provider names (S3/OSS/Azure/GCS/COS) when the
+   * corresponding key pairs are present in {@code properties}. Delegates to {@link
+   * CredentialUtils#addStorageCredentialProviders(Map, List)}.
+   *
+   * @param properties catalog or merged plaintext properties
+   * @param credentialProviders list to append detected provider type names to
+   */
   @Evolving
   protected void addStorageCredentialProviders(
       Map<String, String> properties, List<String> credentialProviders) {
-    String s3AccessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
-    String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
-    if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
-      credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
-    }
-
-    String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
-    String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
-      credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
-    }
-
-    String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
-    String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
-      credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
-    }
-
-    String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
-    if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
-      credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
-    }
-
-    String cosAccessKeyId = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID);
-    String cosSecretAccessKey = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(cosAccessKeyId) && StringUtils.isNotBlank(cosSecretAccessKey)) {
-      credentialProviders.add(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE);
-    }
+    CredentialUtils.addStorageCredentialProviders(properties, credentialProviders);
   }
 
   @Override

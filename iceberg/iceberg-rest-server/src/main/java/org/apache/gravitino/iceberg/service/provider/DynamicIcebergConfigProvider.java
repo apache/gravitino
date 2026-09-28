@@ -108,7 +108,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         String.format("Catalog %s is not an Iceberg catalog", catalog.name()));
 
     // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets for
-    // non-credential secrets, then getCredentials().credentialInfo() for cloud/JDBC fields.
+    // non-credential secrets, then static getCredentials().credentialInfo() for cloud/JDBC fields.
     if (catalog instanceof BaseCatalog) {
       BaseCatalog<?> baseCatalog = (BaseCatalog<?>) catalog;
       Map<String, String> props =
@@ -138,9 +138,13 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         Credential[] credentials = supportsCredentials.getCredentials();
         if (credentials != null) {
           for (Credential credential : credentials) {
-            if (credential != null && credential.credentialInfo() != null) {
-              props.putAll(credential.credentialInfo());
+            // Skip expiring credentials: this config is cached and has no refresh path.
+            if (credential == null
+                || credential.expireTimeInMs() != 0
+                || credential.credentialInfo() == null) {
+              continue;
             }
+            props.putAll(credential.credentialInfo());
           }
         }
       }

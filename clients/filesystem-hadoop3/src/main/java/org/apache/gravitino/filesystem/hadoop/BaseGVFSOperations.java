@@ -56,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -975,9 +976,11 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
-    putCredentialInfo(all, catalog);
     putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
     putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
+    // Recover static keys via fileset getCredentials only. Catalog getCredentials ignores
+    // fileset/schema credential-providers (e.g. token-only) and must not inject catalog AK/SK.
+    putCredentialInfo(all, fileset::supportsCredentials);
     all.putAll(extractNonDefaultConfig(conf));
     return all;
   }
@@ -993,13 +996,14 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   /**
-   * Merges {@link Credential#credentialInfo()} from catalog-level credential vending into GVFS
-   * configuration. Static cloud keys (for example {@code s3-access-key-id}) are recovered here
-   * rather than via {@code getSecrets()}.
+   * Merges static {@link Credential#credentialInfo()} into GVFS configuration. Static cloud keys
+   * (for example {@code s3-access-key-id}) are recovered here rather than via {@code getSecrets()}.
+   * Credentials with a non-zero expire time are skipped (path token vending uses a separate path).
    */
-  private static void putCredentialInfo(Map<String, String> target, Catalog catalog) {
+  private static void putCredentialInfo(
+      Map<String, String> target, Supplier<SupportsCredentials> supportsCredentialsSupplier) {
     try {
-      SupportsCredentials supportsCredentials = catalog.supportsCredentials();
+      SupportsCredentials supportsCredentials = supportsCredentialsSupplier.get();
       if (supportsCredentials == null) {
         return;
       }
@@ -1008,12 +1012,15 @@ public abstract class BaseGVFSOperations implements Closeable {
         return;
       }
       for (Credential credential : credentials) {
-        if (credential != null && credential.credentialInfo() != null) {
-          target.putAll(credential.credentialInfo());
+        if (credential == null
+            || credential.expireTimeInMs() != 0
+            || credential.credentialInfo() == null) {
+          continue;
         }
+        target.putAll(credential.credentialInfo());
       }
     } catch (UnsupportedOperationException ignored) {
-      // Catalog does not support credential vending.
+      // Object does not support credential vending.
     }
   }
 

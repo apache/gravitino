@@ -21,6 +21,7 @@ package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Assertions;
@@ -62,5 +63,100 @@ public class TestCredentialUtils {
         CredentialUtils.getCredentialProvidersByOrder(
             () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
     Assertions.assertEquals(credentialProviders, ImmutableSet.of("a", "b"));
+  }
+
+  @Test
+  void testInferWhenEntireChainOmitsCredentialProviders() {
+    Map<String, String> filesetProperties =
+        ImmutableMap.of(
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
+            "fileset-ak",
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+            "fileset-sk");
+    Map<String, String> schemaProperties = ImmutableMap.of();
+    Map<String, String> catalogProperties = ImmutableMap.of();
+
+    Set<String> providers =
+        CredentialUtils.getCredentialProvidersByOrderOrInfer(
+            () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
+    Assertions.assertEquals(
+        ImmutableSet.of(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE), providers);
+  }
+
+  @Test
+  void testExplicitCatalogProvidersWinOverFilesetKeys() {
+    Map<String, String> filesetProperties =
+        ImmutableMap.of(
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
+            "fileset-ak",
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+            "fileset-sk");
+    Map<String, String> schemaProperties = ImmutableMap.of();
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            CredentialConstants.CREDENTIAL_PROVIDERS, S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
+
+    Set<String> providers =
+        CredentialUtils.getCredentialProvidersByOrderOrInfer(
+            () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
+    Assertions.assertEquals(ImmutableSet.of(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE), providers);
+  }
+
+  @Test
+  void testSchemaKeysInferredWhenChainOmitsProviders() {
+    Map<String, String> filesetProperties = ImmutableMap.of();
+    Map<String, String> schemaProperties =
+        ImmutableMap.of(
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
+            "schema-ak",
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+            "schema-sk");
+    Map<String, String> catalogProperties = ImmutableMap.of();
+
+    Set<String> providers =
+        CredentialUtils.getCredentialProvidersByOrderOrInfer(
+            () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
+    Assertions.assertEquals(
+        ImmutableSet.of(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE), providers);
+  }
+
+  @Test
+  void testFilesetKeysWinOverCatalogWhenInferring() {
+    Map<String, String> filesetProperties =
+        ImmutableMap.of(
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
+            "fileset-ak",
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+            "fileset-sk");
+    Map<String, String> schemaProperties = ImmutableMap.of();
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
+            "catalog-ak",
+            S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+            "catalog-sk");
+
+    Set<String> providers =
+        CredentialUtils.getCredentialProvidersByOrderOrInfer(
+            () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
+    Assertions.assertEquals(
+        ImmutableSet.of(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE), providers);
+  }
+
+  @Test
+  void testInferEmptyWhenNoKeysAndNoProviders() {
+    Set<String> providers =
+        CredentialUtils.getCredentialProvidersByOrderOrInfer(
+            ImmutableMap::of, ImmutableMap::of, ImmutableMap::of);
+    Assertions.assertTrue(providers.isEmpty());
+  }
+
+  @Test
+  void testAddStorageCredentialProvidersNullSafe() {
+    Assertions.assertDoesNotThrow(
+        () -> CredentialUtils.addStorageCredentialProviders(null, new ArrayList<>()));
+    Assertions.assertDoesNotThrow(
+        () -> CredentialUtils.addStorageCredentialProviders(ImmutableMap.of(), null));
+    Assertions.assertTrue(CredentialUtils.inferStorageCredentialProviders(null).isEmpty());
   }
 }

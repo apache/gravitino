@@ -31,6 +31,10 @@ import javax.annotation.Nullable;
  * (for example {@code s3-session-token}, {@code oss-security-token}, {@code cos-security-token},
  * {@code adls-sas-token}, GCS {@code token}, and AWS IRSA {@code access-key-id} / {@code
  * secret-access-key} / {@code session-token}).
+ *
+ * <p>Every {@link Credential} SPI implementation's {@link Credential#credentialInfo()} keys must be
+ * in this set or among the vended-only exclusions above. Unit tests walk the SPI to enforce that
+ * contract.
  */
 public final class CredentialPropertyKeys {
 

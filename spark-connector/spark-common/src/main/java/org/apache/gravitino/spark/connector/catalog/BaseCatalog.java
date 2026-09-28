@@ -738,9 +738,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       Credential[] credentials = catalog.supportsCredentials().getCredentials();
       if (credentials != null) {
         for (Credential credential : credentials) {
-          if (credential != null && credential.credentialInfo() != null) {
-            props.putAll(credential.credentialInfo());
+          // Skip expiring credentials: Spark catalog properties are fixed at initialize time.
+          if (credential == null
+              || credential.expireTimeInMs() != 0
+              || credential.credentialInfo() == null) {
+            continue;
           }
+          props.putAll(credential.credentialInfo());
         }
       }
     } catch (UnsupportedOperationException ignored) {

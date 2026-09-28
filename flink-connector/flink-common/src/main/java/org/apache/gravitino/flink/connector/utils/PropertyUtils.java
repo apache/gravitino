@@ -43,8 +43,8 @@ public class PropertyUtils {
 
   /**
    * Merges masked entity {@code properties} with plaintext from {@link
-   * SupportsSecrets#getSecrets()} and {@link Credential#credentialInfo()} from {@link
-   * SupportsCredentials#getCredentials()}.
+   * SupportsSecrets#getSecrets()} and static {@link Credential#credentialInfo()} from {@link
+   * SupportsCredentials#getCredentials()} ({@code expireTimeInMs() == 0} only).
    *
    * <p>When secrets or credentials are unavailable — stubs that do not implement the interfaces, or
    * older Gravitino servers that return {@link NotFoundException} / {@link RESTException} — returns
@@ -61,8 +61,9 @@ public class PropertyUtils {
   }
 
   /**
-   * Merges masked entity {@code properties} with {@code getSecrets()} and {@code
-   * getCredentials().credentialInfo()}.
+   * Merges masked entity {@code properties} with {@code getSecrets()} and static (non-expiring)
+   * {@code getCredentials().credentialInfo()}. Expiring credentials must not be frozen into Flink
+   * catalog store configuration.
    *
    * @param properties masked or raw properties (may be null)
    * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}
@@ -95,9 +96,12 @@ public class PropertyUtils {
           Credential[] credentials = supportsCredentials.getCredentials();
           if (credentials != null) {
             for (Credential credential : credentials) {
-              if (credential != null && credential.credentialInfo() != null) {
-                merged.putAll(credential.credentialInfo());
+              if (credential == null
+                  || credential.expireTimeInMs() != 0
+                  || credential.credentialInfo() == null) {
+                continue;
               }
+              merged.putAll(credential.credentialInfo());
             }
           }
         }

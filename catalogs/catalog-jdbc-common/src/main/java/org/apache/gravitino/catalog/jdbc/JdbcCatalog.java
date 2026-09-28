@@ -153,23 +153,13 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   }
 
   /**
-   * Ensures the JDBC provider stays listed even when {@code credential-providers} was set
-   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case,
-   * and jdbc keys are no longer recovered via {@code getSecrets}.
+   * Adds the JDBC credential provider when username/password are configured. Only used when {@code
+   * credential-providers} is omitted; an explicit list is left unchanged by {@link
+   * BaseCatalog#propertiesWithCredentialProviders()}.
    *
-   * @return catalog properties with credential providers
+   * @param properties the raw catalog properties
+   * @param credentialProviders the list to append detected provider names to
    */
-  @Override
-  public Map<String, String> propertiesWithCredentialProviders() {
-    Map<String, String> props = super.propertiesWithCredentialProviders();
-    String jdbcUser = props.get(JdbcConfig.USERNAME.getKey());
-    String jdbcPassword = props.get(JdbcConfig.PASSWORD.getKey());
-    if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
-      ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
-    }
-    return props;
-  }
-
   @Override
   protected void addCatalogSpecificCredentialProviders(
       Map<String, String> properties, List<String> credentialProviders) {
