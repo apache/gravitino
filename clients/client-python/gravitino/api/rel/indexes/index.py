@@ -86,3 +86,7 @@ class Index(ABC):
             List[List[str]]: The field name under the table contained in the index.
         """
         pass  # pragma: no cover
+
+    def properties(self) -> dict[str, str]:
+        """Returns extra index properties, or an empty dictionary when none are set."""
+        return {}

@@ -38,6 +38,21 @@ class MockDataClass(DataClassJsonMixin):
 
 
 class TestIndexSerdes(unittest.TestCase):
+    def test_index_serdes_without_properties_override(self):
+        class IndexWithoutProperties(Index):
+            def type(self) -> Index.IndexType:
+                return Index.IndexType.PRIMARY_KEY
+
+            def name(self) -> str:
+                return "PRIMARY"
+
+            def field_names(self) -> list[list[str]]:
+                return [["id"]]
+
+        index = IndexWithoutProperties()
+        self.assertEqual({}, index.properties())
+        self.assertNotIn("properties", IndexSerdes.serialize(index))
+
     def test_index_serdes_invalid_json(self):
         invalid_json_string = [
             '{"indexes": [{}]}',
@@ -150,3 +165,14 @@ class TestIndexSerdes(unittest.TestCase):
         self.assertEqual(annoy_properties, annoy.properties())
         self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, usearch.type())
         self.assertEqual(usearch_properties, usearch.properties())
+
+        serialized_json = MockDataClass([annoy, usearch]).to_json()
+        serialized = json.loads(serialized_json)
+        self.assertEqual(annoy_properties, serialized["indexes"][0]["properties"])
+        self.assertEqual(usearch_properties, serialized["indexes"][1]["properties"])
+
+        round_tripped = MockDataClass.from_json(serialized_json).indexes
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_ANNOY, round_tripped[0].type())
+        self.assertEqual(annoy_properties, round_tripped[0].properties())
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, round_tripped[1].type())
+        self.assertEqual(usearch_properties, round_tripped[1].properties())
