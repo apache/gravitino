@@ -33,9 +33,15 @@ import javax.annotation.Nullable;
  * properties()} responses (which may be masked as {@code ******}). Plaintext for S3/OSS/COS access
  * key pairs and Azure storage account keys is recovered via {@code getCredentials()}. Masked
  * placeholders are dropped by {@link #omitStaticCredentialProperties}. Non-credential configuration
- * such as {@code gcs-service-account-file} may still appear in {@code properties()}. Azure client
- * secrets that are not credential-vending keys remain omitted here; recover them via {@code
- * getSecrets()} when needed.
+ * such as {@code gcs-service-account-file} may still appear in {@code properties()}.
+ *
+ * <p>{@code azure-storage-account-name} is intentionally left non-hidden (and not listed here):
+ * unlike S3/OSS/COS access key IDs, the account name is already disclosed in ADLS URIs such as
+ * {@code abfss://container@account.dfs.core.windows.net}, so masking it on load/list adds no
+ * confidentiality. Only {@code azure-storage-account-key} is treated as a secret half.
+ *
+ * <p>Azure client secrets that are not credential-vending keys remain omitted here; recover them
+ * via {@code getSecrets()} when needed.
  */
 public final class CloudStorageCredentialPropertyKeys {
 
