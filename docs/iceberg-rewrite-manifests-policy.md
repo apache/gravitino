@@ -30,8 +30,8 @@ At the defaults, 99 manifests never trigger; 100 manifests averaging 8 MiB do no
 ## Collect, evaluate, and submit
 
 Collect `custom-manifest-number-by-spec` and `custom-avg-manifest-size-by-spec` for the
-chosen spec before evaluating. The statistics job supports `--update-mode manifests` for
-collecting this pair without data-file statistics, including after partition evolution. Both values are objects keyed by the decimal spec ID.
+chosen spec before evaluating. Submit `builtin-iceberg-update-manifest-stats` to collect
+this pair without data-file statistics, including after partition evolution. Both values are objects keyed by the decimal spec ID.
 The handler reads the same key from one table-statistics response. A missing map or key
 means collection is required and produces no recommendation. An empty spec has count and
 average zero. Malformed measurements fail evaluation. Counts from other specs are ignored.
@@ -67,7 +67,7 @@ Recollect statistics after a successful rewrite before evaluating again.
 ## Keeping the collection target
 
 An application that collects and evaluates in one cycle may omit the requested spec.
-`IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(spark, catalog, table, null)`
+`IcebergUpdateManifestStatsJob.collectManifestStatistics(spark, catalog, table, null)`
 resolves the current default once and returns an `IcebergManifestStatistics` measurement.
 Pass its `statistics()` into `StrategyHandlerContext` and its `specId()` into
 `ManifestRewriteStrategyHandler.initialize(context, resolvedSpecId)`. Alternatively, publish

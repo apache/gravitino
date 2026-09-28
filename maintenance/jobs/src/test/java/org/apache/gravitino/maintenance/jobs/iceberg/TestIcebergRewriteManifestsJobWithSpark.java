@@ -152,7 +152,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
   @Test
   public void testCollectEvaluateAndRewriteAfterDefaultSpecChanges() {
     IcebergManifestStatistics measurement =
-        IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(
+        IcebergUpdateManifestStatsJob.collectManifestStatistics(
             spark, "manifest_catalog", "db.events", null);
     assertEquals(1, measurement.specId());
     assertEquals(3, measurement.count());
@@ -194,7 +194,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertEquals(newDefaultManifests, manifests(2));
     assertEquals(records, records());
     IcebergManifestStatistics after =
-        IcebergUpdateStatsAndMetricsJob.collectManifestStatistics(
+        IcebergUpdateManifestStatsJob.collectManifestStatistics(
             spark, "manifest_catalog", "db.events", measurement.specId());
     handler.initialize(
         StrategyHandlerContext.builder(context.nameIdentifier(), context.strategy())
