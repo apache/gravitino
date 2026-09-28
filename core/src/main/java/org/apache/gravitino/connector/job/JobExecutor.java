@@ -60,15 +60,45 @@ public interface JobExecutor extends Closeable {
   String submitJob(JobTemplate jobTemplate);
 
   /**
-   * Get the status of a job by its unique identifier. The status should be one of the values in
-   * {@link JobHandle.Status}. The implementors should query the external job runner to get the job
-   * status, and map the status to the values in {@link JobHandle.Status}.
+   * Get a snapshot of the job's execution state by its unique identifier, including its status and
+   * when the job actually started and finished. The implementors should query the external job
+   * runner to get the job state, and map the status to the values in {@link JobHandle.Status}.
+   *
+   * <p>Gravitino pulls the job state periodically, so a job may go through several statuses between
+   * two pulls, for example, from {@link JobHandle.Status#QUEUED} straight to {@link
+   * JobHandle.Status#SUCCEEDED}. The timestamps are attributes of the job, not of a particular
+   * status: once the job has started, the started time must be reported in every later snapshot,
+   * including the terminal ones. Once reported, a timestamp should not change.
+   *
+   * <ul>
+   *   <li>The started time is null if the job hasn't started executing, or if it is unknown to the
+   *       job executor.
+   *   <li>The finished time is only set for a terminal status, and is null if it is unknown to the
+   *       job executor.
+   * </ul>
+   *
+   * <p>If the job runner can't tell when a job started or finished, leave the time null. Gravitino
+   * then falls back to the time it observes the job running or finished, which can be off by up to
+   * the job status pull interval. A job that starts and finishes between two pulls is never
+   * observed running, so it has no started time in that case.
+   *
+   * @param jobId The unique identifier of the job.
+   * @return The execution snapshot of the job.
+   * @throws NoSuchJobException If the job with the given identifier does not exist.
+   */
+  JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException;
+
+  /**
+   * Get the status of a job by its unique identifier. It is a shortcut of {@link
+   * #getJobExecutionInfo(String)} that only returns the status.
    *
    * @param jobId The unique identifier of the job.
    * @return The status of the job.
    * @throws NoSuchJobException If the job with the given identifier does not exist.
    */
-  JobHandle.Status getJobStatus(String jobId) throws NoSuchJobException;
+  default JobHandle.Status getJobStatus(String jobId) throws NoSuchJobException {
+    return getJobExecutionInfo(jobId).status();
+  }
 
   /**
    * Cancel a job by its unique identifier. The job runner should stop the job if it is currently
@@ -119,12 +149,12 @@ public interface JobExecutor extends Closeable {
    * Get the captured standard output of the job, as a list of lines.
    *
    * <p>The default implementation returns an empty list, so implementors that don't support output
-   * retrieval don't need to override this method. Unlike {@link #getJobStatus(String)}/{@link
-   * #cancelJob(String)}, this method never throws for a job the executor doesn't (or no longer)
-   * know about - the job entity itself may still exist even after the executor's own bookkeeping
-   * for its output has expired or been lost (e.g. when it's only kept in memory and the server
-   * restarts, or kept on storage this server can't reach), so "unknown to this executor" is
-   * reported as empty output, not as an error.
+   * retrieval don't need to override this method. Unlike {@link
+   * #getJobExecutionInfo(String)}/{@link #cancelJob(String)}, this method never throws for a job
+   * the executor doesn't (or no longer) know about - the job entity itself may still exist even
+   * after the executor's own bookkeeping for its output has expired or been lost (e.g. when it's
+   * only kept in memory and the server restarts, or kept on storage this server can't reach), so
+   * "unknown to this executor" is reported as empty output, not as an error.
    *
    * @param jobId The unique identifier of the job.
    * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
@@ -142,12 +172,12 @@ public interface JobExecutor extends Closeable {
    * Get the captured standard error output of the job, as a list of lines.
    *
    * <p>The default implementation returns an empty list, so implementors that don't support output
-   * retrieval don't need to override this method. Unlike {@link #getJobStatus(String)}/{@link
-   * #cancelJob(String)}, this method never throws for a job the executor doesn't (or no longer)
-   * know about - the job entity itself may still exist even after the executor's own bookkeeping
-   * for its output has expired or been lost (e.g. when it's only kept in memory and the server
-   * restarts, or kept on storage this server can't reach), so "unknown to this executor" is
-   * reported as empty output, not as an error.
+   * retrieval don't need to override this method. Unlike {@link
+   * #getJobExecutionInfo(String)}/{@link #cancelJob(String)}, this method never throws for a job
+   * the executor doesn't (or no longer) know about - the job entity itself may still exist even
+   * after the executor's own bookkeeping for its output has expired or been lost (e.g. when it's
+   * only kept in memory and the server restarts, or kept on storage this server can't reach), so
+   * "unknown to this executor" is reported as empty output, not as an error.
    *
    * @param jobId The unique identifier of the job.
    * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
