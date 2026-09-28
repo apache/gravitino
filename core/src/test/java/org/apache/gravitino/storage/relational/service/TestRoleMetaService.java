@@ -46,6 +46,11 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+>>>>>>> 19e3a555c ([#13504] fix(core): Report missing securable objects correctly (#13505))
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -836,6 +841,242 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+<<<<<<< HEAD
+=======
+  void testUpdateRoleReportsMissingSecurableObject() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    String catalogName = "catalog";
+    createAndInsertCatalog(METALAKE_NAME, catalogName);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role",
+            AUDIT_INFO,
+            catalogName);
+    roleMetaService.insertRole(role, false);
+
+    String missingCatalog = "missing_catalog";
+    NoSuchMetadataObjectException exception =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                roleMetaService.updateRole(
+                    role.nameIdentifier(),
+                    (RoleEntity current) ->
+                        RoleEntity.builder()
+                            .withId(current.id())
+                            .withName(current.name())
+                            .withNamespace(current.namespace())
+                            .withProperties(current.properties())
+                            .withSecurableObjects(
+                                Lists.newArrayList(
+                                    SecurableObjects.ofCatalog(
+                                        missingCatalog,
+                                        Lists.newArrayList(Privileges.UseCatalog.allow()))))
+                            .withAuditInfo(current.auditInfo())
+                            .build()));
+
+    Assertions.assertEquals(
+        "Metadata object missing_catalog type CATALOG doesn't exist", exception.getMessage());
+    Assertions.assertInstanceOf(NoSuchEntityException.class, exception.getCause());
+    Assertions.assertEquals(role, roleMetaService.getRoleByIdentifier(role.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testConcurrentUpdateDoesNotChangeSecurableObjectsOnConflict() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "concurrent-role",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            RoleMetaService.getInstance()
+                .updateRole(
+                    role.nameIdentifier(),
+                    (RoleEntity oldRole) -> {
+                      advanceRoleVersion(role.id());
+                      List<SecurableObject> securableObjects =
+                          Lists.newArrayList(oldRole.securableObjects());
+                      securableObjects.add(
+                          SecurableObjects.ofMetalake(
+                              METALAKE_NAME, Lists.newArrayList(Privileges.CreateTable.allow())));
+                      return RoleEntity.builder()
+                          .withId(oldRole.id())
+                          .withName(oldRole.name())
+                          .withNamespace(oldRole.namespace())
+                          .withProperties(oldRole.properties())
+                          .withSecurableObjects(securableObjects)
+                          .withAuditInfo(oldRole.auditInfo())
+                          .build();
+                    }));
+
+    RoleEntity storedRole =
+        RoleMetaService.getInstance().getRoleByIdentifier(role.nameIdentifier());
+    assertTrue(
+        CollectionUtils.isEqualCollection(
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            storedRole.securableObjects()));
+  }
+
+  @TestTemplate
+  void testCreateLocksMetalakeWithoutChangingVersion() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "fenced-role",
+            AUDIT_INFO,
+            "catalog");
+
+    service.insertRole(role, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion(), afterCreate.getCurrentVersion());
+    assertEquals(beforeCreate.getLastVersion(), afterCreate.getLastVersion());
+
+    RoleEntity duplicate =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            role.name(),
+            AUDIT_INFO,
+            "catalog");
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertRole(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
+  }
+
+  @TestTemplate
+  void testOverwriteInsertAdvancesVersion() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "overwrite-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO initialPO = getRolePO(role.name());
+
+    service.insertRole(role, true);
+
+    RolePO overwrittenPO = getRolePO(role.name());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            RoleMetaMapper.class,
+            mapper -> mapper.softDeleteRoleMetaByRoleId(role.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  void testMetadataOnlyUpdateUsesOcc() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "metadata-only-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO beforeUpdate = getRolePO(role.name());
+
+    service.updateRole(role.nameIdentifier(), (RoleEntity oldRole) -> copyRole(oldRole, "value-1"));
+
+    RolePO afterUpdate = getRolePO(role.name());
+    assertEquals(beforeUpdate.getCurrentVersion() + 1, afterUpdate.getCurrentVersion());
+    assertEquals(
+        "value-1", service.getRoleByIdentifier(role.nameIdentifier()).properties().get("key"));
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateRole(
+                role.nameIdentifier(),
+                (RoleEntity oldRole) -> {
+                  advanceRoleVersion(role.id());
+                  return copyRole(oldRole, "value-2");
+                }));
+    assertEquals(
+        "value-1", service.getRoleByIdentifier(role.nameIdentifier()).properties().get("key"));
+  }
+
+  @TestTemplate
+  void testStaleDeleteReportsConflict() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "stale-delete-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO staleRolePO = getRolePO(role.name());
+    advanceRoleVersion(role.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteRoleWithVersion(role.nameIdentifier(), staleRolePO));
+    assertEquals(role.id(), service.getRoleByIdentifier(role.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  void testAlterReportsNoSuchWhenRoleIsDeletedConcurrently() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "deleted-during-alter",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            service.updateRole(
+                role.nameIdentifier(),
+                (RoleEntity oldRole) -> {
+                  service.deleteRole(role.nameIdentifier());
+                  return copyRole(oldRole, "ignored-value");
+                }));
+  }
+
+  @TestTemplate
+>>>>>>> 19e3a555c ([#13504] fix(core): Report missing securable objects correctly (#13505))
   void testDeleteMetalakeCascade() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     createAndInsertCatalog(METALAKE_NAME, "catalog");
