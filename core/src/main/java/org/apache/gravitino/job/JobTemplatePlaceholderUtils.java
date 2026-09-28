@@ -41,13 +41,17 @@ import org.apache.gravitino.meta.JobTemplateEntity;
  *   <li>{@code {{name}}}: a required parameter. Submitting a job without a value for it fails.
  *   <li>{@code {{name:-default}}}: an optional parameter that falls back to {@code default}, which
  *       may be empty ({@code {{name:-}}}). A default declared on one occurrence of a parameter
- *       applies to all of its occurrences in the template. The default value is used as is and may
- *       span lines, but its braces must be balanced, so the placeholder ends at the first <code>
+ *       applies to all of its occurrences in the template, wherever it is declared, so a parameter
+ *       written as {@code {{name}}} in one place and {@code {{name:-default}}} in another is
+ *       optional everywhere. Declaring different defaults for the same parameter is rejected. The
+ *       default value is used as is and may span lines, but its braces must be balanced, so the
+ *       placeholder ends at the first <code>
  *       }}</code> outside of them. A JSON object is a valid default value, for example {@code
  *       {{options:-{"k":"v"}}}}.
  *   <li><code>\{{</code>: a literal <code>{{</code>, for templates that must pass through text such
  *       as another tool's {@code {{macro}}}. A value that ends with a backslash right before a
- *       placeholder therefore has to double it, as in <code>\\{{name}}</code>.
+ *       placeholder doubles it, as in <code>\\{{name}}</code>, which resolves the placeholder and
+ *       keeps one backslash. A backslash anywhere else is plain text.
  * </ul>
  *
  * <p>A parameter takes its value from the job configuration first, where an explicit empty string
@@ -65,6 +69,8 @@ final class JobTemplatePlaceholderUtils {
   private static final String CLOSE = "}}";
 
   private static final String ESCAPED_OPEN = "\\{{";
+
+  private static final String ESCAPED_BACKSLASH_OPEN = "\\\\{{";
 
   /** Receives the literal text and the placeholders of a template value, in order. */
   private interface TokenVisitor {
@@ -216,6 +222,16 @@ final class JobTemplatePlaceholderUtils {
     Matcher start = PLACEHOLDER_START.matcher(value);
     int index = 0;
     while (index < value.length()) {
+      // "\\{{" keeps one backslash and lets the placeholder resolve, so a value that ends with a
+      // backslash can still be followed by a placeholder. It is checked first, because its tail is
+      // itself an escape.
+      if (value.startsWith(ESCAPED_BACKSLASH_OPEN, index)) {
+        literal.append('\\');
+        // Consume both backslashes, so the "{{" that follows is read as a placeholder.
+        index += 2;
+        continue;
+      }
+
       if (value.startsWith(ESCAPED_OPEN, index)) {
         literal.append(OPEN);
         index += ESCAPED_OPEN.length();
@@ -252,6 +268,7 @@ final class JobTemplatePlaceholderUtils {
   private static int findDefaultValueEnd(String value, int from, String name) {
     int depth = 0;
     boolean hasBrace = false;
+    boolean hasUnmatchedClose = false;
     for (int index = from; index < value.length(); index++) {
       char c = value.charAt(index);
       if (c == '{') {
@@ -271,9 +288,10 @@ final class JobTemplatePlaceholderUtils {
           if (hasBrace && next < value.length() && value.charAt(next) == '}') {
             throw new IllegalArgumentException(
                 String.format(
-                    "The default value of job template parameter %s is ambiguous because the "
-                        + "placeholder is followed by '}'. Keep the braces in the default value "
-                        + "balanced: %s",
+                    "The placeholder of job template parameter %s is followed by '}', so it is "
+                        + "unclear whether that '}' closes the placeholder or belongs to its "
+                        + "default value. Insert a space before it, or move it into the default "
+                        + "value: %s",
                     name, value));
           }
           return index;
@@ -282,17 +300,21 @@ final class JobTemplatePlaceholderUtils {
               String.format(
                   "The default value of job template parameter %s has an unmatched '}': %s",
                   name, value));
+        } else {
+          hasUnmatchedClose = true;
         }
       }
     }
 
-    throw new IllegalArgumentException(
-        String.format(
-            depth > 0
-                ? "The default value of job template parameter %s has an unmatched '{': %s"
-                : "The placeholder of job template parameter %s is not closed with '}}': %s",
-            name,
-            value));
+    String reason;
+    if (depth > 0) {
+      reason = "The default value of job template parameter %s has an unmatched '{': %s";
+    } else if (hasUnmatchedClose) {
+      reason = "The default value of job template parameter %s has an unmatched '}': %s";
+    } else {
+      reason = "The placeholder of job template parameter %s is not closed with '}}': %s";
+    }
+    throw new IllegalArgumentException(String.format(reason, name, value));
   }
 
   private static void flushLiteral(StringBuilder literal, TokenVisitor visitor) {
@@ -302,18 +324,27 @@ final class JobTemplatePlaceholderUtils {
     }
   }
 
+  /**
+   * Returns the values of a job template that are resolved when a job runs. Only the fields of the
+   * template's own job type are included, so a leftover value of another job type never turns into
+   * a parameter the job configuration has to provide.
+   */
   private static List<String> templateValues(JobTemplateEntity.TemplateContent content) {
     List<String> values = new ArrayList<>();
     values.add(content.executable());
     addAll(values, content.arguments());
     addEntries(values, content.environments());
     addEntries(values, content.customFields());
-    addAll(values, content.scripts());
-    values.add(content.className());
-    addAll(values, content.jars());
-    addAll(values, content.files());
-    addAll(values, content.archives());
-    addEntries(values, content.configs());
+
+    if (content.jobType() == JobTemplate.JobType.SHELL) {
+      addAll(values, content.scripts());
+    } else if (content.jobType() == JobTemplate.JobType.SPARK) {
+      values.add(content.className());
+      addAll(values, content.jars());
+      addAll(values, content.files());
+      addAll(values, content.archives());
+      addEntries(values, content.configs());
+    }
     return values;
   }
 

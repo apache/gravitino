@@ -122,11 +122,12 @@ default value.
   missing parameters. No job is created and no file is downloaded.
 - Keys in the job configuration that the template does not use are ignored, and the server logs a
   warning.
-- A placeholder name can contain letters, digits, `_`, `.`, and `-`. Text such as `{{ name }}`,
-  with spaces, is not a placeholder and is passed through as is.
+- A placeholder name can contain ASCII letters, digits, `_`, `.`, and `-`. Text such as
+  `{{ name }}`, with spaces, is not a placeholder and is passed through as is.
 - Only `{{` needs escaping. A placeholder always starts with `{{`, so `}}` on its own is plain
-  text. A value that ends with a backslash right before a placeholder has to double it, as in
-  `\\{{name}}`.
+  text. A value that ends with a backslash right before a placeholder doubles it, as in
+  `\\{{name}}`, which keeps one backslash and still resolves the placeholder. A backslash anywhere
+  else is plain text.
 - A placeholder whose default value contains braces cannot be immediately followed by a literal
   `}`, because it is then unclear which `}}` closes it. Put the whole structure in the default
   value, or insert a space. A default value without braces, such as `{"k":{{v:-1}}}`, is fine.

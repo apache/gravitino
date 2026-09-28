@@ -18,13 +18,19 @@
  */
 package org.apache.gravitino.maintenance.jobs;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
+import org.apache.gravitino.job.JobTemplateResolver;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Test;
 
 public class TestBuiltInJobTemplateProvider {
@@ -61,6 +67,28 @@ public class TestBuiltInJobTemplateProvider {
       assertTrue(
           version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN),
           "Version should match pattern v\\d+: " + version);
+    }
+  }
+
+  @Test
+  public void testAllTemplatePlaceholdersAreValid() {
+    // Built-in templates are stored without going through registerJobTemplate, so a malformed
+    // placeholder in one of them would only fail when a job runs from it.
+    for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {
+      JobTemplateEntity entity =
+          JobTemplateEntity.builder()
+              .withId(1L)
+              .withName(template.name())
+              .withComment(template.comment())
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+
+      assertDoesNotThrow(
+          () -> JobTemplateResolver.validate(entity),
+          "Built-in job template has invalid placeholders: " + template.name());
     }
   }
 }

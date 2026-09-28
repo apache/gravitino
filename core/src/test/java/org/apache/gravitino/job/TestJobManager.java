@@ -950,8 +950,8 @@ public class TestJobManager {
 
     verify(jobExecutor, never()).submitJob(any());
     verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
-    Assertions.assertFalse(
-        new File(testStagingDir, metalake + File.separator + jobTemplateEntity.name()).exists());
+    // Nothing was created for the job, not even the directory its staging directory would live in.
+    Assertions.assertFalse(jobManager.jobStagingDir(0L).getParentFile().exists());
   }
 
   @Test
@@ -974,10 +974,10 @@ public class TestJobManager {
         () -> jobManager.runJob(metalake, jobTemplateEntity.name(), Collections.emptyMap()));
 
     verify(jobExecutor, never()).submitJob(any());
-    File templateStagingDir =
-        new File(testStagingDir, metalake + File.separator + jobTemplateEntity.name());
-    String[] jobStagingDirs = templateStagingDir.list();
-    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+    // The staging directory was created, and removed again when the template failed to resolve.
+    File jobRunsDir = jobManager.jobStagingDir(0L).getParentFile();
+    Assertions.assertTrue(jobRunsDir.isDirectory(), "The job staging directory was never created");
+    Assertions.assertArrayEquals(new String[0], jobRunsDir.list());
   }
 
   @Test

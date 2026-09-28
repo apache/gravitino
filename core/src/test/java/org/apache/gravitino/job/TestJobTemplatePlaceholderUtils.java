@@ -294,6 +294,71 @@ public class TestJobTemplatePlaceholderUtils {
   }
 
   @Test
+  public void testDoubledBackslashKeepsOneAndResolvesThePlaceholder() {
+    Map<String, String> conf = ImmutableMap.of("dir", "tmp", "a", "1");
+    Assertions.assertEquals("C:\\tmp", replace("C:\\\\{{dir}}", conf));
+    Assertions.assertEquals("\\1", replace("\\\\{{a}}", conf));
+    // A backslash that is not right before a placeholder is plain text.
+    Assertions.assertEquals("a\\\\b", replace("a\\\\b", conf));
+    Assertions.assertEquals("C:\\tmp\\", replace("C:\\tmp\\", conf));
+    // Backslashes are read left to right, and only a "\\" right before "{{" is special, so three
+    // of them keep the first as plain text and the second as the escaped one.
+    Assertions.assertEquals("\\\\1", replace("\\\\\\{{a}}", conf));
+    // A doubled backslash is not an escape, so the parameter is still required.
+    assertMalformed("\\\\{{missing}}", "missing");
+  }
+
+  @Test
+  public void testParametersOfTheOtherJobTypeAreIgnored() {
+    // A SHELL template keeps only its own fields; a leftover Spark field must not become a
+    // parameter the job configuration has to provide.
+    JobTemplateEntity.TemplateContent shell =
+        JobTemplateEntity.TemplateContent.builder()
+            .withJobType(JobTemplate.JobType.SHELL)
+            .withExecutable("/bin/echo")
+            .withArguments(Lists.newArrayList("{{arg}}"))
+            .withEnvironments(Collections.emptyMap())
+            .withCustomFields(Collections.emptyMap())
+            .withScripts(Lists.newArrayList("{{script}}"))
+            .withClassName("{{main_class}}")
+            .withJars(Lists.newArrayList("{{jar}}"))
+            .withConfigs(ImmutableMap.of("k", "{{conf}}"))
+            .build();
+    Assertions.assertEquals(
+        Lists.newArrayList("arg", "script"),
+        Lists.newArrayList(JobTemplatePlaceholderUtils.parseParameters(shell).keySet()));
+
+    JobTemplateEntity.TemplateContent spark =
+        JobTemplateEntity.TemplateContent.builder()
+            .withJobType(JobTemplate.JobType.SPARK)
+            .withExecutable("{{exec}}")
+            .withArguments(Collections.emptyList())
+            .withEnvironments(Collections.emptyMap())
+            .withCustomFields(Collections.emptyMap())
+            .withScripts(Lists.newArrayList("{{script}}"))
+            .withClassName("{{main_class}}")
+            .withJars(Collections.emptyList())
+            .withFiles(Collections.emptyList())
+            .withArchives(Collections.emptyList())
+            .withConfigs(Collections.emptyMap())
+            .build();
+    Assertions.assertEquals(
+        Lists.newArrayList("exec", "main_class"),
+        Lists.newArrayList(JobTemplatePlaceholderUtils.parseParameters(spark).keySet()));
+  }
+
+  @Test
+  public void testMalformedDefaultValueMessages() {
+    // The message names the actual problem, so the template author knows what to change.
+    assertMessage("{{c:-{}}", "unmatched '}'");
+    assertMessage("{{c:-{", "unmatched '{'");
+    // A balanced but unterminated default value reports the missing "}}" instead.
+    assertMessage("{{c:-{{}}", "not closed with '}}'");
+    assertMessage("{{c:-abc", "not closed with '}}'");
+    assertMessage("{\"k\":{{c:-{\"a\":1}}}}", "followed by '}'");
+  }
+
+  @Test
   public void testEscapesAreNotPlaceholders() {
     Map<String, String> conf = ImmutableMap.of("a", "1");
     Assertions.assertEquals("{{a:-{}}}", replace("\\{{a:-{}}}", conf));
@@ -345,6 +410,13 @@ public class TestJobTemplatePlaceholderUtils {
         .withCustomFields(Collections.emptyMap())
         .withScripts(Collections.emptyList())
         .build();
+  }
+
+  private static void assertMessage(String value, String expected) {
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> replace(value, Collections.emptyMap()));
+    Assertions.assertTrue(e.getMessage().contains(expected), e.getMessage());
   }
 
   private static void assertMalformed(String value, String name) {

@@ -225,8 +225,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   /**
    * Parse the value of {@code --stream-results}.
    *
-   * @param value the value, {@code true} for a bare {@code --stream-results}, or null if the option
-   *     is absent or empty
+   * @param value the raw value, which is {@code true} for a bare {@code --stream-results}, and null
+   *     or blank when the option is absent
    * @return whether to stream intermediate results
    * @throws IllegalArgumentException if the value is neither true nor false
    */

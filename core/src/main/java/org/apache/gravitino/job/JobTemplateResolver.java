@@ -124,39 +124,47 @@ public final class JobTemplateResolver {
     checkRequiredParameters(conf);
     Function<String, String> resolver =
         value -> JobTemplatePlaceholderUtils.replacePlaceholders(value, conf, parameters);
-    Function<String, String> fetcher =
-        uri -> fetchFileFromUri(resolver.apply(uri), stagingDir, FETCH_TIMEOUT_IN_MS);
 
-    String executable = fetcher.apply(content.executable());
+    // Resolve everything before fetching anything, so a template that resolves to duplicate keys
+    // is rejected without downloading a file first.
+    String executableUri = resolver.apply(content.executable());
     List<String> args = resolveList(content.arguments(), resolver);
     Map<String, String> environments = resolveMap(content.environments(), resolver, "environments");
     Map<String, String> customFields = resolveMap(content.customFields(), resolver, "customFields");
 
     if (content.jobType() == JobTemplate.JobType.SHELL) {
+      List<String> scriptUris = resolveList(content.scripts(), resolver);
+
       return ShellJobTemplate.builder()
           .withName(name)
           .withComment(comment)
-          .withExecutable(executable)
+          .withExecutable(fetchFileFromUri(executableUri, stagingDir, FETCH_TIMEOUT_IN_MS))
           .withArguments(args)
           .withEnvironments(environments)
           .withCustomFields(customFields)
-          .withScripts(resolveList(content.scripts(), fetcher))
+          .withScripts(fetchFilesFromUri(scriptUris, stagingDir, FETCH_TIMEOUT_IN_MS))
           .build();
     }
 
     if (content.jobType() == JobTemplate.JobType.SPARK) {
+      String className = resolver.apply(content.className());
+      List<String> jarUris = resolveList(content.jars(), resolver);
+      List<String> fileUris = resolveList(content.files(), resolver);
+      List<String> archiveUris = resolveList(content.archives(), resolver);
+      Map<String, String> configs = resolveMap(content.configs(), resolver, "configs");
+
       return SparkJobTemplate.builder()
           .withName(name)
           .withComment(comment)
-          .withExecutable(executable)
+          .withExecutable(fetchFileFromUri(executableUri, stagingDir, FETCH_TIMEOUT_IN_MS))
           .withArguments(args)
           .withEnvironments(environments)
           .withCustomFields(customFields)
-          .withClassName(resolver.apply(content.className()))
-          .withJars(resolveList(content.jars(), fetcher))
-          .withFiles(resolveList(content.files(), fetcher))
-          .withArchives(resolveList(content.archives(), fetcher))
-          .withConfigs(resolveMap(content.configs(), resolver, "configs"))
+          .withClassName(className)
+          .withJars(fetchFilesFromUri(jarUris, stagingDir, FETCH_TIMEOUT_IN_MS))
+          .withFiles(fetchFilesFromUri(fileUris, stagingDir, FETCH_TIMEOUT_IN_MS))
+          .withArchives(fetchFilesFromUri(archiveUris, stagingDir, FETCH_TIMEOUT_IN_MS))
+          .withConfigs(configs)
           .build();
     }
 
@@ -198,13 +206,20 @@ public final class JobTemplateResolver {
     }
   }
 
-  private static List<String> resolveList(List<String> source, Function<String, String> resolver) {
+  private static List<String> resolveList(
+      @Nullable List<String> source, Function<String, String> resolver) {
+    if (source == null) {
+      return Collections.emptyList();
+    }
     return source.stream().map(resolver).collect(Collectors.toList());
   }
 
   private static Map<String, String> resolveMap(
-      Map<String, String> source, Function<String, String> resolver, String field) {
+      @Nullable Map<String, String> source, Function<String, String> resolver, String field) {
     Map<String, String> resolved = new LinkedHashMap<>();
+    if (source == null) {
+      return resolved;
+    }
     source.forEach(
         (key, value) -> {
           String resolvedKey = resolver.apply(key);
