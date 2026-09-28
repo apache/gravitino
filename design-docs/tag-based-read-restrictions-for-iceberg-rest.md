@@ -113,7 +113,7 @@ The content of a row-filter policy contains exactly one `expression`.
   "policyType": "system_row_filter",
   "enabled": false,
   "content": {
-    "expression": "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
+    "expression": "result := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := col(\"owner\") == session_user()"
   }
 }
 ```
@@ -136,7 +136,7 @@ Iceberg mask action name.
   "policyType": "system_column_mask",
   "enabled": false,
   "content": {
-    "expression": "mask := \"show-last-4\" if is_group_member(\"auditors\") else := \"replace-with-null\""
+    "expression": "result := \"show-last-4\" if is_group_member(\"auditors\") else := \"replace-with-null\""
   }
 }
 ```
@@ -177,22 +177,23 @@ expression form.
 
 Both built-in policy types use the restricted Rego subset defined below. Its version is part of the
 policy content schema rather than a field repeated in every policy. The subset supports only one
-complete rule named `filter` or `mask`; it is not an arbitrary Rego module. A filter result and its
-conditions must be Boolean. A mask result must be a string naming a supported Iceberg action, and a
-mask condition must be Boolean and context-only.
+complete rule named `result`; it is not an arbitrary Rego module. The policy type determines the
+rule's result type. A row-filter result and its conditions must be Boolean. A column-mask result
+must be a string naming a supported Iceberg action, and its condition must be Boolean and
+context-only.
 
 The grammar is:
 
 ```text
 program     := filterRule | maskRule
 filterRule  := unconditionalFilter | conditionalFilter
-unconditionalFilter := "filter" ":=" expr
-conditionalFilter := "filter" ":=" expr "if" expr filterElse* filterFallback
+unconditionalFilter := "result" ":=" expr
+conditionalFilter := "result" ":=" expr "if" expr filterElse* filterFallback
 filterElse  := "else" ":=" expr "if" expr
 filterFallback := "else" ":=" expr
 maskRule    := unconditionalMask | conditionalMask
-unconditionalMask := "mask" ":=" string
-conditionalMask := "mask" ":=" string "if" contextExpr maskElse* maskFallback
+unconditionalMask := "result" ":=" string
+conditionalMask := "result" ":=" string "if" contextExpr maskElse* maskFallback
 maskElse    := "else" ":=" string "if" contextExpr
 maskFallback := "else" ":=" string
 contextExpr := expr
@@ -214,11 +215,14 @@ digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 ```
 
-`filter := result if condition else := fallback` and
-`mask := "action-a" if condition else := "action-b"` have the semantic reading “if condition, then
-result, otherwise fallback.” Conditional branches are evaluated from left to right and the first
-true condition selects its result. A conditional rule requires an unconditional final `else`, so a
+`result := value-a if condition else := value-b` has the semantic reading “if condition, then
+value-a, otherwise value-b.” Conditional branches are evaluated from left to right and the first
+true condition selects its value. A conditional rule requires an unconditional final `else`, so a
 selected policy never becomes undefined. Unconditional forms omit `if` and `else`.
+
+The `result :=` rule head is required to keep the stored text valid Rego conditional-assignment
+syntax. It is intentionally generic: `policyType`, rather than the rule name, determines whether
+the value is a row predicate or a column-mask action.
 
 Strings use JSON double-quoted syntax. Packages, imports, additional rules, variables, rule bodies
 in braces, comments, exponent notation, leading `+`, leading zeroes, trailing decimal points,
@@ -226,7 +230,7 @@ chained comparisons, arbitrary functions, and bare non-Boolean roots are invalid
 
 ### Keywords, identifiers, and escaping
 
-The reserved, lowercase keywords are `filter`, `mask`, `if`, `else`, `and`, `or`, `not`, `in`,
+The reserved, lowercase keywords are `result`, `if`, `else`, `and`, `or`, `not`, `in`,
 `true`, `false`, and `null`. `:=` is the rule-result assignment operator; `then` is not a literal
 token in Rego syntax because the result precedes `if`. The reserved built-in function identifiers
 are `col`, `session_user`, and `is_group_member`. They are case-sensitive and are recognized only
@@ -241,8 +245,8 @@ single quotes, SQL delimited identifiers, and backslash escaping outside a JSON 
 There are two syntactic JSON layers in an API request. The HTTP JSON parser decodes the outer
 `expression` field once, and the expression parser decodes each inner JSON string literal once. For
 example, the request fragment
-`"expression": "filter := col(\"and\") == \"open\""` becomes the source
-`filter := col("and") == "open"`, whose decoded column name is `and`. No layer performs an
+`"expression": "result := col(\"and\") == \"open\""` becomes the source
+`result := col("and") == "open"`, whose decoded column name is `and`. No layer performs an
 additional or implicit unescape.
 
 After decoding, identifiers and values are preserved exactly. Gravitino performs no Unicode
@@ -302,7 +306,7 @@ resolver then binds their context, columns, and literals and lowers an `if`/`els
 Boolean predicate. For example:
 
 ```text
-filter := result1 if condition1
+result := result1 if condition1
 else := result2 if condition2
 else := fallback
 ```
