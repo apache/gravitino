@@ -276,8 +276,26 @@ public abstract class SharedDbContainerService
                 "-P",
                 // Disposable container -- backing the data dir with tmpfs removes real disk
                 // I/O for every write, on top of the durability-relaxing mysqld flags below.
+                //
+                // The size cap is mandatory, not cosmetic: an uncapped `--tmpfs` mount defaults
+                // to 50% of host RAM *per mount*, so MySQL's and PostgreSQL's data dirs could
+                // between them claim 100% of RAM and get the Gradle daemon or a test fork
+                // OOM-killed. Headroom math for this repo's real lane -- the backend
+                // integration-test job in .github/workflows/backend-integration-test.yml runs
+                // on `ubuntu-22.04`, a GitHub-hosted runner with 4 vCPU / 16 GiB RAM:
+                //     16 GiB  total
+                //   -  4 GiB  build-process reserve (CoreDatabaseConcurrency
+                //             DEFAULT_BUILD_PROCESS_MEMORY_RESERVE_BYTES)
+                //   - 12 GiB  2 concurrent test forks x (4 GiB max heap,
+                //             TEST_WORKER_MAX_HEAP_MIB + 2 GiB native overhead,
+                //             DEFAULT_TEST_WORKER_OVERHEAD_BYTES)
+                // i.e. the JVM side alone nominally commits the whole box, so these mounts must
+                // stay a bounded worst case rather than an open-ended 8 GiB each. MySQL's share
+                // is 2g: the core test schema is small, and --skip-log-bin plus the default
+                // ~100 MiB redo capacity mean little but table data lands here, while
+                // --innodb-buffer-pool-size=2G is separately resident in the container's RSS.
                 "--tmpfs",
-                "/var/lib/mysql",
+                "/var/lib/mysql:size=2g",
                 "-e",
                 "MYSQL_ROOT_PASSWORD=" + DB_PASSWORD,
                 MYSQL_IMAGE));
@@ -318,9 +336,20 @@ public abstract class SharedDbContainerService
                 "--label",
                 CONTAINER_PID_LABEL_KEY + "=" + ownerPid,
                 "-P",
-                // Disposable container -- see the equivalent tmpfs mount in startMySql().
+                // Disposable container -- see the equivalent tmpfs mount in startMySql() for
+                // the runner spec (ubuntu-22.04, 4 vCPU / 16 GiB) and the headroom math.
+                //
+                // PostgreSQL gets a larger cap than MySQL (5g vs 2g) because pg_wal lives
+                // *inside* the data dir and postgresql.args sets max_wal_size=4GB with
+                // checkpoint_timeout=1h, so up to ~4 GiB of WAL can legitimately accumulate
+                // here before a checkpoint recycles it. Capping this at MySQL's 2g would turn a
+                // merely-late checkpoint into an ENOSPC and a PostgreSQL PANIC partway through
+                // the run. 5g = ~4 GiB WAL headroom + ~1 GiB for the schema and its data.
+                // Worst case both mounts together top out at 7 GiB, leaving ~9 GiB for the OS,
+                // the two database processes' RSS (2 GiB buffer pool + 1 GiB shared_buffers,
+                // plus overhead) and the fork JVMs' actual (as opposed to maximum) heap usage.
                 "--tmpfs",
-                "/var/lib/postgresql/data",
+                "/var/lib/postgresql/data:size=5g",
                 "-e",
                 "POSTGRES_USER=" + DB_USER,
                 "-e",
