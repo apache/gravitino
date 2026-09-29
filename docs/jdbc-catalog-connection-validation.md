@@ -27,15 +27,14 @@ does not need to restore the statement's original database.
 
 The benefit is preserving healthy pooled connections and avoiding repeated connection setup and
 authentication caused by failed validation. Validation remains enabled and disconnected connections
-are still replaced. The MySQL regression test verifies that 100 sequential borrows reuse the same
-physical connection after catalog switching, with and without a default database. This does not
-establish a general throughput improvement: other drivers may implement `isValid()` using SQL, and
-validation can still require a network round trip.
+are still replaced. This does not establish a general throughput improvement: other drivers may
+implement `isValid()` using SQL, and validation can still require a network round trip.
 
 For a driver that does not support `Connection.isValid()`, set the catalog property
 `gravitino.bypass.validationQuery` to a SQL SELECT statement that returns at least one row.
-Explicit validation queries are passed to DBCP without being overwritten. The `jdbc.pool.test-on-borrow` property
-controls validation on borrow. See the [DBCP configuration reference](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+Explicit validation queries are passed to DBCP without being overwritten. The
+`jdbc.pool.test-on-borrow` property controls validation on borrow. See the
+[DBCP configuration reference](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 for other pool validation settings. DBCP-specific properties require the `gravitino.bypass.`
 prefix in catalog configuration; the prefix is removed before passing them to DBCP.
 

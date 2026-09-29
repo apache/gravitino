@@ -134,8 +134,9 @@ public class DataSourceUtils {
     JdbcUrlUtils.validateJdbcConfig(
         jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
     // Keep DBCP's default Connection.isValid() validation unless a validationQuery is explicitly
-    // configured. A forced query is cached as a prepared statement and can retain a previous
-    // catalog.
+    // configured. DBCP caches a validation query as a prepared statement, and MySQL Connector/J
+    // switches back to the database captured at prepare time when executing it. That switch fails
+    // when the captured database is empty, so healthy connections would be discarded.
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();

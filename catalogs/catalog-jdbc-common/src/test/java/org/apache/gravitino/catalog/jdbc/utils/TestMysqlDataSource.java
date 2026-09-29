@@ -25,6 +25,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.junit.jupiter.api.AfterAll;
@@ -68,6 +69,9 @@ public class TestMysqlDataSource {
     try (BasicDataSource dataSource = createDataSource(defaultDatabase)) {
       long expectedId;
       try (Connection connection = dataSource.getConnection()) {
+        // Guard the URL rewrite: without a default database, the case must start with none.
+        Assertions.assertEquals(
+            defaultDatabase ? MYSQL.getDatabaseName() : null, currentDatabase(connection));
         connection.setCatalog(TARGET_DATABASE);
         expectedId = connectionId(connection);
       }
@@ -77,11 +81,7 @@ public class TestMysqlDataSource {
         try (Connection connection = dataSource.getConnection()) {
           connection.setCatalog(TARGET_DATABASE);
           Assertions.assertEquals(expectedId, connectionId(connection));
-          try (Statement statement = connection.createStatement();
-              ResultSet result = statement.executeQuery("SELECT DATABASE()")) {
-            Assertions.assertTrue(result.next());
-            Assertions.assertEquals(TARGET_DATABASE, result.getString(1));
-          }
+          Assertions.assertEquals(TARGET_DATABASE, currentDatabase(connection));
         }
       }
     }
@@ -122,6 +122,15 @@ public class TestMysqlDataSource {
     properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "1");
     properties.put(JdbcConfig.POOL_MIN_SIZE.getKey(), "1");
     return (BasicDataSource) DataSourceUtils.createDataSource(properties);
+  }
+
+  @Nullable
+  private static String currentDatabase(Connection connection) throws SQLException {
+    try (Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery("SELECT DATABASE()")) {
+      Assertions.assertTrue(result.next());
+      return result.getString(1);
+    }
   }
 
   private static long connectionId(Connection connection) throws SQLException {
