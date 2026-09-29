@@ -190,7 +190,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     // Official non-hidden keys stay out of getSecrets.
     Assertions.assertFalse(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
-    // Declared hidden cloud credentials fuzzy-recover into getSecrets (USE_SECRET / owner).
+    // Declared hidden cloud credentials fuzzy-recover into getSecrets (USE_SECRETS / owner).
     Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
     Assertions.assertTrue(

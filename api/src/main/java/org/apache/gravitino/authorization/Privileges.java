@@ -211,10 +211,10 @@ public class Privileges {
         // Secrets
       case VIEW_SECRET_PROVIDERS:
         return ViewSecretProviders.allow();
-      case USE_SECRET:
-        return UseSecret.allow();
-      case INCLUDE_CREDENTIAL_SECRET:
-        return IncludeCredentialSecret.allow();
+      case USE_SECRETS:
+        return UseSecrets.allow();
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return IncludeCredentialSecrets.allow();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -347,10 +347,10 @@ public class Privileges {
         // Secrets
       case VIEW_SECRET_PROVIDERS:
         return ViewSecretProviders.deny();
-      case USE_SECRET:
-        return UseSecret.deny();
-      case INCLUDE_CREDENTIAL_SECRET:
-        return IncludeCredentialSecret.deny();
+      case USE_SECRETS:
+        return UseSecrets.deny();
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return IncludeCredentialSecrets.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -1418,7 +1418,7 @@ public class Privileges {
   }
 
   /**
-   * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecret},
+   * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecrets},
    * cloud access-key pairs are omitted from the result.
    *
    * <p>Intended for connectors that recover JDBC and similar secrets via {@code getSecrets}, and
@@ -1426,26 +1426,28 @@ public class Privileges {
    * that are not the metalake owner and lack this privilege receive an empty {@code getSecrets}
    * result rather than a forbidden error, once they can already access the metadata object.
    */
-  public static final class UseSecret extends GenericPrivilege<UseSecret> {
+  public static final class UseSecrets extends GenericPrivilege<UseSecrets> {
 
-    private static final UseSecret ALLOW_INSTANCE = new UseSecret(Condition.ALLOW, Name.USE_SECRET);
-    private static final UseSecret DENY_INSTANCE = new UseSecret(Condition.DENY, Name.USE_SECRET);
+    private static final UseSecrets ALLOW_INSTANCE =
+        new UseSecrets(Condition.ALLOW, Name.USE_SECRETS);
+    private static final UseSecrets DENY_INSTANCE =
+        new UseSecrets(Condition.DENY, Name.USE_SECRETS);
 
-    private UseSecret(Condition condition, Name name) {
+    private UseSecrets(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static UseSecret allow() {
+    public static UseSecrets allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static UseSecret deny() {
+    public static UseSecrets deny() {
       return DENY_INSTANCE;
     }
 
@@ -1456,36 +1458,36 @@ public class Privileges {
   }
 
   /**
-   * When held together with {@link UseSecret}, includes cloud access-key pairs and other credential
-   * secrets in the {@code getSecrets} result.
+   * When held together with {@link UseSecrets}, includes cloud access-key pairs and other
+   * credential secrets in the {@code getSecrets} result.
    *
    * <p>Does not authorize {@code getSecrets} or {@code getCredentials} by itself. Metalake owners
-   * and holders of both privileges receive the full secrets map; holders of only {@link UseSecret}
+   * and holders of both privileges receive the full secrets map; holders of only {@link UseSecrets}
    * get cloud access-key pairs omitted.
    */
-  public static final class IncludeCredentialSecret
-      extends GenericPrivilege<IncludeCredentialSecret> {
+  public static final class IncludeCredentialSecrets
+      extends GenericPrivilege<IncludeCredentialSecrets> {
 
-    private static final IncludeCredentialSecret ALLOW_INSTANCE =
-        new IncludeCredentialSecret(Condition.ALLOW, Name.INCLUDE_CREDENTIAL_SECRET);
-    private static final IncludeCredentialSecret DENY_INSTANCE =
-        new IncludeCredentialSecret(Condition.DENY, Name.INCLUDE_CREDENTIAL_SECRET);
+    private static final IncludeCredentialSecrets ALLOW_INSTANCE =
+        new IncludeCredentialSecrets(Condition.ALLOW, Name.INCLUDE_CREDENTIAL_SECRETS);
+    private static final IncludeCredentialSecrets DENY_INSTANCE =
+        new IncludeCredentialSecrets(Condition.DENY, Name.INCLUDE_CREDENTIAL_SECRETS);
 
-    private IncludeCredentialSecret(Condition condition, Name name) {
+    private IncludeCredentialSecrets(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static IncludeCredentialSecret allow() {
+    public static IncludeCredentialSecrets allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static IncludeCredentialSecret deny() {
+    public static IncludeCredentialSecrets deny() {
       return DENY_INSTANCE;
     }
 

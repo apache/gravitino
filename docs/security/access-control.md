@@ -202,8 +202,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRET`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRET`) |
-| `INCLUDE_CREDENTIAL_SECRET`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | With `USE_SECRET`, include cloud access-key pairs in the `getSecrets` result |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`) |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | With `USE_SECRETS`, include cloud access-key pairs in the `getSecrets` result |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
@@ -286,10 +286,10 @@ ownership, the same as altering it, because the caller chooses what the server c
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
-`USE_SECRET`. Cloud access-key pairs are included only when the caller is the metalake owner or also
-holds `INCLUDE_CREDENTIAL_SECRET`. Vend credentials (`getCredentials`) requires no dedicated
+`USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
+holds `INCLUDE_CREDENTIAL_SECRETS`. Vend credentials (`getCredentials`) requires no dedicated
 privilege beyond being able to load the object. Callers who can load the object but lack
-`USE_SECRET` receive an empty `getSecrets` result rather than a forbidden error.
+`USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

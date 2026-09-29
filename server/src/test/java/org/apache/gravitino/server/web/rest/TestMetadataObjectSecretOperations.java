@@ -136,7 +136,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsReturnsEmptyWithoutUseSecret() throws Exception {
+  public void testGetSecretsReturnsEmptyWithoutUseSecretss() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
@@ -167,7 +167,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+                              .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
           .thenReturn(true);
 
       Response response =
@@ -183,7 +183,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsFiltersCloudKeysWithUseSecretOnly() throws Exception {
+  public void testGetSecretsFiltersCloudKeysWithUseSecretsOnly() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
@@ -222,7 +222,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+                              .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
           .thenReturn(false);
 
       Response response =
@@ -239,7 +239,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsIncludesCloudKeysWithUseSecretAndIncludeCredentialSecret()
+  public void testGetSecretsIncludesCloudKeysWithUseSecretsAndIncludeCredentialSecretss()
       throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
@@ -277,7 +277,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+                              .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
           .thenReturn(true);
 
       Response response =

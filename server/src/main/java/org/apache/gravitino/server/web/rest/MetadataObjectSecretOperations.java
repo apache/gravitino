@@ -112,23 +112,23 @@ public class MetadataObjectSecretOperations {
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
-            boolean canUseSecret =
+            boolean canUseSecrets =
                 MetadataAuthzHelper.checkAccess(
                     identifier,
                     entityType,
                     AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION);
-            if (!canUseSecret) {
+            if (!canUseSecrets) {
               return Utils.ok(new SecretsResponse(ImmutableMap.of()));
             }
-            boolean canIncludeCredentialSecret =
+            boolean canIncludeCredentialSecrets =
                 MetadataAuthzHelper.checkAccess(
                     identifier,
                     entityType,
                     AuthorizationExpressionConstants
-                        .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION);
+                        .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
             Map<String, String> secrets =
                 secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
-            if (!canIncludeCredentialSecret) {
+            if (!canIncludeCredentialSecrets) {
               secrets = SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets);
             }
             return Utils.ok(new SecretsResponse(secrets));

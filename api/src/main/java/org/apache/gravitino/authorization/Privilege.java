@@ -162,16 +162,16 @@ public interface Privilege {
     VIEW_SECRET_PROVIDERS(0L, 1L << 36),
     /**
      * The privilege required to call {@code getSecrets}. Without {@link
-     * #INCLUDE_CREDENTIAL_SECRET}, cloud access-key pairs are omitted from the result. Does not
+     * #INCLUDE_CREDENTIAL_SECRETS}, cloud access-key pairs are omitted from the result. Does not
      * authorize {@code getCredentials}.
      */
-    USE_SECRET(0L, 1L << 37),
+    USE_SECRETS(0L, 1L << 37),
     /**
-     * When held together with {@link #USE_SECRET}, includes cloud access-key pairs and other
+     * When held together with {@link #USE_SECRETS}, includes cloud access-key pairs and other
      * credential secrets in the {@code getSecrets} result. Alone it does not authorize {@code
      * getSecrets}. Does not authorize {@code getCredentials}.
      */
-    INCLUDE_CREDENTIAL_SECRET(0L, 1L << 38);
+    INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38);
 
     private final long highBits;
     private final long lowBits;

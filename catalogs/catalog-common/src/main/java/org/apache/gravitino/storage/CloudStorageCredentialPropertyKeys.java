@@ -32,9 +32,9 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
  * <p>GVFS must not consume these keys from REST catalog/schema/fileset {@code properties()}
  * responses (which may be masked as {@code ******}). Plaintext for hidden static credentials,
  * including {@code s3-access-key-id}, is recovered via {@code getSecrets()} when the caller holds
- * {@code USE_SECRET} and {@code INCLUDE_CREDENTIAL_SECRET}, or via {@code getCredentials()} (no
+ * {@code USE_SECRETS} and {@code INCLUDE_CREDENTIAL_SECRETS}, or via {@code getCredentials()} (no
  * dedicated privilege). Masked placeholders are dropped by {@link #omitStaticCredentialProperties}.
- * Callers with only {@code USE_SECRET} receive {@code getSecrets()} with cloud access-key pairs
+ * Callers with only {@code USE_SECRETS} receive {@code getSecrets()} with cloud access-key pairs
  * omitted via {@link #omitCloudAccessKeyPairProperties}.
  *
  * <p>{@code azure-storage-account-name} is intentionally left non-hidden (and not listed here):
@@ -64,7 +64,7 @@ public final class CloudStorageCredentialPropertyKeys {
 
   /**
    * Cloud access-key pair (and Azure static secret) keys omitted from {@code getSecrets()} when the
-   * caller has {@code USE_SECRET} but not {@code INCLUDE_CREDENTIAL_SECRET}. JDBC secrets are
+   * caller has {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}. JDBC secrets are
    * intentionally not listed so connectors can still recover them via {@code getSecrets()}.
    */
   private static final Set<String> CLOUD_ACCESS_KEY_PAIR_KEYS =
@@ -96,8 +96,8 @@ public final class CloudStorageCredentialPropertyKeys {
 
   /**
    * Returns whether the property key is a cloud access-key pair (or Azure static secret) that
-   * {@code USE_SECRET} must not see via {@code getSecrets()} without {@code
-   * INCLUDE_CREDENTIAL_SECRET}.
+   * {@code USE_SECRETS} must not see via {@code getSecrets()} without {@code
+   * INCLUDE_CREDENTIAL_SECRETS}.
    *
    * @param key the property key
    * @return true when the key must be omitted for use-secret-only callers
@@ -135,8 +135,8 @@ public final class CloudStorageCredentialPropertyKeys {
 
   /**
    * Returns a copy of {@code secrets} with cloud access-key pair keys removed. Used when filtering
-   * {@code getSecrets()} for callers that hold {@code USE_SECRET} but not {@code
-   * INCLUDE_CREDENTIAL_SECRET}.
+   * {@code getSecrets()} for callers that hold {@code USE_SECRETS} but not {@code
+   * INCLUDE_CREDENTIAL_SECRETS}.
    *
    * @param secrets plaintext secrets map
    * @return secrets without cloud access-key pairs
@@ -162,7 +162,7 @@ public final class CloudStorageCredentialPropertyKeys {
     return STATIC_CREDENTIAL_KEYS;
   }
 
-  /** Returns cloud access-key pair keys omitted for {@code USE_SECRET} {@code getSecrets}. */
+  /** Returns cloud access-key pair keys omitted for {@code USE_SECRETS} {@code getSecrets}. */
   public static Set<String> cloudAccessKeyPairKeys() {
     return CLOUD_ACCESS_KEY_PAIR_KEYS;
   }

@@ -131,22 +131,22 @@ public class TestAuthorizationExpressionConverter {
   }
 
   @Test
-  public void testReplaceAnyPrivilegeForAnyUseSecret() {
-    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_SECRET");
+  public void testReplaceAnyPrivilegeForAnyUseSecretss() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_SECRETS");
     Assertions.assertEquals(
-        "((ANY(USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-            + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE,"
+        "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+            + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE,"
             + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
         replaced);
   }
 
   @Test
-  public void testReplaceAnyPrivilegeForAnyIncludeCredentialSecret() {
+  public void testReplaceAnyPrivilegeForAnyIncludeCredentialSecretss() {
     String replaced =
-        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_INCLUDE_CREDENTIAL_SECRET");
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_INCLUDE_CREDENTIAL_SECRETS");
     Assertions.assertEquals(
-        "((ANY(INCLUDE_CREDENTIAL_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
-            + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRET,"
+        "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+            + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS,"
             + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
             + " MODEL_VERSION)))",
         replaced);

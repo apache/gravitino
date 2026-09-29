@@ -366,7 +366,7 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRET}
+   * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRETS}
    * callers. Delegates to {@link
    * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
    *
