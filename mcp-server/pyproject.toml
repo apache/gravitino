@@ -23,16 +23,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     # Pin FastMCP so breaking API changes are handled explicitly during dependency upgrades.
-<<<<<<< HEAD
     "fastmcp==3.2.0",
-    # Function validation aliases require Pydantic 2.12 or newer.
-=======
-    "fastmcp==3.4.5",
     # Function argument validation via Field(validation_alias=AliasChoices(...)) — used to
     # keep accepting legacy tool argument names — is only honored from Pydantic 2.12.0
     # (fix: https://github.com/pydantic/pydantic/pull/12340). Without this floor the lock
     # resolves an older Pydantic and the legacy-alias tests fail.
->>>>>>> 502bd5f37 ([#13595] improvement(mcp): move pylint/pytest/parameterized to a dev group (#13596))
     "pydantic>=2.12.0,<3",
     # httpx.Auth plugin for hop-2 client_credentials fetch/cache.
     "httpx-auth>=0.22,<0.24",
@@ -40,10 +35,7 @@ dependencies = [
     # requires fakeredis>=2.32.1, but fakeredis 2.35.0 removed FakeConnection from
     # fakeredis.aioredis, which pydocket still uses. Pin fakeredis to <2.35.0 until the
     # tracked pydocket/fakeredis compatibility issue is resolved.
-<<<<<<< HEAD
     "fakeredis<2.35.0",
-=======
-    "fakeredis<2.38.0",
 ]
 
 # Development-only dependencies. These are NOT shipped in the MCP server image:
@@ -52,7 +44,6 @@ dependencies = [
 # distributed runtime environment. Developers still get them via `uv sync` locally.
 [dependency-groups]
 dev = [
->>>>>>> 502bd5f37 ([#13595] improvement(mcp): move pylint/pytest/parameterized to a dev group (#13596))
     "parameterized>=0.9.0",
     "pytest>=8.4.1",
     "pylint>=2.20.0",
