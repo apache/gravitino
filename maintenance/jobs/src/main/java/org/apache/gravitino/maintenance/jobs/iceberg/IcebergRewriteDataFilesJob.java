@@ -39,7 +39,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   // Valid strategy values for Iceberg rewrite_data_files procedure
   private static final String STRATEGY_BINPACK = "binpack";
@@ -378,15 +378,17 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         "--table",
         "{{table_identifier}}",
         "--strategy",
-        "{{strategy}}",
+        "{{strategy:-binpack}}",
         "--sort-order",
-        "{{sort_order}}",
+        "{{sort_order:-}}",
+        // No default on purpose: an empty where clause rewrites the whole table, so callers must
+        // pass it explicitly, as "" to target the whole table.
         "--where",
         "{{where_clause}}",
         "--options",
-        "{{options}}",
+        "{{options:-}}",
         "--spark-conf",
-        "{{spark_conf}}");
+        "{{spark_conf:-}}");
   }
 
   /**
