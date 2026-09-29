@@ -62,12 +62,32 @@ Measured on `apache/gravitino#13553` with `-PcoreDatabaseForks=2`:
 | `core:corePostgreSQLTest` | 7m10s             | 2m11s                  | 3.28x   |
 | `core:coreH2Test`         | 1m27s             | 1m21s                  | ~1.0x (control) |
 
-For MySQL the intermediate steps were 27m53s for a shared-but-untuned container
-(a 5.6% *regression* versus per-fork containers) and 22m15s with only the
-durability flags, before the `tmpfs` data dir brought it to 7m04s.
-
 `coreH2Test` uses no container and is flat across every run, which is what
 confirms the speedup is database I/O rather than a faster host.
+
+### Attribution: the tmpfs data dir did most of the work
+
+The numbers above were originally collected while a classpath-path bug meant
+the `.args` files were never actually loaded (`ClassLoader#getResourceAsStream`
+resolving an absolute name that did not match where the resources are
+packaged), so both containers silently ran on stock server defaults. They
+therefore measure **the tmpfs data dir alone**, not the server flags.
+
+Re-measured after that bug was fixed, with the flags verified as applied in the
+running container (`innodb_buffer_pool_size=2147483648`,
+`innodb_flush_log_at_trx_commit=0`, `innodb_doublewrite=OFF`, `log_bin=OFF`):
+
+| Task                      | tmpfs only | tmpfs + flags | Flags' marginal gain |
+| ------------------------- | ---------- | ------------- | -------------------- |
+| `core:coreMySQLTest`      | 7m05s      | 6m40s         | ~6%                  |
+| `core:corePostgreSQLTest` | 2m11s      | 2m10s         | ~0% (within noise)   |
+
+So the headline 3-4x speedup comes almost entirely from moving the data dir to
+`tmpfs`; the durability flags are a modest additional gain on top. Keep that in
+mind before trading test fidelity for another flag -- the remaining headroom is
+small. It is also why `--performance-schema=OFF` is not worth having: it would
+buy a little overhead back while silently disabling the lock-contention
+assertions described above.
 
 ### Caveat: those numbers came from bigger hardware than CI
 

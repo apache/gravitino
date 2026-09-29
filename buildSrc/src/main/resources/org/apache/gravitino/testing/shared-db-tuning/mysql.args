@@ -27,8 +27,13 @@
 # class, -PcoreDatabaseForks=2), core:coreMySQLTest wall clock:
 #   26m25s  per-fork containers (old design)
 #   27m53s  shared container, untuned
-#   22m15s  shared container, first 4 flags below only
-#    7m04s  shared container, all flags below + tmpfs data dir
+#    7m05s  shared container + tmpfs data dir (flags NOT yet loading)
+#    6m40s  shared container + tmpfs data dir + the flags below, verified
+#           as actually applied inside the running container
+# The staged numbers above predate the fix for a classpath bug that stopped
+# this file from ever being read, so the large win is attributable to the tmpfs
+# data dir; these flags add roughly a further 6%. See README.md next to this
+# file for the full attribution table.
 # All runs: 520 tests, 0 failures, 0 deadlocks / lock-wait timeouts.
 # core:coreH2Test is unchanged across all runs (1m27s -> 1m21s), the control
 # confirming the speedup is database I/O and not the host.
