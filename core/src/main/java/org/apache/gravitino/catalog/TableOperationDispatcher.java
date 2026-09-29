@@ -56,6 +56,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -70,6 +72,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -770,7 +773,20 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         && Objects.equal(left.comment(), right.comment())
         && left.nullable() == right.nullable()
         && left.autoIncrement() == right.autoIncrement()
-        && Objects.equal(left.defaultValue(), right.defaultValue());
+        && isSameDefaultValue(left.defaultValue(), right.defaultValue());
+  }
+
+  private boolean isSameDefaultValue(Expression left, Expression right) {
+    // Connector snapshots use DTOs, while relational storage restores API expressions. Compare
+    // their persisted representation rather than implementation-specific equals methods.
+    return Objects.equal(toDefaultValueArg(left), toDefaultValueArg(right));
+  }
+
+  @Nullable
+  private FunctionArg toDefaultValueArg(Expression expression) {
+    return expression.equals(Column.DEFAULT_VALUE_NOT_SET)
+        ? null
+        : DTOConverters.toFunctionArg(expression);
   }
 
   private String columnDifferenceContent(
@@ -806,7 +822,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               "autoIncrement[catalog=%s, store=%s]",
               catalogColumn.autoIncrement(), entityColumn.autoIncrement()));
     }
-    if (!Objects.equal(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
+    if (!isSameDefaultValue(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
       differences.add(
           String.format(
               "defaultValue[catalog=%s, store=%s]",
