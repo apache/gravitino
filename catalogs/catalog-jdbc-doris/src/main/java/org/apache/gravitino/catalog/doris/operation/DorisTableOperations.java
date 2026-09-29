@@ -62,6 +62,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -124,15 +125,25 @@ public class DorisTableOperations extends JdbcTableOperations {
       // Doris 2.1.0's Nereids CREATE TABLE path can discard the table comment. Repair it only
       // when necessary, without changing the planner on the pooled connection. Keep the full
       // comment, including the Gravitino identifier, so subsequent loads retain table identity.
-      if (StringUtils.isNotEmpty(comment)
-          && !comment.equals(loadTableComment(connection, databaseName, tableName))) {
-        JdbcConnectorUtils.executeUpdate(
-            connection,
-            "ALTER TABLE `"
-                + tableName
-                + "` MODIFY COMMENT \""
-                + escapeSqlLiteral(comment, '"')
-                + "\"");
+      try {
+        if (StringUtils.isNotEmpty(comment)
+            && !comment.equals(loadTableComment(connection, databaseName, tableName))) {
+          JdbcConnectorUtils.executeUpdate(
+              connection,
+              "ALTER TABLE `"
+                  + tableName
+                  + "` MODIFY COMMENT \""
+                  + escapeSqlLiteral(comment, '"')
+                  + "\"");
+        }
+      } catch (SQLException e) {
+        throw new GravitinoRuntimeException(
+            e,
+            "Table %s.%s was created in Doris, but its comment could not be verified or restored. "
+                + "The table may be missing its Gravitino identifier. "
+                + "Drop the created table in Doris before retrying creation.",
+            databaseName,
+            tableName);
       }
       LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
     } catch (SQLException e) {
@@ -1310,7 +1321,12 @@ public class DorisTableOperations extends JdbcTableOperations {
       statement.setString(1, databaseName);
       statement.setString(2, tableName);
       try (ResultSet result = statement.executeQuery()) {
-        return result.next() ? result.getString("TABLE_COMMENT") : "";
+        if (!result.next()) {
+          throw new NoSuchTableException(
+              "Table %s.%s does not exist in Doris when loading its comment",
+              databaseName, tableName);
+        }
+        return result.getString("TABLE_COMMENT");
       }
     }
   }

@@ -62,6 +62,12 @@ Gravitino checks the stored comment after creation and, if necessary, restores i
 the JDBC user must have permission to alter the created table. The connector leaves the
 planner settings unchanged.
 
+If the comment lookup or restoration fails after `CREATE TABLE` succeeds, Gravitino reports
+that the table was created but its comment could not be verified or restored. Doris DDL is
+not rolled back, so the table remains and may be missing its Gravitino identifier. Drop the
+created table in Doris before retrying creation; otherwise, the retry fails because the table
+already exists.
+
 ### Driver Version Compatibility
 
 The Doris catalog includes driver version compatibility checks for datetime precision calculation:

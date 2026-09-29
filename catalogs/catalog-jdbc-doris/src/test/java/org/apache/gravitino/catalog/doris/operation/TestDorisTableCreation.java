@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.doris.operation;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.doReturn;
@@ -42,6 +43,7 @@ import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -69,6 +71,34 @@ class TestDorisTableCreation {
         .executeUpdate("ALTER TABLE `t` MODIFY COMMENT \"" + COMMENT + "\"");
     verify(fixture.commentStatement).setString(1, "db");
     verify(fixture.commentStatement).setString(2, "t");
+    verify(fixture.commentResult).close();
+    verify(fixture.commentStatement).close();
+    verify(fixture.connection).close();
+  }
+
+  @Test
+  void testRepairEscapesQuotesAndBackslashes() throws Exception {
+    String comment =
+        "owner's \"comment\" C:\\tmp (From Gravitino, DO NOT EDIT: gravitino.v1.uid123)";
+    CreateFixture fixture = new CreateFixture(comment, "OLAP");
+
+    fixture.create();
+
+    verify(fixture.alterStatement)
+        .executeUpdate(
+            "ALTER TABLE `t` MODIFY COMMENT \"owner's \"\"comment\"\" C:\\\\tmp "
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid123)\"");
+  }
+
+  @Test
+  void testMissingTableIsNotTreatedAsEmptyComment() throws Exception {
+    CreateFixture fixture = new CreateFixture(COMMENT, "");
+    when(fixture.commentResult.next()).thenReturn(false);
+
+    NoSuchTableException error = assertThrows(NoSuchTableException.class, fixture::create);
+
+    assertTrue(error.getMessage().contains("Table db.t does not exist in Doris"));
+    verify(fixture.alterStatement, never()).executeUpdate(anyString());
     verify(fixture.commentResult).close();
     verify(fixture.commentStatement).close();
     verify(fixture.connection).close();
@@ -117,6 +147,9 @@ class TestDorisTableCreation {
         assertThrows(GravitinoRuntimeException.class, fixture::create);
 
     assertSame(failure, error.getCause());
+    assertTrue(error.getMessage().contains("Table db.t was created in Doris"));
+    assertTrue(error.getMessage().contains("may be missing its Gravitino identifier"));
+    assertTrue(error.getMessage().contains("Drop the created table in Doris before retrying"));
     verify(fixture.alterStatement, never()).executeUpdate(anyString());
     verify(fixture.commentStatement).close();
     verify(fixture.connection).close();
@@ -132,6 +165,9 @@ class TestDorisTableCreation {
         assertThrows(GravitinoRuntimeException.class, fixture::create);
 
     assertSame(failure, error.getCause());
+    assertTrue(error.getMessage().contains("Table db.t was created in Doris"));
+    assertTrue(error.getMessage().contains("may be missing its Gravitino identifier"));
+    assertTrue(error.getMessage().contains("Drop the created table in Doris before retrying"));
     verify(fixture.alterStatement).close();
     verify(fixture.connection).close();
   }
