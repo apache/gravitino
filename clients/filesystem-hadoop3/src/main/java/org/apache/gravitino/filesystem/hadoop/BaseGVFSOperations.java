@@ -161,9 +161,6 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final boolean autoCreateLocation;
 
-  /** Cached static catalog credential_info keyed by catalog name (avoids STS on every op). */
-  private final ConcurrentHashMap<String, Map<String, String>> catalogStaticCredentialCache =
-      new ConcurrentHashMap<>();
   /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
   public static class FileSystemCacheKey {
     private final String scheme;
@@ -1000,34 +997,25 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   /**
    * Merges static ({@code expireTimeInMs == 0}) {@link Credential#credentialInfo()} from catalog
-   * {@code getCredentials} into GVFS configuration. Successful results (including empty) are cached
-   * per catalog name so repeated operations do not re-hit the server (and do not re-trigger STS for
-   * token providers). Transient {@link RESTException} failures are not cached so a later call can
-   * retry. Expiring credentials are skipped; path token vending uses a separate fileset path.
+   * {@code getCredentials} into GVFS configuration. Invoked when a filesystem is created, so results
+   * are not cached here — rotated keys are picked up on the next filesystem build. Expiring
+   * credentials are skipped; path token vending uses a separate fileset path.
    */
   private void putStaticCatalogCredentialInfo(Map<String, String> target, Catalog catalog) {
-    if (catalog == null || catalog.name() == null) {
+    if (catalog == null) {
       return;
     }
-    String catalogName = catalog.name();
-    Map<String, String> cached = catalogStaticCredentialCache.get(catalogName);
-    if (cached == null) {
-      Map<String, String> loaded = loadStaticCatalogCredentialInfo(catalog);
-      // null means a transient REST failure; do not cache so the next op can retry.
-      if (loaded == null) {
-        return;
-      }
-      Map<String, String> raced = catalogStaticCredentialCache.putIfAbsent(catalogName, loaded);
-      cached = raced != null ? raced : loaded;
+    Map<String, String> loaded = loadStaticCatalogCredentialInfo(catalog);
+    if (loaded != null && !loaded.isEmpty()) {
+      target.putAll(loaded);
     }
-    target.putAll(cached);
   }
 
   /**
    * Loads static catalog credential info.
    *
-   * @return an immutable map to cache (may be empty), or {@code null} if loading failed transiently
-   *     and must not be cached
+   * @return a map of static credential info (may be empty), or {@code null} if loading failed
+   *     transiently
    */
   @Nullable
   private static Map<String, String> loadStaticCatalogCredentialInfo(Catalog catalog) {
@@ -1035,11 +1023,11 @@ public abstract class BaseGVFSOperations implements Closeable {
     try {
       SupportsCredentials supportsCredentials = catalog.supportsCredentials();
       if (supportsCredentials == null) {
-        return Collections.unmodifiableMap(staticInfo);
+        return staticInfo;
       }
       Credential[] credentials = supportsCredentials.getCredentials();
       if (credentials == null) {
-        return Collections.unmodifiableMap(staticInfo);
+        return staticInfo;
       }
       for (Credential credential : credentials) {
         if (credential == null
@@ -1062,7 +1050,7 @@ public abstract class BaseGVFSOperations implements Closeable {
           e.toString());
       return null;
     }
-    return Collections.unmodifiableMap(staticInfo);
+    return staticInfo;
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {

@@ -232,10 +232,6 @@ class BaseGVFSOperations(ABC):
         self._credential_cache: LRUCache = LRUCache(maxsize=cache_size)
         self._credential_cache_lock = rwlock.RWLockFair()
 
-        # Cached static catalog credential_info (expire==0) keyed by catalog name.
-        self._catalog_static_credential_cache: Dict[str, Dict[str, str]] = {}
-        self._catalog_static_credential_cache_lock = threading.Lock()
-
         self._enable_fileset_metadata_cache = (
             self.ENABLE_FILESET_METADATA_CACHE_DEFAULT
             if options is None
@@ -551,33 +547,21 @@ class BaseGVFSOperations(ABC):
         return fileset_props
 
     def _merge_static_catalog_credentials(self, fileset_props: Dict[str, str], catalog) -> None:
-        """Overlay cached static catalog credential_info into fileset_props.
+        """Overlay static catalog credential_info into fileset_props.
 
-        Successful loads (including empty) are cached per catalog. Transient REST failures
-        are not cached so a later operation can retry.
+        Called when a filesystem is created, so results are not cached here — rotated
+        keys are picked up on the next filesystem build.
         """
-        catalog_name = getattr(catalog, "name", None)
-        if callable(catalog_name):
-            catalog_name = catalog_name()
-        if not catalog_name:
-            return
-        with self._catalog_static_credential_cache_lock:
-            cached = self._catalog_static_credential_cache.get(catalog_name)
-            if cached is None:
-                loaded = self._load_static_catalog_credential_info(catalog)
-                # None means a transient REST failure; do not cache.
-                if loaded is None:
-                    return
-                self._catalog_static_credential_cache[catalog_name] = loaded
-                cached = loaded
-        fileset_props.update(cached)
+        loaded = self._load_static_catalog_credential_info(catalog)
+        if loaded:
+            fileset_props.update(loaded)
 
     @staticmethod
     def _load_static_catalog_credential_info(catalog) -> Optional[Dict[str, str]]:
         """Load expire==0 credential_info and map keys to GVFS option names.
 
-        Returns an empty dict when credentials are unsupported or absent (cacheable).
-        Returns None on transient REST failure (must not be cached).
+        Returns an empty dict when credentials are unsupported or absent.
+        Returns None on transient REST failure.
         """
         static_info: Dict[str, str] = {}
         try:
