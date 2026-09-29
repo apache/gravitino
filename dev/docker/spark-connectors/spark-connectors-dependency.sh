@@ -177,13 +177,10 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# The image ships the shaded runtime jars, so /licenses must describe what those
-# jars bundle, not the source tree. Each jar already carries that LICENSE and
-# NOTICE in META-INF, generated from the resolved dependency set, and keeps the
-# per-component licence texts it references alongside them inside the jar.
-#
-# One image carries several Spark/Scala variants whose bundled components
-# differ, so each variant gets its own directory rather than one merged file.
+# /licenses must describe what the shipped jars bundle, not the source tree.
+# Each jar already carries that pair in META-INF, generated from its resolved
+# dependency set, with the per-component texts it cites alongside them inside the
+# jar. Variants bundle different components, so each gets its own directory.
 license_jars="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort)"
 [ -n "${license_jars}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
 

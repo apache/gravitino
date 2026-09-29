@@ -89,13 +89,10 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# The image ships the connector plugin jars, so /licenses must describe what
-# those jars bundle, not the source tree. Each plugin band already carries that
-# LICENSE and NOTICE (built from LICENSE.trino/NOTICE.trino), and keeps the
-# licence texts they reference in its own licenses/ directory.
-#
-# One image carries several Trino version bands, so each band gets its own
-# directory rather than one merged file.
+# /licenses must describe what the shipped plugin jars bundle, not the source
+# tree. Each band already carries that pair, built from LICENSE.trino and
+# NOTICE.trino, with the texts it cites in its own licenses/ directory. Bands
+# bundle different components, so each gets its own directory.
 bands="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -type d | sort)"
 [ -n "${bands}" ] || { echo "ERROR: no staged connector band to take licenses from" >&2; exit 1; }
 
