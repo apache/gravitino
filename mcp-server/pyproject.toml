@@ -24,6 +24,11 @@ requires-python = ">=3.10"
 dependencies = [
     # Pin FastMCP so breaking API changes are handled explicitly during dependency upgrades.
     "fastmcp==3.4.5",
+    # Function argument validation via Field(validation_alias=AliasChoices(...)) — used to
+    # keep accepting legacy tool argument names — is only honored from Pydantic 2.12.0
+    # (fix: https://github.com/pydantic/pydantic/pull/12340). Without this floor the lock
+    # resolves an older Pydantic and the legacy-alias tests fail.
+    "pydantic>=2.12.0,<3",
     # httpx.Auth plugin for hop-2 client_credentials fetch/cache.
     "httpx-auth>=0.22,<0.24",
     # TODO(#10754): pydocket (a transitive dep of fastmcp>=2.14.0)
