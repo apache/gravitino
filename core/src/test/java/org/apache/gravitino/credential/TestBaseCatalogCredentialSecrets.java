@@ -79,7 +79,7 @@ public class TestBaseCatalogCredentialSecrets {
   }
 
   @Test
-  void testExplicitProvidersStillEnsureDetectedStaticSecretKey() {
+  void testExplicitProvidersAreNotOverriddenByStaticDetection() {
     Map<String, String> entityProps =
         Map.of(
             CredentialConstants.CREDENTIAL_PROVIDERS,
@@ -105,10 +105,10 @@ public class TestBaseCatalogCredentialSecrets {
 
     Map<String, String> withProviders = catalog.propertiesWithCredentialProviders();
     String providers = withProviders.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertTrue(providers.contains("s3-token"));
-    Assertions.assertTrue(
+    Assertions.assertEquals("s3-token", providers);
+    Assertions.assertFalse(
         providers.contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE),
-        "static s3-secret-key must stay recoverable when credential-providers is explicit");
+        "must not append s3-secret-key beside s3-token (path-based vending rejects mixed providers)");
   }
 
   @Test

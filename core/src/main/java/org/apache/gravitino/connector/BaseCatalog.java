@@ -535,10 +535,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
-      // Explicit credential-providers wins for vending, but static secret-key / JDBC / AWS / DLF
-      // providers must still be listed when complete key pairs exist so getCredentials can recover
-      // them when clients stop reading those keys from properties()/getSecrets().
-      ensureDetectedCredentialProvidersListed(props);
+      // Explicit credential-providers wins: do not auto-append detected static providers (e.g.
+      // s3-secret-key next to s3-token), which breaks path-based credential selection. Catalogs that
+      // must keep jdbc/aws/dlf listed use ensureCredentialProviderListed in their overrides.
       return props;
     }
     List<String> credentialProviders = new ArrayList<>();
@@ -564,25 +563,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * When {@code credential-providers} is already set, appends any providers that {@link
-   * #addCatalogSpecificCredentialProviders(Map, List)} would have detected from complete static key
-   * pairs (storage / JDBC / AWS / DLF). Does not remove entries from the explicit list.
-   *
-   * @param props mutable catalog properties that already contain {@code credential-providers}
-   */
-  protected void ensureDetectedCredentialProvidersListed(Map<String, String> props) {
-    List<String> detected = new ArrayList<>();
-    addCatalogSpecificCredentialProviders(props, detected);
-    for (String credentialType : detected) {
-      ensureCredentialProviderListed(props, credentialType);
-    }
-  }
-
-  /**
    * Appends {@code credentialType} to {@link CredentialConstants#CREDENTIAL_PROVIDERS} when it is
-   * not already listed. Used by subclasses that must keep catalog-specific providers available even
-   * when the property was set explicitly (so {@link #addCatalogSpecificCredentialProviders} was
-   * skipped).
+   * not already listed. Used by subclasses that must keep catalog-specific providers (jdbc / aws /
+   * dlf) available even when the property was set explicitly (so {@link
+   * #addCatalogSpecificCredentialProviders} was skipped).
    *
    * @param props mutable catalog properties
    * @param credentialType provider type name to ensure
