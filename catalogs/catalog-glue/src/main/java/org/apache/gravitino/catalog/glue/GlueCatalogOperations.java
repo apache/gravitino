@@ -46,7 +46,6 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
-import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -166,7 +165,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       applyCatalogId(catalogId, req::catalogId);
       glueClient.getDatabases(req.build());
     } catch (SdkException e) {
-      throw new ConnectionFailedException(e, "Failed to connect to AWS Glue: %s", e.getMessage());
+      throw GlueExceptionConverter.toConnectionException(e);
     }
   }
 
