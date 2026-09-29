@@ -770,6 +770,18 @@ class TestDTOConverters(unittest.TestCase):
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
 
+    def test_text_index_properties_survive_dto_conversion(self):
+        properties = {"tokenizer": "ngrams", "ngram_size": "3"}
+        index = Indexes.of(
+            Index.IndexType.DATA_SKIPPING_TEXT, "idx_body", [["body"]], properties
+        )
+
+        dto = DTOConverters.to_dto(index)
+        self.assertEqual(dto.properties(), properties)
+        restored = DTOConverters.from_dto(dto)
+        self.assertIs(restored.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(restored.properties(), properties)
+
     def test_to_dtos_representations(self):
         representations = [
             SQLRepresentation(Dialects.TRINO, "SELECT 1"),
