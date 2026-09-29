@@ -170,7 +170,7 @@ public class CatalogDorisIT extends BaseIT {
   private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    DorisContainer dorisContainer = containerSuite.getDorisContainer();
+    DorisContainer dorisContainer = containerSuite.getDorisContainer(dorisImageName);
 
     jdbcUrl =
         String.format(
