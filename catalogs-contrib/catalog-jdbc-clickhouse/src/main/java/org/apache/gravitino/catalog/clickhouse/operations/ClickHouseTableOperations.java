@@ -19,13 +19,18 @@
 package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.BLOOM_FILTER_SIZE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_ANNOY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_NGRAMBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TOKENBFV1;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_USEARCH;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DIMENSIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HASH_FUNCTIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.LEGACY_TYPE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.NGRAM_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
@@ -669,6 +674,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case DATA_SKIPPING_SET:
         case DATA_SKIPPING_NGRAMBFV1:
         case DATA_SKIPPING_TOKENBFV1:
+        case DATA_SKIPPING_ANNOY:
+        case DATA_SKIPPING_USEARCH:
           sqlBuilder
               .append(" ")
               .append(
@@ -1207,6 +1214,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_SET:
       case DATA_SKIPPING_NGRAMBFV1:
       case DATA_SKIPPING_TOKENBFV1:
+      case DATA_SKIPPING_ANNOY:
+      case DATA_SKIPPING_USEARCH:
         return "ADD "
             + buildDataSkippingIndexDdl(
                 addIndex.getName(), fieldStr, addIndex.getType(), properties);
@@ -1981,6 +1990,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 tableName);
           }
           properties.putAll(parameterProperties);
+          properties.putAll(parseLegacyVectorIndexProperties(indexType, parameterSource));
           secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
         }
       }
@@ -2221,6 +2231,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
       case DATA_SKIPPING_TOKENBFV1:
         return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+      case DATA_SKIPPING_ANNOY:
+        return Index.IndexType.DATA_SKIPPING_ANNOY;
+      case DATA_SKIPPING_USEARCH:
+        return Index.IndexType.DATA_SKIPPING_USEARCH;
       default:
         // ClickHouse may return type with parameters in some versions (e.g. "set(0)",
         // "ngrambf_v1(3, 512, 3, 0)"). Match on prefix to handle both bare and
@@ -2234,8 +2248,78 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
           return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
         }
+        if (rawType.startsWith(DATA_SKIPPING_ANNOY + "(")) {
+          return Index.IndexType.DATA_SKIPPING_ANNOY;
+        }
+        if (rawType.startsWith(DATA_SKIPPING_USEARCH + "(")) {
+          return Index.IndexType.DATA_SKIPPING_USEARCH;
+        }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
+  }
+
+  /**
+   * Parses the positional parameters of a legacy {@code annoy}/{@code usearch} index type clause as
+   * returned by {@code system.data_skipping_indices.type} on a server that still exposes them.
+   *
+   * <p>ClickHouse reports these indexes as {@code annoy('distance_type', 'vector_dimensions')} (and
+   * the equivalent {@code usearch(...)} form). The complete clause is always retained verbatim so
+   * that no information is lost even when the individual parameters cannot be split, and the
+   * distance function and dimensions are additionally exposed as individual properties when they
+   * can be parsed.
+   *
+   * @param indexType the mapped Gravitino legacy index type
+   * @param typeClause the raw ClickHouse index type clause
+   * @return the preserved legacy index properties, or an empty map when {@code indexType} is not a
+   *     legacy vector index type
+   */
+  @VisibleForTesting
+  static Map<String, String> parseLegacyVectorIndexProperties(
+      Index.IndexType indexType, String typeClause) {
+    if (!isLegacyVectorIndex(indexType)) {
+      return Collections.emptyMap();
+    }
+
+    String normalizedClause = StringUtils.trimToEmpty(typeClause);
+    Map<String, String> properties = new HashMap<>();
+    if (StringUtils.isNotBlank(normalizedClause)) {
+      properties.put(LEGACY_TYPE, normalizedClause);
+    }
+
+    int paramsStart = normalizedClause.indexOf('(');
+    int paramsEnd = normalizedClause.lastIndexOf(')');
+    if (paramsStart > 0 && paramsEnd > paramsStart) {
+      String[] params = normalizedClause.substring(paramsStart + 1, paramsEnd).split(",", -1);
+      if (params.length > 0 && StringUtils.isNotBlank(params[0])) {
+        properties.put(DISTANCE_FUNCTION, stripQuotes(params[0]));
+      }
+      if (params.length > 1 && StringUtils.isNotBlank(params[1])) {
+        properties.put(DIMENSIONS, stripQuotes(params[1]));
+      }
+    }
+
+    return Map.copyOf(properties);
+  }
+
+  private static boolean isLegacyVectorIndex(Index.IndexType indexType) {
+    return indexType == Index.IndexType.DATA_SKIPPING_ANNOY
+        || indexType == Index.IndexType.DATA_SKIPPING_USEARCH;
+  }
+
+  private static String legacyTypeName(Index.IndexType indexType) {
+    return indexType == Index.IndexType.DATA_SKIPPING_ANNOY
+        ? DATA_SKIPPING_ANNOY
+        : DATA_SKIPPING_USEARCH;
+  }
+
+  private static String stripQuotes(String value) {
+    String stripped = StringUtils.trim(value);
+    if (stripped.length() >= 2
+        && ((stripped.startsWith("'") && stripped.endsWith("'"))
+            || (stripped.startsWith("\"") && stripped.endsWith("\"")))) {
+      return stripped.substring(1, stripped.length() - 1);
+    }
+    return stripped;
   }
 
   /**
@@ -2353,6 +2437,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return buildBloomFilterTypeClause(properties, DATA_SKIPPING_NGRAMBFV1, indexName);
       case DATA_SKIPPING_TOKENBFV1:
         return buildBloomFilterTypeClause(properties, DATA_SKIPPING_TOKENBFV1, indexName);
+      case DATA_SKIPPING_ANNOY:
+      case DATA_SKIPPING_USEARCH:
+        throw new IllegalArgumentException(
+            "ClickHouse no longer accepts the legacy index type '%s' for index '%s'; "
+                    .formatted(legacyTypeName(indexType), indexName)
+                + "migrate the index to 'vector_similarity' explicitly. Gravitino preserves these "
+                + "legacy indexes on load but never generates their DDL.");
       default:
         throw new IllegalArgumentException(
             "Gravitino ClickHouse doesn't support index : " + indexType);

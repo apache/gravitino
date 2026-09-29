@@ -144,5 +144,21 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /**
+     * Legacy Annoy data skipping index. ClickHouse supported it in earlier releases but replaced it
+     * with {@code vector_similarity} in v24.8 and removed support in v25.5. This type exists only
+     * so that the ClickHouse catalog can preserve the metadata of pre-existing tables; it is never
+     * generated as DDL.
+     */
+    DATA_SKIPPING_ANNOY,
+
+    /**
+     * Legacy USearch data skipping index. ClickHouse supported it in earlier releases but replaced
+     * it with {@code vector_similarity} in v24.8 and removed support in v25.5. This type exists
+     * only so that the ClickHouse catalog can preserve the metadata of pre-existing tables; it is
+     * never generated as DDL.
+     */
+    DATA_SKIPPING_USEARCH,
   }
 }
