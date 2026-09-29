@@ -67,7 +67,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -536,10 +536,10 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     ViewEntity registered = entityStore.get(viewIdent, VIEW, ViewEntity.class);
 
     reset(entityStore);
-    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+    doReturn(registered.id() - 1)
         .doCallRealMethod()
-        .when(entityStore)
-        .getVersion(viewIdent, VIEW);
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(viewIdent, VIEW);
 
     Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
     Assertions.assertEquals(

@@ -49,8 +49,8 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -280,18 +280,18 @@ public abstract class OperationDispatcher {
   }
 
   /**
-   * Reads the id and store version of a registration before an external-catalog call, so a later
-   * store write can be fenced on it.
+   * Reads the id of a registration before an external-catalog call, so a later store write can be
+   * fenced on it.
    *
    * @param ident the entity identifier
    * @param type the entity type
-   * @return the observed id and version, or null when nothing is registered under the name
-   * @throws UnsupportedOperationException if the store cannot read versions
+   * @return the observed id, or null when nothing is registered under the name
+   * @throws UnsupportedOperationException if the store lacks identity-fenced delete support
    */
   @Nullable
-  protected EntityVersion observeRegistration(NameIdentifier ident, Entity.EntityType type) {
+  protected Long observeRegistration(NameIdentifier ident, Entity.EntityType type) {
     try {
-      return store.getVersion(ident, type);
+      return SupportsIdentityFencedDelete.require(store).getEntityId(ident, type);
     } catch (NoSuchEntityException e) {
       return null;
     } catch (IOException e) {
@@ -317,16 +317,13 @@ public abstract class OperationDispatcher {
    * @param ident the entity identifier
    * @param type the entity type
    * @param cascade whether to delete the children as well
-   * @param observed the id and version read before the external call, or null when there was no
-   *     registration to delete
+   * @param observed the id read before the external call, or null when there was no registration to
+   *     delete
    * @return true if the observed registration was deleted
-   * @throws UnsupportedOperationException if the store cannot delete with a version check
+   * @throws UnsupportedOperationException if the store lacks identity-fenced delete support
    */
   protected boolean deleteObservedRegistration(
-      NameIdentifier ident,
-      Entity.EntityType type,
-      boolean cascade,
-      @Nullable EntityVersion observed) {
+      NameIdentifier ident, Entity.EntityType type, boolean cascade, @Nullable Long observed) {
     if (observed == null) {
       LOG.warn(
           "No {} registration was found for {} before the external drop; leaving the store alone",
@@ -336,9 +333,10 @@ public abstract class OperationDispatcher {
     }
     for (int attempt = 1; ; attempt++) {
       try {
-        return store.delete(ident, type, cascade, observed);
+        return SupportsIdentityFencedDelete.require(store)
+            .deleteIfIdMatches(ident, type, cascade, observed);
       } catch (OptimisticLockException e) {
-        EntityVersion current = observeRegistration(ident, type);
+        Long current = observeRegistration(ident, type);
         if (current == null) {
           LOG.warn(
               "The {} registration of {} was removed concurrently while the external drop ran",
@@ -346,7 +344,7 @@ public abstract class OperationDispatcher {
               ident);
           return false;
         }
-        if (current.id() != observed.id()) {
+        if (current.longValue() != observed.longValue()) {
           LOG.warn(
               "The {} registration of {} changed while the external drop ran (expected {}, found"
                   + " {}); it is kept instead of being deleted under the new incarnation",
@@ -400,7 +398,7 @@ public abstract class OperationDispatcher {
    * @throws OptimisticLockException if the stale registration changed while it was replaced
    */
   protected <E extends Entity & HasIdentifier> void putCreatedEntity(
-      E entity, boolean cascade, @Nullable EntityVersion observed) throws IOException {
+      E entity, boolean cascade, @Nullable Long observed) throws IOException {
     try {
       store.put(entity, false /* overwrite */);
       return;
@@ -409,13 +407,13 @@ public abstract class OperationDispatcher {
     }
 
     NameIdentifier ident = entity.nameIdentifier();
-    EntityVersion existing = observeRegistration(ident, entity.type());
-    if (existing != null && existing.id() == entity.id()) {
+    Long existing = observeRegistration(ident, entity.type());
+    if (existing != null && existing.longValue() == entity.id()) {
       // Another node already imported this object. Keep any updates it has made since then.
       return;
     }
     if (existing != null) {
-      if (observed == null || existing.id() != observed.id()) {
+      if (observed == null || existing.longValue() != observed.longValue()) {
         throw new OptimisticLockException(
             "The registration of %s changed during create; keeping the newer registration %s",
             ident, existing);
@@ -426,7 +424,8 @@ public abstract class OperationDispatcher {
           existing,
           ident,
           entity.id());
-      store.delete(ident, entity.type(), cascade, observed);
+      SupportsIdentityFencedDelete.require(store)
+          .deleteIfIdMatches(ident, entity.type(), cascade, observed);
     }
     store.put(entity, false /* overwrite */);
   }

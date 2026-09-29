@@ -38,7 +38,6 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -305,15 +304,15 @@ public class TableMetaService {
   }
 
   /**
-   * Reads the id and store version of the table under this name.
+   * Reads the id of the table under this name.
    *
    * @param identifier the table identifier
-   * @return the id and version
+   * @return the id
    * @throws NoSuchEntityException if the table does not exist
    */
-  public EntityVersion getTableVersion(NameIdentifier identifier) {
+  public long getTableId(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
-    return EntityVersion.of(tablePO.getTableId(), tablePO.getCurrentVersion());
+    return tablePO.getTableId();
   }
 
   public boolean deleteTable(NameIdentifier identifier) {
@@ -324,19 +323,18 @@ public class TableMetaService {
    * Deletes the table under this name only if it is still the observed one.
    *
    * @param identifier the table identifier
-   * @param expected the id and version read before the operation started, or null to delete
-   *     whatever row is under the name now
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
    * @return true once the row is deleted
    * @throws NoSuchEntityException if no table exists under the name
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
-  public boolean deleteTable(NameIdentifier identifier, @Nullable EntityVersion expected) {
+  public boolean deleteTable(NameIdentifier identifier, @Nullable Long expected) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
-    if (expected != null) {
-      OccWriteSupport.checkExpectedIdentity(
-          identifier, Entity.EntityType.TABLE, tablePO.getTableId(), expected);
+    if (expected != null && tablePO.getTableId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.TABLE, identifier);
     }
 
     // Delete the table row first and only if it still has the version we read. A stale drop stops

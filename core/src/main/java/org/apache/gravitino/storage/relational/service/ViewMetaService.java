@@ -40,7 +40,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -226,23 +225,23 @@ public class ViewMetaService {
   }
 
   /**
-   * Reads the id and store version of the view under this name.
+   * Reads the id of the view under this name.
    *
    * @param ident the view identifier
-   * @return the id and version
+   * @return the id
    * @throws NoSuchEntityException if the view does not exist
    */
-  public EntityVersion getViewVersion(NameIdentifier ident) {
+  public long getViewId(NameIdentifier ident) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
-    return EntityVersion.of(viewPO.getViewId(), viewPO.getCurrentVersion());
+    return viewPO.getViewId();
   }
 
   /**
    * Deletes the view under this name only if it is still the observed one.
    *
    * @param ident the view identifier
-   * @param expected the id and version read before the operation started, or null to delete
-   *     whatever row is under the name now
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
    * @return true once the row is deleted
    * @throws NoSuchEntityException if no view exists under the name
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
@@ -251,11 +250,10 @@ public class ViewMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteViewByIdentifier")
-  public boolean deleteView(NameIdentifier ident, @Nullable EntityVersion expected) {
+  public boolean deleteView(NameIdentifier ident, @Nullable Long expected) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
-    if (expected != null) {
-      OccWriteSupport.checkExpectedIdentity(
-          ident, Entity.EntityType.VIEW, viewPO.getViewId(), expected);
+    if (expected != null && viewPO.getViewId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.VIEW, ident);
     }
 
     deleteViewWithVersion(ident, viewPO);

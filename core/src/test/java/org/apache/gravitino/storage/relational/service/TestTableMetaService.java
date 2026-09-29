@@ -61,8 +61,8 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -319,8 +319,8 @@ public class TestTableMetaService extends TestJDBCBackend {
     TableEntity first =
         createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "t", AUDIT_INFO);
     backend.insert(first, false);
-    EntityVersion observed = service.getTableVersion(first.nameIdentifier());
-    Assertions.assertEquals(first.id(), observed.id());
+    Long observed = service.getTableId(first.nameIdentifier());
+    Assertions.assertEquals(first.id(), observed.longValue());
 
     // The observed table is dropped and re-created under the same name by someone else.
     Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.TABLE, false));
@@ -335,16 +335,18 @@ public class TestTableMetaService extends TestJDBCBackend {
         second.id(), service.getTableByIdentifier(second.nameIdentifier()).id());
 
     // An update to the same incarnation during the external call must not prevent deletion.
-    EntityVersion current = service.getTableVersion(second.nameIdentifier());
+    long current = service.getTableId(second.nameIdentifier());
+    long versionBeforeUpdate = getTablePO(second.id()).getCurrentVersion();
     service.insertTable(second, true);
     Assertions.assertEquals(
-        current.version() + 1, service.getTableVersion(second.nameIdentifier()).version());
-    long maxIdBeforeVersionedDelete = maxEntityChangeId();
+        versionBeforeUpdate + 1, getTablePO(second.id()).getCurrentVersion().longValue());
+    long maxIdBeforeFencedDelete = maxEntityChangeId();
     Assertions.assertTrue(
-        backend.delete(second.nameIdentifier(), Entity.EntityType.TABLE, false, current));
+        SupportsIdentityFencedDelete.require(backend)
+            .deleteIfIdMatches(second.nameIdentifier(), Entity.EntityType.TABLE, false, current));
     Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.TABLE));
     Assertions.assertTrue(
-        listEntityChanges(maxIdBeforeVersionedDelete).stream()
+        listEntityChanges(maxIdBeforeFencedDelete).stream()
             .anyMatch(
                 record ->
                     record.getEntityType().equals(Entity.EntityType.TABLE.name())

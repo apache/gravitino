@@ -45,7 +45,6 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -92,14 +91,14 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
     Namespace topicNs = NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName);
     TopicMetaService service = TopicMetaService.getInstance();
 
     TopicEntity first =
         createTopicEntity(RandomIdGenerator.INSTANCE.nextId(), topicNs, "t", AUDIT_INFO);
     backend.insert(first, false);
-    EntityVersion observed = service.getTopicVersion(first.nameIdentifier());
+    Long observed = service.getTopicId(first.nameIdentifier());
 
     Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.TOPIC, false));
     TopicEntity second =
@@ -111,8 +110,7 @@ public class TestTopicMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         second.id(), service.getTopicByIdentifier(second.nameIdentifier()).id());
     Assertions.assertTrue(
-        service.deleteTopic(
-            second.nameIdentifier(), service.getTopicVersion(second.nameIdentifier())));
+        service.deleteTopic(second.nameIdentifier(), service.getTopicId(second.nameIdentifier())));
   }
 
   @TestTemplate

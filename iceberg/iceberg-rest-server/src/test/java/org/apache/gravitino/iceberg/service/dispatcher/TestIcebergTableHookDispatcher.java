@@ -21,11 +21,11 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -43,14 +43,13 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
@@ -65,10 +64,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 
 public class TestIcebergTableHookDispatcher {
 
@@ -102,9 +98,11 @@ public class TestIcebergTableHookDispatcher {
     mockNamespaceDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
 
     // Mock GravitinoEnv components
-    mockEntityStore = mock(EntityStore.class);
-    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.TABLE)))
-        .thenReturn(EntityVersion.of(1L, 0L));
+    mockEntityStore =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    when(SupportsIdentityFencedDelete.require(mockEntityStore)
+            .getEntityId(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA)))
+        .thenReturn(1L);
     mockTableDispatcher = mock(TableDispatcher.class);
     mockInternalTableDispatcher = mock(TableDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
@@ -208,65 +206,6 @@ public class TestIcebergTableHookDispatcher {
     Assertions.assertEquals(TEST_USER, userCaptor.getValue());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testDropTableStopsBeforeExternalDropWhenRegistrationCannotBeRead(boolean unsupported)
-      throws IOException {
-    TableIdentifier identifier = TableIdentifier.of("schema", "unreadable");
-    NameIdentifier ident =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            TEST_METALAKE, TEST_CATALOG, identifier, ":");
-    if (unsupported) {
-      when(mockEntityStore.getVersion(ident, Entity.EntityType.TABLE))
-          .thenThrow(new UnsupportedOperationException("version reads unsupported"));
-    } else {
-      when(mockEntityStore.getVersion(ident, Entity.EntityType.TABLE))
-          .thenThrow(new IOException("registration unavailable"));
-    }
-
-    Assertions.assertThrows(
-        RuntimeException.class, () -> hookDispatcher.dropTable(mockContext, identifier, false));
-    verify(mockDispatcher, never()).dropTable(mockContext, identifier, false);
-  }
-
-  @Test
-  public void testDropTablePreservesRegistrationRecreatedAfterTheExistenceProbe() throws Exception {
-    TableIdentifier identifier = TableIdentifier.of("schema", "recreated");
-    NameIdentifier ident =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            TEST_METALAKE, TEST_CATALOG, identifier, ":");
-    EntityVersion observed = EntityVersion.of(1L, 0L);
-    when(mockDispatcher.tableExists(mockContext, identifier)).thenReturn(false);
-    doThrow(new OptimisticLockException("replacement registration"))
-        .when(mockEntityStore)
-        .delete(ident, Entity.EntityType.TABLE, false, observed);
-
-    Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, identifier, false));
-
-    InOrder order = inOrder(mockEntityStore, mockDispatcher);
-    order.verify(mockEntityStore).getVersion(ident, Entity.EntityType.TABLE);
-    order.verify(mockDispatcher).dropTable(mockContext, identifier, false);
-    order.verify(mockDispatcher).tableExists(mockContext, identifier);
-    order.verify(mockEntityStore).delete(ident, Entity.EntityType.TABLE, false, observed);
-    verify(mockEntityStore, never()).delete(ident, Entity.EntityType.TABLE);
-  }
-
-  @Test
-  public void testDropTableDoesNotDeleteARegistrationAbsentBeforeTheDrop() throws Exception {
-    TableIdentifier identifier = TableIdentifier.of("schema", "unregistered");
-    NameIdentifier ident =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            TEST_METALAKE, TEST_CATALOG, identifier, ":");
-    when(mockEntityStore.getVersion(ident, Entity.EntityType.TABLE))
-        .thenThrow(new NoSuchEntityException("not registered"));
-
-    hookDispatcher.dropTable(mockContext, identifier, false);
-
-    verify(mockDispatcher).dropTable(mockContext, identifier, false);
-    verify(mockEntityStore, never()).delete(any(), eq(Entity.EntityType.TABLE), eq(false), any());
-    verify(mockEntityStore, never()).delete(ident, Entity.EntityType.TABLE);
-  }
-
   @Test
   public void testDropTableDeletesEntity() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
@@ -278,8 +217,7 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier expectedIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
-    verify(mockEntityStore)
-        .delete(expectedIdentifier, Entity.EntityType.TABLE, false, EntityVersion.of(1L, 0L));
+    verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
   }
 
   @Test
@@ -293,8 +231,7 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier expectedIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
-    verify(mockEntityStore, never())
-        .delete(expectedIdentifier, Entity.EntityType.TABLE, false, EntityVersion.of(1L, 0L));
+    verify(mockEntityStore, never()).delete(expectedIdentifier, Entity.EntityType.TABLE);
     verify(mockInternalTableDispatcher).loadTable(expectedIdentifier);
     verify(mockTableDispatcher, never()).loadTable(any());
   }
@@ -310,8 +247,7 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier expectedIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
-    verify(mockEntityStore)
-        .delete(expectedIdentifier, Entity.EntityType.TABLE, false, EntityVersion.of(1L, 0L));
+    verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
     verify(mockInternalTableDispatcher).loadTable(expectedIdentifier);
     verify(mockTableDispatcher, never()).loadTable(any());
   }
@@ -324,13 +260,12 @@ public class TestIcebergTableHookDispatcher {
         .thenReturn(false);
     when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent")))
         .thenReturn(false);
-    EntityVersion observed = EntityVersion.of(1L, 0L);
-    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.SCHEMA))).thenReturn(observed);
 
     hookDispatcher.dropTable(mockContext, tableId, false);
 
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
-    verify(mockEntityStore).delete(schemaIdent, Entity.EntityType.SCHEMA, true, observed);
+    verify(SupportsIdentityFencedDelete.require(mockEntityStore))
+        .deleteIfIdMatches(schemaIdent, Entity.EntityType.SCHEMA, true, 1L);
   }
 
   @Test
@@ -342,7 +277,7 @@ public class TestIcebergTableHookDispatcher {
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
     doThrow(new NoSuchEntityException("Table not found"))
         .when(mockEntityStore)
-        .delete(expectedIdentifier, Entity.EntityType.TABLE, false, EntityVersion.of(1L, 0L));
+        .delete(expectedIdentifier, Entity.EntityType.TABLE);
 
     // Should not throw exception
     Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
@@ -354,9 +289,7 @@ public class TestIcebergTableHookDispatcher {
   public void testDropTableIgnoresReconciliationIOException() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
 
-    doThrow(new IOException("IO error"))
-        .when(mockEntityStore)
-        .delete(any(), eq(Entity.EntityType.TABLE), eq(false), any(EntityVersion.class));
+    doThrow(new IOException("IO error")).when(mockEntityStore).delete(any(), any());
 
     Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
@@ -413,8 +346,7 @@ public class TestIcebergTableHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source, ":");
     NameIdentifier destIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, dest, ":");
-    verify(mockEntityStore)
-        .delete(sourceIdentifier, Entity.EntityType.TABLE, false, EntityVersion.of(1L, 0L));
+    verify(mockEntityStore).delete(sourceIdentifier, Entity.EntityType.TABLE);
     verify(mockInternalTableDispatcher).loadTable(destIdentifier);
     verify(mockTableDispatcher, never()).loadTable(any());
   }

@@ -26,7 +26,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +65,7 @@ public final class SchemaEntityCleaner {
     }
 
     try {
+      SupportsIdentityFencedDelete fence = SupportsIdentityFencedDelete.require(store);
       String separator = HierarchicalSchemaUtil.schemaSeparator();
       ArrayList<String> schemaNames =
           new ArrayList<>(HierarchicalSchemaUtil.allScopes(schemaIdent.name(), separator));
@@ -73,14 +74,14 @@ public final class SchemaEntityCleaner {
       }
 
       NameIdentifier outermostOrphan = null;
-      EntityVersion outermostObserved = null;
+      Long outermostObserved = null;
       for (String schemaName : schemaNames) {
         NameIdentifier candidate = NameIdentifier.of(schemaIdent.namespace(), schemaName);
         // The source may be re-created while schemaExists runs. Observe the store row first so
         // cleanup cannot delete that new incarnation or its children by name.
-        EntityVersion observed;
+        Long observed;
         try {
-          observed = store.getVersion(candidate, SCHEMA);
+          observed = fence.getEntityId(candidate, SCHEMA);
         } catch (NoSuchEntityException e) {
           observed = null;
         }
@@ -95,7 +96,7 @@ public final class SchemaEntityCleaner {
         return;
       }
 
-      store.delete(outermostOrphan, SCHEMA, true, outermostObserved);
+      fence.deleteIfIdMatches(outermostOrphan, SCHEMA, true, outermostObserved);
     } catch (NoSuchEntityException e) {
       LOG.debug("The orphaned schema entity was already removed from the store", e);
     } catch (OptimisticLockException e) {

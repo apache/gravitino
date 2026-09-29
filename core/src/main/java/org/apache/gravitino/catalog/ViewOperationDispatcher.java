@@ -55,7 +55,6 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -328,7 +327,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
           boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
           // Read the registration before the external call, so the store delete below can only
           // remove the row this drop started with and never one re-created under the same name.
-          EntityVersion observed = isManagedView ? null : observeRegistration(ident, VIEW);
+          Long observed = isManagedView ? null : observeRegistration(ident, VIEW);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -382,7 +381,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         StringIdentifier.newPropertiesWithId(stringId, properties);
 
     boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
-    EntityVersion observed = isManagedView ? null : observeRegistration(ident, VIEW);
+    Long observed = isManagedView ? null : observeRegistration(ident, VIEW);
     View catalogView =
         doWithCatalog(
             catalogIdent,
@@ -527,7 +526,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   }
 
   private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
-    EntityVersion observed = observeRegistration(ident, VIEW);
+    Long observed = observeRegistration(ident, VIEW);
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {

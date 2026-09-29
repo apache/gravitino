@@ -27,6 +27,7 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -56,6 +58,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -82,7 +85,9 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
+import org.apache.gravitino.storage.relational.RelationalBackend;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -340,10 +345,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // Simulate the race: the drop observed an older incarnation of t before its external drop,
     // and by the time it reaches the store another node has re-created t under a new id.
     reset(entityStore);
-    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+    doReturn(registered.id() - 1)
         .doCallRealMethod()
-        .when(entityStore)
-        .getVersion(tableIdent, TABLE);
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
 
     // The external drop succeeded, so the drop reports success instead of a conflict that would
     // invite a retry against the new incarnation, and it does not delete what is under the name.
@@ -553,9 +558,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
     schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
-    doThrow(new UnsupportedOperationException("versions unsupported"))
-        .when(entityStore)
-        .getVersion(tableIdent, TABLE);
+    doThrow(new UnsupportedOperationException("identity reads unsupported"))
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
 
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -640,8 +645,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     reset(entityStore);
     doThrow(new OptimisticLockException("concurrent update"))
         .doCallRealMethod()
-        .when(entityStore)
-        .delete(eq(tableIdent), eq(TABLE), eq(false), any(EntityVersion.class));
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .deleteIfIdMatches(eq(tableIdent), eq(TABLE), eq(false), anyLong());
 
     Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
     Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
@@ -658,13 +663,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         tableIdent, new Column[0], "comment", props, new Transform[0]);
     reset(entityStore);
     doThrow(new OptimisticLockException("concurrent update"))
-        .when(entityStore)
-        .delete(eq(tableIdent), eq(TABLE), eq(false), any(EntityVersion.class));
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .deleteIfIdMatches(eq(tableIdent), eq(TABLE), eq(false), anyLong());
 
     Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
     Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
-    verify(entityStore, times(3))
-        .delete(eq(tableIdent), eq(TABLE), eq(false), any(EntityVersion.class));
+    verify(SupportsIdentityFencedDelete.require(entityStore), times(3))
+        .deleteIfIdMatches(eq(tableIdent), eq(TABLE), eq(false), anyLong());
   }
 
   @Test
@@ -836,9 +841,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // thrown).
     reset(entityStore);
     doThrow(new NoSuchEntityException("not observed"))
-        .doReturn(EntityVersion.of(mismatchedTableEntity.id(), 0L))
-        .when(entityStore)
-        .getVersion(tableIdent, TABLE);
+        .doReturn(mismatchedTableEntity.id())
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedTableEntity)
@@ -1061,7 +1066,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  void testDropTableFailsBeforeExternalDropWhenStoreCannotReadVersion() throws IOException {
+  void testDropTableFailsBeforeExternalDropWhenStoreCannotReadIdentity() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_version");
     NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_version", "t");
     schemaOperationDispatcher.createSchema(
@@ -1069,9 +1074,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     createTable(tableIdent);
 
     reset(entityStore);
-    doThrow(new UnsupportedOperationException("version reads unsupported"))
-        .when(entityStore)
-        .getVersion(tableIdent, TABLE);
+    doThrow(new UnsupportedOperationException("identity reads unsupported"))
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
 
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
@@ -1086,26 +1091,44 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  void testUnsupportedVersionCheckedDeleteDoesNotFallBackToDeleteByName() throws IOException {
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_cas");
-    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_cas", "t");
+  void testDropAndPurgeRejectStoresWithoutIdentityFenceBeforeExternalCall()
+      throws IOException, IllegalAccessException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_fence");
+    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_fence", "t");
     schemaOperationDispatcher.createSchema(
         schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
     createTable(tableIdent);
-    EntityVersion observed = tableOperationDispatcher.observeRegistration(tableIdent, TABLE);
+    EntityStore legacyStore = mock(EntityStore.class);
+    doReturn(entityStore.get(tableIdent, TABLE, TableEntity.class))
+        .when(legacyStore)
+        .get(tableIdent, TABLE, TableEntity.class);
+    RelationalEntityStore relationalStore = new RelationalEntityStore();
+    RelationalBackend legacyBackend = mock(RelationalBackend.class);
+    FieldUtils.writeField(relationalStore, "backend", legacyBackend, true);
 
-    reset(entityStore);
-    doThrow(new UnsupportedOperationException("versioned delete unsupported"))
-        .when(entityStore)
-        .delete(tableIdent, TABLE, false, observed);
-
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () ->
-            tableOperationDispatcher.deleteObservedRegistration(
-                tableIdent, TABLE, false, observed));
-    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
-    verify(entityStore, never()).delete(tableIdent, TABLE, false);
+    for (EntityStore unsupportedStore : List.of(legacyStore, relationalStore)) {
+      TableOperationDispatcher dispatcher =
+          new TableOperationDispatcher(
+              catalogManager,
+              unsupportedStore,
+              idGenerator,
+              () -> schemaOperationDispatcher,
+              secretManager);
+      Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> dispatcher.dropTable(tableIdent));
+      Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> dispatcher.purgeTable(tableIdent));
+      Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+      catalogManager.doWithCatalog(
+          NameIdentifier.of(metalake, catalog),
+          liveCatalog -> {
+            TestCatalogOperations operations = (TestCatalogOperations) liveCatalog.ops();
+            Assertions.assertDoesNotThrow(() -> operations.loadTable(tableIdent));
+            return null;
+          });
+    }
+    verify(legacyStore, never()).delete(any(), any(), anyBoolean());
+    verifyNoInteractions(legacyBackend);
   }
 
   @Test

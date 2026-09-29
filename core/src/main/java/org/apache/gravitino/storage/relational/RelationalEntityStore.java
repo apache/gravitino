@@ -58,7 +58,7 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -70,7 +70,10 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
 public class RelationalEntityStore
-    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
+    implements EntityStore,
+        SupportsRelationOperations,
+        SupportsEntityChangeLog,
+        SupportsIdentityFencedDelete {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -313,19 +316,18 @@ public class RelationalEntityStore
   }
 
   @Override
-  public EntityVersion getVersion(NameIdentifier ident, Entity.EntityType entityType)
-      throws IOException {
-    // Always read through: a cached entity does not carry the store version, and a stale cache
-    // entry must never be the basis of a version check.
-    return backend.getVersion(ident, entityType);
+  public long getEntityId(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    // Observe storage directly: a stale cache entry may describe another incarnation.
+    return SupportsIdentityFencedDelete.require(backend).getEntityId(ident, entityType);
   }
 
   @Override
-  public boolean delete(
-      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, EntityVersion expected)
+  public boolean deleteIfIdMatches(
+      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, long expectedId)
       throws IOException {
     try {
-      return backend.delete(ident, entityType, cascade, expected);
+      return SupportsIdentityFencedDelete.require(backend)
+          .deleteIfIdMatches(ident, entityType, cascade, expectedId);
     } finally {
       invalidateCache(ident, entityType);
     }

@@ -43,7 +43,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -273,15 +272,15 @@ public class SchemaMetaService {
   }
 
   /**
-   * Reads the id and store version of the schema under this name.
+   * Reads the id of the schema under this name.
    *
    * @param identifier the schema identifier
-   * @return the id and version
+   * @return the id
    * @throws NoSuchEntityException if the schema does not exist
    */
-  public EntityVersion getSchemaVersion(NameIdentifier identifier) {
+  public long getSchemaId(NameIdentifier identifier) {
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
-    return EntityVersion.of(schemaPO.getSchemaId(), schemaPO.getCurrentVersion());
+    return schemaPO.getSchemaId();
   }
 
   /**
@@ -289,8 +288,8 @@ public class SchemaMetaService {
    *
    * @param identifier the schema identifier
    * @param cascade whether to delete the children as well
-   * @param expected the id and version read before the operation started, or null to delete
-   *     whatever row is under the name now
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
    * @return true once the row is deleted
    * @throws NoSuchEntityException if no schema exists under the name
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
@@ -299,14 +298,12 @@ public class SchemaMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchema")
-  public boolean deleteSchema(
-      NameIdentifier identifier, boolean cascade, @Nullable EntityVersion expected) {
+  public boolean deleteSchema(NameIdentifier identifier, boolean cascade, @Nullable Long expected) {
     NameIdentifierUtil.checkSchema(identifier);
 
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
-    if (expected != null) {
-      OccWriteSupport.checkExpectedIdentity(
-          identifier, Entity.EntityType.SCHEMA, schemaPO.getSchemaId(), expected);
+    if (expected != null && schemaPO.getSchemaId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
     }
     Long schemaId = schemaPO.getSchemaId();
 

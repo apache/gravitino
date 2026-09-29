@@ -57,7 +57,7 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -274,10 +274,10 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     TopicEntity registered = entityStore.get(topicIdent, TOPIC, TopicEntity.class);
 
     reset(entityStore);
-    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+    doReturn(registered.id() - 1)
         .doCallRealMethod()
-        .when(entityStore)
-        .getVersion(topicIdent, TOPIC);
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(topicIdent, TOPIC);
 
     Assertions.assertTrue(topicOperationDispatcher.dropTopic(topicIdent));
     Assertions.assertEquals(

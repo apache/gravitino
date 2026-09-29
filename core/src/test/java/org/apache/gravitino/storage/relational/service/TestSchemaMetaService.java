@@ -68,7 +68,6 @@ import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -112,7 +111,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     Namespace schemaNs = NamespaceUtil.ofSchema(metalakeName, catalogName);
@@ -121,8 +120,8 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     SchemaEntity first =
         createSchemaEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNs, "s", AUDIT_INFO);
     backend.insert(first, false);
-    EntityVersion observed = service.getSchemaVersion(first.nameIdentifier());
-    Assertions.assertEquals(first.id(), observed.id());
+    Long observed = service.getSchemaId(first.nameIdentifier());
+    Assertions.assertEquals(first.id(), observed.longValue());
 
     Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.SCHEMA, false));
     SchemaEntity second =
@@ -135,7 +134,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         second.id(), service.getSchemaByIdentifier(second.nameIdentifier()).id());
 
-    EntityVersion current = service.getSchemaVersion(second.nameIdentifier());
+    Long current = service.getSchemaId(second.nameIdentifier());
     Assertions.assertTrue(service.deleteSchema(second.nameIdentifier(), true, current));
     Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.SCHEMA));
   }

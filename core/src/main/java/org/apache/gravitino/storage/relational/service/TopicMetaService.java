@@ -37,7 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -280,15 +279,15 @@ public class TopicMetaService {
   }
 
   /**
-   * Reads the id and store version of the topic under this name.
+   * Reads the id of the topic under this name.
    *
    * @param identifier the topic identifier
-   * @return the id and version
+   * @return the id
    * @throws NoSuchEntityException if the topic does not exist
    */
-  public EntityVersion getTopicVersion(NameIdentifier identifier) {
+  public long getTopicId(NameIdentifier identifier) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
-    return EntityVersion.of(topicPO.getTopicId(), topicPO.getCurrentVersion());
+    return topicPO.getTopicId();
   }
 
   public boolean deleteTopic(NameIdentifier identifier) {
@@ -299,19 +298,18 @@ public class TopicMetaService {
    * Deletes the topic under this name only if it is still the observed one.
    *
    * @param identifier the topic identifier
-   * @param expected the id and version read before the operation started, or null to delete
-   *     whatever row is under the name now
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
    * @return true once the row is deleted
    * @throws NoSuchEntityException if no topic exists under the name
    * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
    *     one
    */
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
-  public boolean deleteTopic(NameIdentifier identifier, @Nullable EntityVersion expected) {
+  public boolean deleteTopic(NameIdentifier identifier, @Nullable Long expected) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
-    if (expected != null) {
-      OccWriteSupport.checkExpectedIdentity(
-          identifier, Entity.EntityType.TOPIC, topicPO.getTopicId(), expected);
+    if (expected != null && topicPO.getTopicId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.TOPIC, identifier);
     }
     deleteTopicWithVersion(identifier, topicPO);
     return true;

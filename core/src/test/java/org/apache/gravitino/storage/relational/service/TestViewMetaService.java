@@ -53,7 +53,6 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.storage.EntityVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -84,13 +83,13 @@ public class TestViewMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteWithObservedVersionOnlyRemovesThatIncarnation() throws IOException {
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
     Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
     ViewMetaService service = ViewMetaService.getInstance();
 
     ViewEntity first = createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "v");
     service.insertView(first, false);
-    EntityVersion observed = service.getViewVersion(first.nameIdentifier());
+    Long observed = service.getViewId(first.nameIdentifier());
 
     Assertions.assertTrue(service.deleteView(first.nameIdentifier()));
     ViewEntity second = createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, "v");
@@ -100,8 +99,7 @@ public class TestViewMetaService extends TestJDBCBackend {
         OptimisticLockException.class, () -> service.deleteView(first.nameIdentifier(), observed));
     Assertions.assertEquals(second.id(), service.getViewByIdentifier(second.nameIdentifier()).id());
     Assertions.assertTrue(
-        service.deleteView(
-            second.nameIdentifier(), service.getViewVersion(second.nameIdentifier())));
+        service.deleteView(second.nameIdentifier(), service.getViewId(second.nameIdentifier())));
   }
 
   /** Dropping the old parent after a move must preserve every historical version. */

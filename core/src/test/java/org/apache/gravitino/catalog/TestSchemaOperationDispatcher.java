@@ -67,7 +67,7 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -285,9 +285,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // thrown).
     reset(entityStore);
     doThrow(new NoSuchEntityException("not observed"))
-        .doReturn(EntityVersion.of(mismatchedSchemaEntity.id(), 0L))
-        .when(entityStore)
-        .getVersion(schemaIdent, SCHEMA);
+        .doReturn(mismatchedSchemaEntity.id())
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(schemaIdent, SCHEMA);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedSchemaEntity)
@@ -405,10 +405,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     entityStore.put(child, false);
 
     reset(entityStore);
-    doReturn(EntityVersion.of(registered.id() - 1, 0L))
+    doReturn(registered.id() - 1)
         .doCallRealMethod()
-        .when(entityStore)
-        .getVersion(schemaIdent, SCHEMA);
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(schemaIdent, SCHEMA);
 
     Assertions.assertTrue(dispatcher.dropSchema(schemaIdent, true));
     Assertions.assertEquals(
@@ -484,7 +484,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertThrows(
         IOException.class,
         () ->
-            dispatcher.putCreatedEntity(replacement, true, entityStore.getVersion(ident, SCHEMA)));
+            dispatcher.putCreatedEntity(
+                replacement,
+                true,
+                SupportsIdentityFencedDelete.require(entityStore).getEntityId(ident, SCHEMA)));
     Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
     Assertions.assertFalse(entityStore.exists(child.nameIdentifier(), SCHEMA));
     dispatcher.loadSchema(ident);

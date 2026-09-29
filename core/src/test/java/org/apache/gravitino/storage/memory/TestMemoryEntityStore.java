@@ -58,7 +58,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.Assertions;
@@ -67,7 +67,7 @@ import org.mockito.Mockito;
 
 public class TestMemoryEntityStore {
 
-  public static class InMemoryEntityStore implements EntityStore {
+  public static class InMemoryEntityStore implements EntityStore, SupportsIdentityFencedDelete {
 
     private final Map<NameIdentifier, Entity> entityMap;
     private final Lock lock;
@@ -177,25 +177,25 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public EntityVersion getVersion(NameIdentifier ident, EntityType entityType)
+    public long getEntityId(NameIdentifier ident, EntityType entityType)
         throws NoSuchEntityException {
       Entity entity = entityMap.get(ident);
       if (entity == null) {
         throw new NoSuchEntityException("No such entity: %s", ident);
       }
       // The in-memory store keeps no row version; the id alone identifies an incarnation.
-      return EntityVersion.of(((HasIdentifier) entity).id(), 0L);
+      return ((HasIdentifier) entity).id();
     }
 
     @Override
-    public boolean delete(
-        NameIdentifier ident, EntityType entityType, boolean cascade, EntityVersion expected)
+    public boolean deleteIfIdMatches(
+        NameIdentifier ident, EntityType entityType, boolean cascade, long expected)
         throws IOException {
       Entity current = entityMap.get(ident);
       if (current == null) {
         throw new NoSuchEntityException("No such entity: %s", ident);
       }
-      if (((HasIdentifier) current).id() != expected.id()) {
+      if (((HasIdentifier) current).id() != expected) {
         throw new OptimisticLockException("The %s %s was modified concurrently", entityType, ident);
       }
       return delete(ident, entityType, cascade);

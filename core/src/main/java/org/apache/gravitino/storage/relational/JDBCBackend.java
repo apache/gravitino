@@ -70,7 +70,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -112,7 +112,8 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
+public class JDBCBackend
+    implements RelationalBackend, SupportsOrphanedRelationCleanup, SupportsIdentityFencedDelete {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
@@ -377,27 +378,25 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
-  public EntityVersion getVersion(NameIdentifier ident, Entity.EntityType entityType) {
+  public long getEntityId(NameIdentifier ident, Entity.EntityType entityType) {
     switch (entityType) {
       case SCHEMA:
-        return SchemaMetaService.getInstance().getSchemaVersion(ident);
+        return SchemaMetaService.getInstance().getSchemaId(ident);
       case TABLE:
-        return TableMetaService.getInstance().getTableVersion(ident);
+        return TableMetaService.getInstance().getTableId(ident);
       case TOPIC:
-        return TopicMetaService.getInstance().getTopicVersion(ident);
+        return TopicMetaService.getInstance().getTopicId(ident);
       case VIEW:
-        return ViewMetaService.getInstance().getViewVersion(ident);
-      case FUNCTION:
-        return FunctionMetaService.getInstance().getFunctionVersion(ident);
+        return ViewMetaService.getInstance().getViewId(ident);
       default:
         throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for version read", entityType);
+            "Unsupported entity type: %s for identity read", entityType);
     }
   }
 
   @Override
-  public boolean delete(
-      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, EntityVersion expected)
+  public boolean deleteIfIdMatches(
+      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, long expectedId)
       throws IOException {
     return deleteRecordingChange(
         ident,
@@ -405,18 +404,16 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         () -> {
           switch (entityType) {
             case SCHEMA:
-              return SchemaMetaService.getInstance().deleteSchema(ident, cascade, expected);
+              return SchemaMetaService.getInstance().deleteSchema(ident, cascade, expectedId);
             case TABLE:
-              return TableMetaService.getInstance().deleteTable(ident, expected);
+              return TableMetaService.getInstance().deleteTable(ident, expectedId);
             case TOPIC:
-              return TopicMetaService.getInstance().deleteTopic(ident, expected);
+              return TopicMetaService.getInstance().deleteTopic(ident, expectedId);
             case VIEW:
-              return ViewMetaService.getInstance().deleteView(ident, expected);
-            case FUNCTION:
-              return FunctionMetaService.getInstance().deleteFunction(ident, expected);
+              return ViewMetaService.getInstance().deleteView(ident, expectedId);
             default:
               throw new UnsupportedEntityTypeException(
-                  "Unsupported entity type: %s for version-checked delete", entityType);
+                  "Unsupported entity type: %s for identity-fenced delete", entityType);
           }
         });
   }

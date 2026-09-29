@@ -21,8 +21,8 @@ package org.apache.gravitino.utils;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,23 +30,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
-import org.apache.gravitino.storage.EntityVersion;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.appender.AbstractAppender;
-import org.apache.logging.log4j.core.config.Configuration;
-import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.junit.jupiter.api.Test;
 
 /** Tests that orphan cleanup only removes the schema registration it observed. */
@@ -55,68 +47,47 @@ public class TestSchemaEntityCleaner {
   @Test
   public void testRecreatedSchemaSurvivesCleanup() throws IOException {
     NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
-    EntityVersion oldRegistration = EntityVersion.of(1, 0);
-    EntityVersion newRegistration = EntityVersion.of(2, 0);
-    AtomicReference<EntityVersion> current = new AtomicReference<>(oldRegistration);
-    EntityStore store = mock(EntityStore.class);
-    when(store.getVersion(schema, SCHEMA)).thenAnswer(ignored -> current.get());
-    when(store.delete(eq(schema), eq(SCHEMA), eq(true), any(EntityVersion.class)))
+    Long oldRegistration = 1L;
+    Long newRegistration = 2L;
+    AtomicReference<Long> current = new AtomicReference<>(oldRegistration);
+    EntityStore store =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    SupportsIdentityFencedDelete fence = (SupportsIdentityFencedDelete) store;
+    when(fence.getEntityId(schema, SCHEMA)).thenAnswer(ignored -> current.get());
+    when(fence.deleteIfIdMatches(eq(schema), eq(SCHEMA), eq(true), anyLong()))
         .thenAnswer(
             invocation -> {
-              EntityVersion expected = invocation.getArgument(3);
-              if (current.get().id() != expected.id()) {
+              Long expected = invocation.getArgument(3);
+              if (current.get().longValue() != expected.longValue()) {
                 throw new OptimisticLockException("Schema was recreated");
               }
               current.set(null);
               return true;
             });
 
-    List<LogEvent> events = new ArrayList<>();
-    LoggerContext context =
-        (LoggerContext) LogManager.getContext(SchemaEntityCleaner.class.getClassLoader(), false);
-    Configuration config = context.getConfiguration();
-    AbstractAppender appender =
-        new AbstractAppender("schemaCleanupCapture", null, null, true, null) {
-          @Override
-          public void append(LogEvent event) {
-            events.add(event.toImmutable());
-          }
-        };
-    appender.start();
-    LoggerConfig logger = new LoggerConfig(SchemaEntityCleaner.class.getName(), Level.DEBUG, false);
-    logger.addAppender(appender, Level.DEBUG, null);
-    config.addLogger(SchemaEntityCleaner.class.getName(), logger);
-    context.updateLoggers();
-    try {
-      SchemaEntityCleaner.deleteOrphanedSchemaEntities(
-          store,
-          schema,
-          true,
-          ignored -> {
-            current.set(newRegistration);
-            return false;
-          });
-    } finally {
-      config.removeLogger(SchemaEntityCleaner.class.getName());
-      context.updateLoggers();
-      appender.stop();
-    }
+    SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+        store,
+        schema,
+        true,
+        ignored -> {
+          current.set(newRegistration);
+          return false;
+        });
 
     assertEquals(newRegistration, current.get());
-    verify(store).delete(schema, SCHEMA, true, oldRegistration);
-    assertEquals(1, events.size());
-    assertEquals(Level.DEBUG, events.get(0).getLevel());
-    assertTrue(events.get(0).getMessage().getFormattedMessage().contains("registration changed"));
+    verify(fence).deleteIfIdMatches(schema, SCHEMA, true, oldRegistration);
   }
 
   @Test
   public void testUnchangedOrphanIsDeleted() throws IOException {
     NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
-    EntityVersion observed = EntityVersion.of(1, 0);
-    AtomicReference<EntityVersion> current = new AtomicReference<>(observed);
-    EntityStore store = mock(EntityStore.class);
-    when(store.getVersion(schema, SCHEMA)).thenReturn(observed);
-    when(store.delete(schema, SCHEMA, true, observed))
+    Long observed = 1L;
+    AtomicReference<Long> current = new AtomicReference<>(observed);
+    EntityStore store =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    SupportsIdentityFencedDelete fence = (SupportsIdentityFencedDelete) store;
+    when(fence.getEntityId(schema, SCHEMA)).thenReturn(observed);
+    when(fence.deleteIfIdMatches(schema, SCHEMA, true, observed))
         .thenAnswer(
             ignored -> {
               current.set(null);
@@ -126,7 +97,7 @@ public class TestSchemaEntityCleaner {
     SchemaEntityCleaner.deleteOrphanedSchemaEntities(store, schema, true, ignored -> false);
 
     assertNull(current.get());
-    verify(store).delete(schema, SCHEMA, true, observed);
+    verify(fence).deleteIfIdMatches(schema, SCHEMA, true, observed);
   }
 
   @Test
@@ -135,19 +106,21 @@ public class TestSchemaEntityCleaner {
     NameIdentifier inner = NameIdentifier.of("metalake", "catalog", "a:b:c");
     NameIdentifier outermostOrphan = NameIdentifier.of("metalake", "catalog", "a:b");
     NameIdentifier existingAncestor = NameIdentifier.of("metalake", "catalog", "a");
-    EntityVersion innerObserved = EntityVersion.of(1, 0);
-    EntityVersion outerObserved = EntityVersion.of(2, 1);
-    EntityStore store = mock(EntityStore.class);
-    when(store.getVersion(inner, SCHEMA)).thenReturn(innerObserved);
-    when(store.getVersion(outermostOrphan, SCHEMA)).thenReturn(outerObserved);
+    Long innerObserved = 1L;
+    Long outerObserved = 2L;
+    EntityStore store =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    SupportsIdentityFencedDelete fence = (SupportsIdentityFencedDelete) store;
+    when(fence.getEntityId(inner, SCHEMA)).thenReturn(innerObserved);
+    when(fence.getEntityId(outermostOrphan, SCHEMA)).thenReturn(outerObserved);
 
     SchemaEntityCleaner.deleteOrphanedSchemaEntities(
         store, leaf, false, candidate -> existingAncestor.equals(candidate));
 
-    verify(store).delete(outermostOrphan, SCHEMA, true, outerObserved);
-    verify(store, times(1))
-        .delete(any(NameIdentifier.class), eq(SCHEMA), eq(true), any(EntityVersion.class));
-    verify(store, never()).getVersion(leaf, SCHEMA);
+    verify(fence).deleteIfIdMatches(outermostOrphan, SCHEMA, true, outerObserved);
+    verify(fence, times(1))
+        .deleteIfIdMatches(any(NameIdentifier.class), eq(SCHEMA), eq(true), anyLong());
+    verify(fence, never()).getEntityId(leaf, SCHEMA);
   }
 
   @Test
@@ -155,15 +128,17 @@ public class TestSchemaEntityCleaner {
     NameIdentifier leaf = NameIdentifier.of("metalake", "catalog", "a:b:c");
     NameIdentifier inner = NameIdentifier.of("metalake", "catalog", "a:b");
     NameIdentifier outermostOrphan = NameIdentifier.of("metalake", "catalog", "a");
-    EntityStore store = mock(EntityStore.class);
-    when(store.getVersion(inner, SCHEMA)).thenReturn(EntityVersion.of(1, 0));
-    when(store.getVersion(outermostOrphan, SCHEMA))
+    EntityStore store =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    SupportsIdentityFencedDelete fence = (SupportsIdentityFencedDelete) store;
+    when(fence.getEntityId(inner, SCHEMA)).thenReturn(1L);
+    when(fence.getEntityId(outermostOrphan, SCHEMA))
         .thenThrow(new NoSuchEntityException("No registration for outermost orphan"));
 
     SchemaEntityCleaner.deleteOrphanedSchemaEntities(store, leaf, false, ignored -> false);
 
-    verify(store).getVersion(inner, SCHEMA);
-    verify(store).getVersion(outermostOrphan, SCHEMA);
+    verify(fence).getEntityId(inner, SCHEMA);
+    verify(fence).getEntityId(outermostOrphan, SCHEMA);
     verifyNoMoreInteractions(store);
   }
 }

@@ -23,12 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -41,11 +41,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
-import org.apache.gravitino.storage.EntityVersion;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -59,12 +58,8 @@ import org.apache.iceberg.types.Types;
 import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
 import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InOrder;
 
 public class TestIcebergViewHookDispatcher {
 
@@ -99,9 +94,11 @@ public class TestIcebergViewHookDispatcher {
   public void setUp() throws IOException {
     mockExecutor = mock(IcebergViewOperationDispatcher.class);
     mockNamespaceDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
-    mockEntityStore = mock(EntityStore.class);
-    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.VIEW)))
-        .thenReturn(EntityVersion.of(1L, 0L));
+    mockEntityStore =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    when(SupportsIdentityFencedDelete.require(mockEntityStore)
+            .getEntityId(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA)))
+        .thenReturn(1L);
     mockViewDispatcher = mock(ViewDispatcher.class);
     mockInternalViewDispatcher = mock(ViewDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
@@ -275,62 +272,6 @@ public class TestIcebergViewHookDispatcher {
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testDropViewStopsBeforeExternalDropWhenRegistrationCannotBeRead(boolean unsupported)
-      throws IOException {
-    TableIdentifier identifier = TableIdentifier.of("schema", "unreadable");
-    NameIdentifier ident =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, identifier, ":");
-    if (unsupported) {
-      when(mockEntityStore.getVersion(ident, Entity.EntityType.VIEW))
-          .thenThrow(new UnsupportedOperationException("version reads unsupported"));
-    } else {
-      when(mockEntityStore.getVersion(ident, Entity.EntityType.VIEW))
-          .thenThrow(new IOException("registration unavailable"));
-    }
-
-    Assertions.assertThrows(
-        RuntimeException.class, () -> hookDispatcher.dropView(mockContext, identifier));
-    verify(mockExecutor, never()).dropView(mockContext, identifier);
-  }
-
-  @Test
-  public void testDropViewPreservesRegistrationRecreatedAfterTheExistenceProbe() throws Exception {
-    TableIdentifier identifier = TableIdentifier.of("schema", "recreated");
-    NameIdentifier ident =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, identifier, ":");
-    EntityVersion observed = EntityVersion.of(1L, 0L);
-    when(mockExecutor.viewExists(mockContext, identifier)).thenReturn(false);
-    doThrow(new OptimisticLockException("replacement registration"))
-        .when(mockEntityStore)
-        .delete(ident, Entity.EntityType.VIEW, false, observed);
-
-    Assertions.assertDoesNotThrow(() -> hookDispatcher.dropView(mockContext, identifier));
-
-    InOrder order = inOrder(mockEntityStore, mockExecutor);
-    order.verify(mockEntityStore).getVersion(ident, Entity.EntityType.VIEW);
-    order.verify(mockExecutor).dropView(mockContext, identifier);
-    order.verify(mockExecutor).viewExists(mockContext, identifier);
-    order.verify(mockEntityStore).delete(ident, Entity.EntityType.VIEW, false, observed);
-    verify(mockEntityStore, never()).delete(ident, Entity.EntityType.VIEW);
-  }
-
-  @Test
-  public void testDropViewDoesNotDeleteARegistrationAbsentBeforeTheDrop() throws Exception {
-    TableIdentifier identifier = TableIdentifier.of("schema", "unregistered");
-    NameIdentifier ident =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, identifier, ":");
-    when(mockEntityStore.getVersion(ident, Entity.EntityType.VIEW))
-        .thenThrow(new NoSuchEntityException("not registered"));
-
-    hookDispatcher.dropView(mockContext, identifier);
-
-    verify(mockExecutor).dropView(mockContext, identifier);
-    verify(mockEntityStore, never()).delete(any(), eq(Entity.EntityType.VIEW), eq(false), any());
-    verify(mockEntityStore, never()).delete(ident, Entity.EntityType.VIEW);
-  }
-
   @Test
   public void testDropViewRemovesFromEntityStore() throws Exception {
     TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
@@ -343,9 +284,7 @@ public class TestIcebergViewHookDispatcher {
     // Verify view was deleted from entity store
     NameIdentifier expectedIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
-    verify(mockEntityStore, times(1))
-        .delete(
-            eq(expectedIdent), eq(Entity.EntityType.VIEW), eq(false), eq(EntityVersion.of(1L, 0L)));
+    verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
   }
 
   @Test
@@ -358,9 +297,7 @@ public class TestIcebergViewHookDispatcher {
     verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
     NameIdentifier expectedIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
-    verify(mockEntityStore, never())
-        .delete(
-            eq(expectedIdent), eq(Entity.EntityType.VIEW), eq(false), eq(EntityVersion.of(1L, 0L)));
+    verify(mockEntityStore, never()).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
     verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
     verify(mockViewDispatcher, never()).loadView(any());
   }
@@ -375,9 +312,7 @@ public class TestIcebergViewHookDispatcher {
     verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
     NameIdentifier expectedIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
-    verify(mockEntityStore, times(1))
-        .delete(
-            eq(expectedIdent), eq(Entity.EntityType.VIEW), eq(false), eq(EntityVersion.of(1L, 0L)));
+    verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
     verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
     verify(mockViewDispatcher, never()).loadView(any());
   }
@@ -390,13 +325,12 @@ public class TestIcebergViewHookDispatcher {
         .thenReturn(false);
     when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent")))
         .thenReturn(false);
-    EntityVersion observed = EntityVersion.of(1L, 0L);
-    when(mockEntityStore.getVersion(any(), eq(Entity.EntityType.SCHEMA))).thenReturn(observed);
 
     hookDispatcher.dropView(mockContext, viewIdent);
 
     verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
-    verify(mockEntityStore, times(1)).delete(schemaIdent, Entity.EntityType.SCHEMA, true, observed);
+    verify(SupportsIdentityFencedDelete.require(mockEntityStore), times(1))
+        .deleteIfIdMatches(schemaIdent, Entity.EntityType.SCHEMA, true, 1L);
   }
 
   @Test
@@ -408,16 +342,13 @@ public class TestIcebergViewHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     doThrow(new NoSuchEntityException("Entity not found"))
         .when(mockEntityStore)
-        .delete(
-            eq(expectedIdent), eq(Entity.EntityType.VIEW), eq(false), eq(EntityVersion.of(1L, 0L)));
+        .delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
 
     // Should not throw - missing entity is ignored
     hookDispatcher.dropView(mockContext, viewIdent);
 
     verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
-    verify(mockEntityStore, times(1))
-        .delete(
-            eq(expectedIdent), eq(Entity.EntityType.VIEW), eq(false), eq(EntityVersion.of(1L, 0L)));
+    verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
   }
 
   @Test
@@ -429,8 +360,7 @@ public class TestIcebergViewHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     doThrow(new IOException("IO error"))
         .when(mockEntityStore)
-        .delete(
-            eq(expectedIdent), eq(Entity.EntityType.VIEW), eq(false), eq(EntityVersion.of(1L, 0L)));
+        .delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
 
     hookDispatcher.dropView(mockContext, viewIdent);
 
@@ -471,12 +401,7 @@ public class TestIcebergViewHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
     NameIdentifier destGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, destIdent, ":");
-    verify(mockEntityStore, times(1))
-        .delete(
-            eq(sourceGravitinoIdent),
-            eq(Entity.EntityType.VIEW),
-            eq(false),
-            eq(EntityVersion.of(1L, 0L)));
+    verify(mockEntityStore, times(1)).delete(eq(sourceGravitinoIdent), eq(Entity.EntityType.VIEW));
     verify(mockInternalViewDispatcher, times(1)).loadView(eq(destGravitinoIdent));
     verify(mockViewDispatcher, never()).loadView(any());
   }
@@ -493,21 +418,12 @@ public class TestIcebergViewHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
     doThrow(new IOException("IO error"))
         .when(mockEntityStore)
-        .delete(
-            eq(sourceGravitinoIdent),
-            eq(Entity.EntityType.VIEW),
-            eq(false),
-            eq(EntityVersion.of(1L, 0L)));
+        .delete(eq(sourceGravitinoIdent), eq(Entity.EntityType.VIEW));
 
     hookDispatcher.renameView(mockContext, renameRequest);
 
     verify(mockExecutor, times(1)).renameView(mockContext, renameRequest);
-    verify(mockEntityStore, times(1))
-        .delete(
-            eq(sourceGravitinoIdent),
-            eq(Entity.EntityType.VIEW),
-            eq(false),
-            eq(EntityVersion.of(1L, 0L)));
+    verify(mockEntityStore, times(1)).delete(eq(sourceGravitinoIdent), eq(Entity.EntityType.VIEW));
   }
 
   @Test
