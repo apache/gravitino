@@ -74,6 +74,11 @@ public class TableHookDispatcher implements TableDispatcher {
   }
 
   @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    return dispatcher.loadTableLight(ident);
+  }
+
+  @Override
   public Table createTable(
       NameIdentifier ident,
       Column[] columns,

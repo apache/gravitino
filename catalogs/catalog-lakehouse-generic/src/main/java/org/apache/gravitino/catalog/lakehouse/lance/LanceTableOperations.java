@@ -48,7 +48,9 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.GenericTable;
+import org.apache.gravitino.connector.SupportsLightTableLoad;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -82,7 +84,7 @@ import org.lance.schema.ColumnAlteration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LanceTableOperations extends ManagedTableOperations {
+public class LanceTableOperations extends ManagedTableOperations implements SupportsLightTableLoad {
   private static final Logger LOG = LoggerFactory.getLogger(LanceTableOperations.class);
 
   /**
@@ -101,41 +103,6 @@ public class LanceTableOperations extends ManagedTableOperations {
     CREATE,
     EXIST_OK,
     OVERWRITE
-  }
-
-  /**
-   * Controls when Gravitino refreshes a Lance table's stored columns from the underlying dataset.
-   *
-   * <p>{@link #DECLARED_AND_EMPTY} is the default. It covers two complementary repair cases:
-   *
-   * <ul>
-   *   <li><b>Declared tables</b> ({@code lance.declared=true}): metadata-only tables whose schema
-   *       has not yet been written to Gravitino (e.g. Spark staged-create flow).
-   *   <li><b>Empty stored columns</b>: tables where Gravitino has no column metadata but the Lance
-   *       dataset at the table's location already carries a real schema (e.g. tables registered via
-   *       the register-table path before schema was captured).
-   * </ul>
-   *
-   * <p><b>Zero-column Lance dataset:</b> when the dataset has no columns, Gravitino records the
-   * checked dataset version ({@code lance.version}) without modifying stored columns. Subsequent
-   * {@code loadTable} calls skip the dataset open because the stored version acts as a "confirmed
-   * empty" marker. The dataset is re-examined only after the stored version changes (for example
-   * via an explicit {@code alterTable}) or when the mode is switched to {@link #VERSION_CHECK}.
-   */
-  public enum SchemaRefreshMode {
-    /**
-     * Default mode. Refreshes stored columns from the Lance dataset for declared tables ({@code
-     * lance.declared=true}) and for tables whose Gravitino column list is empty. Also repairs
-     * empty-column tables that were registered before their schema was captured.
-     */
-    DECLARED_AND_EMPTY,
-    /**
-     * Opens the Lance dataset on every {@code loadTable}, compares the dataset version with the
-     * stored {@code lance.version}, and refreshes columns when the version has changed. The version
-     * is the sole gating factor: if the version is unchanged the schema read is skipped even when
-     * stored columns are empty.
-     */
-    VERSION_CHECK
   }
 
   private final EntityStore store;
@@ -184,9 +151,87 @@ public class LanceTableOperations extends ManagedTableOperations {
             : Collections.unmodifiableMap(Maps.newHashMap(catalogProperties));
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>This is the full load. It opens the Lance dataset on every call and compares the dataset's
+   * version with the {@code lance.version} Gravitino stored, so the schema it returns is current.
+   * When the dataset cannot be reached it fails with {@link ConnectionFailedException} instead of
+   * falling back to the stored metadata: a load that promises a fresh schema cannot quietly return
+   * an unverified one. Callers that would rather have stale metadata than an error should use
+   * {@link #loadTableLight} and say that what they got is unverified.
+   *
+   * <p>A declared table ({@code lance.declared=true}) is the one exception. Its dataset is not
+   * written until something else creates it, so an unreachable dataset is its normal state and the
+   * declared metadata is returned as-is.
+   */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    return loadTableInternal(ident, false);
+    Table table = loadTableLight(ident);
+    boolean declaredOnly = isDeclaredOnly(table);
+
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    if (StringUtils.isBlank(location)) {
+      if (declaredOnly) {
+        return table;
+      }
+      throw new ConnectionFailedException(
+          "Cannot verify the schema of Lance table %s: it has no %s property. Load it without "
+              + "detailed metadata to read the stored metadata unverified.",
+          ident, Table.PROPERTY_LOCATION);
+    }
+
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    Column[] columns;
+    long datasetVersion;
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      datasetVersion = dataset.version();
+      // NOTE: skipping the schema read here assumes lance.version is only ever stored together
+      // with columns that were read back from the dataset at that version. createTable and
+      // alterTable currently stamp the version alongside columns they derived themselves rather
+      // than re-read, so a conversion asymmetry there would be masked by this check.
+      if (!declaredOnly && !isDatasetVersionChanged(table, datasetVersion)) {
+        return table;
+      }
+      columns = extractColumns(dataset.getSchema());
+    } catch (Exception e) {
+      if (declaredOnly) {
+        LOG.debug(
+            "Lance dataset at {} for declared table {} is not readable yet, returning the "
+                + "declared metadata.",
+            location,
+            ident,
+            e);
+        return table;
+      }
+      throw new ConnectionFailedException(
+          e,
+          "Failed to read the Lance dataset at %s to verify the schema of table %s. Load it "
+              + "without detailed metadata to read the stored metadata unverified.",
+          location,
+          ident);
+    }
+
+    if (columns.length == 0) {
+      // Dataset is genuinely empty. Record the checked version so the version comparison above can
+      // short-circuit the next load; a declared table keeps its lance.declared flag instead, which
+      // is the authoritative "not yet written" signal.
+      return declaredOnly ? table : recordCheckedEmptyVersion(ident, datasetVersion);
+    }
+
+    return repairTableMetadata(ident, columns, datasetVersion);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Reads the table entity and nothing else: no dataset is opened, no version is compared and
+   * nothing is written back. The schema may therefore lag the dataset.
+   */
+  @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    return super.loadTable(ident);
   }
 
   @Override
@@ -221,7 +266,8 @@ public class LanceTableOperations extends ManagedTableOperations {
           !register, "EXIST_OK mode is not supported for register operation");
 
       try {
-        Table table = super.loadTable(ident);
+        // Only the table's existence and format matter here, so the stored metadata is enough.
+        Table table = loadTableLight(ident);
         validateLanceTable(ident, table);
         return table;
       } catch (NoSuchTableException e) {
@@ -259,7 +305,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     // Hydrate an empty stored schema before changing the dataset. Otherwise this method can write
     // the latest lance.version while leaving columns empty, making that incomplete metadata look
     // like a zero-column schema already confirmed at the same version.
-    Table loadedTable = loadTableInternal(ident, true);
+    Table loadedTable = loadTable(ident);
     boolean unhydratedSchema =
         isDeclaredOnly(loadedTable)
             || (loadedTable.columns().length == 0
@@ -284,9 +330,10 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public boolean purgeTable(NameIdentifier ident) {
     try {
-      // Use super.loadTable to avoid triggering an unnecessary schema-refresh (which may open the
-      // dataset) for a table that is about to be deleted anyway.
-      Table table = super.loadTable(ident);
+      // A light load is enough for a table that is about to be deleted: only its location,
+      // format and external flag are read, and opening the dataset just to verify a schema nobody
+      // will look at would also make the purge fail whenever the storage is unreachable.
+      Table table = loadTableLight(ident);
       validateLanceTable(ident, table);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
@@ -324,8 +371,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public boolean dropTable(NameIdentifier ident) {
     try {
-      // Use super.loadTable to skip schema-refresh overhead when dropping.
-      Table table = super.loadTable(ident);
+      // Light load, for the same reason as in purgeTable.
+      Table table = loadTableLight(ident);
       validateLanceTable(ident, table);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
@@ -472,81 +519,6 @@ public class LanceTableOperations extends ManagedTableOperations {
     return new Schema(fields);
   }
 
-  private Table loadTableInternal(NameIdentifier ident, boolean forAlter) {
-    Table table = super.loadTable(ident);
-    // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
-    // Gravitino metadata when the stored table is declared-only, empty, or configured to track
-    // Lance dataset versions.
-    boolean declaredOnly = isDeclaredOnly(table);
-    boolean emptySchema = table.columns().length == 0;
-    SchemaRefreshMode refreshMode = schemaRefreshMode();
-    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
-      return table;
-    }
-    // Empty-schema table that was already confirmed against a stored version: skip the dataset
-    // open during ordinary loads. An alter must recheck it so an externally initialized schema is
-    // hydrated before the latest dataset version is persisted.
-    if (!forAlter
-        && !declaredOnly
-        && emptySchema
-        && StringUtils.isNotBlank(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
-        && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
-      return table;
-    }
-
-    String location = table.properties().get(Table.PROPERTY_LOCATION);
-    if (StringUtils.isBlank(location)) {
-      return table;
-    }
-
-    Map<String, String> storageOptions =
-        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
-    Column[] columns;
-    long datasetVersion;
-    try (Dataset dataset = openDataset(location, storageOptions)) {
-      datasetVersion = dataset.version();
-      if (refreshMode == SchemaRefreshMode.VERSION_CHECK
-          && !declaredOnly
-          && !(forAlter && emptySchema)
-          && !isDatasetVersionChanged(table, datasetVersion)) {
-        return table;
-      }
-      columns = extractColumns(dataset.getSchema());
-    } catch (Exception e) {
-      if (forAlter) {
-        throw new IllegalStateException(
-            ExceptionMessages.withCause(
-                "Failed to load Lance schema before altering table " + ident, e),
-            e);
-      }
-      LOG.debug(
-          "Failed to load Lance schema from location {} for table {}. Return stored metadata.",
-          location,
-          ident,
-          e);
-      return table;
-    }
-
-    if (columns.length == 0) {
-      // Dataset is genuinely empty: record the checked version so future DECLARED_AND_EMPTY loads
-      // can skip the dataset open (see the early-return above). Declared tables are excluded
-      // because their lance.declared flag is the authoritative "not yet written" signal.
-      if (!declaredOnly) {
-        return recordCheckedEmptyVersion(ident, datasetVersion);
-      }
-      return table;
-    }
-
-    return repairTableMetadata(ident, columns, datasetVersion);
-  }
-
-  private SchemaRefreshMode schemaRefreshMode() {
-    return Optional.ofNullable(catalogProperties.get(LanceConstants.LANCE_SCHEMA_REFRESH_MODE))
-        .map(mode -> mode.trim().replace('-', '_').toUpperCase())
-        .map(SchemaRefreshMode::valueOf)
-        .orElse(SchemaRefreshMode.DECLARED_AND_EMPTY);
-  }
-
   private boolean isDeclaredOnly(Table table) {
     return isDeclaredOnly(table.properties());
   }
@@ -680,7 +652,7 @@ public class LanceTableOperations extends ManagedTableOperations {
                     LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
                 // Always use an empty column list: the dataset is confirmed empty at this version.
                 // Using current.columns() would preserve stale columns when the dataset schema was
-                // cleared externally, causing future VERSION_CHECK loads to return stale metadata
+                // cleared externally, causing future loads to return stale metadata
                 // permanently (the version sentinel would match but columns would be wrong).
                 return TableEntity.builder()
                     .withId(current.id())

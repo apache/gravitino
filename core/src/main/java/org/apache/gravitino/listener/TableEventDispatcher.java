@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -103,9 +104,20 @@ public class TableEventDispatcher implements TableDispatcher {
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    return dispatchLoad(ident, dispatcher::loadTable);
+  }
+
+  @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    // A light load is still a load, so it is audited like one. The event carries the table as it
+    // was returned, whose schema may be the stored one rather than a freshly verified one.
+    return dispatchLoad(ident, dispatcher::loadTableLight);
+  }
+
+  private Table dispatchLoad(NameIdentifier ident, Function<NameIdentifier, Table> load) {
     eventBus.dispatchEvent(new LoadTablePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
-      Table table = dispatcher.loadTable(ident);
+      Table table = load.apply(ident);
       Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
           extras.isEmpty()

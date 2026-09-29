@@ -130,7 +130,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Table table;
     try {
-      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
+      // The schema is the only part of the response that has to be verified against the dataset,
+      // and it is returned only when detailed metadata was asked for.
+      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId, loadDetailedMetadata);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -278,7 +280,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
     Table t;
     try {
-      t = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
+      t = loadAndValidateLanceTable(catalog, tableIdentifier, tableId, false);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -327,8 +329,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     try {
       return LancePropertiesUtils.isLanceTableFormat(
           namespaceWrapper
-              .asTableCatalog(catalog)
-              .loadTable(tableIdentifier)
+              .loadTableLight(catalog, tableIdentifier)
               .properties()
               .get(Table.PROPERTY_TABLE_FORMAT));
     } catch (NoSuchTableException e) {
@@ -350,7 +351,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Table table;
     try {
-      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
+      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId, false);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -388,7 +389,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     }
     TableChange[] changes = handler.buildGravitinoTableChange(request);
 
-    loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
+    loadAndValidateLanceTable(catalog, tableIdentifier, tableId, true);
     Table table = namespaceWrapper.asTableCatalog(catalog).alterTable(tableIdentifier, changes);
 
     return handler.handle(table, request);
@@ -400,9 +401,24 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     return (GravitinoLanceTableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
   }
 
+  /**
+   * Loads a table and checks that it is a Lance table.
+   *
+   * @param catalog the catalog holding the table.
+   * @param tableIdentifier the schema-qualified identifier of the table.
+   * @param tableId the request's table id, used in error messages.
+   * @param freshSchema whether the caller needs a schema verified against the Lance dataset. Pass
+   *     {@code false} unless the schema is actually going to be read: a fresh load opens the
+   *     dataset and fails when the storage cannot be reached, so asking for freshness that is not
+   *     needed makes the request both slower and more fragile.
+   * @return the loaded table.
+   */
   private Table loadAndValidateLanceTable(
-      Catalog catalog, NameIdentifier tableIdentifier, String tableId) {
-    Table table = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+      Catalog catalog, NameIdentifier tableIdentifier, String tableId, boolean freshSchema) {
+    Table table =
+        freshSchema
+            ? namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier)
+            : namespaceWrapper.loadTableLight(catalog, tableIdentifier);
     if (!LancePropertiesUtils.isLanceTableFormat(
         table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
       throw new InvalidInputException(

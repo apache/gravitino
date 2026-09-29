@@ -285,6 +285,32 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
+  public void testLightLoadFallsBackForAFormatWithoutOne() {
+    // The testing format reads nothing but the entity store on load, so its full load already
+    // satisfies the light contract and the catalog hands the call straight to it.
+    NameIdentifier schemaIdent = createSchema();
+    NameIdentifier tableIdent = createTable(schemaIdent, "table1");
+
+    Table light = opsWithFakeProvider.loadTableLight(tableIdent);
+    Table full = opsWithFakeProvider.loadTable(tableIdent);
+
+    Assertions.assertEquals(full.name(), light.name());
+    Assertions.assertEquals(
+        FakeTableDelegator.TABLE_FORMAT, light.properties().get(Table.PROPERTY_TABLE_FORMAT));
+    Assertions.assertEquals(locationOf("table1"), light.properties().get(Table.PROPERTY_LOCATION));
+  }
+
+  @Test
+  public void testLightLoadOfAMissingTableFails() {
+    NameIdentifier schemaIdent = createSchema();
+    NameIdentifier missing =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "absent");
+
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> opsWithFakeProvider.loadTableLight(missing));
+  }
+
+  @Test
   public void testDropTableUnprovisionsItsLocation() {
     NameIdentifier schemaIdent = createSchema();
     NameIdentifier tableIdent = createTable(schemaIdent, "table1");

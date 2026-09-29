@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.catalog;
 
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.connector.SupportsLightTableLoad;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 
 /**
@@ -27,4 +31,23 @@ import org.apache.gravitino.rel.TableCatalog;
  * dispatching or handling table-related events or actions that are not covered by the standard
  * {@code TableCatalog} operations.
  */
-public interface TableDispatcher extends TableCatalog {}
+public interface TableDispatcher extends TableCatalog {
+
+  /**
+   * Loads a table without contacting the storage system that holds it, for callers that do not need
+   * a fresh schema. See {@link SupportsLightTableLoad} for the guarantees this trades away and for
+   * when to prefer it over {@link #loadTable}.
+   *
+   * <p>The default falls back to {@link #loadTable}, which is always a correct answer because a
+   * light load may return everything a full load returns. Implementations that sit in front of
+   * another dispatcher should override this to forward it, so that a connector able to serve the
+   * light load is actually reached.
+   *
+   * @param ident the identifier of the table to load.
+   * @return the loaded table.
+   * @throws NoSuchTableException if the table does not exist.
+   */
+  default Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    return loadTable(ident);
+  }
+}

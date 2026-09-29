@@ -23,6 +23,7 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -107,6 +108,12 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
     } else if (ex instanceof NotFoundException) {
       return new NamespaceNotFoundException(ex.getMessage(), errorDetail(ex), instance);
+
+    } else if (ex instanceof ConnectionFailedException) {
+      // Gravitino could not reach the storage holding the dataset, so it could not verify the
+      // schema. Reported as 503 rather than 500: the request may well succeed later, and a client
+      // that can live with unverified metadata can re-ask without detailed metadata.
+      return new ServiceUnavailableException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof IllegalArgumentException) {
       return new InvalidInputException(ex.getMessage(), errorDetail(ex), instance);

@@ -24,10 +24,12 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
@@ -110,12 +112,7 @@ class TestGravitinoLanceTableOperations {
         .thenReturn(managedTable);
 
     Catalog catalog = Mockito.mock(Catalog.class);
-
-    GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
-    Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
-    // In auxiliary mode the catalog is accessed through the namespace wrapper's dispatcher rather
-    // than catalog.asTableCatalog() directly, so stub the wrapper routing accordingly.
-    Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
+    GravitinoLanceNamespaceWrapper wrapper = wrapperOver(catalog, tableCatalog);
 
     GravitinoLanceTableOperations ops = new GravitinoLanceTableOperations(wrapper);
 
@@ -188,20 +185,108 @@ class TestGravitinoLanceTableOperations {
     Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
   }
 
-  private static TableCatalog tableCatalogWithTable(String format) {
+  @Test
+  void testDescribeTableOnlyAsksForAFreshSchemaWhenItReturnsOne() {
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Table table = externalTableOfFormat("lance");
+    // The detailed branch renders the columns into the response, so the fake needs some.
+    Mockito.when(table.columns()).thenReturn(new Column[0]);
+    TableCatalog tableCatalog = tableCatalogReturning(table);
+    GravitinoLanceNamespaceWrapper wrapper = wrapperOver(catalog, tableCatalog, table);
+    GravitinoLanceTableOperations ops = new GravitinoLanceTableOperations(wrapper);
+
+    // Without detailed metadata the schema is not in the response, so verifying it against the
+    // dataset would be cost and fragility for nothing.
+    ops.describeTable("catalog.schema.table", ".", Optional.empty(), false, false);
+    Mockito.verify(wrapper).loadTableLight(Mockito.eq(catalog), Mockito.any());
+    Mockito.verify(tableCatalog, Mockito.never()).loadTable(Mockito.any());
+
+    // With detailed metadata the schema is returned, so it has to be the verified one.
+    Mockito.clearInvocations(wrapper, tableCatalog);
+    ops.describeTable("catalog.schema.table", ".", Optional.empty(), false, true);
+    Mockito.verify(tableCatalog).loadTable(Mockito.any());
+    Mockito.verify(wrapper, Mockito.never()).loadTableLight(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  void testMetadataOnlyOperationsNeverAskForAFreshSchema() {
+    // tableExists, dropTable and deregisterTable read properties only. Routing them through the
+    // full load would make each of them fail whenever the Lance storage is unreachable.
+    Catalog catalog = Mockito.mock(Catalog.class);
+
+    Table existsTable = externalTableOfFormat("lance");
+    TableCatalog existsCatalog = tableCatalogReturning(existsTable);
+    Assertions.assertTrue(
+        new GravitinoLanceTableOperations(wrapperOver(catalog, existsCatalog, existsTable))
+            .tableExists("catalog.schema.table", "."));
+    Mockito.verify(existsCatalog, Mockito.never()).loadTable(Mockito.any());
+
+    Table dropTable = externalTableOfFormat("lance");
+    TableCatalog dropCatalog = tableCatalogReturning(dropTable);
+    Mockito.when(dropCatalog.purgeTable(Mockito.any())).thenReturn(true);
+    new GravitinoLanceTableOperations(wrapperOver(catalog, dropCatalog, dropTable))
+        .dropTable("catalog.schema.table", ".");
+    Mockito.verify(dropCatalog, Mockito.never()).loadTable(Mockito.any());
+
+    Table deregisterTable = externalTableOfFormat("lance");
+    TableCatalog deregisterCatalog = tableCatalogReturning(deregisterTable);
+    Mockito.when(deregisterCatalog.dropTable(Mockito.any())).thenReturn(true);
+    new GravitinoLanceTableOperations(wrapperOver(catalog, deregisterCatalog, deregisterTable))
+        .deregisterTable("catalog.schema.table", ".");
+    Mockito.verify(deregisterCatalog, Mockito.never()).loadTable(Mockito.any());
+  }
+
+  private static Table externalTableOfFormat(String format) {
     Table table = Mockito.mock(Table.class);
     Mockito.when(table.properties())
         .thenReturn(Map.of(Table.PROPERTY_TABLE_FORMAT, format, Table.PROPERTY_EXTERNAL, "true"));
+    return table;
+  }
+
+  private static TableCatalog tableCatalogReturning(Table table) {
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
     return tableCatalog;
   }
 
+  private static TableCatalog tableCatalogWithTable(String format) {
+    return tableCatalogReturning(externalTableOfFormat(format));
+  }
+
   private static GravitinoLanceTableOperations operations(TableCatalog tableCatalog) {
     Catalog catalog = Mockito.mock(Catalog.class);
+    return new GravitinoLanceTableOperations(wrapperOver(catalog, tableCatalog));
+  }
+
+  /**
+   * Builds a namespace wrapper serving both the full and the light load from the same fake table,
+   * the way the real one does. Stubbing only {@link GravitinoLanceNamespaceWrapper#asTableCatalog}
+   * would leave every call that routes to the light load returning null.
+   */
+  private static GravitinoLanceNamespaceWrapper wrapperOver(
+      Catalog catalog, TableCatalog tableCatalog) {
+    GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+    Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
+    // In auxiliary mode the catalog is reached through the namespace wrapper rather than
+    // catalog.asTableCatalog() directly, so the wrapper routing is what gets stubbed.
+    Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
+    Mockito.when(wrapper.loadTableLight(Mockito.eq(catalog), Mockito.any(NameIdentifier.class)))
+        .thenAnswer(invocation -> tableCatalog.loadTable(invocation.getArgument(1)));
+    return wrapper;
+  }
+
+  /**
+   * Same as {@link #wrapperOver(Catalog, TableCatalog)} but serving the light load from {@code
+   * table} directly. A test that has to tell the two loads apart cannot have the light one reach
+   * the catalog mock, or verifying the full load would see the light load's call as well.
+   */
+  private static GravitinoLanceNamespaceWrapper wrapperOver(
+      Catalog catalog, TableCatalog tableCatalog, Table table) {
     GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
     Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
     Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
-    return new GravitinoLanceTableOperations(wrapper);
+    Mockito.when(wrapper.loadTableLight(Mockito.eq(catalog), Mockito.any(NameIdentifier.class)))
+        .thenReturn(table);
+    return wrapper;
   }
 }

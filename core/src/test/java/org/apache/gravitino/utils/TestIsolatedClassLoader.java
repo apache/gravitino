@@ -19,11 +19,20 @@
 
 package org.apache.gravitino.utils;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
+import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import org.apache.gravitino.connector.SupportsLightTableLoad;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestIsolatedClassLoader {
 
@@ -42,6 +51,73 @@ public class TestIsolatedClassLoader {
 
   private boolean isCatalogClass(String name) throws Exception {
     return (boolean) isCatalogClassMethod.invoke(classLoader, name);
+  }
+
+  /**
+   * A connector implements {@link SupportsLightTableLoad} inside its own ClassLoader while the
+   * server tests the result with {@code instanceof}, so both have to end up with the same {@link
+   * Class}. This packages a second copy of the interface into the isolated ClassLoader's own jar,
+   * the way a connector's {@code libs} directory does, and checks the server's copy still wins.
+   *
+   * <p>Identical bytes are not enough for {@code instanceof}: a class defined by another
+   * ClassLoader is a different {@code Class} even byte-for-byte, which is why this asserts identity
+   * rather than equality.
+   */
+  @Test
+  public void testConnectorMixinIsSharedWithTheServerClassLoader(@TempDir Path pkgDir)
+      throws Exception {
+    String name = SupportsLightTableLoad.class.getName();
+    writeClassIntoJar(pkgDir.resolve("duplicate.jar"), name);
+
+    IsolatedClassLoader isolated = IsolatedClassLoader.buildClassLoader(List.of(pkgDir.toString()));
+    try {
+      Class<?> loaded = isolated.withClassLoader(cl -> cl.loadClass(name));
+
+      // Checked first so the assertion below cannot pass simply because the duplicate was never
+      // there: the isolated ClassLoader can see its own copy, and delegates anyway.
+      Assertions.assertNotNull(
+          isolated.getInternalClassLoader().findResource(name.replace('.', '/') + ".class"),
+          "the duplicate should be visible to the isolated ClassLoader");
+      Assertions.assertSame(
+          SupportsLightTableLoad.class,
+          loaded,
+          "A connector-local copy of the mixin must not shadow the server's, or the instanceof "
+              + "check that routes a light load would silently be false");
+    } finally {
+      isolated.close();
+    }
+  }
+
+  /**
+   * The sharing above only holds while the server's ClassLoader can actually serve the class, which
+   * means the interface has to ship in a module on the server's main classpath. Connector and
+   * auxiliary-service modules are packaged into their own directories instead, so an interface
+   * declared in one of those would be served from each package directory separately -- and tests,
+   * which run everything in a single ClassLoader, would not notice.
+   */
+  @Test
+  public void testConnectorMixinShipsWithTheServerModule() {
+    String codeSource =
+        SupportsLightTableLoad.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+
+    Assertions.assertTrue(
+        codeSource.contains("/core/") || codeSource.contains("gravitino-core"),
+        "SupportsLightTableLoad must stay in gravitino-core, which the server loads; it was "
+            + "found in "
+            + codeSource);
+  }
+
+  private static void writeClassIntoJar(Path jar, String className) throws Exception {
+    String resource = className.replace('.', '/') + ".class";
+    try (InputStream in =
+            TestIsolatedClassLoader.class.getClassLoader().getResourceAsStream(resource);
+        OutputStream out = Files.newOutputStream(jar);
+        JarOutputStream jarOut = new JarOutputStream(out)) {
+      Assertions.assertNotNull(in, "cannot read " + resource);
+      jarOut.putNextEntry(new JarEntry(resource));
+      in.transferTo(jarOut);
+      jarOut.closeEntry();
+    }
   }
 
   @Test

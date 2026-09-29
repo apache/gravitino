@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -111,8 +112,12 @@ public class TestCatalogOperations
         FilesetCatalog,
         TopicCatalog,
         ModelCatalog,
-        SupportsSchemas {
+        SupportsSchemas,
+        SupportsLightTableLoad {
   private static final Logger LOG = LoggerFactory.getLogger(TestCatalogOperations.class);
+
+  /** Records whether the last table load came in through the light path. */
+  private final AtomicBoolean lastLoadWasLight = new AtomicBoolean(false);
 
   private final Map<NameIdentifier, TestTable> tables;
 
@@ -172,11 +177,29 @@ public class TestCatalogOperations
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    lastLoadWasLight.set(false);
     if (tables.containsKey(ident)) {
       return tables.get(ident);
     } else {
       throw new NoSuchTableException("Table %s does not exist", ident);
     }
+  }
+
+  @Override
+  public Table loadTableLight(NameIdentifier ident) throws NoSuchTableException {
+    Table table = loadTable(ident);
+    lastLoadWasLight.set(true);
+    return table;
+  }
+
+  /**
+   * Reports how the table loaded last was loaded, so a test can tell which of the two paths the
+   * dispatcher took.
+   *
+   * @return true if the last load came in through {@link #loadTableLight}.
+   */
+  public boolean lastLoadWasLight() {
+    return lastLoadWasLight.get();
   }
 
   @Override
