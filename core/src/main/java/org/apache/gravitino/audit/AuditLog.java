@@ -109,6 +109,8 @@ import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
@@ -241,6 +243,8 @@ public interface AuditLog {
     ENABLE_CATALOG,
 
     DISABLE_CATALOG,
+
+    TEST_CONNECTION_CATALOG,
 
     CREATE_SCHEMA,
 
@@ -557,6 +561,9 @@ public interface AuditLog {
       } else if (event instanceof DisableCatalogEvent
           || event instanceof DisableCatalogFailureEvent) {
         return DISABLE_CATALOG;
+      } else if (event instanceof TestConnectionEvent
+          || event instanceof TestConnectionFailureEvent) {
+        return TEST_CONNECTION_CATALOG;
       } else if (event instanceof CreateSchemaEvent || event instanceof CreateSchemaFailureEvent) {
         return CREATE_SCHEMA;
       } else if (event instanceof AlterSchemaEvent || event instanceof AlterSchemaFailureEvent) {
