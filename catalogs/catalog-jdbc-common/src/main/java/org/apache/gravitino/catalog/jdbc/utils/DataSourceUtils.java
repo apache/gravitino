@@ -153,10 +153,15 @@ public class DataSourceUtils {
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
-    // Set each time a connection is taken out from the connection pool, a test statement will be
-    // executed to confirm whether the connection is valid.
+    // Validate connections on borrow when enabled.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
-    basicDataSource.setValidationQuery(POOL_TEST_QUERY);
+    // DBCP caches the validation prepared statement. MySQL binds it to the catalog at preparation
+    // time, so reusing it after setCatalog() can fail when the URL has no default database. Use
+    // Connection.isValid() for MySQL instead; Connector/J validates with a catalog-independent
+    // ping.
+    String lowerUrl = jdbcUrl.toLowerCase(Locale.ROOT);
+    boolean isMysql = lowerUrl.startsWith("jdbc:mysql:") || lowerUrl.startsWith("jdbc:mysql+srv:");
+    basicDataSource.setValidationQuery(isMysql ? null : POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
   }
