@@ -90,6 +90,22 @@ public class TestNoOpsCache {
     assertEquals("backend failed", failure.getMessage());
   }
 
+  @Test
+  void testWithCacheLockRejectsNullArguments() throws Exception {
+    NoOpsCache cache = new NoOpsCache(new Config(false) {});
+    EntityCacheKey key =
+        EntityCacheKey.of(NameIdentifier.of("metalake", "user"), Entity.EntityType.USER);
+
+    assertThrows(IllegalArgumentException.class, () -> cache.withCacheLock(null, () -> {}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.withCacheLock(key, (EntityCache.ThrowingRunnable<Exception>) null));
+    assertThrows(IllegalArgumentException.class, () -> cache.withCacheLock(null, () -> "loaded"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.withCacheLock(key, (EntityCache.ThrowingSupplier<String, Exception>) null));
+  }
+
   private void fail() {
     throw new IllegalStateException("backend failed");
   }
