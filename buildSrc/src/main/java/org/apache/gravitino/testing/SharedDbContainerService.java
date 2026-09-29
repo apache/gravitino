@@ -92,6 +92,9 @@ public abstract class SharedDbContainerService
 
   // How long a single docker CLI invocation (including a cold image pull) may run before it is
   // treated as hung and killed.
+  /** Number of trailing container-log lines echoed into the readiness-timeout exception. */
+  private static final int CONTAINER_LOG_TAIL_LINES = 20;
+
   private static final long EXEC_TIMEOUT_SECONDS = 300L;
 
   // Unique per build-service instance, embedded in every container this instance starts (see
@@ -452,11 +455,59 @@ public abstract class SharedDbContainerService
       sleep(READINESS_POLL_INTERVAL_MILLIS);
     }
 
+    // Capture the container's own logs before returning: the caller removes a container that
+    // failed to become ready, which destroys the only evidence of *why* it failed (bad server
+    // flag, ENOSPC on the tmpfs data dir, image init script error). Done here rather than in the
+    // caller so it runs before any removal path.
+    String containerLogs = captureContainerLogs(containerId);
+    LOG.error(
+        "Shared {} test database container {} never became ready. Full container logs follow:\n{}",
+        backendLabel,
+        containerId,
+        containerLogs);
+
     throw new IllegalStateException(
         String.format(
             "Timed out after %d attempts waiting for shared %s test database container %s to"
-                + " become ready",
-            READINESS_MAX_ATTEMPTS, backendLabel, containerId));
+                + " become ready. Last %d lines of container logs:%n%s",
+            READINESS_MAX_ATTEMPTS,
+            backendLabel,
+            containerId,
+            CONTAINER_LOG_TAIL_LINES,
+            tailLines(containerLogs, CONTAINER_LOG_TAIL_LINES)));
+  }
+
+  /**
+   * Returns the combined stdout and stderr of {@code docker logs <containerId>}, or a short
+   * placeholder if the logs cannot be read. Never throws: this only ever runs on a path that is
+   * already failing, and losing the diagnostic must not mask the original error. Both streams are
+   * collected because the MySQL and PostgreSQL images write their server logs to stderr.
+   */
+  private String captureContainerLogs(String containerId) {
+    try {
+      ProcessResult result = exec("logs", containerId);
+      StringBuilder combined = new StringBuilder();
+      if (!result.stdout.isEmpty()) {
+        combined.append(result.stdout);
+      }
+      if (!result.stderr.isEmpty()) {
+        if (combined.length() > 0) {
+          combined.append(System.lineSeparator());
+        }
+        combined.append(result.stderr);
+      }
+      return combined.length() == 0 ? "<no container logs available>" : combined.toString();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to capture logs for container {}", containerId, e);
+      return "<failed to capture container logs: " + e.getMessage() + ">";
+    }
+  }
+
+  /** Returns at most the last {@code maxLines} non-blank lines of {@code text}. */
+  static String tailLines(String text, int maxLines) {
+    List<String> lines = splitNonBlankLines(text);
+    List<String> tail = lines.subList(Math.max(0, lines.size() - maxLines), lines.size());
+    return String.join(System.lineSeparator(), tail);
   }
 
   private void sleep(long millis) {
