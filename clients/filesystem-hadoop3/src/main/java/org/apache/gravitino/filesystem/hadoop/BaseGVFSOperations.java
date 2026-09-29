@@ -997,8 +997,8 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   /**
    * Merges static ({@code expireTimeInMs == 0}) {@link Credential#credentialInfo()} from catalog
-   * {@code getCredentials} into GVFS configuration. Invoked when a filesystem is created, so results
-   * are not cached here — rotated keys are picked up on the next filesystem build. Expiring
+   * {@code getCredentials} into GVFS configuration. Invoked when a filesystem is created, so
+   * results are not cached here — rotated keys are picked up on the next filesystem build. Expiring
    * credentials are skipped; path token vending uses a separate fileset path.
    */
   private void putStaticCatalogCredentialInfo(Map<String, String> target, Catalog catalog) {
