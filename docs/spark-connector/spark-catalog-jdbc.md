@@ -23,6 +23,8 @@ Set `spark.sql.gravitino.enableDorisSupport=true` to select the specialized Spar
 
 The first read baseline validates the Gravitino logical schema against Doris FE and JDBC metadata, supports ordinary scalar batch reads, rejects schema drift and unsupported Doris types, and keeps Gravitino authorization ahead of specialized physical access. The specialized table is read-only and rejects Spark writes and catalog DDL. Aggregate, Top-N, limit, offset, partitioned-read, native-tablet, and special-type normalization lanes are added only by follow-up contributions.
 
+The Doris 3.0.6.2 integration test verifies reads of `INT`, `VARCHAR`, `BOOLEAN`, `DECIMAL`, `STRING`, `DOUBLE`, `DATEV2`, and plain `DATETIME`, including nullable and non-nullable columns and `NULL` values. The specialized JDBC path exposes `DATETIME` as Spark `TimestampType`, so string rendering follows `spark.sql.session.timeZone`. The specialized path rejects `CHAR` and `FLOAT` because their Gravitino logical types differ from the types exposed by Spark JDBC. Other ordinary scalar types are accepted only when the FE, JDBC, Gravitino, and Spark schemas agree; this baseline does not claim integration-test coverage for every such type.
+
 This baseline uses the MySQL Connector/J driver for Doris FE's MySQL protocol; it does not bundle a separate Doris Spark connector. MySQL Connector/J and any required external runtime dependencies must be available on the Spark driver and executors. Do not pass connection credentials or protected catalog settings through Spark catalog options.
 
 ### DML and DDL Operations

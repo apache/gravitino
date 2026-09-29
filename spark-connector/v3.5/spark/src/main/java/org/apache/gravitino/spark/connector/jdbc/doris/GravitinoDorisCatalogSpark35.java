@@ -46,7 +46,6 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
 
   private String jdbcUrl;
-  private String jdbcDriver;
   private String jdbcUser;
   private String jdbcPassword;
 
@@ -57,7 +56,7 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
         DorisPropertiesConverter35.getInstance().toSparkCatalogProperties(options, properties);
     JdbcCredential credential = requiredJdbcCredential(gravitinoCatalogClient);
     jdbcUrl = requireProperty(all, "url");
-    jdbcDriver = requireProperty(all, "driver");
+    requireProperty(all, "driver");
     jdbcUser = credential.jdbcUser();
     jdbcPassword = credential.jdbcPassword();
     all.put("user", jdbcUser);
@@ -86,7 +85,6 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
         gravitinoTable,
         sparkTable.schema(),
         jdbcUrl,
-        jdbcDriver,
         jdbcUser,
         jdbcPassword,
         sparkTypeConverter);

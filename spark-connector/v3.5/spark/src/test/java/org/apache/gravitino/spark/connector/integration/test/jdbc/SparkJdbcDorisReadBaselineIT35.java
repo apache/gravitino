@@ -24,9 +24,13 @@ import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.
 import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.GRAVITINO_JDBC_URL;
 import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.GRAVITINO_JDBC_USER;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +55,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   private static final String CATALOG_NAME = "jdbc_doris";
   private static final String DATABASE_NAME = "doris_spark_baseline_it";
   private static final String TABLE_NAME = "read_baseline";
+  private static final String ORDINARY_TYPES_TABLE_NAME = "read_ordinary_types";
   private static final String PATTERN_MATCH_TABLE_NAME = "readxbaseline";
   private static final String OTHER_DATABASE_NAME = "doris_spark_baseline_other_it";
   private static final String UNSUPPORTED_TABLE_NAME = "unsupported_json";
@@ -148,6 +153,80 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     Assertions.assertEquals("one", rows.get(0)[1]);
     Assertions.assertEquals(2, rows.get(1)[0]);
     Assertions.assertEquals("two", rows.get(1)[1]);
+  }
+
+  @Test
+  void testReadOrdinaryScalarTypeFamiliesAndNullValues() throws Exception {
+    Timestamp expectedCreatedAt;
+    try {
+      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+          Statement statement = connection.createStatement()) {
+        statement.execute(
+            "DROP TABLE IF EXISTS " + DATABASE_NAME + "." + ORDINARY_TYPES_TABLE_NAME);
+        statement.execute(
+            "CREATE TABLE "
+                + DATABASE_NAME
+                + "."
+                + ORDINARY_TYPES_TABLE_NAME
+                + " (id INT NOT NULL, is_active BOOLEAN NULL, "
+                + "amount DECIMAL(10,2) NOT NULL, description STRING NULL, "
+                + "measure DOUBLE NOT NULL, event_date DATEV2 NULL, created_at DATETIME NULL) "
+                + "DISTRIBUTED BY HASH(id) BUCKETS 1");
+        statement.execute(
+            "INSERT INTO "
+                + DATABASE_NAME
+                + "."
+                + ORDINARY_TYPES_TABLE_NAME
+                + " VALUES (1, TRUE, 12.34, 'one', 2.25, '2024-01-02', '2024-01-02 03:04:05'), "
+                + "(2, NULL, 0.50, NULL, 4.25, NULL, NULL)");
+        try (ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT created_at FROM "
+                    + DATABASE_NAME
+                    + "."
+                    + ORDINARY_TYPES_TABLE_NAME
+                    + " WHERE id = 1")) {
+          Assertions.assertTrue(resultSet.next());
+          expectedCreatedAt = resultSet.getTimestamp(1);
+        }
+      }
+
+      GravitinoDorisCatalogSpark35 sparkCatalog =
+          (GravitinoDorisCatalogSpark35)
+              getSparkSession().sessionState().catalogManager().catalog(CATALOG_NAME);
+      sparkCatalog.invalidateTable(
+          Identifier.of(new String[] {DATABASE_NAME}, ORDINARY_TYPES_TABLE_NAME));
+      List<Object[]> rows =
+          sql(
+              "SELECT id, is_active, amount, description, measure, event_date, created_at FROM "
+                  + CATALOG_NAME
+                  + "."
+                  + DATABASE_NAME
+                  + "."
+                  + ORDINARY_TYPES_TABLE_NAME
+                  + " ORDER BY id");
+
+      Assertions.assertEquals(2, rows.size());
+      Assertions.assertArrayEquals(
+          new Object[] {
+            1,
+            true,
+            new BigDecimal("12.34"),
+            "one",
+            2.25d,
+            Date.valueOf("2024-01-02"),
+            expectedCreatedAt
+          },
+          rows.get(0));
+      Assertions.assertArrayEquals(
+          new Object[] {2, null, new BigDecimal("0.50"), null, 4.25d, null, null}, rows.get(1));
+    } finally {
+      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+          Statement statement = connection.createStatement()) {
+        statement.execute(
+            "DROP TABLE IF EXISTS " + DATABASE_NAME + "." + ORDINARY_TYPES_TABLE_NAME);
+      }
+    }
   }
 
   @Test

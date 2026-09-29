@@ -50,14 +50,13 @@ final class DorisPhysicalSchemaValidator35 {
       ImmutableSet.of(
           "bigint",
           "boolean",
-          "char",
           "date",
           "datev2",
           "datetime",
           "datetimev2",
           "decimal",
+          "decimalv3",
           "double",
-          "float",
           "int",
           "integer",
           "smallint",
@@ -73,27 +72,23 @@ final class DorisPhysicalSchemaValidator35 {
       Table logicalTable,
       StructType sparkPhysicalSchema,
       String jdbcUrl,
-      String jdbcDriver,
       String jdbcUser,
       String jdbcPassword,
       SparkTypeConverter typeConverter) {
-    try {
-      Class.forName(jdbcDriver);
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword)) {
-        List<PhysicalColumn> jdbcColumns = loadJdbcColumns(connection, identifier);
-        List<PhysicalColumn> feColumns = loadFeColumns(connection, identifier);
-        validateColumns(
-            identifier, logicalTable, sparkPhysicalSchema, jdbcColumns, feColumns, typeConverter);
-      }
-    } catch (ClassNotFoundException | SQLException | RuntimeException e) {
-      if (e instanceof IllegalArgumentException
-          && e.getMessage() != null
-          && e.getMessage().startsWith("Doris schema mismatch")) {
-        throw (IllegalArgumentException) e;
-      }
-      throw new IllegalArgumentException(
-          "Doris physical schema validation failed for " + identifier);
+    List<PhysicalColumn> jdbcColumns;
+    List<PhysicalColumn> feColumns;
+    String stage = "JDBC connection";
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword)) {
+      stage = "JDBC column metadata";
+      jdbcColumns = loadJdbcColumns(connection, identifier);
+      stage = "FE SHOW COLUMNS";
+      feColumns = loadFeColumns(connection, identifier);
+      stage = "JDBC connection close";
+    } catch (SQLException | RuntimeException e) {
+      throw physicalAccessFailure(identifier, stage, e);
     }
+    validateColumns(
+        identifier, logicalTable, sparkPhysicalSchema, jdbcColumns, feColumns, typeConverter);
   }
 
   private static List<PhysicalColumn> loadJdbcColumns(Connection connection, Identifier identifier)
@@ -271,8 +266,8 @@ final class DorisPhysicalSchemaValidator35 {
         parameters = "(" + size + ")";
       }
     }
-    if (parameters.isEmpty() && "datetime".equals(base) && scale != null) {
-      parameters = "(" + scale + ")";
+    if (parameters.isEmpty() && "datetime".equals(base)) {
+      parameters = "(" + (scale == null ? 0 : scale) + ")";
     }
     return base + parameters;
   }
@@ -316,6 +311,24 @@ final class DorisPhysicalSchemaValidator35 {
 
   private static IllegalArgumentException mismatch(Identifier identifier, String reason) {
     return new IllegalArgumentException("Doris schema mismatch for " + identifier + ": " + reason);
+  }
+
+  private static IllegalArgumentException physicalAccessFailure(
+      Identifier identifier, String stage, Exception cause) {
+    String diagnostics = "";
+    if (cause instanceof SQLException) {
+      SQLException sqlException = (SQLException) cause;
+      String state = sqlException.getSQLState();
+      if (state != null && state.matches("[A-Za-z0-9]{5}")) {
+        diagnostics = " (SQLState " + state + ", vendor code " + sqlException.getErrorCode() + ")";
+      }
+    }
+    return new IllegalArgumentException(
+        "Doris physical schema validation failed during "
+            + stage
+            + " for "
+            + identifier
+            + diagnostics);
   }
 
   static final class PhysicalColumn {

@@ -20,13 +20,26 @@
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -39,6 +52,74 @@ import org.junit.jupiter.api.Test;
 
 /** Unit tests for Doris FE/JDBC physical schema validation. */
 public class TestDorisPhysicalSchemaValidator35 {
+
+  @Test
+  void testConnectionFailureReportsStageWithoutConnectionDetails() {
+    String jdbcUrl = "jdbc:missing-doris-driver://host/db?password=test-only-secret";
+    String jdbcPassword = "test-only-secret";
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                DorisPhysicalSchemaValidator35.validate(
+                    Identifier.of(new String[] {"db"}, "table"),
+                    logicalTable(logicalColumn("id", Types.IntegerType.get(), false)),
+                    DataTypes.createStructType(
+                        new StructField[] {
+                          DataTypes.createStructField("id", DataTypes.IntegerType, false)
+                        }),
+                    jdbcUrl,
+                    "test-user",
+                    jdbcPassword,
+                    new SparkJdbcTypeConverter()));
+
+    assertTrue(failure.getMessage().contains("JDBC connection"));
+    assertFalse(failure.getMessage().contains(jdbcUrl));
+    assertFalse(failure.getMessage().contains(jdbcPassword));
+    assertNull(failure.getCause());
+  }
+
+  @Test
+  void testShowColumnsFailureReportsSafeJdbcDiagnostics() throws Exception {
+    String jdbcUrl = "jdbc:doris-validator-test://host/db";
+    Driver driver = mock(Driver.class);
+    Connection connection = mock(Connection.class);
+    DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+    ResultSet jdbcColumns = mock(ResultSet.class);
+    Statement statement = mock(Statement.class);
+    when(driver.connect(eq(jdbcUrl), any(Properties.class))).thenReturn(connection);
+    when(connection.getMetaData()).thenReturn(metadata);
+    when(metadata.getColumns("db", "db", "table", "%")).thenReturn(jdbcColumns);
+    when(connection.createStatement()).thenReturn(statement);
+    when(statement.executeQuery(anyString()))
+        .thenThrow(new SQLException("test-only-secret", "42000", 1234));
+
+    DriverManager.registerDriver(driver);
+    try {
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DorisPhysicalSchemaValidator35.validate(
+                      Identifier.of(new String[] {"db"}, "table"),
+                      logicalTable(logicalColumn("id", Types.IntegerType.get(), false)),
+                      DataTypes.createStructType(
+                          new StructField[] {
+                            DataTypes.createStructField("id", DataTypes.IntegerType, false)
+                          }),
+                      jdbcUrl,
+                      "test-user",
+                      "test-only-secret",
+                      new SparkJdbcTypeConverter()));
+      assertTrue(failure.getMessage().contains("FE SHOW COLUMNS"));
+      assertTrue(failure.getMessage().contains("SQLState 42000"));
+      assertTrue(failure.getMessage().contains("vendor code 1234"));
+      assertFalse(failure.getMessage().contains("test-only-secret"));
+      assertNull(failure.getCause());
+    } finally {
+      DriverManager.deregisterDriver(driver);
+    }
+  }
 
   @Test
   void testOrdinaryScalarSchemaPasses() {
@@ -94,6 +175,78 @@ public class TestDorisPhysicalSchemaValidator35 {
                 physicalSchema,
                 jdbcColumns,
                 feColumns,
+                new SparkJdbcTypeConverter()));
+  }
+
+  @Test
+  void testDecimalV3AndJdbcDecimalSignaturesMatch() {
+    Identifier identifier = Identifier.of(new String[] {"db"}, "table");
+    Column logicalColumn = logicalColumn("amount", Types.DecimalType.of(10, 2), false);
+    StructType physicalSchema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("amount", DataTypes.createDecimalType(10, 2), false)
+            });
+    List<DorisPhysicalSchemaValidator35.PhysicalColumn> jdbcColumns =
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn("amount", "DECIMAL(10,2)", false, 0));
+    List<DorisPhysicalSchemaValidator35.PhysicalColumn> feColumns =
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn(
+                "amount", "DECIMALV3(10,2)", false, 0));
+
+    assertDoesNotThrow(
+        () ->
+            DorisPhysicalSchemaValidator35.validateColumns(
+                identifier,
+                logicalTable(logicalColumn),
+                physicalSchema,
+                jdbcColumns,
+                feColumns,
+                new SparkJdbcTypeConverter()));
+  }
+
+  @Test
+  void testDefaultDatetimePrecisionMatchesButHigherPrecisionDoesNot() {
+    Identifier identifier = Identifier.of(new String[] {"db"}, "table");
+    Column logicalColumn =
+        logicalColumn("created_at", Types.TimestampType.withoutTimeZone(0), true);
+    StructType physicalSchema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("created_at", DataTypes.TimestampType, true)
+            });
+    List<DorisPhysicalSchemaValidator35.PhysicalColumn> jdbcColumns =
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn("created_at", "DATETIME", true, 0));
+    List<DorisPhysicalSchemaValidator35.PhysicalColumn> feZeroPrecision =
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn(
+                "created_at", "DATETIMEV2(0)", true, 0));
+
+    assertDoesNotThrow(
+        () ->
+            DorisPhysicalSchemaValidator35.validateColumns(
+                identifier,
+                logicalTable(logicalColumn),
+                physicalSchema,
+                jdbcColumns,
+                feZeroPrecision,
+                new SparkJdbcTypeConverter()));
+
+    List<DorisPhysicalSchemaValidator35.PhysicalColumn> feHigherPrecision =
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn(
+                "created_at", "DATETIMEV2(3)", true, 0));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DorisPhysicalSchemaValidator35.validateColumns(
+                identifier,
+                logicalTable(logicalColumn),
+                physicalSchema,
+                jdbcColumns,
+                feHigherPrecision,
                 new SparkJdbcTypeConverter()));
   }
 
@@ -158,22 +311,24 @@ public class TestDorisPhysicalSchemaValidator35 {
     StructType physicalSchema =
         DataTypes.createStructType(
             new StructField[] {DataTypes.createStructField("payload", DataTypes.StringType, true)});
-    List<DorisPhysicalSchemaValidator35.PhysicalColumn> columns =
-        Arrays.asList(
-            new DorisPhysicalSchemaValidator35.PhysicalColumn("payload", "JSON", true, 0));
+    for (String typeName : Arrays.asList("JSON", "CHAR(4)", "FLOAT")) {
+      List<DorisPhysicalSchemaValidator35.PhysicalColumn> columns =
+          Arrays.asList(
+              new DorisPhysicalSchemaValidator35.PhysicalColumn("payload", typeName, true, 0));
 
-    IllegalArgumentException failure =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                DorisPhysicalSchemaValidator35.validateColumns(
-                    identifier,
-                    logicalTable(logicalColumn),
-                    physicalSchema,
-                    columns,
-                    columns,
-                    new SparkJdbcTypeConverter()));
-    assertTrue(failure.getMessage().contains("unsupported Doris type"));
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DorisPhysicalSchemaValidator35.validateColumns(
+                      identifier,
+                      logicalTable(logicalColumn),
+                      physicalSchema,
+                      columns,
+                      columns,
+                      new SparkJdbcTypeConverter()));
+      assertTrue(failure.getMessage().contains("unsupported Doris type"));
+    }
   }
 
   @Test
