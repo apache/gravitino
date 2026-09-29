@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
@@ -147,6 +149,9 @@ public class TestGravitinoCatalogManager {
 
     manager.loadRelationalCatalogs();
 
+    verify(clientFactory.lastClient()).listCatalogsInfo(false);
+    verify(clientFactory.lastClient(), never()).listCatalogsInfo();
+    verify(clientFactory.lastClient(), never()).listCatalogsInfo(true);
     assertEquals(1, clientFactory.listCount());
     assertEquals(0, clientFactory.loadCount());
     assertEquals(1, manager.getCatalogs().size());
@@ -330,11 +335,13 @@ public class TestGravitinoCatalogManager {
     private final AtomicInteger loads = new AtomicInteger();
     private final AtomicInteger lists = new AtomicInteger();
     private Catalog[] catalogDescriptors = new Catalog[0];
+    private GravitinoClient lastClient;
 
     @Override
     public GravitinoClient apply(GravitinoIdentity identity) {
       clients.incrementAndGet();
       GravitinoClient client = mock(GravitinoClient.class);
+      lastClient = client;
       when(client.listCatalogsInfo(false))
           .thenAnswer(
               invocation -> {
@@ -376,6 +383,10 @@ public class TestGravitinoCatalogManager {
 
     int listCount() {
       return lists.get();
+    }
+
+    GravitinoClient lastClient() {
+      return lastClient;
     }
 
     int closedCount() {
