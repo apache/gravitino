@@ -213,8 +213,8 @@ public class Privileges {
         return ViewSecretProviders.allow();
       case USE_SECRET:
         return UseSecret.allow();
-      case RETRIEVE_CREDENTIAL_SECRET:
-        return RetrieveCredentialSecret.allow();
+      case INCLUDE_CREDENTIAL_SECRET:
+        return IncludeCredentialSecret.allow();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -349,8 +349,8 @@ public class Privileges {
         return ViewSecretProviders.deny();
       case USE_SECRET:
         return UseSecret.deny();
-      case RETRIEVE_CREDENTIAL_SECRET:
-        return RetrieveCredentialSecret.deny();
+      case INCLUDE_CREDENTIAL_SECRET:
+        return IncludeCredentialSecret.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -1418,14 +1418,13 @@ public class Privileges {
   }
 
   /**
-   * The privilege to retrieve plaintext non-credential secrets via {@code getSecrets} (cloud
-   * access-key pairs omitted).
+   * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecret},
+   * cloud access-key pairs are omitted from the result.
    *
    * <p>Intended for connectors that recover JDBC and similar secrets via {@code getSecrets}, and
    * recover cloud access keys via {@code getCredentials} (which requires no privilege). Callers
-   * that are not the metalake owner and lack this privilege (and lack {@link
-   * RetrieveCredentialSecret}) receive an empty {@code getSecrets} result rather than a forbidden
-   * error, once they can already access the metadata object.
+   * that are not the metalake owner and lack this privilege receive an empty {@code getSecrets}
+   * result rather than a forbidden error, once they can already access the metadata object.
    */
   public static final class UseSecret extends GenericPrivilege<UseSecret> {
 
@@ -1457,36 +1456,36 @@ public class Privileges {
   }
 
   /**
-   * The privilege to retrieve all plaintext secrets via {@code getSecrets}, including cloud
-   * access-key pairs and other credential secrets.
+   * When held together with {@link UseSecret}, includes cloud access-key pairs and other credential
+   * secrets in the {@code getSecrets} result.
    *
-   * <p>Does not authorize {@code getCredentials}. Metalake owners and holders of this privilege
-   * receive the full secrets map; others with only {@link UseSecret} get cloud access-key pairs
-   * omitted.
+   * <p>Does not authorize {@code getSecrets} or {@code getCredentials} by itself. Metalake owners
+   * and holders of both privileges receive the full secrets map; holders of only {@link UseSecret}
+   * get cloud access-key pairs omitted.
    */
-  public static final class RetrieveCredentialSecret
-      extends GenericPrivilege<RetrieveCredentialSecret> {
+  public static final class IncludeCredentialSecret
+      extends GenericPrivilege<IncludeCredentialSecret> {
 
-    private static final RetrieveCredentialSecret ALLOW_INSTANCE =
-        new RetrieveCredentialSecret(Condition.ALLOW, Name.RETRIEVE_CREDENTIAL_SECRET);
-    private static final RetrieveCredentialSecret DENY_INSTANCE =
-        new RetrieveCredentialSecret(Condition.DENY, Name.RETRIEVE_CREDENTIAL_SECRET);
+    private static final IncludeCredentialSecret ALLOW_INSTANCE =
+        new IncludeCredentialSecret(Condition.ALLOW, Name.INCLUDE_CREDENTIAL_SECRET);
+    private static final IncludeCredentialSecret DENY_INSTANCE =
+        new IncludeCredentialSecret(Condition.DENY, Name.INCLUDE_CREDENTIAL_SECRET);
 
-    private RetrieveCredentialSecret(Condition condition, Name name) {
+    private IncludeCredentialSecret(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static RetrieveCredentialSecret allow() {
+    public static IncludeCredentialSecret allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static RetrieveCredentialSecret deny() {
+    public static IncludeCredentialSecret deny() {
       return DENY_INSTANCE;
     }
 

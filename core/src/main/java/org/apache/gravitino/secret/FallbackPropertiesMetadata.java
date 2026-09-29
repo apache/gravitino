@@ -32,9 +32,9 @@ import org.apache.gravitino.connector.PropertyEntry;
  * {@code credential-providers}, {@code s3-token-expire-in-secs}) are not fuzzy-recovered into
  * {@code getSecrets}. Undeclared sensitive-named keys still use fuzzy recovery. Declared hidden
  * cloud credential keys (for example {@code s3-access-key-id}, {@code s3-secret-access-key}) are
- * recovered via {@code getSecrets} when the caller holds {@code RETRIEVE_CREDENTIAL_SECRET} (or is
- * metalake owner); callers with only {@code USE_SECRET} get those cloud keys via {@code
- * getCredentials} instead.
+ * recovered via {@code getSecrets} when the caller holds {@code USE_SECRET} and {@code
+ * INCLUDE_CREDENTIAL_SECRET} (or is metalake owner); callers with only {@code USE_SECRET} get those
+ * cloud keys via {@code getCredentials} instead.
  *
  * <p>Does not include the AWS access-key pair. That pair is a Glue catalog property merged only via
  * {@link org.apache.gravitino.connector.BaseCatalogPropertiesMetadata}, matching fileset and schema

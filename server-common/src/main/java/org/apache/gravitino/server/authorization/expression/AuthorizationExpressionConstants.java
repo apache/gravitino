@@ -277,10 +277,10 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Soft check for filtered {@code getSecrets} (cloud access-key pairs omitted). Only the metalake
-   * owner or a principal with {@code USE_SECRET} may receive non-credential secrets; others get an
-   * empty response rather than a forbidden error. Holders of {@code RETRIEVE_CREDENTIAL_SECRET}
-   * receive the full map (see {@link #FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION}).
+   * Soft check required to call {@code getSecrets}. Only the metalake owner or a principal with
+   * {@code USE_SECRET} may receive secrets; others get an empty response rather than a forbidden
+   * error. Whether cloud access-key pairs are included depends on {@link
+   * #FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION}.
    */
   public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
       """
@@ -289,15 +289,15 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Soft check for full plaintext {@code getSecrets} (including cloud access-key pairs). Only the
-   * metalake owner or a principal with {@code RETRIEVE_CREDENTIAL_SECRET} may receive the
-   * unfiltered map; others with only {@code USE_SECRET} get a filtered map rather than a forbidden
-   * error.
+   * Soft check that, together with {@link #FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION}, includes
+   * cloud access-key pairs in the {@code getSecrets} result. Alone it does not authorize {@code
+   * getSecrets}. Metalake owners and holders of {@code INCLUDE_CREDENTIAL_SECRET} receive the
+   * unfiltered map when they also pass the {@code USE_SECRET} check.
    */
-  public static final String FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION =
+  public static final String FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION =
       """
                   METALAKE::OWNER ||
-                  ANY_RETRIEVE_CREDENTIAL_SECRET
+                  ANY_INCLUDE_CREDENTIAL_SECRET
                   """;
 
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =

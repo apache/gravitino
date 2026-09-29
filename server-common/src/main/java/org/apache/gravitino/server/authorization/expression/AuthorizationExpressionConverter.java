@@ -302,9 +302,9 @@ public class AuthorizationExpressionConverter {
                 + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))");
     expression =
         expression.replaceAll(
-            "ANY_RETRIEVE_CREDENTIAL_SECRET",
-            "((ANY(RETRIEVE_CREDENTIAL_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
-                + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_RETRIEVE_CREDENTIAL_SECRET,"
+            "ANY_INCLUDE_CREDENTIAL_SECRET",
+            "((ANY(INCLUDE_CREDENTIAL_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRET,"
                 + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
                 + " MODEL_VERSION)))");
     expression =

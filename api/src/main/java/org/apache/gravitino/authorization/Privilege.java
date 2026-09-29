@@ -161,15 +161,17 @@ public interface Privilege {
     /** The privilege to list configured secrets providers. */
     VIEW_SECRET_PROVIDERS(0L, 1L << 36),
     /**
-     * The privilege to retrieve plaintext non-credential secrets via {@code getSecrets} (cloud
-     * access-key pairs omitted). Does not authorize {@code getCredentials}.
+     * The privilege required to call {@code getSecrets}. Without {@link
+     * #INCLUDE_CREDENTIAL_SECRET}, cloud access-key pairs are omitted from the result. Does not
+     * authorize {@code getCredentials}.
      */
     USE_SECRET(0L, 1L << 37),
     /**
-     * The privilege to retrieve all plaintext secrets via {@code getSecrets}, including cloud
-     * access-key pairs and other credential secrets. Does not authorize {@code getCredentials}.
+     * When held together with {@link #USE_SECRET}, includes cloud access-key pairs and other
+     * credential secrets in the {@code getSecrets} result. Alone it does not authorize {@code
+     * getSecrets}. Does not authorize {@code getCredentials}.
      */
-    RETRIEVE_CREDENTIAL_SECRET(0L, 1L << 38);
+    INCLUDE_CREDENTIAL_SECRET(0L, 1L << 38);
 
     private final long highBits;
     private final long lowBits;

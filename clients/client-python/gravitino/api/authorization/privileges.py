@@ -202,10 +202,10 @@ class Privilege(ABC):
         """The privilege to list configured secrets providers."""
 
         USE_SECRET = (0, 1 << 37)
-        """The privilege to retrieve plaintext non-credential secrets via getSecrets."""
+        """Required to call getSecrets; cloud AK/SK omitted without INCLUDE_CREDENTIAL_SECRET."""
 
-        RETRIEVE_CREDENTIAL_SECRET = (0, 1 << 38)
-        """The privilege to retrieve all plaintext secrets via getSecrets, including credentials."""
+        INCLUDE_CREDENTIAL_SECRET = (0, 1 << 38)
+        """With USE_SECRET, include cloud credential secrets in the getSecrets result."""
 
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
@@ -1684,7 +1684,7 @@ class ViewSecretProviders(GenericPrivilege):
 
 
 class UseSecret(GenericPrivilege):
-    """The privilege to retrieve plaintext non-credential secrets via getSecrets."""
+    """Required to call getSecrets; cloud AK/SK omitted without INCLUDE_CREDENTIAL_SECRET."""
 
     _ALLOW_INSTANCE: Optional["UseSecret"] = None
     _DENY_INSTANCE: Optional["UseSecret"] = None
@@ -1709,27 +1709,27 @@ class UseSecret(GenericPrivilege):
         return obj_type in Privileges.SECRET_SUPPORTED_TYPES
 
 
-class RetrieveCredentialSecret(GenericPrivilege):
-    """The privilege to retrieve all plaintext secrets via getSecrets, including credentials."""
+class IncludeCredentialSecret(GenericPrivilege):
+    """With USE_SECRET, include cloud credential secrets in the getSecrets result."""
 
-    _ALLOW_INSTANCE: Optional["RetrieveCredentialSecret"] = None
-    _DENY_INSTANCE: Optional["RetrieveCredentialSecret"] = None
+    _ALLOW_INSTANCE: Optional["IncludeCredentialSecret"] = None
+    _DENY_INSTANCE: Optional["IncludeCredentialSecret"] = None
 
     @staticmethod
     def allow() -> Privilege:
-        if RetrieveCredentialSecret._ALLOW_INSTANCE is None:
-            RetrieveCredentialSecret._ALLOW_INSTANCE = RetrieveCredentialSecret(
-                Privilege.Condition.ALLOW, Privilege.Name.RETRIEVE_CREDENTIAL_SECRET
+        if IncludeCredentialSecret._ALLOW_INSTANCE is None:
+            IncludeCredentialSecret._ALLOW_INSTANCE = IncludeCredentialSecret(
+                Privilege.Condition.ALLOW, Privilege.Name.INCLUDE_CREDENTIAL_SECRET
             )
-        return RetrieveCredentialSecret._ALLOW_INSTANCE
+        return IncludeCredentialSecret._ALLOW_INSTANCE
 
     @staticmethod
     def deny() -> Privilege:
-        if RetrieveCredentialSecret._DENY_INSTANCE is None:
-            RetrieveCredentialSecret._DENY_INSTANCE = RetrieveCredentialSecret(
-                Privilege.Condition.DENY, Privilege.Name.RETRIEVE_CREDENTIAL_SECRET
+        if IncludeCredentialSecret._DENY_INSTANCE is None:
+            IncludeCredentialSecret._DENY_INSTANCE = IncludeCredentialSecret(
+                Privilege.Condition.DENY, Privilege.Name.INCLUDE_CREDENTIAL_SECRET
             )
-        return RetrieveCredentialSecret._DENY_INSTANCE
+        return IncludeCredentialSecret._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
         return obj_type in Privileges.SECRET_SUPPORTED_TYPES
@@ -1773,7 +1773,7 @@ class Privileges:
         Privilege.Name.EXECUTE_FUNCTION: ExecuteFunction,
         Privilege.Name.MODIFY_FUNCTION: ModifyFunction,
         Privilege.Name.USE_SECRET: UseSecret,
-        Privilege.Name.RETRIEVE_CREDENTIAL_SECRET: RetrieveCredentialSecret,
+        Privilege.Name.INCLUDE_CREDENTIAL_SECRET: IncludeCredentialSecret,
     }
 
     TABLE_SUPPORTED_TYPES = {

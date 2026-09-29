@@ -136,8 +136,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsReturnsEmptyWithoutUseSecretOrRetrieveCredentialSecret()
-      throws Exception {
+  public void testGetSecretsReturnsEmptyWithoutUseSecret() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
@@ -159,6 +158,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                           AuthorizationExpressionConstants
                               .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
           .thenReturn(false);
+      // INCLUDE alone must not authorize getSecrets.
       metadataAuthzHelper
           .when(
               () ->
@@ -167,8 +167,8 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
-          .thenReturn(false);
+                              .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(true);
 
       Response response =
           operations.getSecrets(metalake, metadataObject.type().name(), metadataObject.fullName());
@@ -222,7 +222,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+                              .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
           .thenReturn(false);
 
       Response response =
@@ -235,6 +235,60 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
       Assertions.assertFalse(secretResponse.getSecrets().containsKey("s3-access-key-id"));
       Assertions.assertFalse(secretResponse.getSecrets().containsKey("s3-secret-access-key"));
+    }
+  }
+
+  @Test
+  public void testGetSecretsIncludesCloudKeysWithUseSecretAndIncludeCredentialSecret()
+      throws Exception {
+    MetadataObject metadataObject =
+        MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
+    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+        .thenReturn(
+            Map.of(
+                "s3-access-key-id",
+                "AKIA",
+                "s3-secret-access-key",
+                "secret",
+                "jdbc-password",
+                "db-pass"));
+
+    MetadataObjectSecretOperations operations =
+        new MetadataObjectSecretOperations(secretPropertyOperationDispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+
+    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
+        mockStatic(MetadataAuthzHelper.class)) {
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      any(),
+                      any(Entity.EntityType.class),
+                      eq(
+                          AuthorizationExpressionConstants
+                              .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(true);
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      any(),
+                      any(Entity.EntityType.class),
+                      eq(
+                          AuthorizationExpressionConstants
+                              .FILTER_INCLUDE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(true);
+
+      Response response =
+          operations.getSecrets(metalake, metadataObject.type().name(), metadataObject.fullName());
+
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+      SecretsResponse secretResponse = (SecretsResponse) response.getEntity();
+      Assertions.assertEquals(0, secretResponse.getCode());
+      Assertions.assertEquals("AKIA", secretResponse.getSecrets().get("s3-access-key-id"));
+      Assertions.assertEquals("secret", secretResponse.getSecrets().get("s3-secret-access-key"));
+      Assertions.assertEquals("db-pass", secretResponse.getSecrets().get("jdbc-password"));
     }
   }
 
