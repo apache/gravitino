@@ -56,4 +56,3 @@ a connection when initializing its connection factory.
 For MySQL drivers affected by the catalog-switching problem, explicitly setting `SELECT 1` restores
 the cached-statement validation path and can reproduce connection churn. Leave the query unset when
 the driver supports `Connection.isValid()`.
-
