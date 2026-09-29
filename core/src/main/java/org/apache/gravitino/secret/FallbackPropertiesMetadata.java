@@ -29,14 +29,19 @@ import org.apache.gravitino.connector.PropertyEntry;
  *
  * <p>Registers shared base + credential-vending + cloud-storage entries ({@link
  * CloudPropertiesMetadata#STORAGE_PROPERTY_ENTRIES}) so officially non-hidden keys (for example
- * {@code credential-providers}, {@code s3-access-key-id}) are not fuzzy-recovered into {@code
- * getSecrets}. Undeclared sensitive-named keys still use fuzzy recovery; declared hidden secrets
- * (for example {@code s3-secret-access-key}) remain recoverable.
+ * {@code credential-providers}, {@code s3-token-expire-in-secs}) are not fuzzy-recovered into
+ * {@code getSecrets}. Undeclared sensitive-named keys still use fuzzy recovery. Declared hidden
+ * cloud credential keys that belong to {@link
+ * org.apache.gravitino.credential.CredentialPropertyKeys} (for example {@code s3-access-key-id},
+ * {@code s3-secret-access-key}) are <strong>not</strong> recovered via {@code getSecrets}; clients
+ * must use {@code getCredentials()}.
  *
  * <p>Does not include the AWS access-key pair. That pair is a Glue catalog property merged only via
  * {@link org.apache.gravitino.connector.BaseCatalogPropertiesMetadata}, matching fileset and schema
  * metadata which also omit it. A catalog path that hits this fallback therefore treats {@code
- * aws-access-key-id} as undeclared (fuzzy mask / recover), the same as a fileset or schema.
+ * aws-access-key-id} as undeclared for masking, but {@link
+ * org.apache.gravitino.credential.CredentialPropertyKeys} still excludes it from {@code
+ * getSecrets}; clients use {@code getCredentials()} ({@code AwsSecretKeyCredential}).
  */
 final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
