@@ -218,7 +218,7 @@ public class TestSecurableObjects {
     Privilege executeFunction = Privileges.ExecuteFunction.allow();
     Privilege modifyFunction = Privileges.ModifyFunction.allow();
     Privilege useSecret = Privileges.UseSecret.allow();
-    Privilege useCredential = Privileges.UseCredential.allow();
+    Privilege retrieveCredentialSecret = Privileges.RetrieveCredentialSecret.allow();
 
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.TAG));
@@ -454,18 +454,18 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.FUNCTION));
 
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.SCHEMA));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.TABLE));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.VIEW));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.TOPIC));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.FILESET));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.MODEL));
-    Assertions.assertTrue(useCredential.canBindTo(MetadataObject.Type.MODEL_VERSION));
-    Assertions.assertFalse(useCredential.canBindTo(MetadataObject.Type.ROLE));
-    Assertions.assertFalse(useCredential.canBindTo(MetadataObject.Type.COLUMN));
-    Assertions.assertFalse(useCredential.canBindTo(MetadataObject.Type.FUNCTION));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.VIEW));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertTrue(retrieveCredentialSecret.canBindTo(MetadataObject.Type.MODEL_VERSION));
+    Assertions.assertFalse(retrieveCredentialSecret.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(retrieveCredentialSecret.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(retrieveCredentialSecret.canBindTo(MetadataObject.Type.FUNCTION));
 
     Assertions.assertTrue(createTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertFalse(createTag.canBindTo(MetadataObject.Type.CATALOG));

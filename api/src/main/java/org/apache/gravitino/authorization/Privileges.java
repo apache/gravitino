@@ -213,8 +213,8 @@ public class Privileges {
         return ViewSecretProviders.allow();
       case USE_SECRET:
         return UseSecret.allow();
-      case USE_CREDENTIAL:
-        return UseCredential.allow();
+      case RETRIEVE_CREDENTIAL_SECRET:
+        return RetrieveCredentialSecret.allow();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -349,8 +349,8 @@ public class Privileges {
         return ViewSecretProviders.deny();
       case USE_SECRET:
         return UseSecret.deny();
-      case USE_CREDENTIAL:
-        return UseCredential.deny();
+      case RETRIEVE_CREDENTIAL_SECRET:
+        return RetrieveCredentialSecret.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -1418,12 +1418,14 @@ public class Privileges {
   }
 
   /**
-   * The privilege to retrieve plaintext secrets (including cloud access-key pairs) via {@code
-   * getSecrets}.
+   * The privilege to retrieve plaintext non-credential secrets via {@code getSecrets} (cloud
+   * access-key pairs omitted).
    *
-   * <p>Does not authorize {@code getCredentials}. Callers that are not the metalake owner and lack
-   * this privilege (and lack {@link UseCredential}) receive an empty {@code getSecrets} result
-   * rather than a forbidden error, once they can already access the metadata object.
+   * <p>Intended for connectors that recover JDBC and similar secrets via {@code getSecrets}, and
+   * recover cloud access keys via {@code getCredentials} (which requires no privilege). Callers
+   * that are not the metalake owner and lack this privilege (and lack {@link
+   * RetrieveCredentialSecret}) receive an empty {@code getSecrets} result rather than a forbidden
+   * error, once they can already access the metadata object.
    */
   public static final class UseSecret extends GenericPrivilege<UseSecret> {
 
@@ -1455,35 +1457,36 @@ public class Privileges {
   }
 
   /**
-   * The privilege to call {@code getCredentials} and to call {@code getSecrets} with cloud
-   * access-key pairs omitted.
+   * The privilege to retrieve all plaintext secrets via {@code getSecrets}, including cloud
+   * access-key pairs and other credential secrets.
    *
-   * <p>Intended for connectors: recover non-cloud secrets via {@code getSecrets}, and recover cloud
-   * access keys via {@code getCredentials}. Metalake owners and holders of this privilege receive
-   * credentials; others get an empty credential list rather than a forbidden error.
+   * <p>Does not authorize {@code getCredentials}. Metalake owners and holders of this privilege
+   * receive the full secrets map; others with only {@link UseSecret} get cloud access-key pairs
+   * omitted.
    */
-  public static final class UseCredential extends GenericPrivilege<UseCredential> {
+  public static final class RetrieveCredentialSecret
+      extends GenericPrivilege<RetrieveCredentialSecret> {
 
-    private static final UseCredential ALLOW_INSTANCE =
-        new UseCredential(Condition.ALLOW, Name.USE_CREDENTIAL);
-    private static final UseCredential DENY_INSTANCE =
-        new UseCredential(Condition.DENY, Name.USE_CREDENTIAL);
+    private static final RetrieveCredentialSecret ALLOW_INSTANCE =
+        new RetrieveCredentialSecret(Condition.ALLOW, Name.RETRIEVE_CREDENTIAL_SECRET);
+    private static final RetrieveCredentialSecret DENY_INSTANCE =
+        new RetrieveCredentialSecret(Condition.DENY, Name.RETRIEVE_CREDENTIAL_SECRET);
 
-    private UseCredential(Condition condition, Name name) {
+    private RetrieveCredentialSecret(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static UseCredential allow() {
+    public static RetrieveCredentialSecret allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static UseCredential deny() {
+    public static RetrieveCredentialSecret deny() {
       return DENY_INSTANCE;
     }
 

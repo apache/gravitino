@@ -136,7 +136,8 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsReturnsEmptyWithoutUseSecretOrUseCredential() throws Exception {
+  public void testGetSecretsReturnsEmptyWithoutUseSecretOrRetrieveCredentialSecret()
+      throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
@@ -166,7 +167,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION)))
+                              .FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
           .thenReturn(false);
 
       Response response =
@@ -182,7 +183,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsFiltersCloudKeysWithUseCredentialOnly() throws Exception {
+  public void testGetSecretsFiltersCloudKeysWithUseSecretOnly() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
@@ -212,7 +213,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       eq(
                           AuthorizationExpressionConstants
                               .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
-          .thenReturn(false);
+          .thenReturn(true);
       metadataAuthzHelper
           .when(
               () ->
@@ -221,8 +222,8 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION)))
-          .thenReturn(true);
+                              .FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(false);
 
       Response response =
           operations.getSecrets(metalake, metadataObject.type().name(), metadataObject.fullName());

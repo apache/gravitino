@@ -216,7 +216,7 @@ components:
             - LINK_MODEL_VERSION
             - USE_MODEL
             - USE_SECRET
-            - USE_CREDENTIAL
+            - RETRIEVE_CREDENTIAL_SECRET
             - REGISTER_FUNCTION
             - EXECUTE_FUNCTION
             - MODIFY_FUNCTION

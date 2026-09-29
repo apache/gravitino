@@ -117,18 +117,18 @@ public class MetadataObjectSecretOperations {
                     identifier,
                     entityType,
                     AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION);
-            boolean canUseCredential =
+            boolean canRetrieveCredentialSecret =
                 MetadataAuthzHelper.checkAccess(
                     identifier,
                     entityType,
                     AuthorizationExpressionConstants
-                        .FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION);
-            if (!canUseSecret && !canUseCredential) {
+                        .FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION);
+            if (!canUseSecret && !canRetrieveCredentialSecret) {
               return Utils.ok(new SecretsResponse(ImmutableMap.of()));
             }
             Map<String, String> secrets =
                 secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
-            if (!canUseSecret) {
+            if (!canRetrieveCredentialSecret) {
               secrets = SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets);
             }
             return Utils.ok(new SecretsResponse(secrets));

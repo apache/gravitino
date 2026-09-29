@@ -277,10 +277,10 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Soft check for full plaintext {@code getSecrets} (including cloud access-key pairs). Only the
-   * metalake owner or a principal with {@code USE_SECRET} may receive the unfiltered map; others
-   * get an empty response or a filtered map (see {@link
-   * #FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION}) rather than a forbidden error.
+   * Soft check for filtered {@code getSecrets} (cloud access-key pairs omitted). Only the metalake
+   * owner or a principal with {@code USE_SECRET} may receive non-credential secrets; others get an
+   * empty response rather than a forbidden error. Holders of {@code RETRIEVE_CREDENTIAL_SECRET}
+   * receive the full map (see {@link #FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION}).
    */
   public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
       """
@@ -289,14 +289,15 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Soft check for {@code getCredentials} and for filtered {@code getSecrets} (cloud access-key
-   * pairs omitted). Only the metalake owner or a principal with {@code USE_CREDENTIAL} may receive
-   * non-empty credential results; others get an empty response rather than a forbidden error.
+   * Soft check for full plaintext {@code getSecrets} (including cloud access-key pairs). Only the
+   * metalake owner or a principal with {@code RETRIEVE_CREDENTIAL_SECRET} may receive the
+   * unfiltered map; others with only {@code USE_SECRET} get a filtered map rather than a forbidden
+   * error.
    */
-  public static final String FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION =
+  public static final String FILTER_RETRIEVE_CREDENTIAL_SECRET_AUTHORIZATION_EXPRESSION =
       """
                   METALAKE::OWNER ||
-                  ANY_USE_CREDENTIAL
+                  ANY_RETRIEVE_CREDENTIAL_SECRET
                   """;
 
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =

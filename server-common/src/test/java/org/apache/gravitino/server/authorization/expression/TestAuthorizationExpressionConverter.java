@@ -141,12 +141,14 @@ public class TestAuthorizationExpressionConverter {
   }
 
   @Test
-  public void testReplaceAnyPrivilegeForAnyUseCredential() {
-    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_CREDENTIAL");
+  public void testReplaceAnyPrivilegeForAnyRetrieveCredentialSecret() {
+    String replaced =
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_RETRIEVE_CREDENTIAL_SECRET");
     Assertions.assertEquals(
-        "((ANY(USE_CREDENTIAL, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-            + " MODEL_VERSION)) && !(ANY(DENY_USE_CREDENTIAL, METALAKE, CATALOG, SCHEMA, TABLE,"
-            + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
+        "((ANY(RETRIEVE_CREDENTIAL_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+            + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_RETRIEVE_CREDENTIAL_SECRET,"
+            + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+            + " MODEL_VERSION)))",
         replaced);
   }
 
