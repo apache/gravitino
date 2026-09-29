@@ -73,6 +73,21 @@ Everything Gravitino manages is an object with a type and a name. The name is th
 below the metalake, so a table is `{catalog}.{schema}.{table}`, and requests identify an object by
 both type and name, since the same name can exist at more than one type.
 
+##### Local names containing one or more dots {#names-containing-dots}
+
+::::caution
+When authorization is enabled, Gravitino cannot authorize a federated object whose local name
+contains one or more dots (`.`), because dots separate the components of a qualified metadata object name.
+Loading such an object returns `400 Bad Request`. If a connector returns one of these objects in a
+list, Gravitino rejects the entire list request with `400 Bad Request` and identifies the unsupported
+name instead of returning a partial result. Consequently, one object with a dotted name can prevent
+all sibling objects from appearing in list APIs.
+
+Rename or recreate the object in the source system with a name that does not contain dots before
+using it with authorization. When authorization is disabled, existing source objects whose names
+are supported by the connector can still be listed and loaded.
+::::
+
 Access to an object is controlled by privileges, granted through roles, and by ownership. Ownership
 behaves like a privilege that arrives with the object rather than one you grant, and it carries the
 administrative rights, altering, dropping, and transferring, that no privilege name covers.
@@ -144,8 +159,9 @@ Note the third case. Granting `SELECT_TABLE` on a schema covers every table in t
 its own it authorizes nothing, because the traversal privileges are still missing.
 
 A failed check returns `403 Forbidden`. Some read paths return `404 Not Found` instead, so that a
-caller cannot infer the existence of an object they are not entitled to see. List operations do not
-fail; they return only the entries the caller is entitled to see.
+caller cannot infer the existence of an object they are not entitled to see. List operations
+normally do not fail; they return only the entries the caller is entitled to see. An object whose
+name contains a dot is an exception, as described in [Names containing dots](#names-containing-dots).
 
 #### Allow and Deny
 
@@ -208,9 +224,11 @@ they will be removed in a future release. Use the current names in new roles.
 | `CREATE_ROLE`           | Metalake                                                                | Create roles                                       |
 | `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grant and revoke privileges on any object in scope |
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
+| `VIEW_TAG`              | Metalake, Tag                                                           | Read tag metadata                                  |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
-| `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `VIEW_POLICY`           | Metalake, Policy                                                        | Read policy metadata                               |
+| `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
 | `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
@@ -222,12 +240,17 @@ object and its descendants.
 
 `APPLY_TAG`, `APPLY_POLICY`, and `USE_JOB_TEMPLATE` scope differently from every other privilege on
 this page. The object they bind to is the instrument the holder may use, not the object the operation
-acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder attach that one policy
-and no other, while granting it on the metalake lets them attach any policy in the metalake.
+acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder associate that
+policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it on the metalake
+covers any policy in that metalake.
 
-Attaching a tag or a policy is checked twice: the holder needs `APPLY_TAG` or `APPLY_POLICY` for the
-tag or policy in question, and separately needs access to the metadata object being tagged. A user
-cannot tag an object they could not otherwise reach.
+Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
+Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
+`APPLY_TAG` on the tag. Ownership can satisfy either check.
+
+Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
+`APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
+List results include only tags and policies the caller can read.
 
 ### Required Privileges
 
@@ -281,17 +304,17 @@ owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object           | Create                  | Read                                   | Alter or delete | Use                                             |
-|------------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
-| Metalake         | Service administrator   | Membership                             | Owner           |                                                 |
-| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
-| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
-| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
-| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
-| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
-| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
-| Job              |                         | Owner                                  | Owner           |                                                 |
-| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                                |
+|------------------|-------------------------|----------------------------------------|-----------------|----------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                    |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                    |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                    |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                   |
+| Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object       |
+| Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`        |
+| Job              |                         | Owner                                  | Owner           |                                                    |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                    |
 
 The secrets-provider registry is process-global server configuration; the metalake path only scopes
 authorization. Listing providers does not return secret material.

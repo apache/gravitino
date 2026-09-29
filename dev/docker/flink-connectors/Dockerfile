@@ -73,6 +73,9 @@ COPY --chmod=755 copy-connector.sh /copy-connector.sh
 # --- licenses directory (LICENSE + NOTICE + third-party summary) ---
 COPY licenses /licenses
 
+# --- Connector image usage documentation ---
+COPY README.md /README.md
+
 # --- Drop source-control artifacts, OpenShift arbitrary UID compatibility,
 #     and a passwd entry for UID 1000 ---
 RUN rm -f /licenses/.gitignore \

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.COLUMN;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
@@ -241,6 +242,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
+    TableEntity.NAME.validate(ident.name(), TABLE);
+    validateColumns(columns);
+
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
@@ -295,9 +299,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // to on the schema.
     NameIdentifier nameIdentifierForLock = ident;
     String schemaName = ident.namespace().level(2);
+    Arrays.stream(changes).forEach(TableOperationDispatcher::validateColumnChange);
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         TableChange.RenameTable rename = (TableChange.RenameTable) change;
+        TableEntity.NAME.validate(rename.getNewName(), TABLE);
         if (rename.getNewSchemaName().isPresent()
             && !rename.getNewSchemaName().get().equals(schemaName)) {
           nameIdentifierForLock = getCatalogIdentifier(ident);
@@ -1242,6 +1248,33 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .build()),
                 "UPDATE",
                 combinedTable.tableFromGravitino().id()));
+  }
+
+  private static void validateColumns(Column[] columns) {
+    for (Column column : columns) {
+      ColumnEntity.NAME.validate(column.name(), COLUMN);
+      ColumnEntity.COMMENT.validate(column.comment(), COLUMN);
+    }
+  }
+
+  private static void validateColumnChange(TableChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      if (addColumn.getFieldName().length == 1) {
+        ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
+        ColumnEntity.COMMENT.validate(addColumn.getComment(), COLUMN);
+      }
+    } else if (change instanceof TableChange.RenameColumn) {
+      TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
+      if (renameColumn.getFieldName().length == 1) {
+        ColumnEntity.NAME.validate(renameColumn.getNewName(), COLUMN);
+      }
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
+      if (updateComment.getFieldName().length == 1) {
+        ColumnEntity.COMMENT.validate(updateComment.getNewComment(), COLUMN);
+      }
+    }
   }
 
   private static class TableCatalogResult {

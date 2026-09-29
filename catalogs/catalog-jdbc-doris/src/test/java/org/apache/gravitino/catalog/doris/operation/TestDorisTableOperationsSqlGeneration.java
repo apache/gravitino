@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -52,6 +53,8 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestDorisTableOperationsSqlGeneration {
@@ -73,6 +76,10 @@ public class TestDorisTableOperationsSqlGeneration {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
+    }
+
+    void setExceptionConverter(JdbcExceptionConverter converter) {
+      super.exceptionMapper = converter;
     }
 
     public void setDataSource(DataSource dataSource) {
@@ -126,6 +133,38 @@ public class TestDorisTableOperationsSqlGeneration {
         throws SQLException {
       return getIndexes(connection, databaseName, tableName);
     }
+  }
+
+  /**
+   * Verifies DROP returns false for missing-table errors from different Doris versions.
+   *
+   * @param errorCode the JDBC error code returned by Doris
+   * @throws SQLException if setting up the mocked JDBC connection fails
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1051, 1105, 1109})
+  public void testDropMissingTableReturnsFalse(int errorCode) throws SQLException {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Statement statement = Mockito.mock(Statement.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.executeUpdate("DROP TABLE `no_such_table_xyz`"))
+        .thenThrow(
+            new SQLException(
+                "errCode = 2, detailMessage = Unknown table 'no_such_table_xyz' in test_schema",
+                "42S02",
+                errorCode));
+
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setDataSource(dataSource);
+    ops.setExceptionConverter(new DorisExceptionConverter());
+
+    Assertions.assertFalse(ops.drop("test_schema", "no_such_table_xyz"));
+    Mockito.verify(connection).setCatalog("test_schema");
+    Mockito.verify(statement).executeUpdate("DROP TABLE `no_such_table_xyz`");
+    Mockito.verify(statement).close();
+    Mockito.verify(connection).close();
   }
 
   @Test
