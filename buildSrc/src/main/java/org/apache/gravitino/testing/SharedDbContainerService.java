@@ -237,9 +237,14 @@ public abstract class SharedDbContainerService
    * it only ever falls back to untuned defaults.
    */
   private List<String> loadExtraDbArgs(String backend) {
+    // Resolved relative to this class's own package via Class#getResourceAsStream, NOT
+    // ClassLoader#getResourceAsStream: the loader variant treats the name as absolute from the
+    // classpath root, so "shared-db-tuning/mysql.args" never matched the file's actual location
+    // (org/apache/gravitino/testing/shared-db-tuning/mysql.args) and every lookup silently
+    // returned null, leaving both containers on stock server defaults.
     String resourcePath = "shared-db-tuning/" + backend + ".args";
     try (java.io.InputStream in =
-        SharedDbContainerService.class.getClassLoader().getResourceAsStream(resourcePath)) {
+        SharedDbContainerService.class.getResourceAsStream(resourcePath)) {
       if (in == null) {
         LOG.warn(
             "No DB tuning args found on the classpath at {} for backend {}; the shared container"
