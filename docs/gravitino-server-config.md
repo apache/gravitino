@@ -645,6 +645,18 @@ classpath automatically, which is also where provider-specific files such as `hd
 ‡ Contributed catalogs, shipped only in the `-all` distribution package. The standard package
 does not contain their directories.
 
+### JDBC Connection Validation
+
+JDBC catalogs validate connections on borrow by default using the JDBC driver's
+`Connection.isValid()` method. Gravitino does not force a validation SQL query, so the driver
+can validate the connection after catalog or schema changes.
+
+For a driver that does not support `Connection.isValid()`, set the catalog property
+`validationQuery` to a SQL SELECT statement that returns at least one row. Explicit validation
+queries are passed to DBCP without being overwritten. The `jdbc.pool.test-on-borrow` property
+controls validation on borrow. See the [DBCP configuration reference](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+for other pool validation settings.
+
 ## Container Configuration
 
 ```shell

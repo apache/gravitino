@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog.jdbc.utils;
 
 import com.google.common.collect.Maps;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.HashMap;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -28,8 +27,6 @@ import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDataSourceUrlValidation {
 
@@ -43,40 +40,8 @@ public class TestDataSourceUrlValidation {
 
     DataSource dataSource =
         Assertions.assertDoesNotThrow(() -> DataSourceUtils.createDataSource(properties));
-    Assertions.assertTrue(dataSource instanceof BasicDataSource);
-    Assertions.assertEquals("SELECT 1", ((BasicDataSource) dataSource).getValidationQuery());
+    Assertions.assertTrue(dataSource instanceof org.apache.commons.dbcp2.BasicDataSource);
     ((BasicDataSource) dataSource).close();
-  }
-
-  /** Verifies MySQL validation is independent of the connection's current catalog. */
-  @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "jdbc:mysql://localhost:3306/",
-        "jdbc:mysql://localhost:3306/bootstrap",
-        "jdbc:mysql:loadbalance://localhost:3306/",
-        "jdbc:mysql:replication://localhost:3306/",
-        "jdbc:mysql+srv://mysql.example/",
-        "jdbc:mysql+srv:loadbalance://mysql.example/",
-        "jdbc:mysql+srv:replication://mysql.example/"
-      })
-  public void testMysqlValidation(String url) throws SQLException {
-    HashMap<String, String> properties = Maps.newHashMap();
-    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
-    properties.put(JdbcConfig.JDBC_URL.getKey(), url);
-    properties.put(JdbcConfig.USERNAME.getKey(), "test");
-    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
-    // The factory receives raw pool properties, so the explicit setter must clear this too.
-    properties.put("validationQuery", "SELECT 1");
-    properties.put("validationQueryTimeout", "5");
-    properties.put(JdbcConfig.TEST_ON_BORROW.getKey(), "false");
-    try (BasicDataSource dataSource =
-        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
-      Assertions.assertNull(dataSource.getValidationQuery());
-      Assertions.assertEquals(
-          Duration.ofSeconds(5), dataSource.getValidationQueryTimeoutDuration());
-      Assertions.assertFalse(dataSource.getTestOnBorrow());
-    }
   }
 
   @Test

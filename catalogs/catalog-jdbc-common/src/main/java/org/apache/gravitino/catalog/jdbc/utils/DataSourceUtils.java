@@ -38,9 +38,6 @@ import org.apache.gravitino.utils.JdbcUrlUtils;
  */
 public class DataSourceUtils {
 
-  /** SQL statements for database connection pool testing. */
-  private static final String POOL_TEST_QUERY = "SELECT 1";
-
   // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
   // config map is handed to BasicDataSourceFactory, so allowing these would either run arbitrary
   // code or let a raw property override the validated canonical connection fields:
@@ -136,6 +133,9 @@ public class DataSourceUtils {
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
     JdbcUrlUtils.validateJdbcConfig(
         jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
+    // Keep DBCP's default Connection.isValid() validation unless a validationQuery is explicitly
+    // configured. A forced query is cached as a prepared statement and can retain a previous
+    // catalog.
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -155,13 +155,6 @@ public class DataSourceUtils {
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Validate connections on borrow when enabled.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
-    // DBCP caches the validation prepared statement. MySQL binds it to the catalog at preparation
-    // time, so reusing it after setCatalog() can fail when the URL has no default database. Use
-    // Connection.isValid() for MySQL instead; Connector/J validates with a catalog-independent
-    // ping.
-    String lowerUrl = jdbcUrl.toLowerCase(Locale.ROOT);
-    boolean isMysql = lowerUrl.startsWith("jdbc:mysql:") || lowerUrl.startsWith("jdbc:mysql+srv:");
-    basicDataSource.setValidationQuery(isMysql ? null : POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
   }
