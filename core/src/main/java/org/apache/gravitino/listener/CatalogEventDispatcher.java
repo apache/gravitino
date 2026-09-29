@@ -222,12 +222,10 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       Map<String, String> properties)
       throws Exception {
     // Do not put properties on the event payload - they may contain credentials (#12566).
-    eventBus.dispatchEvent(
-        new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       dispatcher.testConnection(ident, type, provider, comment, properties);
-      eventBus.dispatchEvent(
-          new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
@@ -237,12 +235,10 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public void testConnection(NameIdentifier ident) throws Exception {
-    eventBus.dispatchEvent(
-        new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       dispatcher.testConnection(ident);
-      eventBus.dispatchEvent(
-          new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
@@ -252,8 +248,16 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception {
-    // TODO(#12566): Support event dispatching for testConnection
-    dispatcher.testConnection(ident, changes);
+    // Do not put changes on the event payload - they may contain credentials (#12566).
+    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.testConnection(ident, changes);
+      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override

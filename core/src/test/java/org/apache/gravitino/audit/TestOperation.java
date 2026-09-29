@@ -112,6 +112,8 @@ import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
@@ -677,6 +679,16 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.DISABLE_CATALOG,
         AuditLog.Operation.fromEvent(disableCatalogFailureEvent));
+
+    Event testConnectionEvent = new TestConnectionEvent(USER, catalogIdentifier);
+    Assertions.assertEquals(
+        AuditLog.Operation.TEST_CONNECTION_CATALOG,
+        AuditLog.Operation.fromEvent(testConnectionEvent));
+    Event testConnectionFailureEvent =
+        new TestConnectionFailureEvent(USER, catalogIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.TEST_CONNECTION_CATALOG,
+        AuditLog.Operation.fromEvent(testConnectionFailureEvent));
   }
 
   @Test

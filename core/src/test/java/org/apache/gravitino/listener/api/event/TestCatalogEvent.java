@@ -448,4 +448,32 @@ public class TestCatalogEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
+  @Test
+  void testTestConnectionExistingCatalogEvent() throws Exception {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    dispatcher.testConnection(identifier);
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(TestConnectionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testTestConnectionExistingCatalogFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "fail");
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.testConnection(identifier));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
 }
