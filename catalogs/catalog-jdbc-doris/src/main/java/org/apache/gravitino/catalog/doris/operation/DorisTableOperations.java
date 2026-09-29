@@ -61,6 +61,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -69,6 +70,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -91,6 +93,51 @@ public class DorisTableOperations extends JdbcTableOperations {
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
     return new DorisTablePartitionOperations(
         dataSource, loadedTable, exceptionMapper, typeConverter);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void create(
+      String databaseName,
+      String tableName,
+      JdbcColumn[] columns,
+      @Nullable String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      Index[] indexes,
+      @Nullable SortOrder[] sortOrders) {
+    LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
+    try (Connection connection = getConnection(databaseName)) {
+      String sql =
+          generateCreateTableSql(
+              tableName,
+              columns,
+              comment,
+              properties,
+              partitioning,
+              distribution,
+              indexes,
+              sortOrders);
+      JdbcConnectorUtils.executeUpdate(connection, sql);
+
+      // Doris 2.1.0's Nereids CREATE TABLE path can discard the table comment. Repair it only
+      // when necessary, without changing the planner on the pooled connection. Keep the full
+      // comment, including the Gravitino identifier, so subsequent loads retain table identity.
+      if (StringUtils.isNotEmpty(comment)
+          && !comment.equals(loadTableComment(connection, databaseName, tableName))) {
+        JdbcConnectorUtils.executeUpdate(
+            connection,
+            "ALTER TABLE `"
+                + tableName
+                + "` MODIFY COMMENT \""
+                + escapeSqlLiteral(comment, '"')
+                + "\"");
+      }
+      LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 
   @Override
@@ -707,19 +754,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     // Doris JDBC metadata can report the OLAP engine as REMARKS. Query the actual table comment
     // from information_schema when REMARKS is empty or contains that engine name. Preserve the
     // Gravitino ID suffix so JdbcCatalogOperations can extract it when loading the table.
-    StringBuilder comment = new StringBuilder();
-    String sql =
-        "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
-    try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-      preparedStatement.setString(1, databaseName);
-      preparedStatement.setString(2, tableName);
-
-      try (ResultSet resultSet = preparedStatement.executeQuery()) {
-        while (resultSet.next()) {
-          comment.append(resultSet.getString("TABLE_COMMENT"));
-        }
-      }
-      tableBuilder.withComment(comment.toString());
+    try {
+      tableBuilder.withComment(loadTableComment(connection, databaseName, tableName));
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
@@ -1263,6 +1299,20 @@ public class DorisTableOperations extends JdbcTableOperations {
           indexName);
     }
     return Collections.unmodifiableMap(properties);
+  }
+
+  @Nullable
+  private String loadTableComment(Connection connection, String databaseName, String tableName)
+      throws SQLException {
+    String sql =
+        "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet result = statement.executeQuery()) {
+        return result.next() ? result.getString("TABLE_COMMENT") : "";
+      }
+    }
   }
 
   private static String generateIndexPropertiesSql(
