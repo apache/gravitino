@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.doris.operation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -126,6 +127,28 @@ class TestDorisTableCommentOperations {
     assertEquals("", tableBuilder.comment());
     verify(commentResult).close();
     verify(commentStatement).close();
+  }
+
+  @Test
+  void testNullInformationSchemaCommentIsLoadedAsNull() throws Exception {
+    Connection connection = mock(Connection.class);
+    PreparedStatement commentStatement = mock(PreparedStatement.class);
+    ResultSet commentResult = mock(ResultSet.class);
+    PreparedStatement statusStatement = mock(PreparedStatement.class);
+    ResultSet statusResult = mock(ResultSet.class);
+    when(connection.prepareStatement(startsWith("SELECT TABLE_COMMENT")))
+        .thenReturn(commentStatement);
+    when(commentStatement.executeQuery()).thenReturn(commentResult);
+    when(commentResult.next()).thenReturn(true, false);
+    when(commentResult.getString("TABLE_COMMENT")).thenReturn(null);
+    when(connection.prepareStatement(startsWith("SHOW ALTER TABLE COLUMN")))
+        .thenReturn(statusStatement);
+    when(statusStatement.executeQuery()).thenReturn(statusResult);
+
+    JdbcTable.Builder tableBuilder = JdbcTable.builder().withComment("OLAP");
+    new DorisTableOperations().correctJdbcTableFields(connection, "db", "t", tableBuilder);
+
+    assertNull(tableBuilder.comment());
   }
 
   @Test

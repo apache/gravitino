@@ -108,46 +108,47 @@ public class DorisTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes,
       @Nullable SortOrder[] sortOrders) {
-    LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
-    try (Connection connection = getConnection(databaseName)) {
-      String sql =
-          generateCreateTableSql(
-              tableName,
-              columns,
-              comment,
-              properties,
-              partitioning,
-              distribution,
-              indexes,
-              sortOrders);
-      JdbcConnectorUtils.executeUpdate(connection, sql);
+    super.create(
+        databaseName,
+        tableName,
+        columns,
+        comment,
+        properties,
+        partitioning,
+        distribution,
+        indexes,
+        sortOrders);
+    if (StringUtils.isEmpty(comment)) {
+      return;
+    }
 
-      // Doris 2.1.0's Nereids CREATE TABLE path can discard the table comment. Repair it only
-      // when necessary, without changing the planner on the pooled connection. Keep the full
-      // comment, including the Gravitino identifier, so subsequent loads retain table identity.
-      try {
-        if (StringUtils.isNotEmpty(comment)
-            && !comment.equals(loadTableComment(connection, databaseName, tableName))) {
-          JdbcConnectorUtils.executeUpdate(
-              connection,
-              "ALTER TABLE `"
-                  + tableName
-                  + "` MODIFY COMMENT \""
-                  + escapeSqlLiteral(comment, '"')
-                  + "\"");
-        }
-      } catch (SQLException e) {
-        throw new GravitinoRuntimeException(
-            e,
-            "Table %s.%s was created in Doris, but its comment could not be verified or restored. "
-                + "The table may be missing its Gravitino identifier. "
-                + "Drop the created table in Doris before retrying creation.",
-            databaseName,
-            tableName);
+    // Doris 2.1.0's Nereids CREATE TABLE path can discard the table comment. Repair it only
+    // when necessary, without changing the planner on the pooled connection. Keep the full
+    // comment, including the Gravitino identifier, so subsequent loads retain table identity.
+    //
+    // The check runs on every Doris version on purpose: JdbcCatalogOperations always appends the
+    // Gravitino identifier, so each CREATE pays one information_schema lookup. Gating on the
+    // server version would cost a comparable extra query per CREATE, and comparing the stored
+    // comment also covers other versions or planner settings that drop it. ALTER privilege is
+    // needed only when the stored comment actually differs.
+    try (Connection connection = getConnection(databaseName)) {
+      if (!comment.equals(loadTableComment(connection, databaseName, tableName))) {
+        JdbcConnectorUtils.executeUpdate(
+            connection,
+            "ALTER TABLE `"
+                + tableName
+                + "` MODIFY COMMENT \""
+                + escapeSqlLiteral(comment, '"')
+                + "\"");
       }
-      LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
-    } catch (SQLException e) {
-      throw exceptionMapper.toGravitinoException(e);
+    } catch (SQLException | NoSuchTableException e) {
+      throw new GravitinoRuntimeException(
+          e,
+          "Table %s.%s was created in Doris, but its comment could not be verified or restored. "
+              + "The table may be missing its Gravitino identifier. "
+              + "Drop the created table in Doris before retrying creation.",
+          databaseName,
+          tableName);
     }
   }
 

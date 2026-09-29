@@ -22,17 +22,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.Maps;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.container.DorisImageName;
+import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -40,25 +47,58 @@ import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Integration tests for Doris 2.1.0 with the Nereids planner enabled. */
-public class CatalogDoris2xIT extends CatalogDorisIT {
+@Tag("gravitino-docker-test")
+@Tag("doris-multi-version")
+public class CatalogDoris2xIT extends BaseIT {
 
-  /** Creates a test suite using the Doris 2.1.0 image. */
-  public CatalogDoris2xIT() {
-    dorisImageName = DorisImageName.VERSION_2_1;
+  private static final String PROVIDER = "jdbc-doris";
+  private static final String DRIVER_CLASS_NAME = "com.mysql.cj.jdbc.Driver";
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+
+  private final String metalakeName = GravitinoITUtils.genRandomName("doris2x_metalake");
+  private final String catalogName = GravitinoITUtils.genRandomName("doris2x_catalog");
+  private final String schemaName = GravitinoITUtils.genRandomName("doris2x_schema");
+
+  private GravitinoMetalake metalake;
+  private Catalog catalog;
+  private String jdbcUrl;
+
+  @BeforeAll
+  public void startup() {
+    containerSuite.startDorisContainer(DorisImageName.VERSION_2_1);
+    createMetalake();
+    createCatalog();
+    createSchema();
+  }
+
+  @AfterAll
+  public void stop() {
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
+  }
+
+  @AfterEach
+  public void resetSchema() {
+    catalog.asSchemas().dropSchema(schemaName, true);
+    createSchema();
   }
 
   @ParameterizedTest
   @ValueSource(
       strings = {"a real comment", "quote \" and apostrophe ' and backslash \\ and newline\nend"})
   void testTableCommentWithNereids(String comment) throws Exception {
-    String jdbcUrl = catalog.properties().get(JdbcConfig.JDBC_URL.getKey()) + schemaName;
     try (Connection connection =
             DriverManager.getConnection(
-                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
         Statement statement = connection.createStatement()) {
       try (ResultSet result = statement.executeQuery("SELECT @@enable_nereids_planner")) {
         assertTrue(result.next());
@@ -97,5 +137,35 @@ public class CatalogDoris2xIT extends CatalogDorisIT {
         assertTrue(result.getString(2).contains("gravitino.v1.uid"));
       }
     }
+  }
+
+  private void createMetalake() {
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    metalake = client.loadMetalake(metalakeName);
+    assertEquals(metalakeName, metalake.name());
+  }
+
+  private void createCatalog() {
+    DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_2_1);
+    jdbcUrl =
+        String.format(
+            "jdbc:mysql://%s:%d/",
+            dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
+
+    Map<String, String> props = Maps.newHashMap();
+    props.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    props.put(JdbcConfig.JDBC_DRIVER.getKey(), DRIVER_CLASS_NAME);
+    props.put(JdbcConfig.USERNAME.getKey(), DorisContainer.USER_NAME);
+    props.put(JdbcConfig.PASSWORD.getKey(), DorisContainer.PASSWORD);
+
+    catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, PROVIDER, "doris 2.x catalog", props);
+    assertEquals(catalogName, metalake.loadCatalog(catalogName).name());
+  }
+
+  private void createSchema() {
+    catalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
+    assertEquals(schemaName, catalog.asSchemas().loadSchema(schemaName).name());
   }
 }

@@ -174,7 +174,7 @@ public class CatalogDorisIT extends BaseIT {
   private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    DorisContainer dorisContainer = containerSuite.getDorisContainer(dorisImageName);
+    DorisContainer dorisContainer = containerSuite.getDorisContainer();
 
     jdbcUrl =
         String.format(
