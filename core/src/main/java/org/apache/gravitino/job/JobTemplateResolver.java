@@ -83,6 +83,16 @@ public final class JobTemplateResolver {
   }
 
   /**
+   * Returns the parameters of the template that a job configuration has to provide, which are the
+   * ones whose placeholders declare no default value.
+   *
+   * @return the required parameters, sorted
+   */
+  public Set<String> requiredParameters() {
+    return JobTemplatePlaceholderUtils.findMissingParameters(parameters, Collections.emptyMap());
+  }
+
+  /**
    * Checks that a job configuration provides every required parameter of the template, and logs a
    * warning for the keys that the template does not use. It fetches nothing, so it can run before
    * any resource is created for the job.

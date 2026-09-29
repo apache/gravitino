@@ -266,10 +266,12 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 
 | Job template                         | Required keys                                                                           | Optional keys and defaults                                                                                         |
 |--------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| All three                            | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (`local[*]`), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
-| `builtin-iceberg-update-stats`       | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
-| `builtin-iceberg-rewrite-data-files` | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
-| `builtin-iceberg-expire-snapshots`   | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
+| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (`local[*]`), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
+| `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
+| `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
+| `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
+| `builtin-iceberg-remove-orphan-files` | —                                                                                       | `older_than` (empty), `location` (empty), `dry_run` (`false`)                                                      |
+| `builtin-iceberg-rewrite-manifests`   | —                                                                                       | `use_caching` (empty), `spec_id` (empty)                                                                           |
 
 `where_clause` has no default on purpose: an empty where clause compacts every data file in the
 table, so it must be asked for explicitly.
