@@ -47,8 +47,8 @@ import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
-import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateResolver;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
@@ -152,8 +152,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Assertions.assertNotNull(jobId);
@@ -178,10 +177,9 @@ public class TestLocalJobExecutor {
     Assertions.assertTrue(executor.executorId().matches("[0-9a-f]{8}"));
 
     JobTemplate template =
-        JobManager.createRuntimeJobTemplate(
-            jobTemplateEntity,
-            ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"),
-            workingDir);
+        new JobTemplateResolver(jobTemplateEntity)
+            .resolve(
+                ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"), workingDir);
     String jobId = executor.submitJob(template);
     Assertions.assertTrue(
         jobId.matches("local-job-" + executor.executorId() + "-[0-9a-f-]{36}"), jobId);
@@ -241,8 +239,7 @@ public class TestLocalJobExecutor {
             "arg2", "fail",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Assertions.assertNotNull(jobId);
@@ -307,8 +304,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -356,8 +352,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -394,9 +389,9 @@ public class TestLocalJobExecutor {
       // Submit two jobs to a single-threaded executor - the second one stays QUEUED until the
       // first (which sleeps for a few seconds) finishes.
       JobTemplate templateA =
-          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirA);
+          new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDirA);
       JobTemplate templateB =
-          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirB);
+          new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDirB);
       exec.submitJob(templateA);
       String jobIdB = exec.submitJob(templateB);
 
@@ -424,8 +419,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -454,8 +448,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -485,8 +478,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -517,8 +509,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -550,8 +541,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -574,8 +564,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -601,8 +590,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Awaitility.await()
@@ -631,8 +619,7 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf, workingDir);
 
     String jobId = jobExecutor.submitJob(template);
     Assertions.assertNotNull(jobId);
@@ -662,7 +649,7 @@ public class TestLocalJobExecutor {
             "var", "value3");
 
     JobTemplate successTemplate =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, successJobConf, workingDir);
+        new JobTemplateResolver(jobTemplateEntity).resolve(successJobConf, workingDir);
     String successJobId = jobExecutor.submitJob(successTemplate);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
@@ -682,7 +669,7 @@ public class TestLocalJobExecutor {
             "var", "value3");
 
     JobTemplate failTemplate =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, failJobConf, workingDir);
+        new JobTemplateResolver(jobTemplateEntity).resolve(failJobConf, workingDir);
     String failJobId = jobExecutor.submitJob(failTemplate);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
@@ -1156,10 +1143,8 @@ public class TestLocalJobExecutor {
   }
 
   private static JobTemplate newRuntimeJobTemplate(File jobDir) {
-    return JobManager.createRuntimeJobTemplate(
-        jobTemplateEntity,
-        ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"),
-        jobDir);
+    return new JobTemplateResolver(jobTemplateEntity)
+        .resolve(ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"), jobDir);
   }
 
   private static String runSucceededJob(File jobDir) {

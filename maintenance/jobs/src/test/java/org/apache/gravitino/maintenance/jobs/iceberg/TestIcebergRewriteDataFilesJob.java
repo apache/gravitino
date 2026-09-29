@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -73,24 +74,25 @@ public class TestIcebergRewriteDataFilesJob {
     IcebergRewriteDataFilesJob job = new IcebergRewriteDataFilesJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(14, template.arguments().size()); // 7 flags * 2 (flag + value)
-
-    // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--strategy"));
-    assertTrue(template.arguments().contains("{{strategy}}"));
-    assertTrue(template.arguments().contains("--sort-order"));
-    assertTrue(template.arguments().contains("{{sort_order}}"));
-    assertTrue(template.arguments().contains("--where"));
-    assertTrue(template.arguments().contains("{{where_clause}}"));
-    assertTrue(template.arguments().contains("--options"));
-    assertTrue(template.arguments().contains("{{options}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    // The where clause has no default: an empty one rewrites the whole table, so callers must
+    // pass it explicitly.
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--strategy",
+            "{{strategy:-binpack}}",
+            "--sort-order",
+            "{{sort_order:-}}",
+            "--where",
+            "{{where_clause}}",
+            "--options",
+            "{{options:-}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
@@ -132,7 +134,7 @@ public class TestIcebergRewriteDataFilesJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v1", version);
+    assertEquals("v2", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 

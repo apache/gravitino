@@ -197,3 +197,15 @@ UPDATE `owner_meta` o
     SET o.`deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
         o.`updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
     WHERE o.`deleted_at` = 0 AND o.`id` <> d.keep_id;
+
+-- Separate the optimistic-concurrency token from the history version for fileset and policy.
+-- Until now `current_version` served as both: it is the join key into `*_version_info` and the
+-- value the CAS compares, so every alter had to advance it and write a snapshot even when nothing
+-- in that snapshot changed. `occ_version` takes over the CAS; `current_version` again advances
+-- only when the stored snapshot changes. The default is the whole backfill, because `occ_version`
+-- is only ever compared against itself on the same row.
+ALTER TABLE `fileset_meta`
+    ADD COLUMN `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset optimistic concurrency version' AFTER `last_version`;
+
+ALTER TABLE `policy_meta`
+    ADD COLUMN `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version' AFTER `last_version`;

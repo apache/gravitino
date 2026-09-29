@@ -620,8 +620,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             current -> withReusedColumnIds(tableEntity, current));
       } else {
         // Import a new name without overwrite so a concurrent import of the same ID cannot move
-        // its row. Preserve overwrite when repairing a registration already stored at this name.
-        boolean overwriteByName = stringId == null || store.exists(identifier, TABLE);
+        // its row. Repair a registration at this name only with the ID stored in the catalog:
+        // a generated ID carries no identity and must not overwrite a concurrent import.
+        boolean overwriteByName = stringId != null && store.exists(identifier, TABLE);
         store.put(tableEntity, overwriteByName);
       }
     } catch (EntityAlreadyExistsException | OptimisticLockException e) {
