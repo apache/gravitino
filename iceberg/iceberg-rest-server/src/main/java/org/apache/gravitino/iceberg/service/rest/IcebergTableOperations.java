@@ -641,6 +641,7 @@ public class IcebergTableOperations {
         TableMetadata.buildFrom(metadata)
             .withMetadataLocation(metadata.metadataFileLocation())
             .suppressHistoricalSnapshots()
+            .discardChanges()
             .build();
     LoadTableResponse.Builder builder =
         LoadTableResponse.builder()

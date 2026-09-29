@@ -39,7 +39,8 @@ class StatisticsErrorHandler(RestErrorHandler):
         self, error_response: ErrorResponse
     ):  # pylint: disable=too-many-branches
         error_message = error_response.format_error_message()
-        code = ErrorConstants(error_response.code())
+        # Keep unknown server codes intact so the common handler can report them.
+        code = error_response.code()
         exception_type = error_response.type()
 
         match code:

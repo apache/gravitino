@@ -35,13 +35,13 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 class PartitionErrorHandler(RestErrorHandler):
     def handle(self, error_response: ErrorResponse):
         error_message = error_response.format_error_message()
-        code = ErrorConstants(error_response.code())
+        code = error_response.code()
         exception_type = error_response.type()
 
-        if code is ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+        if code == ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
             raise IllegalArgumentException(error_message)
 
-        if code is ErrorConstants.NOT_FOUND_CODE:
+        if code == ErrorConstants.NOT_FOUND_CODE:
             if exception_type == NoSuchSchemaException.__name__:
                 raise NoSuchSchemaException(error_message)
             if exception_type == NoSuchTableException.__name__:
@@ -50,16 +50,16 @@ class PartitionErrorHandler(RestErrorHandler):
                 raise NoSuchPartitionException(error_message)
             raise NotFoundException(error_message)
 
-        if code is ErrorConstants.ALREADY_EXISTS_CODE:
+        if code == ErrorConstants.ALREADY_EXISTS_CODE:
             raise PartitionAlreadyExistsException(error_message)
 
-        if code is ErrorConstants.INTERNAL_ERROR_CODE:
+        if code == ErrorConstants.INTERNAL_ERROR_CODE:
             raise RuntimeError(error_message)
 
-        if code is ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+        if code == ErrorConstants.UNSUPPORTED_OPERATION_CODE:
             raise UnsupportedOperationException(error_message)
 
-        if code is ErrorConstants.NOT_IN_USE_CODE:
+        if code == ErrorConstants.NOT_IN_USE_CODE:
             if exception_type == CatalogNotInUseException.__name__:
                 raise CatalogNotInUseException(error_message)
             if exception_type == MetalakeNotInUseException.__name__:

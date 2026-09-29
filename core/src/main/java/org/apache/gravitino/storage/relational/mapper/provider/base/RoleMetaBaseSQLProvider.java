@@ -43,14 +43,24 @@ public class RoleMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  /** Returns SQL that selects and locks an active role by ID. */
-  public String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+  /** Returns SQL that selects an active role by ID. */
+  protected String selectRoleMetaById(Long roleId) {
     return "SELECT role_id as roleId, role_name as roleName, metalake_id as metalakeId,"
         + " properties, audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + ROLE_TABLE_NAME
-        + " WHERE role_id = #{roleId} AND deleted_at = 0 FOR UPDATE";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active role by ID. */
+  public String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return selectRoleMetaById(roleId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects an active role by ID and locks it for shared access. */
+  public String selectRoleMetaByIdForShare(@Param("roleId") Long roleId) {
+    return selectRoleMetaById(roleId) + " LOCK IN SHARE MODE";
   }
 
   public String selectRoleIdByMetalakeIdAndName(
