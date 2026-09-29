@@ -62,6 +62,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -561,7 +562,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier invalidNameTableIdent = NameIdentifier.of(tableNs, "invalid_column_name");
     NameIdentifier invalidCommentTableIdent = NameIdentifier.of(tableNs, "invalid_column_comment");
     String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
-    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column validColumn =
         TestColumn.builder()
@@ -610,7 +611,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                     props,
                     new Transform[0]));
     Assertions.assertEquals(
-        "The comment of the column must not exceed 4096 characters",
+        "The comment of the column must not exceed 256 characters",
         createCommentException.getMessage());
 
     tableOperationDispatcher.createTable(
@@ -635,7 +636,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                     TableChange.addColumn(
                         new String[] {"col2"}, Types.StringType.get(), oversizedComment)));
     Assertions.assertEquals(
-        "The comment of the column must not exceed 4096 characters",
+        "The comment of the column must not exceed 256 characters",
         addCommentException.getMessage());
 
     IllegalArgumentException renameException =
@@ -656,7 +657,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                     validTableIdent,
                     TableChange.updateColumnComment(new String[] {"col1"}, oversizedComment)));
     Assertions.assertEquals(
-        "The comment of the column must not exceed 4096 characters",
+        "The comment of the column must not exceed 256 characters",
         updateCommentException.getMessage());
 
     catalogManager.doWithCatalog(

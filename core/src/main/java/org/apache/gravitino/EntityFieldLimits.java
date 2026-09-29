@@ -36,9 +36,6 @@ public final class EntityFieldLimits {
   /** The maximum number of characters of an entity comment stored in a 256-character column. */
   public static final int MAX_COMMENT_LENGTH = 256;
 
-  /** The maximum number of characters of a column comment. */
-  public static final int MAX_COLUMN_COMMENT_LENGTH = 4096;
-
   private EntityFieldLimits() {}
 
   /**

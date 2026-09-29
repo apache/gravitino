@@ -82,7 +82,7 @@ public class TestEntityFieldLimits {
         comment -> columnBuilder("column", comment),
         "comment",
         "column",
-        EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+        EntityFieldLimits.MAX_COMMENT_LENGTH);
   }
 
   @Test

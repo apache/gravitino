@@ -47,21 +47,13 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
-<<<<<<< HEAD
-import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
-import org.apache.iceberg.rest.responses.GetNamespaceResponse;
-import org.apache.iceberg.rest.responses.ListNamespacesResponse;
-=======
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
-import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
-import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
->>>>>>> 8e9ca0009 ([#13565] fix: Validate table and column field lengths (#13551))
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -202,21 +194,6 @@ public class TestIcebergNamespaceOperationExecutor {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  public void testRegisterViewDelegatesToCatalogWrapper() {
-    Namespace ns = Namespace.of("test_ns");
-    RegisterViewRequest mockRequest = mock(RegisterViewRequest.class);
-    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
-    when(mockCatalogWrapper.registerView(ns, mockRequest)).thenReturn(mockResponse);
-
-    LoadViewResponse result = executor.registerView(mockContext, ns, mockRequest);
-
-    verify(mockCatalogWrapper).registerView(ns, mockRequest);
-    Assertions.assertEquals(mockResponse, result);
-  }
-
-  @Test
   public void testRejectsOversizedTableNameBeforeRegister() {
     RegisterTableRequest request = mock(RegisterTableRequest.class);
     when(request.name()).thenReturn("a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1));
@@ -240,10 +217,9 @@ public class TestIcebergNamespaceOperationExecutor {
 
   @Test
   public void testRejectsOversizedColumnCommentBeforeRegister() {
-    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
     Schema schema = new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment));
-    assertRegisterRejectsSchema(
-        schema, "The comment of the column must not exceed 4096 characters");
+    assertRegisterRejectsSchema(schema, "The comment of the column must not exceed 256 characters");
   }
 
   @Test
@@ -309,7 +285,6 @@ public class TestIcebergNamespaceOperationExecutor {
   }
 
   @Test
->>>>>>> 8e9ca0009 ([#13565] fix: Validate table and column field lengths (#13551))
   public void testDropNestedNamespacePassesCorrectLevels() {
     Namespace nestedNs = Namespace.of("A", "B", "C");
 

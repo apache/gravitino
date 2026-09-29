@@ -47,8 +47,7 @@ public class ColumnEntity implements Entity, Auditable {
       Field.required("position", Integer.class, "The column's position");
   public static final Field TYPE = Field.required("dataType", Type.class, "The column's data type");
   public static final Field COMMENT =
-      Field.optional(
-          "comment", "The column's comment", EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+      Field.optional("comment", "The column's comment", EntityFieldLimits.MAX_COMMENT_LENGTH);
   public static final Field NULLABLE =
       Field.required("nullable", Boolean.class, "The column's nullable property");
   public static final Field AUTO_INCREMENT =

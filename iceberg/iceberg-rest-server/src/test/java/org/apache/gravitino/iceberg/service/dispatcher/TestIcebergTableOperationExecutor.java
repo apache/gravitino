@@ -249,7 +249,7 @@ public class TestIcebergTableOperationExecutor {
     Assertions.assertEquals(
         "The name of the column must not exceed 128 characters", nameException.getMessage());
 
-    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
     Schema oversizedCommentSchema =
         new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment));
     CreateTableRequest oversizedCommentRequest =
@@ -265,7 +265,7 @@ public class TestIcebergTableOperationExecutor {
                 executor.createTable(
                     mockContext, Namespace.of("test_namespace"), oversizedCommentRequest));
     Assertions.assertEquals(
-        "The comment of the column must not exceed 4096 characters", commentException.getMessage());
+        "The comment of the column must not exceed 256 characters", commentException.getMessage());
     verifyNoInteractions(mockCatalogWrapper);
   }
 
@@ -286,7 +286,7 @@ public class TestIcebergTableOperationExecutor {
     Assertions.assertEquals(
         "The name of the column must not exceed 128 characters", nameException.getMessage());
 
-    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
     UpdateTableRequest oversizedCommentRequest =
         updateRequest(
             new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment)));
@@ -300,7 +300,7 @@ public class TestIcebergTableOperationExecutor {
                     TableIdentifier.of("test_namespace", "test_table"),
                     oversizedCommentRequest));
     Assertions.assertEquals(
-        "The comment of the column must not exceed 4096 characters", commentException.getMessage());
+        "The comment of the column must not exceed 256 characters", commentException.getMessage());
     verifyNoInteractions(mockCatalogWrapper);
   }
 
