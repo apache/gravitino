@@ -43,7 +43,7 @@ public class TestGravitinoIcebergCatalogRestRouting {
   @BeforeAll
   static void initCatalogManager() {
     GravitinoClient gravitinoClient = mock(GravitinoClient.class);
-    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
+    GravitinoCatalogManager.create("user", () -> gravitinoClient);
   }
 
   @AfterAll
