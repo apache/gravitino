@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -582,6 +583,55 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(
         0,
         listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
+  }
+
+  /** Verifies that an audit-only winner fences a stale audit-only update without a new snapshot. */
+  @TestTemplate
+  public void testMetadataOnlyAlterRejectsAStaleUpdate() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_conflict",
+            AUDIT_INFO);
+    service.insertPolicy(policy, false);
+    PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
+    AuditInfo winningAudit =
+        AuditInfo.builder().withCreator("winning-updater").withCreateTime(Instant.now()).build();
+    AuditInfo staleAudit =
+        AuditInfo.builder().withCreator("stale-updater").withCreateTime(Instant.now()).build();
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updatePolicy(
+                policy.nameIdentifier(),
+                entity -> {
+                  PolicyEntity current = (PolicyEntity) entity;
+                  // Commit the winner after the outer update reads, before its CAS executes.
+                  assertDoesNotThrow(
+                      () ->
+                          service.updatePolicy(
+                              current.nameIdentifier(),
+                              winner ->
+                                  copyPolicy(
+                                      (PolicyEntity) winner,
+                                      current.name(),
+                                      current.comment(),
+                                      winningAudit)));
+                  return copyPolicy(current, current.name(), current.comment(), staleAudit);
+                }));
+
+    PolicyEntity stored = service.getPolicyByIdentifier(policy.nameIdentifier());
+    assertEquals(winningAudit, stored.auditInfo());
+    assertEquals(policy.comment(), stored.comment());
+    PolicyPO afterConflict = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getOccVersion() + 1, afterConflict.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), afterConflict.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterConflict.getLastVersion());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate

@@ -122,6 +122,12 @@ public class PolicyPO {
       return this;
     }
 
+    /**
+     * Sets the concurrency token, independently of the content snapshot version.
+     *
+     * @param occVersion the optimistic concurrency version
+     * @return this builder
+     */
     public Builder withOccVersion(Long occVersion) {
       this.occVersion = occVersion;
       return this;

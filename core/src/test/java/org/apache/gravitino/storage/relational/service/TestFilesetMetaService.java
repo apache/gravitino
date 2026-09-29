@@ -829,6 +829,55 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     assertVersionActive(versions, 2);
   }
 
+  /** Verifies that an audit-only winner fences a stale audit-only update without a new snapshot. */
+  @TestTemplate
+  public void testMetadataOnlyAlterRejectsAStaleUpdate() throws IOException {
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            GravitinoITUtils.genRandomName("tst_fs_metadata_conflict"),
+            AUDIT_INFO,
+            "/tmp");
+    FilesetMetaService service = FilesetMetaService.getInstance();
+    service.insertFileset(fileset, false);
+    FilesetPO initialPO = getFilesetPO(fileset.id());
+    AuditInfo winningAudit =
+        AuditInfo.builder().withCreator("winning-updater").withCreateTime(Instant.now()).build();
+    AuditInfo staleAudit =
+        AuditInfo.builder().withCreator("stale-updater").withCreateTime(Instant.now()).build();
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            updateFilesetUnchecked(
+                fileset.nameIdentifier(),
+                current -> {
+                  // Commit the winner after the outer update reads, before its CAS executes.
+                  updateFilesetUnchecked(
+                      current.nameIdentifier(),
+                      winner ->
+                          copyFileset(
+                              winner,
+                              winner.id(),
+                              winner.name(),
+                              winner.comment(),
+                              "/tmp",
+                              winningAudit));
+                  return copyFileset(
+                      current, current.id(), current.name(), current.comment(), "/tmp", staleAudit);
+                }));
+
+    FilesetEntity stored = service.getFilesetByIdentifier(fileset.nameIdentifier());
+    assertEquals(winningAudit, stored.auditInfo());
+    assertEquals(fileset.comment(), stored.comment());
+    FilesetPO afterConflict = getFilesetPO(fileset.id());
+    assertEquals(initialPO.getOccVersion() + 1, afterConflict.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), afterConflict.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterConflict.getLastVersion());
+    assertEquals(1, countFilesetVersionRows(fileset.id()));
+  }
+
   @TestTemplate
   public void testDeleteRejectsAStaleVersionAfterAMetadataOnlyAlter() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_stale_delete");

@@ -698,13 +698,13 @@ public class POConverters {
   }
 
   /**
-   * Update FilesetPO version
+   * Updates fileset metadata, advancing OCC and reusing a known unchanged content snapshot.
    *
    * @param oldFilesetPO the existing {@link FilesetPO} containing the current and last version data
    * @param newFileset the {@link FilesetEntity} with updated metadata and storage locations
    * @param maxStoredVersion the highest version the fileset still has a stored snapshot for, or
-   *     {@code null} when it has none
-   * @return {@code FilesetPO} object with updated version
+   *     {@code null} when it has not been queried or no active snapshot exists
+   * @return the updated fileset row, carrying only newly allocated snapshot rows
    * @throws RuntimeException if JSON serialization of properties fails
    */
   public static FilesetPO updateFilesetPOWithVersion(
@@ -832,7 +832,7 @@ public class POConverters {
   }
 
   /**
-   * Builds the next complete policy metadata and content snapshot.
+   * Updates policy metadata, advancing OCC and reusing a known unchanged content snapshot.
    *
    * <p>The row keeps the ID it already has: {@code oldPolicyPO} is the row being replaced, and its
    * ID is what the version snapshots and every relation row point at. An alter cannot change the
@@ -842,7 +842,7 @@ public class POConverters {
    *
    * @param oldPolicyPO The policy row observed by the caller.
    * @param newPolicy The policy values to persist.
-   * @return The policy row and version snapshot at the next monotonic version.
+   * @return The updated policy row and the content snapshot it points at.
    */
   public static PolicyPO updatePolicyPOWithVersion(PolicyPO oldPolicyPO, PolicyEntity newPolicy) {
     try {
@@ -860,7 +860,7 @@ public class POConverters {
   }
 
   /**
-   * Builds the next policy version from values that were serialized before acquiring a row lock.
+   * Updates a policy from values that were serialized before acquiring a row lock.
    *
    * <p>This overload is used by overwrite: the initialized replacement already contains the
    * serialized audit and content values, so advancing the locked row does not repeat CPU-bound JSON
@@ -868,7 +868,7 @@ public class POConverters {
    *
    * @param oldPolicyPO The locked policy row being replaced.
    * @param replacementPolicyPO The initialized replacement values.
-   * @return The policy row and version snapshot at the next monotonic version.
+   * @return The updated policy row and the content snapshot it points at.
    */
   public static PolicyPO updatePolicyPOWithVersion(
       PolicyPO oldPolicyPO, PolicyPO replacementPolicyPO) {

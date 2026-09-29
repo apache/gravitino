@@ -72,6 +72,11 @@ public class FilesetPO {
     return lastVersion;
   }
 
+  /**
+   * Returns the concurrency token advanced by every metadata update.
+   *
+   * @return the optimistic concurrency version
+   */
   public Long getOccVersion() {
     return occVersion;
   }
@@ -176,6 +181,12 @@ public class FilesetPO {
       return this;
     }
 
+    /**
+     * Sets the concurrency token, independently of the content snapshot version.
+     *
+     * @param occVersion the optimistic concurrency version
+     * @return this builder
+     */
     public FilesetPO.Builder withOccVersion(Long occVersion) {
       filesetPO.occVersion = occVersion;
       return this;
