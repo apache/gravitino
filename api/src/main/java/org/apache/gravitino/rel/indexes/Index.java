@@ -54,8 +54,8 @@ public interface Index {
   }
 
   /**
-   * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
-   * supported.
+   * Identifies an index type in the Gravitino table model. The index types and operations supported
+   * by a catalog implementation may vary.
    */
   enum IndexType {
     /**
