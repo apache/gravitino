@@ -231,6 +231,9 @@ components:
             - RUN_JOB
             - CREATE_VIEW
             - SELECT_VIEW
+            - CREATE_SEMANTIC_MODEL
+            - SELECT_SEMANTIC_MODEL
+            - MODIFY_SEMANTIC_MODEL
           description: The name of the privilege
         condition:
           type: string
@@ -259,6 +262,7 @@ components:
             - "TOPIC"
             - "ROLE"
             - "MODEL"
+            - "SEMANTIC_MODEL"
             - "FUNCTION"
             - "TAG"
             - "POLICY"
@@ -430,6 +434,7 @@ components:
           - "TOPIC"
           - "ROLE"
           - "MODEL"
+          - "SEMANTIC_MODEL"
           - "FUNCTION"
           - "TAG"
           - "POLICY"

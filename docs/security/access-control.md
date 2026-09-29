@@ -142,7 +142,7 @@ catalog, or schema, never to a table. Whoever creates a role owns it, and can al
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
 it, and it can be transferred at any time. It applies to metalakes, catalogs, schemas, tables, views,
-topics, filesets, models, functions, roles, tags, policies, job templates, and jobs.
+topics, filesets, models, semantic models, functions, roles, tags, policies, job templates, and jobs.
 
 ### Resolution
 
@@ -226,7 +226,7 @@ they will be removed in a future release. Use the current names in new roles.
 | `MANAGE_USERS`          | Metalake                                                                | Add and remove users                               |
 | `MANAGE_GROUPS`         | Metalake                                                                | Add and remove groups                              |
 | `CREATE_ROLE`           | Metalake                                                                | Create roles                                       |
-| `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grant and revoke privileges on any object in scope |
+| `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function, Semantic Model | Grant and revoke privileges on any object in scope |
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
 | `VIEW_TAG`              | Metalake, Tag                                                           | Read tag metadata                                  |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
