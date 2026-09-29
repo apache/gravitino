@@ -49,10 +49,26 @@ public class TestCloudStorageCredentialPropertyKeys {
 
     assertEquals("https://s3.amazonaws.com", filtered.get(S3Properties.GRAVITINO_S3_ENDPOINT));
     assertEquals("cn-hangzhou", filtered.get(OSSProperties.GRAVITINO_OSS_REGION));
-    // Access key ID is non-hidden plaintext in properties(); GVFS keeps it.
-    assertEquals("AKIATEST", filtered.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    // Access key IDs and secrets are recovered via getCredentials, not REST properties.
+    assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
     assertFalse(filtered.containsKey("masked-any-key"));
+  }
+
+  @Test
+  void testOmitMaskedAccessKeyIds() {
+    Map<String, String> input =
+        Map.of(
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+            S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+            "secret");
+
+    Map<String, String> filtered =
+        CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
+
+    assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
   }
 
   @Test
@@ -60,7 +76,7 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertTrue(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
-    assertFalse(
+    assertTrue(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     assertFalse(
@@ -85,7 +101,6 @@ public class TestCloudStorageCredentialPropertyKeys {
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
 
-    // Access key IDs are non-hidden identifiers, not secrets; they behave like s3/oss/cos IDs.
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(GlueConstants.AWS_ACCESS_KEY_ID));
     assertFalse(
@@ -107,7 +122,7 @@ public class TestCloudStorageCredentialPropertyKeys {
     // azure-client-secret is the sole branch-added cloud-storage secret this filter strips.
     assertFalse(filtered.containsKey(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
 
-    // Access key IDs are non-hidden identifiers and must survive in properties().
+    // Access key IDs are not stripped by key name; masked values are dropped separately.
     assertEquals("ak", filtered.get(GlueConstants.AWS_ACCESS_KEY_ID));
     assertEquals("dlf-ak", filtered.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
   }
