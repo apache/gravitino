@@ -100,22 +100,3 @@ class PolicyOperation(ABC):
             str: JSON-formatted list of policy-tag associations, including selectors
         """
         pass
-
-    @abstractmethod
-    async def list_policies_for_metadata(
-        self, metadata_full_name: str, metadata_type: str
-    ) -> str:
-        """
-        List the effective policies derived from a metadata item's effective tags.
-
-        Args:
-            metadata_full_name: Full name of the metadata object whose effective policies to list.
-            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
-            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
-            is the same as for "catalog.schema.table".
-            metadata_type: Type of the metadata (e.g., "table", "column")
-
-        Returns:
-            str: JSON-formatted list of effective policy metadata derived from the metadata's tags
-        """
-        pass

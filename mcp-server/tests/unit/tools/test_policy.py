@@ -54,23 +54,6 @@ class TestPolicyTool(unittest.TestCase):
 
         asyncio.run(_test_get_policy_detail_information(self.mcp))
 
-    def test_list_policies_for_metadata(self):
-        async def _test_list_policies_for_metadata(mcp_server):
-            async with Client(mcp_server) as client:
-                result = await client.call_tool(
-                    "list_policies_for_metadata",
-                    {
-                        "metadata_full_name": "catalog.db.table",
-                        "metadata_type": "table",
-                    },
-                )
-                self.assertEqual(
-                    "list_policies_for_metadata: catalog.db.table, table",
-                    result.content[0].text,
-                )
-
-        asyncio.run(_test_list_policies_for_metadata(self.mcp))
-
     def test_list_policies_for_tag(self):
         async def _test():
             async with Client(self.mcp) as client:
@@ -159,6 +142,7 @@ class TestPolicyTool(unittest.TestCase):
             async with Client(self.mcp) as client:
                 names = {tool.name for tool in await client.list_tools()}
                 for name in (
+                    "list_policies_for_metadata",
                     "associate_policy_with_metadata",
                     "disassociate_policy_from_metadata",
                     "get_policy_for_metadata",
