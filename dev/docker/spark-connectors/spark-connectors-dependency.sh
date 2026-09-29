@@ -187,6 +187,10 @@ fi
 license_jars="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort)"
 [ -n "${license_jars}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
 
+# Drop earlier staging; leftovers would ship licences for jars not in the image.
+mkdir -p "${conn_dir}/licenses"
+find "${conn_dir}/licenses" -mindepth 1 -maxdepth 1 ! -name '.gitignore' -exec rm -rf {} +
+
 while IFS= read -r jar; do
   dest="${conn_dir}/licenses/$(basename "${jar}" .jar)"
   mkdir -p "${dest}"

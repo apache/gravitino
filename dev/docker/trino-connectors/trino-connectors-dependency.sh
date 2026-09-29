@@ -99,6 +99,10 @@ fi
 bands="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -type d | sort)"
 [ -n "${bands}" ] || { echo "ERROR: no staged connector band to take licenses from" >&2; exit 1; }
 
+# Drop earlier staging; leftovers would ship licences for bands not in the image.
+mkdir -p "${conn_dir}/licenses"
+find "${conn_dir}/licenses" -mindepth 1 -maxdepth 1 ! -name '.gitignore' -exec rm -rf {} +
+
 while IFS= read -r band; do
   dest="${conn_dir}/licenses/$(basename "${band}")"
   [ -s "${band}/LICENSE" ] && [ -s "${band}/NOTICE" ] || {
