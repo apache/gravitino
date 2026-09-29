@@ -104,7 +104,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetCredentialsReturnsEmptyWithoutUseSecret() throws Exception {
+  public void testGetCredentialsReturnsEmptyWithoutUseCredential() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
@@ -125,7 +125,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
                       any(Entity.EntityType.class),
                       eq(
                           AuthorizationExpressionConstants
-                              .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
+                              .FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION)))
           .thenReturn(false);
 
       Response response =

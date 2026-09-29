@@ -24,24 +24,23 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 
 /**
- * Gravitino property keys for cloud static credentials that must not be taken from REST {@code
- * properties()} responses.
+ * Gravitino property keys for cloud static credentials (access-key pairs and related secrets).
  *
- * <p>GVFS must not consume static credential keys from REST catalog/schema/fileset {@code
- * properties()} responses (which may be masked as {@code ******}). Plaintext for S3/OSS/COS access
- * key pairs and Azure storage account keys is recovered via {@code getCredentials()}. Masked
- * placeholders are dropped by {@link #omitStaticCredentialProperties}. Non-credential configuration
- * such as {@code gcs-service-account-file} may still appear in {@code properties()}.
+ * <p>GVFS must not consume these keys from REST catalog/schema/fileset {@code properties()}
+ * responses (which may be masked as {@code ******}). Plaintext for hidden static credentials,
+ * including {@code s3-access-key-id}, is recovered via {@code getSecrets()} (for {@code
+ * USE_SECRET}) or {@code getCredentials()} (for connectors with {@code USE_CREDENTIAL}). Masked
+ * placeholders are dropped by {@link #omitStaticCredentialProperties}. Callers with only {@code
+ * USE_CREDENTIAL} receive {@code getSecrets()} with cloud access-key pairs omitted via {@link
+ * #omitCloudAccessKeyPairProperties}.
  *
  * <p>{@code azure-storage-account-name} is intentionally left non-hidden (and not listed here):
  * unlike S3/OSS/COS access key IDs, the account name is already disclosed in ADLS URIs such as
  * {@code abfss://container@account.dfs.core.windows.net}, so masking it on load/list adds no
  * confidentiality. Only {@code azure-storage-account-key} is treated as a secret half.
- *
- * <p>Azure client secrets that are not credential-vending keys remain omitted here; recover them
- * via {@code getSecrets()} when needed.
  */
 public final class CloudStorageCredentialPropertyKeys {
 
@@ -49,9 +48,8 @@ public final class CloudStorageCredentialPropertyKeys {
   public static final String MASKED_PROPERTY_VALUE = "******";
 
   /**
-   * Static cloud credential property keys omitted from REST {@code properties()} merges. Access key
-   * IDs and secret halves that belong to credential vending are recovered via {@code
-   * getCredentials()}.
+   * Static cloud credential property keys omitted from REST {@code properties()} merges for GVFS
+   * (alongside masked placeholders).
    */
   private static final Set<String> STATIC_CREDENTIAL_KEYS =
       ImmutableSet.of(
@@ -64,6 +62,26 @@ public final class CloudStorageCredentialPropertyKeys {
           COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
           COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
 
+  /**
+   * Cloud access-key pair (and Azure static secret) keys omitted from {@code getSecrets()} when the
+   * caller has {@code USE_CREDENTIAL} but not {@code USE_SECRET}. JDBC secrets are intentionally
+   * not listed so connectors can still recover them via {@code getSecrets()}.
+   */
+  private static final Set<String> CLOUD_ACCESS_KEY_PAIR_KEYS =
+      ImmutableSet.of(
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+          AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID,
+          AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY,
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
+          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET);
+
   private CloudStorageCredentialPropertyKeys() {}
 
   /**
@@ -74,6 +92,17 @@ public final class CloudStorageCredentialPropertyKeys {
    */
   public static boolean isStaticCredentialKey(@Nullable String key) {
     return key != null && STATIC_CREDENTIAL_KEYS.contains(key);
+  }
+
+  /**
+   * Returns whether the property key is a cloud access-key pair (or Azure static secret) that
+   * {@code USE_CREDENTIAL} must not see via {@code getSecrets()}.
+   *
+   * @param key the property key
+   * @return true when the key must be omitted for credential-only callers
+   */
+  public static boolean isCloudAccessKeyPairKey(@Nullable String key) {
+    return key != null && CLOUD_ACCESS_KEY_PAIR_KEYS.contains(key);
   }
 
   /**
@@ -103,8 +132,36 @@ public final class CloudStorageCredentialPropertyKeys {
     return ImmutableMap.copyOf(filtered);
   }
 
+  /**
+   * Returns a copy of {@code secrets} with cloud access-key pair keys removed. Used when filtering
+   * {@code getSecrets()} for callers that hold {@code USE_CREDENTIAL} but not {@code USE_SECRET}.
+   *
+   * @param secrets plaintext secrets map
+   * @return secrets without cloud access-key pairs
+   */
+  public static Map<String, String> omitCloudAccessKeyPairProperties(
+      @Nullable Map<String, String> secrets) {
+    if (secrets == null || secrets.isEmpty()) {
+      return ImmutableMap.of();
+    }
+    Map<String, String> filtered = new HashMap<>();
+    for (Map.Entry<String, String> entry : secrets.entrySet()) {
+      String key = entry.getKey();
+      if (key == null || isCloudAccessKeyPairKey(key)) {
+        continue;
+      }
+      filtered.put(key, entry.getValue());
+    }
+    return ImmutableMap.copyOf(filtered);
+  }
+
   /** Returns the static credential property keys. */
   public static Set<String> staticCredentialKeys() {
     return STATIC_CREDENTIAL_KEYS;
+  }
+
+  /** Returns cloud access-key pair keys omitted for {@code USE_CREDENTIAL} {@code getSecrets}. */
+  public static Set<String> cloudAccessKeyPairKeys() {
+    return CLOUD_ACCESS_KEY_PAIR_KEYS;
   }
 }

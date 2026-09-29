@@ -111,7 +111,7 @@ public class MetadataObjectCredentialOperations {
             if (!MetadataAuthzHelper.checkAccess(
                 identifier,
                 entityType,
-                AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)) {
+                AuthorizationExpressionConstants.FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION)) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
             }
 

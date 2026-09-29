@@ -213,6 +213,8 @@ public class Privileges {
         return ViewSecretProviders.allow();
       case USE_SECRET:
         return UseSecret.allow();
+      case USE_CREDENTIAL:
+        return UseCredential.allow();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -347,6 +349,8 @@ public class Privileges {
         return ViewSecretProviders.deny();
       case USE_SECRET:
         return UseSecret.deny();
+      case USE_CREDENTIAL:
+        return UseCredential.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -1414,11 +1418,12 @@ public class Privileges {
   }
 
   /**
-   * The privilege to retrieve plaintext secrets and vend credentials for a metadata object.
+   * The privilege to retrieve plaintext secrets (including cloud access-key pairs) via {@code
+   * getSecrets}.
    *
-   * <p>Applies to both {@code getSecrets} and {@code getCredentials}. Callers that are not the
-   * metalake owner and lack this privilege receive an empty result rather than a forbidden error,
-   * once they can already access the metadata object.
+   * <p>Does not authorize {@code getCredentials}. Callers that are not the metalake owner and lack
+   * this privilege (and lack {@link UseCredential}) receive an empty {@code getSecrets} result
+   * rather than a forbidden error, once they can already access the metadata object.
    */
   public static final class UseSecret extends GenericPrivilege<UseSecret> {
 
@@ -1440,6 +1445,45 @@ public class Privileges {
      * @return The instance with deny condition of the privilege.
      */
     public static UseSecret deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SECRET_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /**
+   * The privilege to call {@code getCredentials} and to call {@code getSecrets} with cloud
+   * access-key pairs omitted.
+   *
+   * <p>Intended for connectors: recover non-cloud secrets via {@code getSecrets}, and recover cloud
+   * access keys via {@code getCredentials}. Metalake owners and holders of this privilege receive
+   * credentials; others get an empty credential list rather than a forbidden error.
+   */
+  public static final class UseCredential extends GenericPrivilege<UseCredential> {
+
+    private static final UseCredential ALLOW_INSTANCE =
+        new UseCredential(Condition.ALLOW, Name.USE_CREDENTIAL);
+    private static final UseCredential DENY_INSTANCE =
+        new UseCredential(Condition.DENY, Name.USE_CREDENTIAL);
+
+    private UseCredential(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseCredential allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseCredential deny() {
       return DENY_INSTANCE;
     }
 

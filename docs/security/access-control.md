@@ -202,7 +202,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRET`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | Retrieve plaintext secrets and vend credentials for objects in scope |
+| `USE_SECRET`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | Retrieve plaintext secrets via `getSecrets` (including cloud access-key pairs) |
+| `USE_CREDENTIAL`     | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | Call `getCredentials`, and call `getSecrets` with cloud access-key pairs omitted |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
@@ -284,9 +285,11 @@ ownership, the same as altering it, because the caller chooses what the server c
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
-alter or delete. Fetching plaintext secrets (`getSecrets`) or vend credentials (`getCredentials`)
-requires owning the metalake or holding the `USE_SECRET` privilege. Callers who can load the object
-but lack that access receive an empty result rather than a forbidden error.
+alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
+`USE_SECRET` (full secrets, including cloud access-key pairs) or `USE_CREDENTIAL` (secrets with
+cloud access-key pairs omitted; intended for connectors). Vend credentials (`getCredentials`)
+requires owning the metalake or holding `USE_CREDENTIAL`. Callers who can load the object but lack
+the matching privilege receive an empty result rather than a forbidden error.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

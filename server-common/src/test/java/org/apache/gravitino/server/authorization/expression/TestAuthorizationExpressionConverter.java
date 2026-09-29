@@ -141,6 +141,16 @@ public class TestAuthorizationExpressionConverter {
   }
 
   @Test
+  public void testReplaceAnyPrivilegeForAnyUseCredential() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_CREDENTIAL");
+    Assertions.assertEquals(
+        "((ANY(USE_CREDENTIAL, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+            + " MODEL_VERSION)) && !(ANY(DENY_USE_CREDENTIAL, METALAKE, CATALOG, SCHEMA, TABLE,"
+            + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
+        replaced);
+  }
+
+  @Test
   public void testReplaceAnyPrivilegeForAnyViewTag() {
     String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_TAG");
     Assertions.assertEquals(

@@ -190,22 +190,22 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     // Official non-hidden keys stay out of getSecrets.
     Assertions.assertFalse(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
-    // Credential property keys are never recovered via getSecrets.
-    Assertions.assertFalse(
+    // Declared hidden cloud credentials fuzzy-recover into getSecrets (USE_SECRET / owner).
+    Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
     // Undeclared sensitive names still fuzzy-recover.
     Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("custom-token", metadata));
     // AWS access-key pair is catalog-only (BaseCatalogPropertiesMetadata), not in this entity
-    // fallback — same exclusion as fileset/schema STORAGE_PROPERTY_ENTRIES. Credential keys are
-    // never recovered via getSecrets (delivered via getCredentials / AwsSecretKeyCredential).
+    // fallback — same exclusion as fileset/schema STORAGE_PROPERTY_ENTRIES. Undeclared sensitive
+    // names still fuzzy-recover.
     Assertions.assertFalse(metadata.containsProperty("aws-access-key-id"));
     Assertions.assertFalse(metadata.containsProperty("aws-secret-access-key"));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("aws-access-key-id", metadata));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("aws-secret-access-key", metadata));
   }
 }

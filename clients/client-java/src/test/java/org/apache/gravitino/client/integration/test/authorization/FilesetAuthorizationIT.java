@@ -404,7 +404,8 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, readableFileset.properties().get(secretKey));
     assertEquals("visible-value", readableFileset.properties().get("visible-key"));
 
-    // Can load the object but lacks USE_SECRET → empty secrets (not ForbiddenException).
+    // Can load the object but lacks USE_SECRET and USE_CREDENTIAL → empty secrets
+    // (not ForbiddenException).
     Map<String, String> secretsWithoutPrivilege = readableFileset.supportsSecrets().getSecrets();
     assertTrue(secretsWithoutPrivilege.isEmpty());
 

@@ -23,33 +23,34 @@ import java.util.Map;
 /**
  * Interface to retrieve plaintext secret properties for a metadata object.
  *
- * <p>Returns (excluding {@link org.apache.gravitino.credential.CredentialPropertyKeys}, which are
- * delivered only via {@link org.apache.gravitino.credential.SupportsCredentials#getCredentials()}):
+ * <p>Returns:
  *
  * <ul>
- *   <li>Every secret-URN property value, resolved via the secret manager.
- *   <li>Declared {@code hidden} property plaintext, regardless of whether the key name matches the
- *       sensitive-keyword list (so masking and recovery stay aligned when operators shorten {@code
- *       gravitino.secret.sensitiveKeyKeywords}).
- *   <li>Undeclared keys whose names look sensitive (contain {@code secret}, {@code password},
- *       {@code token}, {@code credential}, {@code access}, or {@code account}, case-insensitive —
- *       or the operator-configured keyword set), so mistyped / custom secrets remain usable after
- *       API responses mask them as {@code ******}.
+ *   <li>Every secret-URN property value, resolved via the secret manager (including keys that may
+ *       also be delivered via {@link org.apache.gravitino.credential.SupportsCredentials}).
+ *   <li>Stored plaintext for property keys whose names look sensitive (contain {@code secret},
+ *       {@code password}, {@code token}, {@code credential}, {@code access}, or {@code account},
+ *       case-insensitive) when the key is undeclared or declared {@code hidden}, so mistyped /
+ *       undeclared credential properties remain usable after API responses mask them as {@code
+ *       ******}. Declared non-hidden configuration keys are not returned even when the name
+ *       matches.
  * </ul>
  *
- * <p>Declared non-hidden configuration keys are not returned even when the name looks sensitive
- * (for example {@code credential-providers} stays in {@code properties()}).
+ * <p>Properties that are only declared {@code hidden} in property metadata, and whose names do
+ * <em>not</em> match the sensitive-name pattern above, are masked as {@code ******} on list/get but
+ * are <strong>not</strong> returned by {@link #getSecrets()}. Clients must not treat a remaining
+ * {@code ******} value as a usable credential for those keys.
  *
- * <p>Normal non-sensitive, non-hidden properties are not included; combine with {@code
- * load*().properties()} on the client.
+ * <p>Normal non-sensitive properties are not included; combine with {@code load*().properties()} on
+ * the client.
  */
 public interface SupportsSecrets {
 
   /**
    * Returns plaintext secret properties for this metadata object.
    *
-   * <p>Does not recover credential-vending property keys (see {@link
-   * org.apache.gravitino.credential.CredentialPropertyKeys}). See the interface javadoc.
+   * <p>Does not recover values for properties that are only metadata-{@code hidden} without a
+   * sensitive-looking name or a secret URN. See the interface javadoc.
    *
    * @return a map of property key to plaintext value; never null, may be empty
    */

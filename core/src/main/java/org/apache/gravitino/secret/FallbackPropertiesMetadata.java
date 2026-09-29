@@ -31,17 +31,15 @@ import org.apache.gravitino.connector.PropertyEntry;
  * CloudPropertiesMetadata#STORAGE_PROPERTY_ENTRIES}) so officially non-hidden keys (for example
  * {@code credential-providers}, {@code s3-token-expire-in-secs}) are not fuzzy-recovered into
  * {@code getSecrets}. Undeclared sensitive-named keys still use fuzzy recovery. Declared hidden
- * cloud credential keys that belong to {@link
- * org.apache.gravitino.credential.CredentialPropertyKeys} (for example {@code s3-access-key-id},
- * {@code s3-secret-access-key}) are <strong>not</strong> recovered via {@code getSecrets}; clients
- * must use {@code getCredentials()}.
+ * cloud credential keys (for example {@code s3-access-key-id}, {@code s3-secret-access-key}) are
+ * recovered via {@code getSecrets} when the caller holds {@code USE_SECRET} (or is metalake owner);
+ * callers with only {@code USE_CREDENTIAL} get those cloud keys via {@code getCredentials} instead.
  *
  * <p>Does not include the AWS access-key pair. That pair is a Glue catalog property merged only via
  * {@link org.apache.gravitino.connector.BaseCatalogPropertiesMetadata}, matching fileset and schema
  * metadata which also omit it. A catalog path that hits this fallback therefore treats {@code
- * aws-access-key-id} as undeclared for masking, but {@link
- * org.apache.gravitino.credential.CredentialPropertyKeys} still excludes it from {@code
- * getSecrets}; clients use {@code getCredentials()} ({@code AwsSecretKeyCredential}).
+ * aws-access-key-id} as undeclared for masking; sensitive-named undeclared keys still fuzzy-recover
+ * into {@code getSecrets}.
  */
 final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -49,8 +47,6 @@ final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
   private static final Map<String, PropertyEntry<?>> CLOUD_PROPERTY_ENTRIES =
       CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES;
-
-  private FallbackPropertiesMetadata() {}
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {

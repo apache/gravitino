@@ -117,12 +117,12 @@ public class TestSecretPropertyUtils {
 
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
-      // Non-credential secret URNs remain in getSecrets
+      // Secret-URN entries, including keys also used by credential vending
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
-      // Credential property keys (jdbc-password, s3-*) are not recovered via getSecrets
-      Assertions.assertFalse(secrets.containsKey("jdbc-password"));
-      Assertions.assertFalse(secrets.containsKey("s3-secret-access-key"));
-      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+      Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+      Assertions.assertEquals("s3-secret-value", secrets.get("s3-secret-access-key"));
+      // Inline sensitive-named plaintext is also returned for getSecrets clients
+      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
       Assertions.assertFalse(secrets.containsKey("jdbc-user"));
       Assertions.assertFalse(secrets.containsKey("jdbc-url"));
       Assertions.assertFalse(secrets.containsKey("visible"));
@@ -171,20 +171,10 @@ public class TestSecretPropertyUtils {
               "s3-access-key-id",
               "AKIA...",
               "s3-secret-access-key",
-              "super-secret",
-              "custom-token",
-              "tok",
-              "my-api-token",
-              "api-tok");
+              "super-secret");
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
-      // Credential keys stay out of getSecrets
-      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
-      Assertions.assertFalse(secrets.containsKey("s3-secret-access-key"));
-      Assertions.assertFalse(secrets.containsKey("aws-access-key-id"));
-      Assertions.assertFalse(secrets.containsKey("dlf-access-key-id"));
-      // Non-credential sensitive keys and custom tokens remain
-      Assertions.assertEquals("tok", secrets.get("custom-token"));
-      Assertions.assertEquals("api-tok", secrets.get("my-api-token"));
+      Assertions.assertEquals("AKIA...", secrets.get("s3-access-key-id"));
+      Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
       Assertions.assertFalse(secrets.containsKey("warehouse"));
       Assertions.assertFalse(secrets.containsKey("aws-region"));
     }
@@ -219,7 +209,7 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testBuildSecretsExcludesDeclaredNonHiddenSensitiveKeys() {
+  void testBuildSecretsRecoversDeclaredHiddenCloudAccessKeyIds() {
     try (SecretManager sm = memorySecretManager()) {
       PropertiesMetadata metadata =
           new PropertiesMetadata() {
@@ -234,7 +224,7 @@ public class TestSecretPropertyUtils {
                       "azure-storage-account-name", "account", false, null, false),
                   "s3-access-key-id",
                   PropertyEntry.stringOptionalPropertyEntry(
-                      "s3-access-key-id", "ak", false, null, false),
+                      "s3-access-key-id", "ak", false, null, true),
                   "jdbc-password",
                   PropertyEntry.stringOptionalPropertyEntry(
                       "jdbc-password", "password", false, null, true),
@@ -260,72 +250,10 @@ public class TestSecretPropertyUtils {
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
       Assertions.assertFalse(secrets.containsKey("credential-providers"));
       Assertions.assertFalse(secrets.containsKey("azure-storage-account-name"));
-      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
-      Assertions.assertFalse(secrets.containsKey("jdbc-password"));
-      Assertions.assertFalse(secrets.containsKey("s3-secret-access-key"));
+      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
+      Assertions.assertEquals("inline-secret", secrets.get("jdbc-password"));
+      Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
       Assertions.assertEquals("tok", secrets.get("custom-token"));
-    }
-  }
-
-  @Test
-  void testBuildSecretsRecoversDeclaredHiddenWithoutSensitiveName() {
-    try (SecretManager sm = memorySecretManager()) {
-      PropertiesMetadata metadata =
-          new PropertiesMetadata() {
-            @Override
-            public Map<String, PropertyEntry<?>> propertyEntries() {
-              return ImmutableMap.of(
-                  "auth-file",
-                  PropertyEntry.stringOptionalPropertyEntry("auth-file", "path", false, null, true),
-                  "visible-config",
-                  PropertyEntry.stringOptionalPropertyEntry(
-                      "visible-config", "cfg", false, null, false));
-            }
-          };
-      Map<String, String> entityProps =
-          Map.of("auth-file", "/secret/path.json", "visible-config", "ok", "custom-token", "tok");
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
-      Assertions.assertEquals("/secret/path.json", secrets.get("auth-file"));
-      Assertions.assertFalse(secrets.containsKey("visible-config"));
-      Assertions.assertEquals("tok", secrets.get("custom-token"));
-      Assertions.assertFalse(
-          SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("auth-file", metadata));
-    }
-  }
-
-  @Test
-  void testBuildSecretsDeclaredHiddenIgnoresShortenedKeywords() {
-    SensitivePropertyKeyMatcher.configure(List.of("token"));
-    try (SecretManager sm = memorySecretManager()) {
-      PropertiesMetadata metadata =
-          new PropertiesMetadata() {
-            @Override
-            public Map<String, PropertyEntry<?>> propertyEntries() {
-              return ImmutableMap.of(
-                  "auth-file",
-                  PropertyEntry.stringOptionalPropertyEntry("auth-file", "path", false, null, true),
-                  "my-custom-token",
-                  PropertyEntry.stringOptionalPropertyEntry(
-                      "my-custom-token", "tok", false, null, true));
-            }
-          };
-      Map<String, String> entityProps =
-          Map.of(
-              "auth-file",
-              "/secret/path.json",
-              "my-custom-token",
-              "tok-value",
-              "undeclared-password",
-              "should-not-recover");
-      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
-      // Declared hidden recovers even when keywords omit password/access/secret.
-      Assertions.assertEquals("/secret/path.json", secrets.get("auth-file"));
-      Assertions.assertEquals("tok-value", secrets.get("my-custom-token"));
-      // Undeclared "password" no longer matches shortened keyword list.
-      Assertions.assertFalse(secrets.containsKey("undeclared-password"));
-      Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("undeclared-password"));
-    } finally {
-      SensitivePropertyKeyMatcher.resetToDefaults();
     }
   }
 

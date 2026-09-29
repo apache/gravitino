@@ -49,7 +49,8 @@ public class TestCloudStorageCredentialPropertyKeys {
 
     assertEquals("https://s3.amazonaws.com", filtered.get(S3Properties.GRAVITINO_S3_ENDPOINT));
     assertEquals("cn-hangzhou", filtered.get(OSSProperties.GRAVITINO_OSS_REGION));
-    // Access key IDs and secrets are recovered via getCredentials, not REST properties.
+    // Access key IDs and secrets are stripped from properties(); recover via getSecrets /
+    // getCredentials.
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
     assertFalse(filtered.containsKey("masked-any-key"));
@@ -83,14 +84,12 @@ public class TestCloudStorageCredentialPropertyKeys {
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_REGION));
 
-    // Azure client secret is a cloud-storage static credential and is stripped.
     assertTrue(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
 
     // Glue/Paimon-DLF secrets are catalog/metastore-connection credentials, not cloud-storage
-    // secrets in the fileset properties map this filter governs; they never reach it (declared
-    // hidden and outside FilesetCatalogPropertiesMetadata), so this set must not claim them.
+    // secrets in the fileset properties map this filter governs.
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             GlueConstants.AWS_SECRET_ACCESS_KEY));
@@ -100,7 +99,6 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
             PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
-
     assertFalse(
         CloudStorageCredentialPropertyKeys.isStaticCredentialKey(GlueConstants.AWS_ACCESS_KEY_ID));
     assertFalse(
@@ -109,7 +107,7 @@ public class TestCloudStorageCredentialPropertyKeys {
   }
 
   @Test
-  void testAzureClientSecretStrippedButAccessKeyIdsSurvive() {
+  void testAzureClientSecretStrippedButGlueAccessKeyIdsSurvive() {
     Map<String, String> input =
         Map.of(
             AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET, "aad-secret",
@@ -119,11 +117,45 @@ public class TestCloudStorageCredentialPropertyKeys {
     Map<String, String> filtered =
         CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
 
-    // azure-client-secret is the sole branch-added cloud-storage secret this filter strips.
     assertFalse(filtered.containsKey(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
-
-    // Access key IDs are not stripped by key name; masked values are dropped separately.
+    // Glue/DLF IDs are not in the fileset static cloud set; unmasked values survive here.
     assertEquals("ak", filtered.get(GlueConstants.AWS_ACCESS_KEY_ID));
     assertEquals("dlf-ak", filtered.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
+  }
+
+  @Test
+  void testOmitCloudAccessKeyPairProperties() {
+    Map<String, String> secrets =
+        Map.of(
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            "AKIATEST",
+            S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+            "secret",
+            "jdbc-password",
+            "db-pass",
+            "custom-token",
+            "tok");
+
+    Map<String, String> filtered =
+        CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
+
+    assertEquals("db-pass", filtered.get("jdbc-password"));
+    assertEquals("tok", filtered.get("custom-token"));
+    assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testCloudAccessKeyPairKeyDetection() {
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
+            AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
+    assertFalse(CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey("jdbc-password"));
   }
 }

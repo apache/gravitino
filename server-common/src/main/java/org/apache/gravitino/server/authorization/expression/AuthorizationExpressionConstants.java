@@ -277,14 +277,26 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Soft check for retrieving plaintext secrets or vend credentials. Only the metalake owner or a
-   * principal with {@code USE_SECRET} may receive non-empty results; others get an empty response
-   * rather than a forbidden error.
+   * Soft check for full plaintext {@code getSecrets} (including cloud access-key pairs). Only the
+   * metalake owner or a principal with {@code USE_SECRET} may receive the unfiltered map; others
+   * get an empty response or a filtered map (see {@link
+   * #FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION}) rather than a forbidden error.
    */
   public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
       """
                   METALAKE::OWNER ||
                   ANY_USE_SECRET
+                  """;
+
+  /**
+   * Soft check for {@code getCredentials} and for filtered {@code getSecrets} (cloud access-key
+   * pairs omitted). Only the metalake owner or a principal with {@code USE_CREDENTIAL} may receive
+   * non-empty credential results; others get an empty response rather than a forbidden error.
+   */
+  public static final String FILTER_USE_CREDENTIAL_AUTHORIZATION_EXPRESSION =
+      """
+                  METALAKE::OWNER ||
+                  ANY_USE_CREDENTIAL
                   """;
 
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =

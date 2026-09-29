@@ -31,7 +31,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.CredentialPropertyKeys;
+import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -82,32 +82,35 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Returns whether undeclared sensitive-named inline plaintext should be recovered via {@code
-   * getSecrets} (fuzzy path). Declared {@code hidden} recovery is handled separately in {@link
-   * #buildSecrets}.
+   * Returns whether a sensitive-named inline property should be recovered via {@code getSecrets}.
    *
-   * <p>Keys in {@link CredentialPropertyKeys} are never recovered. When {@code metadata} is null,
-   * returns false (URN-only for non-credential keys). Declared keys (hidden or not) return false
-   * here; declared non-hidden stays in {@code properties()}, declared hidden is recovered in {@link
-   * #buildSecrets}.
+   * <p>Secret-manager URNs are always recovered separately. For inline plaintext:
+   *
+   * <ul>
+   *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
+   *       catalog does not expose properties metadata for the entity type.
+   *   <li>otherwise: recover only undeclared keys or declared {@code hidden} keys. Declared
+   *       non-hidden configuration (for example {@code credential-providers}, {@code
+   *       s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   * </ul>
+   *
+   * <p>Callers that need historical fuzzy recovery without real metadata should pass an empty
+   * {@link PropertiesMetadata} (every key is undeclared) — see the two-argument {@link
+   * #buildSecrets(SecretManager, Map)}.
    *
    * @param key the property key
    * @param metadata entity properties metadata, or null when unavailable
-   * @return true when undeclared sensitive-named plaintext should be included in {@code getSecrets}
+   * @return true when the inline plaintext should be included in {@code getSecrets}
    */
   public static boolean shouldRecoverSensitiveNamedSecret(
       String key, @Nullable PropertiesMetadata metadata) {
-    if (CredentialPropertyKeys.isCredentialPropertyKey(key)) {
+    if (!isSensitivePropertyKey(key)) {
       return false;
     }
     if (metadata == null) {
       return false;
     }
-    if (metadata.containsProperty(key)) {
-      // Declared hidden is recovered in buildSecrets; declared non-hidden stays in properties().
-      return false;
-    }
-    return isSensitivePropertyKey(key);
+    return !metadata.containsProperty(key) || metadata.isHiddenProperty(key);
   }
 
   /**
@@ -141,18 +144,26 @@ public final class SecretPropertyUtils {
   /**
    * Builds a map of plaintext secret properties for {@code getSecrets}.
    *
-   * <p>For each raw property entry:
+   * <p>Starting from raw entity properties:
    *
    * <ol>
-   *   <li>Skip keys in {@link CredentialPropertyKeys} (delivered via {@code getCredentials()}).
-   *   <li>If the key is declared {@code hidden}: include plaintext, resolving secret URNs when
-   *       needed (no sensitive-keyword gate).
-   *   <li>Otherwise: include secret URNs; include undeclared keys whose names match {@link
-   *       #isSensitivePropertyKey}. Declared non-hidden plaintext is excluded even when the name
-   *       looks sensitive.
+   *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
+   *       {@link SecretManager#readSecret}.
+   *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
+   *       not a secret URN, when {@link #shouldRecoverSensitiveNamedSecret} is true (undeclared or
+   *       declared hidden). Declared non-hidden keys are excluded even when the name looks
+   *       sensitive. When {@code metadata} is {@code null}, sensitive-named plaintext is not
+   *       recovered (URN-only).
    * </ol>
    *
-   * <p>When {@code metadata} is {@code null}, only non-credential secret URNs are recovered.
+   * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
+   * hidden. A hidden key is recovered only when it is a secret URN or its name matches {@link
+   * #isSensitivePropertyKey} (for example {@code jdbc-password}). A hidden key whose name does not
+   * look sensitive (for example a path-like {@code auth-file}) stays masked as {@code ******} on
+   * list/get and is absent from this map.
+   *
+   * <p>Normal non-sensitive properties are not included. Clients merge this map over masked {@code
+   * properties()} so undeclared credential keys remain usable without leaking on list/get.
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
@@ -174,23 +185,9 @@ public final class SecretPropertyUtils {
       if (key == null || value == null) {
         continue;
       }
-      if (CredentialPropertyKeys.isCredentialPropertyKey(key)) {
-        continue;
-      }
-      boolean declaredHidden =
-          metadata != null && metadata.containsProperty(key) && metadata.isHiddenProperty(key);
-      if (declaredHidden) {
-        // Declared hidden (non-credential): always recover.
-        if (isSecretProperty(key, value)) {
-          secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
-        } else {
-          secrets.put(key, value);
-        }
-      } else if (isSecretProperty(key, value)) {
-        // Non-hidden: secret URN still recovers.
+      if (isSecretProperty(key, value)) {
         secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
       } else if (shouldRecoverSensitiveNamedSecret(key, metadata)) {
-        // Non-hidden: undeclared + ops sensitive keywords only.
         secrets.put(key, value);
       }
     }
@@ -368,5 +365,18 @@ public final class SecretPropertyUtils {
       Preconditions.checkArgument(
           entry.getValue() != null, "secretReferences[%s] must not be null", key);
     }
+  }
+
+  /**
+   * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_CREDENTIAL}
+   * callers. Delegates to {@link
+   * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
+   *
+   * @param secrets plaintext secrets
+   * @return secrets without cloud AK/SK pairs
+   */
+  public static Map<String, String> omitCloudAccessKeyPairSecrets(
+      @Nullable Map<String, String> secrets) {
+    return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
   }
 }
