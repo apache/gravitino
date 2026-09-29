@@ -217,6 +217,40 @@ public abstract class SharedDbContainerService
     }
   }
 
+
+  /**
+   * Loads extra container-start args for {@code backend} from a plain-text resource at
+   * {@code shared-db-tuning/<backend>.args} (one token per line; blank lines and lines
+   * starting with {@code #} are ignored). Missing resources or read failures are logged and
+   * treated as "no extra args" so a bad/missing tuning file can never fail the build --
+   * it only ever falls back to untuned defaults.
+   */
+  private List<String> loadExtraDbArgs(String backend) {
+    String resourcePath = "shared-db-tuning/" + backend + ".args";
+    try (java.io.InputStream in =
+        SharedDbContainerService.class.getClassLoader().getResourceAsStream(resourcePath)) {
+      if (in == null) {
+        return java.util.Collections.emptyList();
+      }
+      List<String> args = new ArrayList<>();
+      try (java.io.BufferedReader reader =
+          new java.io.BufferedReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          String trimmed = line.trim();
+          if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+            args.add(trimmed);
+          }
+        }
+      }
+      return args;
+    } catch (IOException e) {
+      LOG.warn("Failed to load DB tuning args for {} from {}, continuing untuned",
+          backend, resourcePath, e);
+      return java.util.Collections.emptyList();
+    }
+  }
+
   private DbConnectionInfo startContainer(String backend) {
     switch (backend) {
       case MYSQL_BACKEND:
@@ -229,19 +263,26 @@ public abstract class SharedDbContainerService
   }
 
   private DbConnectionInfo startMySql() {
-    String containerId =
-        runDocker(
-            "run",
-            "-d",
-            "--rm",
-            "--label",
-            CONTAINER_LABEL_KEY + "=" + labelValue,
-            "--label",
-            CONTAINER_PID_LABEL_KEY + "=" + ownerPid,
-            "-P",
-            "-e",
-            "MYSQL_ROOT_PASSWORD=" + DB_PASSWORD,
-            MYSQL_IMAGE);
+    List<String> mysqlRunArgs =
+        new ArrayList<>(
+            Arrays.asList(
+                "run",
+                "-d",
+                "--rm",
+                "--label",
+                CONTAINER_LABEL_KEY + "=" + labelValue,
+                "--label",
+                CONTAINER_PID_LABEL_KEY + "=" + ownerPid,
+                "-P",
+                // Disposable container -- backing the data dir with tmpfs removes real disk
+                // I/O for every write, on top of the durability-relaxing mysqld flags below.
+                "--tmpfs",
+                "/var/lib/mysql",
+                "-e",
+                "MYSQL_ROOT_PASSWORD=" + DB_PASSWORD,
+                MYSQL_IMAGE));
+    mysqlRunArgs.addAll(loadExtraDbArgs("mysql"));
+    String containerId = runDocker(mysqlRunArgs.toArray(new String[0]));
     try {
       awaitReady(
           containerId,
@@ -266,21 +307,27 @@ public abstract class SharedDbContainerService
   }
 
   private DbConnectionInfo startPostgreSql() {
-    String containerId =
-        runDocker(
-            "run",
-            "-d",
-            "--rm",
-            "--label",
-            CONTAINER_LABEL_KEY + "=" + labelValue,
-            "--label",
-            CONTAINER_PID_LABEL_KEY + "=" + ownerPid,
-            "-P",
-            "-e",
-            "POSTGRES_USER=" + DB_USER,
-            "-e",
-            "POSTGRES_PASSWORD=" + DB_PASSWORD,
-            POSTGRESQL_IMAGE);
+    List<String> postgresRunArgs =
+        new ArrayList<>(
+            Arrays.asList(
+                "run",
+                "-d",
+                "--rm",
+                "--label",
+                CONTAINER_LABEL_KEY + "=" + labelValue,
+                "--label",
+                CONTAINER_PID_LABEL_KEY + "=" + ownerPid,
+                "-P",
+                // Disposable container -- see the equivalent tmpfs mount in startMySql().
+                "--tmpfs",
+                "/var/lib/postgresql/data",
+                "-e",
+                "POSTGRES_USER=" + DB_USER,
+                "-e",
+                "POSTGRES_PASSWORD=" + DB_PASSWORD,
+                POSTGRESQL_IMAGE));
+    postgresRunArgs.addAll(loadExtraDbArgs("postgresql"));
+    String containerId = runDocker(postgresRunArgs.toArray(new String[0]));
     try {
       // -h forces a TCP health check. The postgres image's entrypoint first runs a *temporary*,
       // socket-only server (listen_addresses='') to execute init scripts before starting the

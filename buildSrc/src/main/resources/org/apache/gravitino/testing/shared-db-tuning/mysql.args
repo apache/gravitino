@@ -1,0 +1,24 @@
+# Extra mysqld command-line flags for the shared MySQL test container
+# (SharedDbContainerService). One token per line; blank lines and lines
+# starting with # are ignored.
+#
+# Why these are safe HERE (and would NOT be safe in production): this
+# container is disposable and is torn down at the end of every test run,
+# so there is no need for crash durability, replication, or monitoring.
+#
+# Measured effect (apache/gravitino#13553, 8vCPU/31GB gcp-arc-runners-large
+# class, -PcoreDatabaseForks=2), core:coreMySQLTest wall clock:
+#   26m25s  per-fork containers (old design)
+#   27m53s  shared container, untuned
+#   22m15s  shared container, first 4 flags below only
+#    7m04s  shared container, all flags below + tmpfs data dir
+# All runs: 520 tests, 0 failures, 0 deadlocks / lock-wait timeouts.
+# core:coreH2Test is unchanged across all runs (1m27s -> 1m21s), the control
+# confirming the speedup is database I/O and not the host.
+--innodb-flush-log-at-trx-commit=0
+--sync-binlog=0
+--innodb-buffer-pool-size=2G
+--innodb-log-buffer-size=64M
+--skip-log-bin
+--innodb-doublewrite=0
+--performance-schema=OFF
