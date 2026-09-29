@@ -32,10 +32,16 @@
 # All runs: 520 tests, 0 failures, 0 deadlocks / lock-wait timeouts.
 # core:coreH2Test is unchanged across all runs (1m27s -> 1m21s), the control
 # confirming the speedup is database I/O and not the host.
+#
+# NOTE: --performance-schema is deliberately NOT disabled here, even though
+# turning it off would shave a little more overhead. TestRoleMembershipWrites
+# and TestOwnerAssignmentWrites assert on real row-lock contention by polling
+# performance_schema.data_lock_waits; with the performance schema off that
+# table is silently always empty, so those assertions would stop verifying
+# anything without ever failing.
 --innodb-flush-log-at-trx-commit=0
 --sync-binlog=0
 --innodb-buffer-pool-size=2G
 --innodb-log-buffer-size=64M
 --skip-log-bin
 --innodb-doublewrite=0
---performance-schema=OFF
