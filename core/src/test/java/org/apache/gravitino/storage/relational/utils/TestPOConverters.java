@@ -886,10 +886,23 @@ public class TestPOConverters {
         JsonUtils.anyFieldMapper().writeValueAsString(reordered));
 
     Namespace namespace = NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema");
-    FilesetEntity filesetEntity =
-        createFileset(1L, "test", namespace, "this is test", "hdfs://localhost/test", properties);
+    Map<String, String> locations =
+        ImmutableMap.of("first", "hdfs://localhost/first", "second", "hdfs://localhost/second");
+    FilesetEntity original =
+        createFileset(1L, "test", namespace, "this is test", "hdfs://localhost/first", properties);
+    FilesetEntity.Builder filesetBuilder =
+        FilesetEntity.builder()
+            .withId(original.id())
+            .withName(original.name())
+            .withNamespace(namespace)
+            .withFilesetType(original.filesetType())
+            .withStorageLocations(locations)
+            .withComment(original.comment())
+            .withProperties(properties)
+            .withAuditInfo(original.auditInfo());
+    FilesetEntity filesetEntity = filesetBuilder.build();
     FilesetEntity renamedFileset =
-        createFileset(1L, "test1", namespace, "this is test", "hdfs://localhost/test", reordered);
+        filesetBuilder.withName("test1").withProperties(reordered).build();
 
     FilesetPO.Builder builder =
         FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
@@ -900,6 +913,41 @@ public class TestPOConverters {
     assertEquals(2, renamedPO.getOccVersion());
     assertEquals(1, renamedPO.getCurrentVersion());
     assertTrue(renamedPO.getFilesetVersionPOs().isEmpty());
+    assertEquals(2, initPO.getFilesetVersionPOs().size());
+
+    // A real property change still writes a complete snapshot for both locations.
+    Map<String, String> changedProperties = new HashMap<>(reordered);
+    changedProperties.put("retention", "14d");
+    FilesetPO changedPO =
+        POConverters.updateFilesetPOWithVersion(
+            initPO, filesetBuilder.withProperties(changedProperties).build(), null);
+    assertEquals(2, changedPO.getCurrentVersion());
+    assertEquals(2, changedPO.getOccVersion());
+    assertEquals(2, changedPO.getFilesetVersionPOs().size());
+    for (FilesetVersionPO version : changedPO.getFilesetVersionPOs()) {
+      assertEquals(
+          changedProperties,
+          JsonUtils.anyFieldMapper().readValue(version.getProperties(), Map.class));
+    }
+
+    // Comparing shared fields once must not skip changes to any location, including a row
+    // other than the first one used for the shared fields.
+    String changedLocationName = initPO.getFilesetVersionPOs().get(1).getLocationName();
+    Map<String, String> changedLocations = new HashMap<>(locations);
+    changedLocations.put(changedLocationName, "hdfs://localhost/changed");
+    FilesetPO changedLocationPO =
+        POConverters.updateFilesetPOWithVersion(
+            initPO,
+            filesetBuilder.withProperties(reordered).withStorageLocations(changedLocations).build(),
+            null);
+    assertEquals(2, changedLocationPO.getCurrentVersion());
+    assertEquals(2, changedLocationPO.getOccVersion());
+    assertEquals(
+        changedLocations,
+        changedLocationPO.getFilesetVersionPOs().stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation)));
   }
 
   @Test

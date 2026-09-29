@@ -807,12 +807,11 @@ public class POConverters {
     if (!storedLocations.equals(newFileset.storageLocations())) {
       return false;
     }
-    return storedVersions.stream()
-        .allMatch(
-            version ->
-                Objects.equals(version.getFilesetComment(), newFileset.comment())
-                    && filesetPropertiesUnchanged(
-                        version.getProperties(), newProperties, newFileset.properties()));
+    // Rows for the same snapshot share the comment and properties; only locations differ.
+    FilesetVersionPO snapshot = storedVersions.get(0);
+    return Objects.equals(snapshot.getFilesetComment(), newFileset.comment())
+        && filesetPropertiesUnchanged(
+            snapshot.getProperties(), newProperties, newFileset.properties());
   }
 
   private static boolean filesetPropertiesUnchanged(
