@@ -91,6 +91,7 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -4019,5 +4020,37 @@ public class CatalogClickHouseIT extends BaseIT {
         createSql);
     Assertions.assertTrue(normalizedCreateSql.contains("GRANULARITY100000000"), createSql);
     Assertions.assertTrue(normalizedCreateSql.contains("GRANULARITY7"), createSql);
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testLoadTableWithUnsupportedNativeDotProductVectorIndex() {
+    String[] version = clickhouseService.executeQueryForResult("SELECT version()").split("\\.");
+    int majorVersion = Integer.parseInt(version[0]);
+    int minorVersion = Integer.parseInt(version[1]);
+    Assumptions.assumeTrue(
+        majorVersion > 26 || (majorVersion == 26 && minorVersion >= 4),
+        "Native dotProduct vector indexes require ClickHouse 26.4 or later");
+
+    String nativeTableName = GravitinoITUtils.genRandomName("ch_native_dot_vector_idx_");
+    clickhouseService.executeQuery(
+        ("CREATE TABLE `%s`.`%s` ("
+                + "id Int32, embedding_l2 Array(Float32), embedding_dot Array(Float32), "
+                + "INDEX idx_minmax id TYPE minmax GRANULARITY 1, "
+                + "INDEX idx_l2 embedding_l2 TYPE "
+                + "vector_similarity('hnsw', 'L2Distance', 3) GRANULARITY 100000000, "
+                + "INDEX idx_dot embedding_dot TYPE "
+                + "vector_similarity('hnsw', 'dotProduct', 3) GRANULARITY 100000000) "
+                + "ENGINE = MergeTree ORDER BY id")
+            .formatted(schemaName, nativeTableName));
+
+    Table loaded =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, nativeTableName));
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index()).anyMatch(index -> "idx_minmax".equals(index.name())));
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index()).anyMatch(index -> "idx_l2".equals(index.name())));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index()).anyMatch(index -> "idx_dot".equals(index.name())));
   }
 }

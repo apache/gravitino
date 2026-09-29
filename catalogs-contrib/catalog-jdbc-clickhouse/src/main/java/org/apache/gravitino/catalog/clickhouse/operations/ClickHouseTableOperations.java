@@ -1978,6 +1978,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             try {
               parameterProperties =
                   parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
+            } catch (UnsupportedVectorSimilarityIndexException e) {
+              LOG.warn(
+                  "Skip unsupported vector similarity index '{}' on {}.{} with {} '{}': {}",
+                  name,
+                  databaseName,
+                  tableName,
+                  parameterSourceName,
+                  parameterSource,
+                  e.getMessage());
+              continue;
             } catch (IllegalArgumentException e) {
               throw new IllegalArgumentException(
                   "Failed to load data skipping index '%s' from %s.%s with %s '%s': %s"
@@ -2274,21 +2284,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String type =
         parseVectorSimilarityStringParameter(parameters.get(0), VECTOR_SIMILARITY_TYPE, indexName);
-    Preconditions.checkArgument(
-        StringUtils.equalsIgnoreCase(DEFAULT_VECTOR_SIMILARITY_TYPE, type),
-        "Unsupported %s '%s' for vector_similarity index '%s'",
-        VECTOR_SIMILARITY_TYPE,
-        type,
-        indexName);
+    if (!StringUtils.equalsIgnoreCase(DEFAULT_VECTOR_SIMILARITY_TYPE, type)) {
+      throw new UnsupportedVectorSimilarityIndexException(
+          "Unsupported %s '%s' for vector_similarity index '%s'"
+              .formatted(VECTOR_SIMILARITY_TYPE, type, indexName));
+    }
     String distanceFunction =
         parseVectorSimilarityStringParameter(
             parameters.get(1), VECTOR_SIMILARITY_DISTANCE_FUNCTION, indexName);
-    Preconditions.checkArgument(
-        VECTOR_SIMILARITY_DISTANCE_FUNCTIONS.contains(distanceFunction),
-        "Unsupported %s '%s' for vector_similarity index '%s'",
-        VECTOR_SIMILARITY_DISTANCE_FUNCTION,
-        distanceFunction,
-        indexName);
+    if (!VECTOR_SIMILARITY_DISTANCE_FUNCTIONS.contains(distanceFunction)) {
+      throw new UnsupportedVectorSimilarityIndexException(
+          "Unsupported %s '%s' for vector_similarity index '%s'"
+              .formatted(VECTOR_SIMILARITY_DISTANCE_FUNCTION, distanceFunction, indexName));
+    }
     String dimensions =
         requireIntWithMin(
             parameters.get(2),
@@ -2302,12 +2310,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       quantization =
           parseVectorSimilarityStringParameter(
               parameters.get(3), VECTOR_SIMILARITY_QUANTIZATION, indexName);
-      Preconditions.checkArgument(
-          VECTOR_SIMILARITY_QUANTIZATIONS.contains(quantization),
-          "Unsupported %s '%s' for vector_similarity index '%s'",
-          VECTOR_SIMILARITY_QUANTIZATION,
-          quantization,
-          indexName);
+      if (!VECTOR_SIMILARITY_QUANTIZATIONS.contains(quantization)) {
+        throw new UnsupportedVectorSimilarityIndexException(
+            "Unsupported %s '%s' for vector_similarity index '%s'"
+                .formatted(VECTOR_SIMILARITY_QUANTIZATION, quantization, indexName));
+      }
     }
 
     int maxConnections = DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER;
@@ -2898,5 +2905,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return sqlBuilder;
+  }
+
+  private static final class UnsupportedVectorSimilarityIndexException
+      extends IllegalArgumentException {
+    private static final long serialVersionUID = 1L;
+
+    private UnsupportedVectorSimilarityIndexException(String message) {
+      super(message);
+    }
   }
 }

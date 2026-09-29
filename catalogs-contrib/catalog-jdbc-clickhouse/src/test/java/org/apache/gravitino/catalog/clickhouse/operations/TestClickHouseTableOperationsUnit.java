@@ -1467,6 +1467,74 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testGetIndexesSkipsUnsupportedVectorSimilarityWithoutDroppingOtherIndexes()
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_dot", "idx_l2", "idx_minmax");
+    Mockito.when(secondaryRs.getString("type"))
+        .thenReturn("vector_similarity", "vector_similarity", "minmax");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            "vector_similarity('hnsw', 'dotProduct', 3)",
+            "vector_similarity('hnsw', 'L2Distance', 3)",
+            "minmax");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("embedding_dot", "embedding_l2", "id");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(100_000_000L, 100_000_000L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals("idx_l2", indexes.get(0).name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, indexes.get(0).type());
+    Assertions.assertEquals("idx_minmax", indexes.get(1).name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_MINMAX, indexes.get(1).type());
+  }
+
+  @Test
+  void testGetIndexesRejectsMalformedVectorSimilarityMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_malformed");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("vector_similarity");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn("vector_similarity('hnsw', 'L2Distance', not_an_integer)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("embedding");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(100_000_000L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_malformed"));
+    Assertions.assertTrue(exception.getMessage().contains("type_full"));
+  }
+
+  @Test
   void testVectorSimilarityCreateAndAlterDdlUseTheSameTypeClause() {
     JdbcColumn[] columns =
         new JdbcColumn[] {

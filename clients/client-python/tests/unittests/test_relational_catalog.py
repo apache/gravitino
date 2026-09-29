@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
 from http.client import HTTPResponse
 from unittest.mock import Mock, patch
@@ -22,6 +23,7 @@ from unittest.mock import Mock, patch
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.dialects import Dialects
+from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
@@ -150,6 +152,37 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             table = self.catalog.load_table(self.table_identifier)
             self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_load_table_with_vector_similarity_index(self):
+        response_json = json.loads(TableResponse(0, self.table_dto).to_json())
+        response_json["table"]["indexes"] = [
+            {
+                "indexType": "DATA_SKIPPING_VECTOR_SIMILARITY",
+                "name": "idx_vector",
+                "fieldNames": [["id"]],
+                "properties": {
+                    "type": "hnsw",
+                    "distance_function": "L2Distance",
+                    "dimensions": "3",
+                },
+            }
+        ]
+        mock_resp = self._get_mock_http_resp(json.dumps(response_json))
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        ):
+            table = self.catalog.load_table(self.table_identifier)
+
+        self.assertEqual(table.name(), self.table_dto.name())
+        self.assertEqual(len(table.index()), 1)
+        self.assertEqual(
+            table.index()[0].type(), Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+        )
+        self.assertEqual(
+            table.index()[0].properties(),
+            {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
+        )
 
     def test_load_table_with_required_privilege_names(self):
         resp_body = TableResponse(0, self.table_dto)
