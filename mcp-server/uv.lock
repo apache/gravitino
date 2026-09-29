@@ -496,6 +496,10 @@ dependencies = [
     { name = "fakeredis" },
     { name = "fastmcp" },
     { name = "httpx-auth" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "parameterized" },
     { name = "pylint" },
     { name = "pytest" },
@@ -506,6 +510,10 @@ requires-dist = [
     { name = "fakeredis", specifier = "<2.38.0" },
     { name = "fastmcp", specifier = "==3.4.5" },
     { name = "httpx-auth", specifier = ">=0.22,<0.24" },
+]
+
+[package.metadata.requires-dev]
+dev = [
     { name = "parameterized", specifier = ">=0.9.0" },
     { name = "pylint", specifier = ">=2.20.0" },
     { name = "pytest", specifier = ">=8.4.1" },

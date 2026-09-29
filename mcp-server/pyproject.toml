@@ -31,6 +31,14 @@ dependencies = [
     # fakeredis.aioredis, which pydocket still uses. Pin fakeredis to <2.35.0 until the
     # tracked pydocket/fakeredis compatibility issue is resolved.
     "fakeredis<2.38.0",
+]
+
+# Development-only dependencies. These are NOT shipped in the MCP server image:
+# the Dockerfile runs `uv sync --no-dev` and start-mcp-server.sh runs `uv run --no-dev`,
+# so pylint (GPL-2.0-or-later) and its transitive dep astroid (LGPL) stay out of the
+# distributed runtime environment. Developers still get them via `uv sync` locally.
+[dependency-groups]
+dev = [
     "parameterized>=0.9.0",
     "pytest>=8.4.1",
     "pylint>=2.20.0",
