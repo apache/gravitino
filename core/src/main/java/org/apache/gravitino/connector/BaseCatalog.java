@@ -536,8 +536,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       // Explicit credential-providers wins: do not auto-append detected static providers (e.g.
-      // s3-secret-key next to s3-token), which breaks path-based credential selection. Catalogs that
-      // must keep jdbc/aws/dlf listed use ensureCredentialProviderListed in their overrides.
+      // s3-secret-key beside s3-token), which breaks path-based credential selection. Catalogs that
+      // must keep jdbc/aws/dlf listed call ensureCredentialProviderListed in their overrides.
       return props;
     }
     List<String> credentialProviders = new ArrayList<>();
