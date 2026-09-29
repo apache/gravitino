@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,7 +75,7 @@ class TestDorisTableCreation {
     verify(fixture.commentStatement).setString(2, "t");
     verify(fixture.commentResult).close();
     verify(fixture.commentStatement).close();
-    verify(fixture.connection).close();
+    verify(fixture.connection, times(2)).close();
   }
 
   @Test
@@ -95,13 +97,17 @@ class TestDorisTableCreation {
     CreateFixture fixture = new CreateFixture(COMMENT, "");
     when(fixture.commentResult.next()).thenReturn(false);
 
-    NoSuchTableException error = assertThrows(NoSuchTableException.class, fixture::create);
+    GravitinoRuntimeException error =
+        assertThrows(GravitinoRuntimeException.class, fixture::create);
 
-    assertTrue(error.getMessage().contains("Table db.t does not exist in Doris"));
+    assertInstanceOf(NoSuchTableException.class, error.getCause());
+    assertTrue(error.getCause().getMessage().contains("Table db.t does not exist in Doris"));
+    assertTrue(error.getMessage().contains("Table db.t was created in Doris"));
+    assertTrue(error.getMessage().contains("Drop the created table in Doris before retrying"));
     verify(fixture.alterStatement, never()).executeUpdate(anyString());
     verify(fixture.commentResult).close();
     verify(fixture.commentStatement).close();
-    verify(fixture.connection).close();
+    verify(fixture.connection, times(2)).close();
   }
 
   @Test
@@ -122,6 +128,7 @@ class TestDorisTableCreation {
 
     verify(fixture.connection, never()).prepareStatement(anyString());
     verify(fixture.alterStatement, never()).executeUpdate(anyString());
+    verify(fixture.connection).close();
   }
 
   @Test
@@ -152,7 +159,7 @@ class TestDorisTableCreation {
     assertTrue(error.getMessage().contains("Drop the created table in Doris before retrying"));
     verify(fixture.alterStatement, never()).executeUpdate(anyString());
     verify(fixture.commentStatement).close();
-    verify(fixture.connection).close();
+    verify(fixture.connection, times(2)).close();
   }
 
   @Test
@@ -169,7 +176,7 @@ class TestDorisTableCreation {
     assertTrue(error.getMessage().contains("may be missing its Gravitino identifier"));
     assertTrue(error.getMessage().contains("Drop the created table in Doris before retrying"));
     verify(fixture.alterStatement).close();
-    verify(fixture.connection).close();
+    verify(fixture.connection, times(2)).close();
   }
 
   private static class CreateFixture {

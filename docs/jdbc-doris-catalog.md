@@ -58,7 +58,8 @@ Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
 ### Doris 2.1.0 Table Comments
 
 Doris 2.1.0 can discard table comments when its Nereids planner handles `CREATE TABLE`.
-Gravitino checks the stored comment after creation and, if necessary, restores it with
+After every table creation, on all Doris versions, Gravitino reads the stored comment from
+`information_schema.TABLES` and, if it differs, restores it with
 `ALTER TABLE ... MODIFY COMMENT`, including Gravitino's table identifier. On affected servers,
 the JDBC user must have permission to alter the created table. The connector leaves the
 planner settings unchanged.
