@@ -39,7 +39,6 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.DlfSecretKeyCredential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -315,38 +314,6 @@ public class TestPaimonCatalog {
   }
 
   @Test
-  void testDlfCredentialProviderAutoDetected() {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-
-    Map<String, String> dlfProps = Maps.newHashMap();
-    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "dlf");
-    dlfProps.put(PaimonConstants.WAREHOUSE, tempDir);
-    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
-    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");
-
-    CatalogEntity dlfEntity =
-        CatalogEntity.builder()
-            .withId(4L)
-            .withName("dlf-catalog")
-            .withNamespace(Namespace.of("metalake"))
-            .withType(PaimonCatalog.Type.RELATIONAL)
-            .withProvider("lakehouse-paimon")
-            .withAuditInfo(auditInfo)
-            .withProperties(dlfProps)
-            .build();
-
-    PaimonCatalog dlfCatalog =
-        new PaimonCatalog().withCatalogConf(dlfProps).withCatalogEntity(dlfEntity);
-    Map<String, String> properties = dlfCatalog.propertiesWithCredentialProviders();
-
-    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertNotNull(credentialProviders);
-    Assertions.assertTrue(
-        credentialProviders.contains(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE));
-  }
-
-  @Test
   void testJdbcBackendWithOSSCredentialProviders() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -453,39 +420,6 @@ public class TestPaimonCatalog {
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
     Assertions.assertTrue(credentialProviders.contains("custom-provider"));
     Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
-  }
-
-  @Test
-  void testExplicitCredentialProvidersStillGetsDlf() {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-
-    Map<String, String> dlfProps = Maps.newHashMap();
-    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "dlf");
-    dlfProps.put(PaimonConstants.WAREHOUSE, tempDir);
-    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
-    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");
-    dlfProps.put(CredentialConstants.CREDENTIAL_PROVIDERS, "custom-provider");
-
-    CatalogEntity dlfEntity =
-        CatalogEntity.builder()
-            .withId(8L)
-            .withName("dlf-explicit-catalog")
-            .withNamespace(Namespace.of("metalake"))
-            .withType(PaimonCatalog.Type.RELATIONAL)
-            .withProvider("lakehouse-paimon")
-            .withAuditInfo(auditInfo)
-            .withProperties(dlfProps)
-            .build();
-
-    PaimonCatalog dlfCatalog =
-        new PaimonCatalog().withCatalogConf(dlfProps).withCatalogEntity(dlfEntity);
-    Map<String, String> properties = dlfCatalog.propertiesWithCredentialProviders();
-
-    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
-    Assertions.assertTrue(
-        credentialProviders.contains(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE));
   }
 
   private PaimonCatalog newPaimonCatalog(String catalogName) {

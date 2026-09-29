@@ -26,7 +26,6 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.DlfSecretKeyCredential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.rel.ViewCatalog;
 
@@ -89,9 +88,8 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   }
 
   /**
-   * Ensures JDBC / DLF providers stay listed even when {@code credential-providers} was set
-   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case,
-   * and those keys are no longer recovered via {@code getSecrets}.
+   * Ensures the JDBC provider stays listed even when {@code credential-providers} was set
+   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case.
    *
    * @return catalog properties with credential providers
    */
@@ -107,17 +105,12 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
         ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
     }
-    String dlfAccessKeyId = props.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID);
-    String dlfAccessKeySecret = props.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(dlfAccessKeyId) && StringUtils.isNotBlank(dlfAccessKeySecret)) {
-      ensureCredentialProviderListed(props, DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE);
-    }
     return props;
   }
 
   /**
-   * Adds JDBC and/or DLF credential providers when those credentials are configured, then delegates
-   * to the parent for storage (S3/OSS/Azure/GCS) credential provider detection.
+   * Adds a JDBC credential provider when the backend is JDBC and credentials are configured, then
+   * delegates to the parent for storage (S3/OSS/Azure/GCS) credential provider detection.
    *
    * @param properties the raw catalog properties
    * @param credentialProviders the list to append detected provider names to
@@ -133,11 +126,6 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
       if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
         credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
-    }
-    String dlfAccessKeyId = properties.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID);
-    String dlfAccessKeySecret = properties.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(dlfAccessKeyId) && StringUtils.isNotBlank(dlfAccessKeySecret)) {
-      credentialProviders.add(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE);
     }
     addStorageCredentialProviders(properties, credentialProviders);
   }
