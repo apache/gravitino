@@ -219,7 +219,15 @@ public abstract class SharedDbContainerService
 
 
   /**
-   * Loads extra container-start args for {@code backend} from a plain-text resource at
+   * Why this tuning exists at all: one shared container serves roughly twice the concurrent
+   * DDL/DML load that per-fork containers each saw, because every test fork now writes to the
+   * same server. A database's production durability defaults -- an fsync on every commit, frequent
+   * checkpoints, doublewrite/full-page writes, binary logging -- are per-commit costs, so that
+   * doubled write load multiplies them rather than absorbing them. Relaxing those guarantees for
+   * a container that is disposable and torn down at the end of the run was the difference between
+   * the shared container being a ~5.6% regression and being a 3x+ speedup.
+   *
+   * <p>Loads extra container-start args for {@code backend} from a plain-text resource at
    * {@code shared-db-tuning/<backend>.args} (one token per line; blank lines and lines
    * starting with {@code #} are ignored). Missing resources or read failures are logged and
    * treated as "no extra args" so a bad/missing tuning file can never fail the build --
@@ -230,6 +238,11 @@ public abstract class SharedDbContainerService
     try (java.io.InputStream in =
         SharedDbContainerService.class.getClassLoader().getResourceAsStream(resourcePath)) {
       if (in == null) {
+        LOG.warn(
+            "No DB tuning args found on the classpath at {} for backend {}; the shared container"
+                + " will run with untuned server defaults",
+            resourcePath,
+            backend);
         return java.util.Collections.emptyList();
       }
       List<String> args = new ArrayList<>();
@@ -248,6 +261,25 @@ public abstract class SharedDbContainerService
       LOG.warn("Failed to load DB tuning args for {} from {}, continuing untuned",
           backend, resourcePath, e);
       return java.util.Collections.emptyList();
+    }
+  }
+
+  /**
+   * Logs the tuning args actually applied to a shared container, so a run that is unexpectedly
+   * slow can be told apart from a run whose tuning file silently failed to load.
+   */
+  private void logTuningArgs(String backendLabel, List<String> tuningArgs) {
+    if (tuningArgs.isEmpty()) {
+      LOG.warn(
+          "Starting shared {} test database container with NO tuning args (untuned server"
+              + " defaults); expect a substantially slower run",
+          backendLabel);
+    } else {
+      LOG.lifecycle(
+          "Applying {} tuning args to shared {} test database container: {}",
+          tuningArgs.size(),
+          backendLabel,
+          String.join(" ", tuningArgs));
     }
   }
 
@@ -299,7 +331,9 @@ public abstract class SharedDbContainerService
                 "-e",
                 "MYSQL_ROOT_PASSWORD=" + DB_PASSWORD,
                 MYSQL_IMAGE));
-    mysqlRunArgs.addAll(loadExtraDbArgs("mysql"));
+    List<String> mysqlTuningArgs = loadExtraDbArgs("mysql");
+    logTuningArgs("MySQL", mysqlTuningArgs);
+    mysqlRunArgs.addAll(mysqlTuningArgs);
     String containerId = runDocker(mysqlRunArgs.toArray(new String[0]));
     try {
       awaitReady(
@@ -355,7 +389,9 @@ public abstract class SharedDbContainerService
                 "-e",
                 "POSTGRES_PASSWORD=" + DB_PASSWORD,
                 POSTGRESQL_IMAGE));
-    postgresRunArgs.addAll(loadExtraDbArgs("postgresql"));
+    List<String> postgresTuningArgs = loadExtraDbArgs("postgresql");
+    logTuningArgs("PostgreSQL", postgresTuningArgs);
+    postgresRunArgs.addAll(postgresTuningArgs);
     String containerId = runDocker(postgresRunArgs.toArray(new String[0]));
     try {
       // -h forces a TCP health check. The postgres image's entrypoint first runs a *temporary*,
