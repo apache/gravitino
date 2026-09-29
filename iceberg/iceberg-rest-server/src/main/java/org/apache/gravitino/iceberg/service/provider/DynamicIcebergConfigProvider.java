@@ -38,6 +38,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -141,28 +142,12 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
           "Skipping getSecrets while resolving Iceberg catalog {}: {}",
           catalog.name(),
           e.toString());
-    } catch (RESTException e) {
-      LOG.warn(
-          "Failed to resolve getSecrets for Iceberg catalog {}; continuing with masked properties:"
-              + " {}",
-          catalog.name(),
-          e.toString());
     }
     try {
       SupportsCredentials supportsCredentials = catalog.supportsCredentials();
       if (supportsCredentials != null) {
         Credential[] credentials = supportsCredentials.getCredentials();
-        if (credentials != null) {
-          for (Credential credential : credentials) {
-            // Skip expiring credentials: this config is cached and has no refresh path.
-            if (credential == null
-                || credential.expireTimeInMs() != 0
-                || credential.credentialInfo() == null) {
-              continue;
-            }
-            props.putAll(credential.credentialInfo());
-          }
-        }
+        props.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
       }
     } catch (UnsupportedOperationException | NotFoundException e) {
       LOG.debug(

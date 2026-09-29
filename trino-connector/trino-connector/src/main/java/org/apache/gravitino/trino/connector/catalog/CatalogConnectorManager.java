@@ -44,7 +44,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
@@ -1061,14 +1061,14 @@ public class CatalogConnectorManager {
   }
 
   /**
-   * Overlays secrets and credential info the Gravitino server vends for this catalog onto its
-   * properties.
+   * Overlays secrets and non-expiring credential info onto catalog properties.
    *
    * <p>Resolved here, on the node that is about to build the connector, rather than once at
    * registration time: the registered definition travels through a CREATE CATALOG statement that
    * Trino persists as a catalog properties file, and a secret placed in it would be readable there
-   * for as long as the catalog exists. Cloud/JDBC credential fields come from {@code
-   * getCredentials()}; other secrets come from {@code getSecrets()}.
+   * for as long as the catalog exists. {@code getSecrets()} failures other than missing-endpoint /
+   * unsupported are fatal (this connector is cached). Missing {@code /credentials} is tolerated for
+   * older servers.
    */
   private GravitinoCatalog withResolvedSecrets(
       GravitinoCatalog catalog, GravitinoMetalake metalake) {
@@ -1094,12 +1094,10 @@ public class CatalogConnectorManager {
       LOG.debug(
           "Skipping getSecrets for catalog %s in metalake %s: %s",
           catalog.getName(), catalog.getMetalake(), e.toString());
-    } catch (RESTException e) {
-      LOG.warn(
-          "Failed to resolve getSecrets for catalog %s in metalake %s; continuing with masked"
-              + " properties: %s",
-          catalog.getName(), catalog.getMetalake(), e.toString());
     } catch (Exception e) {
+      // Fail-fast on RESTException and unexpected errors: this connector is cached, so continuing
+      // with masked ****** properties would leave a permanently broken catalog after a transient
+      // /secrets failure.
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
           String.format(
@@ -1108,18 +1106,8 @@ public class CatalogConnectorManager {
           e);
     }
     try {
-      Credential[] credentials = loaded.supportsCredentials().getCredentials();
-      if (credentials != null) {
-        for (Credential credential : credentials) {
-          // Skip expiring credentials: connector config is built once and cached.
-          if (credential == null
-              || credential.expireTimeInMs() != 0
-              || credential.credentialInfo() == null) {
-            continue;
-          }
-          properties.putAll(credential.credentialInfo());
-        }
-      }
+      properties.putAll(
+          CredentialInfos.nonExpiringCredentialInfo(loaded.supportsCredentials().getCredentials()));
     } catch (UnsupportedOperationException | NotFoundException e) {
       // Catalog may not support credential vending, or older servers lack /credentials.
       LOG.debug(

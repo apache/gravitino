@@ -30,10 +30,8 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTE
 import static org.apache.gravitino.catalog.glue.GlueConstants.WAREHOUSE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.gravitino.cloud.storage.AWSPropertiesMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,18 +70,12 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testCredentialsAreOptionalAndBothHalvesAreHidden() {
+  void testCredentialsAreOptionalAndAccessKeyIdIsVisible() {
     assertFalse(metadata.isRequiredProperty(AWS_ACCESS_KEY_ID));
     assertFalse(metadata.isRequiredProperty(AWS_SECRET_ACCESS_KEY));
-    // Both halves of the static credential pair are hidden on read paths.
-    assertTrue(metadata.isHiddenProperty(AWS_ACCESS_KEY_ID));
+    // Access key ID is an identifier, same as s3-access-key-id; only the secret is hidden.
+    assertFalse(metadata.isHiddenProperty(AWS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(AWS_SECRET_ACCESS_KEY));
-    // Same PropertyEntry instances as the shared definition, not a Glue-local copy.
-    assertSame(
-        AWSPropertiesMetadata.AWS_ACCESS_KEY_ID, metadata.propertyEntries().get(AWS_ACCESS_KEY_ID));
-    assertSame(
-        AWSPropertiesMetadata.AWS_SECRET_ACCESS_KEY,
-        metadata.propertyEntries().get(AWS_SECRET_ACCESS_KEY));
   }
 
   @Test

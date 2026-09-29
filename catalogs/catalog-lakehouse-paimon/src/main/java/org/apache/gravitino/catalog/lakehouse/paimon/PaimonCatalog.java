@@ -88,27 +88,6 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   }
 
   /**
-   * Ensures the JDBC provider stays listed even when {@code credential-providers} was set
-   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case.
-   *
-   * @return catalog properties with credential providers
-   */
-  @Override
-  public Map<String, String> propertiesWithCredentialProviders() {
-    Map<String, String> props = super.propertiesWithCredentialProviders();
-    String catalogBackend = props.get(PaimonConstants.CATALOG_BACKEND);
-    if (catalogBackend != null
-        && PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
-      String jdbcUser = props.get(PaimonConstants.GRAVITINO_JDBC_USER);
-      String jdbcPassword = props.get(PaimonConstants.GRAVITINO_JDBC_PASSWORD);
-      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
-        ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
-      }
-    }
-    return props;
-  }
-
-  /**
    * Adds a JDBC credential provider when the backend is JDBC and credentials are configured, then
    * delegates to the parent for storage (S3/OSS/Azure/GCS) credential provider detection.
    *

@@ -52,14 +52,14 @@ public class TestPropertyUtils {
   }
 
   @Test
-  void testPropertiesWithSecretsSwallowsRestException() {
+  void testPropertiesWithSecretsPropagatesRestException() {
     SupportsSecrets broken =
         () -> {
           throw new RESTException("connection failed");
         };
-    Map<String, String> merged =
-        PropertyUtils.propertiesWithSecrets(Map.of("k", "v"), () -> broken);
-    Assertions.assertEquals("v", merged.get("k"));
+    Assertions.assertThrows(
+        RESTException.class,
+        () -> PropertyUtils.propertiesWithSecrets(Map.of("k", "v"), () -> broken));
   }
 
   @Test

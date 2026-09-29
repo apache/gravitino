@@ -35,6 +35,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -740,25 +741,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (UnsupportedOperationException | NotFoundException e) {
       // Stubs may not implement SupportsSecrets; older servers lack /secrets.
       LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
-    } catch (RESTException e) {
-      LOG.warn(
-          "Failed to resolve getSecrets while building Spark catalog properties; continuing with"
-              + " masked properties: {}",
-          e.toString());
     }
     try {
       Credential[] credentials = catalog.supportsCredentials().getCredentials();
-      if (credentials != null) {
-        for (Credential credential : credentials) {
-          // Skip expiring credentials: Spark catalog properties are fixed at initialize time.
-          if (credential == null
-              || credential.expireTimeInMs() != 0
-              || credential.credentialInfo() == null) {
-            continue;
-          }
-          props.putAll(credential.credentialInfo());
-        }
-      }
+      props.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
     } catch (UnsupportedOperationException | NotFoundException e) {
       // Stubs may not implement SupportsCredentials; older servers lack /credentials.
       LOG.debug(

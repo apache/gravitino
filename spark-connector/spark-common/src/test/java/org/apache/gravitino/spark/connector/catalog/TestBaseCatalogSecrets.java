@@ -20,6 +20,7 @@ package org.apache.gravitino.spark.connector.catalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -130,6 +131,27 @@ public class TestBaseCatalogSecrets {
     return Stream.of(
         new RESTException("transient failure"),
         new NotFoundException("credentials endpoint missing"));
+  }
+
+  @Test
+  void testGetSecretsRestExceptionAbortsInitialize() {
+    Catalog gravitinoCatalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    TableCatalog sparkCatalog = mock(TableCatalog.class);
+    when(gravitinoCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(gravitinoCatalog.provider()).thenReturn("hive");
+    when(gravitinoCatalog.properties())
+        .thenReturn(Map.of("metastore.uris", "thrift://localhost:9083"));
+    when(gravitinoCatalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets()).thenThrow(new RESTException("transient /secrets failure"));
+    when(gravitinoClient.loadCatalog(any())).thenReturn(gravitinoCatalog);
+    GravitinoCatalogManager.get().close();
+    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
+    catalog = new CapturingCatalog(sparkCatalog);
+
+    assertThrows(
+        RESTException.class,
+        () -> catalog.initialize("hive", new CaseInsensitiveStringMap(Map.of())));
   }
 
   @ParameterizedTest

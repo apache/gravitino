@@ -112,8 +112,8 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
     // credential cannot enumerate sibling keys. This is catalog-type policy, not user-configurable.
     props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
     // super() skips addCatalogSpecificCredentialProviders when credential-providers is already
-    // set; ensure jdbc stays listed so getCredentials can vend after getSecrets stopped returning
-    // jdbc keys.
+    // set; keep jdbc listed so getCredentials can still vend JDBC credentials alongside an
+    // explicit provider list (jdbc does not conflict with path-based storage providers).
     String catalogBackend = props.get(IcebergConstants.CATALOG_BACKEND);
     if (catalogBackend != null
         && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {

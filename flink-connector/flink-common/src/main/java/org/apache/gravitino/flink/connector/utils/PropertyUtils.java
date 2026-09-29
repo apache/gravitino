@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
@@ -50,9 +51,11 @@ public class PropertyUtils {
    * SupportsSecrets#getSecrets()} and {@link Credential#credentialInfo()} from {@link
    * SupportsCredentials#getCredentials()}.
    *
-   * <p>When secrets or credentials are unavailable — stubs that do not implement the interfaces, or
-   * older Gravitino servers that return {@link NotFoundException} / {@link RESTException} — returns
-   * a mutable copy of {@code properties} with whatever overlays succeeded so list/get still works.
+   * <p>When secrets are unavailable — stubs that do not implement {@link SupportsSecrets}, or older
+   * Gravitino servers that return {@link NotFoundException} — returns a mutable copy of {@code
+   * properties}. Transport failures ({@link RESTException}) from {@code getSecrets} are not
+   * swallowed: connectors must not start with masked {@code ******} values. Credential overlays
+   * still tolerate {@link RESTException} for older servers that lack {@code /credentials}.
    *
    * @param properties masked or raw properties (may be null)
    * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}, typically {@code
@@ -91,11 +94,6 @@ public class PropertyUtils {
       } catch (UnsupportedOperationException | NotFoundException e) {
         // Stubs may not implement SupportsSecrets; older servers lack /secrets.
         LOG.debug("Skipping getSecrets while resolving Flink catalog properties: {}", e.toString());
-      } catch (RESTException e) {
-        LOG.warn(
-            "Failed to resolve getSecrets while building Flink catalog properties; continuing with"
-                + " masked properties: {}",
-            e.toString());
       }
     }
     if (supportsCredentialsSupplier != null) {
@@ -103,17 +101,7 @@ public class PropertyUtils {
         SupportsCredentials supportsCredentials = supportsCredentialsSupplier.get();
         if (supportsCredentials != null) {
           Credential[] credentials = supportsCredentials.getCredentials();
-          if (credentials != null) {
-            for (Credential credential : credentials) {
-              // Skip expiring credentials: Flink catalog store config is fixed at initialize time.
-              if (credential == null
-                  || credential.expireTimeInMs() != 0
-                  || credential.credentialInfo() == null) {
-                continue;
-              }
-              merged.putAll(credential.credentialInfo());
-            }
-          }
+          merged.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
         }
       } catch (UnsupportedOperationException | NotFoundException e) {
         // Stubs may not implement SupportsCredentials; older servers lack /credentials.

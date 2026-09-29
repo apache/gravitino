@@ -25,7 +25,6 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.storage.S3Properties;
 
 /**
@@ -92,14 +91,12 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
     // super() skips addCatalogSpecificCredentialProviders() when credential-providers is already
     // set, so the aws-* → s3-* key mapping never runs. Apply it unconditionally here so that
     // S3SecretKeyProvider.initialize() can read s3-access-key-id regardless of how the catalog
-    // was configured. Remap creates s3-* keys; register s3-secret-key so getCredentials can vend
-    // them even when credential-providers was already set (super skips auto-detect).
+    // was configured.
     String accessKeyId = props.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretAccessKey = props.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKeyId) && StringUtils.isNotBlank(secretAccessKey)) {
       props.putIfAbsent(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId);
       props.putIfAbsent(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey);
-      ensureCredentialProviderListed(props, S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
     }
     return props;
   }
@@ -110,7 +107,6 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
     String accessKeyId = properties.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretAccessKey = properties.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKeyId) && StringUtils.isNotBlank(secretAccessKey)) {
-      // Remap to s3-* for storage credential vending (AwsSecretKeyCredential comes in a follow-up).
       properties.putIfAbsent(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId);
       properties.putIfAbsent(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey);
     }

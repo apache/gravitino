@@ -154,8 +154,9 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
 
   /**
    * Ensures the JDBC provider stays listed even when {@code credential-providers} was set
-   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case,
-   * and jdbc keys are no longer recovered via {@code getSecrets}.
+   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case.
+   * JDBC does not conflict with path-based storage providers, so it remains recoverable via {@code
+   * getCredentials} alongside an explicit list.
    *
    * @return catalog properties with credential providers
    */

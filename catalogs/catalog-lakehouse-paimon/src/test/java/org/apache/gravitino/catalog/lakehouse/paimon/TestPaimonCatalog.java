@@ -390,10 +390,11 @@ public class TestPaimonCatalog {
   }
 
   @Test
-  void testExplicitCredentialProvidersStillGetsJdbc() {
+  void testExplicitCredentialProvidersNotOverridden() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
+    // Test that explicit credential-providers setting is not overridden
     Map<String, String> explicitProps = Maps.newHashMap();
     explicitProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
     explicitProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
@@ -417,9 +418,9 @@ public class TestPaimonCatalog {
         new PaimonCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
     Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
+    // Should keep explicit credential providers, not override
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
-    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertEquals("custom-provider", credentialProviders);
   }
 
   private PaimonCatalog newPaimonCatalog(String catalogName) {

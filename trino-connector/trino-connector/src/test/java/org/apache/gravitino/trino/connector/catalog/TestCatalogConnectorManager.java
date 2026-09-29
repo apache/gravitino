@@ -1515,6 +1515,30 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testConnectorContextFailsFastOnSecretsRestException() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1"));
+    when(catalog.supportsSecrets().getSecrets())
+        .thenThrow(new RESTException("simulated: /secrets unavailable"));
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    TrinoException error =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                manager.createCatalogConnectorContext(
+                    "memory",
+                    createConnectorConfig(
+                        GravitinoCatalog.toJson(
+                            new GravitinoCatalog(
+                                "test", "memory", "memory", Map.of("visible", "v1"), 0L))),
+                    mockContext()));
+    assertTrue(error.getMessage().contains("Failed to resolve the secrets"));
+  }
+
+  @Test
   public void testConnectorContextToleratesMissingCredentialsEndpoint() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
