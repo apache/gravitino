@@ -18,19 +18,25 @@
  */
 package org.apache.gravitino.catalog.jdbc.utils;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.sqlite.JDBC;
 import org.sqlite.SQLiteConnection;
 
 /** Tests default driver validation and explicitly configured SQL validation. */
@@ -110,6 +116,40 @@ public class TestDataSourceValidation {
       try (Connection connection = dataSource.getConnection()) {
         Assertions.assertTrue(connection.isValid(1));
       }
+    }
+  }
+
+  /** A driver fixture whose connections do not implement JDBC connection validation. */
+  public static class UnsupportedValidationDriver extends JDBC {
+    /**
+     * Creates a SQLite connection that rejects calls to {@code isValid()}.
+     *
+     * @param url the JDBC URL
+     * @param properties the connection properties
+     * @return a connection without JDBC validation support
+     * @throws SQLException if opening the connection fails
+     */
+    @Override
+    @Nullable
+    public Connection connect(String url, Properties properties) throws SQLException {
+      Connection delegate = super.connect(url, properties);
+      if (delegate == null) {
+        return null;
+      }
+      return (Connection)
+          Proxy.newProxyInstance(
+              getClass().getClassLoader(),
+              new Class<?>[] {Connection.class},
+              (proxy, method, args) -> {
+                if (method.getName().equals("isValid")) {
+                  throw new SQLFeatureNotSupportedException("isValid is not supported");
+                }
+                try {
+                  return method.invoke(delegate, args);
+                } catch (InvocationTargetException exception) {
+                  throw exception.getCause();
+                }
+              });
     }
   }
 

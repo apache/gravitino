@@ -652,10 +652,25 @@ JDBC catalogs validate connections on borrow by default using the JDBC driver's
 can validate the connection after catalog or schema changes.
 
 For a driver that does not support `Connection.isValid()`, set the catalog property
-`validationQuery` to a SQL SELECT statement that returns at least one row. Explicit validation
-queries are passed to DBCP without being overwritten. The `jdbc.pool.test-on-borrow` property
+`gravitino.bypass.validationQuery` to a SQL SELECT statement that returns at least one row.
+Explicit validation queries are passed to DBCP without being overwritten. The `jdbc.pool.test-on-borrow` property
 controls validation on borrow. See the [DBCP configuration reference](https://commons.apache.org/proper/commons-dbcp/configuration.html)
-for other pool validation settings.
+for other pool validation settings. DBCP-specific properties require the `gravitino.bypass.`
+prefix in catalog configuration; the prefix is removed before passing them to DBCP.
+
+For example, to use SQL validation with a driver that does not support `Connection.isValid()`:
+
+```json
+{
+  "jdbc.pool.test-on-borrow": "true",
+  "gravitino.bypass.validationQuery": "SELECT 1",
+  "gravitino.bypass.validationQueryTimeout": "5"
+}
+```
+
+Choose a validation query supported by the driver and database. Disabling validation on borrow
+alone does not make a driver without `Connection.isValid()` support compatible: DBCP also validates
+a connection when initializing its connection factory.
 
 ## Container Configuration
 
