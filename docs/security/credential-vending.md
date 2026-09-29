@@ -134,6 +134,31 @@ JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
 
+### Static providers and `getCredentials` privilege risk
+
+Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
+and `jdbc-user-password` return the configured long-lived plaintext keys from
+`getCredentials` / `GET .../credentials`. That endpoint does **not** require a dedicated privilege
+beyond being able to load the metadata object (unlike `getSecrets`, which requires `USE_SECRETS`,
+with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+
+**Risk:** any principal that can load a catalog (or fileset) configured with these static providers
+can retrieve the same static AK/SK or JDBC password that Gravitino uses server-side.
+
+**Temporary mitigation** until provider-level authorization is tightened:
+
+- Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
+  `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
+  whenever possible.
+- When static providers are unavoidable, grant load / use privileges only to trusted principals
+  (connectors and operators that must recover credentials).
+- Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /
+  `INCLUDE_CREDENTIAL_SECRETS` and `getSecrets` when you need privilege-gated plaintext access.
+
+A follow-up should track a lasting fix (for example privilege checks specific to static
+credentials, or refusing to vend static secret-key credentials through `getCredentials` when
+authorization is enabled).
+
 ## S3
 
 ### `s3-token`
