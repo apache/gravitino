@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -122,6 +123,51 @@ public class TestJobResourceUtils {
     Assertions.assertEquals(localized.executable(), localizedAgain.executable());
     Assertions.assertEquals(
         "echo hi", Files.readString(new File(localizedAgain.executable()).toPath()));
+  }
+
+  @Test
+  public void testIsCommandName() {
+    for (String command : List.of("python", "bash", "python3.11", "spark-submit", "run.sh")) {
+      Assertions.assertTrue(JobResourceUtils.isCommandName(command), command);
+    }
+    for (String notCommand :
+        Arrays.asList(
+            null,
+            "",
+            " ",
+            ".",
+            "..",
+            "/bin/bash",
+            "./run.sh",
+            "jobs/run.sh",
+            "file:///bin/bash",
+            "https://repo.example.com/run.sh",
+            "hdfs://nn/run.sh",
+            "my command")) {
+      Assertions.assertFalse(JobResourceUtils.isCommandName(notCommand), notCommand);
+    }
+  }
+
+  @Test
+  public void testLocalizeShellJobTemplateKeepsCommandName() throws IOException {
+    File script = Files.createTempFile(tempDir.toPath(), "job", ".py").toFile();
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("python_job")
+            .withExecutable("python")
+            .withArguments(Lists.newArrayList(script.getName()))
+            .withScripts(Lists.newArrayList(script.toURI().toString()))
+            .build();
+
+    ShellJobTemplate result =
+        (ShellJobTemplate) JobResourceUtils.localizeJobTemplate(template, tempStagingDir);
+
+    // The command is run from the PATH, only the script is fetched.
+    Assertions.assertEquals("python", result.executable());
+    Assertions.assertEquals(
+        Lists.newArrayList(new File(tempStagingDir, script.getName()).getAbsolutePath()),
+        result.scripts());
+    Assertions.assertArrayEquals(new String[] {script.getName()}, tempStagingDir.list());
   }
 
   @Test

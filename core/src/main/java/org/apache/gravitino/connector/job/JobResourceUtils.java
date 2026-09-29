@@ -21,8 +21,10 @@ package org.apache.gravitino.connector.job;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -54,10 +56,13 @@ public final class JobResourceUtils {
    * @throws RuntimeException if a resource cannot be fetched
    */
   public static JobTemplate localizeJobTemplate(JobTemplate jobTemplate, File dir) {
-    String executable = fetchFile(jobTemplate.executable(), dir, DEFAULT_FETCH_TIMEOUT_IN_MS);
-
     if (jobTemplate instanceof ShellJobTemplate) {
       ShellJobTemplate shellJobTemplate = (ShellJobTemplate) jobTemplate;
+      // A command name is looked up in the environment the job runs in, not fetched.
+      String executable =
+          isCommandName(shellJobTemplate.executable())
+              ? shellJobTemplate.executable()
+              : fetchFile(shellJobTemplate.executable(), dir, DEFAULT_FETCH_TIMEOUT_IN_MS);
       return ShellJobTemplate.builder()
           .withName(shellJobTemplate.name())
           .withComment(shellJobTemplate.comment())
@@ -74,7 +79,8 @@ public final class JobResourceUtils {
       return SparkJobTemplate.builder()
           .withName(sparkJobTemplate.name())
           .withComment(sparkJobTemplate.comment())
-          .withExecutable(executable)
+          .withExecutable(
+              fetchFile(sparkJobTemplate.executable(), dir, DEFAULT_FETCH_TIMEOUT_IN_MS))
           .withArguments(sparkJobTemplate.arguments())
           .withEnvironments(sparkJobTemplate.environments())
           .withCustomFields(sparkJobTemplate.customFields())
@@ -87,6 +93,30 @@ public final class JobResourceUtils {
     }
 
     throw new IllegalArgumentException("Unsupported job type: " + jobTemplate.jobType());
+  }
+
+  /**
+   * Whether the executable of a shell job template is a command name, such as {@code python}: a
+   * name with no scheme and no path separator, which is looked up in the environment the job runs
+   * in, for example on the {@code PATH} of the process that launches it, instead of a file to
+   * fetch.
+   *
+   * @param executable the executable of a shell job template
+   * @return true if the executable is a command name
+   */
+  public static boolean isCommandName(String executable) {
+    if (StringUtils.isBlank(executable)
+        || executable.equals(".")
+        || executable.equals("..")
+        || executable.indexOf('/') >= 0
+        || executable.indexOf(File.separatorChar) >= 0) {
+      return false;
+    }
+    try {
+      return new URI(executable).getScheme() == null;
+    } catch (URISyntaxException e) {
+      return false;
+    }
   }
 
   /**

@@ -24,7 +24,10 @@ implements:
 
 - The `JobTemplate` is the runtime job template. Its placeholders are already replaced with the
   job configuration, but its resources, that is its executable, scripts, jars, files and archives,
-  are still the URIs written in the template.
+  are still the URIs written in the template. A shell executable can also be a command name with no
+  path, such as `python`: it is not a file to fetch, but a command to look up in the environment the
+  job runs in. `JobResourceUtils.isCommandName` tells whether it is one; the `local` job executor
+  runs it through the `PATH` of the Gravitino server process.
 - The `JobContext` carries the Gravitino job id, the metalake of the job, and a staging directory on
   the Gravitino server dedicated to the job. Gravitino creates the staging directory before
   submitting the job, removes it right away if the job fails to be submitted, and otherwise cleans

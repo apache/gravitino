@@ -198,6 +198,35 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testRunCommandNameExecutable() throws IOException {
+    // The executable is a command on the PATH, and the script it runs is shipped as a script.
+    File sourceDir = new File(workingDir, "command-src");
+    Assertions.assertTrue(sourceDir.mkdirs());
+    File script = new File(sourceDir, "hello.sh");
+    Files.writeString(script.toPath(), "echo \"hello from $1\"\n");
+    File jobDir = new File(workingDir, "command-job");
+    Assertions.assertTrue(jobDir.mkdirs());
+    JobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("command-job")
+            .withExecutable("bash")
+            .withArguments(Lists.newArrayList("hello.sh", "bash"))
+            .withScripts(Lists.newArrayList(script.getAbsolutePath()))
+            .build();
+
+    String jobId = submit(jobExecutor, template, jobDir);
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    Assertions.assertEquals(
+        Collections.singletonList("hello from bash"),
+        jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES));
+    // Only the script is localized, there is no file named after the command.
+    Assertions.assertFalse(new File(jobDir, "bash").exists());
+  }
+
+  @Test
   public void testJobOwnership() throws IOException {
     LocalJobExecutor executor = (LocalJobExecutor) jobExecutor;
     Assertions.assertTrue(executor.isJobStateNodeLocal());
