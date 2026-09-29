@@ -39,6 +39,7 @@ import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -73,6 +74,15 @@ public class TestEntityFieldLimits {
                 .withAuditInfo(AuditInfo.EMPTY)
                 .build();
     assertLengthLimit(builder, "alias", "model version", EntityFieldLimits.MAX_NAME_LENGTH);
+  }
+
+  @Test
+  public void testColumnCommentLength() {
+    assertLengthLimit(
+        comment -> columnBuilder("column", comment),
+        "comment",
+        "column",
+        EntityFieldLimits.MAX_COMMENT_LENGTH);
   }
 
   @Test
@@ -119,6 +129,17 @@ public class TestEntityFieldLimits {
 
   private static Stream<Arguments> nameBuilders() {
     return Stream.of(
+        Arguments.of("column", (Function<String, Entity>) name -> columnBuilder(name, null)),
+        Arguments.of(
+            "table",
+            (Function<String, Entity>)
+                name ->
+                    TableEntity.builder()
+                        .withId(1L)
+                        .withName(name)
+                        .withNamespace(NAMESPACE)
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build()),
         Arguments.of("tag", (Function<String, Entity>) name -> tagBuilder(name, null)),
         Arguments.of(
             "policy",
@@ -251,6 +272,17 @@ public class TestEntityFieldLimits {
         .withId(1L)
         .withName(name)
         .withNamespace(NAMESPACE)
+        .withComment(comment)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
+  private static ColumnEntity columnBuilder(String name, String comment) {
+    return ColumnEntity.builder()
+        .withId(1L)
+        .withName(name)
+        .withPosition(0)
+        .withDataType(Types.StringType.get())
         .withComment(comment)
         .withAuditInfo(AuditInfo.EMPTY)
         .build();

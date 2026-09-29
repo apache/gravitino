@@ -21,26 +21,43 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 public class TestIcebergNamespaceOperationExecutor {
@@ -177,6 +194,97 @@ public class TestIcebergNamespaceOperationExecutor {
   }
 
   @Test
+  public void testRejectsOversizedTableNameBeforeRegister() {
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.registerTable(mockContext, Namespace.of("test_namespace"), request));
+
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", exception.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRejectsOversizedColumnNameBeforeRegister() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    Schema schema = new Schema(NestedField.required(1, oversizedName, StringType.get()));
+    assertRegisterRejectsSchema(schema, "The name of the column must not exceed 128 characters");
+  }
+
+  @Test
+  public void testRejectsOversizedColumnCommentBeforeRegister() {
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
+    Schema schema = new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment));
+    assertRegisterRejectsSchema(schema, "The comment of the column must not exceed 256 characters");
+  }
+
+  @Test
+  public void testInvalidRegisterOverwriteLeavesMetadataUnchanged(@TempDir Path tempDir)
+      throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "jdbc",
+                IcebergConstants.URI,
+                "jdbc:sqlite:" + tempDir.resolve("catalog.db"),
+                IcebergConstants.WAREHOUSE,
+                tempDir.resolve("warehouse").toString(),
+                IcebergConstants.GRAVITINO_JDBC_DRIVER,
+                "org.sqlite.JDBC",
+                IcebergConstants.ICEBERG_JDBC_USER,
+                "test",
+                IcebergConstants.ICEBERG_JDBC_PASSWORD,
+                "test",
+                IcebergConstants.ICEBERG_JDBC_INITIALIZE,
+                "true"));
+    CatalogWrapperForREST catalogWrapper = new CatalogWrapperForREST("test_catalog", config);
+    try {
+      when(mockWrapperManager.getCatalogWrapper("test_catalog")).thenReturn(catalogWrapper);
+      Namespace namespace = Namespace.of("test_namespace");
+      catalogWrapper.createNamespace(
+          CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      String originalMetadataLocation =
+          writeMetadata(
+              tempDir.resolve("v1.metadata.json"),
+              new Schema(NestedField.required(1, "id", StringType.get())));
+      RegisterTableRequest originalRequest =
+          ImmutableRegisterTableRequest.builder()
+              .name("test_table")
+              .metadataLocation(originalMetadataLocation)
+              .build();
+      catalogWrapper.registerTable(namespace, originalRequest, false);
+
+      String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+      String invalidMetadataLocation =
+          writeMetadata(
+              tempDir.resolve("v2.metadata.json"),
+              new Schema(NestedField.required(1, oversizedName, StringType.get())));
+      RegisterTableRequest invalidOverwriteRequest =
+          ImmutableRegisterTableRequest.builder()
+              .name("test_table")
+              .metadataLocation(invalidMetadataLocation)
+              .overwrite(true)
+              .build();
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> executor.registerTable(mockContext, namespace, invalidOverwriteRequest));
+
+      Assertions.assertEquals(
+          Optional.of(originalMetadataLocation),
+          catalogWrapper.getTableMetadataLocation(
+              TableIdentifier.of(namespace, originalRequest.name())));
+    } finally {
+      catalogWrapper.close();
+    }
+  }
+
+  @Test
   public void testDropNestedNamespacePassesCorrectLevels() {
     Namespace nestedNs = Namespace.of("A", "B", "C");
 
@@ -244,5 +352,37 @@ public class TestIcebergNamespaceOperationExecutor {
 
     verify(mockCatalogWrapper).namespaceExists(ns);
     Assertions.assertFalse(exists);
+  }
+
+  private void assertRegisterRejectsSchema(Schema schema, String expectedMessage) {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/test.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("test_table");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "file:/tmp/table", Collections.emptyMap());
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation)).thenReturn(metadata);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper, never()).registerTable(namespace, request, false);
+  }
+
+  private static String writeMetadata(Path metadataFile, Schema schema) throws Exception {
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema,
+            PartitionSpec.unpartitioned(),
+            metadataFile.getParent().resolve("table").toUri().toString(),
+            Collections.emptyMap());
+    Files.writeString(metadataFile, TableMetadataParser.toJson(metadata), StandardCharsets.UTF_8);
+    return metadataFile.toUri().toString();
   }
 }
