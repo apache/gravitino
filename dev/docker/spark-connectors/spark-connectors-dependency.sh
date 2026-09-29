@@ -181,12 +181,24 @@ fi
 # jars bundle, not the source tree. Each jar already carries that LICENSE and
 # NOTICE in META-INF, generated from the resolved dependency set, and keeps the
 # per-component licence texts it references alongside them inside the jar.
-license_jar="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort | head -1)"
-[ -n "${license_jar}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
-unzip -p "${license_jar}" META-INF/LICENSE > "${conn_dir}/licenses/LICENSE" \
-  || { echo "ERROR: ${license_jar} has no META-INF/LICENSE" >&2; exit 1; }
-unzip -p "${license_jar}" META-INF/NOTICE > "${conn_dir}/licenses/NOTICE" \
-  || { echo "ERROR: ${license_jar} has no META-INF/NOTICE" >&2; exit 1; }
+#
+# One image carries several Spark/Scala variants and each jar declares only its
+# own components, so the bundled-component blocks are unioned across all of
+# them. NOTICE is identical between variants apart from those path references,
+# so one copy suffices.
+license_jars="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort)"
+[ -n "${license_jars}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
+first_jar="$(printf '%s\n' "${license_jars}" | head -1)"
+
+unzip -p "${first_jar}" META-INF/LICENSE | sed -n '1,/^Bundled component licensing:$/p' \
+  > "${conn_dir}/licenses/LICENSE" \
+  || { echo "ERROR: ${first_jar} has no META-INF/LICENSE" >&2; exit 1; }
+printf '%s\n' "${license_jars}" | while IFS= read -r jar; do
+  unzip -p "${jar}" META-INF/LICENSE | sed -n '/^Bundled component licensing:$/,$p' | tail -n +2
+done | awk 'BEGIN{RS="";ORS="\n\n"} NF && !seen[$0]++' >> "${conn_dir}/licenses/LICENSE"
+
+unzip -p "${first_jar}" META-INF/NOTICE > "${conn_dir}/licenses/NOTICE" \
+  || { echo "ERROR: ${first_jar} has no META-INF/NOTICE" >&2; exit 1; }
 
 echo ""
 echo "=== Spark connectors prepared (${copied} combination(s)) ==="

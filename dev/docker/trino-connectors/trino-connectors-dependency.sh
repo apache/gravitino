@@ -100,6 +100,17 @@ license_src="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -t
   exit 1
 }
 
+# Every band is built from the same LICENSE.trino/NOTICE.trino, so one band's
+# copy describes them all. Fail rather than under-declare if that stops holding.
+for name in LICENSE NOTICE; do
+  for band in "${conn_dir}"/packages/connectors/*/; do
+    cmp -s "${license_src}/${name}" "${band}${name}" || {
+      echo "ERROR: ${band}${name} differs from ${license_src}/${name}; staged bands no longer share one ${name}" >&2
+      exit 1
+    }
+  done
+done
+
 cp "${license_src}/LICENSE" "${conn_dir}/licenses/LICENSE"
 cp "${license_src}/NOTICE" "${conn_dir}/licenses/NOTICE"
 
