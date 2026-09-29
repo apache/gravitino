@@ -93,26 +93,22 @@ fi
 # those jars bundle, not the source tree. Each plugin band already carries that
 # LICENSE and NOTICE (built from LICENSE.trino/NOTICE.trino), and keeps the
 # licence texts they reference in its own licenses/ directory.
-license_src="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -type d | sort | head -1)"
-[ -n "${license_src}" ] || { echo "ERROR: no staged connector band to take licenses from" >&2; exit 1; }
-[ -s "${license_src}/LICENSE" ] && [ -s "${license_src}/NOTICE" ] || {
-  echo "ERROR: ${license_src} has no LICENSE or NOTICE" >&2
-  exit 1
-}
+#
+# One image carries several Trino version bands, so each band gets its own
+# directory rather than one merged file.
+bands="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -type d | sort)"
+[ -n "${bands}" ] || { echo "ERROR: no staged connector band to take licenses from" >&2; exit 1; }
 
-# Every band is built from the same LICENSE.trino/NOTICE.trino, so one band's
-# copy describes them all. Fail rather than under-declare if that stops holding.
-for name in LICENSE NOTICE; do
-  for band in "${conn_dir}"/packages/connectors/*/; do
-    cmp -s "${license_src}/${name}" "${band}${name}" || {
-      echo "ERROR: ${band}${name} differs from ${license_src}/${name}; staged bands no longer share one ${name}" >&2
-      exit 1
-    }
-  done
-done
-
-cp "${license_src}/LICENSE" "${conn_dir}/licenses/LICENSE"
-cp "${license_src}/NOTICE" "${conn_dir}/licenses/NOTICE"
+while IFS= read -r band; do
+  dest="${conn_dir}/licenses/$(basename "${band}")"
+  [ -s "${band}/LICENSE" ] && [ -s "${band}/NOTICE" ] || {
+    echo "ERROR: ${band} has no LICENSE or NOTICE" >&2
+    exit 1
+  }
+  mkdir -p "${dest}"
+  cp "${band}/LICENSE" "${dest}/LICENSE"
+  cp "${band}/NOTICE" "${dest}/NOTICE"
+done <<< "${bands}"
 
 echo ""
 echo "=== Trino connectors prepared (${copied} version range(s)) ==="
