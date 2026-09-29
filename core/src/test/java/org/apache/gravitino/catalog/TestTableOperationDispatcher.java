@@ -63,7 +63,7 @@ import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
-import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -1692,6 +1692,26 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testSameDefaultValueWithDifferentRepresentations() {
+    LiteralDTO connectorDefault =
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("1").build();
+
+    Column storedColumn =
+        TestColumn.builder()
+            .withName("col1")
+            .withPosition(0)
+            .withType(Types.StringType.get())
+            .withDefaultValue(Literals.stringLiteral("1"))
+            .build();
+
+    Assertions.assertTrue(
+        tableOperationDispatcher.isSameDefaultValue(connectorDefault, storedColumn.defaultValue()));
+
+    Assertions.assertFalse(
+        tableOperationDispatcher.isSameDefaultValue(connectorDefault, Literals.stringLiteral("2")));
+  }
+
+  @Test
   public void testCreateAndDropTableWithColumn() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema111");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -1743,8 +1763,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
       Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
       Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
-      Assertions.assertEquals(
-          DTOConverters.toDTO(expectedColumn).defaultValue(), actualColumn.defaultValue());
+      Assertions.assertTrue(
+          tableOperationDispatcher.isSameDefaultValue(
+              expectedColumn.defaultValue(), actualColumn.defaultValue()));
     }
   }
 
@@ -1773,8 +1794,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.comment(), actualColumn.comment());
           Assertions.assertEquals(e.nullable(), actualColumn.nullable());
           Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
-          Assertions.assertEquals(
-              DTOConverters.toDTO(e).defaultValue(), actualColumn.defaultValue());
+          Assertions.assertTrue(
+              tableOperationDispatcher.isSameDefaultValue(
+                  e.defaultValue(), actualColumn.defaultValue()));
         });
   }
 
