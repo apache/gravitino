@@ -201,6 +201,60 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  /** Verifies the OCC backfill preserves existing history versions on live and deleted rows. */
+  @TestTemplate
+  public void testUpgradeToTwoZeroBackfillsOccVersions() throws SQLException, IOException {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
+    Path scriptDir = Path.of(gravitinoHome, "scripts", backendType.toLowerCase());
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.3.0" + suffix).toFile());
+
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute(
+          "INSERT INTO fileset_meta (fileset_id, fileset_name, metalake_id, catalog_id, schema_id,"
+              + " type, audit_info, current_version, last_version, deleted_at) VALUES"
+              + " (1, 'live', 1, 1, 1, 'MANAGED', '{}', 7, 9, 0),"
+              + " (2, 'deleted', 1, 1, 1, 'MANAGED', '{}', 5, 5, 100)");
+      statement.execute(
+          "INSERT INTO policy_meta (policy_id, policy_name, policy_type, metalake_id, audit_info,"
+              + " current_version, last_version, deleted_at) VALUES"
+              + " (1, 'live', 'custom', 1, '{}', 7, 9, 0),"
+              + " (2, 'deleted', 'custom', 1, '{}', 5, 5, 100)");
+    }
+
+    executeScript(scriptDir.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile());
+
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String table : List.of("fileset_meta", "policy_meta")) {
+        try (ResultSet rows =
+            statement.executeQuery(
+                "SELECT current_version, last_version, occ_version, deleted_at FROM "
+                    + table
+                    + " ORDER BY deleted_at")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(7, rows.getLong("current_version"));
+          Assertions.assertEquals(9, rows.getLong("last_version"));
+          Assertions.assertEquals(1, rows.getLong("occ_version"));
+          Assertions.assertEquals(0, rows.getLong("deleted_at"));
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(5, rows.getLong("current_version"));
+          Assertions.assertEquals(5, rows.getLong("last_version"));
+          Assertions.assertEquals(1, rows.getLong("occ_version"));
+          Assertions.assertEquals(100, rows.getLong("deleted_at"));
+          Assertions.assertFalse(rows.next());
+        }
+      }
+    }
+  }
+
   private void executeScript(File scriptFile) throws IOException, SQLException {
     List<String> ddls = extractStatements(scriptFile.toPath());
     try (SqlSession sqlSession =
