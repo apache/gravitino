@@ -234,7 +234,7 @@ public interface SemanticModelUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           definition != null, "\"definition\" field is required and cannot be null");
-      definition.toDefinition();
+      definition.validate();
     }
 
     @Override

@@ -141,10 +141,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(0, body.getCode());
     Assertions.assertArrayEquals(new NameIdentifier[] {first, second}, body.identifiers());
 
-    when(dispatcher.listSemanticModels(namespace)).thenReturn(null);
-    Assertions.assertEquals(
-        0, get(semanticModelPath()).readEntity(EntityListResponse.class).identifiers().length);
-
     doThrow(new NoSuchSchemaException("schema is missing"))
         .when(dispatcher)
         .listSemanticModels(namespace);
@@ -475,6 +471,17 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testAlterSemanticModelRejectsNullBody() {
+    assertError(
+        putJson(semanticModelPath() + "/sales", "null"),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "Request body must not be null");
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
   void testAlterSemanticModelErrors() {
     NameIdentifier ident = semanticModelIdentifier("sales");
     SemanticModelUpdatesRequest request =
@@ -625,6 +632,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         .request(MediaType.APPLICATION_JSON_TYPE)
         .accept(VND_V1_JSON)
         .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response putJson(String path, String json) {
+    return target(path)
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept(VND_V1_JSON)
+        .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE));
   }
 
   private Response delete(String path) {

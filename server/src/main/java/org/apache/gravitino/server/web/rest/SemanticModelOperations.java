@@ -96,7 +96,6 @@ public class SemanticModelOperations {
           () -> {
             Namespace namespace = NamespaceUtil.ofSemanticModel(metalake, catalog, schema);
             NameIdentifier[] identifiers = dispatcher.listSemanticModels(namespace);
-            identifiers = identifiers == null ? new NameIdentifier[0] : identifiers;
             LOG.info(
                 "List {} Semantic Models under schema: {}.{}.{}",
                 identifiers.length,
