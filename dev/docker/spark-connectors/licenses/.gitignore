@@ -1,4 +1,5 @@
 # Populated at build time by spark-connectors-dependency.sh from the staged
 # runtime jars. Do not commit generated copies.
-/*
-!/.gitignore
+/*/
+/LICENSE
+/NOTICE
