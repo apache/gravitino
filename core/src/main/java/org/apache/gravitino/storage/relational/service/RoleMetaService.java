@@ -264,7 +264,13 @@ public class RoleMetaService {
       for (SecurableObject object : insertObjects) {
         NameIdentifier objectIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
         Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object.type());
-        NamespacedEntityId observed = EntityIdService.getEntityIds(objectIdentifier, objectType);
+        NamespacedEntityId observed;
+        try {
+          observed = EntityIdService.getEntityIds(objectIdentifier, objectType);
+        } catch (NoSuchEntityException nse) {
+          throw new NoSuchMetadataObjectException(
+              nse, "Metadata object %s type %s doesn't exist", object.fullName(), object.type());
+        }
         insertSecurableObjectPOs.add(
             POConverters.initializeSecurablePOBuilderWithVersion(
                     oldRoleEntity.id(), object, getType(object))
