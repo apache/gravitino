@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 Failures fall into three groups, matching where they occur in the workflow. Command and argument errors surface immediately. Evaluation problems produce no output rather than an error, which is what makes them confusing. Execution failures happen inside Spark, so the real message is in the staging log rather than the API response.
 
-Staging logs live under `/tmp/gravitino/jobs/staging/{metalake}/{job_template_name}/{job_id}/`, controlled by `gravitino.job.stagingDir`. Read `error.log` for failures and `output.log` for results.
+Staging logs live under `/tmp/gravitino/jobs/staging/job-runs/{job_id}/`, controlled by `gravitino.job.stagingDir`. Read `error.log` for failures and `output.log` for results.
 
 ## Command and Argument Errors
 

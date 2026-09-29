@@ -210,7 +210,7 @@ public class OwnerManager implements OwnerDispatcher {
               mo,
               authorizationPlugin ->
                   authorizationPlugin.onOwnerSet(mo, originOwner.orElse(null), newOwner));
-          originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, mo));
+          notifyOwnerChange(originOwner.orElse(null), metalake, mo);
         } catch (RuntimeException re) {
           LOG.warn(
               "Failed to notify authorization plugin for metadata object {} during batch setOwners",

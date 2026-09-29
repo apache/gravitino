@@ -19,12 +19,57 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergJobUtils {
+
+  @Test
+  public void testStrictArgumentsNormalizeTemplateValues() {
+    Map<String, String> parsed =
+        IcebergJobUtils.parseArguments(
+            new String[] {"--required", " value ", "--optional", " {{optional}} "},
+            new HashSet<>(Arrays.asList("required", "optional")),
+            Collections.singleton("required"));
+    assertEquals("value", parsed.get("required"));
+    assertNull(parsed.get("optional"));
+  }
+
+  @Test
+  public void testStrictArgumentsRejectMalformedInput() {
+    Set<String> supported = Collections.singleton("key");
+    String[][] invalid = {
+      {"--unknown", "value"},
+      {"key", "value"},
+      {null, "value"},
+      {"--key"},
+      {"--key", null},
+      {"--key", "--key"},
+      {"--key", "", "--key", "value"},
+      {"--key", "{{key}}"},
+      {"--key", " "},
+      {}
+    };
+    for (String[] args : invalid) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> IcebergJobUtils.parseArguments(args, supported, supported));
+    }
+  }
+
+  @Test
+  public void testLegacyArgumentsStillAcceptBareFlags() {
+    assertEquals("true", IcebergJobUtils.parseArguments(new String[] {"--flag"}).get("flag"));
+  }
 
   @Test
   public void testRequireIcebergSparkRuntimeSucceedsWhenPresent() {
