@@ -18,10 +18,11 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.data_type import DataType
 from gravitino.api.semantic.field import Field
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.ai_context_dto import AIContextDTO
 from gravitino.dto.semantic.custom_extension_dto import CustomExtensionDTO
 from gravitino.dto.semantic.dimension_dto import DimensionDTO
@@ -33,7 +34,7 @@ from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class FieldDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attributes
+class FieldDTO(SemanticJsonMixin):  # pylint: disable=too-many-instance-attributes
     """Represents a Semantic Model field DTO."""
 
     _name: Optional[str] = field(
@@ -66,7 +67,7 @@ class FieldDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attribu
     _ai_context: Optional[AIContextDTO] = field(
         default=None,
         metadata=config(
-            field_name="ai_context",
+            field_name="aiContext",
             encoder=AIContextSerdes.serialize,
             decoder=AIContextSerdes.deserialize,
             exclude=is_none,
@@ -74,7 +75,7 @@ class FieldDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attribu
     )
     _custom_extensions: Optional[list[CustomExtensionDTO]] = field(
         default=None,
-        metadata=config(field_name="custom_extensions", exclude=is_none),
+        metadata=config(field_name="customExtensions", exclude=is_none),
     )
 
     def name(self) -> Optional[str]:

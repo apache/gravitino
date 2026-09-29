@@ -18,16 +18,17 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.expression import Expression
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.dialect_expression_dto import DialectExpressionDTO
 from gravitino.dto.semantic.semantic_dto_utils import convert_list, is_none
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class ExpressionDTO(DataClassJsonMixin):
+class ExpressionDTO(SemanticJsonMixin):
     """Represents a Semantic Model expression DTO."""
 
     _dialects: Optional[list[DialectExpressionDTO]] = field(

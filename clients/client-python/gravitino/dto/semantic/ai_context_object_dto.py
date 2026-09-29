@@ -84,22 +84,10 @@ class AIContextObjectDTO:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, AIContextObjectDTO):
             return False
-        return (
-            self._instructions == other.instructions()
-            and self._synonyms == other.synonyms()
-            and self._examples == other.examples()
-            and self._additional_properties == other.additional_properties()
-        )
+        return self.to_ai_context_object() == other.to_ai_context_object()
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._instructions,
-                None if self._synonyms is None else tuple(self._synonyms),
-                None if self._examples is None else tuple(self._examples),
-                tuple(sorted(self._additional_properties)),
-            )
-        )
+        return hash(self.to_ai_context_object())
 
     def __repr__(self) -> str:
         return (

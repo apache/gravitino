@@ -18,9 +18,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.dataset import Dataset
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.ai_context_dto import AIContextDTO
 from gravitino.dto.semantic.custom_extension_dto import CustomExtensionDTO
 from gravitino.dto.semantic.field_dto import FieldDTO
@@ -30,7 +31,7 @@ from gravitino.name_identifier import NameIdentifier
 
 
 @dataclass
-class DatasetDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attributes
+class DatasetDTO(SemanticJsonMixin):  # pylint: disable=too-many-instance-attributes
     """Represents a Semantic Model dataset DTO."""
 
     _name: Optional[str] = field(
@@ -41,11 +42,11 @@ class DatasetDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attri
     )
     _primary_key: Optional[list[str]] = field(
         default=None,
-        metadata=config(field_name="primary_key", exclude=is_none),
+        metadata=config(field_name="primaryKey", exclude=is_none),
     )
     _unique_keys: Optional[list[list[str]]] = field(
         default=None,
-        metadata=config(field_name="unique_keys", exclude=is_none),
+        metadata=config(field_name="uniqueKeys", exclude=is_none),
     )
     _description: Optional[str] = field(
         default=None,
@@ -54,7 +55,7 @@ class DatasetDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attri
     _ai_context: Optional[AIContextDTO] = field(
         default=None,
         metadata=config(
-            field_name="ai_context",
+            field_name="aiContext",
             encoder=AIContextSerdes.serialize,
             decoder=AIContextSerdes.deserialize,
             exclude=is_none,
@@ -66,7 +67,7 @@ class DatasetDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attri
     )
     _custom_extensions: Optional[list[CustomExtensionDTO]] = field(
         default=None,
-        metadata=config(field_name="custom_extensions", exclude=is_none),
+        metadata=config(field_name="customExtensions", exclude=is_none),
     )
 
     def name(self) -> Optional[str]:

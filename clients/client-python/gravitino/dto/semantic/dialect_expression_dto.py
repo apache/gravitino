@@ -18,14 +18,15 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.dialect_expression import DialectExpression
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.semantic_dto_utils import is_none
 
 
 @dataclass
-class DialectExpressionDTO(DataClassJsonMixin):
+class DialectExpressionDTO(SemanticJsonMixin):
     """Represents one dialect-specific rendering of an expression."""
 
     _dialect: Optional[str] = field(

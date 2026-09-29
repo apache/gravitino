@@ -18,19 +18,20 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.dimension import Dimension
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.semantic_dto_utils import is_none
 
 
 @dataclass
-class DimensionDTO(DataClassJsonMixin):
+class DimensionDTO(SemanticJsonMixin):
     """Represents a Semantic Model dimension marker DTO."""
 
     _is_time: Optional[bool] = field(
         default=None,
-        metadata=config(field_name="is_time", exclude=is_none),
+        metadata=config(field_name="isTime", exclude=is_none),
     )
 
     def is_time(self) -> Optional[bool]:

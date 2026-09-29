@@ -135,7 +135,7 @@ class TestSemanticModelDefinitionDTO(unittest.TestCase):
 
         serialized = SemanticModelDefinitionDTO.from_definition(definition).to_dict()
 
-        self.assertEqual("Governed sales definitions", serialized["ai_context"])
+        self.assertEqual("Governed sales definitions", serialized["aiContext"])
 
     def test_ai_context_object_flattens_additional_properties(self):
         ai_context = AIContext.of(
@@ -158,7 +158,7 @@ class TestSemanticModelDefinitionDTO(unittest.TestCase):
                 "audience": "finance",
                 "priority": 1,
             },
-            serialized["ai_context"],
+            serialized["aiContext"],
         )
 
     def test_ai_context_object_round_trips_additional_properties(self):
@@ -195,8 +195,8 @@ class TestSemanticModelDefinitionDTO(unittest.TestCase):
 
         self.assertEqual("orders", relationship["from"])
         self.assertEqual("customers", relationship["to"])
-        self.assertEqual(["customer_id"], relationship["from_columns"])
-        self.assertEqual(["id"], relationship["to_columns"])
+        self.assertEqual(["customer_id"], relationship["fromColumns"])
+        self.assertEqual(["id"], relationship["toColumns"])
 
     def test_dataset_source_uses_name_identifier_encoding(self):
         definition = _complete_definition()

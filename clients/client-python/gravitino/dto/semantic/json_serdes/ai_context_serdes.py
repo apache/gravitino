@@ -86,7 +86,7 @@ def _deserialize_object(value: dict[str, Any]) -> AIContextObjectDTO:
 
 
 def _read_string(value: dict[str, Any], name: str) -> Optional[str]:
-    if name not in value:
+    if value.get(name) is None:
         return None
     item = value[name]
     Precondition.check_argument(isinstance(item, str), f"{name} must be a string")
@@ -94,7 +94,7 @@ def _read_string(value: dict[str, Any], name: str) -> Optional[str]:
 
 
 def _read_string_list(value: dict[str, Any], name: str) -> Optional[list[str]]:
-    if name not in value:
+    if value.get(name) is None:
         return None
     items = value[name]
     Precondition.check_argument(

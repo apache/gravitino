@@ -18,18 +18,19 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.custom_extension import CustomExtension
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.semantic_dto_utils import is_none
 
 
 @dataclass
-class CustomExtensionDTO(DataClassJsonMixin):
+class CustomExtensionDTO(SemanticJsonMixin):
     """Represents a vendor-specific custom extension DTO."""
 
     _vendor_name: Optional[str] = field(
-        default=None, metadata=config(field_name="vendor_name", exclude=is_none)
+        default=None, metadata=config(field_name="vendorName", exclude=is_none)
     )
     _data: Optional[str] = field(
         default=None, metadata=config(field_name="data", exclude=is_none)

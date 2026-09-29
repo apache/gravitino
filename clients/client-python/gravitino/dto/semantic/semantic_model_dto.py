@@ -18,10 +18,11 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
@@ -31,7 +32,7 @@ from gravitino.dto.semantic.semantic_dto_utils import is_none
 
 
 @dataclass
-class SemanticModelDTO(SemanticModel, DataClassJsonMixin):
+class SemanticModelDTO(SemanticModel, SemanticJsonMixin):
     """Represents a schema-scoped Semantic Model DTO."""
 
     _name: Optional[str] = field(

@@ -18,9 +18,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, config
+from dataclasses_json import config
 
 from gravitino.api.semantic.relationship import Relationship
+from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.ai_context_dto import AIContextDTO
 from gravitino.dto.semantic.custom_extension_dto import CustomExtensionDTO
 from gravitino.dto.semantic.json_serdes.ai_context_serdes import AIContextSerdes
@@ -29,7 +30,7 @@ from gravitino.dto.semantic.semantic_dto_utils import convert_list, is_none
 
 @dataclass
 class RelationshipDTO(
-    DataClassJsonMixin
+    SemanticJsonMixin
 ):  # pylint: disable=too-many-instance-attributes
     """Represents a Semantic Model relationship DTO."""
 
@@ -43,15 +44,15 @@ class RelationshipDTO(
         default=None, metadata=config(field_name="to", exclude=is_none)
     )
     _from_columns: Optional[list[str]] = field(
-        default=None, metadata=config(field_name="from_columns", exclude=is_none)
+        default=None, metadata=config(field_name="fromColumns", exclude=is_none)
     )
     _to_columns: Optional[list[str]] = field(
-        default=None, metadata=config(field_name="to_columns", exclude=is_none)
+        default=None, metadata=config(field_name="toColumns", exclude=is_none)
     )
     _ai_context: Optional[AIContextDTO] = field(
         default=None,
         metadata=config(
-            field_name="ai_context",
+            field_name="aiContext",
             encoder=AIContextSerdes.serialize,
             decoder=AIContextSerdes.deserialize,
             exclude=is_none,
@@ -59,7 +60,7 @@ class RelationshipDTO(
     )
     _custom_extensions: Optional[list[CustomExtensionDTO]] = field(
         default=None,
-        metadata=config(field_name="custom_extensions", exclude=is_none),
+        metadata=config(field_name="customExtensions", exclude=is_none),
     )
 
     def name(self) -> Optional[str]:
