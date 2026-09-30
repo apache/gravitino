@@ -1007,6 +1007,56 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testReloadReadFailureMustNotLoseDeny() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    String roleName = "unavailableDenyRole";
+    RoleEntity denyRole =
+        mockRoleInStore(DENY_ROLE_ID, roleName, ImmutableList.of(getDenySecurableObject()));
+    mockDirectUserRoles(denyRole);
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, requestContext));
+    getLoadedRolesCache(jcasbinAuthorizer).invalidate(DENY_ROLE_ID);
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, roleName);
+    when(entityStore.get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class)))
+        .thenThrow(new IllegalStateException("Role store temporarily unavailable"));
+
+    assertTrue(
+        jcasbinAuthorizer.deny(
+            currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, requestContext),
+        "an unsuccessful reload must fail closed instead of treating missing p-rows as no deny");
+  }
+
+  @Test
+  public void testNewDenyOnInitiallyEmptyRoleIsSeenMidRequest() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    Long roleId = 32L;
+    String roleName = "newDenyRole";
+    RoleEntity emptyRole = mockRoleInStore(roleId, roleName, ImmutableList.of());
+    mockDirectUserRoles(emptyRole);
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, requestContext));
+
+    mockRoleInStore(
+        roleId,
+        roleName,
+        ImmutableList.of(
+            buildSecurableObject(
+                roleId, MetadataObject.Type.CATALOG, "testCatalog", USE_CATALOG, "DENY")));
+    jcasbinAuthorizer.handleRolePrivilegeChange(roleId);
+
+    assertTrue(
+        jcasbinAuthorizer.deny(
+            currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, requestContext),
+        "a privilege change on an empty role must trigger a reload in the same request");
+  }
+
+  @Test
   public void testHasDenyPolicyReloadsEvictedDenyPolicies() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     RoleEntity denyRole =

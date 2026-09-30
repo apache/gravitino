@@ -747,7 +747,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
-    invalidateRolePolicies(roleId);
+    invalidateRolePolicies(roleId, true);
   }
 
   @Override
@@ -1583,8 +1583,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /** Clears a role's policies and removes its loaded marker as one serialized operation. */
   private void invalidateRolePolicies(long roleId) {
+    invalidateRolePolicies(roleId, false);
+  }
+
+  private void invalidateRolePolicies(long roleId, boolean recordEmptyRoleChange) {
     rolePolicyLock.writeLock().lock();
     try {
+      Long previousClearGeneration = roleClearGenerations.get(roleId);
       // An explicit invalidation is stronger than the retry throttle. Clear it under the same lock
       // before removing the loaded marker so the removal callback cannot mistake the old partial
       // state for a newer load and skip policy cleanup.
@@ -1594,6 +1599,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (!markerPresent) {
         // An incomplete load has policies but deliberately has no loadedRoles marker.
         clearRolePoliciesAndRecordGeneration(roleId);
+      }
+      // A privilege change can grant a previously empty role its first deny policy. Such a role
+      // has no p-row to remove, but in-flight requests must still reload before their next check.
+      if (recordEmptyRoleChange
+          && Objects.equals(previousClearGeneration, roleClearGenerations.get(roleId))) {
+        roleClearGenerations.put(roleId, rolePolicyGenerationCounter.incrementAndGet());
       }
     } finally {
       rolePolicyLock.writeLock().unlock();
@@ -1699,6 +1710,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             requestContext.getBoundRoleIds(),
             e);
         return Optional.empty();
+      }
+      // versionCheckAndLoadRoles intentionally tolerates failed or partial entity-store reads.
+      // Those outcomes have no loaded marker, so a deny check must not treat their missing p-rows
+      // as proof that no deny policy exists. This only checks the in-memory cache.
+      for (Long roleId : requestContext.getBoundRoleIds()) {
+        if (!loadedRoles.getIfPresent(roleId).isPresent()) {
+          LOG.warn(
+              "Role {} was not fully reloaded after its policies were cleared; failing closed",
+              roleId);
+          return Optional.empty();
+        }
       }
       requestContext.setRolePolicyGeneration(rolePolicyGeneration);
     }
