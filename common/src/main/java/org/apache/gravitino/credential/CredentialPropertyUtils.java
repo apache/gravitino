@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,7 +185,7 @@ public class CredentialPropertyUtils {
         DlfSecretKeyCredential dlf = (DlfSecretKeyCredential) credential;
         props.put(PAIMON_DLF_ACCESS_KEY_ID, dlf.accessKeyId());
         props.put(PAIMON_DLF_ACCESS_KEY_SECRET, dlf.accessKeySecret());
-        if (dlf.securityToken() != null && !dlf.securityToken().isEmpty()) {
+        if (StringUtils.isNotBlank(dlf.securityToken())) {
           props.put(PAIMON_DLF_SECURITY_TOKEN, dlf.securityToken());
         }
       } else {

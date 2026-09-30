@@ -320,7 +320,7 @@ public class TestPaimonCatalog {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     Map<String, String> dlfProps = Maps.newHashMap();
-    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "dlf");
+    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "rest");
     dlfProps.put(PaimonConstants.WAREHOUSE, tempDir);
     dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
     dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");
@@ -462,7 +462,7 @@ public class TestPaimonCatalog {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     Map<String, String> dlfProps = Maps.newHashMap();
-    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "dlf");
+    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "rest");
     dlfProps.put(PaimonConstants.WAREHOUSE, tempDir);
     dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
     dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");

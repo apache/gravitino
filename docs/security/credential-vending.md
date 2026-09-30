@@ -116,6 +116,8 @@ Catalogs defined in `gravitino.conf` are not registered in a metalake, so Gravit
 | `cos-token`          | COS     | A temporary STS token                                      |
 | `cos-secret-key`     | COS     | The configured static access key and secret                |
 | `jdbc-user-password` | JDBC    | The configured JDBC username and password                  |
+| `aws-secret-key`     | Glue    | The configured AWS access key and secret for Glue API auth |
+| `dlf-secret-key`     | Paimon  | The configured DLF access key and secret (optional token)  |
 
 Each value has its own properties, listed in the sections below. To vend for more than one storage type on a catalog, separate values with a comma. Custom providers can be added by implementing `CredentialProvider`, described under [Custom Credentials](#custom-credentials).
 
@@ -129,6 +131,8 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
 | `gcs-service-account-file`                                   | `gcs-token`         |
+| `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
+| `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 
 JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
 
@@ -137,10 +141,10 @@ Four providers have no inference rule and must always be set explicitly: `s3-tok
 ### Static providers and `getCredentials` privilege risk
 
 Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
-and `jdbc-user-password` return the configured long-lived plaintext keys from
-`getCredentials` / `GET .../credentials`. That endpoint does **not** require a dedicated privilege
-beyond being able to load the metadata object (unlike `getSecrets`, which requires `USE_SECRETS`,
-with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+`jdbc-user-password`, `aws-secret-key`, and `dlf-secret-key` return the configured long-lived
+plaintext keys from `getCredentials` / `GET .../credentials`. That endpoint does **not** require a
+dedicated privilege beyond being able to load the metadata object (unlike `getSecrets`, which
+requires `USE_SECRETS`, with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
 
 **Risk:** any principal that can load a catalog (or fileset) configured with these static providers
 can retrieve the same static AK/SK or JDBC password that Gravitino uses server-side.
