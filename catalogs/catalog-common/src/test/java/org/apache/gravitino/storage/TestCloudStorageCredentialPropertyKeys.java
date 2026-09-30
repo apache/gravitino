@@ -156,6 +156,31 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertTrue(
         CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
             PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
+            PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
     assertFalse(CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey("jdbc-password"));
+  }
+
+  @Test
+  void testOmitCloudAccessKeyPairOmitsDlfSecurityToken() {
+    Map<String, String> secrets =
+        Map.of(
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+            "dlf-ak",
+            PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+            "dlf-sk",
+            PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+            "dlf-token",
+            "jdbc-password",
+            "db-pass");
+
+    Map<String, String> filtered =
+        CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
+
+    assertEquals("db-pass", filtered.get("jdbc-password"));
+    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
+    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
+    assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
   }
 }
