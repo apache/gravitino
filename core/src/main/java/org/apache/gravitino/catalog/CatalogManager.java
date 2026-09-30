@@ -1426,8 +1426,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   Set<Long> allowedSchemaIds =
                       schemaEntities.stream().map(SchemaEntity::id).collect(Collectors.toSet());
                   if (!(store instanceof SupportsConditionalCatalogDelete)) {
+                    // Fail closed: an unconditional cascade could delete a schema created after
+                    // the classification above.
                     throw new UnsupportedOperationException(
-                        "Atomic catalog delete with allowed schemas is not supported by this store");
+                        String.format(
+                            "Catalog %s still has built-in, imported, or externally removed "
+                                + "schemas, and entity store %s cannot delete it atomically with "
+                                + "them. Use the force option, or use an entity store that "
+                                + "implements %s",
+                            ident,
+                            store.getClass().getName(),
+                            SupportsConditionalCatalogDelete.class.getSimpleName()));
                   }
                   deleted =
                       ((SupportsConditionalCatalogDelete) store)
@@ -1471,7 +1480,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // reaches here: it maps a missing entity to false on its own.
             catalogCache.invalidate(ident);
             return false;
-          } catch (GravitinoRuntimeException e) {
+          } catch (GravitinoRuntimeException | UnsupportedOperationException e) {
+            // Keep UnsupportedOperationException unwrapped so REST reports an unsupported
+            // operation instead of an internal error.
             throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);

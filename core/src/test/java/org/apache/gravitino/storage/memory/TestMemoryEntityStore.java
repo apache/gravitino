@@ -191,6 +191,10 @@ public class TestMemoryEntityStore {
               throw new NonEmptyEntityException(
                   "Entity %s has sub-entities, you should remove sub-entities first", ident);
             }
+            // Mirror the relational store, which removes the allowed schemas with the catalog.
+            for (SchemaEntity schema : schemas) {
+              delete(schema.nameIdentifier(), EntityType.SCHEMA, true);
+            }
             return delete(ident, EntityType.CATALOG, true);
           });
     }
