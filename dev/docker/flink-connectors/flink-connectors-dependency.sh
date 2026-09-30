@@ -98,10 +98,25 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
-# the image ships the real texts (not drifting copies committed in-tree).
-cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
-cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+# /licenses must describe what the shipped jars bundle, not the source tree.
+# Each jar already carries that pair in META-INF, generated from its resolved
+# dependency set, with the per-component texts it cites alongside them inside the
+# jar. Versions bundle different components, so each gets its own directory.
+license_jars="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort)"
+[ -n "${license_jars}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
+
+# Drop earlier staging; leftovers would ship licences for jars not in the image.
+mkdir -p "${conn_dir}/licenses"
+find "${conn_dir}/licenses" -mindepth 1 -maxdepth 1 ! -name '.gitignore' -exec rm -rf {} +
+
+while IFS= read -r jar; do
+  dest="${conn_dir}/licenses/$(basename "${jar}" .jar)"
+  mkdir -p "${dest}"
+  unzip -p "${jar}" META-INF/LICENSE > "${dest}/LICENSE" \
+    || { echo "ERROR: ${jar} has no META-INF/LICENSE" >&2; exit 1; }
+  unzip -p "${jar}" META-INF/NOTICE > "${dest}/NOTICE" \
+    || { echo "ERROR: ${jar} has no META-INF/NOTICE" >&2; exit 1; }
+done <<< "${license_jars}"
 
 echo ""
 echo "=== Flink connectors prepared (${copied} version(s)) ==="
