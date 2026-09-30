@@ -39,7 +39,7 @@ public class COSPropertiesMetadata {
                   "COS access key ID (Tencent Cloud SecretId)",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(

@@ -46,6 +46,13 @@ underscores while the catalog and the Java client use hyphens.
 | `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes      |
 | `credential-providers`  | (n/a)                   | The credential provider types, separated by comma. Possible values are `oss-token`, `oss-secret-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#oss) for the extra properties each provider takes. | No       |
 
+:::note
+`oss-access-key-id` and `oss-secret-access-key` are hidden from the default load/list catalog
+response (`******`). Recover them via the [credential vending API](./security/credential-vending.md)
+(`getCredentials` / `OSSSecretKeyCredential`). Other non-credential secrets use
+`getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
+:::
+
 Schema and fileset properties are documented on the shared page: see
 [schema properties](./fileset-catalog.md#schema-properties) and
 [fileset properties](./fileset-catalog.md#fileset-properties).

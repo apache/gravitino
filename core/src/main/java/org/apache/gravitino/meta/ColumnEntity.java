@@ -27,6 +27,7 @@ import lombok.ToString;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -40,12 +41,14 @@ import org.apache.gravitino.rel.types.Type;
 public class ColumnEntity implements Entity, Auditable {
 
   public static final Field ID = Field.required("id", Long.class, "The column's unique identifier");
-  public static final Field NAME = Field.required("name", String.class, "The column's name");
+  public static final Field NAME =
+      Field.required("name", "The column's name", EntityFieldLimits.MAX_NAME_LENGTH);
   public static final Field POSITION =
       Field.required("position", Integer.class, "The column's position");
   public static final Field TYPE = Field.required("dataType", Type.class, "The column's data type");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The column's comment");
+      Field.optional(
+          "comment", "The column's comment", EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
   public static final Field NULLABLE =
       Field.required("nullable", Boolean.class, "The column's nullable property");
   public static final Field AUTO_INCREMENT =

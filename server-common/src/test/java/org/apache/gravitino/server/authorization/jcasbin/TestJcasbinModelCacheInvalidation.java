@@ -54,20 +54,18 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
-/** Regression tests for invalidating a model and its versions in the metadata id cache. */
+/** Regression tests for invalidating model IDs in the metadata id cache. */
 public class TestJcasbinModelCacheInvalidation {
 
   private static final String METALAKE = "ml1";
   private static final MetadataObject MODEL =
       MetadataObjects.parse("cat1.sch1.model1", MetadataObject.Type.MODEL);
-  private static final MetadataObject VERSION =
-      MetadataObjects.parse("cat1.sch1.model1.0", MetadataObject.Type.MODEL_VERSION);
-  private static final MetadataObject OTHER_VERSION =
-      MetadataObjects.parse("cat1.sch1.model10.0", MetadataObject.Type.MODEL_VERSION);
+  private static final MetadataObject OTHER_MODEL =
+      MetadataObjects.parse("cat1.sch1.model10", MetadataObject.Type.MODEL);
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void testModelMutationInvalidatesModelAndVersions(boolean rename) throws Exception {
+  void testModelMutationInvalidatesModel(boolean rename) throws Exception {
     GravitinoEnv env = mock(GravitinoEnv.class);
     CatalogManager catalogManager = mock(CatalogManager.class);
     when(env.catalogManager()).thenReturn(catalogManager);
@@ -93,10 +91,6 @@ public class TestJcasbinModelCacheInvalidation {
       converter
           .when(() -> MetadataIdConverter.getID(MODEL, METALAKE))
           .thenReturn(Optional.of(10L), Optional.of(30L));
-      converter
-          .when(() -> MetadataIdConverter.getID(VERSION, METALAKE))
-          .thenReturn(Optional.of(20L), Optional.of(40L));
-
       // Use the real JCasbin hook and shared caches without starting its background poller.
       JcasbinAuthorizer authorizer = mock(JcasbinAuthorizer.class, CALLS_REAL_METHODS);
       FieldUtils.writeField(authorizer, "metadataIdCache", metadataIdCache, true);
@@ -106,10 +100,7 @@ public class TestJcasbinModelCacheInvalidation {
       Assertions.assertEquals(
           Optional.of(10L),
           lookups.resolveMetadataId(MODEL, METALAKE, new AuthorizationRequestContext()));
-      Assertions.assertEquals(
-          Optional.of(20L),
-          lookups.resolveMetadataId(VERSION, METALAKE, new AuthorizationRequestContext()));
-      String otherKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, OTHER_VERSION);
+      String otherKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, OTHER_MODEL);
       metadataIdCache.put(otherKey, 50L);
 
       ModelDispatcher dispatcher =
@@ -124,21 +115,13 @@ public class TestJcasbinModelCacheInvalidation {
           metadataIdCache
               .getIfPresent(JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, MODEL))
               .isPresent());
-      Assertions.assertFalse(
-          metadataIdCache
-              .getIfPresent(JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, VERSION))
-              .isPresent());
       Assertions.assertEquals(Optional.of(50L), metadataIdCache.getIfPresent(otherKey));
 
-      // Simulate recreation under the old name, with fresh model and version IDs.
+      // Simulate recreation under the old name with a fresh model ID.
       Assertions.assertEquals(
           Optional.of(30L),
           lookups.resolveMetadataId(MODEL, METALAKE, new AuthorizationRequestContext()));
-      Assertions.assertEquals(
-          Optional.of(40L),
-          lookups.resolveMetadataId(VERSION, METALAKE, new AuthorizationRequestContext()));
       converter.verify(() -> MetadataIdConverter.getID(MODEL, METALAKE), times(2));
-      converter.verify(() -> MetadataIdConverter.getID(VERSION, METALAKE), times(2));
     }
   }
 
@@ -146,7 +129,7 @@ public class TestJcasbinModelCacheInvalidation {
   @EnumSource(
       value = OperateType.class,
       names = {"ALTER", "DROP"})
-  void testModelChangeLogInvalidatesVersions(OperateType operation) {
+  void testModelChangeLogInvalidatesModel(OperateType operation) {
     try (CaffeineGravitinoCache<String, Long> metadataIdCache =
             new CaffeineGravitinoCache<>(60_000L, 100L);
         CaffeineGravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache =
@@ -154,10 +137,8 @@ public class TestJcasbinModelCacheInvalidation {
         JcasbinChangeListener listener =
             new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1)) {
       String modelKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, MODEL);
-      String versionKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, VERSION);
-      String otherKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, OTHER_VERSION);
+      String otherKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, OTHER_MODEL);
       metadataIdCache.put(modelKey, 10L);
-      metadataIdCache.put(versionKey, 20L);
       metadataIdCache.put(otherKey, 50L);
       EntityChangeRecord change =
           new EntityChangeRecord(
@@ -170,7 +151,6 @@ public class TestJcasbinModelCacheInvalidation {
               1L);
       listener.onEntityChange(List.of(change));
       Assertions.assertFalse(metadataIdCache.getIfPresent(modelKey).isPresent());
-      Assertions.assertFalse(metadataIdCache.getIfPresent(versionKey).isPresent());
       Assertions.assertEquals(Optional.of(50L), metadataIdCache.getIfPresent(otherKey));
     }
   }

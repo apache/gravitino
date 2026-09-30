@@ -37,8 +37,8 @@ public final class GlueConstants {
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
 
   /**
-   * AWS access key ID for static credential authentication (optional, not hidden). This is an
-   * account identifier, not a secret; {@link #AWS_SECRET_ACCESS_KEY} is the hidden half.
+   * AWS access key ID for static credential authentication (optional, hidden). Identifier half of
+   * the static credential pair; {@link #AWS_SECRET_ACCESS_KEY} is the secret half.
    */
   public static final String AWS_ACCESS_KEY_ID = AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID;
 

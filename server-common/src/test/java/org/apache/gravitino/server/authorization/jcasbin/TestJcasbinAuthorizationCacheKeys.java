@@ -64,15 +64,7 @@ public class TestJcasbinAuthorizationCacheKeys {
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "model1"), MetadataObject.Type.MODEL);
     String modelKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", model);
     Assertions.assertEquals(
-        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "MODEL", "model1", ""), modelKey);
-
-    MetadataObject modelVersion =
-        MetadataObjects.of(
-            Arrays.asList("cat1", "sch1", "model1", "0"), MetadataObject.Type.MODEL_VERSION);
-    String modelVersionKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", modelVersion);
-    Assertions.assertEquals(
-        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "MODEL", "model1", "MODEL_VERSION", "0"),
-        modelVersionKey);
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "MODEL", "model1"), modelKey);
 
     MetadataObject view =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.VIEW);
@@ -84,14 +76,12 @@ public class TestJcasbinAuthorizationCacheKeys {
     Assertions.assertTrue(tableKey.startsWith(schemaKey));
     Assertions.assertTrue(columnKey.startsWith(tableKey));
     Assertions.assertFalse(viewKey.startsWith(tableKey));
-    Assertions.assertTrue(modelVersionKey.startsWith(modelKey));
-    Assertions.assertFalse(
+    Assertions.assertNotEquals(
+        modelKey,
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
-                "ml1",
-                MetadataObjects.of(
-                    Arrays.asList("cat1", "sch1", "model10", "0"),
-                    MetadataObject.Type.MODEL_VERSION))
-            .startsWith(modelKey));
+            "ml1",
+            MetadataObjects.of(
+                Arrays.asList("cat1", "sch1", "model10"), MetadataObject.Type.MODEL)));
   }
 
   @Test
@@ -105,10 +95,8 @@ public class TestJcasbinAuthorizationCacheKeys {
     Assertions.assertTrue(
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.TABLE));
 
-    Assertions.assertTrue(
-        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.MODEL));
     Assertions.assertFalse(
-        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.MODEL_VERSION));
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.MODEL));
 
     Assertions.assertFalse(
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.VIEW));
