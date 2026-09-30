@@ -114,6 +114,34 @@ public class IcebergRestTestUtil {
       boolean bindIcebergTableOps,
       List<EventListenerPlugin> eventListenerPlugins,
       WrapperManagerFactory wrapperManagerFactory) {
+    return getIcebergResourceConfig(
+        c,
+        bindIcebergTableOps,
+        eventListenerPlugins,
+        wrapperManagerFactory,
+        Collections.emptyMap());
+  }
+
+  /** Creates REST resources with additional catalog properties for scan planning tests. */
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c,
+      boolean bindIcebergTableOps,
+      List<EventListenerPlugin> eventListenerPlugins,
+      Map<String, String> extraCatalogConf) {
+    return getIcebergResourceConfig(
+        c,
+        bindIcebergTableOps,
+        eventListenerPlugins,
+        IcebergCatalogWrapperManagerForTest::new,
+        extraCatalogConf);
+  }
+
+  private static ResourceConfig getIcebergResourceConfig(
+      Class c,
+      boolean bindIcebergTableOps,
+      List<EventListenerPlugin> eventListenerPlugins,
+      WrapperManagerFactory wrapperManagerFactory,
+      Map<String, String> extraCatalogConf) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
     resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
@@ -155,6 +183,13 @@ public class IcebergRestTestUtil {
           String.format(
               "%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS),
           "true");
+      // Apply the extra properties to the prefixed catalog and, unprefixed, to the default catalog
+      // that serves requests without a prefix in the path.
+      extraCatalogConf.forEach(
+          (key, value) -> {
+            catalogConf.put(String.format("%s.%s", catalogConfigPrefix, key), value);
+            catalogConf.put(key, value);
+          });
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface

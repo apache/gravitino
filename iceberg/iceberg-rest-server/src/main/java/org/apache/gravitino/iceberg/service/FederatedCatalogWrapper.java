@@ -57,10 +57,12 @@ import org.apache.iceberg.rest.auth.AuthManager;
 import org.apache.iceberg.rest.auth.AuthManagers;
 import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ConfigResponse;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -87,11 +89,10 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   private static final String VENDED_CREDENTIALS = "vended-credentials";
 
   /**
-   * Caches whether the remote catalog advertises the scan-plan endpoint. Only successful lookups
-   * are cached, so a failure to reach the remote can be retried. Races just repeat an idempotent
-   * lookup.
+   * Caches the endpoints advertised by the remote catalog. Only successful lookups are cached, so a
+   * failure to reach the remote can be retried. Races just repeat an idempotent lookup.
    */
-  private volatile Boolean remoteSupportsScanPlan;
+  private volatile List<Endpoint> remoteEndpoints;
 
   /**
    * Creates a federated wrapper.
@@ -227,6 +228,25 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   }
 
   /**
+   * Delegates the second step of scan planning to the remote REST catalog.
+   *
+   * <p>{@code plan-tasks} in a federated setup are issued by the remote catalog during {@link
+   * #planTableScan}, so they are opaque here and are handed back untouched for the remote catalog
+   * to resolve. Scan tasks carry no credentials, so nothing needs rewriting on the way back.
+   *
+   * @param tableIdentifier the table the plan task belongs to.
+   * @param request the request carrying the remote catalog's {@code plan-task}.
+   * @return the scan tasks the remote catalog returns for that plan task.
+   */
+  @Override
+  public FetchScanTasksResponse fetchScanTasks(
+      TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
+    Table table = getCatalog().loadTable(tableIdentifier);
+    return getRESTFetchScanTasks(
+        (RESTCatalog) getCatalog(), tableIdentifier, request, table.specs());
+  }
+
+  /**
    * Reports whether the remote catalog advertises the scan-plan endpoint, since {@link
    * #planTableScan} delegates planning to it rather than planning locally.
    *
@@ -246,21 +266,34 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    */
   @Override
   public boolean supportsScanPlanOperations() {
-    Boolean cached = remoteSupportsScanPlan;
+    return supportsRemoteEndpoint(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN);
+  }
+
+  /**
+   * Reports whether the remote catalog advertises the fetch scan tasks endpoint.
+   *
+   * @return true if the remote catalog supports fetching scan tasks
+   */
+  @Override
+  public boolean supportsFetchScanTasks() {
+    return supportsRemoteEndpoint(Endpoint.V1_FETCH_TABLE_SCAN_PLAN_TASKS);
+  }
+
+  private boolean supportsRemoteEndpoint(Endpoint endpoint) {
+    List<Endpoint> cached = remoteEndpoints;
     if (cached != null) {
-      return cached;
+      return cached.contains(endpoint);
     }
 
     try {
-      boolean supported =
-          fetchRemoteConfig().endpoints().contains(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN);
-      remoteSupportsScanPlan = supported;
-      return supported;
+      List<Endpoint> endpoints = fetchRemoteConfig().endpoints();
+      remoteEndpoints = endpoints;
+      return endpoints.contains(endpoint);
     } catch (Exception e) {
       LOG.warn(
-          "Failed to read the endpoints advertised by the remote catalog of {}; not advertising the"
-              + " scan plan endpoint",
+          "Failed to read the endpoints advertised by the remote catalog of {}; not advertising {}",
           catalogCredentialManager.catalogName(),
+          endpoint,
           e);
       return false;
     }
@@ -366,9 +399,9 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   /**
    * Sends a {@code POST {table}/plan} request to the remote REST catalog.
    *
-   * <p>Follows the same HTTP client lifecycle as {@link #getRESTTableCredentials}. When credential
-   * vending is requested, the {@code X-Iceberg-Access-Delegation: vended-credentials} header is
-   * included so the remote catalog returns credentials inline in the plan response.
+   * <p>When credential vending is requested, the {@code X-Iceberg-Access-Delegation:
+   * vended-credentials} header is included so the remote catalog returns credentials inline in the
+   * plan response.
    *
    * <p>The Iceberg response deserializer requires pre-loaded partition specs to parse {@code
    * file-scan-tasks}. These are supplied via a {@link ParserContext} built from the caller-provided
@@ -408,6 +441,44 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
                 PlanTableScanResponse.class,
                 headers,
                 ErrorHandlers.planErrorHandler(),
+                ignored -> {},
+                parserContext));
+  }
+
+  /**
+   * Sends a {@code POST {table}/tasks} request to the remote REST catalog, redeeming a {@code
+   * plan-task} the remote catalog issued.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param identifier the table the plan task belongs to.
+   * @param request the request carrying the remote catalog's {@code plan-task}.
+   * @param specsById partition specs for the table, needed for response deserialization.
+   * @return the scan tasks the remote catalog returns for that plan task.
+   */
+  private static FetchScanTasksResponse getRESTFetchScanTasks(
+      RESTCatalog restCatalog,
+      TableIdentifier identifier,
+      FetchScanTasksRequest request,
+      Map<Integer, PartitionSpec> specsById) {
+    Map<String, String> properties = restCatalog.properties();
+    String tasksPath = ResourcePaths.forCatalogProperties(properties).fetchScanTasks(identifier);
+
+    // A fetch scan tasks request carries only the plan task, so the case sensitivity the scan was
+    // planned with is not known here; the response deserializer needs a value and Iceberg's default
+    // is case sensitive.
+    ParserContext parserContext =
+        ParserContext.builder().add("specsById", specsById).add("caseSensitive", true).build();
+
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("fetching scan tasks for table: %s", identifier),
+        client ->
+            client.post(
+                tasksPath,
+                request,
+                FetchScanTasksResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.planTaskHandler(),
                 ignored -> {},
                 parserContext));
   }

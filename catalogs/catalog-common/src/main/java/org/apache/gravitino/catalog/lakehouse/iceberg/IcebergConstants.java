@@ -157,4 +157,7 @@ public class IcebergConstants {
   public static final String SCAN_PLAN_CACHE_IMPL = "scan-plan-cache-impl";
   public static final String SCAN_PLAN_CACHE_CAPACITY = "scan-plan-cache-capacity";
   public static final String SCAN_PLAN_CACHE_EXPIRE_MINUTES = "scan-plan-cache-expire-minutes";
+
+  /** Catalog property controlling the number of file scan tasks in each response. */
+  public static final String SCAN_PLAN_TASK_BATCH_SIZE = "scan-plan-task-batch-size";
 }
