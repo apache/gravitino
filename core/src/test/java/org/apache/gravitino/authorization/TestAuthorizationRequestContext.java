@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -343,5 +345,22 @@ public class TestAuthorizationRequestContext {
     ActiveRoles seen =
         PrincipalUtils.doAs(principal, () -> new AuthorizationRequestContext().getActiveRoles());
     assertEquals(named, seen);
+  }
+
+  @Test
+  public void testBoundRoleIdsAndRolePolicyGeneration() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertTrue(context.getBoundRoleIds().isEmpty());
+    assertEquals(0L, context.getRolePolicyGeneration());
+
+    List<Long> roleIds = new ArrayList<>(Arrays.asList(1L, 2L));
+    context.setBoundRoleIds(roleIds);
+    context.setRolePolicyGeneration(7L);
+    roleIds.add(3L);
+
+    assertEquals(Arrays.asList(1L, 2L), context.getBoundRoleIds());
+    assertThrows(UnsupportedOperationException.class, () -> context.getBoundRoleIds().add(4L));
+    assertThrows(NullPointerException.class, () -> context.setBoundRoleIds(null));
+    assertEquals(7L, context.getRolePolicyGeneration());
   }
 }

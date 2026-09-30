@@ -20,6 +20,9 @@
 package org.apache.gravitino.authorization;
 
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -88,6 +91,19 @@ public class AuthorizationRequestContext {
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
   private volatile String originalAuthorizationExpression;
+
+  /**
+   * Ids of the roles bound to the caller when this request loaded role policies. The authorizer
+   * uses them to detect whether one of these roles lost its policies after the load.
+   */
+  private volatile List<Long> boundRoleIds = Collections.emptyList();
+
+  /**
+   * Authorizer-defined generation of the in-memory role policies this request last validated its
+   * bound roles against. A role cleared after this generation must be reloaded before the request
+   * evaluates it again.
+   */
+  private volatile long rolePolicyGeneration;
 
   /**
    * The roles the caller has declared active for this request (role assumption). Read from the
@@ -230,6 +246,44 @@ public class AuthorizationRequestContext {
    */
   public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
     this.prefetchedRoleVersions = prefetchedRoleVersions;
+  }
+
+  /**
+   * Returns the ids of the roles bound to the caller when this request loaded role policies.
+   *
+   * @return the bound role ids; empty when no role has been loaded yet
+   */
+  public List<Long> getBoundRoleIds() {
+    return boundRoleIds;
+  }
+
+  /**
+   * Records the ids of the roles bound to the caller by this request's role load.
+   *
+   * @param boundRoleIds the bound role ids; must not be {@code null}
+   */
+  public void setBoundRoleIds(List<Long> boundRoleIds) {
+    this.boundRoleIds =
+        Collections.unmodifiableList(
+            new ArrayList<>(Objects.requireNonNull(boundRoleIds, "boundRoleIds must not be null")));
+  }
+
+  /**
+   * Returns the role policy generation this request last validated its bound roles against.
+   *
+   * @return the role policy generation
+   */
+  public long getRolePolicyGeneration() {
+    return rolePolicyGeneration;
+  }
+
+  /**
+   * Records the role policy generation this request validated its bound roles against.
+   *
+   * @param rolePolicyGeneration the role policy generation
+   */
+  public void setRolePolicyGeneration(long rolePolicyGeneration) {
+    this.rolePolicyGeneration = rolePolicyGeneration;
   }
 
   /**
