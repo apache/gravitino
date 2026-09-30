@@ -104,6 +104,7 @@ exists only as the pile of grants someone remembered to issue.
 | Cross-tag conditions                                          | A rule matches one tag. Conditions spanning several tags await the `EXPRESSION` selector type in [policy-on-tag.md](policy-on-tag.md).                                                                                                                                                                                                                                                                                                                                              |
 | Column-level decisions                                        | A tag on a column does not affect decisions about its table.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | A `scope` field in `content`, restricting a rule to a subtree | Not a security boundary: creating a policy already needs metalake-wide `CREATE_POLICY`, so whoever writes the rule chooses its reach anyway. It is also not checked when a tag is applied, so it limits where a rule takes effect rather than stopping a wrong tag. One tag meaning different things in different subtrees is already covered by tag assignment values with a value-sensitive selector. Can be added later, since an absent `scope` has always meant metalake-wide. |
+| Audit of tag-conferred access, and dry-run                    | Nothing records that a tag granted access — the authorizer emits an event on denial, not on allow. A dry-run mode previewing what enabling the flag would change needs that same record. Both can follow. |
 | Replacing RBAC                                                | Baseline privileges, ownership and traversal are unchanged. See [Composition with RBAC](#composition-with-rbac).                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
@@ -134,7 +135,11 @@ existing example. `system_access_control` follows the same pattern with a new
 | Field              | Type                     | Meaning                                                                                                             |
 | ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | `privileges`       | list of `Privilege.Name` | The privileges the rule confers. Each must be a permitted name — see [Permitted privileges](#permitted-privileges). |
-| `applicableRoles`  | list of role names       | The **condition**. Satisfied when any listed role is among the caller's expanded roles.                             |
+| `applicableRoles`  | list of role names       | The **condition**. Satisfied when any listed role is among the caller's active roles.                               |
+
+Active roles are the roles the caller activated for the request, and default to every role they hold
+when the request does not narrow. [Evaluation](#evaluation) explains why the tag check has to apply
+that narrowing itself.
 
 `validate()` rejects at creation rather than at evaluation:
 
@@ -157,11 +162,17 @@ a fixed allowlist:
 | Object   | Permitted                                          |
 | -------- | -------------------------------------------------- |
 | Table    | `SELECT_TABLE`, `MODIFY_TABLE`, `PROBE_TABLE_LIKE` |
+
 | View     | `SELECT_VIEW`                                      |
 | Fileset  | `READ_FILESET`, `WRITE_FILESET`                    |
 | Topic    | `CONSUME_TOPIC`, `PRODUCE_TOPIC`                   |
 | Model    | `USE_MODEL`                                        |
 | Function | `EXECUTE_FUNCTION`                                 |
+
+`PROBE_TABLE_LIKE` is the only entry that is not data access — it confers the ability to probe
+whether a table-like object exists. It is in because a rule conferring `SELECT_TABLE` on an object
+already reveals that the object exists; withholding the probe would leave a caller able to read a
+table they cannot confirm is there.
 
 An allowlist rather than a denylist so the boundary fails closed: a privilege added to
 `Privilege.Name` later confers nothing through a tag until someone adds it here deliberately.
@@ -215,7 +226,7 @@ storage credentials and never asks Gravitino for one.
 ### `applicableRoles` is a condition, not a principal
 
 The rule does not grant anything to `analyst`. It states that *if* the caller holds `analyst`
-among their expanded roles *and* the object carries `certified`, then `SELECT_TABLE` is satisfied
+among their active roles *and* the object carries `certified`, then `SELECT_TABLE` is satisfied
 for this request.
 
 The distinction matters for two reasons. The rule is not a grant, so it does not appear in the
@@ -239,14 +250,14 @@ whether any access rule is satisfied. That requires three things:
 1. the tags effective at the object after nearest-wins resolution
    ([tag-assignment-values.md](tag-assignment-values.md)), including those inherited from ancestors;
 2. the `system_access_control` policies bound to those tags;
-3. for each, whether any of `applicableRoles` is among the caller's expanded roles.
+3. for each, whether any of `applicableRoles` is among the caller's active roles.
 
 Access rules only allow — `content` has a role condition but no deny effect — so a tag cannot
 restrict or deny. An RBAC `DENY` is unaffected; see [Allow and deny](#allow-and-deny).
 
 The question is *where* steps 1 and 2 happen.
 
-### Proposed: check tags at the privilege leaf
+### Decided: check tags at the privilege leaf
 
 Every privilege check bottoms out in `GravitinoAuthorizer.authorize`. The expression converter
 expands each `ANY_*` macro mechanically —
@@ -443,12 +454,11 @@ them:
 | Test `applicableRoles`              | In memory, against roles the request has already loaded.                                                                                       |
 
 The chain is not bounded by a constant. `getParentMetadataObjects` expands a hierarchical schema
-one level at a time, so a column under `catalog.a:b.table` walks five levels, and a deeper schema
-walks more:
+one level at a time, so a table under `catalog.a:b` walks four levels, and a deeper schema walks
+more:
 
 ```
-COLUMN:catalog.a:b.table.col -> TABLE:catalog.a:b.table -> SCHEMA:catalog.a:b
-                             -> SCHEMA:catalog.a -> CATALOG:catalog
+TABLE:catalog.a:b.table -> SCHEMA:catalog.a:b -> SCHEMA:catalog.a -> CATALOG:catalog
 ```
 
 Two costs the query count hides. `TagManager.listTagsInfoForMetadataObject` and
@@ -528,7 +538,7 @@ separate question — see [Credential vending](#credential-vending).
 ### Allow and deny
 
 With `ALLOW` only, two access rules cannot conflict — they union. The interaction that remains is
-between a tag rule that allows and an RBAC grant that denies; the proposal is that the deny wins. See
+between a tag rule that allows and an RBAC grant that denies, and the deny wins. See
 [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
 
 ---
@@ -648,6 +658,9 @@ policy operations; nothing is added.
 
 Policy creation, update and deletion already emit events. Access policies emit the same events with
 no additional payload. The bind and unbind operations emit the existing policy-to-tag events.
+
+Nothing is emitted when a tag confers access. The authorizer emits an event on denial only, and
+that is unchanged here — see [Not in this version](#not-in-this-version).
 
 ---
 
