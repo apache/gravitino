@@ -83,7 +83,7 @@ When using Gravitino authorization for Hive with Apache Ranger, see the [Authori
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including keys that overlap with credential vending) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) remains available for typed credential delivery.
+Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Recover credential fields via the [credential vending API](security/credential-vending.md) (`getCredentials`). Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema

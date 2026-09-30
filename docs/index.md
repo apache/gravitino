@@ -32,6 +32,11 @@ Gravitino also provides a playground to experience the whole Gravitino system wi
 See the [Gravitino playground repository](https://github.com/apache/gravitino-playground)
 and [How to use the playground](./how-to-use-the-playground.md).
 
+## Migration Guide
+
+Use the [Migration Guide](./migration-guide.md) for version-specific behavior and API changes.
+For database schema upgrades, see [Upgrade Gravitino](./how-to-upgrade.md).
+
 ## Getting Started
 
 To get started with Gravitino, see [Getting started](./getting-started/index.md) for the details.
