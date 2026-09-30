@@ -30,6 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -61,8 +62,8 @@ public class SecurableObjectBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE FALSE "
         + "<foreach collection='securableObjects' item='item' separator=' '>"
         + " OR (metadata_object_id = #{item.metadataObjectId} AND"
@@ -74,16 +75,16 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
   public String softDeleteSecurableObjectsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " ob SET ob.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE exists (SELECT * FROM "
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
@@ -95,8 +96,8 @@ public class SecurableObjectBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND type = #{metadataObjectType}";
   }
@@ -104,8 +105,8 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " sect SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -153,8 +154,8 @@ public class SecurableObjectBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " sect SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME

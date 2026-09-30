@@ -19,14 +19,12 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.GCSProperties;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,11 +61,12 @@ public class IcebergRESTGCSTokenAuthorizationIT extends IcebergRESTCloudTokenAut
     // Use null to trigger ADC (Application Default Credentials) if not explicitly provided
     this.serviceAccountFile = System.getenv().get("GOOGLE_APPLICATION_CREDENTIALS");
 
+    // The server resolves GCSFileIO from its classpath at startup, so bundles must land first.
+    setupCloudBundles();
+
     super.startIntegrationTest();
 
-    catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
-
-    setupCloudBundles();
+    createSchemaIfAbsent();
   }
 
   @Override
@@ -83,22 +82,17 @@ public class IcebergRESTGCSTokenAuthorizationIT extends IcebergRESTCloudTokenAut
   }
 
   @Override
-  protected void downloadCloudBundleJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-gcp-bundle/%s/iceberg-gcp-bundle-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
-  }
-
-  @Override
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
+    // The REST server and the catalog use separate classloaders, so each needs its own copy.
+    copyBundlesTo(ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs"));
+    copyBundlesTo(ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs"));
+  }
+
+  private void copyBundlesTo(String directory) {
+    // iceberg-gcp-bundle carries GCSFileIO and the GCS SDK, gcp carries the credential providers.
+    BaseIT.copyBundleJarsToDirectory("iceberg-gcp-bundle", directory);
+    BaseIT.copyBundleJarsToDirectory("gcp", directory);
   }
 
   private Map<String, String> getGCSConfig() {

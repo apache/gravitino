@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
@@ -43,8 +45,10 @@ public final class EntityCombinedTable implements Table {
 
   private final TableEntity tableEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties;
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -67,14 +71,20 @@ public final class EntityCombinedTable implements Table {
     return new EntityCombinedTable(table, null);
   }
 
-  public EntityCombinedTable withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedTable withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
   public EntityCombinedTable withImported(boolean imported) {
     this.imported = imported;
     return this;
+  }
+
+  MaskAndOmitKeys hiddenProperties() {
+    return MaskAndOmitKeys.of(keysToMask, keysToOmit);
   }
 
   @Override
@@ -94,10 +104,7 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Map<String, String> properties() {
-    return table.properties().entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(table.properties(), keysToMask, keysToOmit);
   }
 
   @Override

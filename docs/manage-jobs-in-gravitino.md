@@ -1,11 +1,7 @@
 ---
 title: "Manage Jobs"
 slug: "/manage-jobs-in-gravitino"
-date: 2025-08-13
-keywords:
-  - job
-  - job template
-  - gravitino
+keyword: "job management, job template, shell job, spark job, Gravitino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -14,654 +10,432 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Apache Gravitino introduces a new submodule called the job system for users to
-register, run, and manage jobs. This job system integrates with the existing metadata
-management, enabling users to execute the jobs or actions based on the metadata,
-known as metadata-driven actions. For instance, this allows users to run jobs for tasks such as
-compacting Iceberg tables or cleaning old data based on TTL properties.
+This page covers the Gravitino API for job templates and jobs. For what a template is, how it
+relates to a run, and what the job statuses mean, see [Jobs](./jobs.md).
 
-The aim of the job system is to provide a unified way to manage job templates and jobs,
-including registering job templates, running jobs based on the job templates, and other related
-tasks. The job system itself is a unified job submitter that allows users to run jobs through it,
-but it doesn't provide the actual job execution capabilities. Instead, it relies on the
-existing job executors (schedulers), such as Apache Airflow, Apache Livy, to execute the jobs.
-Gravitino's job system provides an extensible way to connect to different job executors.
+Jobs run through a job executor, set with `gravitino.job.executor`. The default, `local`, launches
+the job as a process on the Gravitino server and is intended for testing. Running jobs anywhere else
+means implementing an executor. See
+[Custom job executor](./development/custom-job-executor.md).
 
 :::note
-1. The job system is a new feature introduced in Gravitino 1.0.0, and it is still under
-   development, so some features may not be fully implemented yet.
+1. The job system is still under development, so some features may not be fully
+   implemented yet.
 2. The aim of the job system is not to replace the existing job executors. So, it can only
    support running a single job at a time, and it doesn't support job scheduling for now.
    :::
 
+## Job Template Operations
+
+### Register a Shell Template
+
+A shell template runs an executable. Its placeholders are filled in with the job configuration when
+a job runs. See [Placeholders](#placeholders).
+
+```json
+{
+  "name": "nightly_export",
+  "jobType": "shell",
+  "comment": "Exports a table to a drop location",
+  "executable": "/opt/jobs/export.sh",
+  "arguments": ["{{table}}", "{{target}}"],
+  "environments": {"REGION": "{{region}}"},
+  "scripts": ["/opt/jobs/lib/common.sh"]
+}
+```
+
+`executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
+HTTP, HTTPS, FTP, and FTPS URLs.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "jobTemplate": {
+    "name": "nightly_export",
+    "jobType": "shell",
+    "comment": "Exports a table to a drop location",
+    "executable": "/opt/jobs/export.sh",
+    "arguments": ["{{table}}", "{{target}}"]
+  }
+}' http://localhost:8090/api/metalakes/example/jobs/templates
+```
+
+</TabItem>
+</Tabs>
+
+### Register a Spark Template
+
+A Spark template submits an application. Running one with the local executor needs either
+`gravitino.jobExecutor.local.sparkHome` or `SPARK_HOME` set before the server starts, pointing to a
+Spark installation with an executable `bin/spark-submit`. Otherwise, the run request is rejected with
+an error that names the missing setting, and no job is created.
+
+```json
+{
+  "name": "nightly_rollup",
+  "jobType": "spark",
+  "comment": "Rolls up daily aggregates",
+  "executable": "/opt/jobs/rollup.jar",
+  "className": "com.example.Rollup",
+  "arguments": ["{{date}}"],
+  "configs": {"spark.executor.memory": "4g"}
+}
+```
+
+### Placeholders
+
+Any string in a template can contain placeholders: `executable`, `className`, the entries of
+`scripts`, `jars`, `files`, and `archives`, and the keys and values of `environments`, `configs`,
+and `customFields`. When a job runs, each placeholder is replaced with a value from the job
+configuration (`jobConf`).
+
+| Syntax              | Meaning                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------|
+| `{{name}}`          | Required. A run without a value for `name` is rejected.                                      |
+| `{{name:-default}}` | Optional. `default` is used when the job configuration has no value. It can be empty: `{{name:-}}`. |
+| `\{{`               | A literal `{{`, for example to pass `{{ds}}` to another tool. Written as `"\\{{"` in JSON.   |
+
+For example, a template with `"arguments": ["--date", "{{date}}", "--mode", "{{mode:-full}}"]` run
+with `{"date": "2026-09-22"}` passes `--date 2026-09-22 --mode full` to the job.
+
+:::caution
+Templates registered before Gravitino supported default values could pass an unresolved
+placeholder through to the job as literal text, which is how templates carried another tool's
+syntax, such as `{{ds}}` or `{{.Values.image}}`. A placeholder with no value is now a required
+parameter, so those runs are rejected. Escape such text as `\{{ds}}`, or give the parameter a
+default value.
+:::
+
+- A value in the job configuration is used as is, including an empty string `""`. A `null` value
+  counts as no value. Values are never scanned for placeholders.
+- A default declared on one occurrence of a parameter applies to all of its occurrences. A
+  template that gives the same parameter different defaults is rejected when it is registered or
+  updated.
+- A default value is used as is and can span lines, but its braces must be balanced, so the
+  placeholder ends at the first `}}` outside of them. This makes a JSON object a valid default, for
+  example `{{options:-{"k":"v"}}}`. A default with unbalanced braces, such as `{{options:-{}}`, is
+  rejected when the template is registered or updated.
+- If any required parameter has no value, the run request fails with an error that lists all the
+  missing parameters. No job is created and no file is downloaded.
+- Keys in the job configuration that the template does not use are ignored, and the server logs a
+  warning.
+- A placeholder name can contain ASCII letters, digits, `_`, `.`, and `-`. Text such as
+  `{{ name }}`, with spaces, is not a placeholder and is passed through as is.
+- Only `{{` needs escaping. A placeholder always starts with `{{`, so `}}` on its own is plain
+  text. A value that ends with a backslash right before a placeholder doubles it, as in
+  `\\{{name}}`, which keeps one backslash and still resolves the placeholder. A backslash anywhere
+  else is plain text.
+- A placeholder whose default value contains braces cannot be immediately followed by a literal
+  `}`, because it is then unclear which `}}` closes it. Put the whole structure in the default
+  value, or insert a space. A default value without braces, such as `{"k":{{v:-1}}}`, is fine.
+
+### List, Get, and Delete Templates
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/jobs/templates
+
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/jobs/templates/nightly_export
+
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/jobs/templates/nightly_export
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+List<JobTemplate> templates = client.listJobTemplates();
+JobTemplate template = client.getJobTemplate("nightly_export");
+boolean deleted = client.deleteJobTemplate("nightly_export");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+templates = client.list_job_templates()
+template = client.get_job_template("nightly_export")
+deleted = client.delete_job_template("nightly_export")
+```
+
+</TabItem>
+</Tabs>
+
+A template cannot be deleted while jobs from it are queued or running.
+
+### Alter a Template
+
+| Change             | JSON                                                     | Java                                                |
+|--------------------|----------------------------------------------------------|-----------------------------------------------------|
+| Rename             | `{"@type":"rename","newName":"nightly_export_v2"}`       | `JobTemplateChange.rename("nightly_export_v2")`     |
+| Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`   | `JobTemplateChange.updateComment("new_comment")`    |
+| Update the template| `{"@type":"updateTemplate","newTemplate":{...}}`         | `JobTemplateChange.updateTemplate(...)`             |
+
 ## Job Operations
 
-### Register a New Job Template
+### Run a Job
 
-Before running a job, the first step is to register a job template. Gravitino
-supports two types of job templates: `shell` and `spark` (we will add more job templates in the
-future).
+Running names a template and supplies values for its placeholders.
 
-#### Shell Job Template
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
-The `shell` job template is used to run scripts, it can be a shell script, or any executable
-script. The template is defined as follows:
-
-```json
-{
-  "name": "my_shell_job_template",
-  "jobType": "shell",
-  "comment": "A shell job template to run a script",
-  "executable": "/path/to/my_script.sh",
-  "arguments": ["{{arg1}}", "{{arg2}}"],
-  "environments": {
-    "ENV_VAR1": "{{value1}}",
-    "ENV_VAR2": "{{value2}}"
-  },
-  "customFields": {
-    "field1": "{{value1}}",
-    "field2": "{{value2}}"
-  },
-  "scripts": ["/path/to/script1.sh", "/path/to/script2.sh"]
-}
-```
-
-Here is a brief description of the fields in the job template:
-
-- `name`: The name of the job template, must be unique.
-- `jobType`: The type of the job template, use `shell` for a shell job template.
-- `comment`: A comment for the job template, which can be used to describe the job template.
-- `executable`: The path to the executable script, which can be a shell script or any executable script.
-- `arguments`: The arguments to pass to the executable script.
-- `environments`: The environment variables to set when running the jo.
-- `customFields`: Custom fields for the job template, which can be used to store additional
-  information.
-- `scripts`: A list of scripts that the main executable script can use.
-
-Please note that:
-
-1. The `executable` and `scripts` must be accessible by the Gravitino server. Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
-   (more distributed file system support will be added in the future). So the `executable` and
-   `scripts` can be a local file path, or a URL like `http://example.com/my_script.sh`.
-2. The `executable`, `arguments`, `environments`, `customFields` and `scripts` can use placeholders
-   like `{{arg1}}` and `{{value1}}`, the style is `{{foo}}`. They will be replaced with
-   the actual values when running the job, so you can use them to pass dynamic values to the job template.
-3. Gravitino will copy the `executable` and `scripts` files to the job working directory
-   when running the job, so you can use the relative path in the `executable` and `scripts` to
-   refer to other scripts in the job working directory.
-
-#### Spark Job Template
-
-The `spark` job template is used to run Spark jobs, it is a Spark application JAR file for now.
-
-The template is defined as follows:
-
-```json
-{
-  "name": "my_spark_job_template",
-  "jobType": "spark",
-  "comment": "A Spark job template to run a Spark application",
-  "executable": "/path/to/my_spark_app.jar",
-  "arguments": ["{{arg1}}", "{{arg2}}"],
-  "environments": {
-    "ENV_VAR1": "{{value1}}",
-    "ENV_VAR2": "{{value2}}"
-  },
-  "customFields": {
-    "field1": "{{value1}}",
-    "field2": "{{value2}}"
-  },
-  "className": "com.example.MySparkApp",
-  "jars": ["/path/to/dependency1.jar", "/path/to/dependency2.jar"],
-  "files": ["/path/to/file1.txt", "/path/to/file2.txt"],
-  "archives": ["/path/to/archive1.zip", "/path/to/archive2.zip"],
-  "configs": {
-    "spark.executor.memory": "2g",
-    "spark.executor.cores": "2"
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "jobTemplateName": "nightly_export",
+  "jobConf": {
+    "table": "sales.public.orders",
+    "target": "s3a://exports/orders",
+    "region": "us"
   }
-}
-```
-
-Here is a brief description of the fields in the Spark job template:
-
-- `name`: The name of the job template, which must be unique.
-- `jobType`: The type of the job template, use `spark` for Spark job template.
-- `comment`: A comment for the job template, which can be used to describe the job template.
-- `executable`: The path to the Spark application JAR file, which can be a local file path or a URL
-  with a supported scheme.
-- `arguments`: The arguments to pass to the Spark application.
-- `environments`: The environment variables to set when running the job.
-- `customFields`: Custom fields for the job template, which can be used to store additional information.
-- `className`: The main class of the Spark application. It is required for Java/Scala Spark
-  application. For PySpark application, this field can be `null` instead.
-- `jars`: A list of JAR files to add to the Spark job classpath, which can be a local file path or a URL
-  with a supported scheme.
-- `files`: A list of files to be copied to the working directory of the Spark job, which can be a local
-  file path or a URL with a supported scheme.
-- `archives`: A list of archives to be extracted to the working directory of the Spark job, which
-  can be a local file path or a URL with a supported scheme.
-- `configs`: A map of Spark configurations to set when running the Spark job.
-
-Note that:
-
-1. The `executable`, `jars`, `files`, and `archives` must be accessible by the Gravitino server.
-   Gravitino supports accessing files from the local file system, HTTP(S) URLs, and
-   FTP(S) URLs (more distributed file system supports will be added in the future). So the
-   `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
-   `http://example.com/my_spark_app.jar`.
-2. The `executable`, `arguments`, `environments`, `customFields`, `className`, `jars`, `files`,
-   `archives`, and `configs` can use placeholders like `{{arg1}}` and `{{value1}}`, the style is
-   `{{foo}}`. They will be replaced with the actual values when running the job, so you can use them
-   to pass dynamic values to the job template.
-3. Gravitino will copy the `executable`, `jars`, `files`, and `archives` files to the job working
-   directory when running the job, so you can use the relative path in the `executable`, `jars`,
-   `files`, and `archives` to refer to other files in the job working directory.
-4. The `className` is required for the Java and Scala Spark job template, it is the main class of
-   the Spark application to be executed. For PySpark job template, this field can be `null` instead.
-
-To register a job template, you can use REST API or the Java and Python SDKs. Here is the
-example to register a shell job template:
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "jobTemplate": {
-             "name": "my_shell_job_template",
-             "jobType": "shell",
-             "comment": "A shell job template to run a script",
-             "executable": "/path/to/my_script.sh",
-             "arguments": ["{{arg1}}", "{{arg2}}"],
-             "environments": {
-               "ENV_VAR1": "{{value1}}",
-               "ENV_VAR2": "{{value2}}"
-             },
-             "customFields": {
-               "field1": "{{value1}}",
-               "field2": "{{value2}}"
-             },
-             "scripts": ["/path/to/script1.sh", "/path/to/script2.sh"]
-           }
-        }' \
-     http://localhost:8090/api/metalakes/test/jobs/templates
+}' http://localhost:8090/api/metalakes/example/jobs/runs
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-  ShellJobTemplate jobTemplate = ShellJobTemplate.builder()
-      .name("my_shell_job_template")
-      .comment("A shell job template to run a script")
-      .executable("/path/to/my_script.sh")
-      .arguments(List.of("{{arg1}}", "{{arg2}}"))
-      .environments(Map.of("ENV_VAR1", "{{value1}}", "ENV_VAR2", "{{value2}}"))
-      .customFields(Map.of("field1", "{{value1}}", "field2", "{{value2}}"))
-      .scripts(List.of("/path/to/script1.sh", "/path/to/script2.sh"))
-      .build();
-
-  GravitinoClient client = ...;
-  client.registerJobTemplate(jobTemplate);
+JobHandle job = client.runJob(
+    "nightly_export",
+    ImmutableMap.of(
+        "table", "sales.public.orders",
+        "target", "s3a://exports/orders",
+        "region", "us"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-  shell_job_template = (
-      ShellJobTemplate.builder()
-      .with_name("my_shell_job_template")
-      .with_comment("A shell job template to run a script")
-      .with_executable("/path/to/my_script.sh")
-      .with_arguments(["{{arg1}}", "{{arg2}}"])
-      .with_environments({"ENV_VAR1": "{{value1}}", "ENV_VAR2": "{{value2}}"})
-      .with_custom_fields({"field1": "{{value1}}", "field2": "{{value2}}"})
-      .with_scripts(["/path/to/script1.sh", "/path/to/script2.sh"])
-      .build()
-  )
-
-  client = GravitinoClient(...)
-  client.register_job_template(shell_job_template)
-```
-
-</TabItem>
-</Tabs>
-
-### List Registered Job Templates
-
-List all the registered job templates under a metalake by using the REST API or the Java
-and Python SDKs.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/templates
-
-Or using query parameter "details=true" to get more details of the job templates:
-
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/templates?details=true
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    GravitinoClient client = ...;
-    List<JobTemplate> detailedJobTemplates = client.listJobTemplates();
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    client = GravitinoClient(...)
-    detailed_job_templates = client.list_job_templates()
-```
-
-</TabItem>
-</Tabs>
-
-### Get a Registered Job Template by Name
-
-Get a registered job template by its name using the REST API or the Java and Python SDKs.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/templates/my_shell_job_template
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    GravitinoClient client = ...;
-    JobTemplate jobTemplate = client.getJobTemplate("my_shell_job_template");
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    client = GravitinoClient(...)
-    job_template = client.get_job_template("my_shell_job_template")
-```
-
-</TabItem>
-</Tabs>
-
-### Delete a Registered Job Template by Name
-
-Delete a registered job template by its name using the REST API or the Java and Python SDKs.
-
-Note that deleting a job template will also delete all the jobs that are using this job template.
-If there are queued, started, or to be cancelled jobs that are using this job template, the deletion
-will fail with an `InUseException` error.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/templates/my_shell_job_template
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    GravitinoClient client = ...;
-    client.deleteJobTemplate("my_shell_job_template");
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    client = GravitinoClient(...)
-    client.delete_job_template("my_shell_job_template")
-```
-
-</TabItem>
-</Tabs>
-
-### Alter a Registered Job Template
-
-Alter a registered job template by its name using the REST API or the Java and Python
-SDKs. Gravitino supports altering the `name`, `comment` and `template` fields of the job template.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
-    -H "Content-Type: application/json" \
-    -d '{
-        "updates": [
-            {
-                "@type": "rename",
-                "newName": "altered_shell_job_template"
-            },
-            {
-                "@type": "comment",
-                "newComment": "An altered shell job template"
-            },
-            {
-                "@type": "updateTemplate",
-                "newTemplate": {
-                    "@type": "shell",
-                    "newExecutable": "/new/path/to/my_script.sh",
-                    "newArguments": ["{{new_arg1}}", "{{new_arg2}}"],
-                    "newEnvironments": {
-                        "NEW_ENV_VAR1": "{{new_value1}}",
-                        "NEW_ENV_VAR2": "{{new_value2}}"
-                    },
-                    "newCustomFields": {
-                        "new_field1": "{{new_value1}}",
-                        "new_field2": "{{new_value2}}"
-                    },
-                    "newScripts": ["/new/path/to/script1.sh", "/new/path/to/script2.sh"]
-                }
-            }
-        ]
-
-    }' http://localhost:8090/api/metalakes/test/jobs/templates/my_shell_job_template
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    ShellTemplateUpdate newTemplate = ShellTemplateUpdate.builder()
-        .withNewExecutable("/new/path/to/my_script.sh")
-        .withNewArguments(ImmutableList.of("{{new_arg1}}", "{{new_arg2}}"))
-        .withNewEnvironments(ImmutableMap.of("NEW_ENV_VAR1", "{{new_value1}}", "NEW_ENV_VAR2", "{{new_value2}}"))
-        .withNewCustomFields(ImmutableMap.of("new_field1", "{{new_value1}}", "new_field2", "{{new_value2}}"))
-        .withNewScripts(List.of("/new/path/to/script1.sh", "/new/path/to/script2.sh"))
-        .build();
-
-    List<JobTemplateChange> changes = List.of(
-        JobTemplateChange.rename("altered_shell_job_template"),
-        JobTemplateChange.updateComment("An altered shell job template"),
-        JobTemplateChange.updateTemplateUpdateJobTemplate(newTemplate));
-
-    GravitinoClient client = ...;
-    client.alterJobTemplate("my_shell_job_template", changes);
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    new_template = ShellTemplateUpdate(
-        new_executable="/new/path/to/my_script.sh",
-        new_arguments=["{{new_arg1}}", "{{new_arg2}}"],
-        new_environments={"NEW_ENV_VAR1": "{{new_value1}}", "NEW_ENV_VAR2": "{{new_value2}}"},
-        new_custom_fields={"new_field1": "{{new_value1}}", "new_field2": "{{new_value2}}"},
-        new_scripts=["/new/path/to/script1.sh", "/new/path/to/script2.sh"]
-    )
-
-    changes = [
-        JobTemplateChange.rename("altered_shell_job_template"),
-        JobTemplateChange.update_comment("An altered shell job template"),
-        JobTemplateChange.update_template(new_template)
-    ]
-
-    client = GravitinoClient(...)
-    client.alter_job_template("my_shell_job_template", changes)
-```
-
-</TabItem>
-</Tabs>
-
-### Run a Job Based on a Job Template
-
-To run a job based on the registered job template, you can use the REST API or the Java and Python SDKs.
-When running a job, you need to provide the job template name and the parameters to replace the
-placeholders in the job template.
-
-Gravitino leverages the job executor to run the job, so you need to specify the job executor
-through configuration `gravitino.job.executor`. By default, it is set to "local", which means
-the job will be launched as a process within the same machine that runs the Gravitino server. Note
-that the local job executor is only for testing. If you want to run the job in a distributed environment,
-you need to implement your own `JobExecutor` and set the configuration; see
-[Implement a custom job executor](#implement-a-custom-job-executor) section below.
-
-When running a Spark job template with the local executor, configure one of:
-
-- `gravitino.jobExecutor.local.sparkHome`
-- `SPARK_HOME`
-
-If neither is set before the Gravitino server starts, Spark jobs may fail to start.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "jobTemplateName": "my_shell_job_template",
-           "jobConf": {
-             "arg1": "value1",
-             "arg2": "value2",
-             "value1": "env_value1",
-             "value2": "env_value2"
-           }
-        }' \
-     http://localhost:8090/api/metalakes/test/jobs/runs
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    GravitinoClient client = ...;
-    JobHandle jobHandle = client.runJob("my_shell_job_template", ImmutableMap.of(
-        "arg1", "value1",
-        "arg2", "value2",
-        "value1", "env_value1",
-        "value2", "env_value2"
-    ));
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    client = GravitinoClient(...)
-    job_handle = client.run_job("my_shell_job_template", {
-        "arg1": "value1",
-        "arg2": "value2",
-        "value1": "env_value1",
-        "value2": "env_value2"
+job = client.run_job(
+    job_template_name="nightly_export",
+    job_conf={
+        "table": "sales.public.orders",
+        "target": "s3a://exports/orders",
+        "region": "us",
     })
 ```
 
 </TabItem>
 </Tabs>
 
-The returned `JobHandle` contains the job ID and other information about the job. Use the job ID to
-check the job status and cancel the job.
+### List Jobs, Get a Job, and Cancel
 
-The runJob API will return immediately after the job is submitted to the job executor, and the job will be
-executed asynchronously. Check the job status using the job ID returned by the runJob API.
-
-### List All Jobs
-
-List all the jobs under a metalake by using the REST API or the Java and Python SDKs.
+Listing can be filtered to one template. A job is identified by its id, and cancelling is a `POST`
+to the job's own path.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/runs
-
-Or using query parameter "jobTemplateName=my_shell_job_template" to filter jobs by job template name:
+  "http://localhost:8090/api/metalakes/example/jobs/runs?jobTemplateName=nightly_export"
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/runs?jobTemplateName=my_shell_job_template
-```
+  http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}
 
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    GravitinoClient client = ...;
-    List<JobHandle> jobHandles = client.listJobs();
-
-    // To filter jobs by job template name
-    List<JobHandle> filteredJobHandles = client.listJobs("my_shell_job_template");
-
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    client = GravitinoClient(...)
-    job_handles = client.list_jobs()
-
-    # To filter jobs by job template name
-    filtered_job_handles = client.list_jobs(job_template_name="my_shell_job_template")
-```
-
-</TabItem>
-</Tabs>
-
-### Get a Job by Job ID
-
-Get a job by its job ID using the REST API or the Java and Python SDKs.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/runs/job-1234567890
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-    GravitinoClient client = ...;
-    JobHandle jobHandle = client.getJob("job-1234567890");
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-    client = GravitinoClient(...)
-    job_handle = client.get_job("job-1234567890")
-```
-
-</TabItem>
-</Tabs>
-
-### Cancel a Job by Job ID
-
-Cancel a job by its job ID using the REST API or the Java and Python SDKs.
-
-The job will be cancelled asynchronously, and the job status will be updated to `CANCELLING` first,
-then to `CANCELLED` when the cancellation is completed. If the job is already in `SUCCEEDED`,
-`FAILED`, `CANCELLING`, or `CANCELLED` status, the cancellation will be ignored.
-
-The cancellation will be done by the job executor with the best effort, it relies on the job
-executor that supports cancellation. Also, because of the asynchronous nature of the job
-cancellation, the job may not be actually cancelled.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-     http://localhost:8090/api/metalakes/test/jobs/runs/job-1234567890
+  http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-    GravitinoClient client = ...;
-    client.cancelJob("job-1234567890");
+List<JobHandle> jobs = client.listJobs("nightly_export");
+JobHandle job = client.getJob(jobId);
+JobHandle cancelling = client.cancelJob(jobId);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-    client = GravitinoClient(...)
-    client.cancel_job("job-1234567890")
+jobs = client.list_jobs(job_template_name="nightly_export")
+job = client.get_job(job_id)
+cancelling = client.cancel_job(job_id)
 ```
 
 </TabItem>
 </Tabs>
+
+Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
+`CANCELLED`, and one that finishes first keeps the status it finished with.
+
+A job carries three timestamps:
+
+- `queuedAt`: when Gravitino submitted the job to the job executor.
+- `startedAt`: when the job started executing.
+- `finishedAt`: when the job finished.
+
+Gravitino pulls job statuses from the job executor every `gravitino.job.statusPullIntervalInMs`,
+so a job's status can lag behind by up to this interval. The timestamps usually don't lag: the local
+job executor reports when each job actually started and finished, even for a job that starts and
+finishes between two pulls. A job executor that doesn't report these times gets the time Gravitino
+first observes the job running or finished instead. In that case, a job that finishes between two
+pulls has no `startedAt`.
+
+The local job executor only keeps a job's state in memory. When that state is lost before Gravitino
+records the finished job, the actual times are lost too, and the job's `finishedAt` is the time
+Gravitino marks it as finished instead:
+
+- If Gravitino can't pull the job within `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` after it
+  finished, the job is marked as `FAILED`, or `CANCELLED` if it was being cancelled, on the next pull.
+- If the server running the job exits, the job is expired as described in
+  [Configurations for Local Job Executor](#configurations-for-local-job-executor).
+
+### Get a Job's Output
+
+A job's captured stdout/stderr can be fetched alongside its metadata by asking for it explicitly.
+Output is fetched live from the job executor on every call rather than stored in Gravitino, so it's
+only included when requested - a plain `getJob`/`get_job` call, or `listJobs`/`list_jobs`, never
+returns it.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+JobHandle job = client.getJob(jobId, true);
+List<String> stdout = job.stdout();
+List<String> stderr = job.stderr();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+job = client.get_job(job_id, include_output=True)
+stdout = job.stdout()
+stderr = job.stderr()
+```
+
+</TabItem>
+</Tabs>
+
+Output is only kept for as long as the job executor retains it. The local job executor keeps it in
+the job's staging directory, so it's available until the staging directory is cleaned up
+(`gravitino.job.stagingDirKeepTimeInMs` after the job finishes), also across server restarts.
+What's returned is always the tail of the output (the most recent content), capped
+by `gravitino.job.outputMaxLines` (line count) and `gravitino.job.outputMaxBytes` (byte size),
+whichever limit is hit first.
+
+The REST API also accepts `outputMaxLines`/`outputMaxBytes` query parameters to request less output
+than these global caps for a single call (e.g. a quick check that doesn't need the full 1000
+lines) - a value larger than the global cap is clamped down to it, so the global configuration
+always remains a hard upper bound:
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true&outputMaxLines=50&outputMaxBytes=8192"
+```
+
+:::caution
+When multiple Gravitino servers share the same metadata store, `gravitino.job.stagingDir` must be on
+storage shared by all servers (for example an NFS mount) for the local job executor to return a
+job's output from any server. The servers may mount it at different paths. Otherwise, only the
+server that ran a job can return its output, and the other servers return empty output rather than
+an error.
+:::
+
+The local job executor finds a job's output through a small index file it writes to
+`<gravitino.job.stagingDir>/.job-output-index` when the job is submitted:
+
+- Jobs submitted before Gravitino 2.0.0, or during a rolling upgrade by a server that isn't upgraded
+  yet, have no index file and return empty output.
+- Deleting this directory makes the output of existing jobs unavailable. After downgrading to an
+  earlier version, it isn't used anymore and can be removed.
+- A missing index returns empty output, but an index that exists and can't be read, for example
+  while the shared storage is unavailable, fails the request with an error rather than returning
+  empty output that looks like the job printed nothing.
 
 ### Job System Configuration
 
 Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
-| Property name                          | Description                                                                       | Default value                 | Required | Since Version |
-|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|---------------|
-| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       | 1.0.0         |
-| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       | 1.0.0         |
-| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       | 1.0.0         |
-| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       | 1.0.0         |
-
+| Property name                          | Description                                                                                                                                                          | Default value                 | Required |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|----------|
+| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs. Must be shared by all servers in a multi-server deployment, see [Get a Job's Output](#get-a-jobs-output) | `/tmp/gravitino/jobs/staging` | No       |
+| `gravitino.job.executor`               | The job executor to use for running jobs                                                                                                                             | `local`                       | No       |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed                                                                                    | `604800000` (7 days)          | No       |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor                                                                                            | `300000` (5 minutes)          | No       |
+| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output                                                                                      | `1000`                        | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output                                                                                       | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
 
-| Property name                                       | Description                                                                                                                                       | Default value                          | Required | Since Version |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|---------------|
-| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.0.1         |
+| Property name                                       | Description                                                                                                                                       | Default value                          | Required |
+|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
+| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
+| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
+| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
 
-### Implement a Custom Job Executor
+The local job executor always uses `gravitino.job.stagingDir` as its staging directory, the same one
+the job system stages jobs in. A `gravitino.jobExecutor.local.stagingDir` setting is ignored.
 
-Gravitino's job system is extensible: you can implement your own job executor
-to run jobs in a distributed environment. Refer to the interface `JobExecutor` in the
-code [here](https://github.com/apache/gravitino/blob/main/core/src/main/java/org/apache/gravitino/connector/job/JobExecutor.java).
+The local job executor runs up to `gravitino.jobExecutor.local.maxRunningJobs` jobs at the same
+time, each in its own process on the Gravitino server host, and queues the others. Make sure the
+host has enough resources for that many jobs, or lower this value, especially when running Spark
+jobs.
 
-After you implement your own job executor, you need to register it in the Gravitino server by
-using the `gravitino.conf` file. For example, if you have implemented a job executor named
-`airflow`, you need to configure it as follows:
+When multiple Gravitino servers share the same metadata store, each server's local job executor
+only tracks the jobs it runs itself:
 
-```
-gravitino.job.executor = airflow
-gravitino.jobExecutor.airflow.class = com.example.MyAirflowJobExecutor
-```
+- A job can only be run and tracked by the server that received the run request. Other servers
+  skip it when pulling job statuses.
+- Cancelling a job on a server that doesn't run it marks the job as `CANCELLING`, and the server
+  running the job cancels it the next time it pulls job statuses. This can take up to
+  `gravitino.job.statusPullIntervalInMs`.
+- A job's output can be read from any server only if `gravitino.job.stagingDir` is shared by all
+  servers, see [Get a Job's Output](#get-a-jobs-output).
+- If a server exits while running jobs, nobody can track these jobs anymore. When such a job has
+  not been updated for `gravitino.job.stagingDirKeepTimeInMs`, it is marked as `FAILED`, or as
+  `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
+  `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
+  directory.
 
-Configure the job executor with additional properties, like:
+:::caution
+The local job executor can't tell a job left behind by an exited server from a job that is still
+running without changing its status. A job of the local job executor that is still queued, started
+or cancelling after `gravitino.job.stagingDirKeepTimeInMs` is marked as `FAILED` (or `CANCELLED`),
+even if the job is still running, and keeps this status even if it later finishes. Set this time
+longer than any job can run, or stay queued, without changing its status.
+:::
 
-```
-gravitino.jobExecutor.airflow.host = http://localhost:8080
-gravitino.jobExecutor.airflow.username = myuser
-gravitino.jobExecutor.airflow.password = mypassword
-```
-
-These properties will be passed to the airflow job executor when it is instantiated.
+:::caution
+The local job executor gets a new identity every time the Gravitino server starts, so a restarted
+server doesn't recognize the jobs it ran before the restart. This also applies to a single-server
+deployment. The processes of these jobs are usually gone with the previous server process, but the
+jobs are only marked as `FAILED` once they expire as described above, which can take up to about
+1.1 times `gravitino.job.stagingDirKeepTimeInMs` (about 7.7 days by default), as the cleanup runs
+every tenth of that time. Until then, they are still reported as queued, started or cancelling.
+Cancelling such a job only marks it as `CANCELLING`, which also restarts the expiration.
+:::
 
 ## Future Work
 
-The job system is a new feature introduced in Gravitino 1.0.0, and it still needs more work:
+The job system still needs more work:
 
 1. Support modification of job templates.
 2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job

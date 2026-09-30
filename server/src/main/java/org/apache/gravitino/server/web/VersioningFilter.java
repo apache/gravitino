@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -36,6 +38,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +69,15 @@ public class VersioningFilter implements Filter {
     }
 
     @Override
+    public Enumeration<String> getHeaders(String name) {
+      String headerValue = customHeaders.get(name);
+      if (headerValue != null) {
+        return Collections.enumeration(Collections.singletonList(headerValue));
+      }
+      return ((HttpServletRequest) getRequest()).getHeaders(name);
+    }
+
+    @Override
     public Enumeration<String> getHeaderNames() {
       List<String> combinedHeaderNames = new ArrayList<>(customHeaders.keySet());
 
@@ -78,9 +90,26 @@ public class VersioningFilter implements Filter {
     }
   }
 
-  private static final Pattern ACCEPT_VERSION_REGEX =
+  private static final Pattern VERSIONED_JSON_MEDIA_TYPE_REGEX =
       Pattern.compile("application/vnd\\.gravitino\\.v(\\d+)\\+json");
   private static final String ACCEPT_VERSION_HEADER = "Accept";
+  private static final String CONTENT_TYPE_HEADER = "Content-Type";
+
+  private final ObjectMapper objectMapper;
+
+  /** Creates a versioning filter with the backward-compatible error response behavior. */
+  public VersioningFilter() {
+    this.objectMapper = ObjectMapperProvider.objectMapper();
+  }
+
+  /**
+   * Creates a versioning filter with explicit error stack-trace response behavior.
+   *
+   * @param includeErrorStackTrace whether error responses should include diagnostic stack traces
+   */
+  public VersioningFilter(boolean includeErrorStackTrace) {
+    this.objectMapper = ObjectMapperProvider.objectMapper(includeErrorStackTrace);
+  }
 
   private static String getAcceptVersion(int version) {
     return String.format("application/vnd.gravitino.v%d+json", version);
@@ -93,34 +122,70 @@ public class VersioningFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
-    Enumeration<String> acceptHeader = req.getHeaders(ACCEPT_VERSION_HEADER);
-    while (acceptHeader.hasMoreElements()) {
-      String value = acceptHeader.nextElement();
-
-      // If version accept header is set, then we need to check if it is supported.
-      Matcher m = ACCEPT_VERSION_REGEX.matcher(value);
-      if (m.find()) {
-        int version = Integer.parseInt(m.group(1));
-
-        if (!ApiVersion.isSupportedVersion(version)) {
-          LOG.error("Unsupported version v{} in Request Header {}.", version, value);
-
-          HttpServletResponse resp = (HttpServletResponse) response;
-          resp.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
-        } else {
-          chain.doFilter(request, response);
-        }
-
+    Integer acceptVersion = versionFromHeaders(req.getHeaders(ACCEPT_VERSION_HEADER));
+    if (acceptVersion != null) {
+      if (isUnsupportedVersion(acceptVersion, response)) {
         return;
+      }
+
+      chain.doFilter(request, response);
+      return;
+    }
+
+    MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(req);
+    Integer contentTypeVersion = versionFromHeader(req.getHeader(CONTENT_TYPE_HEADER));
+    if (contentTypeVersion != null) {
+      if (isUnsupportedVersion(contentTypeVersion, response)) {
+        return;
+      }
+
+      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(contentTypeVersion));
+    } else {
+      ApiVersion defaultVersion = ApiVersion.defaultVersion();
+      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(defaultVersion.version()));
+    }
+
+    chain.doFilter(mutableRequest, response);
+  }
+
+  private static Integer versionFromHeaders(Enumeration<String> headers) {
+    while (headers.hasMoreElements()) {
+      Integer version = versionFromHeader(headers.nextElement());
+      if (version != null) {
+        return version;
       }
     }
 
-    // If no version accept header not is set, then we need to set the latest version.
-    MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(req);
-    ApiVersion latest = ApiVersion.latestVersion();
-    mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(latest.version()));
+    return null;
+  }
 
-    chain.doFilter(mutableRequest, response);
+  private static Integer versionFromHeader(String value) {
+    if (value == null) {
+      return null;
+    }
+
+    Matcher matcher = VERSIONED_JSON_MEDIA_TYPE_REGEX.matcher(value);
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
+  }
+
+  private boolean isUnsupportedVersion(int version, ServletResponse response) throws IOException {
+    if (ApiVersion.isSupportedVersion(version)) {
+      return false;
+    }
+
+    LOG.error("Unsupported version v{} in request header.", version);
+    String message = String.format("Unsupported version v%d in request header", version);
+    ErrorResponse errorResponse = ErrorResponse.illegalArguments(message);
+
+    // Write the JSON ErrorResponse directly instead of calling HttpServletResponse#sendError, so
+    // this filter -- which runs before Jersey ever sees the request -- doesn't fall through to
+    // Jetty's default HTML error page.
+    HttpServletResponse resp = (HttpServletResponse) response;
+    resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+    resp.setContentType("application/json");
+    resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    objectMapper.writeValue(resp.getWriter(), errorResponse);
+    return true;
   }
 
   @Override

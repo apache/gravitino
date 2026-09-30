@@ -19,9 +19,13 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
+import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -43,6 +47,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.Principal;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,7 +55,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -63,6 +76,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -74,6 +90,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -381,6 +398,17 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testIsServiceAdminUsesInternalDispatcher() {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.isServiceAdmin(USERNAME)).thenReturn(true);
+
+    assertTrue(jcasbinAuthorizer.isServiceAdmin());
+
+    verify(dispatcher).isServiceAdmin(USERNAME);
+  }
+
+  @Test
   public void testAuthorize() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -607,6 +635,299 @@ public class TestJcasbinAuthorizer {
         "loadedRoles entry for the deleted role must be evicted");
   }
 
+  @Test
+  public void testPartialPolicyLoadIsNotRecordedAsLoaded() throws Exception {
+    // Regression test for the permanently-denied-role failure mode. When a securable object cannot
+    // be resolved to a metadata id, loadPolicyByRoleEntity skips it. Recording the role as loaded
+    // anyway pins the broken state forever: role_meta.updated_at never moves, so the version check
+    // keeps skipping the reload and the role's privileges never come back on that node.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Boolean> backoff = getPartialRoleLoadBackoffCache(jcasbinAuthorizer);
+
+    // 1. The role's only securable object does not resolve, so nothing can be loaded.
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    try {
+      invokeVersionCheckAndLoadRoles(
+          jcasbinAuthorizer,
+          METALAKE,
+          ImmutableList.of(ALLOW_ROLE_ID),
+          new AuthorizationRequestContext());
+
+      assertFalse(
+          loadedRoles.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+          "a role whose policies could not be loaded must not be recorded as loaded");
+      assertTrue(
+          allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+          "no p-row can exist when the securable object did not resolve");
+      assertTrue(
+          backoff.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+          "the incomplete load must arm the retry backoff");
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+
+    // 2. While the backoff is armed the role is not re-read, so a request cannot turn into a DB
+    //    round-trip per call for a role that stays unresolvable.
+    invokeVersionCheckAndLoadRoles(
+        jcasbinAuthorizer,
+        METALAKE,
+        ImmutableList.of(ALLOW_ROLE_ID),
+        new AuthorizationRequestContext());
+    assertTrue(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+        "the backoff must suppress the immediate retry");
+
+    // 3. Once the backoff lapses the role is retried and, now that the object resolves, loads
+    //    fully and is recorded — this is the self-healing the old code could never reach.
+    backoff.invalidate(ALLOW_ROLE_ID);
+    invokeVersionCheckAndLoadRoles(
+        jcasbinAuthorizer,
+        METALAKE,
+        ImmutableList.of(ALLOW_ROLE_ID),
+        new AuthorizationRequestContext());
+
+    assertFalse(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(allowRole.id())).isEmpty(),
+        "the retry must load the role's p-rows");
+    assertTrue(
+        loadedRoles.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "a fully loaded role must be recorded as loaded");
+    assertFalse(
+        backoff.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "a successful load must disarm the retry backoff");
+  }
+
+  @Test
+  public void testStaleRemovalDoesNotClearReloadedPolicies() throws Exception {
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    ReentrantReadWriteLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+    String[] policyRow =
+        new String[] {
+          roleIdStr,
+          MetadataObject.Type.CATALOG.name(),
+          String.valueOf(CATALOG_ID),
+          USE_CATALOG.name(),
+          AuthConstants.ALLOW
+        };
+    allowEnforcer.addPolicy(policyRow);
+    loadedRoles.put(ALLOW_ROLE_ID, 1L);
+
+    CountDownLatch invalidationStarted = new CountDownLatch(1);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    rolePolicyLock.writeLock().lock();
+    Thread invalidator =
+        new Thread(
+            () -> {
+              invalidationStarted.countDown();
+              try {
+                loadedRoles.invalidate(ALLOW_ROLE_ID);
+              } catch (Throwable t) {
+                failure.set(t);
+              }
+            });
+    invalidator.setDaemon(true);
+    try {
+      invalidator.start();
+      assertTrue(invalidationStarted.await(5, TimeUnit.SECONDS));
+
+      // Caffeine removes the marker before its listener waits for rolePolicyLock. Wait until that
+      // ordering is visible, then simulate a loader installing a fresh policy set and marker while
+      // the old removal callback is still blocked.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (loadedRoles.getIfPresent(ALLOW_ROLE_ID).isPresent() && System.nanoTime() < deadline) {
+        Thread.yield();
+      }
+      assertFalse(
+          loadedRoles.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+          "the invalidation must remove the old marker before its listener acquires the lock");
+
+      allowEnforcer.removeFilteredPolicy(0, roleIdStr);
+      allowEnforcer.addPolicy(policyRow);
+      loadedRoles.put(ALLOW_ROLE_ID, 2L);
+    } finally {
+      rolePolicyLock.writeLock().unlock();
+    }
+
+    invalidator.join(5000L);
+    assertFalse(invalidator.isAlive(), "the invalidation thread must finish");
+    Assertions.assertNull(failure.get(), "the invalidation thread must not fail");
+    assertEquals(2L, loadedRoles.getIfPresent(ALLOW_ROLE_ID).orElse(null));
+    assertFalse(
+        allowEnforcer.getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "a stale removal callback must not clear policies installed by a later load");
+  }
+
+  @Test
+  public void testStaleRemovalDoesNotClearNewPartialPolicies() throws Exception {
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, Boolean> backoff = getPartialRoleLoadBackoffCache(jcasbinAuthorizer);
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+    allowEnforcer.addPolicy(
+        roleIdStr,
+        MetadataObject.Type.CATALOG.name(),
+        String.valueOf(CATALOG_ID),
+        USE_CATALOG.name(),
+        AuthConstants.ALLOW);
+    backoff.put(ALLOW_ROLE_ID, Boolean.TRUE);
+
+    // A partial loader records its backoff marker under rolePolicyLock before an older cache
+    // removal callback can resume. The callback must treat that marker as a newer policy state even
+    // though partial loads deliberately have no loadedRoles marker.
+    invokeClearRolePoliciesOnCacheRemoval(jcasbinAuthorizer, ALLOW_ROLE_ID);
+
+    assertFalse(
+        allowEnforcer.getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "a stale removal callback must not clear a newer partial policy set");
+  }
+
+  @Test
+  public void testPartialResultCannotOverwriteCompletedConcurrentLoad() throws Exception {
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+    String[] policyRow =
+        new String[] {
+          roleIdStr,
+          MetadataObject.Type.CATALOG.name(),
+          String.valueOf(CATALOG_ID),
+          USE_CATALOG.name(),
+          AuthConstants.ALLOW
+        };
+    ResolvedRolePolicies complete =
+        new ResolvedRolePolicies(
+            ImmutableList.<String[]>of(policyRow),
+            Collections.emptyList(),
+            Collections.emptyList());
+    ResolvedRolePolicies partial =
+        new ResolvedRolePolicies(
+            Collections.emptyList(),
+            Collections.emptyList(),
+            ImmutableList.of("CATALOG:testCatalog"));
+    long roleVersion = 42L;
+
+    // Both results may be resolved before either request acquires rolePolicyLock. Once the complete
+    // result wins, a late partial result for the same version must not clear its policies or leave
+    // its loaded marker attached to a partial policy set.
+    assertTrue(invokeReplaceRolePolicies(jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion, complete));
+    assertFalse(invokeReplaceRolePolicies(jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion, partial));
+
+    assertEquals(
+        roleVersion,
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).orElse(null));
+    assertFalse(
+        getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "the completed load's policies must survive a late partial result");
+  }
+
+  @Test
+  public void testConcurrentAuthorizationWaitsForPolicyReload() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, new AuthorizationRequestContext()));
+    List<List<String>> policyRows = allowEnforcer.getFilteredPolicy(0, roleIdStr);
+    assertFalse(policyRows.isEmpty());
+
+    ReentrantReadWriteLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
+    rolePolicyLock.writeLock().lock();
+    ExecutorService executor = Executors.newFixedThreadPool(16);
+    List<Future<Boolean>> futures = new ArrayList<>();
+    try {
+      allowEnforcer.removeFilteredPolicy(0, roleIdStr);
+      CountDownLatch start = new CountDownLatch(1);
+      CountDownLatch started = new CountDownLatch(16);
+      for (int i = 0; i < 16; i++) {
+        futures.add(
+            executor.submit(
+                () -> {
+                  assertTrue(start.await(5, TimeUnit.SECONDS));
+                  started.countDown();
+                  return invokeAuthorizeByJcasbin(
+                      jcasbinAuthorizer,
+                      USER_ID,
+                      METALAKE,
+                      catalog,
+                      CATALOG_ID,
+                      USE_CATALOG,
+                      new AuthorizationRequestContext());
+                }));
+      }
+
+      start.countDown();
+      assertTrue(started.await(5, TimeUnit.SECONDS));
+      for (List<String> policyRow : policyRows) {
+        allowEnforcer.addPolicy(policyRow);
+      }
+    } finally {
+      rolePolicyLock.writeLock().unlock();
+    }
+
+    try {
+      for (Future<Boolean> future : futures) {
+        assertTrue(future.get(5, TimeUnit.SECONDS));
+      }
+    } finally {
+      executor.shutdown();
+    }
+    assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testLoadedRoleExpirationCleanerCanTakeWriteLockAfterDiagnosticRead()
+      throws Exception {
+    ReentrantReadWriteLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
+    JcasbinLoadedRolesCache expiringLoadedRoles =
+        new JcasbinLoadedRolesCache(
+            1,
+            10,
+            roleId -> {
+              rolePolicyLock.writeLock().lock();
+              try {
+                // Simulate the authorizer cleanup path entered by Caffeine's synchronous removal
+                // listener. The test fails by timeout if a caller still holds readLock while
+                // touching loadedRoles.
+              } finally {
+                rolePolicyLock.writeLock().unlock();
+              }
+            });
+
+    expiringLoadedRoles.put(ALLOW_ROLE_ID, 1L);
+    Thread.sleep(10L);
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(2),
+        () -> {
+          Map<String, Integer> rolePolicyCounts = new HashMap<>();
+          rolePolicyLock.readLock().lock();
+          try {
+            rolePolicyCounts.put(String.valueOf(ALLOW_ROLE_ID), 0);
+          } finally {
+            rolePolicyLock.readLock().unlock();
+          }
+
+          for (String roleIdStr : rolePolicyCounts.keySet()) {
+            expiringLoadedRoles.getIfPresent(Long.parseLong(roleIdStr));
+          }
+        });
+  }
+
   /** Reflectively invoke the private versionCheckAndLoadRoles. */
   private static void invokeVersionCheckAndLoadRoles(
       JcasbinAuthorizer authorizer,
@@ -622,6 +943,63 @@ public class TestJcasbinAuthorizer {
             AuthorizationRequestContext.class);
     m.setAccessible(true);
     m.invoke(authorizer, metalake, roleIds, requestContext);
+  }
+
+  /** Reflectively invoke the allow-side JCasbin authorization step. */
+  private static boolean invokeAuthorizeByJcasbin(
+      JcasbinAuthorizer authorizer,
+      long userId,
+      String metalake,
+      MetadataObject metadataObject,
+      Long metadataId,
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("allowInternalAuthorizer");
+    field.setAccessible(true);
+    Object allowInternalAuthorizer = field.get(authorizer);
+    Method method =
+        allowInternalAuthorizer
+            .getClass()
+            .getDeclaredMethod(
+                "authorizeByJcasbin",
+                long.class,
+                String.class,
+                MetadataObject.class,
+                Long.class,
+                String.class,
+                AuthorizationRequestContext.class);
+    method.setAccessible(true);
+    return (Boolean)
+        method.invoke(
+            allowInternalAuthorizer,
+            userId,
+            metalake,
+            metadataObject,
+            metadataId,
+            privilege.name(),
+            requestContext);
+  }
+
+  private static boolean invokeReplaceRolePolicies(
+      JcasbinAuthorizer authorizer,
+      long roleId,
+      long updatedAt,
+      ResolvedRolePolicies resolvedRolePolicies)
+      throws Exception {
+    Method method =
+        JcasbinAuthorizer.class.getDeclaredMethod(
+            "replaceRolePolicies", long.class, long.class, ResolvedRolePolicies.class);
+    method.setAccessible(true);
+    return (boolean) method.invoke(authorizer, roleId, updatedAt, resolvedRolePolicies);
+  }
+
+  private static void invokeClearRolePoliciesOnCacheRemoval(
+      JcasbinAuthorizer authorizer, long roleId) throws Exception {
+    Method method =
+        JcasbinAuthorizer.class.getDeclaredMethod("clearRolePoliciesOnCacheRemoval", long.class);
+    method.setAccessible(true);
+    method.invoke(authorizer, roleId);
   }
 
   @Test
@@ -654,6 +1032,36 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
+  /** Reusing entry state avoids another SQL prefetch even for a different privilege check. */
+  @Test
+  public void testReadScopeReusesEntryRolePrefetch() throws Exception {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity role =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(role);
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    AuthorizationRequestContext entryContext = new AuthorizationRequestContext();
+    assertTrue(
+        jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, entryContext));
+    Mockito.clearInvocations(userMetaMapper, roleMetaMapper);
+
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      scope.bind(METALAKE, entryContext);
+      AuthorizationRequestContext filterContext = AuthorizationRequestScope.getOrCreate(METALAKE);
+      assertSame(entryContext, filterContext);
+      assertFalse(
+          jcasbinAuthorizer.authorize(principal, METALAKE, catalog, SELECT_TABLE, filterContext));
+      verify(userMetaMapper, Mockito.never())
+          .batchGetAuthSubjectsForUser(anyString(), anyString(), anyList());
+      verify(roleMetaMapper, Mockito.never()).batchGetRoleUpdatedAt(any());
+    }
+
+    // A subsequent request must revalidate SQL versions, even with warm shared role caches.
+    AuthorizationRequestContext nextContext = AuthorizationRequestScope.getOrCreate(METALAKE);
+    assertTrue(jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, nextContext));
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
   }
 
   @Test
@@ -884,6 +1292,46 @@ public class TestJcasbinAuthorizer {
             Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
 
     restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfGroupViaPrincipalGroup() throws Exception {
+    NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME);
+
+    setCurrentPrincipalWithGroup(GROUP_NAME);
+    Mockito.clearInvocations(groupMetaMapper);
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    Mockito.verify(groupMetaMapper, Mockito.never()).getGroupUpdatedAt(anyString(), anyString());
+
+    setCurrentPrincipalWithGroup("otherGroup");
+    assertFalse(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    Mockito.verify(groupMetaMapper, Mockito.never()).getGroupUpdatedAt(anyString(), anyString());
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfGroupDoesNotRequireCurrentUserName() throws Exception {
+    NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME);
+
+    UserPrincipal groupPrincipal = mock(UserPrincipal.class);
+    when(groupPrincipal.getGroups())
+        .thenReturn(ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
+    when(groupPrincipal.getName())
+        .thenThrow(new AssertionError("GROUP self check should only use principal groups"));
+    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+
+    try {
+      assertTrue(
+          jcasbinAuthorizer.isSelf(
+              Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    } finally {
+      restoreDefaultPrincipal();
+    }
   }
 
   @Test
@@ -1294,6 +1742,224 @@ public class TestJcasbinAuthorizer {
   }
 
   /**
+   * Role assumption narrows allows to the active subset. The caller holds a granting and a
+   * non-granting role; the per-assertion comments below cover each case.
+   */
+  @Test
+  public void testActiveRolesNarrowAllowToNamedRole() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "grantingRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity nonGrantingRole = mockRoleInStore(30L, "nonGrantingRole", ImmutableList.of());
+    mockDirectUserRoles(grantingRole, nonGrantingRole);
+
+    // Default (ALL) evaluates every role -> allowed.
+    assertTrue(doAuthorizeWithActiveRoles(currentPrincipal, ActiveRoles.all()));
+
+    // Narrowing to the non-granting role removes the granting role's allow -> denied.
+    assertFalse(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("nonGrantingRole"))));
+
+    // Narrowing to the granting role keeps the allow -> allowed.
+    assertTrue(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("grantingRole"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** {@code NONE} activates no role, so every role-derived allow is dropped. */
+  @Test
+  public void testActiveRolesNoneDeniesRoleDerivedAccess() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID, "noneGrantingRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(grantingRole);
+
+    assertTrue(doAuthorizeWithActiveRoles(currentPrincipal, ActiveRoles.all()));
+    assertFalse(doAuthorizeWithActiveRoles(currentPrincipal, ActiveRoles.none()));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * Deny stays global: a deny carried by a role that is <em>not</em> in the active set still blocks
+   * access. Here only the granting role is active, but the caller also holds a deny role, so the
+   * request is denied.
+   */
+  @Test
+  public void testActiveRolesDenyStaysGlobalWhenAllowNarrowed() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID, "denyGlobalAllowRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity denyRole =
+        mockRoleInStore(
+            DENY_ROLE_ID, "denyGlobalDenyRole", ImmutableList.of(getDenySecurableObject()));
+    mockDirectUserRoles(grantingRole, denyRole);
+
+    assertFalse(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("denyGlobalAllowRole"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A group-inherited role can be activated by name exactly like a directly-granted role. */
+  @Test
+  public void testActiveRolesNarrowingCoversGroupInheritedRole() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    Long groupRoleId = 31L;
+    RoleEntity groupRole =
+        mockRoleInStore(
+            groupRoleId, "activeGroupRole", ImmutableList.of(getAllowSecurableObject()));
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRole.name()));
+
+    assertTrue(
+        doAuthorizeWithActiveRoles(
+            groupPrincipal, ActiveRoles.of(ImmutableList.of("activeGroupRole"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * Narrowing is subtractive: naming only a role the caller does not hold activates nothing. The
+   * {@code 403} rejection for unheld roles happens earlier in the request pipeline, not here.
+   */
+  @Test
+  public void testActiveRolesUnheldRoleActivatesNothing() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID, "heldGrantingRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(grantingRole);
+
+    assertFalse(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("roleTheUserDoesNotHold"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** All declared active roles are held (directly), so nothing is unheld. */
+  @Test
+  public void testFindUnheldRolesEmptyWhenAllRolesHeld() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal principal = setCurrentPrincipalWithGroup(null);
+    RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
+    mockDirectUserRoles(held);
+    Mockito.clearInvocations(userMetaMapper);
+    metadataIdConverterMockedStatic.clearInvocations();
+
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            principal, METALAKE, ImmutableSet.of("heldRole"), requestContext);
+
+    assertTrue(unheld.isEmpty());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(any(), eq(METALAKE)), Mockito.never());
+    jcasbinAuthorizer.authorize(
+        principal,
+        METALAKE,
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        USE_CATALOG,
+        requestContext);
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A declared role that exists but is not assigned to the caller is reported as unheld. */
+  @Test
+  public void testFindUnheldRolesReturnsRolesNotAssigned() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal principal = setCurrentPrincipalWithGroup(null);
+    RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
+    mockDirectUserRoles(held);
+
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            principal,
+            METALAKE,
+            ImmutableSet.of("heldRole", "otherRole"),
+            new AuthorizationRequestContext());
+
+    assertEquals(ImmutableSet.of("otherRole"), unheld);
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A declared role that does not exist (no id) is treated as unheld. */
+  @Test
+  public void testFindUnheldRolesTreatsNonExistentRoleAsUnheld() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal principal = setCurrentPrincipalWithGroup(null);
+    RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
+    mockDirectUserRoles(held);
+
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            principal, METALAKE, ImmutableSet.of("ghostRole"), new AuthorizationRequestContext());
+
+    assertEquals(ImmutableSet.of("ghostRole"), unheld);
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A group-inherited role counts as held, so it is not reported as unheld. */
+  @Test
+  public void testFindUnheldRolesCoversGroupInheritedRole() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+    Long groupRoleId = 31L;
+    mockRoleInStore(groupRoleId, "groupRole", ImmutableList.of());
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of("groupRole"));
+    Mockito.clearInvocations(userMetaMapper);
+    metadataIdConverterMockedStatic.clearInvocations();
+
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            groupPrincipal,
+            METALAKE,
+            ImmutableSet.of("groupRole"),
+            new AuthorizationRequestContext());
+
+    assertTrue(unheld.isEmpty());
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(any(), eq(METALAKE)), Mockito.never());
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
    * Sets the current principal mock to a {@link UserPrincipal} with the given group, or with no
    * groups when {@code groupName} is null. Returns the principal for use in assertions.
    */
@@ -1404,6 +2070,17 @@ public class TestJcasbinAuthorizer {
         MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
         USE_CATALOG,
         new AuthorizationRequestContext());
+  }
+
+  private Boolean doAuthorizeWithActiveRoles(Principal currentPrincipal, ActiveRoles activeRoles) {
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    requestContext.setActiveRoles(activeRoles);
+    return jcasbinAuthorizer.authorize(
+        currentPrincipal,
+        "testMetalake",
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        USE_CATALOG,
+        requestContext);
   }
 
   private Boolean doAuthorizeOwner(Principal currentPrincipal) {
@@ -1588,25 +2265,33 @@ public class TestJcasbinAuthorizer {
     // Add a role and its policy to the enforcer
     Long testRoleId = 300L;
     String roleIdStr = String.valueOf(testRoleId);
+    String userIdStr = String.valueOf(USER_ID);
 
-    // Add a policy for this role
+    // Add a policy and a user-role binding for this role.
+    allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
+    denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
     allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
     denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
 
     // Add role to cache
     loadedRoles.put(testRoleId, System.currentTimeMillis());
 
-    // Verify role exists in enforcer (has policy)
+    // Verify role exists in enforcer (has policy and grouping).
     assertTrue(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
     assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
 
     // Invalidate the cache entry - this triggers the synchronous removal listener
     // (using executor(Runnable::run) to ensure synchronous execution)
     loadedRoles.invalidate(testRoleId);
 
-    // Verify the role's policies have been deleted from enforcers (synchronous, no need to wait)
+    // Verify the role's policies have been deleted from enforcers (synchronous, no need to wait),
+    // but user-role bindings are preserved because loadedRoles owns role policies only.
     assertFalse(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
     assertFalse(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
   }
 
   @Test
@@ -1629,9 +2314,10 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testClearRolePoliciesPreservesUserRoleBindings() throws Exception {
+  public void testInvalidateRolePoliciesPreservesUserRoleBindings() throws Exception {
     Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
     Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, Boolean> backoff = getPartialRoleLoadBackoffCache(jcasbinAuthorizer);
 
     Long testRoleId = 302L;
     String roleIdStr = String.valueOf(testRoleId);
@@ -1640,16 +2326,18 @@ public class TestJcasbinAuthorizer {
     denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
     allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
     denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
+    backoff.put(testRoleId, Boolean.TRUE);
 
-    Method clearRolePolicies =
-        JcasbinAuthorizer.class.getDeclaredMethod("clearRolePolicies", long.class);
-    clearRolePolicies.setAccessible(true);
-    clearRolePolicies.invoke(jcasbinAuthorizer, testRoleId);
+    Method invalidateRolePolicies =
+        JcasbinAuthorizer.class.getDeclaredMethod("invalidateRolePolicies", long.class);
+    invalidateRolePolicies.setAccessible(true);
+    invalidateRolePolicies.invoke(jcasbinAuthorizer, testRoleId);
 
     assertFalse(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
     assertFalse(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
     assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
     assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertFalse(backoff.getIfPresent(testRoleId).isPresent());
   }
 
   @Test
@@ -1685,7 +2373,13 @@ public class TestJcasbinAuthorizer {
             "metalakeGrantRole",
             ImmutableList.of(
                 buildManageGrantsSecurableObject(
-                    metalakeGrantRoleId, MetadataObject.Type.METALAKE, METALAKE)));
+                    metalakeGrantRoleId, MetadataObject.Type.METALAKE, METALAKE),
+                buildSecurableObject(
+                    metalakeGrantRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
     when(entityStore.get(
             eq(NameIdentifierUtil.ofRole(METALAKE, metalakeGrantRole.name())),
             eq(Entity.EntityType.ROLE),
@@ -1708,7 +2402,19 @@ public class TestJcasbinAuthorizer {
             "catalogGrantRole",
             ImmutableList.of(
                 buildManageGrantsSecurableObject(
-                    catalogGrantRoleId, MetadataObject.Type.CATALOG, "testCatalog")));
+                    catalogGrantRoleId, MetadataObject.Type.CATALOG, "testCatalog"),
+                buildSecurableObject(
+                    catalogGrantRoleId,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "ALLOW"),
+                buildSecurableObject(
+                    catalogGrantRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
     when(entityStore.get(
             eq(NameIdentifierUtil.ofRole(METALAKE, catalogGrantRole.name())),
             eq(Entity.EntityType.ROLE),
@@ -1737,7 +2443,13 @@ public class TestJcasbinAuthorizer {
                 buildManageGrantsSecurableObject(
                     tableGrantRoleId,
                     MetadataObject.Type.TABLE,
-                    "testCatalog.testSchema.testTable")));
+                    "testCatalog.testSchema.testTable"),
+                buildSecurableObject(
+                    tableGrantRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
     when(entityStore.get(
             eq(NameIdentifierUtil.ofRole(METALAKE, tableGrantRole.name())),
             eq(Entity.EntityType.ROLE),
@@ -1758,6 +2470,270 @@ public class TestJcasbinAuthorizer {
         () ->
             jcasbinAuthorizer.hasMetadataPrivilegePermission(
                 METALAKE, "INVALID_TYPE", "testCatalog", new AuthorizationRequestContext()));
+  }
+
+  @Test
+  public void testHasMetadataPrivilegePermissionRejectsDenyManageGrants() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 203L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowManageGrantsRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.TABLE,
+                    "testCatalog.testSchema.testTable",
+                    Privilege.Name.MANAGE_GRANTS,
+                    "ALLOW"),
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
+    Long denyRoleId = 204L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyManageGrantsRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.MANAGE_GRANTS,
+                    "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+
+    assertFalse(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "DENY MANAGE_GRANTS should override a narrower ALLOW MANAGE_GRANTS");
+  }
+
+  @Test
+  public void testHasMetadataPrivilegePermissionRejectsMissingParentUsage() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 209L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowManageGrantsWithoutUseRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.TABLE,
+                    "testCatalog.testSchema.testTable",
+                    Privilege.Name.MANAGE_GRANTS,
+                    "ALLOW")));
+    mockDirectUserRoles(allowRole);
+
+    assertFalse(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "MANAGE_GRANTS on a table should also require parent USE_SCHEMA");
+  }
+
+  @Test
+  public void testHasMetadataPrivilegePermissionRejectsDenyParentUsageForFunction()
+      throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 210L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowFunctionManageGrantsRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.FUNCTION,
+                    "testCatalog.testSchema.testFunction",
+                    Privilege.Name.MANAGE_GRANTS,
+                    "ALLOW"),
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
+    Long denyRoleId = 211L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyUseSchemaForFunctionRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId, MetadataObject.Type.METALAKE, METALAKE, USE_SCHEMA, "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+
+    assertFalse(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "FUNCTION",
+            "testCatalog.testSchema.testFunction",
+            new AuthorizationRequestContext()),
+        "DENY USE_SCHEMA should override FUNCTION-level MANAGE_GRANTS");
+  }
+
+  @Test
+  public void testHasMetadataPrivilegePermissionAllowsOwnerWithDenyManageGrants() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long denyRoleId = 205L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyManageGrantsForOwnerRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.MANAGE_GRANTS,
+                    "DENY")));
+    mockDirectUserRoles(denyRole);
+    GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
+    ownerRelCache.invalidateAll();
+    ownerRelCache.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
+
+    assertTrue(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE, "CATALOG", "testCatalog", new AuthorizationRequestContext()),
+        "Owner should be able to manage privileges without checking DENY MANAGE_GRANTS");
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionAllowsSchemaAndCatalogOwner() throws Exception {
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(eq(metalakeObject), eq(METALAKE)))
+        .thenReturn(Optional.of(USER_METALAKE_ID));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("SCHEMA")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    try {
+      assertTrue(
+          jcasbinAuthorizer.hasSetOwnerPermission(
+              METALAKE, "SCHEMA", "testCatalog.testSchema", new AuthorizationRequestContext()));
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(eq(metalakeObject), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionRejectsDenyUseCatalogForTableOwner() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 206L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowUseSchemaRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
+    Long denyRoleId = 207L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyUseCatalogRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId, MetadataObject.Type.METALAKE, METALAKE, USE_CATALOG, "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("TABLE")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    assertFalse(
+        jcasbinAuthorizer.hasSetOwnerPermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "DENY USE_CATALOG should override table ownership when setting owner");
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionRejectsDenyUseCatalogForFunctionOwner() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 212L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowUseSchemaForFunctionOwnerRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
+    Long denyRoleId = 213L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyUseCatalogForFunctionOwnerRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId, MetadataObject.Type.METALAKE, METALAKE, USE_CATALOG, "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("FUNCTION")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    assertFalse(
+        jcasbinAuthorizer.hasSetOwnerPermission(
+            METALAKE,
+            "FUNCTION",
+            "testCatalog.testSchema.testFunction",
+            new AuthorizationRequestContext()),
+        "DENY USE_CATALOG should override function ownership when setting owner");
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionAllowsCatalogOwnerWithDenyUseCatalog() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long denyRoleId = 208L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyUseCatalogForCatalogOwnerRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId, MetadataObject.Type.METALAKE, METALAKE, USE_CATALOG, "DENY")));
+    mockDirectUserRoles(denyRole);
+    GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
+    ownerRelCache.invalidateAll();
+    ownerRelCache.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
+
+    assertTrue(
+        jcasbinAuthorizer.hasSetOwnerPermission(
+            METALAKE, "CATALOG", "testCatalog", new AuthorizationRequestContext()),
+        "Catalog owner should be able to set owner without checking DENY USE_CATALOG");
   }
 
   /**
@@ -1786,12 +2762,51 @@ public class TestJcasbinAuthorizer {
     }
   }
 
+  private static SecurableObject buildSecurableObject(
+      Long roleId,
+      MetadataObject.Type type,
+      String objectName,
+      Privilege.Name privilege,
+      String condition) {
+    try {
+      SecurableObjectPO po =
+          SecurableObjectPO.builder()
+              .withType(String.valueOf(type))
+              .withMetadataObjectId(CATALOG_ID)
+              .withRoleId(roleId)
+              .withPrivilegeNames(objectMapper.writeValueAsString(ImmutableList.of(privilege)))
+              .withPrivilegeConditions(objectMapper.writeValueAsString(ImmutableList.of(condition)))
+              .withDeletedAt(0L)
+              .withCurrentVersion(1L)
+              .withLastVersion(1L)
+              .build();
+      return POConverters.fromSecurableObjectPO(objectName, po, type);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @SuppressWarnings("unchecked")
   private static GravitinoCache<Long, Long> getLoadedRolesCache(JcasbinAuthorizer authorizer)
       throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
     field.setAccessible(true);
     return (GravitinoCache<Long, Long>) field.get(authorizer);
+  }
+
+  private static ReentrantReadWriteLock getRolePolicyLock(JcasbinAuthorizer authorizer)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("rolePolicyLock");
+    field.setAccessible(true);
+    return (ReentrantReadWriteLock) field.get(authorizer);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static GravitinoCache<Long, Boolean> getPartialRoleLoadBackoffCache(
+      JcasbinAuthorizer authorizer) throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("partialRoleLoadBackoff");
+    field.setAccessible(true);
+    return (GravitinoCache<Long, Boolean>) field.get(authorizer);
   }
 
   @SuppressWarnings("unchecked")

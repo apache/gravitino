@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -116,6 +119,56 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return TABLE_PROPERTIES_META;
+  }
+
+  /**
+   * Resolves the database required by a JDBC provider before accepting its configuration.
+   *
+   * @param config The catalog configuration.
+   * @param databaseFromUrl A driver-backed parser returning the database, or null if absent, and
+   *     rejecting invalid URLs.
+   * @return A copy of the configuration containing a nonblank database.
+   * @throws IllegalArgumentException if the URL is invalid, no database is configured, or the
+   *     database names conflict.
+   */
+  protected static Map<String, String> resolveJdbcDatabase(
+      Map<String, String> config, Function<String, String> databaseFromUrl) {
+    String database = config.get(JdbcConfig.JDBC_DATABASE.getKey());
+    Preconditions.checkArgument(
+        !config.containsKey(JdbcConfig.JDBC_DATABASE.getKey()) || StringUtils.isNotBlank(database),
+        "jdbc-database must be nonblank when explicitly configured");
+    String urlDatabase = databaseFromUrl.apply(new JdbcConfig(config).getJdbcUrl());
+    if (!config.containsKey(JdbcConfig.JDBC_DATABASE.getKey())) {
+      database = urlDatabase;
+    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(database),
+        "jdbc-database must be nonblank; specify it explicitly or include the database in jdbc-url");
+    Preconditions.checkArgument(
+        StringUtils.isBlank(urlDatabase) || database.equals(urlDatabase),
+        "jdbc-database must match the database specified in jdbc-url");
+    Map<String, String> resolved = new HashMap<>(config);
+    resolved.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
+    return resolved;
+  }
+
+  /**
+   * Ensures the JDBC provider stays listed even when {@code credential-providers} was set
+   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case.
+   * JDBC does not conflict with path-based storage providers, so it remains recoverable via {@code
+   * getCredentials} alongside an explicit list.
+   *
+   * @return catalog properties with credential providers
+   */
+  @Override
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> props = super.propertiesWithCredentialProviders();
+    String jdbcUser = props.get(JdbcConfig.USERNAME.getKey());
+    String jdbcPassword = props.get(JdbcConfig.PASSWORD.getKey());
+    if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
+      ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
+    }
+    return props;
   }
 
   @Override

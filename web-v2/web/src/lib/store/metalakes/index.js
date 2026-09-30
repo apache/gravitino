@@ -20,6 +20,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
+import { isUnsupportedOperationError } from '@/lib/utils/axios/unsupportedOperation'
 import toast from 'react-hot-toast'
 
 import _ from 'lodash-es'
@@ -108,19 +109,31 @@ const mergeWithViewNodes = ({ tree, key, entities }) => {
   return _.uniqBy([...subSchemas, ...tables, ...functions, ...entities], 'key')
 }
 
-export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
-  const [err, res] = await to(getMetalakesApi())
+const isAuthReady = state => {
+  const { authType, authToken } = state.auth
 
-  if (err || !res) {
-    throw new Error(err)
+  return !!authType && (authType !== 'oauth' || !!authToken)
+}
+
+export const fetchMetalakes = createAsyncThunk(
+  'appMetalakes/fetchMetalakes',
+  async () => {
+    const [err, res] = await to(getMetalakesApi())
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    const { metalakes } = res
+
+    metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
+
+    return { metalakes }
+  },
+  {
+    condition: (_, { getState }) => isAuthReady(getState())
   }
-
-  const { metalakes } = res
-
-  metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
-
-  return { metalakes }
-})
+)
 
 export const createMetalake = createAsyncThunk('appMetalakes/createMetalake', async (data, { getState, dispatch }) => {
   const [err, res] = await to(createMetalakeApi(data))
@@ -2238,8 +2251,8 @@ export const fetchViews = createAsyncThunk(
     const [err, res] = await to(getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
-      // Catalog doesn't support views (HTTP 405) — return empty views silently
-      if (err?.response?.status === 405) {
+      // Catalog doesn't support views (HTTP 501, or legacy 405 with code 1006) — return empty views silently
+      if (isUnsupportedOperationError(err)) {
         return { views: [], init }
       }
       if (init) {
@@ -2292,8 +2305,8 @@ export const getViewDetails = createAsyncThunk(
     const [err, res] = await to(getViewDetailsApi({ metalake, catalog, schema, view }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
-      // Catalog doesn't support views (HTTP 405) — return empty result silently
-      if (err?.response?.status === 405) {
+      // Catalog doesn't support views (HTTP 501, or legacy 405 with code 1006) — return empty result silently
+      if (isUnsupportedOperationError(err)) {
         return { view: null, init }
       }
       throw new Error(err)

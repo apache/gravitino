@@ -17,6 +17,9 @@
 
 package org.apache.gravitino;
 
+import java.util.Optional;
+import javax.annotation.Nullable;
+
 /**
  * Represents a directed relation between two entities. The source is identified by a {@link
  * NameIdentifier} and an {@link Entity.EntityType}; the target is the actual resolved entity,
@@ -29,6 +32,7 @@ public class RelationalEntity<T extends Entity & HasIdentifier> {
   private final NameIdentifier source;
   private final Entity.EntityType sourceType;
   private final T targetEntity;
+  @Nullable private final String relationValue;
 
   /**
    * Constructs a RelationalEntity.
@@ -43,10 +47,29 @@ public class RelationalEntity<T extends Entity & HasIdentifier> {
       NameIdentifier source,
       Entity.EntityType sourceType,
       T targetEntity) {
+    this(type, source, sourceType, targetEntity, null);
+  }
+
+  /**
+   * Constructs a RelationalEntity with an optional value stored on the relation edge.
+   *
+   * @param type the relation type
+   * @param source the source identifier
+   * @param sourceType the entity type of the source
+   * @param targetEntity the resolved target entity
+   * @param relationValue the optional value carried by the relation edge
+   */
+  public RelationalEntity(
+      SupportsRelationOperations.Type type,
+      NameIdentifier source,
+      Entity.EntityType sourceType,
+      T targetEntity,
+      @Nullable String relationValue) {
     this.type = type;
     this.source = source;
     this.sourceType = sourceType;
     this.targetEntity = targetEntity;
+    this.relationValue = relationValue;
   }
 
   /**
@@ -83,5 +106,14 @@ public class RelationalEntity<T extends Entity & HasIdentifier> {
    */
   public T targetEntity() {
     return targetEntity;
+  }
+
+  /**
+   * Gets the optional value stored on this relation edge.
+   *
+   * @return the relation value, or empty when the edge has no value
+   */
+  public Optional<String> relationValue() {
+    return Optional.ofNullable(relationValue);
   }
 }

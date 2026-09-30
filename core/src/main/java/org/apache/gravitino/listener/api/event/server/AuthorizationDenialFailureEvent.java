@@ -108,6 +108,9 @@ public final class AuthorizationDenialFailureEvent extends FailureEvent {
 
   /**
    * Returns authorization-specific context that distinguishes this event from HTTP-level events.
+   * Merged automatically by {@link org.apache.gravitino.listener.api.event.Event#customInfo()} with
+   * the request's automatically captured query parameters; these keys always win on a collision
+   * with a query parameter of the same name.
    *
    * <ul>
    *   <li>{@code auth.method} — the intercepted Java method name
@@ -119,7 +122,7 @@ public final class AuthorizationDenialFailureEvent extends FailureEvent {
    * here to avoid duplication.
    */
   @Override
-  public Map<String, String> customInfo() {
+  protected Map<String, String> ownCustomInfo() {
     return ImmutableMap.of(
         "auth.method", methodName,
         "auth.expression", expression);

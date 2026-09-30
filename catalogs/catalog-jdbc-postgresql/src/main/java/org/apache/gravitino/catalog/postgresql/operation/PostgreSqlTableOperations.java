@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -65,7 +67,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   public static final String NEW_LINE = "\n";
   public static final String ALTER_TABLE = "ALTER TABLE ";
   public static final String ALTER_COLUMN = "ALTER COLUMN ";
-  public static final String IS = " IS '";
+  public static final String IS = " IS E'";
   public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
   public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
@@ -163,7 +165,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           "Currently we do not support Partitioning in PostgreSQL");
     }
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "PostgreSQL does not support distribution");
+        Distributions.isNone(distribution), "PostgreSQL does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
@@ -204,7 +206,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           .append(tableName)
           .append(PG_QUOTE)
           .append(IS)
-          .append(comment)
+          .append(escapeSqlLiteral(comment, '\''))
           .append("';");
     }
     Arrays.stream(columns)
@@ -222,7 +224,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
                     .append(jdbcColumn.name())
                     .append(PG_QUOTE)
                     .append(IS)
-                    .append(jdbcColumn.comment())
+                    .append(escapeSqlLiteral(jdbcColumn.comment(), '\''))
                     .append("';"));
 
     // Return the generated SQL statement
@@ -510,7 +512,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         }
       }
     }
-    return TABLE_COMMENT + PG_QUOTE + jdbcTable.name() + PG_QUOTE + IS + newComment + "';";
+    return TABLE_COMMENT
+        + PG_QUOTE
+        + jdbcTable.name()
+        + PG_QUOTE
+        + IS
+        + escapeSqlLiteral(newComment, '\'')
+        + "';";
   }
 
   private String deleteColumnFieldDefinition(
@@ -555,7 +563,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
 
-    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    StringBuilder sqlBuilder =
+        new StringBuilder(ALTER_TABLE + PG_QUOTE + jdbcTable.name() + PG_QUOTE);
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
@@ -584,7 +593,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (null == column) {
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
-    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    StringBuilder sqlBuilder =
+        new StringBuilder(ALTER_TABLE + PG_QUOTE + jdbcTable.name() + PG_QUOTE);
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
@@ -611,7 +621,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     return ALTER_TABLE
+        + PG_QUOTE
         + tableName
+        + PG_QUOTE
         + " RENAME COLUMN "
         + PG_QUOTE
         + renameColumn.fieldName()[0]
@@ -636,7 +648,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
         .append(ALTER_TABLE)
+        .append(PG_QUOTE)
         .append(lazyLoadTable.name())
+        .append(PG_QUOTE)
         .append(SPACE)
         .append("ADD COLUMN ")
         .append(PG_QUOTE)
@@ -689,7 +703,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
               + col
               + PG_QUOTE
               + IS
-              + addColumn.getComment()
+              + escapeSqlLiteral(addColumn.getComment(), '\'')
               + "';");
     }
     return result;
@@ -711,7 +725,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         + col
         + PG_QUOTE
         + IS
-        + newComment
+        + escapeSqlLiteral(newComment, '\'')
         + "';";
   }
 

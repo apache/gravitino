@@ -21,13 +21,18 @@ package org.apache.gravitino.flink.connector.utils;
 import static org.apache.flink.table.factories.FactoryUtil.validateFactoryOptions;
 import static org.apache.flink.table.factories.FactoryUtil.validateWatermarkOptions;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
@@ -51,7 +56,41 @@ public class FactoryUtils {
           GravitinoPaimonCatalogFactoryOptions.IDENTIFIER);
 
   public static boolean isGravitinoManagedCatalogType(String type) {
-    return GRAVITINO_CATALOG_TYPES.contains(type);
+    return GRAVITINO_CATALOG_TYPES.contains(type) || isProvidedByCatalogFactory(type);
+  }
+
+  /**
+   * Whether a {@link BaseCatalogFactory} on the classpath declares the type. This lets a jar
+   * outside the connector contribute catalog types without registering them here.
+   */
+  private static boolean isProvidedByCatalogFactory(String type) {
+    if (type == null) {
+      return false;
+    }
+    return isProvidedByCatalogFactory(ServiceLoader.load(Factory.class).iterator(), type);
+  }
+
+  @VisibleForTesting
+  static boolean isProvidedByCatalogFactory(Iterator<Factory> factories, String type) {
+    while (true) {
+      try {
+        if (!factories.hasNext()) {
+          return false;
+        }
+        Factory factory = factories.next();
+        if (factory instanceof BaseCatalogFactory && type.equals(factory.factoryIdentifier())) {
+          return true;
+        }
+      } catch (ServiceConfigurationError | LinkageError | RuntimeException e) {
+        // A factory that cannot be loaded or fails to report its identifier cannot be the one
+        // asked for.
+        LOG.debug(
+            "Skip a {} entry that cannot be loaded while resolving catalog type '{}'.",
+            Factory.class.getName(),
+            type,
+            e);
+      }
+    }
   }
 
   /**

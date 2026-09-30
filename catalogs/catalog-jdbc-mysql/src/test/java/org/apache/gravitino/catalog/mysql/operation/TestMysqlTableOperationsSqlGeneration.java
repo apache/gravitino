@@ -20,9 +20,11 @@ package org.apache.gravitino.catalog.mysql.operation;
 
 import java.util.Collections;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -41,14 +43,28 @@ public class TestMysqlTableOperationsSqlGeneration {
     }
 
     public String createTableSql(String tableName, JdbcColumn[] columns) {
+      return createTableSql(tableName, columns, "comment");
+    }
+
+    public String createTableSql(String tableName, JdbcColumn[] columns, String comment) {
       return generateCreateTableSql(
           tableName,
           columns,
-          "comment",
+          comment,
           Collections.emptyMap(),
           Transforms.EMPTY_TRANSFORM,
           Distributions.NONE,
           Indexes.EMPTY_INDEXES);
+    }
+
+    public String alterTableSql(String tableName, TableChange... changes) {
+      return generateAlterTableSql("database", tableName, changes);
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return JdbcTable.builder().withName(tableName).build();
     }
   }
 
@@ -88,5 +104,47 @@ public class TestMysqlTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testEscapeCommentsInGeneratedSql() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    String injectedComment = "owner's comment; DROP TABLE marker; --";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withComment(injectedComment)
+            .build();
+
+    String createSql = ops.createTableSql("test_table", new JdbcColumn[] {column}, injectedComment);
+    Assertions.assertTrue(
+        createSql.contains("COMMENT 'owner''s comment; DROP TABLE marker; --'"), createSql);
+    Assertions.assertTrue(
+        createSql.contains("COMMENT='owner''s comment; DROP TABLE marker; --'"), createSql);
+
+    String commentWithIdentifier =
+        injectedComment + " (From Gravitino, DO NOT EDIT: gravitino.v1.uid1)";
+    String alterSql =
+        ops.alterTableSql("test_table", TableChange.updateComment(commentWithIdentifier));
+    Assertions.assertTrue(
+        alterSql.contains(
+            "COMMENT 'owner''s comment; DROP TABLE marker; -- "
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid1)'"),
+        alterSql);
+  }
+
+  @Test
+  public void testEscapeAddColumnCommentInGeneratedSql() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    String comment = "owner\\'s \"comment\"; --";
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(new String[] {"col2"}, Types.IntegerType.get(), comment));
+
+    Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
+    Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
   }
 }

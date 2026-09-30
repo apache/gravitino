@@ -20,6 +20,12 @@
 package org.apache.gravitino.iceberg.common;
 
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLSyntaxErrorException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -28,9 +34,13 @@ import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfi
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.jdbc.JdbcClientPool;
+import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 public class TestClosableJdbcCatalog {
 
@@ -44,6 +54,35 @@ public class TestClosableJdbcCatalog {
     catalog.initialize("test", newJdbcCatalogProperties());
 
     Assertions.assertDoesNotThrow(catalog::close);
+  }
+
+  @Test
+  void testFailedSchemaMigrationClosesPartiallyCreatedResources() throws Exception {
+    FileIO fileIO = Mockito.mock(FileIO.class);
+    Connection connection = Mockito.mock(Connection.class);
+    DatabaseMetaData metadata = Mockito.mock(DatabaseMetaData.class);
+    ResultSet columns = Mockito.mock(ResultSet.class);
+    PreparedStatement alterTable = Mockito.mock(PreparedStatement.class);
+    Mockito.when(connection.getMetaData()).thenReturn(metadata);
+    Mockito.when(metadata.getColumns(null, null, "iceberg_tables", "iceberg_type"))
+        .thenReturn(columns);
+    Mockito.when(columns.next()).thenReturn(false);
+    Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(alterTable);
+    Mockito.when(alterTable.execute())
+        .thenThrow(new SQLSyntaxErrorException("Duplicate column name 'iceberg_type'"));
+
+    JdbcClientPool clientPool = new TestJdbcClientPool(connection);
+    ClosableJdbcCatalog catalog =
+        new ClosableJdbcCatalog(properties -> fileIO, properties -> clientPool, false);
+    Map<String, String> properties = newJdbcCatalogProperties();
+    properties.put(IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION, "V1");
+
+    Assertions.assertThrows(
+        UncheckedSQLException.class, () -> catalog.initialize("test", properties));
+
+    Assertions.assertTrue(clientPool.isClosed());
+    Mockito.verify(connection).close();
+    Mockito.verify(fileIO).close();
   }
 
   @Test
@@ -130,5 +169,20 @@ public class TestClosableJdbcCatalog {
     properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
     properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
     return properties;
+  }
+
+  private static class TestJdbcClientPool extends JdbcClientPool {
+    private final Connection connection;
+
+    private TestJdbcClientPool(Connection connection) {
+      super(1, "jdbc:test", Collections.emptyMap());
+      this.connection = connection;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected Connection newClient() {
+      return connection;
+    }
   }
 }

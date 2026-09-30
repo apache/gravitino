@@ -161,6 +161,9 @@ public class TestRequiredPrivilegesSparkResolution {
     }
 
     @Override
+    // Overriding the form deprecated in Spark 3.4 keeps this stub compiling on every supported
+    // version; the test never calls it.
+    @SuppressWarnings("deprecation")
     public Table createTable(
         Identifier ident, StructType schema, Transform[] partitions, Map<String, String> props) {
       throw new UnsupportedOperationException();

@@ -21,6 +21,8 @@ from typing import List, Optional
 from gravitino.api.auditable import Auditable
 from gravitino.api.function.function_definition import FunctionDefinition
 from gravitino.api.function.function_type import FunctionType
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Function(Auditable):
@@ -61,3 +63,14 @@ class Function(Auditable):
     def definitions(self) -> List[FunctionDefinition]:
         """Returns the definitions of the function."""
         pass
+
+    def supports_tags(self) -> SupportsTags:
+        """Return tag operations if the function supports tags.
+
+        Raises:
+            UnsupportedOperationException: If the function does not support tag operations.
+
+        Returns:
+            SupportsTags: The tag operations supported by the function.
+        """
+        raise UnsupportedOperationException("Function does not support tag operations.")

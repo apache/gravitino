@@ -21,6 +21,8 @@ package org.apache.gravitino.audit;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -105,6 +107,8 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
@@ -266,6 +270,8 @@ public interface AuditLog {
 
     CANCEL_PLANNING,
 
+    FETCH_SCAN_TASKS,
+
     PURGE_TABLE,
 
     LIST_TABLE,
@@ -334,6 +340,10 @@ public interface AuditLog {
 
     LIST_TAGS_INFO,
 
+    ADD_POLICY_FOR_TAG,
+
+    REMOVE_POLICY_FROM_TAG,
+
     CREATE_VIEW,
 
     ALTER_VIEW,
@@ -388,6 +398,12 @@ public interface AuditLog {
 
     GET_USER_BY_EXTERNAL_ID,
 
+    GET_USER_BY_ID,
+
+    REMOVE_USER_BY_ID,
+
+    ALTER_USER,
+
     ENABLE_USER,
 
     DISABLE_USER,
@@ -409,6 +425,12 @@ public interface AuditLog {
     GET_GROUP,
 
     GET_GROUP_BY_EXTERNAL_ID,
+
+    GET_GROUP_BY_ID,
+
+    REMOVE_GROUP_BY_ID,
+
+    ALTER_GROUP,
 
     LIST_GROUPS,
 
@@ -608,6 +630,12 @@ public interface AuditLog {
         return LOAD_FILESET;
       } else if (event instanceof ListFilesetEvent || event instanceof ListFilesetFailureEvent) {
         return LIST_FILESET;
+      } else if (event instanceof AddPolicyForTagEvent
+          || event instanceof AddPolicyForTagFailureEvent) {
+        return ADD_POLICY_FOR_TAG;
+      } else if (event instanceof RemovePolicyFromTagEvent
+          || event instanceof RemovePolicyFromTagFailureEvent) {
+        return REMOVE_POLICY_FROM_TAG;
       } else if (event instanceof AuthorizationDenialFailureEvent) {
         return AUTHORIZATION_DENIAL;
       } else {

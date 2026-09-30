@@ -177,8 +177,7 @@ public class IcebergNamespaceOperations {
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA || ANY_CREATE_SCHEMA)",
+      expression = AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response namespaceExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,

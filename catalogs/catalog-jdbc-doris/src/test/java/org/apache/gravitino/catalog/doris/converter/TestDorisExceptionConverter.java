@@ -18,10 +18,64 @@
  */
 package org.apache.gravitino.catalog.doris.converter;
 
+import java.sql.SQLException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDorisExceptionConverter {
+  /**
+   * Verifies missing-table errors from both legacy and newer Doris versions.
+   *
+   * @param errorCode the JDBC error code returned by Doris
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1051, 1105, 1109})
+  public void testUnknownTableErrorCodes(int errorCode) {
+    String message =
+        "errCode = 2, detailMessage = Unknown table 'no_such_table_xyz' in __internal_schema";
+    SQLException sqlException = new SQLException(message, "42S02", errorCode);
+
+    GravitinoRuntimeException converted =
+        new DorisExceptionConverter().toGravitinoException(sqlException);
+
+    Assertions.assertInstanceOf(NoSuchTableException.class, converted);
+    Assertions.assertEquals(message, converted.getMessage());
+    Assertions.assertSame(sqlException, converted.getCause());
+  }
+
+  @Test
+  public void testUnknownTableWithoutQuotes() {
+    String message = "errCode = 2, detailMessage = Unknown table no_such_table_xyz in s_12412";
+    SQLException sqlException =
+        new SQLException(message, "HY000", DorisExceptionConverter.CODE_OTHER);
+
+    GravitinoRuntimeException converted =
+        new DorisExceptionConverter().toGravitinoException(sqlException);
+
+    Assertions.assertTrue(converted instanceof NoSuchTableException);
+    Assertions.assertEquals(message, converted.getMessage());
+    Assertions.assertSame(sqlException, converted.getCause());
+  }
+
+  @Test
+  public void testRepeatedErrorPrefixIsRemoved() {
+    String prefix = "errCode = 2, detailMessage = ";
+    String detail = "Unknown table no_such_table_xyz in s_12412";
+    SQLException sqlException =
+        new SQLException(prefix + prefix + detail, "HY000", DorisExceptionConverter.CODE_OTHER);
+
+    GravitinoRuntimeException converted =
+        new DorisExceptionConverter().toGravitinoException(sqlException);
+
+    Assertions.assertTrue(converted instanceof NoSuchTableException);
+    Assertions.assertEquals(prefix + detail, converted.getMessage());
+    Assertions.assertSame(sqlException, converted.getCause());
+  }
+
   @Test
   public void testGetErrorCodeFromMessage() {
     String msg =

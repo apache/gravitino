@@ -35,6 +35,29 @@ import org.junit.jupiter.api.Test;
 
 public class TestResponseJsonSerDe {
 
+  /**
+   * Checks that custom internal error types and causes survive JSON serialization.
+   *
+   * @throws JsonProcessingException If serialization fails.
+   */
+  @Test
+  public void testInternalErrorRetainsTypeAndCause() throws JsonProcessingException {
+    Error error = new NoClassDefFoundError("catalog class");
+    error.initCause(new ClassNotFoundException("missing dependency"));
+    ErrorResponse response =
+        ErrorResponse.internalError("NoClassDefFoundError", "Server error", error);
+    String json = JsonUtils.objectMapper().writeValueAsString(response);
+    ErrorResponse restored = JsonUtils.objectMapper().readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(response, restored);
+    Assertions.assertEquals("NoClassDefFoundError", restored.getType());
+    Assertions.assertTrue(
+        String.join("\n", restored.getStack())
+            .contains("Caused by: java.lang.ClassNotFoundException: missing dependency"));
+    Assertions.assertEquals(
+        "RuntimeException", ErrorResponse.internalError("existing behavior", error).getType());
+    Assertions.assertNull(ErrorResponse.internalError("Error", "No stack", null).getStack());
+  }
+
   @Test
   public void testBaseResponseSerDe() throws JsonProcessingException {
     BaseResponse response = new BaseResponse();

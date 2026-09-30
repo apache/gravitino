@@ -45,6 +45,10 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
 
   testImplementation(libs.azure.identity)
+  testImplementation(libs.azure.storage.file.datalake)
+  testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)

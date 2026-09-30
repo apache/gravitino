@@ -20,9 +20,11 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import java.util.Collections;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -41,14 +43,38 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
     }
 
     public String createTableSql(String tableName, JdbcColumn[] columns) {
+      return createTableSql(tableName, columns, "comment");
+    }
+
+    public String createTableSql(String tableName, JdbcColumn[] columns, String comment) {
       return generateCreateTableSql(
           tableName,
           columns,
-          "comment",
+          comment,
           Collections.emptyMap(),
           Transforms.EMPTY_TRANSFORM,
           Distributions.NONE,
           Indexes.EMPTY_INDEXES);
+    }
+
+    public String alterTableSql(String tableName, TableChange... changes) {
+      return generateAlterTableSql("database", tableName, changes);
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withColumns(
+              new JdbcColumn[] {
+                JdbcColumn.builder()
+                    .withName("col1")
+                    .withType(Types.VarCharType.of(255))
+                    .withNullable(true)
+                    .build()
+              })
+          .build();
     }
   }
 
@@ -88,5 +114,84 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testEscapeCommentsInGeneratedSql() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String injectedComment = "owner\\'s comment; DROP TABLE marker; --";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withComment(injectedComment)
+            .build();
+
+    String createSql = ops.createTableSql("test_table", new JdbcColumn[] {column}, injectedComment);
+    Assertions.assertTrue(
+        createSql.contains("IS E'owner\\\\''s comment; DROP TABLE marker; --';"), createSql);
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table", TableChange.updateColumnComment(new String[] {"col1"}, injectedComment));
+    Assertions.assertEquals(
+        "COMMENT ON COLUMN \"test_table\".\"col1\" "
+            + "IS E'owner\\\\''s comment; DROP TABLE marker; --';",
+        alterSql);
+  }
+
+  @Test
+  public void testEscapeAddColumnCommentInGeneratedSql() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String comment = "owner\\'s \"comment\"; --";
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(new String[] {"col2"}, Types.IntegerType.get(), comment));
+
+    Assertions.assertTrue(alterSql.contains("ADD COLUMN \"col2\""), alterSql);
+    Assertions.assertTrue(
+        alterSql.contains(
+            "COMMENT ON COLUMN \"test_table\".\"col2\" IS E'owner\\\\''s \"comment\"; --';"),
+        alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnAddColumn() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql(
+            "MixedCaseTbl", TableChange.addColumn(new String[] {"extra"}, Types.IntegerType.get()));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnUpdateColumnDefaultValue() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql(
+            "MixedCaseTbl",
+            TableChange.updateColumnDefaultValue(
+                new String[] {"col1"}, Literals.of("abc", Types.VarCharType.of(255))));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnUpdateColumnType() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql(
+            "MixedCaseTbl",
+            TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(255)));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
+  }
+
+  @Test
+  public void testMixedCaseTableNameIsQuotedOnRenameColumn() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String alterSql =
+        ops.alterTableSql("MixedCaseTbl", TableChange.renameColumn(new String[] {"col1"}, "col2"));
+    Assertions.assertTrue(alterSql.contains("ALTER TABLE \"MixedCaseTbl\""), alterSql);
   }
 }

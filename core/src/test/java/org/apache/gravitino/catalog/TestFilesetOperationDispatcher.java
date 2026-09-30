@@ -25,15 +25,28 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.IdGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -45,9 +58,9 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
   }
 
   public static FilesetOperationDispatcher getFilesetOperationDispatcher() {
@@ -311,5 +324,101 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         path.delete();
       }
     }
+  }
+
+  @Test
+  public void testCreateWithSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(9000L);
+      IdGenerator ids = nextId::getAndIncrement;
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
+          .createSchema(
+              NameIdentifier.of(metalake, catalog, "schema_secret_fileset"),
+              "comment",
+              ImmutableMap.of("k1", "v1"));
+
+      NameIdentifier ident =
+          NameIdentifier.of(metalake, catalog, "schema_secret_fileset", "fileset_secret_1");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      long entityId = nextId.get();
+      Fileset fileset =
+          filesets.createMultipleLocationFileset(
+              ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
+      Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, fileset.properties().get("k2"));
+
+      Fileset stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident));
+      Assertions.assertTrue(
+          SecretPropertyUtils.isSecretProperty("k2", stored.properties().get("k2")));
+
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      filesets.alterFileset(ident, FilesetChange.removeProperty("k2"));
+      Assertions.assertFalse(
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident))
+              .properties()
+              .containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      Assertions.assertThrows(
+          FilesetAlreadyExistsException.class,
+          () ->
+              filesets.createMultipleLocationFileset(
+                  ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
+      Assertions.assertTrue(filesets.dropFileset(ident));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  public void testCreateAndAlterFilesetRejectMaskedPlaceholder() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema_masked_fileset");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(filesetNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_masked");
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", "v1", "k2", HiddenPropertyMaskUtils.MASKED_VALUE);
+    testMaskedPlaceholderRejected(
+        () ->
+            filesetOperationDispatcher.createFileset(
+                filesetIdent, "comment", Fileset.Type.MANAGED, "loc", createProps),
+        "k2");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    filesetOperationDispatcher.createFileset(
+        filesetIdent, "comment", Fileset.Type.MANAGED, "loc", props);
+    testMaskedPlaceholderRejected(
+        () ->
+            filesetOperationDispatcher.alterFileset(
+                filesetIdent,
+                FilesetChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 }

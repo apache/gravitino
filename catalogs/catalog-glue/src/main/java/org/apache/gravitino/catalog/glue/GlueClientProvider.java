@@ -18,13 +18,17 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.GlueClientBuilder;
@@ -52,7 +56,9 @@ public final class GlueClientProvider {
    * @param config Catalog configuration properties.
    * @return A configured and ready-to-use {@link GlueClient}.
    * @throws IllegalArgumentException if {@code aws-region} is missing or blank, if only one of the
-   *     credential keys is provided, or if {@code aws-glue-endpoint} is not a valid URI.
+   *     credential keys is provided, or if {@code aws-glue-endpoint} is not a valid URI
+   * @throws ConnectionFailedException if the configured credential provider cannot resolve
+   *     credentials
    */
   public static GlueClient buildClient(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
@@ -74,6 +80,42 @@ public final class GlueClientProvider {
     //   6. EC2 instance profile (IMDSv2)
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
+    boolean hasStaticCredentials = hasAwsStaticCredentials(accessKey, secretKey);
+
+    AwsCredentialsProvider credentialsProvider =
+        hasStaticCredentials
+            ? StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
+            : DefaultCredentialsProvider.builder().build();
+    validateCredentials(credentialsProvider);
+    builder.credentialsProvider(credentialsProvider);
+
+    // Optional custom endpoint override for VPC endpoints or LocalStack testing.
+    String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
+    if (StringUtils.isNotBlank(endpoint)) {
+      builder.endpointOverride(URI.create(endpoint));
+    }
+
+    return builder.build();
+  }
+
+  /**
+   * Eagerly resolves {@code credentialsProvider} when Glue operations are initialized, instead of
+   * leaving resolution to the first real Glue API call. This makes an explicit connection test or
+   * the first operation fail with an actionable connection error when no credential source is
+   * available. It does not authenticate static credentials; only an AWS API request can do that.
+   *
+   * @throws ConnectionFailedException if no credentials can be resolved
+   */
+  @VisibleForTesting
+  static void validateCredentials(AwsCredentialsProvider credentialsProvider) {
+    try {
+      credentialsProvider.resolveCredentials();
+    } catch (SdkClientException e) {
+      throw GlueExceptionConverter.toConnectionException(e);
+    }
+  }
+
+  static boolean hasAwsStaticCredentials(String accessKey, String secretKey) {
     boolean hasAccessKey = StringUtils.isNotBlank(accessKey);
     boolean hasSecretKey = StringUtils.isNotBlank(secretKey);
     Preconditions.checkArgument(
@@ -84,19 +126,6 @@ public final class GlueClientProvider {
         GlueConstants.AWS_ACCESS_KEY_ID,
         GlueConstants.AWS_SECRET_ACCESS_KEY);
 
-    if (hasAccessKey) {
-      builder.credentialsProvider(
-          StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));
-    } else {
-      builder.credentialsProvider(DefaultCredentialsProvider.builder().build());
-    }
-
-    // Optional custom endpoint override for VPC endpoints or LocalStack testing.
-    String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
-    if (StringUtils.isNotBlank(endpoint)) {
-      builder.endpointOverride(URI.create(endpoint));
-    }
-
-    return builder.build();
+    return hasAccessKey;
   }
 }

@@ -157,6 +157,10 @@ class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
 
 
+class OptimisticLockException(GravitinoRuntimeException):
+    """Raised when another update changes an entity before a write completes."""
+
+
 class UnauthorizedException(GravitinoRuntimeException):
     """An exception thrown when a user is not authorized to perform an action."""
 
@@ -217,6 +221,10 @@ class NoSuchTableException(NotFoundException):
     """An exception thrown when a table with specified name is not existed."""
 
 
+class NoSuchViewException(NotFoundException):
+    """An exception thrown when a view with specified name is not found."""
+
+
 class NoSuchPartitionException(NotFoundException):
     """An exception thrown when a partition with specified name is not existed."""
 
@@ -229,12 +237,28 @@ class TableAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a table already exists."""
 
 
+class ViewAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a view already exists."""
+
+
 class NoSuchFunctionException(NotFoundException):
     """An exception thrown when a function with specified name is not found."""
 
 
 class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
+
+
+class NoSuchSemanticModelException(NotFoundException):
+    """An exception thrown when a Semantic Model with specified name is not found."""
+
+
+class SemanticModelAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a Semantic Model already exists."""
+
+
+class IllegalSemanticModelException(IllegalArgumentException):
+    """An exception thrown when a Semantic Model definition is invalid."""
 
 
 class IllegalPrivilegeException(IllegalArgumentException):

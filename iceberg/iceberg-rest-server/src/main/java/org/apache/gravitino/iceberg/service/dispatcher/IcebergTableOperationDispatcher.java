@@ -24,10 +24,12 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -165,6 +167,20 @@ public interface IcebergTableOperationDispatcher {
    */
   void cancelPlanning(
       IcebergRequestContext context, TableIdentifier tableIdentifier, String planId);
+
+  /**
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior {@link #planTableScan} call,
+   * completing the second step of the Iceberg REST two-step scan planning protocol.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param request The request carrying the {@code plan-task}.
+   * @return A {@link FetchScanTasksResponse} containing the scan tasks for that plan task.
+   */
+  FetchScanTasksResponse fetchScanTasks(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      FetchScanTasksRequest request);
 
   /**
    * Retrieves the metadata file location for a table without loading full table metadata. This is

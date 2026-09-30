@@ -30,7 +30,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - name: Check required command
         run: |
@@ -48,7 +48,7 @@ jobs:
         id: integrationTest
         # run embedded mode and deploy mode integration tests for every supported Flink minor
         run: |
-          for v in 1.18 1.19 1.20; do
+          for v in 1.19 1.20 2.1; do
             ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true \
               :flink-connector:flink-$v:test \
               --tests "org.apache.gravitino.flink.connector.integration.test.**"
@@ -64,12 +64,12 @@ jobs:
           name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
           path: |
             build/reports
-            flink-connector/v1.18/flink/build/*.log
-            flink-connector/v1.18/flink/build/*.tar
             flink-connector/v1.19/flink/build/*.log
             flink-connector/v1.19/flink/build/*.tar
             flink-connector/v1.20/flink/build/*.log
             flink-connector/v1.20/flink/build/*.tar
+            flink-connector/v2.1/flink/build/*.log
+            flink-connector/v2.1/flink/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log

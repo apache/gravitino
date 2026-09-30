@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.mysql.operation;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,10 +31,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.sql.DataSource;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -1137,6 +1141,55 @@ public class TestMysqlTableOperations extends TestMysql {
     Assertions.assertNull(
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
+  }
+
+  @Test
+  public void testLoadColumnsWithLossyTypeDeclarations() throws Exception {
+    // These types either drop their parameters (VARBINARY/ENUM/SET) or collapse distinct widths
+    // into the same Gravitino type (BIT/BINARY) when only JDBC's TYPE_NAME/COLUMN_SIZE metadata
+    // is used.
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_lossy_type_table";
+    DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
+    try {
+      try (Connection connection = dataSource.getConnection()) {
+        connection.setCatalog(TEST_DB_NAME.toString());
+        try (Statement statement = connection.createStatement()) {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE `%s` ("
+                      + "c_int INT, "
+                      + "c_varbinary VARBINARY(100), "
+                      + "c_enum ENUM('a','b','c'), "
+                      + "c_set SET('x','y','z'), "
+                      + "c_bit BIT(8), "
+                      + "c_bit1 BIT(1), "
+                      + "c_binary1 BINARY(1), "
+                      + "c_binary BINARY(16))",
+                  tableName));
+        }
+      }
+    } finally {
+      DataSourceUtils.closeDataSource(dataSource);
+    }
+
+    JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Map<String, Type> typeByColumn =
+        Arrays.stream(table.columns()).collect(Collectors.toMap(Column::name, Column::dataType));
+
+    // A plain, non-candidate column must be left untouched by the correction.
+    Assertions.assertEquals(Types.IntegerType.get(), typeByColumn.get("c_int"));
+    Assertions.assertEquals(
+        Types.ExternalType.of("varbinary(100)"), typeByColumn.get("c_varbinary"));
+    Assertions.assertEquals(Types.ExternalType.of("enum('a','b','c')"), typeByColumn.get("c_enum"));
+    Assertions.assertEquals(Types.ExternalType.of("set('x','y','z')"), typeByColumn.get("c_set"));
+    Assertions.assertEquals(Types.ExternalType.of("bit(8)"), typeByColumn.get("c_bit"));
+    Assertions.assertEquals(Types.ExternalType.of("binary(16)"), typeByColumn.get("c_binary"));
+    // BIT(1) still maps to boolean, and a default-width BINARY(1) already round-trips correctly
+    // as Types.BinaryType, so neither must be affected by this fix.
+    Assertions.assertEquals(Types.BooleanType.get(), typeByColumn.get("c_bit1"));
+    Assertions.assertEquals(Types.BinaryType.get(), typeByColumn.get("c_binary1"));
+
+    TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
   }
 
   @Test

@@ -48,21 +48,22 @@ public class TestTagHookDispatcher {
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(TagDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     hookDispatcher = new TagHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
   }
 
   @Test
   public void testCreateTagThrowsWhenSetOwnerFails() {
     Tag mockTag = mock(Tag.class);
-    when(mockDispatcher.createTag(any(), any(), any(), any())).thenReturn(mockTag);
+    when(mockDispatcher.createTag(any(), any(), any(), any(), any())).thenReturn(mockTag);
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -75,6 +76,6 @@ public class TestTagHookDispatcher {
                 hookDispatcher.createTag(
                     "test_metalake", "test_tag", "comment", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
-    verify(mockDispatcher).createTag(any(), any(), any(), any());
+    verify(mockDispatcher).createTag(any(), any(), any(), any(), any());
   }
 }

@@ -24,12 +24,14 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -78,11 +80,11 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
 
   protected static void prepareTable() throws IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -90,10 +92,10 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
     Column[] columns =
         new Column[] {
           Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())
@@ -110,13 +112,13 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testListPartitions() {
     Partition[] partitions = partitionOperationDispatcher.listPartitions(TABLE_IDENT);
-    Assertions.assertTrue(Arrays.asList(partitions).contains(PARTITION));
+    Assertions.assertTrue(Arrays.asList(partitions).contains(DTOConverters.toDTO(PARTITION)));
   }
 
   @Test
   public void testGetPartition() {
     Partition p = partitionOperationDispatcher.getPartition(TABLE_IDENT, PARTITION.name());
-    Assertions.assertEquals(PARTITION, p);
+    Assertions.assertEquals(DTOConverters.toDTO(PARTITION), p);
   }
 
   @Test

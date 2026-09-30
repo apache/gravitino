@@ -24,6 +24,7 @@ import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserGroupRelBaseSQLProvider {
@@ -62,10 +63,10 @@ public class IdpUserGroupRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
-        + " (id, user_id, group_id, current_version, last_version, deleted_at)"
+        + " (id, user_id, group_id, audit_info, current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach item='item' collection='relations' separator=','>"
-        + "(#{item.id}, #{item.userId}, #{item.groupId}, #{item.currentVersion},"
+        + "(#{item.id}, #{item.userId}, #{item.groupId}, #{item.auditInfo}, #{item.currentVersion},"
         + " #{item.lastVersion}, #{item.deletedAt})"
         + "</foreach>"
         + "</script>";
@@ -125,6 +126,6 @@ public class IdpUserGroupRelBaseSQLProvider {
   }
 
   protected String currentTimeMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 }

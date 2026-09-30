@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -33,12 +34,6 @@ public interface ViewVersionInfoMapper {
   @InsertProvider(type = ViewVersionInfoSQLProviderFactory.class, method = "insertViewVersionInfo")
   void insertViewVersionInfo(@Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO);
 
-  @InsertProvider(
-      type = ViewVersionInfoSQLProviderFactory.class,
-      method = "insertViewVersionInfoOnDuplicateKeyUpdate")
-  void insertViewVersionInfoOnDuplicateKeyUpdate(
-      @Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO);
-
   @SelectProvider(
       type = ViewVersionInfoSQLProviderFactory.class,
       method = "selectViewVersionInfoByViewIdAndVersion")
@@ -52,8 +47,8 @@ public interface ViewVersionInfoMapper {
 
   @UpdateProvider(
       type = ViewVersionInfoSQLProviderFactory.class,
-      method = "softDeleteViewVersionsBySchemaId")
-  Integer softDeleteViewVersionsBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteViewVersionsBySchemaIds")
+  Integer softDeleteViewVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = ViewVersionInfoSQLProviderFactory.class,

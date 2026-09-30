@@ -30,10 +30,13 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Per-HTTP-request scratchpad shared by {@link GravitinoAuthorizer} calls. A fresh instance is
@@ -48,9 +51,11 @@ import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
  *   <li>per-request role loading happens at most once via {@link #loadRole(Runnable)}.
  * </ul>
  *
- * <p>Instances are not intended to outlive a request and are not reusable across threads beyond the
- * request handling thread; the internal maps are {@link ConcurrentHashMap} purely to tolerate any
- * incidental fan-out (e.g. async listeners) within the same request scope.
+ * <p>Instances must not outlive a request or be reused across principals, active-role selections or
+ * metalakes. Entry authorization and list filtering of one read-only request may share an instance:
+ * list workers receive it explicitly, which is why the internal maps are {@link ConcurrentHashMap}.
+ * Role selection must be fixed before workers start, and a mutation must not reuse decisions made
+ * before it.
  */
 public class AuthorizationRequestContext {
 
@@ -83,6 +88,20 @@ public class AuthorizationRequestContext {
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
   private volatile String originalAuthorizationExpression;
+
+  /**
+   * The roles the caller has declared active for this request (role assumption). Read from the
+   * current {@link UserPrincipal}; defaults to {@link ActiveRoles#all()} (no narrowing) when the
+   * caller declared none.
+   */
+  private volatile ActiveRoles activeRoles = currentPrincipalActiveRoles();
+
+  private static ActiveRoles currentPrincipalActiveRoles() {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    return principal instanceof UserPrincipal
+        ? ((UserPrincipal) principal).getActiveRoles()
+        : ActiveRoles.all();
+  }
 
   /**
    * check allow
@@ -211,6 +230,26 @@ public class AuthorizationRequestContext {
    */
   public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
     this.prefetchedRoleVersions = prefetchedRoleVersions;
+  }
+
+  /**
+   * Returns the roles declared active for this request. Never {@code null}; defaults to {@link
+   * ActiveRoles#all()}.
+   *
+   * @return the active-role declaration
+   */
+  public ActiveRoles getActiveRoles() {
+    return activeRoles;
+  }
+
+  /**
+   * Sets the roles declared active for this request. Narrowing is subtractive: only roles the
+   * caller actually holds are ever consulted, regardless of what is declared here.
+   *
+   * @param activeRoles the active-role declaration; must not be {@code null}
+   */
+  public void setActiveRoles(ActiveRoles activeRoles) {
+    this.activeRoles = Objects.requireNonNull(activeRoles, "activeRoles must not be null");
   }
 
   /**

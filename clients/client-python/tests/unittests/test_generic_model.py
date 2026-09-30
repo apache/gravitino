@@ -19,6 +19,7 @@ import unittest
 
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_model import GenericModel
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils.http_client import HTTPClient
@@ -68,3 +69,13 @@ class TestGenericModel(unittest.TestCase):
                 for method in expected_methods
             )
         )
+
+    def test_supports_roles_is_not_supported_yet(self) -> None:
+        generic_model = GenericModel(
+            build_model_dto(),
+            TestGenericModel._rest_client,
+            TestGenericModel._model_ident.namespace(),
+        )
+
+        with self.assertRaisesRegex(UnsupportedOperationException, "Not supported yet"):
+            generic_model.supports_roles()

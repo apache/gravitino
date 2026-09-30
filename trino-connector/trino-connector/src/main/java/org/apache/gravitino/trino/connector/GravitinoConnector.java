@@ -18,13 +18,17 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalNotification;
+import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
@@ -54,8 +58,6 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * GravitinoConnector serves as the entry point for operations on the connector managed by Trino and
@@ -64,7 +66,10 @@ import org.slf4j.LoggerFactory;
  */
 public class GravitinoConnector implements Connector {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnector.class);
+  private static final Logger LOG = Logger.get(GravitinoConnector.class);
+  private static final String ICEBERG_PROVIDER = "lakehouse-iceberg";
+  private static final String TRINO_ICEBERG_REST_SECURITY = "iceberg.rest-catalog.security";
+  private static final String OAUTH2_PASSTHROUGH = "OAUTH2_PASSTHROUGH";
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
@@ -109,15 +114,39 @@ public class GravitinoConnector implements Connector {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
 
-    Connector internalConnector = catalogConnectorContext.getInternalConnector();
     ConnectorMetadata internalMetadata =
-        internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
+        getInternalMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
     CatalogConnectorMetadata metadata =
         forwardUser ? resolveSessionMetadata(session) : connectorMetadata;
     return createGravitinoMetadata(
         metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+  }
+
+  /**
+   * Defers native REST authentication until a data operation needs it. Catalog registration uses a
+   * password-authenticated management session without a delegated user token.
+   *
+   * @param session the authenticated query session
+   * @param transactionHandle the native transaction handle
+   * @return metadata that preserves user authentication at first data access
+   */
+  protected ConnectorMetadata getInternalMetadata(
+      ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
+    if (ICEBERG_PROVIDER.equals(catalogConnectorContext.getCatalog().getProvider())
+        && OAUTH2_PASSTHROUGH.equalsIgnoreCase(
+            catalogConnectorContext
+                .getInternalConnectorConfig()
+                .get(TRINO_ICEBERG_REST_SECURITY))) {
+      return DeferredConnectorMetadata.create(
+          session,
+          currentSession ->
+              catalogConnectorContext
+                  .getInternalConnector()
+                  .getMetadata(currentSession, transactionHandle));
+    }
+    return catalogConnectorContext.getInternalConnector().getMetadata(session, transactionHandle);
   }
 
   protected GravitinoMetadata createGravitinoMetadata(
@@ -225,35 +254,86 @@ public class GravitinoConnector implements Connector {
     catalogConnectorContext.close();
   }
 
-  private CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
-    String credKey = "simple:" + session.getUser();
+  @VisibleForTesting
+  CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
+    String authType =
+        catalogConnectorContext
+            .getConfig()
+            .getClientConfig()
+            .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple");
+    String credentialKey =
+        catalogConnectorContext
+            .getConfig()
+            .getClientConfig()
+            .getOrDefault(
+                GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY,
+                GravitinoAuthProvider.DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
+    String token = session.getIdentity().getExtraCredentials().get(credentialKey);
+    // Password-authenticated sessions have no OAuth token. Reuse the configured service
+    // identity in that case; failures with a supplied token must still propagate.
+    if (GravitinoAuthProvider.parseAuthType(authType) == GravitinoAuthProvider.AuthType.OAUTH2
+        && StringUtils.isBlank(token)) {
+      return connectorMetadata;
+    }
+    String credKey = sessionCacheKey(authType, session.getUser(), token);
     try {
       return perUserSessionCache.get(
               credKey,
               () -> {
-                GravitinoAdminClient userClient =
-                    GravitinoAuthProvider.buildForSession(
-                        catalogConnectorContext.getConfig(), session);
+                GravitinoAdminClient userClient = buildAuthClient(session);
                 GravitinoMetalake userMetalake =
                     userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
                 return new UserSession(
                     userClient, new CatalogConnectorMetadata(userMetalake, catalogIdentifier));
               })
           .metadata;
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
+    } catch (ExecutionException | UncheckedExecutionException e) {
+      Throwable cause = e.getCause() == null ? e : e.getCause();
       LOG.warn(
-          "Failed to create per-user Gravitino client for user '{}': {}",
-          session.getUser(),
-          cause.getMessage());
+          cause, "Failed to create per-user Gravitino client for user '%s'", session.getUser());
+      if (cause instanceof TrinoException) {
+        // Already carries a specific Trino error code (e.g. from buildForSession); re-wrapping
+        // would swallow it.
+        throw (TrinoException) cause;
+      }
+      if (cause instanceof IllegalArgumentException
+          || cause instanceof UnsupportedOperationException) {
+        throw new TrinoException(
+            PERMISSION_DENIED,
+            "Failed to authenticate user '"
+                + session.getUser()
+                + "' with Gravitino: "
+                + cause.getMessage(),
+            cause);
+      }
       throw new TrinoException(
-          PERMISSION_DENIED,
-          "Failed to authenticate user '"
+          GENERIC_INTERNAL_ERROR,
+          "Unexpected error while creating per-user Gravitino client for user '"
               + session.getUser()
-              + "' with Gravitino: "
+              + "': "
               + cause.getMessage(),
           cause);
     }
+  }
+
+  /**
+   * Builds the per-user Gravitino admin client for a forwarded session. Extracted as an overridable
+   * seam so tests can substitute the client-building behavior without needing to mock the static
+   * {@link GravitinoAuthProvider#buildForSession}.
+   *
+   * @param session the current Trino connector session
+   * @return the per-user Gravitino admin client
+   */
+  @VisibleForTesting
+  GravitinoAdminClient buildAuthClient(ConnectorSession session) {
+    return GravitinoAuthProvider.buildForSession(catalogConnectorContext.getConfig(), session);
+  }
+
+  @VisibleForTesting
+  static String sessionCacheKey(String authType, String user, String token) {
+    String tokenPart =
+        StringUtils.isBlank(token) ? "" : ":" + Integer.toHexString(token.hashCode());
+    return authType + ":" + user + tokenPart;
   }
 
   private Cache<String, UserSession> buildSessionCache(GravitinoConfig config) {
@@ -265,10 +345,11 @@ public class GravitinoConnector implements Connector {
           "gravitino.client.session.forwardUser=true requires gravitino.client.authType to be set");
     }
     GravitinoAuthProvider.AuthType authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
-    if (authType != GravitinoAuthProvider.AuthType.SIMPLE) {
+    if (authType != GravitinoAuthProvider.AuthType.SIMPLE
+        && authType != GravitinoAuthProvider.AuthType.OAUTH2) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-          "gravitino.client.session.forwardUser=true only supports authType=simple, got: "
+          "gravitino.client.session.forwardUser=true only supports authType=simple or oauth2, got: "
               + authTypeStr);
     }
 
@@ -304,7 +385,7 @@ public class GravitinoConnector implements Connector {
       try {
         client.close();
       } catch (Exception e) {
-        LOG.warn("Failed to close GravitinoAdminClient", e);
+        LOG.warn(e, "Failed to close GravitinoAdminClient");
       }
     }
   }

@@ -219,25 +219,31 @@
    Jackson Parameter Names
    Jakarta Dependency Injection
    Airlift
-   Apache Log4j 1.x Compatibility API
-   Apache Log4j API
-   Apache Log4j Core
-   Apache Log4j Layout For Templated JSON Encoding
-   Apache Log4j SLF4J Binding
    Trino JDBC Driver
+   fast_double_parser
+   fast_float
 
    This product bundles various third-party components also under the
    MIT license
    
    Checker Framework
+   FastDoubleParser
+   Schubfach
    SLF4J API Module
+   SLF4J JDK14 Binding
 
    This product bundles various third-party components also under the
    BSD license
       
+   bigint
    JSR305
 
    This product bundles various third-party components also placed in
    the public domain.
 
    AOP Alliance
+
+   For the FastDoubleParser license text, see licenses/FastDoubleParser.txt.
+   For the Schubfach license text, see licenses/Schubfach.txt.
+   For the bigint BSD license text, see licenses/FastDoubleParser-thirdparty.txt.
+   The fast_float and fast_double_parser copies in Jackson 2.15.2 use Apache 2.0.

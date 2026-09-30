@@ -18,8 +18,12 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -31,12 +35,10 @@ import org.apache.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLCo
 import org.apache.gravitino.trino.connector.catalog.jdbc.trino.TrinoClusterConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** This class use to create CatalogConnectorContext instance by given catalog. */
 public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
-  private static final Logger LOG = LoggerFactory.getLogger(DefaultCatalogConnectorFactory.class);
+  private static final Logger LOG = Logger.get(DefaultCatalogConnectorFactory.class);
 
   private static final String GLUE_CONNECTOR_PROVIDER_NAME = "glue";
   private static final String HIVE_CONNECTOR_PROVIDER_NAME = "hive";
@@ -72,7 +74,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
         new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
     catalogBuilders.put(
         ICEBERG_CONNECTOR_PROVIDER_NAME,
-        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
+        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter(config)));
     catalogBuilders.put(
         MYSQL_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
@@ -82,7 +84,44 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
     catalogBuilders.put(
         TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new TrinoClusterConnectorAdapter()));
+    registerAdapterProviders(config);
     LOG.info("Start the DefaultCatalogConnectorFactory");
+  }
+
+  /**
+   * Adds the adapters contributed through {@link CatalogConnectorAdapterProvider}. A provider for a
+   * catalog provider name that is already registered is ignored.
+   */
+  private void registerAdapterProviders(GravitinoConfig config) {
+    Iterator<CatalogConnectorAdapterProvider> iterator =
+        ServiceLoader.load(
+                CatalogConnectorAdapterProvider.class,
+                DefaultCatalogConnectorFactory.class.getClassLoader())
+            .iterator();
+    while (true) {
+      try {
+        if (!iterator.hasNext()) {
+          return;
+        }
+        CatalogConnectorAdapterProvider provider = iterator.next();
+        String providerName = provider.provider();
+        if (catalogBuilders.containsKey(providerName)) {
+          LOG.warn(
+              "Ignore catalog connector adapter provider %s for %s: already registered.",
+              provider.getClass().getName(), providerName);
+          continue;
+        }
+        catalogBuilders.put(
+            providerName, new CatalogConnectorContext.Builder(provider.createAdapter(config)));
+        LOG.info("Registered catalog connector adapter for %s", providerName);
+      } catch (ServiceConfigurationError | LinkageError | RuntimeException e) {
+        // ServiceLoader reports a missing class or a failing constructor as
+        // ServiceConfigurationError; a provider built against another Trino version fails with a
+        // LinkageError once its methods run, and a misconfigured one may throw from provider() or
+        // createAdapter(). Skip that entry and keep the rest.
+        LOG.warn(e, "Skip a catalog connector adapter provider that cannot be loaded.");
+      }
+    }
   }
 
   /**

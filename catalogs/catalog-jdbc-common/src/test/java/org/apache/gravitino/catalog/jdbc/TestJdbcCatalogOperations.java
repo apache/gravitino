@@ -18,25 +18,21 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.sql.Driver;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.List;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -44,23 +40,28 @@ import org.junit.jupiter.api.Test;
 public class TestJdbcCatalogOperations {
 
   @Test
-  public void testTestConnection() {
+  public void testExistingCatalogConnectionFailure() {
+    SQLException cause = new SQLException("connection refused");
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public List<String> listDatabases() {
+            throw new GravitinoRuntimeException(cause, cause.getMessage());
+          }
+        };
+
     try (JdbcCatalogOperations catalogOperations =
         new JdbcCatalogOperations(
             new SqliteExceptionConverter(),
             new SqliteTypeConverter(),
-            new SqliteDatabaseOperations("/illegal/path"),
+            databaseOperations,
             new SqliteTableOperations(),
             new SqliteColumnDefaultValueConverter())) {
-      Assertions.assertThrows(
-          GravitinoRuntimeException.class,
-          () ->
-              catalogOperations.testConnection(
-                  NameIdentifier.of("metalake", "catalog"),
-                  Catalog.Type.RELATIONAL,
-                  "sqlite",
-                  "comment",
-                  ImmutableMap.of()));
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertSame(cause, exception.getCause());
     }
   }
 
@@ -81,76 +82,15 @@ public class TestJdbcCatalogOperations {
   }
 
   @Test
-  public void testCloseDeregisterDriver() throws SQLException {
-    TestableJdbcCatalogOperations catalogOperations =
-        new TestableJdbcCatalogOperations(
+  public void testCloseDoesNotThrow() {
+    JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
             new SqliteExceptionConverter(),
             new SqliteTypeConverter(),
             new SqliteDatabaseOperations("/illegal/path"),
             new SqliteTableOperations(),
             new SqliteColumnDefaultValueConverter());
-    catalogOperations.setDriver(DriverManager.getDriver("jdbc:sqlite::memory:"));
 
     Assertions.assertDoesNotThrow(catalogOperations::close);
-    Assertions.assertTrue(catalogOperations.isDeregisterCalled());
-  }
-
-  @Test
-  public void testCloseIgnoreGetDriverException() {
-    TestableJdbcCatalogOperations catalogOperations =
-        new TestableJdbcCatalogOperations(
-            new SqliteExceptionConverter(),
-            new SqliteTypeConverter(),
-            new SqliteDatabaseOperations("/illegal/path"),
-            new SqliteTableOperations(),
-            new SqliteColumnDefaultValueConverter());
-    catalogOperations.setThrowExceptionInGetDriver(true);
-
-    Assertions.assertDoesNotThrow(catalogOperations::close);
-  }
-
-  private static class TestableJdbcCatalogOperations extends JdbcCatalogOperations {
-    private Driver driver;
-    private boolean deregisterCalled;
-    private boolean throwExceptionInGetDriver;
-
-    private TestableJdbcCatalogOperations(
-        JdbcExceptionConverter exceptionConverter,
-        JdbcTypeConverter jdbcTypeConverter,
-        SqliteDatabaseOperations databaseOperation,
-        SqliteTableOperations tableOperation,
-        SqliteColumnDefaultValueConverter columnDefaultValueConverter) {
-      super(
-          exceptionConverter,
-          jdbcTypeConverter,
-          databaseOperation,
-          tableOperation,
-          columnDefaultValueConverter);
-    }
-
-    @Override
-    protected Driver getDriver() throws SQLException {
-      if (throwExceptionInGetDriver) {
-        throw new SQLException("failed to get driver");
-      }
-      return driver;
-    }
-
-    @Override
-    public void deregisterDriver(Driver driver) {
-      this.deregisterCalled = true;
-    }
-
-    private void setDriver(Driver driver) {
-      this.driver = driver;
-    }
-
-    private void setThrowExceptionInGetDriver(boolean throwExceptionInGetDriver) {
-      this.throwExceptionInGetDriver = throwExceptionInGetDriver;
-    }
-
-    private boolean isDeregisterCalled() {
-      return deregisterCalled;
-    }
   }
 }

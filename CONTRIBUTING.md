@@ -149,6 +149,7 @@ Reviewing and triaging helps maintain the project. You can:
 * Add labels to categorize
 * Suggest improvements on PRs
 * Review code and give feedback
+* Please add Copilot before you review. That is recommended, not required. Do not wait on Copilot if you are ready to review.
 
 ## 🔃 Creating Pull Requests
 
@@ -156,6 +157,7 @@ Reviewing and triaging helps maintain the project. You can:
 * Write clear commit messages and PR descriptions
 * Link to issues (e.g., `Fixes #123`)
 * Respond to reviewer feedback
+* Please add Copilot on the PR. Automatic review runs once when the PR is marked ready; later pushes do not re-review, so add Copilot again after you push. Treat Copilot comments as hints: implement the suggestion, or reply with why you are not taking it. Human reviewers remain responsible for the merge decision. Project-specific Copilot guidance lives in [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
 ## 💻 Setting Up Development Environment
 
@@ -169,7 +171,7 @@ bin/gravitino.sh stop
 You can also build manually with:
 
 ```bash
-./mvnw clean install
+./gradlew build
 ```
 
 ## 🧰 Setting Up Your IDE (Optional)
@@ -182,7 +184,7 @@ If using WSL on Windows, install Java and dev tools inside WSL. Access files via
 
 ## ⚙️ Build Profiles and JDK Requirements
 
-Gravitino uses Maven profiles for Scala:
+Gravitino uses Gradle properties for Scala:
 
 * `-Pscala-2.12` for Scala 2.12
 * `-Pscala-2.13` for Scala 2.13 (default)
@@ -228,7 +230,7 @@ Add or update tests in your PR. Test open PRs locally to help maintainers.
 Before contributing:
 
 * Review [ASF License and IP Guidelines](https://www.apache.org/legal/)
-* Ensure all code is original or properly licensed and compatable with the Apache License
+* Ensure all code is original or properly licensed and compatible with the Apache License
 
 ## 📄 License
 

@@ -29,6 +29,7 @@ from gravitino.exceptions.handlers.error_handler import ErrorHandler
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
+from gravitino.utils.precondition import Precondition
 from gravitino.utils.http_client import Response
 
 
@@ -80,6 +81,22 @@ class GenericTag(Tag, Tag.AssociatedObjects):
         """
         return self._tag_dto.properties()
 
+    def allowed_values(self) -> Optional[list[str]]:
+        """Get the allowed values for this tag.
+
+        Returns:
+            Optional[list[str]]: The allowed values, or None if values are unrestricted.
+        """
+        return self._tag_dto.allowed_values()
+
+    def assignment_values(self) -> Optional[list[str]]:
+        """Get assignment values when this tag is loaded from a metadata object.
+
+        Returns:
+            Optional[list[str]]: The assignment values, or None if not assignment-scoped.
+        """
+        return self._tag_dto.assignment_values()
+
     def inherited(self) -> Optional[bool]:
         """Check if the tag is inherited from a parent object or not.
 
@@ -113,9 +130,12 @@ class GenericTag(Tag, Tag.AssociatedObjects):
         """
         return self
 
-    def objects(self) -> list[MetadataObject]:
+    def objects(self, value: Optional[str] = None) -> list[MetadataObject]:
         """
         Retrieve the list of objects that are associated with this tag.
+
+        Args:
+            value: The optional exact assignment value filter.
 
         Returns:
             list[MetadataObject]: The list of objects that are associated with this tag.
@@ -125,7 +145,14 @@ class GenericTag(Tag, Tag.AssociatedObjects):
             encode_string(self.name()),
         )
 
-        response = self.get_response(url, TAG_ERROR_HANDLER)
+        if value is None:
+            response = self.get_response(url, TAG_ERROR_HANDLER)
+        else:
+            Precondition.check_argument(
+                value.strip() != "" and len(value) <= 256,
+                "value must not be empty or longer than 256 characters",
+            )
+            response = self.get_response(url, TAG_ERROR_HANDLER, {"value": value})
         objects_resp = MetadataObjectListResponse.from_json(
             response.body, infer_missing=True
         )
@@ -133,18 +160,25 @@ class GenericTag(Tag, Tag.AssociatedObjects):
 
         return objects_resp.metadata_objects()
 
-    def get_response(self, url: str, error_handler: ErrorHandler) -> Response:
+    def get_response(
+        self,
+        url: str,
+        error_handler: ErrorHandler,
+        params: Optional[dict[str, str]] = None,
+    ) -> Response:
         """
         Get the response from the server, for testing convenience.
 
         Args:
             url (str): The url to get the response from.
             error_handler (ErrorHandlers): The error handler to use.
+            params (dict[str, str]): The query parameters to send.
 
         Returns:
             Response: The response from the server.
         """
         return self._client.get(
             url,
+            params=params or {},
             error_handler=error_handler,
         )

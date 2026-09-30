@@ -134,6 +134,10 @@ public class TestCatalogOperations
 
   public static final String FAIL_TEST = "need-fail";
 
+  public static final String VALIDATE_ON_CREATE = "validate-on-create";
+
+  public static final String FAIL_INITIALIZE = "fail-initialize";
+
   private static final String SLASH = "/";
 
   public TestCatalogOperations(Map<String, String> config) {
@@ -150,7 +154,11 @@ public class TestCatalogOperations
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertyMetadata)
-      throws RuntimeException {}
+      throws RuntimeException {
+    if (config != null && "true".equals(config.get(FAIL_INITIALIZE))) {
+      throw new IllegalArgumentException("Simulated: backend rejected catalog configuration");
+    }
+  }
 
   @Override
   public void close() throws IOException {}

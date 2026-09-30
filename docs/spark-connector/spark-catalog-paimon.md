@@ -14,6 +14,12 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 1. Set `spark.sql.gravitino.enablePaimonSupport` to `true` in Spark configuration.
 2. Download Paimon Spark runtime jar to Spark classpath.
 
+:::info
+The Paimon catalog is available on Spark 3.5 only. Paimon first published `paimon-spark-4.0` in
+Paimon 1.3.0, above the version Gravitino currently depends on, so the Spark 4 connector builds
+without the Paimon classes.
+:::
+
 ## Capabilities
 
 ### DDL and DML Operations
@@ -85,10 +91,10 @@ ALTER TABLE employee DROP PARTITION (`name`='Alice');
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Paimon connector configuration.
 
-| Gravitino catalog property name | Spark Paimon connector configuration | Description                                                                                                                                                                                                         | Since Version     |
-|---------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| `catalog-backend`               | `metastore`                          | Catalog backend type                                                                                                                                                                                                | 0.8.0-incubating  |
-| `uri`                           | `uri`                                | Catalog backend uri                                                                                                                                                                                                 | 0.8.0-incubating  |
-| `warehouse`                     | `warehouse`                          | Catalog backend warehouse                                                                                                                                                                                           | 0.8.0-incubating  |
+| Gravitino catalog property name | Spark Paimon connector configuration | Description               |
+|---------------------------------|--------------------------------------|---------------------------|
+| `catalog-backend`               | `metastore`                          | Catalog backend type      |
+| `uri`                           | `uri`                                | Catalog backend uri       |
+| `warehouse`                     | `warehouse`                          | Catalog backend warehouse |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Paimon connector. For example, using `spark.bypass.client-pool-size` to pass the `client-pool-size` to the Spark Paimon connector.

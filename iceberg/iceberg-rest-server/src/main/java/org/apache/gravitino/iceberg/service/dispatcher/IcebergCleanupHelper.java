@@ -44,10 +44,7 @@ final class IcebergCleanupHelper {
     String metalake = IcebergRESTServerContext.getInstance().metalakeName();
     return GravitinoEnv.getInstance()
         .catalogManager()
-        .loadCatalogAndWrap(NameIdentifier.of(metalake, catalogName))
-        .catalog()
-        .entity()
-        .id();
+        .doWithCatalog(NameIdentifier.of(metalake, catalogName), catalog -> catalog.entity().id());
   }
 
   /**

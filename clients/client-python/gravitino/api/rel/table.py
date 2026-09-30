@@ -19,6 +19,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from gravitino.api.auditable import Auditable
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
@@ -27,6 +28,7 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -117,7 +119,23 @@ class Table(Auditable):
     def supports_tags(self) -> SupportsTags:
         raise UnsupportedOperationException("Table does not support tag operations.")
 
+    def supports_roles(self) -> SupportsRoles:
+        """Return role operations supported by this table.
+
+        Returns:
+            SupportsRoles: The role operations supported by this table.
+
+        Raises:
+            UnsupportedOperationException: If this table does not support role operations.
+        """
+        raise UnsupportedOperationException("Table does not support role operations.")
+
     def supports_statistics(self) -> SupportsStatistics:
         raise UnsupportedOperationException(
             "Table does not support statistics operations."
+        )
+
+    def support_secrets(self) -> SupportsSecrets:
+        raise UnsupportedOperationException(
+            "Table does not support secret property operations."
         )

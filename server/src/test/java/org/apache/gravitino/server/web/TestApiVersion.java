@@ -29,12 +29,19 @@ public class TestApiVersion {
   @Test
   public void testLatestVersion() {
     ApiVersion latest = ApiVersion.latestVersion();
-    assertEquals(ApiVersion.V_1, latest);
+    assertEquals(ApiVersion.V_2, latest);
+  }
+
+  @Test
+  public void testDefaultVersion() {
+    ApiVersion defaultVersion = ApiVersion.defaultVersion();
+    assertEquals(ApiVersion.V_1, defaultVersion);
   }
 
   @Test
   public void testIsSupportedVersion() {
     assertTrue(ApiVersion.isSupportedVersion(1));
-    assertFalse(ApiVersion.isSupportedVersion(2));
+    assertTrue(ApiVersion.isSupportedVersion(2));
+    assertFalse(ApiVersion.isSupportedVersion(3));
   }
 }

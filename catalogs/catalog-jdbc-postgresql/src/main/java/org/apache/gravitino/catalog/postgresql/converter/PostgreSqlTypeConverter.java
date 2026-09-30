@@ -42,8 +42,6 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   static final String UUID = "uuid";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
-  @VisibleForTesting static final int DEFAULT_NUMERIC_PRECISION = 38;
-  @VisibleForTesting static final int DEFAULT_NUMERIC_SCALE = 18;
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -81,11 +79,12 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       case NUMERIC:
         Integer columnSize = typeBean.getColumnSize();
         Integer scale = typeBean.getScale();
+        // An unconstrained NUMERIC accepts values whose precision and scale vary per row, up to
+        // 131072 digits before and 16383 after the decimal point, which no DecimalType can
+        // describe, so it is reported as an external type. The driver reports column size 0 for it,
+        // null is handled defensively.
         if (columnSize == null || columnSize == 0) {
-          // PostgreSQL unconstrained NUMERIC has no fixed precision/scale. Gravitino DecimalType
-          // cannot represent that exactly, so use the maximum supported decimal as a compatibility
-          // tradeoff for engines and clients that cannot consume ExternalType.
-          return Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE);
+          return Types.ExternalType.of(NUMERIC);
         }
         return Types.DecimalType.of(columnSize, scale == null ? 0 : scale);
       case VARCHAR:
@@ -162,10 +161,11 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   // the array size or number of dimensions in CREATE TABLE is simply documentation; it does not
   // affect run-time behavior.
   // https://www.postgresql.org/docs/current/arrays.html#ARRAYS-DECLARATION
+  // PostgreSQL array elements always accept NULL and cannot be declared otherwise, so
+  // elementNullable is ignored: a list declared with non-nullable elements is created as an
+  // ordinary array whose elements accept NULL.
   private String fromGravitinoArrayType(ListType listType) {
     Type elementType = listType.elementType();
-    Preconditions.checkArgument(
-        !listType.elementNullable(), "PostgreSQL doesn't support element to nullable");
     Preconditions.checkArgument(
         !(elementType instanceof ListType),
         "PostgreSQL doesn't support multidimensional list internally, please use one dimensional list");
@@ -176,6 +176,6 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   private ListType toGravitinoArrayType(String typeName) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
-    return ListType.of(toGravitino(bean), false);
+    return ListType.nullable(toGravitino(bean));
   }
 }

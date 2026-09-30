@@ -18,13 +18,15 @@
  */
 package org.apache.gravitino.server.web.filter;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestAccessControlNotAllowedFilter {
   @Test
@@ -32,6 +34,9 @@ public class TestAccessControlNotAllowedFilter {
     AccessControlNotAllowedFilter filter = new AccessControlNotAllowedFilter();
     ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
     filter.filter(requestContext);
-    verify(requestContext).abortWith(any());
+    ArgumentCaptor<Response> responseCaptor = ArgumentCaptor.forClass(Response.class);
+    verify(requestContext).abortWith(responseCaptor.capture());
+    assertEquals(
+        Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), responseCaptor.getValue().getStatus());
   }
 }

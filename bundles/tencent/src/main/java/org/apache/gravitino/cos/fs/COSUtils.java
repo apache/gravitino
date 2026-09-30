@@ -20,19 +20,27 @@
 package org.apache.gravitino.cos.fs;
 
 import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 
 public class COSUtils {
 
   /**
-   * Get the credential from the credential array. PR-A only ships static secret-key support; STS
-   * token credentials will be added by a follow-up PR, at which point this helper should mirror
-   * {@code OSSUtils#getSuitableCredential} and prefer dynamic over static credentials.
+   * Get the credential from the credential array. Using dynamic credential first, if not found,
+   * uses static credential.
    *
    * @param credentials The credential array.
    * @return A credential. Null if not found.
    */
   static Credential getSuitableCredential(Credential[] credentials) {
+    // Use dynamic credential if found.
+    for (Credential credential : credentials) {
+      if (credential instanceof COSTokenCredential) {
+        return credential;
+      }
+    }
+
+    // If dynamic credential not found, use the static one.
     for (Credential credential : credentials) {
       if (credential instanceof COSSecretKeyCredential) {
         return credential;

@@ -6,171 +6,146 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Before the version `0.6.0-incubating`, Apache Gravitino supports KV and Relational backend storage to store metadata.
-Since 0.6.0-incubating, Gravitino only supports using RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
-relational backend storage in Gravitino.
+Apache Gravitino stores its metadata in a relational database through a JDBC backend. H2 is the
+default and needs no configuration, but Gravitino makes no consistency or durability guarantee for
+metadata held in H2. Use it for local development and tests only. A server that holds metadata you
+care about should use MySQL or PostgreSQL.
 
-Relational backend storage mainly aims to the users who are accustomed to using RDBMS to
-store data or lack available a KV storage, and want to use Gravitino.
+This page covers pointing a Gravitino server at MySQL or PostgreSQL. For the connection pool and
+version retention properties that apply whichever database you use, and for the H2 storage path,
+see [Gravitino Server Configuration](gravitino-server-config.md#storage-backend).
 
-With relational backend storage, you can quickly deploy Gravitino in a production environment and
-take advantage of relational storage to manage metadata.
+## Quick Start
 
-### What Kind of Backend Storage Is Supported
-
-Relational backend storage supports the `JDBCBackend`, and `H2`, `MySQL` and `PostgreSQL` are supported for `JDBCBackend`, `H2` is the
-default storage for `JDBCBackend`.
-
-## H2
-
-As mentioned above, `H2` is the default storage for `JDBCBackend`, so you can use `H2` directly without any additional configuration.
-
-## MySQL
-
-### Prerequisites
-
-+ MySQL 5.7 or 8.0.
-+ Gravitino distribution package.
-+ MySQL connector Jar (Should be compatible with the version of MySQL instance).
-
-### Step 1: Get the Initialization Script
-
-You need to `download` and `unzip` the distribution package first; see
-[How to install Gravitino](how-to-install.md).
-
-Then you can get the initialization script in the directory:
+Setting up MySQL or PostgreSQL comes down to four properties in the server configuration file,
+`${GRAVITINO_HOME}/conf/gravitino.conf`:
 
 ```text
-${GRAVITINO_HOME}/scripts/mysql/
+# conf/gravitino.conf
+gravitino.entity.store.relational.jdbcUrl      = {jdbc_url}
+gravitino.entity.store.relational.jdbcDriver   = {driver_class}
+gravitino.entity.store.relational.jdbcUser     = {username}
+gravitino.entity.store.relational.jdbcPassword = {password}
 ```
 
-The script name is like `schema-{version}-mysql.sql`, and the `version` depends on your Gravitino version.
-For example, if your Gravitino version is `0.6.0-incubating`, then you can choose the **latest version** script.
-If you used a legacy script, you can use `upgrade-{old version}-to-{new version}-mysql.sql` to upgrade the schema.
+`gravitino.entity.store` and `gravitino.entity.store.relational` already default to `relational`
+and `JDBCBackend`. Leave them alone.
 
-### Step 2: Initialize the Database
+The values to use, and the driver each one needs:
 
-Please create a database in MySQL in advance, and execute the initialization script obtained above in the database.
+| Database            | JDBC URL                                                          | Driver Class               | Driver Jar                    |
+|---------------------|-------------------------------------------------------------------|----------------------------|-------------------------------|
+| H2 (default)        | `jdbc:h2`                                                         | `org.h2.Driver`            | Bundled with the distribution |
+| MySQL 5.7 or 8.0    | `jdbc:mysql://{host}:3306/{database}`                             | `com.mysql.cj.jdbc.Driver` | `com.mysql:mysql-connector-j` |
+| PostgreSQL 12 to 16 | `jdbc:postgresql://{host}:5432/{database}?currentSchema={schema}` | `org.postgresql.Driver`    | `org.postgresql:postgresql`   |
 
-### Step 3: Place the MySQL Connector Jar
+Other PostgreSQL versions have not been tested by the community and may not work.
 
-You should **download** the MySQL connector Jar for the corresponding version of MySQL you use
-(You can download it from the [maven-central-repo](https://repo1.maven.org/maven2/mysql/mysql-connector-java/)),
-which is name like `mysql-connector-java-{version}.jar`.
+Gravitino initializes its schema automatically on H2 only, by running
+`scripts/h2/schema-{version}-h2.sql` at startup. For MySQL and PostgreSQL you create the database
+and run the script yourself, before starting the server for the first time. Work through the
+steps below.
 
-Then place it in the distribution package directory:
+## Setting Up MySQL
 
-```text
-${GRAVITINO_HOME}/libs/
+**1. Create the database.** Gravitino will not create it for you.
+
+```sql
+CREATE DATABASE {database};
 ```
 
-### Step 4: Set Up the Apache Gravitino Server Configs
-
-Find the server configuration file which name is `gravitino.conf` in the distribution package directory:
-
-```text
-${GRAVITINO_HOME}/conf/
-```
-
-Then set up the following server configs:
-
-```text
-gravitino.entity.store = relational
-gravitino.entity.store.relational = JDBCBackend
-gravitino.entity.store.relational.jdbcUrl = ${your_jdbc_url}
-gravitino.entity.store.relational.jdbcDriver = ${your_driver_name}
-gravitino.entity.store.relational.jdbcUser = ${your_username}
-gravitino.entity.store.relational.jdbcPassword = ${your_password}
-```
-
-### Step 5: Start the Server
-
-Finally, you can run the script in the distribution package directory to start the server:
+**2. Run the schema script.** Download and unpack the Gravitino distribution package if you have
+not already; see [How to Install Gravitino](how-to-install.md). The MySQL scripts are in
+`${GRAVITINO_HOME}/scripts/mysql/`. Run the `schema-*-mysql.sql` file matching your Gravitino
+version against the database you just created:
 
 ```shell
-./${GRAVITINO_HOME}/bin/gravitino.sh start
+mysql -h {host} -u {username} -p {database} < ${GRAVITINO_HOME}/scripts/mysql/schema-{version}-mysql.sql
 ```
 
-## PostgreSQL
+If you are moving an existing deployment forward rather than starting fresh, run the
+`upgrade-{old_version}-to-{new_version}-mysql.sql` scripts in order instead, one per version step.
 
-### Prerequisites
+**3. Install the driver.** Download the MySQL Connector/J jar matching your MySQL version from
+[Maven Central](https://central.sonatype.com/artifact/com.mysql/mysql-connector-j) and place it in
+`${GRAVITINO_HOME}/libs/`. The artifact was renamed from `mysql:mysql-connector-java` to
+`com.mysql:mysql-connector-j`, so the jar is named `mysql-connector-j-{version}.jar`. Older
+`mysql-connector-java-{version}.jar` builds still work but no longer receive fixes.
 
-- PostgreSQL 12 ~ 16. For other versions, the community has not tested fully and may not be compatible.
-- Gravitino distribution package with version `0.7.0` or above.
-- PostgreSQL connector Jar (Should be compatible with the version of PostgreSQL instance).
-
-### Step 1: Get the Initialization Script
-
-You need to `download` and `unzip` the distribution package first; see
-[How to install Gravitino](how-to-install.md).
-
-Then you can get the initialization script in the directory:
+**4. Configure the server.** In `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
 ```text
-${GRAVITINO_HOME}/scripts/postgresql/
+# conf/gravitino.conf
+gravitino.entity.store.relational.jdbcUrl      = jdbc:mysql://{host}:3306/{database}
+gravitino.entity.store.relational.jdbcDriver   = com.mysql.cj.jdbc.Driver
+gravitino.entity.store.relational.jdbcUser     = {username}
+gravitino.entity.store.relational.jdbcPassword = {password}
 ```
 
-The script name is like `schema-{version}-postgresql.sql`, and the `version` depends on your Gravitino version.
-For example, if your Gravitino version is the latest release version, then you can choose the **latest version** script.
-If you used a legacy script, you can use `upgrade-{old version}-to-{new version}-postgresql.sql` to upgrade the schema.
+**5. Start the server.**
 
-### Step 2: Initialize the Database
+```shell
+${GRAVITINO_HOME}/bin/gravitino.sh start
+```
 
-Please create a database and schema in PostgreSQL in advance, and execute the initialization script obtained above in the database.
+## Setting Up PostgreSQL
+
+PostgreSQL follows the same five steps, with one difference: Gravitino addresses a schema inside
+the database, so you create both, and the JDBC URL names both. Neither is optional.
+
+**1. Create the database and schema.**
 
 ```postgresql
-psql --username=postgres --password 
-password:
+psql --username=postgres --password
 
-create database your_database;
-\c your_database
-create schema your_schema;
-set search_path to your_schema;
-\i schema-{version}-postgresql.sql
+CREATE DATABASE {database};
+\c {database}
+CREATE SCHEMA {schema};
 ```
 
-:::note
-Database and schema are required parameters in the Gravitino PostgreSQL JDBC URL, Users should
-create them in advance and set the database and schema in the JDBC URL.
-:::
+**2. Run the schema script.** The PostgreSQL scripts are in `${GRAVITINO_HOME}/scripts/postgresql/`.
+Set the search path first so the tables land in your schema rather than `public`:
 
+```postgresql
+\c {database}
+SET search_path TO {schema};
+\i ${GRAVITINO_HOME}/scripts/postgresql/schema-{version}-postgresql.sql
+```
 
-### Step 3: Place the PostgreSQL Connector Jar
+To move an existing deployment forward, run the
+`upgrade-{old_version}-to-{new_version}-postgresql.sql` scripts in order instead.
 
-You should **download** the PostgreSQL connector Jar for the corresponding version of PostgreSQL you use
-(You can download it from the [PostgreSQL-driver-jar](https://jdbc.postgresql.org/download/postgresql-42.7.11.jar)),
-which is name like `postgresql-{version}.jar`.
+**3. Install the driver.** Download the current pgJDBC driver from
+[jdbc.postgresql.org](https://jdbc.postgresql.org/download/) and place `postgresql-{version}.jar`
+in `${GRAVITINO_HOME}/libs/`. Take the latest release rather than pinning an old one; several
+earlier versions carry published CVEs.
 
-Then place it in the distribution package directory:
+**4. Configure the server.** Note the `currentSchema` parameter:
 
 ```text
-${GRAVITINO_HOME}/libs/
+# conf/gravitino.conf
+gravitino.entity.store.relational.jdbcUrl      = jdbc:postgresql://{host}:5432/{database}?currentSchema={schema}
+gravitino.entity.store.relational.jdbcDriver   = org.postgresql.Driver
+gravitino.entity.store.relational.jdbcUser     = {username}
+gravitino.entity.store.relational.jdbcPassword = {password}
 ```
 
-### Step 4: Set Up the Apache Gravitino Server Configs
+**5. Start the server.**
 
-Find the server configuration file which name is `gravitino.conf` in the distribution package directory:
-
-```text
-${GRAVITINO_HOME}/conf/
+```shell
+${GRAVITINO_HOME}/bin/gravitino.sh start
 ```
 
-Then set up the following server configs:
+## Verifying the Connection
 
-```text
-gravitino.entity.store = relational
-gravitino.entity.store.relational = JDBCBackend
+The readiness endpoint probes the entity store, so it answers the question directly. A server that
+reached its database returns `UP`:
 
-## JDBC URL such as: jdbc:postgresql://localhost:5432/your_database?currentSchema=your_schema
-gravitino.entity.store.relational.jdbcUrl = ${your_jdbc_url}
-
-## JDBC driver name such as: org.postgresql.Driver
-gravitino.entity.store.relational.jdbcDriver = ${your_driver_name}
-
-gravitino.entity.store.relational.jdbcUser = ${your_username}
-gravitino.entity.store.relational.jdbcPassword = ${your_password}
+```shell
+curl http://{host}:8090/health/ready
 ```
 
-### Step 5: Start the Server
-
-Please see the above steps in the MySQL section.
+If the backend is unreachable or slow the endpoint returns 503 with an `entityStore` check in the
+`DOWN` state. See
+[Health Check Endpoints](gravitino-server-config.md#health-check-endpoints) for the response
+format and the probe timeout.

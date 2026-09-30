@@ -39,12 +39,32 @@ fun getUvExecutable(): String {
   }
 }
 
-val venvPython = when {
+// The formatters are invoked through their console scripts rather than `python -m <tool>`:
+// isort 9 no longer ships an `__main__` module, so `python -m isort` cannot be executed.
+fun venvExecutable(name: String): String = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) ->
-    venvDir.resolve("Scripts/python.exe").absolutePath
+    venvDir.resolve("Scripts/$name.exe").absolutePath
   else ->
-    venvDir.resolve("bin/python").absolutePath
+    venvDir.resolve("bin/$name").absolutePath
 }
+
+val venvPython = venvExecutable("python")
+
+// Pinned so that a new formatter release cannot change the outcome of the format check in CI.
+val blackRequirement = "black==26.5.1"
+val isortRequirement = "isort==9.0.0"
+
+// Dev tooling used by the pylint and testPython tasks: pylint (and its transitive
+// astroid) for linting, pytest and parameterized for the unit tests. These live in
+// pyproject's [dependency-groups] dev, not the runtime dependencies, so
+// `uv pip install -e .` (installDependenciesWithUv) does not pull them in and they
+// never reach the shipped image. Pinned so a new release cannot change the lint/test
+// outcome in CI.
+val devToolRequirements = listOf(
+  "pylint==3.3.8",
+  "pytest==8.4.1",
+  "parameterized==0.9.0"
+)
 
 tasks {
   register<Exec>("installUv") {
@@ -160,12 +180,31 @@ tasks {
     workingDir(pythonProjectDir)
 
     doFirst {
-      commandLine(getUvExecutable(), "pip", "install", "--python", venvPython, "black", "isort")
+      commandLine(getUvExecutable(), "pip", "install", "--python", venvPython, blackRequirement, isortRequirement)
     }
 
     doLast {
       if (executionResult.get().exitValue != 0) {
         throw GradleException("Failed to install formatting tools. Exit code: ${executionResult.get().exitValue}")
+      }
+    }
+  }
+
+  register<Exec>("installDevTools") {
+    group = "python"
+    description = "Install dev-group tooling (pylint, pytest, parameterized) into the venv"
+    dependsOn("installDependenciesWithUv")
+    workingDir(pythonProjectDir)
+
+    doFirst {
+      commandLine(
+        listOf(getUvExecutable(), "pip", "install", "--python", venvPython) + devToolRequirements
+      )
+    }
+
+    doLast {
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("Failed to install dev tools. Exit code: ${executionResult.get().exitValue}")
       }
     }
   }
@@ -182,7 +221,10 @@ tasks {
   register<Exec>("testPython") {
     group = "python"
     description = "Run Python unit tests with unittest"
-    dependsOn("buildPython")
+    // The tests import pytest/parameterized, which moved to pyproject's dev group and
+    // are therefore not installed by installDependenciesWithUv; installDevTools adds
+    // them to the venv.
+    dependsOn("buildPython", "installDevTools")
     workingDir(pythonProjectDir)
 
     commandLine(venvPython, "-m", "unittest", "discover", "-s", "tests", "-v")
@@ -213,13 +255,13 @@ tasks {
       // Apply isort
       exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "isort", "mcp_server", "tests")
+        commandLine(venvExecutable("isort"), "mcp_server", "tests")
       }
 
       // Apply Black
       exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "black", "mcp_server", "tests")
+        commandLine(venvExecutable("black"), "mcp_server", "tests")
       }
 
       logger.lifecycle("Python formatting applied (isort + Black)")
@@ -234,8 +276,10 @@ tasks {
     doLast {
       val isortExitCode = exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "isort", "--check", "mcp_server", "tests")
-        isIgnoreExitValue = false
+        commandLine(venvExecutable("isort"), "--check", "mcp_server", "tests")
+        // Let the exit code reach the check below, so the failure is reported with the message
+        // that names the tool instead of a bare Gradle ExecException.
+        isIgnoreExitValue = true
       }.exitValue
 
       if (isortExitCode != 0) {
@@ -244,8 +288,10 @@ tasks {
 
       val blackExitCode = exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "black", "--check", "mcp_server", "tests")
-        isIgnoreExitValue = false
+        commandLine(venvExecutable("black"), "--check", "mcp_server", "tests")
+        // Let the exit code reach the check below, so the failure is reported with the message
+        // that names the tool instead of a bare Gradle ExecException.
+        isIgnoreExitValue = true
       }.exitValue
 
       if (blackExitCode != 0) {
@@ -256,6 +302,9 @@ tasks {
 }
 
 tasks.register<Exec>("pylint") {
+  // pylint moved to pyproject's dev group, so it is no longer installed by
+  // installDependenciesWithUv; installDevTools puts it into the venv for this task.
+  dependsOn("installDevTools")
   mustRunAfter("buildPython")
   commandLine(venvPython, "-m", "pylint", "./tests", "./mcp_server")
 }

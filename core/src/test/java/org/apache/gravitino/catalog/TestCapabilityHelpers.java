@@ -19,8 +19,12 @@
 package org.apache.gravitino.catalog;
 
 import java.util.Locale;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
@@ -28,6 +32,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestCapabilityHelpers {
 
@@ -49,6 +54,39 @@ public class TestCapabilityHelpers {
         @Override
         public String normalizeName(Scope scope, String name) {
           return null;
+        }
+      };
+
+  /**
+   * Mimics Oracle's quoting convention: a quoted name (e.g. {@code "My Table"}) is unquoted with
+   * its case and embedded spaces preserved, while an unquoted name must match a simple word
+   * pattern. {@code specificationOnName} must see the name as it was originally supplied (still
+   * quoted) rather than the already-unquoted result of {@code normalizeName}, or a quoted name with
+   * a space would be wrongly rejected after normalization even though it was valid as supplied.
+   */
+  static final Capability QUOTE_AWARE_CAPABILITY =
+      new Capability() {
+        @Override
+        public CapabilityResult specificationOnName(Scope scope, String name) {
+          if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+            return CapabilityResult.SUPPORTED;
+          }
+          return name.matches("^\\w+$")
+              ? CapabilityResult.SUPPORTED
+              : CapabilityResult.unsupported("Illegal name: " + name);
+        }
+
+        @Override
+        public CapabilityResult caseSensitiveOnName(Scope scope) {
+          return CapabilityResult.unsupported("folding depends on quoting");
+        }
+
+        @Override
+        public String normalizeName(Scope scope, String name) {
+          if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+            return name.substring(1, name.length() - 1);
+          }
+          return name.toUpperCase(Locale.ROOT);
         }
       };
 
@@ -91,5 +129,86 @@ public class TestCapabilityHelpers {
         CapabilityHelpers.applyCaseSensitiveOnName(
             Capability.Scope.PARTITION, null, Capability.DEFAULT);
     Assertions.assertNull(normalized);
+  }
+
+  @Test
+  void testApplyCapabilitiesValidatesNameBeforeNormalizing() {
+    // A quoted name with an embedded space is valid as supplied, but its normalized (unquoted)
+    // form no longer matches the plain-word pattern. specificationOnName must be checked against
+    // the original name, not the already-normalized one, or this would be wrongly rejected.
+    NameIdentifier quotedIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "\"My Table\"");
+
+    NameIdentifier result =
+        CapabilityHelpers.applyCapabilities(
+            quotedIdent, Capability.Scope.TABLE, QUOTE_AWARE_CAPABILITY);
+
+    Assertions.assertEquals("My Table", result.name());
+  }
+
+  @Test
+  void testGetCapabilityPropagatesNoSuchCatalogException() {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Mockito.when(catalogManager.doWithCatalog(Mockito.any(), Mockito.any()))
+        .thenThrow(new NoSuchCatalogException("Catalog %s does not exist", tableIdent));
+
+    // A missing catalog must stay a NoSuchCatalogException (mapped to 404 by the REST layer)
+    // instead of being wrapped into a plain RuntimeException (a 500).
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
+  }
+
+  @Test
+  void testGetCapabilityWrapsCapabilityFailure() throws Exception {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    Mockito.when(catalog.capability()).thenThrow(new IllegalStateException("boom"));
+
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
+
+    Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
+  }
+
+  @Test
+  void testSemanticModelUsesSchemaNamespaceCapabilities() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
+
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCapabilities(
+            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCaseSensitive(
+            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
+  }
+
+  @Test
+  void testModelUsesSchemaNamespaceCapabilities() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
+
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCapabilities(
+            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCaseSensitive(
+            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
+  }
+
+  @Test
+  void testSemanticModelUsesManagedStorageByDefault() {
+    Assertions.assertTrue(
+        Capability.DEFAULT.managedStorage(Capability.Scope.SEMANTIC_MODEL).supported());
   }
 }

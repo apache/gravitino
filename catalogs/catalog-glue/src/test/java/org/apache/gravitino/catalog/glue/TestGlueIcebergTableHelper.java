@@ -22,12 +22,16 @@ import static org.apache.gravitino.catalog.glue.GlueIcebergTableHelper.fromIcebe
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
@@ -35,6 +39,8 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.aws.AwsClientProperties;
+import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Types.BooleanType;
@@ -234,5 +240,100 @@ class TestGlueIcebergTableHelper {
     assertEquals(Types.TimestampType.withTimeZone(6), cols[0].dataType());
     assertEquals(Types.TimeType.of(6), cols[1].dataType());
     assertEquals(Types.DecimalType.of(10, 2), cols[2].dataType());
+  }
+
+  @Test
+  void testCreateGlueCatalog() throws IOException {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+
+    Catalog catalog = GlueIcebergTableHelper.createGlueCatalog(config);
+    GlueCatalog glueCatalog = assertInstanceOf(GlueCatalog.class, catalog);
+    glueCatalog.close();
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithoutStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+    assertFalse(icebergProps.containsKey(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".access-key-id"));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".secret-access-key"));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, " ");
+    icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+    assertFalse(icebergProps.containsKey(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".access-key-id"));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".secret-access-key"));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "test-access-key");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+    assertEquals(
+        GravitinoGlueCredentialsProvider.class.getName(),
+        icebergProps.get(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER));
+    assertEquals(
+        "test-access-key",
+        icebergProps.get(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".access-key-id"));
+    assertEquals(
+        "test-secret-key",
+        icebergProps.get(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".secret-access-key"));
+    assertEquals("test-access-key", icebergProps.get(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    assertEquals(
+        "test-secret-key", icebergProps.get(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithOnlyAccessKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "test-access-key");
+
+    assertEquals(
+        "Both 'aws-access-key-id' and 'aws-secret-access-key' must be set together. Either provide both keys for static authentication, or omit both to use the default credential chain.",
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> GlueIcebergTableHelper.buildIcebergCatalogProperties(config))
+            .getMessage());
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithOnlySecretKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    assertEquals(
+        "Both 'aws-access-key-id' and 'aws-secret-access-key' must be set together. Either provide both keys for static authentication, or omit both to use the default credential chain.",
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> GlueIcebergTableHelper.buildIcebergCatalogProperties(config))
+            .getMessage());
   }
 }

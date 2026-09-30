@@ -21,8 +21,8 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.META_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
 public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
@@ -30,7 +30,8 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -38,7 +39,8 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasByCatalogId(Long catalogId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -47,7 +49,8 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -57,11 +60,13 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteFilesetMetasByFilesetId(Long filesetId) {
+  public String softDeleteFilesetMetasByFilesetId(Long filesetId, Long occVersion) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE fileset_id = #{filesetId}"
+        + " AND occ_version = #{occVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -72,36 +77,5 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " WHERE fileset_id IN (SELECT fileset_id FROM "
         + META_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
-  }
-
-  @Override
-  public String insertFilesetMetaOnDuplicateKeyUpdate(FilesetPO filesetPO) {
-    return "INSERT INTO "
-        + META_TABLE_NAME
-        + " (fileset_id, fileset_name, metalake_id,"
-        + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ("
-        + " #{filesetMeta.filesetId},"
-        + " #{filesetMeta.filesetName},"
-        + " #{filesetMeta.metalakeId},"
-        + " #{filesetMeta.catalogId},"
-        + " #{filesetMeta.schemaId},"
-        + " #{filesetMeta.type},"
-        + " #{filesetMeta.auditInfo},"
-        + " #{filesetMeta.currentVersion},"
-        + " #{filesetMeta.lastVersion},"
-        + " #{filesetMeta.deletedAt}"
-        + " )"
-        + " ON CONFLICT(fileset_id) DO UPDATE SET"
-        + " fileset_name = #{filesetMeta.filesetName},"
-        + " metalake_id = #{filesetMeta.metalakeId},"
-        + " catalog_id = #{filesetMeta.catalogId},"
-        + " schema_id = #{filesetMeta.schemaId},"
-        + " type = #{filesetMeta.type},"
-        + " audit_info = #{filesetMeta.auditInfo},"
-        + " current_version = #{filesetMeta.currentVersion},"
-        + " last_version = #{filesetMeta.lastVersion},"
-        + " deleted_at = #{filesetMeta.deletedAt}";
   }
 }

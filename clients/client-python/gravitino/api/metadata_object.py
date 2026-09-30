@@ -75,6 +75,9 @@ class MetadataObject(ABC):
         MODEL = "model"
         """A model is mapped to the model artifact in ML."""
 
+        MODEL_VERSION = "model_version"
+        """A model version is a checkpoint / snapshot linked to a registered model."""
+
         TAG = "tag"
         """A tag is used to help manage other metadata object."""
 

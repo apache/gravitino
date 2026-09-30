@@ -36,14 +36,17 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
@@ -131,9 +134,18 @@ public class UserMetaService {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
-      Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
-      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
+      String metalakeName = userEntity.namespace().level(0);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
+
+      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
@@ -141,6 +153,10 @@ public class UserMetaService {
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
+          () ->
+              MetalakeMetaService.getInstance()
+                  .lockMetalakeForChildWrite(
+                      metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   UserMetaMapper.class,
@@ -151,6 +167,9 @@ public class UserMetaService {
                       mapper.insertUserMeta(userPO);
                     }
                   }),
+          () ->
+              RoleMetaService.getInstance()
+                  .lockRolesForMembership(metalakePO.getMetalakeId(), roleIds),
           () -> {
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class,
@@ -174,12 +193,34 @@ public class UserMetaService {
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long userId = EntityIdService.getEntityId(identifier, Entity.EntityType.USER);
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
 
+    deleteUserWithVersion(identifier, userPO);
+    return true;
+  }
+
+  /**
+   * Deletes the user whose version matches {@code observedUserPO}, together with its role and owner
+   * relations. Package-private so tests can hand in a deliberately stale PO; callers outside this
+   * class go through {@link #deleteUser(NameIdentifier)}, which reads the row first.
+   *
+   * @param identifier the user being deleted, used only to build the error
+   * @param observedUserPO the user row the caller observed, carrying the version to match
+   */
+  void deleteUserWithVersion(NameIdentifier identifier, UserPO observedUserPO) {
+    Long userId = observedUserPO.getUserId();
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                UserMetaMapper.class, mapper -> mapper.softDeleteUserMetaByUserId(userId)),
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        UserMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteUserMetaByUserId(
+                                userId, observedUserPO.getCurrentVersion())),
+                () -> userWriteFailure(identifier, observedUserPO, UserLookup.NAME)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
@@ -189,7 +230,6 @@ public class UserMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
                         userId, Entity.EntityType.USER.name())));
-    return true;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateUser")
@@ -220,18 +260,37 @@ public class UserMetaService {
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
-      return newEntity;
-    }
-
+    // Every update runs the compare-and-set, including one that leaves the roles untouched. The
+    // short-circuit that used to return early here would skip the version check, so a caller whose
+    // snapshot was already stale would be told the update succeeded. It also has to run because a
+    // metadata-only change, such as the audit info, still has to be written.
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> {
+            if (!insertRoleIds.isEmpty() || !deleteRoleIds.isEmpty()) {
+              // The cascade writes memberships before principals; this update does the reverse.
+              // Fence grants and revokes before the principal CAS to avoid both orphan grants and
+              // a revoke/cascade deadlock. Metadata-only updates write no membership rows, so they
+              // need no parent lock (which would serialize unrelated updates on H2).
+              MetalakeMetaService.getInstance()
+                  .lockMetalakeForChildWrite(
+                      identifier.namespace().level(0), oldUserPO.getMetalakeId());
+            }
+          },
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper ->
+                        mapper.updateUserMeta(
+                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO));
+            if (updated == 0) {
+              throw userWriteFailure(identifier, oldUserPO, UserLookup.NAME);
+            }
+          },
           () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper ->
-                      mapper.updateUserMeta(
-                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+              RoleMetaService.getInstance()
+                  .lockRolesForMembership(oldUserPO.getMetalakeId(), insertRoleIds),
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -321,70 +380,77 @@ public class UserMetaService {
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 
-  private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
-    UserPO userPO =
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countUsersByMetalake")
+  public long countUsersByMetalake(String metalakeName) {
+    Long count =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeName(metalakeName));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByMetalakePaginated")
+  public PagedResult<UserEntity> listUsersByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    long totalCount = countUsersByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedUserPO> userPOs =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId));
-
-    if (userPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          externalId);
-    }
-    return userPO;
+            mapper ->
+                mapper.listExtendedUserPOsByMetalakeNamePaginated(metalakeName, offset, limit));
+    List<UserEntity> users =
+        userPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedUserPO(
+                        po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, users);
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getUserByExternalId")
-  public UserEntity getUserByExternalId(NameIdentifier ident) {
-    AuthorizationUtils.checkUserExternalId(ident);
-    String metalake = ident.namespace().level(0);
-    String externalId = ident.name();
-    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
-    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
+  private RuntimeException userWriteFailure(
+      NameIdentifier identifier, UserPO observedUserPO, UserLookup lookup) {
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a rename or
+    // delete that has not committed yet is classified as not-found instead of as a stale-version
+    // conflict. The lock is taken on the error path of a transaction that is about to roll back.
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.USER,
+        () -> getUserPOByIdForUpdate(observedUserPO.getUserId()),
+        null,
+        current ->
+            Objects.equals(current.getMetalakeId(), observedUserPO.getMetalakeId())
+                && (lookup != UserLookup.NAME
+                    || Objects.equals(current.getUserName(), observedUserPO.getUserName()))
+                && (lookup != UserLookup.EXTERNAL_ID));
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateUserByExternalId")
-  public <E extends Entity & HasIdentifier> UserEntity updateUserByExternalId(
-      NameIdentifier ident, Function<E, E> updater) throws IOException {
-    AuthorizationUtils.checkUserExternalId(ident);
-    String metalake = ident.namespace().level(0);
-    String externalId = ident.name();
-    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
-    UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
-    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
-    Preconditions.checkArgument(
-        Objects.equals(oldEntity.id(), newEntity.id()),
-        "The updated user entity id: %s should be same with the user entity id before: %s",
-        newEntity.id(),
-        oldEntity.id());
+  private UserPO getUserPOByIdForUpdate(long userId) {
+    return SessionUtils.getWithoutCommit(
+        UserMetaMapper.class, mapper -> mapper.selectUserMetaByIdForUpdate(userId));
+  }
 
-    try {
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper ->
-                      mapper.updateUserMetaByExternalId(
-                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
-      throw re;
-    }
-    return newEntity;
+  /**
+   * How the caller addressed the user, which decides what counts as "the same user" when a failed
+   * compare-and-set is classified. A caller that used the name is looking for that name, so a
+   * rename means the user it asked for is gone; the same holds for the external ID. A caller that
+   * used the ID addressed the row itself, so a rename leaves it addressing the same user and only
+   * the metalake has to still match.
+   */
+  private enum UserLookup {
+    NAME,
+    EXTERNAL_ID,
+    ID
   }
 }

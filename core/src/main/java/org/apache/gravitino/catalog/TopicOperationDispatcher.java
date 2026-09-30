@@ -44,6 +44,7 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -58,10 +59,14 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public TopicOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   /**
@@ -138,10 +143,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the topic node, not the schema, so topics in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> internalCreateTopic(ident, comment, dataLayout, properties));
+        ident, LockType.WRITE, () -> internalCreateTopic(ident, comment, dataLayout, properties));
   }
 
   /**
@@ -207,7 +212,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
           return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::topicPropertiesMetadata,
                       alteredTopic.properties()));
@@ -325,14 +330,14 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       if (topicEntity == null) {
         return EntityCombinedTopic.of(topic)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
             .withImported(false);
       }
 
       return EntityCombinedTopic.of(topic, topicEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
           .withImported(true);
     }
@@ -346,7 +351,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
         .withImported(topicEntity != null);
   }
@@ -397,13 +402,13 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
     }
 
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
   }
 }

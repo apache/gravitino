@@ -57,7 +57,6 @@ class TestGroupMetaH2Provider {
             + "group_id BIGINT, "
             + "group_name VARCHAR(255), "
             + "metalake_id BIGINT, "
-            + "external_id VARCHAR(256), "
             + "audit_info VARCHAR(255), "
             + "current_version BIGINT, "
             + "last_version BIGINT, "
@@ -76,7 +75,7 @@ class TestGroupMetaH2Provider {
 
   @Test
   void testListExtendedGroupPOsByMetalakeIdWithoutRoles() throws SQLException {
-    statement.execute("INSERT INTO group_meta VALUES (1, 'g1', 1, null, 'audit', 0, 0, 0)");
+    statement.execute("INSERT INTO group_meta VALUES (1, 'g1', 1, 'audit', 0, 0, 0)");
     String sql =
         groupMetaH2Provider
             .listExtendedGroupPOsByMetalakeId(1L)
@@ -90,7 +89,7 @@ class TestGroupMetaH2Provider {
 
   @Test
   void testListExtendedGroupPOsByMetalakeIdWithRoles() throws SQLException {
-    statement.execute("INSERT INTO group_meta VALUES (2, 'g2', 2, null, 'audit2', 0, 0, 0)");
+    statement.execute("INSERT INTO group_meta VALUES (2, 'g2', 2, 'audit2', 0, 0, 0)");
     statement.execute("INSERT INTO role_meta VALUES (1, 'role1', 0)");
     statement.execute("INSERT INTO role_meta VALUES (2, 'role2', 0)");
     statement.execute("INSERT INTO group_role_rel VALUES (2, 1, 0)");
@@ -103,13 +102,13 @@ class TestGroupMetaH2Provider {
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
       assertEquals("[\"role1\",\"role2\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
-      assertEquals("[\"1\",\"2\"]", rs.getString(COLUMN_LABEL_ROLE_IDS));
+      assertEquals("[1,2]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 
   @Test
   void testListExtendedGroupPOsByMetalakeIdWithInvalidRoles() throws SQLException {
-    statement.execute("INSERT INTO group_meta VALUES (3, 'g3', 3, null, 'audit3', 0, 0, 0)");
+    statement.execute("INSERT INTO group_meta VALUES (3, 'g3', 3, 'audit3', 0, 0, 0)");
     statement.execute("INSERT INTO role_meta VALUES (3, 'role3', 0)");
     statement.execute("INSERT INTO role_meta VALUES (4, '', 0)");
     statement.execute("INSERT INTO role_meta VALUES (5, null, 0)");
@@ -125,8 +124,9 @@ class TestGroupMetaH2Provider {
             .replace(QUERY_PARAM_METALAKE_ID, "3");
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
-      assertEquals("[\"role3\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
-      assertEquals("[\"3\",\"4\",\"5\"]", rs.getString(COLUMN_LABEL_ROLE_IDS));
+      // JSON_ARRAYAGG keeps empty role names and omits SQL NULLs; numeric role ids are unquoted.
+      assertEquals("[\"role3\",\"\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
+      assertEquals("[3,4,5]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 

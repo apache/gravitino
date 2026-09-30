@@ -16,6 +16,7 @@
  */
 package org.apache.gravitino.server.web.rest.authorization;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,6 +27,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.junit.jupiter.api.Test;
@@ -106,6 +108,50 @@ public class TestCatalogAuthorizationExpression {
     String expression = authorizationExpressionAnnotation.expression();
     MockAuthorizationExpressionEvaluator mockEvaluator =
         new MockAuthorizationExpressionEvaluator(expression);
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_SCHEMA")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::CREATE_CATALOG")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG")));
+  }
+
+  @Test
+  public void testTestExistingConnection() throws NoSuchMethodException, OgnlException {
+    Method method =
+        CatalogOperations.class.getMethod(
+            "testExistingConnection", String.class, String.class, CatalogUpdatesRequest.class);
+    AuthorizationExpression authorizationExpressionAnnotation =
+        method.getAnnotation(AuthorizationExpression.class);
+    String expression = authorizationExpressionAnnotation.expression();
+    MockAuthorizationExpressionEvaluator mockEvaluator =
+        new MockAuthorizationExpressionEvaluator(expression);
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_SCHEMA")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::CREATE_CATALOG")));
+    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::USE_CATALOG", "CATALOG::DENY_USE_CATALOG")));
+  }
+
+  @Test
+  public void testTestExistingConnectionWithChanges() throws NoSuchMethodException, OgnlException {
+    Method method =
+        CatalogOperations.class.getMethod(
+            "testExistingConnection", String.class, String.class, CatalogUpdatesRequest.class);
+    AuthorizationExpression authorizationExpressionAnnotation =
+        method.getAnnotation(AuthorizationExpression.class);
+    assertEquals(
+        ExpressionCondition.HAS_PROPOSED_CHANGES,
+        authorizationExpressionAnnotation.secondaryExpressionCondition());
+    MockAuthorizationExpressionEvaluator mockEvaluator =
+        new MockAuthorizationExpressionEvaluator(
+            authorizationExpressionAnnotation.secondaryExpression());
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_SCHEMA")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));

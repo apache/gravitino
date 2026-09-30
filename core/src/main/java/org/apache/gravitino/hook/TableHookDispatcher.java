@@ -20,16 +20,14 @@ package org.apache.gravitino.hook;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.TableDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -50,9 +48,19 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public class TableHookDispatcher implements TableDispatcher {
   private final TableDispatcher dispatcher;
+  private final Supplier<OwnerDispatcher> ownerDispatcher;
 
-  public TableHookDispatcher(TableDispatcher dispatcher) {
+  /**
+   * Creates a table hook dispatcher.
+   *
+   * @param dispatcher the underlying table dispatcher
+   * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
+   *     disabled
+   */
+  public TableHookDispatcher(
+      TableDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   @Override
@@ -81,18 +89,11 @@ public class TableHookDispatcher implements TableDispatcher {
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
     // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the table name (and its schema namespace)
-      // based on catalog capabilities, so the entity is stored under the normalized identifier.
-      // Apply the same normalization here so the owner is attached to the same identifier the
-      // manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.TABLE, GravitinoEnv.getInstance().catalogManager());
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TABLE),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
@@ -103,10 +104,15 @@ public class TableHookDispatcher implements TableDispatcher {
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     TableChange.RenameTable lastRenameChange = null;
+    // Renames apply in order, so the last one that sets a schema decides the table's schema.
+    String newSchemaName = ident.namespace().level(2);
     List<String> locations = null;
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         lastRenameChange = (TableChange.RenameTable) change;
+        if (lastRenameChange.getNewSchemaName().isPresent()) {
+          newSchemaName = lastRenameChange.getNewSchemaName().get();
+        }
       }
     }
     if (lastRenameChange != null) {
@@ -115,9 +121,15 @@ public class TableHookDispatcher implements TableDispatcher {
     Table alteredTable = dispatcher.alterTable(ident, changes);
 
     if (lastRenameChange != null) {
-      // todo: support rename across different schemas
+      // The rename may also move the table to another schema.
+      NameIdentifier newIdent =
+          NameIdentifierUtil.ofTable(
+              ident.namespace().level(0),
+              ident.namespace().level(1),
+              newSchemaName,
+              lastRenameChange.getNewName());
       AuthorizationUtils.authorizationPluginRenamePrivileges(
-          ident, Entity.EntityType.TABLE, lastRenameChange.getNewName(), locations);
+          ident, Entity.EntityType.TABLE, newIdent, locations);
     }
 
     return alteredTable;
@@ -128,8 +140,12 @@ public class TableHookDispatcher implements TableDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
     boolean dropped = dispatcher.dropTable(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TABLE, locations);
+    // A false result means the external table was renamed or dropped out of band and the
+    // registration was kept; the entity alive under another name must keep its privileges too.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
     return dropped;
   }
 
@@ -138,8 +154,10 @@ public class TableHookDispatcher implements TableDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
     boolean purged = dispatcher.purgeTable(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TABLE, locations);
+    if (purged) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
     return purged;
   }
 

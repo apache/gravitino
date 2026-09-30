@@ -39,6 +39,9 @@ catalog_kwargs = {
 
 ### Credential Vending with Basic Authentication
 
+If Gravitino uses [local users and groups](../security/local-users-and-groups.md) for Basic
+authentication, pass the credentials in the catalog arguments:
+
 ```python
 catalog_kwargs = {
     "name": "default",

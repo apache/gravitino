@@ -129,4 +129,41 @@ public class TestAuthorizationExpressionConverter {
             + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))",
         replaced);
   }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyUseSecretss() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_SECRETS");
+    Assertions.assertEquals(
+        "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+            + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE,"
+            + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
+        replaced);
+  }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyIncludeCredentialSecretss() {
+    String replaced =
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_INCLUDE_CREDENTIAL_SECRETS");
+    Assertions.assertEquals(
+        "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+            + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS,"
+            + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+            + " MODEL_VERSION)))",
+        replaced);
+  }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyViewTag() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_TAG");
+    Assertions.assertEquals(
+        "((ANY(VIEW_TAG, METALAKE, TAG)) && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))", replaced);
+  }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyViewPolicy() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_POLICY");
+    Assertions.assertEquals(
+        "((ANY(VIEW_POLICY, METALAKE, POLICY)) && !(ANY(DENY_VIEW_POLICY, METALAKE, POLICY)))",
+        replaced);
+  }
 }

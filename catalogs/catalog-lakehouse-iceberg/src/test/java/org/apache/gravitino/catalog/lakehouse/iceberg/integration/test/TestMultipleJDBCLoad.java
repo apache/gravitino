@@ -76,7 +76,14 @@ public class TestMultipleJDBCLoad extends BaseIT {
             + "?user="
             + mySQLContainer.getUsername()
             + "&password="
-            + mySQLContainer.getPassword();
+            + mySQLContainer.getPassword()
+            // Scope Iceberg's iceberg_tables existence check to the current database. Other tests
+            // in this module (e.g. IcebergClassLoaderPoolIT) create Iceberg JDBC catalogs in other
+            // databases of the SAME shared MySQL container. Under Connector/J's default
+            // (nullCatalogMeansCurrent=false), Iceberg's getTables(null, null, "iceberg_tables",
+            // null) check would see those other databases' control tables and skip creating this
+            // catalog's own, breaking later queries. See IcebergClassLoaderPoolIT for details.
+            + "&nullCatalogMeansCurrent=true";
 
     icebergMysqlConf.put(IcebergConfig.CATALOG_URI.getKey(), jdbcUrl);
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
@@ -121,7 +128,8 @@ public class TestMultipleJDBCLoad extends BaseIT {
     Map<String, String> icebergMysqlConf = Maps.newHashMap();
 
     icebergMysqlConf.put(
-        IcebergConfig.CATALOG_URI.getKey(), mySQLContainer.getJdbcUrl(TEST_DB_NAME));
+        IcebergConfig.CATALOG_URI.getKey(),
+        mySQLContainer.getJdbcUrl(TEST_DB_NAME) + "?nullCatalogMeansCurrent=true");
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergMysqlConf.put(

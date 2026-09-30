@@ -41,6 +41,7 @@ import org.apache.commons.lang3.SystemUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
@@ -367,7 +368,10 @@ public class HadoopUserImpersonationIT extends BaseIT {
     Assertions.assertEquals("comment", fileset.comment());
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
-    Assertions.assertEquals(2, fileset.properties().size());
+    // k1 + default-location-name; gravitino.identifier is reserved+hidden and omitted
+    Assertions.assertEquals(
+        2, fileset.properties().size(), () -> "properties=" + fileset.properties());
+    Assertions.assertFalse(fileset.properties().containsKey(StringIdentifier.ID_KEY));
     Assertions.assertTrue(
         fileset.properties().containsKey(Fileset.PROPERTY_DEFAULT_LOCATION_NAME),
         "properties should contain default location name");

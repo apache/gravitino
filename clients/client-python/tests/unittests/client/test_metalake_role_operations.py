@@ -21,13 +21,8 @@ from unittest.mock import patch
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.authorization.securable_objects import SecurableObjects
 from gravitino.api.metadata_object import MetadataObject
-from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.dto.audit_dto import AuditDTO
-from gravitino.dto.authorization.group_dto import GroupDTO
 from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
-from gravitino.dto.authorization.role_dto import RoleDTO
 from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
-from gravitino.dto.authorization.user_dto import UserDTO
 from gravitino.dto.requests.role_create_request import RoleCreateRequest
 from gravitino.dto.requests.role_grant_request import RoleGrantRequest
 from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
@@ -49,45 +44,13 @@ from gravitino.exceptions.handlers.permission_error_handler import (
 )
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from tests.unittests import mock_base
-
-
-def _audit() -> AuditDTO:
-    return AuditDTO(_creator="admin", _create_time="2024-01-01T00:00:00Z")
-
-
-def _build_role_dto(
-    name: str = "admin_role",
-    props: dict | None = None,
-    sec_objs: list | None = None,
-) -> RoleDTO:
-    return (
-        RoleDTO.builder()
-        .with_name(name)
-        .with_properties(props)
-        .with_securable_objects(sec_objs or [])
-        .with_audit(_audit())
-        .build()
-    )
-
-
-def _build_user_dto(name: str = "alice", roles: list | None = None) -> UserDTO:
-    return (
-        UserDTO.builder()
-        .with_name(name)
-        .with_roles(roles or [])
-        .with_audit(_audit())
-        .build()
-    )
-
-
-def _build_group_dto(name: str = "engineers", roles: list | None = None) -> GroupDTO:
-    return (
-        GroupDTO.builder()
-        .with_name(name)
-        .with_roles(roles if roles is not None else [])
-        .with_audit(_audit())
-        .build()
-    )
+from tests.unittests.client.operation_test_fixtures import (
+    build_group_dto,
+    build_role_dto,
+    build_user_dto,
+    make_gravitino_client,
+    mock_get_metalake,
+)
 
 
 class TestMetalakeRoleOperations(unittest.TestCase):
@@ -117,7 +80,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
                 [PrivilegeDTO(Privilege.Name.USE_CATALOG, Privilege.Condition.ALLOW)],
             )
         ]
-        role = _build_role_dto(sec_objs=sec_objs)
+        role = build_role_dto(sec_objs=sec_objs)
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
 
         with patch(
@@ -164,7 +127,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 
     def test_get_role(self):
         metalake = mock_base.mock_load_metalake()
-        role = _build_role_dto(props={"k": "v"})
+        role = build_role_dto(props={"k": "v"})
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
 
         with patch(
@@ -237,7 +200,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 
     def test_grant_roles_to_user(self):
         metalake = mock_base.mock_load_metalake()
-        user = _build_user_dto(roles=["admin_role"])
+        user = build_user_dto(roles=["admin_role"])
         mock_resp = mock_base.mock_http_response(UserResponse(0, user).to_json())
 
         with patch(
@@ -260,7 +223,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 
     def test_revoke_roles_from_user(self):
         metalake = mock_base.mock_load_metalake()
-        user = _build_user_dto(roles=[])
+        user = build_user_dto(roles=[])
         mock_resp = mock_base.mock_http_response(UserResponse(0, user).to_json())
 
         with patch(
@@ -282,7 +245,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 
     def test_grant_roles_to_group(self):
         metalake = mock_base.mock_load_metalake()
-        group = _build_group_dto(roles=["admin_role"])
+        group = build_group_dto(roles=["admin_role"])
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
 
         with patch(
@@ -304,7 +267,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 
     def test_revoke_roles_from_group(self):
         metalake = mock_base.mock_load_metalake()
-        group = _build_group_dto(roles=[])
+        group = build_group_dto(roles=[])
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
 
         with patch(
@@ -333,7 +296,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
                 PrivilegeDTO(Privilege.Name.CREATE_SCHEMA, Privilege.Condition.ALLOW),
             ],
         )
-        role = _build_role_dto(sec_objs=[sec_obj])
+        role = build_role_dto(sec_objs=[sec_obj])
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
 
         with patch(
@@ -365,7 +328,7 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 
     def test_revoke_privileges_from_role(self):
         metalake = mock_base.mock_load_metalake()
-        role = _build_role_dto(sec_objs=[])
+        role = build_role_dto(sec_objs=[])
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
 
         with patch(
@@ -396,20 +359,12 @@ class TestMetalakeRoleOperations(unittest.TestCase):
 class TestGravitinoClientRoleDelegates(unittest.TestCase):
     """Verify that GravitinoClient correctly delegates Role operations."""
 
-    def _make_client(self):
-        client = GravitinoClient.__new__(GravitinoClient)
-        return client
-
     def test_client_create_role(self):
-        client = self._make_client()
-        role = _build_role_dto()
+        client = make_gravitino_client()
+        role = build_role_dto()
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.post",
                 return_value=mock_resp,
@@ -419,15 +374,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual("admin_role", result.name())
 
     def test_client_get_role(self):
-        client = self._make_client()
-        role = _build_role_dto(props={"k": "v"})
+        client = make_gravitino_client()
+        role = build_role_dto(props={"k": "v"})
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.get",
                 return_value=mock_resp,
@@ -437,14 +388,10 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual({"k": "v"}, result.properties())
 
     def test_client_delete_role(self):
-        client = self._make_client()
+        client = make_gravitino_client()
         mock_resp = mock_base.mock_http_response(DropResponse(0, True).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.delete",
                 return_value=mock_resp,
@@ -453,16 +400,12 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertTrue(client.delete_role("admin_role"))
 
     def test_client_list_role_names(self):
-        client = self._make_client()
+        client = make_gravitino_client()
         mock_resp = mock_base.mock_http_response(
             RoleNamesListResponse(0, ["role1", "role2"]).to_json()
         )
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.get",
                 return_value=mock_resp,
@@ -472,15 +415,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual(["role1", "role2"], result)
 
     def test_client_grant_roles_to_user(self):
-        client = self._make_client()
-        user = _build_user_dto(roles=["admin_role"])
+        client = make_gravitino_client()
+        user = build_user_dto(roles=["admin_role"])
         mock_resp = mock_base.mock_http_response(UserResponse(0, user).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.put",
                 return_value=mock_resp,
@@ -490,15 +429,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual(["admin_role"], result.roles())
 
     def test_client_revoke_roles_from_user(self):
-        client = self._make_client()
-        user = _build_user_dto(roles=[])
+        client = make_gravitino_client()
+        user = build_user_dto(roles=[])
         mock_resp = mock_base.mock_http_response(UserResponse(0, user).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.put",
                 return_value=mock_resp,
@@ -508,15 +443,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual([], result.roles())
 
     def test_client_grant_roles_to_group(self):
-        client = self._make_client()
-        group = _build_group_dto(roles=["admin_role"])
+        client = make_gravitino_client()
+        group = build_group_dto(roles=["admin_role"])
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.put",
                 return_value=mock_resp,
@@ -526,15 +457,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual(["admin_role"], result.roles())
 
     def test_client_revoke_roles_from_group(self):
-        client = self._make_client()
-        group = _build_group_dto(roles=[])
+        client = make_gravitino_client()
+        group = build_group_dto(roles=[])
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.put",
                 return_value=mock_resp,
@@ -544,15 +471,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual([], result.roles())
 
     def test_client_grant_privileges_to_role(self):
-        client = self._make_client()
-        role = _build_role_dto()
+        client = make_gravitino_client()
+        role = build_role_dto()
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.put",
                 return_value=mock_resp,
@@ -570,15 +493,11 @@ class TestGravitinoClientRoleDelegates(unittest.TestCase):
             self.assertEqual("admin_role", result.name())
 
     def test_client_revoke_privileges_from_role(self):
-        client = self._make_client()
-        role = _build_role_dto()
+        client = make_gravitino_client()
+        role = build_role_dto()
         mock_resp = mock_base.mock_http_response(RoleResponse(0, role).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.put",
                 return_value=mock_resp,

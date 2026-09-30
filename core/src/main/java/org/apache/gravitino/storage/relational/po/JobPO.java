@@ -45,7 +45,9 @@ public class JobPO {
   private Long metalakeId;
   private String jobExecutionId;
   private String jobRunStatus;
+  private Long jobStartedAt;
   private Long jobFinishedAt;
+  private String runtimeJobTemplate;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -62,7 +64,9 @@ public class JobPO {
       Long metalakeId,
       String jobExecutionId,
       String jobRunStatus,
+      Long jobStartedAt,
       Long jobFinishedAt,
+      String runtimeJobTemplate,
       String auditInfo,
       Long currentVersion,
       Long lastVersion,
@@ -75,7 +79,10 @@ public class JobPO {
         StringUtils.isNotBlank(jobExecutionId), "jobExecutionId cannot be blank");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jobRunStatus), "jobRunStatus cannot be blank");
+    Preconditions.checkArgument(jobStartedAt != null, "jobStartedAt cannot be null");
     Preconditions.checkArgument(jobFinishedAt != null, "jobFinishedAt cannot be null");
+    // runtimeJobTemplate is legitimately nullable: rows created before this field was introduced
+    // have no resolved template to backfill.
     Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "auditInfo cannot be blank");
     Preconditions.checkArgument(currentVersion != null, "currentVersion cannot be null");
     Preconditions.checkArgument(lastVersion != null, "lastVersion cannot be null");
@@ -86,7 +93,9 @@ public class JobPO {
     this.metalakeId = metalakeId;
     this.jobExecutionId = jobExecutionId;
     this.jobRunStatus = jobRunStatus;
+    this.jobStartedAt = jobStartedAt;
     this.jobFinishedAt = jobFinishedAt;
+    this.runtimeJobTemplate = runtimeJobTemplate;
     this.auditInfo = auditInfo;
     this.currentVersion = currentVersion;
     this.lastVersion = lastVersion;
@@ -99,26 +108,61 @@ public class JobPO {
   }
 
   public static JobPO initializeJobPO(JobEntity jobEntity, JobPOBuilder builder) {
-    // We should not keep the terminated job entities in the database forever, so we set the
-    // current time as the finished timestamp if the job is in a terminal state,
-    // So the entity GC cleaner will clean it up later.
-    long finished = DEFAULT_DELETED_AT;
-    if (jobEntity.status() == JobHandle.Status.CANCELLED
-        || jobEntity.status() == JobHandle.Status.FAILED
-        || jobEntity.status() == JobHandle.Status.SUCCEEDED) {
-      finished = System.currentTimeMillis();
-    }
-
+    // startedAt/finishedAt are required fields on JobEntity - the caller (e.g. JobManager, when
+    // the job transitions to STARTED/a terminal state) is guaranteed to have already set them,
+    // using the storage layer's "not started"/"not finished" sentinel (<= 0) otherwise. The
+    // entity GC cleaner relies on the finishedAt timestamp being set to clean up terminated jobs
+    // later.
     try {
       return builder
           .withJobRunId(jobEntity.id())
           .withJobTemplateName(jobEntity.jobTemplateName())
           .withJobExecutionId(jobEntity.jobExecutionId())
           .withJobRunStatus(jobEntity.status().name())
-          .withJobFinishedAt(finished)
+          .withJobStartedAt(jobEntity.startedAt())
+          .withJobFinishedAt(jobEntity.finishedAt())
+          .withRuntimeJobTemplate(jobEntity.runtimeJobTemplate())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(jobEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize job entity", e);
+    }
+  }
+
+  /**
+   * Builds the {@link JobPO} to persist for an update, carrying forward the identity fields ({@code
+   * jobRunId}, {@code jobTemplateName}) from the old PO since a job's template is immutable once
+   * the job is created, and bumping the version counters. Unlike those identity fields, {@code
+   * runtimeJobTemplate} is taken from {@code newJobEntity} rather than carried forward from the old
+   * PO - this layer stores whatever the caller passes, it does not enforce that the resolved
+   * runtime template never changes. That invariant is the caller's responsibility (see {@code
+   * JobManager}'s updater functions, which always carry the existing value forward). This does not
+   * perform any optimistic-concurrency check; the caller is responsible for any such guarantee.
+   *
+   * @param oldJobPO the existing {@link JobPO} being updated
+   * @param newJobEntity the {@link JobEntity} with the updated status/timestamps/audit info
+   * @param builder the builder to populate, pre-configured with the {@code metalakeId}
+   * @return the {@code JobPO} object with updated fields
+   */
+  public static JobPO updateJobPO(JobPO oldJobPO, JobEntity newJobEntity, JobPOBuilder builder) {
+    try {
+      Long lastVersion = oldJobPO.lastVersion() + 1;
+      Long currentVersion = lastVersion;
+
+      return builder
+          .withJobRunId(oldJobPO.jobRunId())
+          .withJobTemplateName(oldJobPO.jobTemplateName())
+          .withJobExecutionId(newJobEntity.jobExecutionId())
+          .withJobRunStatus(newJobEntity.status().name())
+          .withJobStartedAt(newJobEntity.startedAt())
+          .withJobFinishedAt(newJobEntity.finishedAt())
+          .withRuntimeJobTemplate(newJobEntity.runtimeJobTemplate())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newJobEntity.auditInfo()))
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
@@ -135,7 +179,9 @@ public class JobPO {
           .withStatus(JobHandle.Status.valueOf(jobPO.jobRunStatus))
           .withJobTemplateName(jobPO.jobTemplateName)
           .withAuditInfo(JsonUtils.anyFieldMapper().readValue(jobPO.auditInfo, AuditInfo.class))
+          .withStartedAt(jobPO.jobStartedAt())
           .withFinishedAt(jobPO.jobFinishedAt())
+          .withRuntimeJobTemplate(jobPO.runtimeJobTemplate())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize job PO", e);

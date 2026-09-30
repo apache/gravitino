@@ -123,10 +123,29 @@ class TestExtractPrincipal(unittest.TestCase):
             audit._extract_principal("Basic not-valid-base64!!"), "anonymous"
         )
 
-    def test_unknown_scheme_returns_anonymous(self):
+    def test_other_scheme_falls_back_to_scheme_prefix(self):
+        """A non-Basic scheme stays attributable via '<scheme>:<first-8>'."""
         self.assertEqual(
-            audit._extract_principal("Negotiate abc123"), "anonymous"
+            audit._extract_principal("Negotiate abc123"), "negotiate:abc123"
         )
+
+    def test_custom_scheme_with_multi_word_credential(self):
+        """A credential containing spaces is not treated as unparsable."""
+        self.assertEqual(
+            audit._extract_principal("Custom-Scheme key=abcdefghij, sig=xy"),
+            "custom-scheme:key=abcd",
+        )
+
+    def test_extra_space_between_scheme_and_credential(self):
+        """Repeated separators do not break Basic decoding."""
+        self.assertEqual(
+            audit._extract_principal("Basic   YWxpY2U6ZHVtbXk="), "alice"
+        )
+
+    def test_scheme_without_credential_returns_anonymous(self):
+        """A scheme with no credential has no identity to report."""
+        self.assertEqual(audit._extract_principal("Bearer"), "anonymous")
+        self.assertEqual(audit._extract_principal("Bearer   "), "anonymous")
 
 
 class TestAuditMiddlewareIntegration(unittest.TestCase):
@@ -168,6 +187,37 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         self.assertEqual(record["outcome"], "allow")
         self.assertEqual(record["principal"], "anonymous")
 
+    def test_record_carries_the_resolved_metalake(self):
+        """Defaulted calls must record the metalake too, not just named ones -
+        otherwise the log cannot say which tenant was touched without also
+        knowing the server's startup configuration."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+                await client.call_tool(
+                    "get_list_of_catalogs", {"metalake": "named_ml"}
+                )
+
+        asyncio.run(_run())
+
+        metalakes = [json.loads(r)["metalake"] for r in self.log_records]
+        self.assertEqual(metalakes, ["mock_metalake", "named_ml"])
+
+    def test_non_metalake_scoped_tool_records_no_metalake(self):
+        """list_metalakes spans every metalake the caller can see, so tagging
+        it with the server default would claim a tenant it never touched."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("list_metalakes")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["tool"], "list_metalakes")
+        self.assertNotIn("metalake", record)
+
     def test_principal_falls_back_to_startup_token(self):
         """With no request header, the audit principal uses the startup --token."""
         RESTClientFactory.set_rest_client(MockOperation)
@@ -183,6 +233,27 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
 
         record = json.loads(self.log_records[0])
         self.assertEqual(record["principal"], "bearer:abcdef12")
+
+    def test_principal_falls_back_to_oauth_client_id(self):
+        """With no request header, OAuth client-credentials is attributable."""
+        RESTClientFactory.set_rest_client(MockOperation)
+        server = GravitinoMCPServer(
+            Setting(
+                "mock_metalake",
+                oauth_token_endpoint="https://idp/token",
+                oauth_client_id="mcp-service",
+                oauth_client_secret="s",
+            )
+        )
+
+        async def _run():
+            async with Client(server.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["principal"], "oauth:mcp-serv")
 
     def test_failed_tool_call_emits_deny_record(self):
         """A tool call that raises an exception produces an audit record with outcome=deny."""

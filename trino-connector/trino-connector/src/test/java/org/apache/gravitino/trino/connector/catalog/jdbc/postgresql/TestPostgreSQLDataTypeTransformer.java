@@ -59,6 +59,17 @@ public class TestPostgreSQLDataTypeTransformer {
   }
 
   @Test
+  public void testGravitinoExternalTypeToTrinoType() {
+    GeneralDataTypeTransformer generalDataTypeTransformer = new PostgreSQLDataTypeTransformer();
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(Types.ExternalType.of("numeric")),
+        io.trino.spi.type.VarcharType.createUnboundedVarcharType());
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(Types.ExternalType.of("money")),
+        io.trino.spi.type.VarcharType.createUnboundedVarcharType());
+  }
+
+  @Test
   public void testGravitinoCharToTrinoType() {
     GeneralDataTypeTransformer generalDataTypeTransformer = new PostgreSQLDataTypeTransformer();
     Type stringType = Types.StringType.get();

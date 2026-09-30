@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.system.storedprocedure;
 
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.block.ArrayBlock;
 import io.trino.spi.procedure.Procedure;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -42,8 +44,6 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Stored procedure implementation for altering an existing catalog in Gravitino.
@@ -51,32 +51,33 @@ import org.slf4j.LoggerFactory;
  * <p>This procedure allows setting and removing catalog properties dynamically.
  */
 public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
-  private static final Logger LOG = LoggerFactory.getLogger(AlterCatalogStoredProcedure.class);
+  private static final Logger LOG = Logger.get(AlterCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
-  private final String metalake;
+  @Nullable private final String configuredMetalake;
 
   /**
    * Constructs a new AlterCatalogStoredProcedure.
    *
    * @param catalogConnectorManager the catalog connector manager
-   * @param metalake the metalake name
+   * @param configuredMetalake the metalake name, or null when the connector is not configured with
+   *     one
    */
   public AlterCatalogStoredProcedure(
-      CatalogConnectorManager catalogConnectorManager, String metalake) {
+      CatalogConnectorManager catalogConnectorManager, @Nullable String configuredMetalake) {
     this.catalogConnectorManager = catalogConnectorManager;
-    this.metalake = metalake;
+    this.configuredMetalake = configuredMetalake;
   }
 
   @Override
   public Procedure createStoredProcedure() throws NoSuchMethodException, IllegalAccessException {
-    // call gravitino.system.alter_catalog(catalogName, set_properties, remove_properties
+    // call gravitino.system.alter_catalog(catalogName, set_properties, remove_properties, metalake)
 
     MethodHandle dropCatalog =
         MethodHandles.lookup()
             .unreflect(
                 AlterCatalogStoredProcedure.class.getMethod(
-                    "alterCatalog", String.class, Map.class, List.class))
+                    "alterCatalog", String.class, Map.class, List.class, String.class))
             .bindTo(this);
     List<Procedure.Argument> arguments =
         List.of(
@@ -88,7 +89,8 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
                 new ArrayType(VARCHAR),
                 false,
                 ArrayBlock.fromElementBlock(
-                    0, Optional.empty(), new int[1], VARCHAR.createBlockBuilder(null, 1).build())));
+                    0, Optional.empty(), new int[1], VARCHAR.createBlockBuilder(null, 1).build())),
+            new Procedure.Argument(METALAKE_ARGUMENT, VARCHAR, false, null));
     return new Procedure(
         GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME, "alter_catalog", arguments, dropCatalog);
   }
@@ -99,14 +101,27 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
    * @param catalogName the name of the catalog to alter
    * @param setProperties the properties to set
    * @param removeProperties the properties to remove
+   * @param metalakeArgument the metalake the catalog belongs to, null to use the configured one
    * @throws TrinoException if the catalog does not exist or the operation fails
    */
   public void alterCatalog(
-      String catalogName, Map<String, String> setProperties, List<String> removeProperties) {
+      String catalogName,
+      Map<String, String> setProperties,
+      List<String> removeProperties,
+      @Nullable String metalakeArgument) {
+    String metalake = resolveMetalake(configuredMetalake, metalakeArgument);
     try {
       CatalogConnectorContext catalogConnectorContext =
-          catalogConnectorManager.getCatalogConnector(
-              catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+          catalogConnectorManager.getCatalogConnector(metalake, catalogName);
+      if (catalogConnectorContext == null) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
+            String.format(
+                "Catalog %s is not registered in Trino. %s",
+                NameIdentifier.of(metalake, catalogName),
+                catalogConnectorManager.describeRegistrationFailure(
+                    metalake, catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))));
+      }
       GravitinoCatalog oldCatalog = catalogConnectorContext.getCatalog();
 
       List<CatalogChange> changes = new ArrayList<>();
@@ -137,17 +152,17 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
           .alterCatalog(catalogName, changes.toArray(changes.toArray(new CatalogChange[0])));
 
       catalogConnectorManager.loadMetalakeSync();
-      catalogConnectorContext =
-          catalogConnectorManager.getCatalogConnector(
-              catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+      catalogConnectorContext = catalogConnectorManager.getCatalogConnector(metalake, catalogName);
       if (catalogConnectorContext == null
           || catalogConnectorContext.getCatalog().getLastModifiedTime()
               == oldCatalog.getLastModifiedTime()) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-            "Update catalog failed due to the reloading process fails");
+            "Update catalog failed due to the reloading process fails. "
+                + catalogConnectorManager.describeRegistrationFailure(
+                    metalake, catalogConnectorManager.getTrinoCatalogName(metalake, catalogName)));
       }
-      LOG.info("Alter catalog {} in metalake {} successfully.", catalogName, metalake);
+      LOG.info("Alter catalog %s in metalake %s successfully.", catalogName, metalake);
 
     } catch (NoSuchMetalakeException e) {
       throw new TrinoException(

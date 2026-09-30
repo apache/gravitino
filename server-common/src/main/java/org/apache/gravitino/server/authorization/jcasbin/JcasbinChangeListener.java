@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -33,8 +34,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.storage.relational.EntityChangeLogListener;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -55,6 +58,21 @@ import org.slf4j.LoggerFactory;
 public class JcasbinChangeListener implements EntityChangeLogListener, AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangeListener.class);
+
+  /**
+   * Entity types that are cacheable in the entity store — and therefore emitted into {@code
+   * entity_change_log} — but that live in a virtual namespace ({@code
+   * <metalake>.system.<kind>.<name>}) instead of under a catalog. Their change-log identifier has
+   * more levels than {@link MetadataObjects#of} accepts for the matching type, and the JCasbin
+   * {@code metadataIdCache} never keys on them, so they are dropped before any mapping is
+   * attempted.
+   */
+  private static final Set<MetadataObject.Type> VIRTUAL_NAMESPACE_TYPES =
+      ImmutableSet.of(
+          MetadataObject.Type.TAG,
+          MetadataObject.Type.POLICY,
+          MetadataObject.Type.JOB,
+          MetadataObject.Type.JOB_TEMPLATE);
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -201,11 +219,22 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * Invalidates the affected {@code metadataIdCache} keys from an entity-change batch.
    *
    * <p><b>Contract with the writer side:</b> {@code entity_change_log.full_name} must be the
-   * <i>pre-mutation</i> name (the name that consumers currently have cached). The writers in {@code
-   * SchemaMetaService} / {@code TableMetaService} / etc. emit {@code oldFullName} on rename and the
-   * current name on drop, so the cacheKey we build here resolves to the entry a peer node would
-   * have populated under that name. If a future change starts emitting the new post-rename name,
-   * this invalidation will silently miss and stale entries will only clear via LRU eviction.
+   * <i>pre-mutation</i> name (the name that consumers currently have cached). {@code JDBCBackend}
+   * emits the pre-mutation identifier on update and the current name on drop, so the cacheKey we
+   * build here resolves to the entry a peer node would have populated under that name. If a future
+   * change starts emitting the new post-rename name, this invalidation will silently miss and stale
+   * entries will only clear via LRU eviction.
+   *
+   * <p><b>Bad rows:</b> a record this listener cannot understand is logged and skipped instead of
+   * being thrown up. Such a row does not point at any cache key, so skipping it leaves nothing
+   * stale behind.
+   *
+   * <p><b>Recovering from a failure:</b> the poller hands each batch over only once and never sends
+   * it again, so a failed removal has to be handled here. Otherwise {@code metadataIdCache} would
+   * keep an out-of-date name&#8594;id entry and hand it to authorization checks until that entry's
+   * TTL runs out. So the whole {@code metadataIdCache} is cleared instead. That is safe: everything
+   * in it can be looked up again, and clearing it also covers the entry that failed plus the rest
+   * of the batch. The only cost is redoing those name&#8594;id lookups.
    *
    * <p>The {@code synchronized} modifier is defensive — see the note on {@link #pollOwnerChanges()}
    * for the rationale. The single-threaded scheduler already prevents overlapping runs in
@@ -228,8 +257,23 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
         continue;
       }
 
-      MetadataObject mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
-      String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, mdObj);
+      if (VIRTUAL_NAMESPACE_TYPES.contains(mdType)) {
+        continue;
+      }
+
+      String cacheKey;
+      try {
+        MetadataObject mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
+        cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, mdObj);
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Skipping unmappable entity change log record: metalake={}, type={}, fullName={}",
+            metalake,
+            entityType,
+            fullName,
+            e);
+        continue;
+      }
 
       if (JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(mdType)) {
         addCoalescedPrefix(containerPrefixes, cacheKey);
@@ -258,7 +302,9 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   @VisibleForTesting
   static MetadataObject metadataObjectFromChangeLog(
       String metalake, String fullName, MetadataObject.Type type) {
-    List<String> names = new ArrayList<>(Arrays.asList(fullName.split("\\.")));
+    NameIdentifier ident = EntityChangeLogNameIdentifierCodec.decode(fullName);
+    List<String> names = new ArrayList<>(Arrays.asList(ident.namespace().levels()));
+    names.add(ident.name());
     if (type != MetadataObject.Type.METALAKE
         && !names.isEmpty()
         && Objects.equals(names.get(0), metalake)) {
@@ -285,18 +331,44 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
     if (prefixes.isEmpty() && leafKeys.isEmpty()) {
       return;
     }
-    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
-    // a half-applied state where some prefix/leaf keys have been evicted and others have not.
-    metadataIdCache.runInvalidationBatch(
-        () -> {
-          for (String prefix : prefixes) {
-            metadataIdCache.invalidateByPrefix(prefix);
-          }
-          for (String leafKey : leafKeys) {
-            if (prefixes.stream().noneMatch(leafKey::startsWith)) {
-              metadataIdCache.invalidate(leafKey);
+    // Take the cache's exclusive lock for the whole batch, so a reader never sees a state where
+    // part of the batch has been removed and part has not. If removing one key fails, clear the
+    // whole cache while we still hold the lock. If we never got the lock at all, clear without it.
+    boolean[] batchStarted = {false};
+    try {
+      metadataIdCache.runInvalidationBatch(
+          () -> {
+            batchStarted[0] = true;
+            try {
+              for (String prefix : prefixes) {
+                metadataIdCache.invalidateByPrefix(prefix);
+              }
+              for (String leafKey : leafKeys) {
+                if (prefixes.stream().noneMatch(leafKey::startsWith)) {
+                  metadataIdCache.invalidate(leafKey);
+                }
+              }
+            } catch (RuntimeException e) {
+              LOG.error(
+                  "Failed to invalidate {} prefix(es) and {} leaf key(s) from the entity change "
+                      + "log, clearing the whole metadata id cache to stay coherent",
+                  prefixes.size(),
+                  leafKeys.size(),
+                  e);
+              metadataIdCache.invalidateAll();
             }
-          }
-        });
+          });
+    } catch (RuntimeException e) {
+      if (batchStarted[0]) {
+        throw e;
+      }
+      LOG.error(
+          "Failed to start an invalidation batch for {} prefix(es) and {} leaf key(s), clearing "
+              + "the whole metadata id cache without the batch lock",
+          prefixes.size(),
+          leafKeys.size(),
+          e);
+      metadataIdCache.invalidateAll();
+    }
   }
 }

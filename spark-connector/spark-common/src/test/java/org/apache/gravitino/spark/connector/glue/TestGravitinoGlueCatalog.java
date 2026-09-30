@@ -43,6 +43,7 @@ import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -66,7 +67,7 @@ public class TestGravitinoGlueCatalog {
     // GravitinoGlueCatalog extends BaseCatalog which calls GravitinoCatalogManager.get()
     // in its constructor, so we must initialize the manager first.
     GravitinoClient mockClient = mock(GravitinoClient.class);
-    GravitinoCatalogManager.create(() -> mockClient);
+    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> mockClient);
   }
 
   @AfterAll

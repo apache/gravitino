@@ -19,8 +19,8 @@
 package org.apache.gravitino.client;
 
 import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
+import static javax.servlet.http.HttpServletResponse.SC_CONFLICT;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-import static javax.servlet.http.HttpServletResponse.SC_METHOD_NOT_ALLOWED;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -209,12 +209,7 @@ public class TestSupportsPartitionStatistics extends TestBase {
                 Collections.emptyList()));
     ErrorResponse unmodifiableError = MAPPER.readValue(unmodifiableErrorJson, ErrorResponse.class);
     buildMockResource(
-        Method.PUT,
-        path,
-        Collections.emptyMap(),
-        expectedRequest,
-        unmodifiableError,
-        SC_METHOD_NOT_ALLOWED);
+        Method.PUT, path, Collections.emptyMap(), expectedRequest, unmodifiableError, SC_CONFLICT);
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,
@@ -274,7 +269,7 @@ public class TestSupportsPartitionStatistics extends TestBase {
                 Collections.emptyList()));
     ErrorResponse unmodifiableError = MAPPER.readValue(unmodifiableErrorJson, ErrorResponse.class);
     buildMockResource(
-        Method.POST, path, Collections.emptyMap(), null, unmodifiableError, SC_METHOD_NOT_ALLOWED);
+        Method.POST, path, Collections.emptyMap(), null, unmodifiableError, SC_CONFLICT);
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,

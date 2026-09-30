@@ -24,7 +24,7 @@ from mcp_server.client.factory import RESTClientFactory
 from mcp_server.client.plain.plain_rest_client_operation import (
     PlainRESTClientOperation,
 )
-from mcp_server.core.context import GravitinoContext
+from mcp_server.core.context import GravitinoContext, startup_authorization
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args
 
@@ -126,6 +126,13 @@ class TestSettingTokenMasking(unittest.TestCase):
         setting = Setting(metalake="ml", token="")
         self.assertNotIn("***", str(setting))
 
+    def test_whitespace_only_token_shows_empty_in_str(self):
+        """A whitespace-only token is anonymous on the wire, so do not mask it
+        as a configured identity."""
+        setting = Setting(metalake="ml", token="   ")
+        self.assertEqual(startup_authorization(setting), "")
+        self.assertNotIn("***", str(setting))
+
 
 class TestTokenArgParsing(unittest.TestCase):
     """Verify --token CLI argument and GRAVITINO_TOKEN env var precedence."""
@@ -157,6 +164,77 @@ class TestTokenArgParsing(unittest.TestCase):
         self.assertEqual(args.token, "")
 
 
+class TestStartupAuthorization(unittest.TestCase):
+    """Verify startup_authorization renders the static --token correctly."""
+
+    def test_bare_token_is_prefixed_with_bearer(self):
+        """A bare token is treated as OAuth2 and prefixed with Bearer."""
+        setting = Setting(metalake="ml", token="abc")
+        self.assertEqual(startup_authorization(setting), "Bearer abc")
+
+    def test_bearer_token_is_not_double_wrapped(self):
+        """A value already carrying the Bearer scheme is used verbatim."""
+        setting = Setting(metalake="ml", token="Bearer abc")
+        self.assertEqual(startup_authorization(setting), "Bearer abc")
+
+    def test_basic_token_passes_through(self):
+        """A value carrying the Basic scheme is used verbatim."""
+        setting = Setting(metalake="ml", token="Basic dXNlcjpwYXNz")
+        self.assertEqual(startup_authorization(setting), "Basic dXNlcjpwYXNz")
+
+    def test_builtin_scheme_is_canonicalized_case_insensitively(self):
+        """A built-in scheme is matched case-insensitively and canonicalized."""
+        test_cases = (
+            ("basic credentials", "Basic credentials"),
+            ("bearer credentials", "Bearer credentials"),
+            ("negotiate credentials", "Negotiate credentials"),
+        )
+        for token, expected in test_cases:
+            with self.subTest(token=token):
+                setting = Setting(metalake="ml", token=token)
+                self.assertEqual(startup_authorization(setting), expected)
+
+    def test_scheme_separator_is_normalized(self):
+        """Extra spaces between a scheme and credential are collapsed."""
+        setting = Setting(metalake="ml", token="Basic   credentials")
+        self.assertEqual(startup_authorization(setting), "Basic credentials")
+
+    def test_custom_scheme_passes_through(self):
+        """A syntactically valid custom scheme is not wrapped in Bearer."""
+        setting = Setting(metalake="ml", token="Custom-Scheme credentials")
+        self.assertEqual(
+            startup_authorization(setting), "Custom-Scheme credentials"
+        )
+
+    def test_empty_token_stays_empty(self):
+        """No token configured yields an empty Authorization value."""
+        setting = Setting(metalake="ml", token="")
+        self.assertEqual(startup_authorization(setting), "")
+
+    def test_whitespace_only_token_stays_empty(self):
+        """A whitespace-only token does not produce an Authorization value."""
+        setting = Setting(metalake="ml", token="   ")
+        self.assertEqual(startup_authorization(setting), "")
+
+    def test_bare_token_is_stripped_then_prefixed(self):
+        """Surrounding whitespace is stripped before prefixing a bare token."""
+        setting = Setting(metalake="ml", token="  abc  ")
+        self.assertEqual(startup_authorization(setting), "Bearer abc")
+
+    def test_scheme_word_with_no_credential_is_bare_token(self):
+        """A scheme-like word with nothing after it is treated as a bare token."""
+        setting = Setting(metalake="ml", token="Bearer")
+        self.assertEqual(startup_authorization(setting), "Bearer Bearer")
+
+    def test_invalid_scheme_syntax_is_treated_as_bare_token(self):
+        """A value without a valid HTTP scheme is treated as a bare token."""
+        setting = Setting(metalake="ml", token="Not/A/Scheme credentials")
+        self.assertEqual(
+            startup_authorization(setting),
+            "Bearer Not/A/Scheme credentials",
+        )
+
+
 class TestGravitinoContextTokenPropagation(_RealFactoryTestCase):
     """Verify GravitinoContext passes token from Setting to the REST client."""
 
@@ -173,6 +251,23 @@ class TestGravitinoContextTokenPropagation(_RealFactoryTestCase):
             self.assertEqual(
                 _headers_of(rest_client).get("Authorization"),
                 "Bearer ctx-token-xyz",
+            )
+        finally:
+            _close(rest_client)
+
+    def test_context_propagates_basic_credential(self):
+        """A static Basic credential reaches the client with canonical casing."""
+        setting = Setting(
+            metalake="ml",
+            gravitino_uri="http://localhost:8090",
+            token="basic YWxpY2U6cGFzc3dvcmQ=",
+        )
+        ctx = GravitinoContext(setting)
+        rest_client = ctx.rest_client()
+        try:
+            self.assertEqual(
+                _headers_of(rest_client).get("Authorization"),
+                "Basic YWxpY2U6cGFzc3dvcmQ=",
             )
         finally:
             _close(rest_client)

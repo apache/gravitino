@@ -31,11 +31,15 @@ import com.google.common.collect.Maps;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -43,7 +47,10 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
+import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
@@ -64,6 +71,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -98,6 +106,7 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   private Catalog catalog;
   private ClickHouseService clickHouseService;
   private ClickHouseContainer clickHouseClusterContainer;
+  private List<ClickHouseContainer> clickHouseClusterContainers;
   private final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT;
 
   @BeforeAll
@@ -106,6 +115,8 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         Paths.get("src", "test", "resources", "remote_servers.xml").toAbsolutePath().toString();
     containerSuite.startClickHouseClusterContainer(TEST_DB_NAME, remoteServersConfig);
     clickHouseClusterContainer = containerSuite.getClickHouseClusterContainer();
+    clickHouseClusterContainers = containerSuite.getClickHouseClusterContainers();
+    Assertions.assertEquals(3, clickHouseClusterContainers.size());
 
     clickHouseService = new ClickHouseService(clickHouseClusterContainer, TEST_DB_NAME);
     createMetalake();
@@ -162,8 +173,10 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   }
 
   private void createSchema() {
-    Schema createdSchema =
-        catalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    properties.put(ON_CLUSTER, String.valueOf(true));
+    Schema createdSchema = catalog.asSchemas().createSchema(schemaName, null, properties);
     Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
   }
@@ -546,6 +559,96 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   }
 
   @Test
+  public void testNgrambfAndTokenbfIndexesOnCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_skip_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> ngramProperties =
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0");
+    Map<String, String> tokenProperties =
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0",
+            "granularity", "4");
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{"col_3"}},
+              ngramProperties),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{"col_3"}},
+              tokenProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    assertIndexMetadata(
+        loaded.index(), "idx_ngram", Index.IndexType.DATA_SKIPPING_NGRAMBFV1, ngramProperties);
+    assertIndexMetadata(
+        loaded.index(), "idx_token", Index.IndexType.DATA_SKIPPING_TOKENBFV1, tokenProperties);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+            "idx_ngram_alter",
+            new String[][] {{"col_3"}},
+            ngramProperties),
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+            "idx_token_alter",
+            new String[][] {{"col_3"}},
+            tokenProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    assertIndexMetadata(
+        altered.index(),
+        "idx_ngram_alter",
+        Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+        ngramProperties);
+    assertIndexMetadata(
+        altered.index(),
+        "idx_token_alter",
+        Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+        tokenProperties);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_ngram", false),
+        TableChange.deleteIndex("idx_token", false),
+        TableChange.deleteIndex("idx_ngram_alter", false),
+        TableChange.deleteIndex("idx_token_alter", false));
+  }
+
+  private void assertIndexMetadata(
+      Index[] indexes, String name, Index.IndexType type, Map<String, String> properties) {
+    Index index =
+        Arrays.stream(indexes)
+            .filter(candidate -> Objects.equals(name, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + name));
+    Assertions.assertEquals(type, index.type());
+    Assertions.assertTrue(Arrays.deepEquals(new String[][] {{"col_3"}}, index.fieldNames()));
+    Assertions.assertEquals(properties, index.properties());
+  }
+
+  @Test
   public void testDropTableOnCluster() {
     String dropTableName = GravitinoITUtils.genRandomName("ck_cluster_drop_tbl");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
@@ -685,6 +788,57 @@ public class CatalogClickHouseClusterIT extends BaseIT {
           "loadTable must return the cluster name embedded in COMMENT at create time");
     } finally {
       tableCatalog.dropTable(tableIdent);
+    }
+  }
+
+  @Test
+  public void testRenameTableOnClusterPropagatesToEveryNode() throws SQLException {
+    String oldName = GravitinoITUtils.genRandomName("ck_cluster_rename_old");
+    String newName = GravitinoITUtils.genRandomName("ck_cluster_rename_new");
+    NameIdentifier oldIdent = NameIdentifier.of(schemaName, oldName);
+    NameIdentifier newIdent = NameIdentifier.of(schemaName, newName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    try {
+      tableCatalog.createTable(
+          oldIdent,
+          createColumns(),
+          "cluster rename comment",
+          clusterMergeTreeProperties(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          getSortOrders("col_3"),
+          Indexes.EMPTY_INDEXES);
+
+      Table renamed = tableCatalog.alterTable(oldIdent, TableChange.rename(newName));
+      Assertions.assertEquals(newName, renamed.name());
+      Assertions.assertEquals(String.valueOf(true), renamed.properties().get(ON_CLUSTER));
+      Assertions.assertEquals(
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME, renamed.properties().get(CLUSTER_NAME));
+      Assertions.assertFalse(renamed.properties().containsKey(StringIdentifier.ID_KEY));
+
+      awaitTableStateOnEveryNode(oldName, false, newName, true);
+      assertRenameQueryUsesOnCluster(oldName, newName);
+      for (ClickHouseContainer container : clickHouseClusterContainers) {
+        String storedComment = loadStoredComment(container, newName);
+        Assertions.assertNotNull(StringIdentifier.fromComment(storedComment));
+        Assertions.assertEquals(
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            ClickHouseClusterUtils.extractClusterFromComment(storedComment));
+      }
+
+      Assertions.assertTrue(tableCatalog.dropTable(newIdent));
+      awaitTableStateOnEveryNode(oldName, false, newName, false);
+    } finally {
+      try {
+        clickHouseService.executeQuery(
+            "DROP TABLE IF EXISTS `%s`.`%s` ON CLUSTER `%s` SYNC"
+                .formatted(schemaName, oldName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+      } finally {
+        clickHouseService.executeQuery(
+            "DROP TABLE IF EXISTS `%s`.`%s` ON CLUSTER `%s` SYNC"
+                .formatted(schemaName, newName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+      }
     }
   }
 
@@ -850,5 +1004,395 @@ public class CatalogClickHouseClusterIT extends BaseIT {
             "ALTER TABLE on non-cluster table must NOT include ON CLUSTER, actual: " + sql);
       }
     }
+  }
+
+  @Test
+  public void testAlterTableSettingsOnCluster() throws Exception {
+    String tableName = GravitinoITUtils.genRandomName("ck_alter_settings_cluster");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.setProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout", "3600"));
+    Table modified = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        "3600",
+        modified.properties().get(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.removeProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+    Table reset = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        reset.properties().containsKey(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME),
+                clickHouseClusterContainer.getUsername(),
+                clickHouseClusterContainer.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.execute("SYSTEM FLUSH LOGS");
+      assertSettingAlterUsesOnCluster(statement, tableName, "MODIFY SETTING");
+      assertSettingAlterUsesOnCluster(statement, tableName, "RESET SETTING");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shard key validation IT tests
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Creating a distributed table with a nullable shard key column should fail with a clear error
+   * message from Gravitino, rather than an opaque ClickHouse server error.
+   */
+  @Test
+  public void testDistributedTableNullableShardKeyRejected() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_nullable");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_nullable");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a non-nullable sorting key (id) and a nullable shard column.
+    // The sorting key must be non-nullable because ClickHouse rejects nullable sorting keys
+    // by default (allow_nullable_key is disabled).
+    Column idCol = Column.of("id", Types.LongType.get(), "pk", false, false, DEFAULT_VALUE_NOT_SET);
+    Column nullableCol =
+        Column.of(
+            "shard_col", Types.IntegerType.get(), "shard", true, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {idCol, nullableCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        Indexes.EMPTY_INDEXES);
+
+    // Attempt to create a distributed table with the nullable column as shard key
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                distIdent,
+                new Column[] {},
+                tableComment,
+                distProps,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                null),
+        "Distributed table with nullable shard key column should be rejected");
+  }
+
+  /**
+   * Creating a distributed table with a non-integer shard key column should fail with a clear error
+   * message from Gravitino.
+   */
+  @Test
+  public void testDistributedTableNonIntegerShardKeyRejected() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_str");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_str");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a String column
+    Column stringCol =
+        Column.of(
+            "shard_col", Types.StringType.get(), "shard", false, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {stringCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("shard_col"),
+        Indexes.EMPTY_INDEXES);
+
+    // Attempt to create a distributed table with the String column as shard key
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                distIdent,
+                new Column[] {},
+                tableComment,
+                distProps,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                null),
+        "Distributed table with non-integer shard key column should be rejected");
+  }
+
+  /** Creating a distributed table with a valid integer shard key column should succeed. */
+  @Test
+  public void testDistributedTableIntegerShardKeyAccepted() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_int");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_int");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a non-nullable Int32 column
+    Column intCol =
+        Column.of(
+            "shard_col", Types.IntegerType.get(), "shard", false, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {intCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("shard_col"),
+        Indexes.EMPTY_INDEXES);
+
+    // Create a distributed table with the Int32 column as shard key — should succeed
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    Table distTable =
+        tableCatalog.createTable(
+            distIdent,
+            new Column[] {},
+            tableComment,
+            distProps,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            null);
+
+    Assertions.assertNotNull(distTable);
+    Assertions.assertEquals(distTbl, distTable.name());
+
+    Table loaded = tableCatalog.loadTable(distIdent);
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+  }
+
+  /**
+   * Creating a distributed table with an Int128 shard key column should succeed. Int128 is a valid
+   * ClickHouse integer type that maps to ExternalType in Gravitino's type system, but should still
+   * be recognized as an integer by the shard key validation logic.
+   */
+  @Test
+  public void testDistributedTableWideIntegerShardKeyAccepted() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_i128");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_i128");
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with Int128 column via raw SQL (Gravitino API may not support Int128
+    // directly)
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` "
+                + "(shard_col Int128, val String) "
+                + "ENGINE = MergeTree ORDER BY shard_col",
+            schemaName, localTbl, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+
+    // Create a distributed table with the Int128 column as shard key
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    try {
+      Table distTable =
+          tableCatalog.createTable(
+              distIdent,
+              new Column[] {},
+              tableComment,
+              distProps,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              null);
+
+      Assertions.assertNotNull(distTable);
+      Assertions.assertEquals(distTbl, distTable.name());
+
+      Table loaded = tableCatalog.loadTable(distIdent);
+      Assertions.assertEquals(
+          ENGINE.DISTRIBUTED.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    } finally {
+      tableCatalog.dropTable(distIdent);
+      clickHouseService.executeQuery(
+          String.format(
+              "DROP TABLE `%s`.`%s` ON CLUSTER `%s` SYNC",
+              schemaName, localTbl, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+    }
+  }
+
+  /**
+   * Creating a distributed table with a function-wrapped shard key (e.g. cityHash64(string_col))
+   * should succeed regardless of the inner column type, because the function returns a valid
+   * integer.
+   */
+  @Test
+  public void testDistributedTableFunctionShardKeyAccepted() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_func");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_func");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a String column
+    Column strCol =
+        Column.of("user_name", Types.StringType.get(), "user", false, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {strCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("user_name"),
+        Indexes.EMPTY_INDEXES);
+
+    // Create a distributed table with cityHash64(string_col) as shard key — should succeed
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "cityHash64(user_name)");
+
+    try {
+      Table distTable =
+          tableCatalog.createTable(
+              distIdent,
+              new Column[] {},
+              tableComment,
+              distProps,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              null);
+
+      Assertions.assertNotNull(distTable);
+      Assertions.assertEquals(distTbl, distTable.name());
+
+      Table loaded = tableCatalog.loadTable(distIdent);
+      Assertions.assertEquals(
+          ENGINE.DISTRIBUTED.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    } finally {
+      tableCatalog.dropTable(distIdent);
+      tableCatalog.dropTable(localIdent);
+    }
+  }
+
+  private static void assertSettingAlterUsesOnCluster(
+      Statement statement, String tableName, String command) throws SQLException {
+    try (ResultSet resultSet =
+        statement.executeQuery(
+            String.format(
+                "SELECT query FROM system.query_log "
+                    + "WHERE type = 'QueryFinish' "
+                    + "AND query_kind = 'Alter' "
+                    + "AND query LIKE '%%`%s`%%' "
+                    + "AND query LIKE '%%%s%%' "
+                    + "ORDER BY event_time DESC LIMIT 1",
+                tableName, command))) {
+      Assertions.assertTrue(resultSet.next(), "Should find " + command + " query");
+      String sql = resultSet.getString("query");
+      Assertions.assertTrue(
+          sql.contains("ON CLUSTER"), command + " must include ON CLUSTER, actual: " + sql);
+    }
+  }
+
+  private void awaitTableStateOnEveryNode(
+      String oldTableName, boolean oldTableExists, String newTableName, boolean newTableExists) {
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(250))
+        .untilAsserted(
+            () -> {
+              for (ClickHouseContainer container : clickHouseClusterContainers) {
+                Assertions.assertEquals(
+                    oldTableExists,
+                    tableExists(container, oldTableName),
+                    "Unexpected old-table state on " + container.getContainerIpAddress());
+                Assertions.assertEquals(
+                    newTableExists,
+                    tableExists(container, newTableName),
+                    "Unexpected new-table state on " + container.getContainerIpAddress());
+              }
+            });
+  }
+
+  private boolean tableExists(ClickHouseContainer container, String tableName) throws SQLException {
+    try (Connection connection =
+            DriverManager.getConnection(
+                container.getJdbcUrl(TEST_DB_NAME),
+                container.getUsername(),
+                container.getPassword());
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT count() FROM system.tables WHERE database = ? AND name = ?")) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getLong(1) == 1;
+      }
+    }
+  }
+
+  private String loadStoredComment(ClickHouseContainer container, String tableName)
+      throws SQLException {
+    try (Connection connection =
+            DriverManager.getConnection(
+                container.getJdbcUrl(TEST_DB_NAME),
+                container.getUsername(),
+                container.getPassword());
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT comment FROM system.tables WHERE database = ? AND name = ?")) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getString(1);
+      }
+    }
+  }
+
+  private void assertRenameQueryUsesOnCluster(String oldTableName, String newTableName) {
+    clickHouseService.executeQuery("SYSTEM FLUSH LOGS");
+    String query =
+        clickHouseService.executeQueryForResult(
+            String.format(
+                "SELECT query FROM system.query_log "
+                    + "WHERE type = 'QueryFinish' "
+                    + "AND startsWith(query, 'RENAME TABLE') "
+                    + "AND query LIKE '%%`%s`%%' "
+                    + "ORDER BY event_time DESC LIMIT 1",
+                oldTableName));
+
+    Assertions.assertNotNull(query, "The initiating RENAME query must be present in query_log");
+    Assertions.assertTrue(
+        query.contains("RENAME TABLE `%s` TO `%s`".formatted(oldTableName, newTableName)));
+    Assertions.assertTrue(
+        query.contains("ON CLUSTER `%s`".formatted(ClickHouseContainer.DEFAULT_CLUSTER_NAME)));
+    Assertions.assertEquals(1, StringUtils.countMatches(query, "ON CLUSTER"));
   }
 }

@@ -121,6 +121,20 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the semantic model {@link NameIdentifier} with the given parent names.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param semanticModel The semantic model name
+   * @return The created semantic model {@link NameIdentifier}
+   */
+  public static NameIdentifier ofSemanticModel(
+      String metalake, String catalog, String schema, String semanticModel) {
+    return NameIdentifier.of(metalake, catalog, schema, semanticModel);
+  }
+
+  /**
    * Create the tag {@link NameIdentifier} with the given metalake and tag name.
    *
    * @param metalake The metalake name
@@ -506,6 +520,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a semantic model identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The semantic model {@link NameIdentifier} to check.
+   */
+  public static void checkSemanticModel(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Semantic model identifier must not be null");
+    NamespaceUtil.checkSemanticModel(ident.namespace());
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -594,6 +619,25 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check whether the metadata object name can be represented in a qualified metadata object name.
+   *
+   * @param ident The metadata object identifier to check
+   * @param entityType The metadata object entity type
+   * @throws IllegalNameIdentifierException If the object name contains the qualified-name separator
+   */
+  public static void checkMetadataObjectName(NameIdentifier ident, Entity.EntityType entityType) {
+    Preconditions.checkArgument(
+        ident != null && entityType != null, "The identifier and entity type must not be null");
+
+    if (ident.name().contains(".")) {
+      throw new IllegalNameIdentifierException(
+          "The %s name '%s' is unsupported because '.' is reserved as the qualified-name "
+              + "separator.",
+          entityType, ident.name());
+    }
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
@@ -605,6 +649,7 @@ public class NameIdentifierUtil {
       NameIdentifier ident, Entity.EntityType entityType) {
     Preconditions.checkArgument(
         ident != null && entityType != null, "The identifier and entity type must not be null");
+    checkMetadataObjectName(ident, entityType);
 
     Joiner dot = Joiner.on(".");
 
@@ -632,6 +677,13 @@ public class NameIdentifierUtil {
         String viewParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(viewParent, ident.name(), MetadataObject.Type.VIEW);
 
+      case SEMANTIC_MODEL:
+        checkSemanticModel(ident);
+        String semanticModelParent =
+            dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(
+            semanticModelParent, ident.name(), MetadataObject.Type.SEMANTIC_MODEL);
+
       case COLUMN:
         checkColumn(ident);
         Namespace columnNs = ident.namespace();
@@ -652,6 +704,14 @@ public class NameIdentifierUtil {
         checkModel(ident);
         String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
+
+      case MODEL_VERSION:
+        checkModelVersion(ident);
+        Namespace modelVersionNs = ident.namespace();
+        String modelVersionParent =
+            dot.join(modelVersionNs.level(1), modelVersionNs.level(2), modelVersionNs.level(3));
+        return MetadataObjects.of(
+            modelVersionParent, ident.name(), MetadataObject.Type.MODEL_VERSION);
 
       case FUNCTION:
         checkFunction(ident);
@@ -897,6 +957,7 @@ public class NameIdentifierUtil {
 
       case TABLE:
       case VIEW:
+      case SEMANTIC_MODEL:
       case FILESET:
       case MODEL:
       case TOPIC:

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -52,8 +53,11 @@ import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.Database;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
+import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.GetDatabaseResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.GetTablesRequest;
@@ -74,6 +78,14 @@ class TestGlueCatalogTableOperations {
     ops = new GlueCatalogOperations();
     ops.glueClient = mockClient;
     ops.warehouseLocation = "s3://test-bucket/warehouse";
+    stubDatabaseLocation(null);
+  }
+
+  /** Stubs the database lookup used to resolve table locations. */
+  private void stubDatabaseLocation(String locationUri) {
+    Database database = Database.builder().name("mydb").locationUri(locationUri).build();
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenReturn(GetDatabaseResponse.builder().database(database).build());
   }
 
   // -------------------------------------------------------------------------
@@ -274,6 +286,163 @@ class TestGlueCatalogTableOperations {
     assertFalse(req.tableInput().parameters().containsKey(GlueConstants.LOCATION));
   }
 
+  @Test
+  void testCreateTableLocationFromDatabaseLocationUri() {
+    stubDatabaseLocation("s3://test-bucket/gravprobe");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://test-bucket/gravprobe/mytable",
+        captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableLocationFromDatabaseLocationUriWithTrailingSlashes() {
+    stubDatabaseLocation("s3://test-bucket/gravprobe///");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://test-bucket/gravprobe/mytable",
+        captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableLocationWhenWarehouseEqualsDatabaseLocation() {
+    ops.warehouseLocation = "s3://test-bucket/gravprobe";
+    stubDatabaseLocation("s3://test-bucket/gravprobe");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://test-bucket/gravprobe/mytable",
+        captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableLocationFallsBackToWarehouse() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://test-bucket/warehouse/mydb/mytable",
+        captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableLocationFromWarehouseWithTrailingSlashes() {
+    ops.warehouseLocation = "s3://test-bucket/warehouse///";
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://test-bucket/warehouse/mydb/mytable",
+        captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableExplicitLocationWinsOverDatabaseLocationUri() {
+    stubDatabaseLocation("s3://test-bucket/gravprobe");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        "comment",
+        Map.of(GlueConstants.LOCATION, "s3://my-bucket/path"),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    assertEquals(
+        "s3://my-bucket/path", captor.getValue().tableInput().storageDescriptor().location());
+  }
+
+  @Test
+  void testCreateTableSchemaNotFoundWhileResolvingLocation() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "missing", "mytable");
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenThrow(EntityNotFoundException.builder().message("not found").build());
+
+    assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            ops.createTable(
+                ident,
+                new Column[0],
+                "comment",
+                Collections.emptyMap(),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+  }
+
   // -------------------------------------------------------------------------
   // alterTable
   // -------------------------------------------------------------------------
@@ -297,6 +466,32 @@ class TestGlueCatalogTableOperations {
     GlueTable result = ops.alterTable(ident, TableChange.updateComment("new comment"));
 
     assertEquals("new comment", result.comment());
+  }
+
+  @Test
+  void testAlterTableKeepsExistingLocation() {
+    stubDatabaseLocation("s3://test-bucket/gravprobe");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
+    Table glueTable =
+        Table.builder()
+            .name("t")
+            .storageDescriptor(
+                StorageDescriptor.builder().location("s3://other-bucket/existing/t").build())
+            .createTime(Instant.now())
+            .build();
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(glueTable).build());
+    when(mockClient.updateTable(any(UpdateTableRequest.class)))
+        .thenReturn(UpdateTableResponse.builder().build());
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    ops.alterTable(ident, TableChange.updateComment("new comment"));
+
+    verify(mockClient).updateTable(captor.capture());
+    assertEquals(
+        "s3://other-bucket/existing/t",
+        captor.getValue().tableInput().storageDescriptor().location());
+    verify(mockClient, never()).getDatabase(any(GetDatabaseRequest.class));
   }
 
   @Test
@@ -368,6 +563,7 @@ class TestGlueCatalogTableOperations {
   @Test
   void testDropTableSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
+    stubGetTable(Table.builder().name("t").tableType(GlueConstants.EXTERNAL_TABLE_TYPE).build());
 
     boolean result = ops.dropTable(ident);
 
@@ -378,6 +574,18 @@ class TestGlueCatalogTableOperations {
   @Test
   void testDropTableNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenThrow(EntityNotFoundException.builder().message("not found").build());
+
+    assertFalse(ops.dropTable(ident));
+  }
+
+  /** The table is dropped by another client between the type check and the delete. */
+  @Test
+  void testDropTableVanishesBeforeDelete() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
+    stubGetTable(
+        Table.builder().name("missing").tableType(GlueConstants.EXTERNAL_TABLE_TYPE).build());
     when(mockClient.deleteTable(any(DeleteTableRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
 
@@ -388,6 +596,7 @@ class TestGlueCatalogTableOperations {
   void testDropTableWithCatalogId() {
     ops.catalogId = "123456789012";
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
+    stubGetTable(Table.builder().name("t").tableType(GlueConstants.EXTERNAL_TABLE_TYPE).build());
     ArgumentCaptor<DeleteTableRequest> captor = ArgumentCaptor.forClass(DeleteTableRequest.class);
 
     ops.dropTable(ident);
@@ -396,5 +605,77 @@ class TestGlueCatalogTableOperations {
     assertEquals("123456789012", captor.getValue().catalogId());
     assertEquals("mydb", captor.getValue().databaseName());
     assertEquals("t", captor.getValue().name());
+  }
+
+  // -------------------------------------------------------------------------
+  // views are not tables
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testListTablesExcludesViews() {
+    Namespace ns = Namespace.of("metalake", "catalog", "mydb");
+    Table table = Table.builder().name("iceberg_test").build();
+
+    when(mockClient.getTables(any(GetTablesRequest.class)))
+        .thenReturn(
+            GetTablesResponse.builder()
+                .tableList(table, viewObject("iceberg_view"))
+                .nextToken(null)
+                .build());
+
+    NameIdentifier[] result = ops.listTables(ns);
+
+    assertEquals(1, result.length);
+    assertEquals("iceberg_test", result[0].name());
+  }
+
+  @Test
+  void testLoadTableRejectsView() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "iceberg_view");
+    stubGetTable(viewObject("iceberg_view"));
+
+    NoSuchTableException e = assertThrows(NoSuchTableException.class, () -> ops.loadTable(ident));
+    assertTrue(e.getMessage().contains("it is a view, not a table"));
+  }
+
+  @Test
+  void testAlterTableRejectsView() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "iceberg_view");
+    stubGetTable(viewObject("iceberg_view"));
+
+    assertThrows(
+        NoSuchTableException.class, () -> ops.alterTable(ident, TableChange.updateComment("x")));
+  }
+
+  @Test
+  void testDropTableRejectsView() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "iceberg_view");
+    stubGetTable(viewObject("iceberg_view"));
+
+    assertThrows(NoSuchTableException.class, () -> ops.dropTable(ident));
+    verify(mockClient, never()).deleteTable(any(DeleteTableRequest.class));
+  }
+
+  /** Glue stores tableType as a free-form string; casing must not decide whether it is a view. */
+  @Test
+  void testViewDetectionIsCaseInsensitive() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "v");
+    stubGetTable(Table.builder().name("v").tableType("virtual_view").build());
+
+    assertThrows(NoSuchTableException.class, () -> ops.loadTable(ident));
+  }
+
+  private void stubGetTable(Table table) {
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(table).build());
+  }
+
+  private static Table viewObject(String name) {
+    return Table.builder()
+        .name(name)
+        .tableType(GlueConstants.VIRTUAL_VIEW_TABLE_TYPE)
+        .viewOriginalText("/* Presto View: abc */")
+        .parameters(Map.of("presto_view", "true"))
+        .build();
   }
 }

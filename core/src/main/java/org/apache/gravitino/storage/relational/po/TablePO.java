@@ -120,6 +120,28 @@ public class TablePO {
       tablePO = new TablePO();
     }
 
+    // Copies every column of the source row. When a field is added to TablePO above, add it here
+    // too, otherwise callers that copy a row would silently blank it.
+    private Builder(TablePO source) {
+      tablePO = new TablePO();
+      tablePO.tableId = source.tableId;
+      tablePO.tableName = source.tableName;
+      tablePO.metalakeId = source.metalakeId;
+      tablePO.catalogId = source.catalogId;
+      tablePO.schemaId = source.schemaId;
+      tablePO.auditInfo = source.auditInfo;
+      tablePO.currentVersion = source.currentVersion;
+      tablePO.lastVersion = source.lastVersion;
+      tablePO.deletedAt = source.deletedAt;
+      tablePO.format = source.format;
+      tablePO.properties = source.properties;
+      tablePO.partitions = source.partitions;
+      tablePO.sortOrders = source.sortOrders;
+      tablePO.distribution = source.distribution;
+      tablePO.indexes = source.indexes;
+      tablePO.comment = source.comment;
+    }
+
     public Builder withTableId(Long tableId) {
       tablePO.tableId = tableId;
       return this;
@@ -225,5 +247,16 @@ public class TablePO {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Creates a new instance of {@link Builder} pre-filled with the values of an existing table, so
+   * that a caller changing a few columns does not have to restate the others.
+   *
+   * @param tablePO The table to copy the values from.
+   * @return The new instance.
+   */
+  public static Builder builder(TablePO tablePO) {
+    return new Builder(tablePO);
   }
 }

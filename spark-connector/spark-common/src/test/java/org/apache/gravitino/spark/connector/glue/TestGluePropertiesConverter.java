@@ -21,10 +21,12 @@ package org.apache.gravitino.spark.connector.glue;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.glue.GravitinoGlueCredentialsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestGluePropertiesConverter {
@@ -61,7 +63,7 @@ public class TestGluePropertiesConverter {
     Assertions.assertEquals(
         "http://localhost:4566", icebergProps.get(GluePropertiesConverter.GLUE_ENDPOINT));
     Assertions.assertEquals(
-        "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider",
+        GravitinoGlueCredentialsProvider.class.getName(),
         icebergProps.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
     Assertions.assertEquals(
         "AKIAIOSFODNN7EXAMPLE", icebergProps.get("client.credentials-provider.access-key-id"));
@@ -103,7 +105,7 @@ public class TestGluePropertiesConverter {
                 GluePropertiesConverter.AWS_ACCESS_KEY_ID, "access-key",
                 GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "secret-key"));
     Assertions.assertEquals(
-        "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider",
+        GravitinoGlueCredentialsProvider.class.getName(),
         icebergProps.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
     Assertions.assertEquals(
         "access-key", icebergProps.get("client.credentials-provider.access-key-id"));
@@ -121,6 +123,15 @@ public class TestGluePropertiesConverter {
         converter.toIcebergCatalogProperties(
             ImmutableMap.of(GluePropertiesConverter.AWS_REGION, ""));
     Assertions.assertNull(blankRegion.get(GluePropertiesConverter.CLIENT_REGION));
+  }
+
+  @Test
+  void testSharedCredentialsProviderIsReflectivelyLoadable() throws ClassNotFoundException {
+    Class<?> providerClass =
+        Class.forName(GluePropertiesConverter.GRAVITINO_GLUE_CREDENTIALS_PROVIDER);
+
+    Assertions.assertEquals(GravitinoGlueCredentialsProvider.class, providerClass);
+    Assertions.assertTrue(AwsCredentialsProvider.class.isAssignableFrom(providerClass));
   }
 
   @Test

@@ -185,6 +185,13 @@ tasks {
 }
 
 tasks.test {
+  // Hudi uses HiveClientClassLoader directly without depending on catalog-hive, so prepare the
+  // version-specific Hive client and shim jars before its tests run.
+  dependsOn(
+    ":catalogs:hive-metastore2-libs:jar",
+    ":catalogs:hive-metastore3-libs:jar"
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests

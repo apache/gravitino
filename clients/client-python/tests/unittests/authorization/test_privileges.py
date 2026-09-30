@@ -53,6 +53,8 @@ from gravitino.api.authorization.privileges import (
     UseJobTemplate,
     UseModel,
     UseSchema,
+    ViewPolicy,
+    ViewTag,
     WriteFileset,
 )
 from gravitino.api.metadata_object import MetadataObject
@@ -110,6 +112,10 @@ class TestPrivileges(unittest.TestCase):
             Privilege.Name.LINK_MODEL_VERSION,
             Privileges.deny("CREATE_MODEL_VERSION").name(),
         )
+
+    def test_view_privilege_bit_values_match_java_api(self) -> None:
+        self.assertEqual(1 << 34, Privilege.Name.VIEW_TAG.low_bits)
+        self.assertEqual(1 << 35, Privilege.Name.VIEW_POLICY.low_bits)
 
     def test_create_catalog_binding(self) -> None:
         allow_privilege = CreateCatalog.allow()
@@ -311,6 +317,15 @@ class TestPrivileges(unittest.TestCase):
                     deny_privilege.can_bind_to(obj_type),
                 )
 
+    def test_view_tag_binding(self) -> None:
+        deny_privilege = ViewTag.deny()
+        for obj_type in MetadataObject.Type:
+            with self.subTest(obj_type=obj_type.name):
+                self.assertEqual(
+                    obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.TAG],
+                    deny_privilege.can_bind_to(obj_type),
+                )
+
     def test_create_policy_binding(self) -> None:
         deny_privilege = CreatePolicy.deny()
         for obj_type in MetadataObject.Type:
@@ -331,6 +346,16 @@ class TestPrivileges(unittest.TestCase):
 
     def test_apply_policy_binding(self) -> None:
         deny_privilege = ApplyPolicy.deny()
+        for obj_type in MetadataObject.Type:
+            with self.subTest(obj_type=obj_type.name):
+                self.assertEqual(
+                    obj_type
+                    in [MetadataObject.Type.METALAKE, MetadataObject.Type.POLICY],
+                    deny_privilege.can_bind_to(obj_type),
+                )
+
+    def test_view_policy_binding(self) -> None:
+        deny_privilege = ViewPolicy.deny()
         for obj_type in MetadataObject.Type:
             with self.subTest(obj_type=obj_type.name):
                 self.assertEqual(

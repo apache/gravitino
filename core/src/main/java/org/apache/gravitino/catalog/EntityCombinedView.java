@@ -21,9 +21,10 @@ package org.apache.gravitino.catalog;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
@@ -40,8 +41,10 @@ public final class EntityCombinedView implements View {
 
   @Nullable private final ViewEntity viewEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -67,8 +70,10 @@ public final class EntityCombinedView implements View {
     return this;
   }
 
-  public EntityCombinedView withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+  public EntityCombinedView withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
@@ -108,10 +113,7 @@ public final class EntityCombinedView implements View {
     if (props == null) {
       return Collections.emptyMap();
     }
-    return props.entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(props, keysToMask, keysToOmit);
   }
 
   @Override

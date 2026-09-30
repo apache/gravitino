@@ -88,6 +88,15 @@ public class PermissionOperations {
           String metalake,
       @PathParam("user") String user,
       RoleGrantRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleUserPermissionOperationException(
+          OperationType.GRANT,
+          "",
+          user,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String roleNames = StringUtils.join(request.getRoleNames(), ",");
     try {
       return Utils.doAs(
           httpRequest,
@@ -102,7 +111,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
-          OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
+          OperationType.GRANT, roleNames, user, e);
     }
   }
 
@@ -117,6 +126,15 @@ public class PermissionOperations {
           String metalake,
       @PathParam("group") String group,
       RoleGrantRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleGroupPermissionOperationException(
+          OperationType.GRANT,
+          "",
+          group,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String roleNames = StringUtils.join(request.getRoleNames(), ",");
     try {
       return Utils.doAs(
           httpRequest,
@@ -131,7 +149,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), group, e);
+          OperationType.GRANT, roleNames, group, e);
     }
   }
 
@@ -146,6 +164,15 @@ public class PermissionOperations {
           String metalake,
       @PathParam("user") String user,
       RoleRevokeRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleUserPermissionOperationException(
+          OperationType.REVOKE,
+          "",
+          user,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String roleNames = StringUtils.join(request.getRoleNames(), ",");
     try {
       return Utils.doAs(
           httpRequest,
@@ -160,7 +187,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), user, e);
+          OperationType.REVOKE, roleNames, user, e);
     }
   }
 
@@ -175,6 +202,15 @@ public class PermissionOperations {
           String metalake,
       @PathParam("group") String group,
       RoleRevokeRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleGroupPermissionOperationException(
+          OperationType.REVOKE,
+          "",
+          group,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String roleNames = StringUtils.join(request.getRoleNames(), ",");
     try {
       return Utils.doAs(
           httpRequest,
@@ -189,7 +225,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), group, e);
+          OperationType.REVOKE, roleNames, group, e);
     }
   }
 
@@ -208,6 +244,14 @@ public class PermissionOperations {
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
       PrivilegeGrantRequest privilegeGrantRequest) {
+    if (privilegeGrantRequest == null) {
+      return ExceptionHandlers.handleRolePermissionOperationException(
+          OperationType.GRANT,
+          fullName,
+          role,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       MetadataObject object =
           MetadataObjects.parse(
@@ -256,6 +300,14 @@ public class PermissionOperations {
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
       PrivilegeRevokeRequest privilegeRevokeRequest) {
+    if (privilegeRevokeRequest == null) {
+      return ExceptionHandlers.handleRolePermissionOperationException(
+          OperationType.REVOKE,
+          fullName,
+          role,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       MetadataObject object =
           MetadataObjects.parse(
@@ -300,6 +352,14 @@ public class PermissionOperations {
           String metalake,
       @PathParam("role") String role,
       PrivilegeOverrideRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleRolePermissionOperationException(
+          OperationType.UPDATE,
+          role,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
 
       return Utils.doAs(

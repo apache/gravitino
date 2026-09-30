@@ -70,7 +70,6 @@ import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.paimon.catalog.Catalog;
@@ -163,6 +162,11 @@ public class PaimonCatalogOperations
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       paimonCatalogOps.listDatabases();
     } catch (Exception e) {
@@ -559,7 +563,6 @@ public class PaimonCatalogOperations
     if (paimonCatalogOps != null) {
       try {
         paimonCatalogOps.close();
-        ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

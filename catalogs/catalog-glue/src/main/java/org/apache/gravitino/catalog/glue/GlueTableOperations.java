@@ -32,6 +32,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.glue.GlueClient;
@@ -99,7 +100,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
         nextToken = resp.nextToken();
       } while (nextToken != null);
     } catch (GlueException e) {
-      throw new RuntimeException("Failed to list partitions for table " + tableName, e);
+      throw ExceptionMessages.wrap("Failed to list partitions for table " + tableName, e);
     }
     return names.toArray(new String[0]);
   }
@@ -121,7 +122,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
         nextToken = resp.nextToken();
       } while (nextToken != null);
     } catch (GlueException e) {
-      throw new RuntimeException("Failed to list partitions for table " + tableName, e);
+      throw ExceptionMessages.wrap("Failed to list partitions for table " + tableName, e);
     }
     return partitions.toArray(new Partition[0]);
   }
@@ -141,7 +142,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       throw new NoSuchPartitionException(
           e, "Partition %s does not exist in table %s", partitionName, tableName);
     } catch (GlueException e) {
-      throw new RuntimeException("Failed to get partition " + partitionName, e);
+      throw ExceptionMessages.wrap("Failed to get partition " + partitionName, e);
     }
   }
 
@@ -181,7 +182,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       throw new PartitionAlreadyExistsException(
           e, "Partition %s already exists in table %s", partition.name(), tableName);
     } catch (GlueException e) {
-      throw new RuntimeException("Failed to add partition " + partition.name(), e);
+      throw ExceptionMessages.wrap("Failed to add partition " + partition.name(), e);
     }
 
     LOG.info("Added partition {} to {}.{}", partition.name(), dbName, tableName);
@@ -210,7 +211,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     } catch (EntityNotFoundException e) {
       return false;
     } catch (GlueException e) {
-      throw new RuntimeException("Failed to drop partition " + partitionName, e);
+      throw ExceptionMessages.wrap("Failed to drop partition " + partitionName, e);
     }
   }
 

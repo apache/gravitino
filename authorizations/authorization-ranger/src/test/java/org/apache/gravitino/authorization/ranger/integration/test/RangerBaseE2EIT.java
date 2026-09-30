@@ -1002,8 +1002,16 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // Owner has all the privileges except for creating table
     checkTableAllPrivilegesExceptForCreating();
 
-    // Delete Gravitino's meta data
-    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
+    // The table was dropped externally, so Gravitino keeps its registration and privileges.
+    Assertions.assertFalse(
+        catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName)));
+    waitForUpdatingPolicies();
+
+    // The retained owner privileges allow recreating the same table. A successful Gravitino purge
+    // then removes both its registration and privileges.
+    sparkSession.sql(SQL_CREATE_TABLE);
+    Assertions.assertTrue(
+        catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName)));
     waitForUpdatingPolicies();
 
     checker.checkCreateTable();
@@ -1022,7 +1030,13 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
     // Succeed to drop schema
     sparkSession.sql(SQL_DROP_SCHEMA);
-    catalog.asSchemas().dropSchema(schemaName, false);
+    Assertions.assertFalse(catalog.asSchemas().dropSchema(schemaName, false));
+    waitForUpdatingPolicies();
+
+    // The retained owner privileges allow recreating the same schema. A successful Gravitino drop
+    // then removes both its registration and privileges.
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaName, false));
     waitForUpdatingPolicies();
 
     checker.checkCreateSchema();

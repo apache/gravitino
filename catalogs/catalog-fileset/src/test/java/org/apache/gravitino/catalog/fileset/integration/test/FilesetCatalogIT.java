@@ -40,6 +40,7 @@ import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
@@ -338,7 +339,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
     Assertions.assertEquals(storageLocation, fileset.storageLocations().get(LOCATION_NAME_UNKNOWN));
-    Assertions.assertEquals(2, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 2);
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
@@ -366,9 +367,9 @@ public class FilesetCatalogIT extends BaseIT {
         storageLocation(filesetName2),
         fileset2.storageLocations().get(LOCATION_NAME_UNKNOWN),
         "storage location should be created");
+    assertFilesetPropertiesSize(fileset2.properties(), 1);
     Assertions.assertEquals(
-        ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN),
-        fileset2.properties());
+        LOCATION_NAME_UNKNOWN, fileset2.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     // create fileset with placeholder in storage location
     String filesetName4 = "test_create_fileset_with_placeholder";
@@ -385,7 +386,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(expectedStorageLocation4, fileset4.storageLocation());
     Assertions.assertEquals(
         expectedStorageLocation4, fileset4.storageLocations().get(LOCATION_NAME_UNKNOWN));
-    Assertions.assertEquals(1, fileset4.properties().size(), "properties should be empty");
+    assertFilesetPropertiesSize(fileset4.properties(), 1);
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, fileset4.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
@@ -414,7 +415,7 @@ public class FilesetCatalogIT extends BaseIT {
           }
         };
     Assertions.assertEquals(expectedStorageLocations, fileset.storageLocations());
-    Assertions.assertEquals(1, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 1);
     Assertions.assertEquals("location1", fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     assertFilesetExists(filesetName5);
@@ -423,7 +424,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals("comment", fileset.comment());
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(expectedStorageLocations, fileset.storageLocations());
-    Assertions.assertEquals(1, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 1);
     Assertions.assertEquals("location1", fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     // create fileset with null multiple locations
@@ -517,7 +518,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals("这是中文comment", fileset.comment());
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
-    Assertions.assertEquals(4, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 4);
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
     Assertions.assertEquals("test1", fileset.properties().get("中文key"));
@@ -544,7 +545,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals("comment", fileset.comment());
     Assertions.assertEquals(Fileset.Type.EXTERNAL, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
-    Assertions.assertEquals(2, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 2);
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertTrue(
         fileSystem.exists(new Path(storageLocation)), "storage location should be created");
@@ -930,7 +931,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be change");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v1", newFileset.properties().get("k1"), "properties should not be change");
     Assertions.assertEquals(
@@ -962,7 +963,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be change");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v1", newFileset.properties().get("k1"), "properties should not be change");
     Assertions.assertEquals(
@@ -992,7 +993,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be change");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v2", newFileset.properties().get("k1"), "properties should be updated");
     Assertions.assertEquals(
@@ -1022,7 +1023,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(1, newFileset.properties().size(), "properties should be removed");
+    assertFilesetPropertiesSize(newFileset.properties(), 1);
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, newFileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
   }
@@ -1050,7 +1051,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be changed");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be changed");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be changed");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v1", newFileset.properties().get("k1"), "properties should not be changed");
     Assertions.assertEquals(
@@ -1252,6 +1253,7 @@ public class FilesetCatalogIT extends BaseIT {
                 ImmutableMap.of("k1", "v1"));
     Assertions.assertEquals(
         hdfsLocation + "/local_schema/local_fileset", localFileset.storageLocation());
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(localCatalogName));
 
     // Delete schema
     localCatalog.asSchemas().dropSchema(localSchema.name(), true);
@@ -1362,5 +1364,15 @@ public class FilesetCatalogIT extends BaseIT {
 
   private String storageLocation(String filesetName) {
     return defaultBaseLocation() + "/" + filesetName;
+  }
+
+  /**
+   * Asserts response property size. {@code gravitino.identifier} is reserved+hidden and omitted
+   * from API responses, so {@code expectedSize} must not include it.
+   */
+  private static void assertFilesetPropertiesSize(
+      Map<String, String> properties, int expectedSize) {
+    Assertions.assertEquals(expectedSize, properties.size(), () -> "properties=" + properties);
+    Assertions.assertFalse(properties.containsKey(StringIdentifier.ID_KEY));
   }
 }

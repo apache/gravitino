@@ -23,33 +23,50 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongConsumer;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.casbin.jcasbin.main.Enforcer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * A {@link GravitinoCache} of {@code roleId -> updated_at} that synchronously deletes the role's
- * JCasbin policies from both enforcers when a key is evicted (by TTL, size, or explicit
- * invalidate).
+ * A {@link GravitinoCache} of {@code roleId -> updated_at} that synchronously requests cleanup of
+ * the role's JCasbin policies when a key is evicted (by TTL, size, or explicit invalidate). The
+ * cleaner may ignore a stale removal when the role was reloaded while the callback waited for the
+ * authorizer's policy mutation lock.
  *
- * <p>Uses a raw Caffeine cache internally so it can attach a removal listener with {@code
- * executor(Runnable::run)} — eviction and policy cleanup must happen on the same thread, so the
- * {@link JcasbinAuthorizer} never sees a role bound in the enforcer without a backing policy.
+ * <p>This cache owns role permission policies only. Therefore, eviction must clear only {@code
+ * p(roleId, ...)} policies and must not delete the role itself, because JCasbin's {@code
+ * deleteRole(roleId)} also removes {@code g(user/group, roleId)} bindings that are managed
+ * separately by {@link JcasbinAuthorizer}.
+ *
+ * <p>The TTL is <b>write-based</b>, matching every other authorization cache. An access-based TTL
+ * would be renewed by the version probe that {@code versionCheckAndLoadRoles} performs on every
+ * request, so on a node under steady traffic the entry would never expire. That matters because the
+ * entry is only a {@code roleId -> updated_at} marker: if the enforcer ever ends up without the
+ * policies this entry claims are loaded, an access-based TTL turns a transient inconsistency into a
+ * permanent authorization failure, since each denied request renews the very entry that suppresses
+ * the reload. A write-based TTL bounds any such state to one TTL.
  */
 class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
 
+  private static final Logger LOG = LoggerFactory.getLogger(JcasbinLoadedRolesCache.class);
+
   private final Cache<Long, Long> cache;
 
-  JcasbinLoadedRolesCache(long ttlMs, long maxSize, Enforcer allowEnforcer, Enforcer denyEnforcer) {
+  JcasbinLoadedRolesCache(long ttlMs, long maxSize, LongConsumer rolePolicyCleaner) {
     this.cache =
         Caffeine.newBuilder()
-            .expireAfterAccess(ttlMs, TimeUnit.MILLISECONDS)
+            .expireAfterWrite(ttlMs, TimeUnit.MILLISECONDS)
             .maximumSize(maxSize)
             .executor(Runnable::run)
             .removalListener(
                 (Long roleId, Long value, RemovalCause cause) -> {
+                  LOG.debug(
+                      "Removed JCasbin loaded role cache entry, roleId={}, cause={}",
+                      roleId,
+                      cause);
                   if (roleId != null && cause != RemovalCause.REPLACED) {
-                    allowEnforcer.deleteRole(String.valueOf(roleId));
-                    denyEnforcer.deleteRole(String.valueOf(roleId));
+                    rolePolicyCleaner.accept(roleId);
                   }
                 })
             .build();

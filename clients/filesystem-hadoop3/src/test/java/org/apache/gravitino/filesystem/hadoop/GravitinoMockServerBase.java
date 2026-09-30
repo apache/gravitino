@@ -33,10 +33,13 @@ import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.responses.CatalogResponse;
+import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
@@ -67,12 +70,16 @@ public abstract class GravitinoMockServerBase {
     mockServer = ClientAndServer.startClientAndServer(0);
     port = mockServer.getLocalPort();
     mockAPIVersion();
+    mockEmptySecretsAPI();
+    mockEmptyCredentialsAPI();
   }
 
   @AfterEach
   public void reset() {
     mockServer.reset();
     mockAPIVersion();
+    mockEmptySecretsAPI();
+    mockEmptyCredentialsAPI();
   }
 
   @AfterAll
@@ -127,6 +134,39 @@ public abstract class GravitinoMockServerBase {
           null,
           new VersionResponse(Version.getCurrentVersionDTO()),
           HttpStatus.SC_OK);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /** Mocks metadata-object secrets endpoints used by {@code getAllProperties}. */
+  protected static void mockEmptySecretsAPI() {
+    try {
+      String emptySecretsJson = MAPPER.writeValueAsString(new SecretsResponse(ImmutableMap.of()));
+      mockServer
+          .when(
+              HttpRequest.request()
+                  .withMethod("GET")
+                  .withPath("/api/metalakes/.*/objects/.*/.*/secrets"),
+              Times.unlimited())
+          .respond(HttpResponse.response().withStatusCode(SC_OK).withBody(emptySecretsJson));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /** Mocks metadata-object credentials endpoints used by {@code getAllProperties}. */
+  protected static void mockEmptyCredentialsAPI() {
+    try {
+      String emptyCredentialsJson =
+          MAPPER.writeValueAsString(new CredentialResponse(new CredentialDTO[] {}));
+      mockServer
+          .when(
+              HttpRequest.request()
+                  .withMethod("GET")
+                  .withPath("/api/metalakes/.*/objects/.*/.*/credentials"),
+              Times.unlimited())
+          .respond(HttpResponse.response().withStatusCode(SC_OK).withBody(emptyCredentialsJson));
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

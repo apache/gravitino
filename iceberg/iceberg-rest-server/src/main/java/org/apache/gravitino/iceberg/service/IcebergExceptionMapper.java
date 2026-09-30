@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
@@ -38,6 +39,7 @@ import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchIcebergTableException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchPlanIdException;
+import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
@@ -51,13 +53,14 @@ import org.slf4j.LoggerFactory;
 // Referred from Apache Iceberg's EXCEPTION_ERROR_CODES implementation
 // core/src/test/java/org/apache/iceberg/rest/RESTCatalogAdapter.java
 @Provider
-public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
+public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergExceptionMapper.class);
 
   private static final Map<Class<? extends Exception>, Integer> EXCEPTION_ERROR_CODES =
       ImmutableMap.<Class<? extends Exception>, Integer>builder()
           .put(IllegalArgumentException.class, 400)
+          .put(BadRequestException.class, 400)
           .put(ValidationException.class, 400)
           .put(IllegalNameIdentifierException.class, 400)
           .put(NamespaceNotEmptyException.class, 409)
@@ -73,6 +76,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(NoSuchIcebergTableException.class, 404)
           .put(NoSuchCatalogException.class, 404)
           .put(NoSuchPlanIdException.class, 404)
+          .put(NoSuchPlanTaskException.class, 404)
           .put(UnsupportedOperationException.class, 406)
           .put(NoSuchViewException.class, 404)
           .put(AlreadyExistsException.class, 409)
@@ -122,17 +126,24 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
     return new ServiceFailureException("%s", message);
   }
 
+  /**
+   * Maps an uncaught throwable to an Iceberg REST error response.
+   *
+   * @param ex the failure raised while processing the request
+   * @return the error response, defaulting to HTTP 500 for unmapped failures
+   */
   @Override
-  public Response toResponse(Exception ex) {
+  public Response toResponse(Throwable ex) {
     return toRESTResponse(ex);
   }
 
   public static Response toRESTResponse(Throwable ex) {
+    ServerHealth.getInstance().recordFailure(ex);
     int status =
         EXCEPTION_ERROR_CODES.getOrDefault(
             ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
     if (status == Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-      LOG.warn("Iceberg REST server unexpected exception:", ex);
+      LOG.error("Iceberg REST server unexpected failure:", ex);
     } else {
       LOG.info(
           "Iceberg REST server error maybe caused by user request, response http status: {}, exception: {}, exception message: {}",
