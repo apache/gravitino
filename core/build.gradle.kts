@@ -177,6 +177,8 @@ fun registerCoreTestTask(
 
   if (backend != null) {
     systemProperty(coreTestBackendProperty, backend)
+    // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
+    // configuration action has run - so it doesn't depend on register/configureEach ordering.
     extensions.extraProperties["includeDockerTaggedTests"] = true
 
     // Database tests mutate process-wide state and must remain sequential within each lane.
