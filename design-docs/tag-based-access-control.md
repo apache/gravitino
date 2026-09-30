@@ -184,6 +184,34 @@ access or to reach new territory. [OQ-4](#oq-4--authority-to-confer-access-throu
 who may apply a rule and does not substitute for this, because the applier holds the authority
 privilege by construction — the check they pass is exactly the one the rule would make permanent.
 
+### Credential vending
+
+A tag-conferred privilege does reach storage. `GET .../objects/{type}/{fullName}/credentials` is
+gated by `CAN_ACCESS_METADATA`, which `SELECT_TABLE` or `READ_FILESET` satisfies, so a caller
+holding one only through a tag can obtain a storage credential for that object.
+
+That is intended rather than a leak, and it is why the allowlist admits only data privileges. The
+same privilege granted through a role vends the same credential; a tag changes the route, not the
+reach.
+
+Writes work the same way. Whether a read or a write credential is issued is decided by a privilege
+check of its own: the Iceberg REST server uses
+`ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) || ANY_MODIFY_TABLE`, and the generic credential
+endpoint uses `ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) || ANY_WRITE_FILESET`. Both
+`MODIFY_TABLE` and `WRITE_FILESET` are allowlisted, so a tag that confers one yields a write
+credential, as the same privilege granted through a role would.
+
+What a tag cannot reach is secrets. `getSecrets` is a separate endpoint requiring `USE_SECRETS`,
+which is not on the allowlist, so JDBC passwords and cloud access-key pairs stay out of reach.
+
+How far a credential reaches once issued is the catalog's credential provider's business. A token
+provider scopes it to the object's location; a static secret-key provider hands out the catalog's
+key pair. A tag does not change that either way.
+
+The design does not change a credential once issued — see
+[Enabling the feature](#enabling-the-feature) — and it does not reach an engine that holds its own
+storage credentials and never asks Gravitino for one.
+
 ### `applicableRoles` is a condition, not a principal
 
 The rule does not grant anything to `analyst`. It states that *if* the caller holds `analyst`
@@ -492,7 +520,9 @@ a schema the role cannot enter has no effect. `validate()` rejects both names in
 
 That containment is what makes the worst case analyzable. The most a misapplied tag can do is
 expose an object the role could already traverse to, which scopes the blast radius to the
-territory its RBAC grants already describe rather than to the whole metalake.
+territory its RBAC grants already describe rather than to the whole metalake. It bounds what the
+object reaches on the metadata plane; what a storage credential for that object reaches is a
+separate question — see [Credential vending](#credential-vending).
 
 ### Allow and deny
 
@@ -564,10 +594,16 @@ makes the feature opt-in. It is a kill switch. This adds a new path to the autho
 and an operator who needs it gone — a wrong decision, or list filtering degrading under
 [Cost](#cost) — should not have to unbind policies one at a time to get there.
 
-Flipping it either way takes effect immediately:
+Flipping it either way takes effect immediately on the node serving the request:
 
-- **On to off revokes.** Access held only through a tag disappears at once. Nothing gains access,
-  but callers see a revocation rather than a pause.
+- **On to off revokes.** Access held only through a tag stops being granted. Three bounds apply.
+  Other nodes converge no faster than the transport in [Freshness](#freshness) allows, which until
+  M4 means a TTL. An operation already admitted runs to completion, since the check happens once
+  when the request is authorized. And a storage credential already vended under
+  [Credential vending](#credential-vending) keeps working until it expires, because nothing in
+  Gravitino recalls an issued credential. The flag governs decisions taken after it is flipped, not
+  access already handed out. The stale-allow interval follows from whichever transport
+  [OQ-1](#oq-1--where-tags-are-evaluated) settles on, and is stated and tested with it in M4.
 - **Off to on grants everything authored while it was off.** The authority checks ran when each
   policy was bound, so that access was authorized. The flag decides when it takes effect, not
   whether it was allowed.
@@ -644,6 +680,11 @@ Ranger tag policies can deny; the policies here cannot. Lake Formation and Unity
 allow-only, and Databricks states that GRANT policies cannot revoke access granted directly, so the
 restriction in [Allow and deny](#allow-and-deny) is the majority position rather than an unusual
 one.
+
+Unity Catalog does raise an error where policies conflict, but only between row filters and column
+masks, where two transformations have no principled order to apply in. Its privilege composition is
+additive. It is not precedent for a conflict error in a design that makes whole-object decisions and
+excludes masking — see [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
 
 Ranger is also the only one of the three that documents an answer to [Freshness](#freshness): the
 plugin caches tags locally, polls the tag store for changes, and falls back to the cache file when
@@ -724,22 +765,28 @@ its author cannot see. Cascade stays available later as an explicit, confirmed a
 
 ### OQ-4 — authority to confer access through a tag
 
-Two write paths confer access without going through a grant: applying a tag that carries an access
-policy, and binding an access policy to a tag that is already applied. Neither checks grant
-authority. A user holding only `SELECT_TABLE` can apply a tag that gives another role
-`MODIFY_TABLE` — read access on an object becomes authority over who else can reach it.
+Three write paths confer access without going through a grant: applying a tag that carries an
+access policy, binding an access policy to a tag that is already applied, and widening a bound
+policy by adding a privilege or a role to its `content`. None of them checks grant authority. A
+user holding only `SELECT_TABLE` can apply a tag that gives another role `MODIFY_TABLE` — read
+access on an object becomes authority over who else can reach it.
 
 |              | Option                                                                  | Behaviour                                                                                                                                                                                                                                                                                                           |
 | ------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Proposed** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
+| **Proposed** | Require policy authority to bind or widen an access policy               | Covers the other two paths. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once.                                                                                                                                                          |
 |              | Leave as is                                                             | Reading an object is enough to change who else can reach it.                                                                                                                                                                                                                                                        |
 |              | Require the applier to hold the privilege the tag confers               | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles.                                                                                                                        |
-|              | Require policy authority to bind an access policy to a tag              | Covers the other write path. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once.                                                                                                                                                         |
 
 Justification: the two requirements cover different halves — one governs who may change access
 on an object, the other who may wield a tag that confers it. Neither adds a new privilege, and
 scoping needs no new mechanism, because grant authority can already be given on a catalog or a
 schema.
+
+Widening takes the same requirement as binding: the policy is already attached, so adding a
+privilege or a role to `content` confers access across everything the tag reaches with no further
+act by anyone. Neither is scoped to the tag's current reach — authority comes from where it was
+granted, on a catalog or a schema. M2 covers all three paths.
 
 The earlier alternative of extending `ApplyTag.canBindTo` to `CATALOG` and `SCHEMA` is deferred
 beyond v1. It is not a prerequisite for M2: the explicit tag grant answers *which tag*, while
@@ -758,7 +805,7 @@ resolves differently, the milestones marked against it change shape.
 | Milestone                         | What lands                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Rests on                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1 — model and storage            | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist.                                                                                                                                                                      |
-| M2 — authority on the write paths | The checks that applying an access-carrying tag, and binding an access policy to a tag already applied, have to make. Lands before M3 is switched on, or both paths confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
+| M2 — authority on the write paths | The authority checks on the three write paths in OQ-4: applying an access-carrying tag, binding a policy to a tag already applied, and widening a bound policy's `content`. Lands before M3 is switched on, or all three confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
 | M3 — enforcement, single node     | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). The component boundaries and test acceptance criteria in [Independently testable evaluation](#independently-testable-evaluation) land here too. Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
 | M4 — freshness                    | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way.                                                                                                                             |
 | M5 — affordable list filtering    | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3.                                                                                                                                                                                                                         |
