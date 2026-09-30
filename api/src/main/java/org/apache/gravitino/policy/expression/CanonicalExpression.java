@@ -755,6 +755,34 @@ final class ExpressionValidation {
             == CanonicalExpression.LiteralType.BOOLEAN;
   }
 
+  static boolean isContextOnly(CanonicalExpression expression) {
+    if (expression instanceof CanonicalExpression.Column) {
+      return false;
+    }
+    if (!(expression instanceof CanonicalExpression.Operation)) {
+      return true;
+    }
+
+    CanonicalExpression.Operation operation = (CanonicalExpression.Operation) expression;
+    if (operation.left() != null && !isContextOnly(operation.left())) {
+      return false;
+    }
+    if (operation.right() != null && !isContextOnly(operation.right())) {
+      return false;
+    }
+    if (operation.operand() != null && !isContextOnly(operation.operand())) {
+      return false;
+    }
+    if (operation.operands() != null) {
+      for (CanonicalExpression child : operation.operands()) {
+        if (!isContextOnly(child)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   static void validateComparison(
       CanonicalExpression.Operator operator, CanonicalExpression left, CanonicalExpression right) {
     if (operator == CanonicalExpression.Operator.IN) {

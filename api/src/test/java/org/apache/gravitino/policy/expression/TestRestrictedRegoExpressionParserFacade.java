@@ -19,6 +19,7 @@
 package org.apache.gravitino.policy.expression;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Column;
 import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
@@ -28,6 +29,10 @@ import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operation;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.MaskAction;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RowFilter;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RuleType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,17 +42,44 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestRestrictedRegoExpressionParserFacade {
 
   @Test
+  void testParsesTypedRules() {
+    RowFilter filter =
+        RestrictedRegoExpressionParserFacade.parseRowFilter(
+            "filter := col(\"owner\") == session_user()");
+    Assertions.assertEquals(RuleType.FILTER, filter.ruleType());
+    Assertions.assertFalse(filter.isConditional());
+    Assertions.assertInstanceOf(Operation.class, filter.fallback());
+
+    ColumnMask mask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask("mask := action(\"show-last-4\")");
+    Assertions.assertEquals(RuleType.MASK, mask.ruleType());
+    Assertions.assertFalse(mask.isConditional());
+    Assertions.assertEquals(MaskAction.SHOW_LAST_4, mask.fallback());
+
+    Assertions.assertInstanceOf(
+        RowFilter.class, RestrictedRegoExpressionParserFacade.parse("filter := true"));
+    Assertions.assertInstanceOf(
+        ColumnMask.class,
+        RestrictedRegoExpressionParserFacade.parse("mask := action(\"mask-alphanum\")"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            RestrictedRegoExpressionParserFacade.parseRowFilter("mask := action(\"show-last-4\")"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RestrictedRegoExpressionParserFacade.parseColumnMask("filter := true"));
+  }
+
+  @Test
   void testParsesContextReferences() {
-    Operation comparison =
-        (Operation) RestrictedRegoExpressionParserFacade.parse("col(\"owner\") == session_user()");
+    Operation comparison = (Operation) parseFilterExpression("col(\"owner\") == session_user()");
 
     Assertions.assertEquals(Operator.EQ, comparison.op());
     Assertions.assertEquals("owner", ((Column) comparison.left()).name());
     Assertions.assertInstanceOf(SessionUser.class, comparison.right());
 
     GroupMembership membership =
-        (GroupMembership)
-            RestrictedRegoExpressionParserFacade.parse("is_group_member(\"auditors\")");
+        (GroupMembership) parseFilterExpression("is_group_member(\"auditors\")");
     Assertions.assertEquals("auditors", membership.group());
   }
 
@@ -55,7 +87,7 @@ public class TestRestrictedRegoExpressionParserFacade {
   void testParsesPrecedenceAndLiteralArray() {
     Operation or =
         (Operation)
-            RestrictedRegoExpressionParserFacade.parse(
+            parseFilterExpression(
                 "col(\"region\") in [\"US\", \"CA\"] or "
                     + "col(\"level\") >= 3 and not col(\"deleted\") == true");
 
@@ -79,81 +111,115 @@ public class TestRestrictedRegoExpressionParserFacade {
   }
 
   @Test
+  void testParsesConditionalRowFilterAndLowersFirstMatch() {
+    RowFilter filter =
+        RestrictedRegoExpressionParserFacade.parseRowFilter(
+            "filter := col(\"tenant\") == session_user() if is_group_member(\"member\") "
+                + "else := col(\"public\") == true if session_user() == \"guest\" "
+                + "else := false");
+
+    Assertions.assertTrue(filter.isConditional());
+    Assertions.assertEquals(2, filter.branches().size());
+    Assertions.assertInstanceOf(GroupMembership.class, filter.branches().get(0).condition());
+    Assertions.assertEquals(Operator.EQ, ((Operation) filter.branches().get(1).condition()).op());
+    Assertions.assertEquals(false, ((Literal) filter.fallback()).value());
+    Assertions.assertThrows(UnsupportedOperationException.class, () -> filter.branches().add(null));
+
+    Operation lowered = (Operation) filter.lower();
+    Assertions.assertEquals(Operator.OR, lowered.op());
+    Assertions.assertEquals(Operator.AND, ((Operation) lowered.operands().get(0)).op());
+    Operation remaining = (Operation) lowered.operands().get(1);
+    Assertions.assertEquals(Operator.AND, remaining.op());
+    Assertions.assertEquals(Operator.NOT, ((Operation) remaining.operands().get(0)).op());
+    Assertions.assertEquals(Operator.OR, ((Operation) remaining.operands().get(1)).op());
+  }
+
+  @Test
+  void testParsesConditionalColumnMask() {
+    ColumnMask mask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"show-last-4\") if is_group_member(\"support\") "
+                + "else := action(\"sha-256-query-local\") if session_user() == \"service\" "
+                + "else := action(\"replace-with-null\")");
+
+    Assertions.assertTrue(mask.isConditional());
+    Assertions.assertEquals(2, mask.branches().size());
+    Assertions.assertEquals(MaskAction.SHOW_LAST_4, mask.branches().get(0).action());
+    Assertions.assertEquals(MaskAction.SHA_256_QUERY_LOCAL, mask.branches().get(1).action());
+    Assertions.assertEquals(MaskAction.REPLACE_WITH_NULL, mask.fallback());
+    Assertions.assertInstanceOf(GroupMembership.class, mask.branches().get(0).condition());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "mask-alphanum",
+        "mask-to-fixed-value",
+        "replace-with-null",
+        "show-first-4",
+        "show-last-4",
+        "truncate-to-year",
+        "truncate-to-month",
+        "sha-256-global",
+        "sha-256-query-local"
+      })
+  void testAcceptsAllMaskActions(String action) {
+    ColumnMask mask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask("mask := action(\"" + action + "\")");
+    Assertions.assertEquals(action, mask.fallback().value());
+  }
+
+  @Test
   void testRetainsExactNumbersAndNegativeZero() {
-    Operation comparison =
-        (Operation) RestrictedRegoExpressionParserFacade.parse("col(\"ratio\") == -0.00");
+    Operation comparison = (Operation) parseFilterExpression("col(\"ratio\") == -0.00");
     Literal literal = (Literal) comparison.right();
 
     Assertions.assertEquals(new BigDecimal("0.00"), literal.value());
     Assertions.assertTrue(literal.negativeZero());
 
-    Operation positiveZero =
-        (Operation) RestrictedRegoExpressionParserFacade.parse("col(\"ratio\") == 0.00");
+    Operation positiveZero = (Operation) parseFilterExpression("col(\"ratio\") == 0.00");
     Assertions.assertNotEquals(literal, positiveZero.right());
 
-    Operation one = (Operation) RestrictedRegoExpressionParserFacade.parse("col(\"x\") == 1");
-    Operation onePointZero =
-        (Operation) RestrictedRegoExpressionParserFacade.parse("col(\"x\") == 1.00");
+    Operation one = (Operation) parseFilterExpression("col(\"x\") == 1");
+    Operation onePointZero = (Operation) parseFilterExpression("col(\"x\") == 1.00");
     Assertions.assertEquals(one.right(), onePointZero.right());
   }
 
   @Test
   void testDecodesJsonStringsWithoutNormalizing() {
-    Operation comparison =
-        (Operation) RestrictedRegoExpressionParserFacade.parse("col(\"a\\\"b.c\") == \"a'b\\n\"");
+    Operation comparison = (Operation) parseFilterExpression("col(\"a\\\"b.c\") == \"a'b\\n\"");
 
     Assertions.assertEquals("a\"b.c", ((Column) comparison.left()).name());
     Assertions.assertEquals("a'b\n", ((Literal) comparison.right()).value());
 
     String escapedPair = "\\" + "uD83D" + "\\" + "uDE00";
     Operation unicode =
-        (Operation)
-            RestrictedRegoExpressionParserFacade.parse("col(\"emoji\") == \"" + escapedPair + "\"");
+        (Operation) parseFilterExpression("col(\"emoji\") == \"" + escapedPair + "\"");
     Assertions.assertEquals("😀", ((Literal) unicode.right()).value());
-  }
-
-  @Test
-  void testContextOnlyConditions() {
-    Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parseContextCondition(
-                "not is_group_member(\"pii_unmasked\") " + "and session_user() != \"service\""));
-    Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parseContextCondition(
-                "session_user() in [\"alice\", \"bob\"]"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            RestrictedRegoExpressionParserFacade.parseContextCondition(
-                "col(\"region\") == \"US\""));
   }
 
   @Test
   void testSourceDepthLimit() {
     CanonicalExpression depthEight =
-        RestrictedRegoExpressionParserFacade.parse(
-            "not not not not not not not col(\"active\") == true");
+        parseFilterExpression("not not not not not not not col(\"active\") == true");
     Assertions.assertEquals(8, depthEight.depth());
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "not not not not not not not not col(\"active\") == true"));
+        () -> parseFilterExpression("not not not not not not not not col(\"active\") == true"));
   }
 
   @Test
   void testChecksSourceDepthBeforeBooleanFlattening() {
     CanonicalExpression depthEight =
-        RestrictedRegoExpressionParserFacade.parse(
+        parseFilterExpression(
             "true and true and true and true and true and true and true and true");
     Assertions.assertEquals(8, depthEight.depth());
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            RestrictedRegoExpressionParserFacade.parse(
+            parseFilterExpression(
                 "true and true and true and true and true and true and true and true and true"));
   }
 
@@ -163,62 +229,68 @@ public class TestRestrictedRegoExpressionParserFacade {
     String nul = "\\" + "u0000";
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "col(\"" + isolatedSurrogate + "\") == \"x\""));
+        () -> parseFilterExpression("col(\"" + isolatedSurrogate + "\") == \"x\""));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "col(\"x\") == \"" + isolatedSurrogate + "\""));
+        () -> parseFilterExpression("col(\"x\") == \"" + isolatedSurrogate + "\""));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RestrictedRegoExpressionParserFacade.parse("col(\"" + nul + "\") == \"x\""));
+        () -> parseFilterExpression("col(\"" + nul + "\") == \"x\""));
   }
 
   @Test
   void testResourceLimits() {
-    String maximumSource = "true" + " ".repeat(16 * 1024 - 4);
-    Assertions.assertDoesNotThrow(() -> RestrictedRegoExpressionParserFacade.parse(maximumSource));
+    String sourcePrefix = "filter := true";
+    String maximumSource =
+        sourcePrefix + " ".repeat(16 * 1024 - sourcePrefix.getBytes(StandardCharsets.UTF_8).length);
+    Assertions.assertDoesNotThrow(
+        () -> RestrictedRegoExpressionParserFacade.parseRowFilter(maximumSource));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RestrictedRegoExpressionParserFacade.parse(maximumSource + " "));
+        () -> RestrictedRegoExpressionParserFacade.parseRowFilter(maximumSource + " "));
 
     String maximumString = "a".repeat(4 * 1024);
     Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "col(\"value\") == \"" + maximumString + "\""));
+        () -> parseFilterExpression("col(\"value\") == \"" + maximumString + "\""));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "col(\"value\") == \"" + maximumString + "a\""));
+        () -> parseFilterExpression("col(\"value\") == \"" + maximumString + "a\""));
 
     String maximumUnicodeString = "😀".repeat(1024);
     Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "col(\"value\") == \"" + maximumUnicodeString + "\""));
+        () -> parseFilterExpression("col(\"value\") == \"" + maximumUnicodeString + "\""));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "col(\"value\") == \"" + maximumUnicodeString + "😀\""));
+        () -> parseFilterExpression("col(\"value\") == \"" + maximumUnicodeString + "😀\""));
 
     Assertions.assertDoesNotThrow(
-        () -> RestrictedRegoExpressionParserFacade.parse("col(\"value\") in " + literalArray(256)));
+        () -> parseFilterExpression("col(\"value\") in " + literalArray(256)));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RestrictedRegoExpressionParserFacade.parse("col(\"value\") in " + literalArray(257)));
+        () -> parseFilterExpression("col(\"value\") in " + literalArray(257)));
+
+    Assertions.assertDoesNotThrow(
+        () -> parseFilterExpression("not (" + balancedAndExpression(0, 64) + ")"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> parseFilterExpression(balancedAndExpression(0, 65)));
 
     Assertions.assertDoesNotThrow(
         () ->
-            RestrictedRegoExpressionParserFacade.parse(
-                "not (" + balancedAndExpression(0, 64) + ")"));
+            RestrictedRegoExpressionParserFacade.parseRowFilter(
+                "filter := "
+                    + balancedAndExpression(0, 32)
+                    + " if "
+                    + balancedAndExpression(32, 64)
+                    + " else := true"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RestrictedRegoExpressionParserFacade.parse(balancedAndExpression(0, 65)));
+        () ->
+            RestrictedRegoExpressionParserFacade.parseRowFilter(
+                "filter := "
+                    + balancedAndExpression(0, 33)
+                    + " if "
+                    + balancedAndExpression(33, 66)
+                    + " else := true"));
   }
 
   @ParameterizedTest
@@ -239,14 +311,12 @@ public class TestRestrictedRegoExpressionParserFacade {
         "false"
       })
   void testAcceptsAllowlistedExpressions(String expression) {
-    Assertions.assertDoesNotThrow(() -> RestrictedRegoExpressionParserFacade.parse(expression));
+    Assertions.assertDoesNotThrow(() -> parseFilterExpression(expression));
   }
 
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "",
-        " ",
         "col(\"owner\")",
         "session_user()",
         "\"alice\"",
@@ -279,8 +349,41 @@ public class TestRestrictedRegoExpressionParserFacade {
       })
   void testRejectsUnsupportedOrMalformedExpressions(String expression) {
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RestrictedRegoExpressionParserFacade.parse(expression));
+        IllegalArgumentException.class, () -> parseFilterExpression(expression));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "",
+        " ",
+        "true",
+        "result := true",
+        "package restrictions",
+        "import data.rules",
+        "filter := true filter := false",
+        "filter := true { true }",
+        "filter := true # comment",
+        "filter := true if is_group_member(\"a\")",
+        "filter := true if true else := false if false",
+        "filter := true then false else := false",
+        "filter := \"not-boolean\"",
+        "mask := \"show-last-4\"",
+        "mask := action(\"unknown\")",
+        "mask := action(\"show-last-4\") if true",
+        "mask := action(\"show-last-4\") if col(\"region\") == \"US\" else := action(\"mask-alphanum\")",
+        "mask := action(\"show-last-4\") if true else := action(\"mask-alphanum\") if col(\"x\") == 1 else := action(\"replace-with-null\")",
+        "mask := true",
+        "filter := action(\"show-last-4\")"
+      })
+  void testRejectsUnsupportedOrMalformedPrograms(String source) {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> RestrictedRegoExpressionParserFacade.parse(source));
+  }
+
+  private static CanonicalExpression parseFilterExpression(String expression) {
+    return RestrictedRegoExpressionParserFacade.parseRowFilter("filter := " + expression)
+        .fallback();
   }
 
   private static String literalArray(int elementCount) {
