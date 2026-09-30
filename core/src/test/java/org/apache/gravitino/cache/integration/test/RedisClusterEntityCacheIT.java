@@ -71,6 +71,7 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
 
   private GenericContainer<?> container;
   private String address;
+  private Set<HostAndPort> seeds;
   private JedisCluster rawClient;
 
   @BeforeAll
@@ -106,7 +107,7 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
               .collect(Collectors.joining(","));
       expectedNodes = NODES;
     }
-    Set<HostAndPort> seeds =
+    seeds =
         Arrays.stream(address.split(","))
             .map(String::trim)
             .map(HostAndPort::from)
@@ -176,6 +177,28 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
     return replicas;
   }
 
+  /**
+   * Waits until a freshly discovered slot map shows every replica of the container cluster. A busy
+   * runner can briefly mark a replica as failed after startup, and {@code CLUSTER SLOTS} leaves
+   * failed replicas out, so a single count taken mid-suite can come up short.
+   */
+  private int awaitAllReplicas() {
+    int wanted = MASTERS * REPLICAS_PER_MASTER;
+    return Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .ignoreExceptionsInstanceOf(JedisException.class)
+        .until(
+            () -> {
+              try (JedisCluster probe = new JedisCluster(seeds)) {
+                return probe.getClusterNodes().size() >= MASTERS + wanted
+                    ? replicaCount(probe)
+                    : -1;
+              }
+            },
+            count -> count == wanted);
+  }
+
   /** Whether a TCP connection to the address succeeds within the timeout, retrying meanwhile. */
   private static boolean reachable(String host, int port, long timeoutMs) {
     long deadline = System.currentTimeMillis() + timeoutMs;
@@ -199,13 +222,9 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
   void testClusterHasReplicasAndNodeWideOperationsSkipThem() {
     // With replicas present, every node-wide operation must still see each metalake exactly once
     // and never be redirected, whichever node the client happens to talk to.
-    int replicas = replicaCount(rawClient);
     if (container != null) {
-      Assertions.assertEquals(
-          MASTERS * REPLICAS_PER_MASTER, replicas, "the container cluster must have replicas");
+      Assertions.assertEquals(MASTERS * REPLICAS_PER_MASTER, awaitAllReplicas());
     }
-    Assertions.assertTrue(
-        rawClient.getClusterNodes().size() >= MASTERS + replicas, "client must see every node");
     RedisEntityCache cache = newNode();
     for (int m = 0; m < 12; m++) {
       load(cache, metalake("metalake" + m));
