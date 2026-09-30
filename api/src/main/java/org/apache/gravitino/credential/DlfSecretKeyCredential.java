@@ -31,6 +31,10 @@ import org.apache.commons.lang3.StringUtils;
  * {@code dlf-access-key-secret}, and optionally {@code dlf-security-token}. Connectors map these to
  * Paimon REST keys {@code dlf.access-key-id}, {@code dlf.access-key-secret}, and {@code
  * dlf.security-token}.
+ *
+ * <p>{@code dlf-security-token} is passed through as-is. {@link #expireTimeInMs()} is always {@code
+ * 0}; Gravitino does not refresh this STS token. For rotating DLF tokens, configure {@code
+ * dlf-token-loader} / {@code dlf-token-path} on the Paimon catalog instead.
  */
 public class DlfSecretKeyCredential implements Credential {
 
@@ -133,11 +137,6 @@ public class DlfSecretKeyCredential implements Credential {
   @Nullable
   public String securityToken() {
     return securityToken;
-  }
-
-  @Override
-  public String toString() {
-    return "DlfSecretKeyCredential{accessKeyId='" + accessKeyId + "'}";
   }
 
   private void validate(String accessKeyId, String accessKeySecret, long expireTimeInMs) {

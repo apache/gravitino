@@ -101,11 +101,6 @@ public class AwsSecretKeyCredential implements Credential {
     return secretAccessKey;
   }
 
-  @Override
-  public String toString() {
-    return "AwsSecretKeyCredential{accessKeyId='" + accessKeyId + "'}";
-  }
-
   private void validate(String accessKeyId, String secretAccessKey, long expireTimeInMs) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(accessKeyId), "AWS access key ID should not be empty");

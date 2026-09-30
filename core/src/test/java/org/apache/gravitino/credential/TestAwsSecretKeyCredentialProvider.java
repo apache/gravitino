@@ -57,4 +57,16 @@ public class TestAwsSecretKeyCredentialProvider {
     Assertions.assertTrue(
         provider.getCredentialOptional(new CatalogCredentialContext("u")).isEmpty());
   }
+
+  @Test
+  void testIncompletePairThrows() {
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                CredentialProviderFactory.create(
+                    AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE,
+                    ImmutableMap.of(AwsSecretKeyCredential.GRAVITINO_AWS_ACCESS_KEY_ID, "AKIA")));
+    Assertions.assertInstanceOf(IllegalArgumentException.class, e.getCause());
+  }
 }

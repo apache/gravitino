@@ -18,16 +18,13 @@
  */
 package org.apache.gravitino.credential;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Generates static AWS access-key credentials for Glue API authentication. */
 public class AwsSecretKeyCredentialProvider implements CredentialProvider {
-
-  private static final Logger LOG = LoggerFactory.getLogger(AwsSecretKeyCredentialProvider.class);
 
   private String accessKeyId;
   private String secretAccessKey;
@@ -39,16 +36,14 @@ public class AwsSecretKeyCredentialProvider implements CredentialProvider {
     }
     this.accessKeyId = properties.get(AwsSecretKeyCredential.GRAVITINO_AWS_ACCESS_KEY_ID);
     this.secretAccessKey = properties.get(AwsSecretKeyCredential.GRAVITINO_AWS_SECRET_ACCESS_KEY);
-    if (StringUtils.isNotBlank(accessKeyId) ^ StringUtils.isNotBlank(secretAccessKey)) {
-      LOG.warn(
-          "Incomplete AWS static credential pair for {}: both {} and {} are required;"
-              + " found accessKeyIdBlank={}, secretAccessKeyBlank={}",
-          AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE,
-          AwsSecretKeyCredential.GRAVITINO_AWS_ACCESS_KEY_ID,
-          AwsSecretKeyCredential.GRAVITINO_AWS_SECRET_ACCESS_KEY,
-          StringUtils.isBlank(accessKeyId),
-          StringUtils.isBlank(secretAccessKey));
-    }
+    boolean hasAccessKeyId = StringUtils.isNotBlank(accessKeyId);
+    boolean hasSecretAccessKey = StringUtils.isNotBlank(secretAccessKey);
+    Preconditions.checkArgument(
+        hasAccessKeyId == hasSecretAccessKey,
+        "Incomplete AWS static credential pair for %s: both %s and %s are required",
+        AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE,
+        AwsSecretKeyCredential.GRAVITINO_AWS_ACCESS_KEY_ID,
+        AwsSecretKeyCredential.GRAVITINO_AWS_SECRET_ACCESS_KEY);
   }
 
   @Override

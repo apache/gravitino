@@ -18,16 +18,13 @@
  */
 package org.apache.gravitino.credential;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Generates static DLF access-key credentials for Paimon DLF catalogs. */
 public class DlfSecretKeyCredentialProvider implements CredentialProvider {
-
-  private static final Logger LOG = LoggerFactory.getLogger(DlfSecretKeyCredentialProvider.class);
 
   private String accessKeyId;
   private String accessKeySecret;
@@ -41,16 +38,14 @@ public class DlfSecretKeyCredentialProvider implements CredentialProvider {
     this.accessKeyId = properties.get(DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID);
     this.accessKeySecret = properties.get(DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_SECRET);
     this.securityToken = properties.get(DlfSecretKeyCredential.GRAVITINO_DLF_SECURITY_TOKEN);
-    if (StringUtils.isNotBlank(accessKeyId) ^ StringUtils.isNotBlank(accessKeySecret)) {
-      LOG.warn(
-          "Incomplete DLF static credential pair for {}: both {} and {} are required;"
-              + " found accessKeyIdBlank={}, accessKeySecretBlank={}",
-          DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
-          DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID,
-          DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_SECRET,
-          StringUtils.isBlank(accessKeyId),
-          StringUtils.isBlank(accessKeySecret));
-    }
+    boolean hasAccessKeyId = StringUtils.isNotBlank(accessKeyId);
+    boolean hasAccessKeySecret = StringUtils.isNotBlank(accessKeySecret);
+    Preconditions.checkArgument(
+        hasAccessKeyId == hasAccessKeySecret,
+        "Incomplete DLF static credential pair for %s: both %s and %s are required",
+        DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
+        DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID,
+        DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_SECRET);
   }
 
   @Override

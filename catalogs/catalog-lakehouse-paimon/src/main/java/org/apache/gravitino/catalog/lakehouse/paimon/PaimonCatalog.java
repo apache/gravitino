@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -90,28 +91,17 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
   /**
    * Ensures JDBC / DLF providers stay listed even when {@code credential-providers} was set
-   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case,
-   * and those keys are no longer recovered via {@code getSecrets}.
+   * explicitly. {@code super} skips {@link #addCatalogSpecificCredentialProviders} in that case, so
+   * without this override {@code getCredentials} would not vend JDBC/DLF (callers with {@code
+   * USE_SECRETS} can still recover those keys via {@code getSecrets}; DLF cloud pairs also need
+   * {@code INCLUDE_CREDENTIAL_SECRETS}).
    *
    * @return catalog properties with credential providers
    */
   @Override
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> props = super.propertiesWithCredentialProviders();
-    String catalogBackend = props.get(PaimonConstants.CATALOG_BACKEND);
-    if (catalogBackend != null
-        && PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
-      String jdbcUser = props.get(PaimonConstants.GRAVITINO_JDBC_USER);
-      String jdbcPassword = props.get(PaimonConstants.GRAVITINO_JDBC_PASSWORD);
-      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
-        ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
-      }
-    }
-    String dlfAccessKeyId = props.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID);
-    String dlfAccessKeySecret = props.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(dlfAccessKeyId) && StringUtils.isNotBlank(dlfAccessKeySecret)) {
-      ensureCredentialProviderListed(props, DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE);
-    }
+    detectJdbcAndDlfProviders(props, type -> ensureCredentialProviderListed(props, type));
     return props;
   }
 
@@ -125,20 +115,25 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   @Override
   protected void addCatalogSpecificCredentialProviders(
       Map<String, String> properties, List<String> credentialProviders) {
+    detectJdbcAndDlfProviders(properties, credentialProviders::add);
+    addStorageCredentialProviders(properties, credentialProviders);
+  }
+
+  private static void detectJdbcAndDlfProviders(
+      Map<String, String> properties, Consumer<String> onProvider) {
     String catalogBackend = properties.get(PaimonConstants.CATALOG_BACKEND);
     if (catalogBackend != null
         && PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
       String jdbcUser = properties.get(PaimonConstants.GRAVITINO_JDBC_USER);
       String jdbcPassword = properties.get(PaimonConstants.GRAVITINO_JDBC_PASSWORD);
       if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
-        credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+        onProvider.accept(JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
     }
     String dlfAccessKeyId = properties.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID);
     String dlfAccessKeySecret = properties.get(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET);
     if (StringUtils.isNotBlank(dlfAccessKeyId) && StringUtils.isNotBlank(dlfAccessKeySecret)) {
-      credentialProviders.add(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE);
+      onProvider.accept(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE);
     }
-    addStorageCredentialProviders(properties, credentialProviders);
   }
 }

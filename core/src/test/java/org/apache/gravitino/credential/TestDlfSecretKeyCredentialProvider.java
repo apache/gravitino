@@ -68,4 +68,16 @@ public class TestDlfSecretKeyCredentialProvider {
     Assertions.assertNull(dlf.securityToken());
     Assertions.assertFalse(dlf.credentialInfo().containsKey("dlf-security-token"));
   }
+
+  @Test
+  void testIncompletePairThrows() {
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                CredentialProviderFactory.create(
+                    DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
+                    ImmutableMap.of(DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak")));
+    Assertions.assertInstanceOf(IllegalArgumentException.class, e.getCause());
+  }
 }
