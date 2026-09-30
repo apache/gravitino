@@ -546,7 +546,9 @@ class BaseGVFSOperations(ABC):
         fileset_props.update(user_defined_configs)
         return fileset_props
 
-    def _merge_static_catalog_credentials(self, fileset_props: Dict[str, str], catalog) -> None:
+    def _merge_static_catalog_credentials(
+        self, fileset_props: Dict[str, str], catalog
+    ) -> None:
         """Overlay static catalog credential_info into fileset_props.
 
         Called when a filesystem is created, so results are not cached here — rotated

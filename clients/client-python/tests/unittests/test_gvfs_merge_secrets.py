@@ -166,7 +166,9 @@ class TestGVFSMergeSecrets(unittest.TestCase):
             "s3-access-key-id": "AKIATEST",
             "s3-secret-access-key": "secret",
         }
-        catalog.support_credentials.return_value.get_credentials.return_value = [credential]
+        catalog.support_credentials.return_value.get_credentials.return_value = [
+            credential
+        ]
 
         client = MagicMock()
         client.load_catalog.return_value = catalog
@@ -184,16 +186,18 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["s3_secret_access_key"], "secret")
         catalog.support_credentials.return_value.get_credentials.assert_called_once()
 
-        # Cached: second merge must not call get_credentials again.
+        # No permanent static-credential cache: each merge reloads get_credentials.
         with patch.object(operations, "_get_gravitino_client", return_value=client):
             with patch.object(operations, "_get_user_defined_configs", return_value={}):
                 operations._merge_fileset_properties(
                     NameIdentifier.of("ml", "catalog", "schema", "fs"),
                     "s3://bucket/data",
                 )
-        catalog.support_credentials.return_value.get_credentials.assert_called_once()
+        self.assertEqual(
+            catalog.support_credentials.return_value.get_credentials.call_count, 2
+        )
 
-    def test_rest_failure_does_not_cache_empty_static_credentials(self):
+    def test_rest_failure_retries_static_credentials_on_next_merge(self):
         operations = DefaultGVFSOperations(
             server_uri="http://localhost:8090", metalake_name="ml", options={}
         )
@@ -235,9 +239,13 @@ class TestGVFSMergeSecrets(unittest.TestCase):
                 )
                 catalog = MagicMock()
                 catalog.name.return_value = "catalog"
-                catalog.properties.return_value = {"s3-endpoint": "http://s3.example.com"}
+                catalog.properties.return_value = {
+                    "s3-endpoint": "http://s3.example.com"
+                }
                 catalog.get_secrets.return_value = {}
-                catalog.support_credentials.return_value.get_credentials.side_effect = exc
+                catalog.support_credentials.return_value.get_credentials.side_effect = (
+                    exc
+                )
 
                 merged = self._merge_with_catalog(operations, catalog)
                 self.assertEqual(merged["s3-endpoint"], "http://s3.example.com")
@@ -265,7 +273,10 @@ class TestGVFSMergeSecrets(unittest.TestCase):
             "s3-access-key-id": "AKIATEST",
             "s3-secret-access-key": "static-secret",
         }
-        catalog.support_credentials.return_value.get_credentials.return_value = [token, static]
+        catalog.support_credentials.return_value.get_credentials.return_value = [
+            token,
+            static,
+        ]
 
         merged = self._merge_with_catalog(operations, catalog)
         self.assertEqual(merged["s3-access-key-id"], "AKIATEST")
