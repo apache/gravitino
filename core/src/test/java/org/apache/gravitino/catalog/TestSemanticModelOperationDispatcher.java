@@ -46,9 +46,12 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
@@ -58,6 +61,8 @@ import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityS
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 public class TestSemanticModelOperationDispatcher {
 
@@ -276,6 +281,89 @@ public class TestSemanticModelOperationDispatcher {
         IllegalArgumentException.class,
         () -> dispatcher.createSemanticModel(MODEL_IDENT, null, validDefinition(), null));
     verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testOssieExportImportRoundTrip(OssieFormat format) {
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT,
+            "Sales",
+            validDefinition(),
+            Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, "future-version"));
+
+    OssieDocument document = dispatcher.exportOssieSemanticModel(MODEL_IDENT, format);
+    assertEquals(format, document.format());
+    assertThrows(
+        SemanticModelAlreadyExistsException.class,
+        () -> dispatcher.importOssieSemanticModel(NAMESPACE, document));
+    assertSame(original, dispatcher.loadSemanticModel(MODEL_IDENT));
+
+    assertTrue(dispatcher.dropSemanticModel(MODEL_IDENT));
+    SemanticModel imported = dispatcher.importOssieSemanticModel(NAMESPACE, document);
+    assertEquals(original.name(), imported.name());
+    assertEquals(original.comment(), imported.comment());
+    assertEquals(original.definition(), imported.definition());
+    assertEquals(original.properties(), imported.properties());
+    assertSame(imported, dispatcher.loadSemanticModel(MODEL_IDENT));
+  }
+
+  @Test
+  public void testOssieImportReusesDefinitionValidationWithoutPersisting() {
+    OssieDocument invalid =
+        OssieDocument.yaml(
+            """
+            version: 0.2.0.dev0
+            name: sales_model
+            datasets:
+              - name: orders
+                source: sales.mart.orders
+            relationships:
+              - name: orders_to_missing
+                from: orders
+                to: missing
+                from_columns: [customer_id]
+                to_columns: [customer_id]
+            """);
+
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () -> dispatcher.importOssieSemanticModel(NAMESPACE, invalid));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+  }
+
+  @Test
+  public void testOssieImportRejectsWrongFormatBeforeCatalogLookup() {
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () ->
+            dispatcher.importOssieSemanticModel(
+                NAMESPACE, OssieDocument.json(ossieDocument().content())));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testOssieOperationsPreserveMissingObjectErrors() {
+    assertThrows(
+        NoSuchSemanticModelException.class,
+        () -> dispatcher.exportOssieSemanticModel(MODEL_IDENT, OssieFormat.YAML));
+    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
+        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
+    assertThrows(
+        NoSuchSchemaException.class,
+        () -> dispatcher.importOssieSemanticModel(NAMESPACE, ossieDocument()));
+  }
+
+  private static OssieDocument ossieDocument() {
+    return OssieDocument.yaml(
+        """
+        version: 0.2.0.dev0
+        name: sales_model
+        datasets:
+          - name: orders
+            source: sales.mart.orders
+        """);
   }
 
   private static SemanticModelDefinition validDefinition() {

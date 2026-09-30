@@ -18,11 +18,18 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Locale;
@@ -33,11 +40,15 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.OssieSemanticModelDocumentConverter;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestSemanticModelNormalizeDispatcher {
 
@@ -110,6 +121,58 @@ public class TestSemanticModelNormalizeDispatcher {
     assertThrows(
         IllegalArgumentException.class,
         () -> dispatcher.alterSemanticModel(INPUT_IDENT, new SemanticModelChange[0]));
+  }
+
+  @Test
+  public void testOssieImportUsesNativeCreateNormalization() {
+    SemanticModel model = mock(SemanticModel.class);
+    Map<String, String> properties = Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION);
+    when(delegate.createSemanticModel(
+            eq(NORMALIZED_IDENT), isNull(), any(SemanticModelDefinition.class), eq(properties)))
+        .thenReturn(model);
+
+    assertEquals(
+        model, dispatcher.importOssieSemanticModel(INPUT_NAMESPACE, ossieDocument("SalesModel")));
+
+    ArgumentCaptor<SemanticModelDefinition> definition =
+        ArgumentCaptor.forClass(SemanticModelDefinition.class);
+    verify(delegate)
+        .createSemanticModel(eq(NORMALIZED_IDENT), isNull(), definition.capture(), eq(properties));
+    assertEquals(definition(), definition.getValue());
+    verifyNoMoreInteractions(delegate);
+  }
+
+  @Test
+  public void testOssieImportRejectsInvalidModelName() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.importOssieSemanticModel(INPUT_NAMESPACE, ossieDocument("invalid model")));
+    verifyNoInteractions(delegate);
+  }
+
+  @Test
+  public void testOssieExportUsesNativeLoadNormalization() {
+    SemanticModel model = mock(SemanticModel.class);
+    when(model.name()).thenReturn("SalesModel");
+    when(model.definition()).thenReturn(definition());
+    when(model.properties()).thenReturn(Map.of());
+    when(delegate.loadSemanticModel(NORMALIZED_IDENT)).thenReturn(model);
+
+    OssieDocument document = dispatcher.exportOssieSemanticModel(INPUT_IDENT, OssieFormat.JSON);
+
+    assertEquals(OssieFormat.JSON, document.format());
+    assertEquals(
+        "SalesModel", OssieSemanticModelDocumentConverter.importDocument(document).getName());
+    verify(delegate).loadSemanticModel(NORMALIZED_IDENT);
+    verifyNoMoreInteractions(delegate);
+  }
+
+  private static OssieDocument ossieDocument(String name) {
+    return OssieDocument.yaml(
+        "version: 0.2.0.dev0\nname: "
+            + name
+            + "\ndatasets:\n"
+            + "  - name: orders\n    source: sales.mart.orders\n");
   }
 
   private static SemanticModelDefinition definition() {

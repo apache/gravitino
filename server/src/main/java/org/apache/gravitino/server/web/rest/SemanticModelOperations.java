@@ -35,6 +35,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
@@ -48,7 +49,8 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.semantic.OssieSemanticModelDocumentConverter;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -169,6 +171,7 @@ public class SemanticModelOperations {
    * @param catalog The catalog name.
    * @param schema The schema name.
    * @param document The standalone Ossie document.
+   * @param headers The request headers specifying the document's media type.
    * @return A native response containing the created Semantic Model.
    */
   @POST
@@ -186,7 +189,8 @@ public class SemanticModelOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
-      String document) {
+      String document,
+      @Context HttpHeaders headers) {
     LOG.info(
         "Received import Apache Ossie Semantic Model request for schema: {}.{}.{}",
         metalake,
@@ -196,10 +200,13 @@ public class SemanticModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            SemanticModelCreateRequest request =
-                OssieSemanticModelDocumentConverter.importDocument(document);
+            OssieDocument ossieDocument =
+                MediaType.APPLICATION_JSON_TYPE.isCompatible(headers.getMediaType())
+                    ? OssieDocument.json(document)
+                    : OssieDocument.yaml(document);
             SemanticModel semanticModel =
-                createSemanticModelEntity(metalake, catalog, schema, request);
+                dispatcher.importOssieSemanticModel(
+                    NamespaceUtil.ofSemanticModel(metalake, catalog, schema), ossieDocument);
             LOG.info(
                 "Apache Ossie Semantic Model imported: {}.{}.{}.{}",
                 metalake,
@@ -386,18 +393,18 @@ public class SemanticModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            OssieSemanticModelDocumentConverter.Format outputFormat = parseOssieFormat(format);
+            OssieFormat outputFormat = parseOssieFormat(format);
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
-            SemanticModel loaded = dispatcher.loadSemanticModel(ident);
-            String document =
-                OssieSemanticModelDocumentConverter.exportDocument(loaded, outputFormat);
+            OssieDocument document = dispatcher.exportOssieSemanticModel(ident, outputFormat);
             String mediaType =
-                outputFormat == OssieSemanticModelDocumentConverter.Format.JSON
+                document.format() == OssieFormat.JSON
                     ? MediaType.APPLICATION_JSON
                     : OSSIE_YAML_MEDIA_TYPE;
-            return Response.ok(document, mediaType)
-                .header("Content-Disposition", ossieContentDisposition(semanticModel, outputFormat))
+            return Response.ok(document.content(), mediaType)
+                .header(
+                    "Content-Disposition",
+                    ossieContentDisposition(semanticModel, document.format()))
                 .build();
           });
     } catch (Exception e) {
@@ -419,20 +426,19 @@ public class SemanticModelOperations {
         request.getProperties() == null ? Collections.emptyMap() : request.getProperties());
   }
 
-  private static OssieSemanticModelDocumentConverter.Format parseOssieFormat(String format) {
+  private static OssieFormat parseOssieFormat(String format) {
     if (format == null) {
       throw new IllegalArgumentException("Ossie format must be yaml or json");
     }
     try {
-      return OssieSemanticModelDocumentConverter.Format.valueOf(format.toUpperCase(Locale.ROOT));
+      return OssieFormat.valueOf(format.toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           String.format("Unsupported Ossie format '%s'; expected yaml or json", format), e);
     }
   }
 
-  private static String ossieContentDisposition(
-      String semanticModel, OssieSemanticModelDocumentConverter.Format format) {
+  private static String ossieContentDisposition(String semanticModel, OssieFormat format) {
     String safeName = semanticModel.replaceAll("[^A-Za-z0-9._-]", "_");
     String extension = format.name().toLowerCase(Locale.ROOT);
     return String.format("attachment; filename=\"%s.ossie.%s\"", safeName, extension);

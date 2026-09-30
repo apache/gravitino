@@ -23,9 +23,12 @@ import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.util.JsonParserDelegate;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +37,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -105,14 +109,6 @@ public final class OssieSemanticModelDocumentConverter {
   private static final ObjectMapper JSON_MAPPER = createJsonMapper();
   private static final ObjectMapper YAML_MAPPER = createYamlMapper();
 
-  /** Supported Ossie document serialization formats. */
-  public enum Format {
-    /** YAML serialization. */
-    YAML,
-    /** JSON serialization. */
-    JSON
-  }
-
   private OssieSemanticModelDocumentConverter() {}
 
   /**
@@ -123,7 +119,8 @@ public final class OssieSemanticModelDocumentConverter {
    * @throws IllegalSemanticModelException If the document cannot be parsed or represented by
    *     Gravitino.
    */
-  public static SemanticModelCreateRequest importDocument(String document) {
+  public static SemanticModelCreateRequest importDocument(OssieDocument document) {
+    Objects.requireNonNull(document, "document must not be null");
     ObjectNode root = parseDocument(document);
     return toCreateRequest(root);
   }
@@ -137,7 +134,7 @@ public final class OssieSemanticModelDocumentConverter {
    * @throws IllegalSemanticModelException If the model cannot be represented as a valid Ossie
    *     document.
    */
-  public static String exportDocument(SemanticModel semanticModel, Format format) {
+  public static OssieDocument exportDocument(SemanticModel semanticModel, OssieFormat format) {
     Objects.requireNonNull(semanticModel, "semanticModel must not be null");
     Objects.requireNonNull(format, "format must not be null");
 
@@ -159,10 +156,11 @@ public final class OssieSemanticModelDocumentConverter {
     toCreateRequest(root.deepCopy());
 
     try {
-      if (format == Format.JSON) {
-        return JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root) + "\n";
+      if (format == OssieFormat.JSON) {
+        return OssieDocument.json(
+            JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root) + "\n");
       }
-      return YAML_MAPPER.writeValueAsString(root);
+      return OssieDocument.yaml(YAML_MAPPER.writeValueAsString(root));
     } catch (JsonProcessingException e) {
       throw new IllegalSemanticModelException(
           e, "Cannot serialize Apache Ossie document: %s", e.getOriginalMessage());
@@ -170,7 +168,8 @@ public final class OssieSemanticModelDocumentConverter {
   }
 
   private static ObjectMapper createJsonMapper() {
-    JsonFactory factory = JsonFactory.builder().build();
+    JsonFactory factory =
+        JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     factory.setStreamReadConstraints(STREAM_READ_CONSTRAINTS);
     return JsonMapper.builder(factory)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
@@ -193,24 +192,42 @@ public final class OssieSemanticModelDocumentConverter {
         .setSerializationInclusion(JsonInclude.Include.NON_NULL);
   }
 
-  private static ObjectNode parseDocument(String document) {
-    if (StringUtils.isBlank(document)) {
+  private static ObjectNode parseDocument(OssieDocument document) {
+    String content = document.content();
+    if (StringUtils.isBlank(content)) {
       throw new IllegalSemanticModelException("Apache Ossie document must not be empty");
     }
-    if (document.length() > MAX_DOCUMENT_LENGTH) {
+    if (content.length() > MAX_DOCUMENT_LENGTH) {
       throw new IllegalSemanticModelException(
           "Apache Ossie document exceeds the maximum length of %s characters", MAX_DOCUMENT_LENGTH);
     }
 
     try {
-      JsonNode parsed = YAML_MAPPER.readTree(document);
+      ObjectMapper mapper = document.format() == OssieFormat.JSON ? JSON_MAPPER : YAML_MAPPER;
+      JsonNode parsed = readDocumentTree(mapper, content);
       if (!(parsed instanceof ObjectNode)) {
         throw invalid("$", "document root must be an object");
       }
       return (ObjectNode) parsed;
-    } catch (JsonProcessingException e) {
+    } catch (IOException e) {
       throw new IllegalSemanticModelException(
-          e, "Cannot parse Apache Ossie YAML or JSON: %s", e.getOriginalMessage());
+          e, "Cannot parse Apache Ossie %s: %s", document.format(), originalMessage(e));
+    }
+  }
+
+  private static JsonNode readDocumentTree(ObjectMapper mapper, String content) throws IOException {
+    // Older YAML parsers do not enforce StreamReadConstraints on nesting depth.
+    try (JsonParser parser =
+        new JsonParserDelegate(mapper.createParser(content)) {
+          @Override
+          public JsonToken nextToken() throws IOException {
+            JsonToken token = super.nextToken();
+            STREAM_READ_CONSTRAINTS.validateNestingDepth(getParsingContext().getNestingDepth());
+            return token;
+          }
+        }) {
+      // Check the whole document, without enabling this on nested DTO deserializers.
+      return mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(parser);
     }
   }
 
@@ -696,7 +713,8 @@ public final class OssieSemanticModelDocumentConverter {
       return null;
     }
     try {
-      JsonNode parsed = JSON_MAPPER.readTree(data);
+      JsonNode parsed =
+          JSON_MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(data);
       return parsed instanceof ObjectNode ? (ObjectNode) parsed : null;
     } catch (JsonProcessingException e) {
       return null;
