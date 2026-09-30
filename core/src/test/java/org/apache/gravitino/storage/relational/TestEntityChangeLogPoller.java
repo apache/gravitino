@@ -19,15 +19,26 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
@@ -35,6 +46,8 @@ import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 
 public class TestEntityChangeLogPoller {
@@ -45,6 +58,81 @@ public class TestEntityChangeLogPoller {
   void testRejectsInvalidConfiguration() {
     Assertions.assertThrows(IllegalArgumentException.class, () -> new EntityChangeLogPoller(0));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new EntityChangeLogPoller(-1));
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new EntityChangeLogPoller(1, 0, metrics));
+  }
+
+  @Test
+  void testPollChangesReportsBacklogOnlyForFullBatch() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, 2)).thenReturn(changes(1L, 2L));
+    when(mapper.selectEntityChanges(2L, 2)).thenReturn(changes(3L, 3L));
+    when(mapper.selectEntityChanges(3L, 2)).thenReturn(List.of());
+    List<EntityChangeRecord> received = new ArrayList<>();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, 2, metrics);
+      poller.registerListener(received::addAll);
+
+      Assertions.assertTrue(poller.pollChanges(), "a full batch may leave a backlog");
+      Assertions.assertFalse(poller.pollChanges(), "a partial batch means the poller caught up");
+      Assertions.assertFalse(poller.pollChanges(), "an empty poll means the poller caught up");
+      Assertions.assertEquals(
+          3L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+    }
+
+    Assertions.assertEquals(List.of(1L, 2L, 3L), ids(received));
+  }
+
+  @Test
+  void testFullBatchSchedulesNextPollWithoutWaitingForTheInterval() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, 2)).thenReturn(changes(1L, 2L));
+    when(mapper.selectEntityChanges(2L, 2)).thenReturn(changes(3L, 3L));
+    when(mapper.selectEntityChanges(3L, 2)).thenThrow(new RuntimeException("database down"));
+    ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+    ArgumentCaptor<Runnable> cycle = ArgumentCaptor.forClass(Runnable.class);
+    List<EntityChangeRecord> received = new ArrayList<>();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(5, 2, new EntityChangeLogMetricsSource()));
+      doReturn(scheduler).when(poller).createScheduler();
+      poller.registerListener(received::addAll);
+
+      poller.start();
+      InOrder schedules = inOrder(scheduler);
+      schedules.verify(scheduler).schedule(cycle.capture(), eq(5000L), eq(TimeUnit.MILLISECONDS));
+
+      // A full batch: more rows may be waiting, so the next cycle starts right away.
+      cycle.getValue().run();
+      schedules.verify(scheduler).schedule(any(Runnable.class), eq(0L), eq(TimeUnit.MILLISECONDS));
+
+      // A partial batch: caught up, so wait the normal interval.
+      cycle.getValue().run();
+      schedules
+          .verify(scheduler)
+          .schedule(any(Runnable.class), eq(5000L), eq(TimeUnit.MILLISECONDS));
+
+      // A failed poll keeps the normal interval instead of retrying in a tight loop.
+      cycle.getValue().run();
+      schedules
+          .verify(scheduler)
+          .schedule(any(Runnable.class), eq(5000L), eq(TimeUnit.MILLISECONDS));
+
+      // Once closed, a cycle that is still running does not schedule another one.
+      poller.close();
+      cycle.getValue().run();
+      verify(scheduler, times(4)).schedule(any(Runnable.class), anyLong(), any());
+    }
+
+    Assertions.assertEquals(List.of(1L, 2L, 3L), ids(received));
   }
 
   @Test
@@ -390,6 +478,28 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
+  void testCloseDropsThePendingPollInsteadOfWaitingForIt() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      // Uses the real scheduler. The first poll is an hour away, so close() must not wait for it:
+      // if the pending poll survived shutdown, close() would block for its full five-second
+      // termination timeout.
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(3600);
+      poller.start();
+      long startNanos = System.nanoTime();
+      poller.close();
+      long closeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+
+      Assertions.assertTrue(closeMillis < 4000, "close() took " + closeMillis + " ms");
+    }
+
+    verify(mapper, never()).selectEntityChanges(anyLong(), anyInt());
+  }
+
+  @Test
   void testDispatchesImmutableBatchToListeners() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     EntityChangeRecord first = change(1L, "CATALOG", "ml1.cat1");
@@ -423,6 +533,10 @@ public class TestEntityChangeLogPoller {
       changes.add(change(id, "TABLE", "ml1.cat1.schema1.table" + id));
     }
     return changes;
+  }
+
+  private static List<Long> ids(List<EntityChangeRecord> changes) {
+    return changes.stream().map(EntityChangeRecord::getId).collect(Collectors.toList());
   }
 
   private static void mockSessionUtils(
