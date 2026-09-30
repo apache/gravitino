@@ -116,6 +116,8 @@ Catalogs defined in `gravitino.conf` are not registered in a metalake, so Gravit
 | `cos-token`          | COS     | A temporary STS token                                      |
 | `cos-secret-key`     | COS     | The configured static access key and secret                |
 | `jdbc-user-password` | JDBC    | The configured JDBC username and password                  |
+| `aws-secret-key`     | Glue    | The configured AWS access key and secret for Glue API auth |
+| `dlf-secret-key`     | Paimon  | The configured DLF access key and secret (optional token)  |
 
 Each value has its own properties, listed in the sections below. To vend for more than one storage type on a catalog, separate values with a comma. Custom providers can be added by implementing `CredentialProvider`, described under [Custom Credentials](#custom-credentials).
 
@@ -129,6 +131,8 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
 | `gcs-service-account-file`                                   | `gcs-token`         |
+| `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
+| `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 
 JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
 
@@ -137,10 +141,10 @@ Four providers have no inference rule and must always be set explicitly: `s3-tok
 ### Static providers and `getCredentials` privilege risk
 
 Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
-and `jdbc-user-password` return the configured long-lived plaintext keys from
-`getCredentials` / `GET .../credentials`. That endpoint does **not** require a dedicated privilege
-beyond being able to load the metadata object (unlike `getSecrets`, which requires `USE_SECRETS`,
-with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+`jdbc-user-password`, `aws-secret-key`, and `dlf-secret-key` return the configured long-lived
+plaintext keys from `getCredentials` / `GET .../credentials`. That endpoint does **not** require a
+dedicated privilege beyond being able to load the metadata object (unlike `getSecrets`, which
+requires `USE_SECRETS`, with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
 
 **Risk:** any principal that can load a catalog (or fileset) configured with these static providers
 can retrieve the same static AK/SK or JDBC password that Gravitino uses server-side.
@@ -505,7 +509,8 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner); cloud access-key pairs are included only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). Connectors typically use `USE_SECRETS` plus `getCredentials` / `GET .../credentials` (no dedicated privilege) to recover S3/OSS/COS/Azure/JDBC cloud keys (Glue AWS API keys and Paimon DLF pairs remain `USE_SECRETS` + `INCLUDE_CREDENTIAL_SECRETS` / `getSecrets` until dedicated credential types land). Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` / `dlf-security-token` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner); cloud access-key pairs are included only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). Connectors typically use `USE_SECRETS` plus `getCredentials` / `GET .../credentials` (no dedicated privilege) to recover S3/OSS/COS/Azure/JDBC cloud keys, as well as Glue AWS API keys (`AwsSecretKeyCredential`) and Paimon DLF pairs (`DlfSecretKeyCredential`). Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 
