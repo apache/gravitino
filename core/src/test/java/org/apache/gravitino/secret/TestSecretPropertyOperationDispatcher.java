@@ -64,7 +64,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
 
   private static final String SCHEMA = "secret_schema";
   private static final Map<String, String> SECRET_PROPS =
-      ImmutableMap.of("k1", "v1", "jdbc-password", "s3cr3t", "visible", "ok");
+      ImmutableMap.of("k1", "v1", "custom-token", "s3cr3t", "visible", "ok");
 
   private static SecretPropertyOperationDispatcher secretDispatcher;
   private static SchemaOperationDispatcher schemaOperationDispatcher;
@@ -122,7 +122,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
 
     Map<String, String> secrets =
         secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -134,7 +134,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         tableIdent, columns, "comment", SECRET_PROPS, new Transform[0]);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -144,7 +144,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, SECRET_PROPS);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -159,7 +159,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         viewIdent, "comment", new Column[0], representations, null, null, SECRET_PROPS);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -170,7 +170,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     modelOperationDispatcher.registerModel(modelIdent, "comment", SECRET_PROPS);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -190,15 +190,17 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     // Official non-hidden keys stay out of getSecrets.
     Assertions.assertFalse(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
-    Assertions.assertFalse(
+    // Declared hidden cloud credentials fuzzy-recover into getSecrets (USE_SECRETS / owner).
+    Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
-    // Declared hidden secrets and undeclared sensitive names still fuzzy-recover.
     Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
+    // Undeclared sensitive names still fuzzy-recover.
     Assertions.assertTrue(
         SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("custom-token", metadata));
     // AWS access-key pair is catalog-only (BaseCatalogPropertiesMetadata), not in this entity
-    // fallback — same exclusion as fileset/schema STORAGE_PROPERTY_ENTRIES.
+    // fallback — same exclusion as fileset/schema STORAGE_PROPERTY_ENTRIES. Undeclared sensitive
+    // names still fuzzy-recover.
     Assertions.assertFalse(metadata.containsProperty("aws-access-key-id"));
     Assertions.assertFalse(metadata.containsProperty("aws-secret-access-key"));
     Assertions.assertTrue(

@@ -299,10 +299,17 @@ public class AuthorizationExpressionConverter {
                 + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_USE_SECRET",
-            "((ANY(USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-                + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE,"
+            "ANY_USE_SECRETS",
+            "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+                + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE,"
                 + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))");
+    expression =
+        expression.replaceAll(
+            "ANY_INCLUDE_CREDENTIAL_SECRETS",
+            "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS,"
+                + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
+                + " MODEL_VERSION)))");
     expression =
         expression.replaceAll(
             "ANY_LINK_MODEL_VERSION",

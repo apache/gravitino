@@ -97,11 +97,14 @@ public class TestFilesetCatalogCredential {
     FilesetCatalogImpl catalog = newCatalog(properties);
 
     Map<String, String> masked = catalog.properties();
-    Assertions.assertEquals("s3-ak", masked.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    Assertions.assertEquals("oss-ak", masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
@@ -110,7 +113,9 @@ public class TestFilesetCatalogCredential {
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
-    Assertions.assertEquals("cos-ak", masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));

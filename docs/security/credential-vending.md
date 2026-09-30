@@ -134,6 +134,31 @@ JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
 
+### Static providers and `getCredentials` privilege risk
+
+Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
+and `jdbc-user-password` return the configured long-lived plaintext keys from
+`getCredentials` / `GET .../credentials`. That endpoint does **not** require a dedicated privilege
+beyond being able to load the metadata object (unlike `getSecrets`, which requires `USE_SECRETS`,
+with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+
+**Risk:** any principal that can load a catalog (or fileset) configured with these static providers
+can retrieve the same static AK/SK or JDBC password that Gravitino uses server-side.
+
+**Temporary mitigation** until provider-level authorization is tightened:
+
+- Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
+  `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
+  whenever possible.
+- When static providers are unavoidable, grant load / use privileges only to trusted principals
+  (connectors and operators that must recover credentials).
+- Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /
+  `INCLUDE_CREDENTIAL_SECRETS` and `getSecrets` when you need privilege-gated plaintext access.
+
+A follow-up should track a lasting fix (for example privilege checks specific to static
+credentials, or refusing to vend static secret-key credentials through `getCredentials` when
+authorization is enabled).
+
 ## S3
 
 ### `s3-token`
@@ -480,7 +505,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, and `jdbc-password` are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext). Retrieve secret-manager-backed properties and sensitive-named inline values via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. That API does **not** recover properties that are only declared `hidden` in metadata when their names do not look sensitive; those stay as `******` after merging with `properties()`. The credentials API (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner); cloud access-key pairs are included only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). Connectors typically use `USE_SECRETS` plus `getCredentials` / `GET .../credentials` (no dedicated privilege) to recover S3/OSS/COS/Azure/JDBC cloud keys (Glue AWS API keys and Paimon DLF pairs remain `USE_SECRETS` + `INCLUDE_CREDENTIAL_SECRETS` / `getSecrets` until dedicated credential types land). Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 

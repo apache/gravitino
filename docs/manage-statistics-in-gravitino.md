@@ -274,7 +274,6 @@ For Lance remote storage, you can refer to the document [here](https://lancedb.g
 | `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                | `104857600`                          | No       |
 | `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                | `1000000`                            | No       |
 | `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                      | `10000`                              | No       |
-| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                           | `0`, It means we don't use the cache | No       |
 | `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                      | `102400`                             | No       |
 | `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                              | `102400`                             | No       |
 | `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation | `100`                                | No       |
