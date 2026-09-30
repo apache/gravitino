@@ -16,7 +16,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Measure JDBC connection churn and HTTP tail latency under concurrent reads."""
+"""Measure JDBC connection churn and HTTP tail latency under concurrent reads.
+
+Run the same workload against fresh server processes with only the idle limit changed, for
+example::
+
+    python3 dev/performance/jdbc_idle_retention.py \\
+      --url http://localhost:8090/api/metalakes \\
+      --mysql-defaults-extra-file=/path/to/mysql-client.cnf \\
+      --clients 64 --warmup-seconds 3 --seconds 15 --rounds 3
+
+The MySQL client option file supplies the database credentials. Set
+GRAVITINO_BENCH_AUTHORIZATION to send an Authorization header. Use a catalog read URL, such as
+the list-tables route, to test a JDBC catalog pool instead of the entity-store pool.
+
+Each round prints successful throughput, p50/p99 latency, failures, and the change in MySQL's
+server-wide Connections and Threads_created counters. Those counters include this script's own
+status queries and any other database traffic, so compare runs on an otherwise quiet database with
+the same client count, data, JVM settings and node count, and only after confirming that no
+requests failed.
+
+Self-test: ``cd dev/performance && python3 -m unittest test_jdbc_idle_retention``.
+"""
 
 import argparse
 import concurrent.futures
@@ -126,9 +147,13 @@ def run_phase(url, clients, duration, authorization):
 
 def main():
     """Run warmup and measured rounds against an already-started Gravitino server."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
-        "--url", required=True, help="GET route, such as /api/metalakes"
+        "--url",
+        required=True,
+        help="full URL of a GET route, such as http://localhost:8090/api/metalakes",
     )
     parser.add_argument("--mysql-defaults-extra-file", required=True)
     parser.add_argument("--clients", type=int, default=64)
