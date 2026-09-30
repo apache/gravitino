@@ -19,6 +19,7 @@
 
 import json
 from decimal import Decimal
+from typing import Any
 
 import simplejson
 from dataclasses_json import DataClassJsonMixin
@@ -39,7 +40,9 @@ class SemanticJsonMixin(DataClassJsonMixin):
         Keyword arguments are forwarded to simplejson.dumps, including formatting
         options such as indent and sort_keys.
         """
-        return simplejson.dumps(self.to_dict(), use_decimal=True, **kwargs)
+        return simplejson.dumps(
+            _preserve_decimal_type(self.to_dict()), use_decimal=True, **kwargs
+        )
 
     @classmethod
     def from_json(cls, s, *, parse_float=Decimal, infer_missing=False, **kwargs):
@@ -52,3 +55,20 @@ class SemanticJsonMixin(DataClassJsonMixin):
             json.loads(s, parse_float=parse_float, **kwargs),
             infer_missing=infer_missing,
         )
+
+
+def _preserve_decimal_type(value: Any) -> Any:
+    """Ensure Decimal values produce decimal or exponent JSON tokens.
+
+    Decimal("1") normally emits an integer token, which decodes as int. Append a
+    fractional zero only for exponent-zero decimals. Constructing from text is
+    exact regardless of the active decimal context, unlike quantize or arithmetic.
+    Work on a copy so the DTO's original values and scale remain unchanged.
+    """
+    if isinstance(value, Decimal) and value.as_tuple().exponent == 0:
+        return Decimal(f"{value}.0")
+    if isinstance(value, dict):
+        return {key: _preserve_decimal_type(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_preserve_decimal_type(item) for item in value]
+    return value

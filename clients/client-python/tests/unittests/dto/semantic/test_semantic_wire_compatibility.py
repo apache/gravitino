@@ -245,3 +245,63 @@ class TestSemanticWireCompatibility(unittest.TestCase):
             restored.ai_context().object().additional_properties()["value"], float
         )
         self.assertEqual(dto, restored)
+
+    def test_whole_decimals_keep_their_type_through_json(self):
+        for text in (
+            "1",
+            "0",
+            "-1",
+            "-0",
+            "123456789012345678901234567890",
+            "1E+30",
+            "1.00",
+        ):
+            with self.subTest(value=text), localcontext() as context:
+                context.prec = 6
+                value = Decimal(text)
+                definition = SemanticModelDefinition(
+                    datasets=_complete_definition().datasets(),
+                    ai_context=AIContext.of(
+                        AIContextObject(
+                            additional_properties={
+                                "value": value,
+                                "nested": [
+                                    {"value": value, "integer": 1, "flag": True}
+                                ],
+                            }
+                        )
+                    ),
+                )
+                dto = SemanticModelDefinitionDTO.from_definition(definition)
+                for original in (dto, SemanticModelDTO(_name="sales", _definition=dto)):
+                    wire = original.to_json()
+                    restored = type(original).from_json(wire)
+                    restored_definition = (
+                        restored.definition()
+                        if isinstance(restored, SemanticModelDTO)
+                        else restored.to_definition()
+                    )
+                    properties = (
+                        restored_definition.ai_context()
+                        .object()
+                        .additional_properties()
+                    )
+                    self.assertIsInstance(properties["value"], Decimal)
+                    self.assertIsInstance(properties["nested"][0]["value"], Decimal)
+                    self.assertIs(type(properties["nested"][0]["integer"]), int)
+                    self.assertIs(type(properties["nested"][0]["flag"]), bool)
+                    self.assertEqual(value, properties["value"])
+                    self.assertEqual(value.is_signed(), properties["value"].is_signed())
+                    self.assertEqual(definition, restored_definition)
+                    self.assertEqual(hash(definition), hash(restored_definition))
+                    self.assertEqual(
+                        "found", {definition: "found"}[restored_definition]
+                    )
+                    self.assertEqual(original, restored)
+                self.assertEqual(
+                    value.as_tuple(),
+                    dto.ai_context()
+                    .object()
+                    .additional_properties()["value"]
+                    .as_tuple(),
+                )
