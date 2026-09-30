@@ -37,8 +37,8 @@ import org.apache.gravitino.authorization.Privilege;
  * The content of a {@link Policy.BuiltInType#ACCESS_CONTROL} policy.
  *
  * <p>The policy is bound to a tag, and every object carrying that tag confers {@link #privileges()}
- * on any caller holding one of {@link #applicableRoles()}. The roles are a condition on the rule,
- * not the principals it is granted to.
+ * on any caller whose active roles include one of {@link #applicableRoles()}. The roles are a
+ * condition on the rule, not the principals it is granted to.
  */
 public final class AccessControlContent implements PolicyContent {
 
@@ -53,9 +53,9 @@ public final class AccessControlContent implements PolicyContent {
    *
    * <p>An allowlist rather than a denylist, so the boundary fails closed: a privilege added to
    * {@link Privilege.Name} later confers nothing through a tag until it is added here deliberately.
-   * It holds only privileges that act on the tagged object's own data. Privileges that hand out
-   * access, create entities, change what other principals execute, or open a path to untagged
-   * objects are excluded.
+   * It holds only privileges that act on the tagged object itself. Privileges that hand out access,
+   * create entities, change what other principals execute, or open a path to untagged objects are
+   * excluded.
    */
   public static final Set<Privilege.Name> PERMITTED_PRIVILEGES =
       ImmutableSet.of(
