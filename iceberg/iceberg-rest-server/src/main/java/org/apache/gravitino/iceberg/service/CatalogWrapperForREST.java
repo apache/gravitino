@@ -525,6 +525,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @throws NoSuchPlanTaskException if the plan task was not issued for this table, or the plan it
    *     refers to can no longer be reproduced (for example its snapshot has expired).
    */
+  @SuppressWarnings("deprecation")
   public FetchScanTasksResponse fetchScanTasks(
       TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
     // Validate the table exists first, so a bad table reports 404 for the table rather than
@@ -870,6 +871,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>Returns {@code fullPlan} unchanged when batching is disabled or the plan already fits in one
    * batch, which is the common case and keeps a plan a client can consume without a second call.
    */
+  @SuppressWarnings("deprecation")
   private PlanTableScanResponse splitIntoPlanTasks(
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest,

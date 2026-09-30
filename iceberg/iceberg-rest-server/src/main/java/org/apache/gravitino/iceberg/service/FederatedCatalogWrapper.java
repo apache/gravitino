@@ -463,24 +463,18 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     Map<String, String> properties = restCatalog.properties();
     String tasksPath = ResourcePaths.forCatalogProperties(properties).fetchScanTasks(identifier);
 
-    // A fetch scan tasks request carries only the plan task, so the case sensitivity the scan was
-    // planned with is not known here; the response deserializer needs a value and Iceberg's default
-    // is case sensitive.
-    ParserContext parserContext =
-        ParserContext.builder().add("specsById", specsById).add("caseSensitive", true).build();
-
-    return callRemoteCatalog(
-        restCatalog,
-        String.format("fetching scan tasks for table: %s", identifier),
-        client ->
-            client.post(
-                tasksPath,
-                request,
-                FetchScanTasksResponse.class,
-                Collections.emptyMap(),
-                ErrorHandlers.planTaskHandler(),
-                ignored -> {},
-                parserContext));
+    FederatedScanTasksResponse response =
+        callRemoteCatalog(
+            restCatalog,
+            String.format("fetching scan tasks for table: %s", identifier),
+            client ->
+                client.post(
+                    tasksPath,
+                    request,
+                    FederatedScanTasksResponse.class,
+                    Collections.emptyMap(),
+                    ErrorHandlers.planTaskHandler()));
+    return response.toResponse(specsById);
   }
 
   /**

@@ -707,11 +707,13 @@ Gravitino caches scan plan results to speed up repeated queries with identical p
 
 Plan scan responses follow the Iceberg 1.11 REST API: `file-scan-tasks` are returned as structured tasks rather than as the JSON strings used by some Iceberg 1.9.x–1.10.x clients.
 
-Scan planning is synchronous: `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan` always returns status `COMPLETED`, never `SUBMITTED`, so a plan is never left running in the background.
+For non-REST backends, scan planning is synchronous: `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan` always returns status `COMPLETED`, never `SUBMITTED`, so a plan is never left running in the background.
 
 A plan is handed to the client in batches of at most `scan-plan-task-batch-size` file scan tasks. The first batch is returned inline in the plan response; each remaining batch is offered as a `plan-task` that the client exchanges for its tasks through `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/tasks`, the second step of the Iceberg REST scan planning protocol. A plan that fits in one batch carries no `plan-tasks`, so most scans complete in a single round trip.
 
 A `plan-task` is an opaque string to clients, and describes its own unit of work to the server: the scan it was planned from, with the snapshot pinned at planning time, plus the range of tasks it covers. Nothing is stored server side between the two calls, so a `plan-task` stays redeemable after a server restart and on any Gravitino instance serving the same catalog. Redeeming one replans the pinned snapshot unless the plan is still in the scan plan cache, so enabling the cache is recommended when planning large tables. A `plan-task` that this server did not issue, was issued for another table, or refers to a plan that can no longer be reproduced (for example because its snapshot expired) returns `404` with a `NoSuchPlanTaskException` error.
+
+Federated REST catalogs forward plan tasks to the remote catalog unchanged and preserve its task results. The fetch-tasks endpoint is advertised in `/v1/config` only when the remote catalog advertises support for it.
 
 | Configuration item                                      | Description                                                                                                                                                                        | Default value | Required |
 |---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|

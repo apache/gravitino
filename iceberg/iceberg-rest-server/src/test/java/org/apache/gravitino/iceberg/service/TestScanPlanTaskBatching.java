@@ -146,7 +146,15 @@ public class TestScanPlanTaskBatching {
                 LocalScanPlanCache.class.getName()));
     TableIdentifier tableId = createTableWithDataFiles(wrapper, "tbl", 3);
 
+    Table table = Mockito.spy(wrapper.getCatalog().loadTable(tableId));
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.when(catalog.loadTable(tableId)).thenReturn(table);
+    wrapper = Mockito.spy(wrapper);
+    Mockito.doReturn(catalog).when(wrapper).getCatalog();
     PlanTableScanResponse plan = planTableScan(wrapper, tableId);
+    Mockito.doThrow(new AssertionError("Fetching a cached plan must not re-plan manifests"))
+        .when(table)
+        .newScan();
 
     List<String> fetchedLocations = new ArrayList<>(dataFileLocations(plan.fileScanTasks()));
     for (String planTask : plan.planTasks()) {

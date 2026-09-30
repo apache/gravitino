@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequestParser;
@@ -92,7 +93,7 @@ final class PlanTaskCodec {
    * @param planTask the plan task presented by the client.
    * @return the unit of work it stands for, or empty if it was not issued by this server.
    */
-  static Optional<PlanTask> decode(String planTask) {
+  static Optional<PlanTask> decode(@Nullable String planTask) {
     if (planTask == null || planTask.isEmpty()) {
       return Optional.empty();
     }
@@ -100,7 +101,7 @@ final class PlanTaskCodec {
     try {
       byte[] decoded = Base64.getUrlDecoder().decode(planTask);
       JsonNode node = JsonUtil.mapper().readTree(new String(decoded, StandardCharsets.UTF_8));
-      if (!node.isObject()) {
+      if (node == null || !node.isObject() || !node.path(SCAN).isObject()) {
         return Optional.empty();
       }
 

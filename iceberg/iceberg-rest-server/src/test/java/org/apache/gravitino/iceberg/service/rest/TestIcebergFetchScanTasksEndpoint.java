@@ -22,7 +22,7 @@ package org.apache.gravitino.iceberg.service.rest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +32,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksPreEvent;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.Schema;
@@ -41,6 +43,7 @@ import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -63,13 +66,16 @@ public class TestIcebergFetchScanTasksEndpoint extends IcebergNamespaceTestBase 
   private static final Schema TABLE_SCHEMA =
       new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
 
+  private DummyEventListener eventListener;
+
   @Override
   protected Application configure() {
+    eventListener = new DummyEventListener();
     ResourceConfig resourceConfig =
         IcebergRestTestUtil.getIcebergResourceConfig(
             MockIcebergTableOperations.class,
             true,
-            Arrays.asList(),
+            Collections.singletonList(eventListener),
             ImmutableMap.of(IcebergConstants.SCAN_PLAN_TASK_BATCH_SIZE, "1"));
     resourceConfig.register(MockIcebergNamespaceOperations.class);
 
@@ -101,15 +107,24 @@ public class TestIcebergFetchScanTasksEndpoint extends IcebergNamespaceTestBase 
     Assertions.assertEquals(2, plan.get("plan-tasks").size());
 
     List<String> dataFiles = new ArrayList<>(dataFilePaths(plan.get("file-scan-tasks")));
+    eventListener.clearEvent();
     for (JsonNode planTask : plan.get("plan-tasks")) {
-      Response response = doFetchScanTasks(planTask.asText());
-      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
-
-      JsonNode tasks = response.readEntity(JsonNode.class);
+      JsonNode tasks;
+      try (Response response = doFetchScanTasks(planTask.asText())) {
+        Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+        tasks = response.readEntity(JsonNode.class);
+      }
       Assertions.assertEquals(1, tasks.get("file-scan-tasks").size());
-      Assertions.assertFalse(
-          tasks.has("plan-tasks"), "A redeemed plan task hands out no further tasks");
+      Assertions.assertFalse(tasks.has("plan-tasks"));
       dataFiles.addAll(dataFilePaths(tasks.get("file-scan-tasks")));
+      Assertions.assertInstanceOf(IcebergFetchScanTasksPreEvent.class, eventListener.popPreEvent());
+      Assertions.assertInstanceOf(IcebergFetchScanTasksEvent.class, eventListener.popPostEvent());
+      // HTTP retries must return the same batch, without consuming the plan task.
+      try (Response retry = doFetchScanTasks(planTask.asText())) {
+        Assertions.assertEquals(Status.OK.getStatusCode(), retry.getStatus());
+        Assertions.assertEquals(tasks, retry.readEntity(JsonNode.class));
+      }
+      eventListener.clearEvent();
     }
 
     Assertions.assertEquals(
@@ -123,19 +138,22 @@ public class TestIcebergFetchScanTasksEndpoint extends IcebergNamespaceTestBase 
   void testTasksEndpointRejectsAnUnknownPlanTask() {
     createNamespaceAndTable();
 
-    Response response = doFetchScanTasks("not-a-plan-task");
-
-    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    try (Response response = doFetchScanTasks("not-a-plan-task")) {
+      Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      Assertions.assertEquals(
+          "NoSuchPlanTaskException", response.readEntity(ErrorResponse.class).type());
+    }
   }
 
   private JsonNode planTableScan() {
-    Response response =
+    try (Response response =
         getTableClientBuilder(NAMESPACE, Optional.of(TABLE_NAME + "/plan"))
             .post(
                 Entity.entity(
-                    PlanTableScanRequest.builder().build(), MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
-    return response.readEntity(JsonNode.class);
+                    PlanTableScanRequest.builder().build(), MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+      return response.readEntity(JsonNode.class);
+    }
   }
 
   private Response doFetchScanTasks(String planTask) {
@@ -144,13 +162,14 @@ public class TestIcebergFetchScanTasksEndpoint extends IcebergNamespaceTestBase 
   }
 
   private void createNamespaceAndTable() {
-    Response namespaceResponse =
+    try (Response namespaceResponse =
         getNamespaceClientBuilder()
             .post(
                 Entity.entity(
                     CreateNamespaceRequest.builder().withNamespace(NAMESPACE).build(),
-                    MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Status.OK.getStatusCode(), namespaceResponse.getStatus());
+                    MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), namespaceResponse.getStatus());
+    }
 
     // The test catalog appends three data files when this property is set.
     CreateTableRequest createTableRequest =
@@ -161,10 +180,11 @@ public class TestIcebergFetchScanTasksEndpoint extends IcebergNamespaceTestBase 
                 ImmutableMap.of(
                     CatalogWrapperForTest.GENERATE_PLAN_TASKS_DATA_PROP, Boolean.TRUE.toString()))
             .build();
-    Response tableResponse =
+    try (Response tableResponse =
         getTableClientBuilder(NAMESPACE, Optional.empty())
-            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Status.OK.getStatusCode(), tableResponse.getStatus());
+            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), tableResponse.getStatus());
+    }
   }
 
   private static List<String> dataFilePaths(JsonNode fileScanTasks) {

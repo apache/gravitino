@@ -48,11 +48,18 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.iceberg.BaseFileScanTask;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
@@ -67,6 +74,8 @@ import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.ResidualEvaluator;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.PlanStatus;
@@ -91,6 +100,8 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCatalogWrapperForREST {
 
@@ -559,18 +570,54 @@ public class TestCatalogWrapperForREST {
   }
 
   @SuppressWarnings("deprecation")
-  @Test
-  void testFederatedFetchScanTasksDelegatesToRemote() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"case-insensitive", "case-sensitive", "no-tasks", "no-residual"})
+  void testFederatedFetchScanTasksDelegatesToRemote(String responseKind) throws Exception {
+    boolean exactCase = responseKind.equals("case-sensitive");
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     String expectedPath = "/v1/upstream/namespaces/db/tables/tbl/tasks";
 
-    // Plan tasks are minted by the remote catalog in a federated setup, so this wrapper only has to
-    // hand the plan task back and return whatever the remote catalog answers.
-    FetchScanTasksResponse upstreamResponse =
+    List<Types.NestedField> fields = new ArrayList<>();
+    fields.add(Types.NestedField.required(1, "partition", Types.IntegerType.get()));
+    fields.add(Types.NestedField.required(2, "data", Types.StringType.get()));
+    if (exactCase) {
+      // Both spellings are legal when the upstream scan is case sensitive. Forcing false would
+      // make the residual ambiguous, just as forcing true breaks a case-insensitive DATA filter.
+      fields.add(Types.NestedField.required(3, "DATA", Types.StringType.get()));
+    }
+    Schema schema = new Schema(fields);
+    PartitionSpec spec = PartitionSpec.builderFor(schema).identity("partition").build();
+    DataFile file =
+        DataFiles.builder(spec)
+            .withPath("s3://bucket/data.parquet")
+            .withPartitionPath("partition=1")
+            .withRecordCount(10)
+            .withFileSizeInBytes(100)
+            .build();
+    DeleteFile delete =
+        FileMetadata.deleteFileBuilder(spec)
+            .ofPositionDeletes()
+            .withPath("s3://bucket/delete.parquet")
+            .withPartitionPath("partition=1")
+            .withRecordCount(1)
+            .withFileSizeInBytes(10)
+            .build();
+    BaseFileScanTask task =
+        new BaseFileScanTask(
+            file,
+            new DeleteFile[] {delete},
+            SchemaParser.toJson(schema),
+            PartitionSpecParser.toJson(spec),
+            ResidualEvaluator.unpartitioned(
+                responseKind.equals("no-residual") ? null : Expressions.equal("DATA", "value")));
+    FetchScanTasksResponse.Builder upstreamBuilder =
         FetchScanTasksResponse.builder()
             .withPlanTasks(Collections.singletonList("upstream-next-token"))
-            .withSpecsById(ImmutableMap.of(0, PartitionSpec.unpartitioned()))
-            .build();
+            .withSpecsById(ImmutableMap.of(spec.specId(), spec));
+    if (!responseKind.equals("no-tasks")) {
+      upstreamBuilder.withFileScanTasks(Collections.singletonList(task));
+    }
+    FetchScanTasksResponse upstreamResponse = upstreamBuilder.build();
     String upstreamJson = FetchScanTasksResponseParser.toJson(upstreamResponse);
 
     AtomicReference<String> requestPath = new AtomicReference<>();
@@ -607,7 +654,7 @@ public class TestCatalogWrapperForREST {
                   "prefix",
                   "upstream"));
       Table mockTable = mock(Table.class);
-      when(mockTable.specs()).thenReturn(ImmutableMap.of(0, PartitionSpec.unpartitioned()));
+      when(mockTable.specs()).thenReturn(ImmutableMap.of(spec.specId(), spec));
       when(restCatalog.loadTable(table)).thenReturn(mockTable);
 
       IcebergConfig config =
@@ -630,6 +677,7 @@ public class TestCatalogWrapperForREST {
               + requestBody.get());
       Assertions.assertEquals(
           Collections.singletonList("upstream-next-token"), response.planTasks());
+      Assertions.assertEquals(upstreamJson, FetchScanTasksResponseParser.toJson(response));
     } finally {
       server.stop(0);
     }

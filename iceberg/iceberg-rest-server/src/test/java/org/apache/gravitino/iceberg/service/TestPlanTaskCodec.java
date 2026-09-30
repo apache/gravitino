@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+/** Tests encoding and validation of stateless scan plan tasks. */
 public class TestPlanTaskCodec {
 
   private static final TableIdentifier TABLE = TableIdentifier.of(Namespace.of("db"), "tbl");
@@ -96,6 +97,10 @@ public class TestPlanTaskCodec {
         "{\"table\":\"db.tbl\",\"limit\":10,\"scan\":{}}",
         // Fields of the wrong type.
         "{\"table\":\"db.tbl\",\"offset\":\"first\",\"limit\":10,\"scan\":{}}",
+        "{\"table\":\"db.tbl\",\"offset\":0,\"limit\":10,\"scan\":[]}",
+        "{\"table\":\"db.tbl\",\"offset\":0,\"limit\":10,\"scan\":42}",
+        "{\"table\":\"db.tbl\",\"offset\":0,\"limit\":10,\"scan\":\"scan\"}",
+        "{\"table\":\"db.tbl\",\"offset\":0,\"limit\":10,\"scan\":null}",
         "[\"db.tbl\",0,10]"
       })
   void testMalformedPayloadsAreNotDecoded(String payload) {
