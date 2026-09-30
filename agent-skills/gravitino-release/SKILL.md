@@ -1,3 +1,10 @@
+---
+name: gravitino-release
+description: Apache Gravitino release manager — guides through the full staged release pipeline stage by stage
+argument-hint: "[branch] (e.g. branch-1.2 | mock | status)"
+allowed-tools: Bash
+---
+
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -14,13 +21,6 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-
----
-name: gravitino-release
-description: Apache Gravitino release manager — guides through the full staged release pipeline stage by stage
-argument-hint: "[branch] (e.g. branch-1.2 | mock | status)"
-allowed-tools: Bash
----
 
 # Apache Gravitino Release Manager
 
@@ -48,9 +48,11 @@ You are the Apache Gravitino release manager agent. Your role is to guide the us
 | 3 | **docs** | `docs` | `.release-state/{TAG}/docs.done` |
 | 4 | **publish** | `publish` | `.release-state/{TAG}/publish.done` |
 | 5 | **docker** | _(separate script)_ | `.release-state/{TAG}/docker.done` |
+| — | **vote** | _(mailing list — no script)_ | _(no state file)_ |
 | 6 | **finalize** | `finalize` | `.release-state/{TAG}/finalize.done` |
 | 7 | **docker-final** | _(separate script)_ | `.release-state/{TAG}/docker-final.done` |
 | 8 | **release-note** | _(agent-generated)_ | _(no state file — always re-runnable)_ |
+| 9 | **github-release** | _(`gh release create`)_ | _(no state file)_ |
 
 > `{TAG}` is the release candidate tag, e.g. `v1.2.0-rc1`.
 
@@ -231,8 +233,8 @@ Check each required environment variable before running any stage. If unset, ask
 |----------|---------------------|-------|
 | `ASF_USERNAME` | tag, package, publish, finalize | Apache committer username |
 | `ASF_PASSWORD` | tag, package, publish, finalize | Apache committer password |
-| `GPG_KEY` | package, publish | GPG key ID (typically `user@apache.org`) |
-| `GPG_PASSPHRASE` | package, publish | GPG key passphrase |
+| `GPG_KEY` | package, publish, finalize | GPG key ID (typically `user@apache.org`) |
+| `GPG_PASSPHRASE` | package, publish, finalize | GPG key passphrase |
 | `PYPI_API_TOKEN` | tag, package, finalize | PyPI API token (starts with `pypi-`) |
 | `GH_TOKEN` | docker, docker-final | GitHub token with `repo`+`workflow` scope |
 | `DOCKER_USERNAME` | docker, docker-final | Docker Hub username |
@@ -449,6 +451,25 @@ export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
 
 ---
 
+### Vote (between docker and finalize)
+
+No script covers this, but it is most of the calendar time and all of the judgement.
+
+**Send `[VOTE]` to dev@gravitino.apache.org** once the RC artifacts, PyPI staging, Maven staging and Docker images are all verified. The mail must carry the git tag and commit, the `dist/dev` URL, the staging repository, the KEYS URL, and how to verify signatures.
+
+**The rules:**
+- Open at least **72 hours**.
+- Needs **at least 3 binding +1** votes. Binding means PMC member; others are welcome and are counted separately as non-binding.
+- Any **-1** stops the release. Fix the problem, cut the next RC, and start a new vote thread.
+
+**On a -1:** do not argue the vote. Fix, re-cut, re-vote. The RC number increments; the version does not.
+
+**When it passes**, send `[RESULT][VOTE]` as a **new thread**, not a reply. List every voter, marked binding or non-binding, and give the tally.
+
+**Then note which RC passed.** `finalize` needs `-r` set to that RC, and the RC number is *not* auto-detected correctly: `release-util.sh` derives it as the count of existing `v<version>-rc*` tags plus one, which after rc1, rc2 and rc3 gives 4. A release that needed more than one RC will finalize against a `dist/dev` path that never existed unless `-r` is passed explicitly.
+
+---
+
 ### Stage 6: finalize
 
 > ⚠️ **Irreversible.** Always get explicit user confirmation before running.
@@ -531,6 +552,42 @@ The `--state-key docker-final` flag causes `publish-docker.sh` to write `docker-
    - **Credits** — deduplicated list of all issue assignees sorted case-insensitively by GitHub login, formatted as `@login`
 4. Displays the draft for review, then saves to:
    `$RELEASE_SCRIPTS_DIR/gravitino-{VERSION}-release-notes.md`
+
+---
+
+### Stage 9: github-release
+
+Every past release has a GitHub release page carrying the same artifacts as `dist/release`. Nothing in `dev/release/` creates it.
+
+**Independent of the `svn mv`.** It needs only the pushed `v{VERSION}` tag and the RC artifacts, so it can be done while waiting on PMC karma for `dist/release`.
+
+**Artifacts:** take the list from the dist directory rather than a glob — the working directory also holds the Python sdists, which are not part of the ASF distribution.
+
+```bash
+mkdir -p ~/v{VERSION}-assets && cd ~/v{VERSION}-assets
+svn export --force https://dist.apache.org/repos/dist/dev/gravitino/v{VERSION}-rc{RC} .
+ls *.tar.gz *.tar.gz.asc *.tar.gz.sha512 | wc -l    # expect 30
+sha512sum -c *.sha512                                # all must print OK
+```
+
+**Create it:**
+```bash
+gh release create "v{VERSION}" -R apache/gravitino \
+  --title "Apache Gravitino {VERSION} Release Notes" \
+  --notes-file notes.md \
+  *.tar.gz *.tar.gz.asc *.tar.gz.sha512
+```
+
+Use `--draft` if the release notes are still in review, then `gh release edit "v{VERSION}" --draft=false` to publish.
+
+**Verify the asset count, do not trust the exit code:**
+```bash
+gh release view "v{VERSION}" -R apache/gravitino --json assets --jq '.assets|length'   # expect 30
+```
+
+A partial upload still reports success and leaves the release missing its signatures. If assets are missing, use `gh release upload --clobber` rather than re-running `create`, which fails on an existing release.
+
+**Body:** the same content as the release-note stage, plus a `**Full Changelog:** [v{PREV}...v{VERSION}](https://github.com/apache/gravitino/compare/v{PREV}...v{VERSION})` line and a `## Credits` section listing contributors as `@login`.
 
 ---
 
