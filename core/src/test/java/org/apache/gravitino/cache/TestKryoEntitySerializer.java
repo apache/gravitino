@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.cache;
 
-import com.esotericsoftware.kryo.KryoException;
+import com.esotericsoftware.kryo.kryo5.KryoException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -347,10 +347,10 @@ public class TestKryoEntitySerializer {
   void testNonEntityPayloadIsRejected() {
     Map<String, String> notAnEntity = ImmutableMap.of("a", "b");
     byte[] bytes;
-    com.esotericsoftware.kryo.Kryo kryo = new com.esotericsoftware.kryo.Kryo();
+    com.esotericsoftware.kryo.kryo5.Kryo kryo = new com.esotericsoftware.kryo.kryo5.Kryo();
     kryo.setRegistrationRequired(false);
-    try (com.esotericsoftware.kryo.io.Output output =
-        new com.esotericsoftware.kryo.io.Output(64, -1)) {
+    try (com.esotericsoftware.kryo.kryo5.io.Output output =
+        new com.esotericsoftware.kryo.kryo5.io.Output(64, -1)) {
       kryo.writeClassAndObject(output, new java.util.HashMap<>(notAnEntity));
       bytes = output.toBytes();
     }

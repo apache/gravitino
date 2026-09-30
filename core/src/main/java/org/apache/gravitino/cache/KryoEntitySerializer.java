@@ -18,14 +18,15 @@
  */
 package org.apache.gravitino.cache;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.KryoException;
-import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.kryo.serializers.CompatibleFieldSerializer;
-import com.esotericsoftware.kryo.util.DefaultInstantiatorStrategy;
-import com.esotericsoftware.kryo.util.Pool;
+import com.esotericsoftware.kryo.kryo5.Kryo;
+import com.esotericsoftware.kryo.kryo5.KryoException;
+import com.esotericsoftware.kryo.kryo5.Serializer;
+import com.esotericsoftware.kryo.kryo5.io.Input;
+import com.esotericsoftware.kryo.kryo5.io.Output;
+import com.esotericsoftware.kryo.kryo5.objenesis.strategy.StdInstantiatorStrategy;
+import com.esotericsoftware.kryo.kryo5.serializers.CompatibleFieldSerializer;
+import com.esotericsoftware.kryo.kryo5.util.DefaultInstantiatorStrategy;
+import com.esotericsoftware.kryo.kryo5.util.Pool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.collect.ImmutableList;
@@ -45,7 +46,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Type;
-import org.objenesis.strategy.StdInstantiatorStrategy;
 
 /**
  * Serializes entities for {@link RedisEntityCache} with Kryo.
