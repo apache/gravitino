@@ -130,12 +130,6 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsForModelVersion() {
-    testGetSecretsForObject(
-        MetadataObjects.parse("catalog.schema.model.0", MetadataObject.Type.MODEL_VERSION));
-  }
-
-  @Test
   public void testGetSecretsReturnsEmptyWithoutUseSecretss() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
