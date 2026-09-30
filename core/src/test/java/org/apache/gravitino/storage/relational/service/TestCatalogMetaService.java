@@ -63,6 +63,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -482,6 +483,50 @@ public class TestCatalogMetaService extends TestJDBCBackend {
             .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(allowed.id())));
     assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertFalse(backend.exists(allowed.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testNonCascadeDeleteCleansOrphanedTableVersions() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_with_orphaned_table",
+            auditInfo);
+    backend.insert(catalog, false);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "deleted_schema",
+            auditInfo);
+    backend.insert(schema, false);
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(auditInfo)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("orphaned_table")
+            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withColumns(List.of(column))
+            .withAuditInfo(auditInfo)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    SessionUtils.doWithCommit(
+        SchemaMetaMapper.class,
+        mapper -> mapper.softDeleteSchemaMetasBySchemaIds(List.of(schema.id())));
+    assertTrue(countActiveTableVersionRows(table.id()) > 0);
+
+    assertTrue(CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false));
+    assertEquals(0, countActiveTableVersionRows(table.id()));
   }
 
   @TestTemplate

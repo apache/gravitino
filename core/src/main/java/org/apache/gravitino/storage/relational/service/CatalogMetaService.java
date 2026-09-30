@@ -30,7 +30,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -302,146 +301,102 @@ public class CatalogMetaService {
     CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
     long catalogId = catalogPO.getCatalogId();
 
-    if (cascade || !allowedSchemaIds.isEmpty()) {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            // Delete the parent first, then its children. The parent delete locks the catalog row,
-            // and schema writes lock that same row before they touch a schema, so no schema can be
-            // added or removed after this point. Anything that goes wrong later in this
-            // transaction rolls this soft delete back with it.
-            deleteCatalogWithVersion(identifier, catalogPO);
-            List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
-            if (!cascade) {
-              Optional<SchemaPO> unexpectedSchema =
-                  schemaPOs.stream()
-                      .filter(schema -> !allowedSchemaIds.contains(schema.getSchemaId()))
-                      .findFirst();
-              if (unexpectedSchema.isPresent()) {
-                throw new NonEmptyEntityException(
-                    "Catalog %s has unexpected schema %s (ID %s)",
-                    identifier,
-                    unexpectedSchema.get().getSchemaName(),
-                    unexpectedSchema.get().getSchemaId());
-              }
-            }
-            deleteSchemasWithVersions(identifier, schemaPOs);
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableMetaMapper.class,
-                  mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableVersionMapper.class,
-                  mapper -> mapper.softDeleteTableVersionsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableColumnMapper.class,
-                  mapper -> mapper.softDeleteColumnsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetVersionMapper.class,
-                  mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TopicMetaMapper.class,
-                  mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionMetaMapper.class,
-                  mapper -> mapper.softDeleteFunctionMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionVersionMetaMapper.class,
-                  mapper -> mapper.softDeleteFunctionVersionMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SecurableObjectMapper.class,
-                  mapper -> mapper.softDeleteObjectRelsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TagMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeleteTagMetadataObjectRelsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ModelVersionAliasRelMapper.class,
-                  mapper -> mapper.softDeleteModelVersionAliasRelsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ModelVersionMetaMapper.class,
-                  mapper -> mapper.softDeleteModelVersionMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ModelMetaMapper.class,
-                  mapper -> mapper.softDeleteModelMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewVersionInfoMapper.class,
-                  mapper -> mapper.softDeleteViewVersionsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SemanticModelMetaMapper.class,
-                  mapper -> mapper.softDeleteSemanticModelMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SemanticModelVersionInfoMapper.class,
-                  mapper -> mapper.softDeleteSemanticModelVersionsByCatalogId(catalogId)));
-    } else {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            // Delete the catalog first and check for schemas afterwards. This order looks odd, but
-            // it is what makes the check safe: the delete locks the catalog row, and schema
-            // creation locks the same row before inserting. So a create either finishes before this
-            // delete, in which case the check below sees its schema, or it waits until this
-            // transaction ends. Checking first would leave a gap where a schema can be inserted
-            // between the check and the delete. If the check does find a schema, the exception
-            // rolls the soft delete back.
-            deleteCatalogWithVersion(identifier, catalogPO);
-            List<SchemaPO> schemaPOs =
-                SessionUtils.getWithoutCommit(
-                    SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-            if (!schemaPOs.isEmpty()) {
+    // The manager previously used cascade after classifying safe schemas, even for non-force
+    // drops. Share the cleanup so orphaned metadata under already removed schemas is still
+    // deleted after the transactional check accepts a non-force drop.
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          // Delete the parent first, then its children. The parent delete locks the catalog row,
+          // and schema writes lock that same row before they touch a schema, so no schema can be
+          // added or removed after this point. Anything that goes wrong later in this
+          // transaction rolls this soft delete back with it.
+          deleteCatalogWithVersion(identifier, catalogPO);
+          List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
+          if (!cascade) {
+            Optional<SchemaPO> unexpectedSchema =
+                schemaPOs.stream()
+                    .filter(schema -> !allowedSchemaIds.contains(schema.getSchemaId()))
+                    .findFirst();
+            if (unexpectedSchema.isPresent()) {
               throw new NonEmptyEntityException(
-                  "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+                  "Catalog %s has unexpected schema %s (ID %s)",
+                  identifier,
+                  unexpectedSchema.get().getSchemaName(),
+                  unexpectedSchema.get().getSchemaId());
             }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  OwnerMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                          catalogId, MetadataObject.Type.CATALOG.name())),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SecurableObjectMapper.class,
-                  mapper ->
-                      mapper.softDeleteObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TagMetadataObjectRelMapper.class,
-                  mapper ->
-                      mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)));
-    }
+          }
+          deleteSchemasWithVersions(identifier, schemaPOs);
+        },
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableVersionMapper.class,
+                mapper -> mapper.softDeleteTableVersionsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableColumnMapper.class, mapper -> mapper.softDeleteColumnsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetVersionMapper.class,
+                mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper -> mapper.softDeleteFunctionMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FunctionVersionMetaMapper.class,
+                mapper -> mapper.softDeleteFunctionVersionMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.softDeleteObjectRelsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionAliasRelMapper.class,
+                mapper -> mapper.softDeleteModelVersionAliasRelsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper -> mapper.softDeleteModelVersionMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelMetaMapper.class, mapper -> mapper.softDeleteModelMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.softDeleteStatisticsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                ViewVersionInfoMapper.class,
+                mapper -> mapper.softDeleteViewVersionsByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SemanticModelMetaMapper.class,
+                mapper -> mapper.softDeleteSemanticModelMetasByCatalogId(catalogId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SemanticModelVersionInfoMapper.class,
+                mapper -> mapper.softDeleteSemanticModelVersionsByCatalogId(catalogId)));
 
     return true;
   }
