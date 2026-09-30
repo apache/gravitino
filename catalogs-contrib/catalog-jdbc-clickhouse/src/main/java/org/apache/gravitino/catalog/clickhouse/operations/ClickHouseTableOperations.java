@@ -35,6 +35,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.escapeSingleQuotes;
@@ -61,6 +62,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -108,6 +110,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       "Clickhouse does not support nested column names.";
   private static final String INVALID_SETTINGS_METADATA_MSG =
       "Invalid ClickHouse table SETTINGS metadata";
+  private static final int ERROR_CODE_UNKNOWN_TABLE = 60;
+  private static final Set<String> REQUIRED_PROJECTION_COLUMNS = Set.of("name", "type", "query");
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
 
@@ -157,6 +161,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final String LEGACY_SECONDARY_INDEX_QUERY =
       "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
           + "WHERE database = ? AND table = ? ORDER BY name";
+
+  private final AtomicBoolean projectionSourceUnavailableWarningLogged = new AtomicBoolean();
 
   @Override
   public void create(
@@ -360,12 +366,32 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Add Create table clause; capture whether ON CLUSTER is in use
     boolean onCluster = appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> projections =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(
+            notNullProperties.get(CLICKHOUSE_PROJECTIONS_KEY));
+    if (!projections.isEmpty()) {
+      Preconditions.checkArgument(
+          ArrayUtils.isNotEmpty(columns),
+          "ClickHouse projections require an explicit column definition");
+      String configuredEngine = notNullProperties.get(GRAVITINO_ENGINE_KEY);
+      ENGINE projectionEngine =
+          StringUtils.isBlank(configuredEngine)
+              ? ENGINE_PROPERTY_ENTRY.getDefaultValue()
+              : ENGINE.fromString(configuredEngine);
+      Preconditions.checkArgument(
+          projectionEngine.acceptPartition(),
+          "ClickHouse projections are supported only for MergeTree-family engines");
+    }
+
     // We still allow empty columns when the engine is distributed.
     if (columns.length > 0) {
       buildColumnsDefinition(columns, sqlBuilder);
 
       // Index definition
       appendIndexesSql(indexes, sqlBuilder);
+
+      // Projection definitions are part of the parenthesized CREATE TABLE definition.
+      sqlBuilder.append(ClickHouseTableSqlUtils.formatProjectionClauses(projections));
 
       sqlBuilder.append("\n)");
     }
@@ -908,6 +934,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       // over any settings.* keys that might exist in system.tables (though getTableProperties()
       // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
       Map<String, String> merged = new HashMap<>(tableProperties);
+      String projectionProperty = getProjectionProperty(connection, databaseName, tableName);
+      if (StringUtils.isNotEmpty(projectionProperty)) {
+        merged.put(CLICKHOUSE_PROJECTIONS_KEY, projectionProperty);
+      }
       if (!systemTableMetadata.settings().isEmpty()) {
         merged.putAll(systemTableMetadata.settings());
       }
@@ -959,6 +989,93 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
+  }
+
+  @VisibleForTesting
+  @Nullable
+  String getProjectionProperty(Connection connection, String databaseName, String tableName)
+      throws SQLException {
+    // Probe the stable columns directly so ClickHouse 24.8, which has no system.projections table,
+    // can continue serving ordinary catalog metadata. Only UNKNOWN_TABLE means the capability is
+    // unavailable; access and other query errors must remain visible to the caller.
+    try (PreparedStatement probe =
+            connection.prepareStatement("SELECT database FROM system.projections LIMIT 0");
+        ResultSet probeResult = probe.executeQuery()) {
+      if (probeResult.next()) {
+        throw new SQLException(
+            "Unexpected row returned by the system.projections capability probe");
+      }
+    } catch (SQLException e) {
+      if (e.getErrorCode() == ERROR_CODE_UNKNOWN_TABLE) {
+        if (projectionSourceUnavailableWarningLogged.compareAndSet(false, true)) {
+          LOG.warn(
+              "ClickHouse does not provide system.projections; projection metadata round-trip "
+                  + "requires ClickHouse 24.9 or later");
+        }
+        return null;
+      }
+      throw e;
+    }
+
+    Set<String> projectionColumns = new HashSet<>();
+    try (PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT name FROM system.columns "
+                    + "WHERE database = 'system' AND table = 'projections'");
+        ResultSet resultSet = statement.executeQuery()) {
+      while (resultSet.next()) {
+        projectionColumns.add(resultSet.getString("name"));
+      }
+    }
+    if (!projectionColumns.containsAll(REQUIRED_PROJECTION_COLUMNS)) {
+      Set<String> missingColumns = new HashSet<>(REQUIRED_PROJECTION_COLUMNS);
+      missingColumns.removeAll(projectionColumns);
+      throw new SQLException(
+          "system.projections is missing required columns: "
+              + missingColumns.stream().sorted().collect(Collectors.joining(", ")));
+    }
+
+    boolean hasSettingsColumn = projectionColumns.contains("settings");
+    String query =
+        "SELECT name, type, query"
+            + (hasSettingsColumn ? ", toJSONString(settings) AS settings_json" : "")
+            + " FROM system.projections WHERE database = ? AND table = ? ORDER BY name";
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions = new ArrayList<>();
+    try (PreparedStatement statement = connection.prepareStatement(query)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          Map<String, String> settings;
+          try {
+            settings =
+                hasSettingsColumn
+                    ? ClickHouseTableSqlUtils.parseProjectionSettings(
+                        resultSet.getString("settings_json"))
+                    : Collections.emptyMap();
+          } catch (IllegalArgumentException e) {
+            LOG.warn(
+                "Skip projection metadata of {}.{}: {}", databaseName, tableName, e.getMessage());
+            return null;
+          }
+          definitions.add(
+              new ClickHouseTableSqlUtils.ProjectionDefinition(
+                  resultSet.getString("name"),
+                  resultSet.getString("type"),
+                  resultSet.getString("query"),
+                  settings));
+        }
+      }
+    }
+    if (definitions.isEmpty()) {
+      return null;
+    }
+    try {
+      return ClickHouseTableSqlUtils.serializeProjectionDefinitions(definitions);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Skip projection metadata of {}.{}: {}", databaseName, tableName, e.getMessage());
+      return null;
+    }
   }
 
   @Override

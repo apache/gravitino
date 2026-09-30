@@ -535,6 +535,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      // Explicit credential-providers wins: do not auto-append detected static providers (e.g.
+      // s3-secret-key beside s3-token), which breaks path-based credential selection. Catalogs that
+      // must keep jdbc/aws/dlf listed call ensureCredentialProviderListed in their overrides.
       return props;
     }
     List<String> credentialProviders = new ArrayList<>();
@@ -560,6 +563,30 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Appends {@code credentialType} to {@link CredentialConstants#CREDENTIAL_PROVIDERS} when it is
+   * not already listed. Used by subclasses that must keep catalog-specific providers (jdbc / aws /
+   * dlf) available even when the property was set explicitly (so {@link
+   * #addCatalogSpecificCredentialProviders} was skipped).
+   *
+   * @param props mutable catalog properties
+   * @param credentialType provider type name to ensure
+   */
+  protected static void ensureCredentialProviderListed(
+      Map<String, String> props, String credentialType) {
+    String providers = props.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    if (StringUtils.isBlank(providers)) {
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialType);
+      return;
+    }
+    for (String part : providers.split(",")) {
+      if (credentialType.equals(part.trim())) {
+        return;
+      }
+    }
+    props.put(CredentialConstants.CREDENTIAL_PROVIDERS, providers + "," + credentialType);
+  }
+
+  /**
    * Returns whether hidden credentials should be backfilled into catalog properties for backward
    * compatibility with connectors that do not support credential vending. Controlled by
    * server-level config {@code gravitino.catalog.credential.backfillToProperties}.
@@ -579,18 +606,44 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
       credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(s3AccessKeyId) || StringUtils.isNotBlank(s3SecretAccessKey)) {
+      LOG.warn(
+          "Incomplete S3 static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+          StringUtils.isBlank(s3AccessKeyId),
+          StringUtils.isBlank(s3SecretAccessKey));
     }
 
     String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
     String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
     if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
       credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(ossAccessKeyId)
+        || StringUtils.isNotBlank(ossSecretAccessKey)) {
+      LOG.warn(
+          "Incomplete OSS static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+          StringUtils.isBlank(ossAccessKeyId),
+          StringUtils.isBlank(ossSecretAccessKey));
     }
 
     String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
     String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
     if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
       credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(azureAccountName)
+        || StringUtils.isNotBlank(azureAccountKey)) {
+      LOG.warn(
+          "Incomplete Azure static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accountNameBlank={}, accountKeyBlank={}",
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          StringUtils.isBlank(azureAccountName),
+          StringUtils.isBlank(azureAccountKey));
     }
 
     String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
@@ -602,6 +655,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String cosSecretAccessKey = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
     if (StringUtils.isNotBlank(cosAccessKeyId) && StringUtils.isNotBlank(cosSecretAccessKey)) {
       credentialProviders.add(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(cosAccessKeyId)
+        || StringUtils.isNotBlank(cosSecretAccessKey)) {
+      LOG.warn(
+          "Incomplete COS static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+          StringUtils.isBlank(cosAccessKeyId),
+          StringUtils.isBlank(cosSecretAccessKey));
     }
   }
 

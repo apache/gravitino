@@ -290,4 +290,43 @@ public class TestOwnerManager {
           GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
     }
   }
+
+  @Test
+  @Order(5)
+  public void testInitialOwnerSetByBatchNotifiesAuthorizer()
+      throws IllegalAccessException, IOException {
+    String catalogName = "catalog_initial_owner_notify_batch";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(catalog, false);
+
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer originalAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+    try {
+      MetadataObject catalogObject =
+          MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
+
+      ownerManager.setOwners(
+          METALAKE, Collections.singletonList(catalogObject), USER, Owner.Type.USER);
+
+      Mockito.verify(authorizer)
+          .handleMetadataOwnerChange(
+              Mockito.eq(METALAKE),
+              Mockito.isNull(),
+              Mockito.eq(NameIdentifier.of(METALAKE, catalogName)),
+              Mockito.eq(Entity.EntityType.CATALOG));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+    }
+  }
 }

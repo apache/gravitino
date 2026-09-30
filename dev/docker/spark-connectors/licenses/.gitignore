@@ -1,4 +1,5 @@
-# LICENSE and NOTICE are copied from the repository root at build time
-# by build-docker.sh / the CI workflow. Do not commit generated copies.
+# Populated at build time by spark-connectors-dependency.sh from the staged
+# runtime jars. Do not commit generated copies.
+/*/
 /LICENSE
 /NOTICE

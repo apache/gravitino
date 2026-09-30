@@ -22,9 +22,11 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -71,6 +73,11 @@ public class TestClickHouseTableOperationsUnit {
     SystemTableMetadata callGetSystemTableMetadata(
         Connection connection, String databaseName, String tableName) throws Exception {
       return getSystemTableMetadata(connection, databaseName, tableName);
+    }
+
+    String callGetProjectionProperty(Connection connection, String databaseName, String tableName)
+        throws Exception {
+      return getProjectionProperty(connection, databaseName, tableName);
     }
 
     Map<String, String> callGetTableProperties(Connection connection, String tableName)
@@ -562,6 +569,383 @@ public class TestClickHouseTableOperationsUnit {
 
     Assertions.assertArrayEquals(new SortOrder[0], metadata.sortOrders());
     Assertions.assertTrue(metadata.settings().isEmpty());
+  }
+
+  @Test
+  void testProjectionPropertyRoundTripAndDeterministicOrdering() {
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions =
+        List.of(
+            new ClickHouseTableSqlUtils.ProjectionDefinition(
+                "z_aggregate",
+                "Aggregate",
+                "SELECT region, count() GROUP BY region",
+                Map.of("index_granularity", "128")),
+            new ClickHouseTableSqlUtils.ProjectionDefinition(
+                "a projection", "Normal", "SELECT concat(name, ')') ORDER BY name", Map.of()));
+
+    String property = ClickHouseTableSqlUtils.serializeProjectionDefinitions(definitions);
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> parsed =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(property);
+
+    Assertions.assertEquals("a projection", parsed.get(0).name());
+    Assertions.assertEquals("z_aggregate", parsed.get(1).name());
+    Assertions.assertEquals(Map.of("index_granularity", "128"), parsed.get(1).settings());
+    String clauses = ClickHouseTableSqlUtils.formatProjectionClauses(parsed);
+    Assertions.assertTrue(clauses.contains("PROJECTION `a projection`"), clauses);
+    Assertions.assertTrue(clauses.contains("PROJECTION `z_aggregate`"), clauses);
+    Assertions.assertTrue(clauses.contains("WITH SETTINGS (index_granularity = 128)"), clauses);
+    Assertions.assertTrue(
+        clauses.indexOf("a projection") < clauses.indexOf("z_aggregate"), clauses);
+  }
+
+  @Test
+  void testProjectionPropertyParserRejectsMalformedOrUnsafeValues() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ClickHouseTableSqlUtils.parseProjectionDefinitions("not json"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT x\"}] trailing content"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\",\"query\":\"SELECT x)\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT x; DROP TABLE t\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\",\"query\":\"SELECT x\","
+                    + "\"settings\":{\"index_granularity\":\"1; DROP TABLE t\"}}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Lightweight\",\"query\":\"SELECT x\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\"," + "\"query\":\"SELECT x WHERE x > 0\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT _part_offset ORDER BY _part_offset\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT `_part_offset` ORDER BY tuple()\"}]"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlAppendsProjectionInsideDefinition() {
+    String property =
+        ClickHouseTableSqlUtils.serializeProjectionDefinitions(
+            List.of(
+                new ClickHouseTableSqlUtils.ProjectionDefinition(
+                    "by_name", "Normal", "SELECT name ORDER BY name", Map.of())));
+
+    String sql = newOps().callGenerateCreateTableSql(Map.of(CLICKHOUSE_PROJECTIONS_KEY, property));
+
+    Assertions.assertTrue(
+        sql.contains(",\n PROJECTION `by_name` (\n  SELECT name ORDER BY name\n )"), sql);
+    Assertions.assertTrue(sql.indexOf("PROJECTION") < sql.indexOf("\n)"), sql);
+    Assertions.assertFalse(newOps().callGenerateCreateTableSql(Map.of()).contains("PROJECTION"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            newOps()
+                .callGenerateCreateTableSql(
+                    Map.of(
+                        CLICKHOUSE_PROJECTIONS_KEY,
+                        property,
+                        TableConstants.ENGINE,
+                        ENGINE.LOG.getValue())));
+  }
+
+  @Test
+  void testGetProjectionPropertyReads24_9SchemaWithoutSettings() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns)
+        .thenReturn(projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("by_name");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal");
+    Mockito.when(projectionResult.getString("query")).thenReturn("SELECT name ORDER BY name");
+
+    String property = ops.callGetProjectionProperty(connection, "db", "table");
+
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(property);
+    Assertions.assertEquals(1, definitions.size());
+    Assertions.assertEquals("by_name", definitions.get(0).name());
+    Assertions.assertTrue(definitions.get(0).settings().isEmpty());
+    Mockito.verify(connection, Mockito.times(3)).prepareStatement(sqlCaptor.capture());
+    Assertions.assertFalse(sqlCaptor.getAllValues().get(2).contains("settings"));
+    Mockito.verify(projections).setString(1, "db");
+    Mockito.verify(projections).setString(2, "table");
+  }
+
+  @Test
+  void testGetProjectionPropertyReadsSettingsWhenSystemTableExposesColumn() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns)
+        .thenReturn(projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query", "settings");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("by_name");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal");
+    Mockito.when(projectionResult.getString("query")).thenReturn("SELECT name ORDER BY name");
+    Mockito.when(projectionResult.getString("settings_json"))
+        .thenReturn("{\"index_granularity\":\"128\"}");
+
+    String property = ops.callGetProjectionProperty(connection, "db", "table");
+
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(property);
+    Assertions.assertEquals(Map.of("index_granularity", "128"), definitions.get(0).settings());
+    Mockito.verify(connection, Mockito.times(3)).prepareStatement(sqlCaptor.capture());
+    Assertions.assertTrue(sqlCaptor.getAllValues().get(2).contains("toJSONString(settings)"));
+  }
+
+  @Test
+  void testGetProjectionPropertySkipsAllDefinitionsForUnsupportedQuery() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe, columns, projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("by_name", "by_offset");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal", "Normal");
+    Mockito.when(projectionResult.getString("query"))
+        .thenReturn("SELECT name ORDER BY name", "SELECT _part_offset ORDER BY b");
+
+    Assertions.assertNull(ops.callGetProjectionProperty(connection, "db", "table"));
+  }
+
+  @Test
+  void testGetProjectionPropertySkipsUnsupportedSettings() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe, columns, projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query", "settings");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("settings_json"))
+        .thenReturn("{\"index_granularity\":\"1 + 1\"}");
+
+    Assertions.assertNull(ops.callGetProjectionProperty(connection, "db", "table"));
+  }
+
+  @Test
+  void testLoadKeepsOtherPropertiesWhenProjectionIsUnsupported() throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    DatabaseMetaData metadata = Mockito.mock(DatabaseMetaData.class);
+    ResultSet tableResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    PreparedStatement systemTable = Mockito.mock(PreparedStatement.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projectionColumns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet systemTableResult = Mockito.mock(ResultSet.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionColumnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.getCatalog()).thenReturn("db");
+    Mockito.when(connection.getMetaData()).thenReturn(metadata);
+    Mockito.when(metadata.getTables("db", null, "t", null)).thenReturn(tableResult);
+    Mockito.when(metadata.getColumns("db", "db", "t", null)).thenReturn(columnResult);
+    Mockito.when(tableResult.next()).thenReturn(true, false);
+    Mockito.when(tableResult.getString("TABLE_NAME")).thenReturn("t");
+    Mockito.when(columnResult.next()).thenReturn(true, false);
+    Mockito.when(columnResult.getString("TABLE_NAME")).thenReturn("t");
+    Mockito.when(columnResult.getString("COLUMN_NAME")).thenReturn("a");
+    Mockito.when(columnResult.getString("TYPE_NAME")).thenReturn("Int32");
+    Mockito.when(columnResult.getString("IS_AUTOINCREMENT")).thenReturn("NO");
+
+    ClickHouseTableOperations ops = Mockito.spy(new ClickHouseTableOperations());
+    ops.initialize(
+        dataSource,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    Mockito.doReturn(Map.of()).when(ops).getDefaultKinds(connection, "db", "t");
+    Mockito.doReturn(List.of()).when(ops).getIndexes(connection, "db", "t");
+    Mockito.doReturn("").when(ops).getPartitionKey(connection, "db", "t");
+    Mockito.doReturn(Map.of(TableConstants.ENGINE, "MergeTree"))
+        .when(ops)
+        .getTableProperties(connection, "t");
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(systemTable, probe, projectionColumns, projections);
+    Mockito.when(systemTable.executeQuery()).thenReturn(systemTableResult);
+    Mockito.when(systemTableResult.next()).thenReturn(true, false);
+    Mockito.when(systemTableResult.getString("sorting_key")).thenReturn("a");
+    Mockito.when(systemTableResult.getString("engine_full")).thenReturn("MergeTree ORDER BY a");
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(projectionColumns.executeQuery()).thenReturn(projectionColumnResult);
+    Mockito.when(projectionColumnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(projectionColumnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("p");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal");
+    Mockito.when(projectionResult.getString("query")).thenReturn("SELECT _part_offset ORDER BY a");
+
+    JdbcTable table = ops.load("db", "t");
+
+    Assertions.assertEquals(1, table.columns().length);
+    Assertions.assertEquals("MergeTree", table.properties().get(TableConstants.ENGINE));
+    Assertions.assertEquals("", table.properties().get(TableConstants.PARTITION_KEY));
+    Assertions.assertFalse(table.properties().containsKey(CLICKHOUSE_PROJECTIONS_KEY));
+  }
+
+  @Test
+  void testGetProjectionPropertyReturnsNullWhenAvailableTableHasNoRows() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns)
+        .thenReturn(projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(false);
+
+    Assertions.assertNull(ops.callGetProjectionProperty(connection, "db", "table"));
+  }
+
+  @Test
+  void testGetProjectionPropertyRejectsMissingRequiredSystemColumn() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type");
+
+    SQLException exception =
+        Assertions.assertThrows(
+            SQLException.class, () -> ops.callGetProjectionProperty(connection, "db", "table"));
+
+    Assertions.assertTrue(exception.getMessage().contains("query"));
+    Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
+  }
+
+  @Test
+  void testGetProjectionPropertyHandlesUnavailableSystemTableAndPropagatesOtherErrors()
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection missingConnection = Mockito.mock(Connection.class);
+    PreparedStatement missingProbe = Mockito.mock(PreparedStatement.class);
+    Mockito.when(missingConnection.prepareStatement(Mockito.anyString())).thenReturn(missingProbe);
+    Mockito.when(missingProbe.executeQuery())
+        .thenThrow(new SQLException("Unknown table system.projections", "", 60));
+    Assertions.assertNull(ops.callGetProjectionProperty(missingConnection, "db", "table"));
+
+    Connection deniedConnection = Mockito.mock(Connection.class);
+    PreparedStatement deniedProbe = Mockito.mock(PreparedStatement.class);
+    Mockito.when(deniedConnection.prepareStatement(Mockito.anyString())).thenReturn(deniedProbe);
+    SQLException permissionError = new SQLException("Not enough privileges", "", 497);
+    Mockito.when(deniedProbe.executeQuery()).thenThrow(permissionError);
+    Assertions.assertSame(
+        permissionError,
+        Assertions.assertThrows(
+            SQLException.class,
+            () -> ops.callGetProjectionProperty(deniedConnection, "db", "table")));
   }
 
   @Test
