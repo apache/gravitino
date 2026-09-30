@@ -19,8 +19,10 @@
 package org.apache.gravitino.trino.connector.catalog.glue;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -75,5 +77,18 @@ class TestGlueConnectorAdapter {
     Assertions.assertEquals("test-secret-key", config.get("hive.s3.aws-secret-key"));
     Assertions.assertEquals(
         "https://glue.custom.endpoint", config.get("hive.metastore.glue.endpoint-url"));
+  }
+
+  @Test
+  void testApplyS3CredentialUsesAwsForGlueAndS3ForStorage() {
+    Map<String, String> config = Maps.newHashMap();
+    Credential[] credentials = {
+      new AwsSecretKeyCredential("glue-ak", "glue-sk"), new S3SecretKeyCredential("s3-ak", "s3-sk")
+    };
+    GlueConnectorAdapter.applyS3Credential(credentials, config);
+    Assertions.assertEquals("glue-ak", config.get("hive.metastore.glue.aws-access-key"));
+    Assertions.assertEquals("glue-sk", config.get("hive.metastore.glue.aws-secret-key"));
+    Assertions.assertEquals("s3-ak", config.get("hive.s3.aws-access-key"));
+    Assertions.assertEquals("s3-sk", config.get("hive.s3.aws-secret-key"));
   }
 }
