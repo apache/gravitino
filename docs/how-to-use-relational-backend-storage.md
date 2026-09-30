@@ -33,8 +33,9 @@ and `JDBCBackend`. Leave them alone.
 
 For concurrent metadata reads, tune `gravitino.entity.store.relational.maxIdleConnections`
 alongside `maxConnections`. The default retains up to 32 idle connections per server; the
-effective limit never exceeds `maxConnections`. Include every server and each JDBC catalog pool
-when calculating the database connection budget.
+effective limit never exceeds `maxConnections`. Count this limit once per server when calculating
+the database connection budget, and also count the pools of any JDBC catalogs that point at the
+same database instance.
 
 Idle connections are released slowly. The pool's evictor runs every ten minutes and checks at most
 three idle connections per run, closing those idle for more than 30 seconds. After a burst, a server

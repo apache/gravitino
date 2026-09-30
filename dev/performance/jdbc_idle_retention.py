@@ -36,7 +36,9 @@ status queries and any other database traffic, so compare runs on an otherwise q
 the same client count, data, JVM settings and node count, and only after confirming that no
 requests failed.
 
-Self-test: ``cd dev/performance && python3 -m unittest test_jdbc_idle_retention``.
+Self-test::
+
+    cd dev/performance && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_jdbc_idle_retention
 """
 
 import argparse
