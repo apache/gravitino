@@ -19,7 +19,28 @@
 
 grammar RestrictedRegoExpression;
 
-expression: orExpression EOF;
+program
+    : filterRule EOF
+    | maskRule EOF
+    ;
+
+filterRule
+    : FILTER ASSIGN expression
+    | FILTER ASSIGN expression IF expression filterElseBranch* ELSE ASSIGN expression
+    ;
+
+filterElseBranch: ELSE ASSIGN expression IF expression;
+
+maskRule
+    : MASK ASSIGN maskAction
+    | MASK ASSIGN maskAction IF expression maskElseBranch* ELSE ASSIGN maskAction
+    ;
+
+maskElseBranch: ELSE ASSIGN maskAction IF expression;
+
+maskAction: ACTION LPAREN STRING RPAREN;
+
+expression: orExpression;
 
 orExpression: andExpression (OR andExpression)*;
 
@@ -67,6 +88,10 @@ literal
 
 arrayLiteral: LBRACKET literal (COMMA literal)* RBRACKET;
 
+FILTER: 'filter';
+MASK: 'mask';
+IF: 'if';
+ELSE: 'else';
 OR: 'or';
 AND: 'and';
 NOT: 'not';
@@ -74,10 +99,12 @@ IN: 'in';
 COL: 'col';
 SESSION_USER: 'session_user';
 IS_GROUP_MEMBER: 'is_group_member';
+ACTION: 'action';
 TRUE: 'true';
 FALSE: 'false';
 NULL: 'null';
 
+ASSIGN: ':=';
 EQ: '==';
 NEQ: '!=';
 LTE: '<=';

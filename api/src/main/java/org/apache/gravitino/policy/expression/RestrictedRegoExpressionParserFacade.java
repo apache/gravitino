@@ -37,6 +37,11 @@ import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operation;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.FilterBranch;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.MaskAction;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.MaskBranch;
+import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RowFilter;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionBaseVisitor;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionLexer;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser;
@@ -45,14 +50,20 @@ import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionPars
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.ColumnReferenceContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.ComparisonExpressionContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.ExpressionContext;
+import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.FilterElseBranchContext;
+import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.FilterRuleContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.GroupMembershipContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.LiteralContext;
+import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.MaskActionContext;
+import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.MaskElseBranchContext;
+import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.MaskRuleContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.NotExpressionContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.OrExpressionContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.PrimaryContext;
+import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.ProgramContext;
 import org.apache.gravitino.policy.expression.antlr.RestrictedRegoExpressionParser.SessionUserReferenceContext;
 
-/** Parses and validates expressions in the {@code restricted-rego-v1} source dialect. */
+/** Parses and validates complete programs in the {@code restricted-rego-v1} source dialect. */
 public final class RestrictedRegoExpressionParserFacade {
 
   private static final int MAX_SOURCE_BYTES = 16 * 1024;
@@ -64,41 +75,23 @@ public final class RestrictedRegoExpressionParserFacade {
   private RestrictedRegoExpressionParserFacade() {}
 
   /**
-   * Parses and validates one complete row-filter expression.
+   * Parses and validates one complete row-filter or column-mask program.
    *
-   * @param expression expression in {@code restricted-rego-v1}
-   * @return validated unresolved expression tree
+   * @param source program in {@code restricted-rego-v1}
+   * @return validated unresolved program
    * @throws IllegalArgumentException if syntax or semantics are invalid
    */
-  public static CanonicalExpression parse(String expression) {
-    return parseInternal(expression, false);
-  }
-
-  /**
-   * Parses and validates a context-only column-mask condition.
-   *
-   * <p>The condition supports the same dialect as a row filter but rejects every {@code col(...)}
-   * reference.
-   *
-   * @param expression condition in {@code restricted-rego-v1}
-   * @return validated unresolved context expression tree
-   * @throws IllegalArgumentException if syntax or semantics are invalid or data-dependent
-   */
-  public static CanonicalExpression parseContextCondition(String expression) {
-    return parseInternal(expression, true);
-  }
-
-  private static CanonicalExpression parseInternal(String expression, boolean contextOnly) {
+  public static RestrictedRegoProgram parse(String source) {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(expression), "restricted-rego-v1 expression cannot be blank");
+        StringUtils.isNotBlank(source), "restricted-rego-v1 program cannot be blank");
     Preconditions.checkArgument(
-        expression.getBytes(StandardCharsets.UTF_8).length <= MAX_SOURCE_BYTES,
+        source.getBytes(StandardCharsets.UTF_8).length <= MAX_SOURCE_BYTES,
         "restricted-rego-v1 source must not exceed %s UTF-8 bytes",
         MAX_SOURCE_BYTES);
 
     SyntaxErrorListener errorListener = new SyntaxErrorListener();
     RestrictedRegoExpressionLexer lexer =
-        new RestrictedRegoExpressionLexer(CharStreams.fromString(expression));
+        new RestrictedRegoExpressionLexer(CharStreams.fromString(source));
     lexer.removeErrorListeners();
     lexer.addErrorListener(errorListener);
 
@@ -107,29 +100,123 @@ public final class RestrictedRegoExpressionParserFacade {
     parser.removeErrorListeners();
     parser.addErrorListener(errorListener);
 
-    ExpressionContext context = parser.expression();
+    ProgramContext context = parser.program();
     if (errorListener.errorMessage != null) {
       throw new IllegalArgumentException(errorListener.errorMessage);
     }
 
-    CanonicalExpression result = new ExpressionVisitor().visitExpression(context);
+    ExpressionVisitor visitor = new ExpressionVisitor();
+    RestrictedRegoProgram program =
+        context.filterRule() == null
+            ? buildColumnMask(context.maskRule(), visitor)
+            : buildRowFilter(context.filterRule(), visitor);
+    validateProgram(program);
+    return program;
+  }
+
+  /**
+   * Parses and validates one complete {@code filter := ...} program.
+   *
+   * @param source row-filter program in {@code restricted-rego-v1}
+   * @return validated unresolved row-filter rule
+   * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
+   *     {@code filter}
+   */
+  public static RowFilter parseRowFilter(String source) {
+    RestrictedRegoProgram program = parse(source);
     Preconditions.checkArgument(
-        ExpressionValidation.isPredicate(result),
-        "restricted-rego-v1 expression root must be a boolean predicate");
-    result.validate();
+        program instanceof RowFilter, "row-filter program must declare a filter rule");
+    return (RowFilter) program;
+  }
+
+  /**
+   * Parses and validates one complete {@code mask := action(...)} program.
+   *
+   * @param source column-mask program in {@code restricted-rego-v1}
+   * @return validated unresolved column-mask rule
+   * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
+   *     {@code mask}
+   */
+  public static ColumnMask parseColumnMask(String source) {
+    RestrictedRegoProgram program = parse(source);
     Preconditions.checkArgument(
-        result.depth() <= MAX_SOURCE_DEPTH,
-        "restricted-rego-v1 source depth must not exceed %s",
-        MAX_SOURCE_DEPTH);
+        program instanceof ColumnMask, "column-mask program must declare a mask rule");
+    return (ColumnMask) program;
+  }
+
+  private static RowFilter buildRowFilter(FilterRuleContext context, ExpressionVisitor visitor) {
+    if (context.expression().size() == 1) {
+      return new RowFilter(new ArrayList<>(), visitor.visit(context.expression(0)));
+    }
+
+    List<FilterBranch> branches = new ArrayList<>();
+    branches.add(
+        new FilterBranch(
+            visitor.visit(context.expression(0)), visitor.visit(context.expression(1))));
+    for (FilterElseBranchContext branchContext : context.filterElseBranch()) {
+      branches.add(
+          new FilterBranch(
+              visitor.visit(branchContext.expression(0)),
+              visitor.visit(branchContext.expression(1))));
+    }
+    return new RowFilter(branches, visitor.visit(context.expression(2)));
+  }
+
+  private static ColumnMask buildColumnMask(MaskRuleContext context, ExpressionVisitor visitor) {
+    if (context.maskAction().size() == 1) {
+      return new ColumnMask(new ArrayList<>(), parseMaskAction(context.maskAction(0)));
+    }
+
+    List<MaskBranch> branches = new ArrayList<>();
+    branches.add(
+        new MaskBranch(
+            parseMaskAction(context.maskAction(0)), visitor.visit(context.expression())));
+    for (MaskElseBranchContext branchContext : context.maskElseBranch()) {
+      branches.add(
+          new MaskBranch(
+              parseMaskAction(branchContext.maskAction()),
+              visitor.visit(branchContext.expression())));
+    }
+    return new ColumnMask(branches, parseMaskAction(context.maskAction(1)));
+  }
+
+  private static MaskAction parseMaskAction(MaskActionContext context) {
+    return MaskAction.fromValue(decodeString(context.STRING().getText()));
+  }
+
+  private static void validateProgram(RestrictedRegoProgram program) {
+    program.validate();
+    List<CanonicalExpression> expressions = expressions(program);
+    int nodeCount = 0;
+    for (CanonicalExpression expression : expressions) {
+      Preconditions.checkArgument(
+          expression.depth() <= MAX_SOURCE_DEPTH,
+          "restricted-rego-v1 source depth must not exceed %s",
+          MAX_SOURCE_DEPTH);
+      nodeCount += countNodes(expression);
+    }
     Preconditions.checkArgument(
-        countNodes(result) <= MAX_AST_NODES,
+        nodeCount <= MAX_AST_NODES,
         "restricted-rego-v1 AST must not exceed %s nodes",
         MAX_AST_NODES);
-    if (contextOnly) {
-      Preconditions.checkArgument(
-          isContextOnly(result), "column-mask condition cannot contain col(...)");
+  }
+
+  private static List<CanonicalExpression> expressions(RestrictedRegoProgram program) {
+    List<CanonicalExpression> expressions = new ArrayList<>();
+    if (program instanceof RowFilter) {
+      RowFilter filter = (RowFilter) program;
+      for (FilterBranch branch : filter.branches()) {
+        expressions.add(branch.result());
+        expressions.add(branch.condition());
+      }
+      expressions.add(filter.fallback());
+    } else {
+      ColumnMask mask = (ColumnMask) program;
+      for (MaskBranch branch : mask.branches()) {
+        expressions.add(branch.condition());
+      }
     }
-    return result;
+    return expressions;
   }
 
   private static int countNodes(CanonicalExpression expression) {
@@ -156,34 +243,6 @@ public final class RestrictedRegoExpressionParserFacade {
     return count;
   }
 
-  private static boolean isContextOnly(CanonicalExpression expression) {
-    if (expression instanceof CanonicalExpression.Column) {
-      return false;
-    }
-    if (!(expression instanceof Operation)) {
-      return true;
-    }
-
-    Operation operation = (Operation) expression;
-    if (operation.left() != null && !isContextOnly(operation.left())) {
-      return false;
-    }
-    if (operation.right() != null && !isContextOnly(operation.right())) {
-      return false;
-    }
-    if (operation.operand() != null && !isContextOnly(operation.operand())) {
-      return false;
-    }
-    if (operation.operands() != null) {
-      for (CanonicalExpression child : operation.operands()) {
-        if (!isContextOnly(child)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
   private static final class SyntaxErrorListener extends BaseErrorListener {
     private String errorMessage;
 
@@ -198,7 +257,7 @@ public final class RestrictedRegoExpressionParserFacade {
       if (errorMessage == null) {
         errorMessage =
             String.format(
-                "Invalid restricted-rego-v1 expression at line %s, column %s: %s",
+                "Invalid restricted-rego-v1 program at line %s, column %s: %s",
                 line, charPositionInLine, message);
       }
     }
