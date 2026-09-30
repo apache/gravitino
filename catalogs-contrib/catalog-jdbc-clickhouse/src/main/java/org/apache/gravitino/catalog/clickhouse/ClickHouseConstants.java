@@ -84,6 +84,20 @@ public class ClickHouseConstants {
     /** The name of the data skipping index type for tokenbf_v1 in ClickHouse. */
     public static final String DATA_SKIPPING_TOKENBFV1 = "tokenbf_v1";
 
+    /** The name of the ClickHouse server-wide text data skipping index. */
+    public static final String DATA_SKIPPING_TEXT = "text";
+
+    /** Property key selecting the text index tokenizer (e.g. "default", "ngram", "split"). */
+    public static final String TOKENIZER = "tokenizer";
+
+    /** Property key for the n-gram size when the text index tokenizer is ngram-based. */
+    public static final String TEXT_NGRAM_SIZE = "ngram_size";
+
+    /** Lowest and highest n-gram size accepted by ClickHouse for text index tokenizers. */
+    public static final int MIN_TEXT_NGRAM_SIZE = 2;
+
+    public static final int MAX_TEXT_NGRAM_SIZE = 8;
+
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
 
