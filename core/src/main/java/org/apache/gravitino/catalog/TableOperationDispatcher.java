@@ -776,15 +776,27 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         && isSameDefaultValue(left.defaultValue(), right.defaultValue());
   }
 
-  private boolean isSameDefaultValue(Expression left, Expression right) {
+  @VisibleForTesting
+  static boolean isSameDefaultValue(@Nullable Expression left, @Nullable Expression right) {
+    if (Objects.equal(left, right)) {
+      return true;
+    }
+
     // Connector snapshots use DTOs, while relational storage restores API expressions. Compare
     // their persisted representation rather than implementation-specific equals methods.
-    return Objects.equal(toDefaultValueArg(left), toDefaultValueArg(right));
+    try {
+      return Objects.equal(toDefaultValueArg(left), toDefaultValueArg(right));
+    } catch (IllegalArgumentException e) {
+      // A default value that cannot be converted is treated as changed instead of failing the
+      // comparison.
+      LOG.debug("Failed to compare column default values {} and {}", left, right, e);
+      return false;
+    }
   }
 
   @Nullable
-  private FunctionArg toDefaultValueArg(Expression expression) {
-    return expression.equals(Column.DEFAULT_VALUE_NOT_SET)
+  private static FunctionArg toDefaultValueArg(@Nullable Expression expression) {
+    return expression == null || expression.equals(Column.DEFAULT_VALUE_NOT_SET)
         ? null
         : DTOConverters.toFunctionArg(expression);
   }

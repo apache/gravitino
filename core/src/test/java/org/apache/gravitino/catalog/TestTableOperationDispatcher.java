@@ -1562,6 +1562,28 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             TableChange.deleteColumn(new String[] {"s", "z"}, false)));
   }
 
+  @Test
+  public void testIsSameDefaultValue() {
+    Expression literal = Literals.stringLiteral("1");
+    Assertions.assertTrue(
+        TableOperationDispatcher.isSameDefaultValue(DTOConverters.toFunctionArg(literal), literal));
+    Assertions.assertFalse(
+        TableOperationDispatcher.isSameDefaultValue(literal, Literals.stringLiteral("2")));
+
+    // A missing default value is the same as an unset one.
+    Assertions.assertTrue(TableOperationDispatcher.isSameDefaultValue(null, null));
+    Assertions.assertTrue(
+        TableOperationDispatcher.isSameDefaultValue(null, Column.DEFAULT_VALUE_NOT_SET));
+    Assertions.assertFalse(TableOperationDispatcher.isSameDefaultValue(null, literal));
+
+    // A default value that cannot be converted is reported as changed instead of throwing.
+    Expression unsupported = () -> Expression.EMPTY_EXPRESSION;
+    Assertions.assertTrue(TableOperationDispatcher.isSameDefaultValue(unsupported, unsupported));
+    Assertions.assertFalse(TableOperationDispatcher.isSameDefaultValue(unsupported, literal));
+    Assertions.assertFalse(
+        TableOperationDispatcher.isSameDefaultValue(unsupported, Column.DEFAULT_VALUE_NOT_SET));
+  }
+
   private Map<String, Long> columnIds(NameIdentifier tableIdent) throws IOException {
     return entityStore.get(tableIdent, TABLE, TableEntity.class).columns().stream()
         .collect(Collectors.toMap(ColumnEntity::name, ColumnEntity::id));
