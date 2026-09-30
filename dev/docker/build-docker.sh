@@ -148,8 +148,6 @@ build_args="${build_args} --build-arg IMAGE_NAME=${image_name} --build-arg TAG_N
 # from. Callers may set OCI_IMAGE_VERSION, OCI_IMAGE_REVISION, and
 # OCI_IMAGE_SOURCE. When unset, version is the image tag, revision is this
 # checkout, and source is apache/gravitino.
-# gravitino-enterprise sync: change the default OCI_IMAGE_SOURCE to
-# https://github.com/datastrato/gravitino-enterprise.
 oci_version="${OCI_IMAGE_VERSION:-${tag_name:-}}"
 oci_revision="${OCI_IMAGE_REVISION:-}"
 if [ -z "${oci_revision}" ]; then
