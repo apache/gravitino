@@ -18,12 +18,25 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -47,8 +60,293 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toStartOfMonth[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern FUNCTION_WRAPPER_PATTERN =
       Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
+  private static final Pattern PROJECTION_SETTING_NAME_PATTERN =
+      Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+  private static final Pattern NUMERIC_SETTING_LITERAL_PATTERN =
+      Pattern.compile("^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$");
+  private static final Pattern IDENTIFIER_SETTING_LITERAL_PATTERN =
+      Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+  private static final Set<String> PROJECTION_PROPERTY_FIELDS =
+      Set.of("name", "type", "query", "settings");
+  private static final ObjectMapper PROJECTION_JSON_MAPPER =
+      new ObjectMapper()
+          .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+          .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
   private ClickHouseTableSqlUtils() {}
+
+  record ProjectionDefinition(
+      String name, String type, String query, Map<String, String> settings) {}
+
+  static String serializeProjectionDefinitions(List<ProjectionDefinition> definitions) {
+    ArrayNode root = PROJECTION_JSON_MAPPER.createArrayNode();
+    Set<String> projectionNames = new HashSet<>();
+    definitions.stream()
+        .sorted(Comparator.comparing(ProjectionDefinition::name))
+        .forEach(
+            definition -> {
+              validateProjectionDefinition(definition);
+              Preconditions.checkArgument(
+                  projectionNames.add(definition.name()), "Duplicate ClickHouse projection name");
+              ObjectNode projection = root.addObject();
+              projection.put("name", definition.name());
+              projection.put("type", definition.type());
+              projection.put("query", definition.query().trim());
+              ObjectNode settings = projection.putObject("settings");
+              new TreeMap<>(definition.settings()).forEach(settings::put);
+            });
+    try {
+      return PROJECTION_JSON_MAPPER.writeValueAsString(root);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Unable to serialize ClickHouse projection metadata", e);
+    }
+  }
+
+  static List<ProjectionDefinition> parseProjectionDefinitions(@Nullable String json) {
+    if (StringUtils.isBlank(json)) {
+      return Collections.emptyList();
+    }
+
+    JsonNode root;
+    try {
+      root = PROJECTION_JSON_MAPPER.readTree(json);
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException("Invalid ClickHouse projection property JSON", e);
+    }
+    Preconditions.checkArgument(
+        root != null && root.isArray(), "Projection property must be a JSON array");
+
+    List<ProjectionDefinition> definitions = new ArrayList<>();
+    Set<String> projectionNames = new HashSet<>();
+    for (JsonNode projection : root) {
+      Preconditions.checkArgument(
+          projection.isObject(), "Each projection definition must be a JSON object");
+      Iterator<String> fields = projection.fieldNames();
+      while (fields.hasNext()) {
+        String field = fields.next();
+        Preconditions.checkArgument(
+            PROJECTION_PROPERTY_FIELDS.contains(field),
+            "Unsupported ClickHouse projection property field: %s",
+            field);
+      }
+
+      String name = requiredText(projection, "name");
+      String type = requiredText(projection, "type");
+      String query = requiredText(projection, "query");
+      Map<String, String> settings = parseProjectionSettings(projection.get("settings"));
+      ProjectionDefinition definition = new ProjectionDefinition(name, type, query, settings);
+      validateProjectionDefinition(definition);
+      Preconditions.checkArgument(
+          projectionNames.add(name), "Duplicate ClickHouse projection name");
+      definitions.add(definition);
+    }
+    definitions.sort(Comparator.comparing(ProjectionDefinition::name));
+    return Collections.unmodifiableList(definitions);
+  }
+
+  static String formatProjectionClauses(List<ProjectionDefinition> definitions) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    for (ProjectionDefinition definition : definitions) {
+      validateProjectionDefinition(definition);
+      sqlBuilder
+          .append(",\n PROJECTION ")
+          .append(quoteProjectionIdentifier(definition.name()))
+          .append(" (\n  ")
+          .append(definition.query().trim())
+          .append("\n )");
+      if (!definition.settings().isEmpty()) {
+        String settings =
+            new TreeMap<>(definition.settings())
+                .entrySet().stream()
+                    .map(entry -> entry.getKey() + " = " + entry.getValue())
+                    .collect(java.util.stream.Collectors.joining(", "));
+        sqlBuilder.append(" WITH SETTINGS (").append(settings).append(")");
+      }
+    }
+    return sqlBuilder.toString();
+  }
+
+  private static String requiredText(JsonNode object, String field) {
+    JsonNode value = object.get(field);
+    Preconditions.checkArgument(
+        value != null && value.isTextual() && StringUtils.isNotBlank(value.asText()),
+        "ClickHouse projection property must include non-empty text field '%s'",
+        field);
+    return value.asText();
+  }
+
+  static Map<String, String> parseProjectionSettings(String json) {
+    JsonNode settingsNode;
+    try {
+      settingsNode = PROJECTION_JSON_MAPPER.readTree(json);
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException("Invalid ClickHouse projection settings JSON", e);
+    }
+    return parseProjectionSettings(settingsNode);
+  }
+
+  private static Map<String, String> parseProjectionSettings(@Nullable JsonNode settingsNode) {
+    if (settingsNode == null) {
+      return Collections.emptyMap();
+    }
+    Preconditions.checkArgument(
+        settingsNode.isObject(), "Projection settings must be a JSON object");
+
+    Map<String, String> settings = new TreeMap<>();
+    Iterator<Map.Entry<String, JsonNode>> fields = settingsNode.fields();
+    while (fields.hasNext()) {
+      Map.Entry<String, JsonNode> field = fields.next();
+      JsonNode value = field.getValue();
+      Preconditions.checkArgument(
+          PROJECTION_SETTING_NAME_PATTERN.matcher(field.getKey()).matches(),
+          "Invalid ClickHouse projection setting name");
+      Preconditions.checkArgument(
+          value.isTextual() && isSafeSettingLiteral(value.asText()),
+          "Unsupported ClickHouse projection setting value");
+      settings.put(field.getKey(), value.asText().trim());
+    }
+    return Collections.unmodifiableMap(settings);
+  }
+
+  private static void validateProjectionDefinition(ProjectionDefinition definition) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(definition.name()), "ClickHouse projection name is required");
+    Preconditions.checkArgument(
+        definition.name().chars().noneMatch(Character::isISOControl),
+        "ClickHouse projection name contains a control character");
+    Preconditions.checkArgument(
+        "Normal".equals(definition.type()) || "Aggregate".equals(definition.type()),
+        "Unsupported ClickHouse projection type: %s",
+        definition.type());
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(definition.query()) && isSafeProjectionQuery(definition.query()),
+        "Invalid ClickHouse projection query");
+    Preconditions.checkArgument(
+        definition.settings() != null, "Projection settings cannot be null");
+    definition
+        .settings()
+        .forEach(
+            (name, value) -> {
+              Preconditions.checkArgument(
+                  PROJECTION_SETTING_NAME_PATTERN.matcher(name).matches(),
+                  "Invalid ClickHouse projection setting name");
+              Preconditions.checkArgument(
+                  isSafeSettingLiteral(value), "Unsupported ClickHouse projection setting value");
+            });
+  }
+
+  private static boolean isSafeSettingLiteral(String value) {
+    String literal = StringUtils.trimToEmpty(value);
+    return NUMERIC_SETTING_LITERAL_PATTERN.matcher(literal).matches()
+        || "true".equalsIgnoreCase(literal)
+        || "false".equalsIgnoreCase(literal)
+        || IDENTIFIER_SETTING_LITERAL_PATTERN.matcher(literal).matches()
+        || isValidQuotedSettingLiteral(literal);
+  }
+
+  private static boolean isValidQuotedSettingLiteral(String literal) {
+    if (literal.length() < 2
+        || literal.charAt(0) != '\''
+        || literal.charAt(literal.length() - 1) != '\'') {
+      return false;
+    }
+    for (int i = 1; i < literal.length() - 1; i++) {
+      char current = literal.charAt(i);
+      if (current == '\\') {
+        if (i + 1 >= literal.length() - 1) {
+          return false;
+        }
+        i++;
+      } else if (current == '\'') {
+        if (i + 1 >= literal.length() - 1 || literal.charAt(i + 1) != '\'') {
+          return false;
+        }
+        i++;
+      }
+    }
+    return true;
+  }
+
+  private static boolean isSafeProjectionQuery(String query) {
+    int depth = 0;
+    char quote = 0;
+    boolean identifierQuote = false;
+    StringBuilder quotedIdentifier = new StringBuilder();
+    boolean hasSelect = false;
+    StringBuilder token = new StringBuilder();
+    for (int i = 0; i < query.length(); i++) {
+      char current = query.charAt(i);
+      if (quote != 0) {
+        if (current == '\\' && i + 1 < query.length()) {
+          char escaped = query.charAt(++i);
+          if (identifierQuote) {
+            quotedIdentifier.append(escaped);
+          }
+        } else if (current == quote) {
+          if (i + 1 < query.length() && query.charAt(i + 1) == quote) {
+            if (identifierQuote) {
+              quotedIdentifier.append(current);
+            }
+            i++;
+          } else {
+            if (identifierQuote && "_part_offset".equalsIgnoreCase(quotedIdentifier.toString())) {
+              return false;
+            }
+            quote = 0;
+            identifierQuote = false;
+            quotedIdentifier.setLength(0);
+          }
+        } else if (identifierQuote) {
+          quotedIdentifier.append(current);
+        }
+        continue;
+      }
+
+      if (Character.isLetterOrDigit(current) || current == '_') {
+        token.append(Character.toLowerCase(current));
+        continue;
+      }
+      if (!token.isEmpty()) {
+        String value = token.toString();
+        if ("_part_offset".equals(value) || (depth == 0 && "where".equals(value))) {
+          return false;
+        }
+        hasSelect |= "select".equals(value);
+        token.setLength(0);
+      }
+
+      if (current == '\'' || current == '"' || current == '`') {
+        quote = current;
+        identifierQuote = current != '\'';
+        quotedIdentifier.setLength(0);
+      } else if (current == ';' || current == '#') {
+        return false;
+      } else if (current == '-' && i + 1 < query.length() && query.charAt(i + 1) == '-') {
+        return false;
+      } else if (current == '/'
+          && i + 1 < query.length()
+          && (query.charAt(i + 1) == '*' || query.charAt(i + 1) == '/')) {
+        return false;
+      } else if (current == '(') {
+        depth++;
+      } else if (current == ')' && --depth < 0) {
+        return false;
+      }
+    }
+    if (!token.isEmpty()) {
+      String value = token.toString();
+      if ("_part_offset".equals(value) || (depth == 0 && "where".equals(value))) {
+        return false;
+      }
+      hasSelect |= "select".equals(value);
+    }
+    return quote == 0 && depth == 0 && hasSelect;
+  }
+
+  private static String quoteProjectionIdentifier(String identifier) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(identifier), "Projection name is required");
+    return "`" + identifier.replace("\\", "\\\\").replace("`", "\\`") + "`";
+  }
 
   static Transform[] parsePartitioning(@Nullable String partitionKey) {
     if (StringUtils.isBlank(partitionKey)) {
