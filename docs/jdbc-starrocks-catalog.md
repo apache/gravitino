@@ -48,6 +48,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`.         | `10`          | No       |
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
 
 Before using the StarRocks Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-starrocks/libs` directory.

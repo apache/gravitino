@@ -56,6 +56,7 @@ When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 | `jdbc-password`         | JDBC password                                                         | (none)        | Yes      |
 | `jdbc.pool.min-size`    | Minimum pool size                                                     | `2`           | No       |
 | `jdbc.pool.max-size`    | Maximum pool size                                                     | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`. | `10`          | No       |
 | `jdbc.pool.max-wait-ms` | Max wait time for a connection                                        | `30000`       | No       |
 
 ### Create a ClickHouse Catalog

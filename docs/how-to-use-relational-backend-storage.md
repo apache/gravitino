@@ -31,6 +31,32 @@ gravitino.entity.store.relational.jdbcPassword = {password}
 `gravitino.entity.store` and `gravitino.entity.store.relational` already default to `relational`
 and `JDBCBackend`. Leave them alone.
 
+For concurrent metadata reads, tune `gravitino.entity.store.relational.maxIdleConnections`
+alongside `maxConnections`. The default retains up to 32 idle connections per server; the
+effective limit never exceeds `maxConnections`. Include every server and each JDBC catalog pool
+when calculating the database connection budget. The entity-store pool also runs idle eviction
+every ten minutes, so `maxIdleConnections` is an upper bound after a burst rather than a permanent
+reservation.
+
+To compare pool settings on MySQL, run the same workload against fresh server processes with only
+the idle limit changed:
+
+```bash
+python3 dev/performance/jdbc_idle_retention.py \
+  --url http://localhost:8090/api/metalakes \
+  --mysql-defaults-extra-file=/path/to/mysql-client.cnf \
+  --clients 64 --warmup-seconds 3 --seconds 15 --rounds 3
+```
+
+The MySQL client option file supplies the database credentials; the script also accepts an
+authenticated route through the `GRAVITINO_BENCH_AUTHORIZATION` environment variable. Use a
+catalog read URL such as the list-tables route to test a JDBC catalog pool. Each round reports
+successful throughput, p50/p99 latency, failures, and changes in MySQL's `Connections` and
+`Threads_created` counters. Those server-wide counters include the script's diagnostic connection
+and other database traffic, so compare runs on an otherwise quiet database. Repeat with the same
+client count, schema contents, JVM settings, and node count; verify that no requests failed before
+comparing latency.
+
 The values to use, and the driver each one needs:
 
 | Database            | JDBC URL                                                          | Driver Class               | Driver Jar                    |

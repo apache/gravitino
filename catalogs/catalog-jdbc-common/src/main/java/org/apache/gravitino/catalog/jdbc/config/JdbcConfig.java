@@ -87,6 +87,14 @@ public class JdbcConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
+  public static final ConfigEntry<Integer> POOL_MAX_IDLE =
+      new ConfigBuilder("jdbc.pool.max-idle")
+          .doc("The maximum number of idle connections retained in the pool")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(10);
+
   public static final ConfigEntry<Boolean> TEST_ON_BORROW =
       new ConfigBuilder("jdbc.pool.test-on-borrow")
           .doc("Whether to test the connection on borrow")
@@ -124,6 +132,10 @@ public class JdbcConfig extends Config {
 
   public int getPoolMaxSize() {
     return get(POOL_MAX_SIZE);
+  }
+
+  public int getPoolMaxIdle() {
+    return Math.min(get(POOL_MAX_IDLE), getPoolMaxSize());
   }
 
   public String getJdbcDatabase() {
