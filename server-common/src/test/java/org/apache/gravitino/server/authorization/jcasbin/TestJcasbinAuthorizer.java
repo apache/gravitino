@@ -60,9 +60,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -1057,6 +1059,93 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testPartiallyLoadedRoleDoesNotFailClosedAfterEviction() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    // A role that still references a dropped catalog loads partially and never gets a loaded
+    // marker. It must not turn every mid-request eviction of another role into a denial.
+    long partialRoleId = 40L;
+    RoleEntity partialRole =
+        mockRoleInStore(
+            partialRoleId,
+            "partialRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    partialRoleId,
+                    MetadataObject.Type.CATALOG,
+                    "droppedCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    metadataIdConverterMockedStatic
+        .when(
+            () ->
+                MetadataIdConverter.getID(
+                    Mockito.argThat(
+                        object -> object != null && "droppedCatalog".equals(object.name())),
+                    eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    try {
+      mockDirectUserRoles(allowRole, partialRole);
+      AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+
+      assertFalse(
+          jcasbinAuthorizer.authorize(
+              currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, requestContext));
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(partialRoleId).isPresent());
+      getLoadedRolesCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, requestContext));
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  @Test
+  public void testRoleClearGenerationsArePrunedWithoutMissingClears() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    String roleName = "prunedGenerationRole";
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, roleName, ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+    Field maxField = JcasbinAuthorizer.class.getDeclaredField("maxRoleClearGenerations");
+    maxField.setAccessible(true);
+    maxField.setLong(jcasbinAuthorizer, 4L);
+    Mockito.clearInvocations(entityStore);
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, requestContext));
+
+    // Clear the request's role first, then enough other roles to prune its generation away.
+    getLoadedRolesCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+    for (long roleId = 100L; roleId < 110L; roleId++) {
+      jcasbinAuthorizer.handleRolePrivilegeChange(roleId);
+    }
+    Field generationsField = JcasbinAuthorizer.class.getDeclaredField("roleClearGenerations");
+    generationsField.setAccessible(true);
+    Map<?, ?> generations = (Map<?, ?>) generationsField.get(jcasbinAuthorizer);
+    assertTrue(generations.size() <= 4, "the generation map must stay bounded");
+    assertFalse(
+        generations.containsKey(ALLOW_ROLE_ID), "the role's own clear must have been pruned");
+
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, requestContext),
+        "a pruned clear must still make the request reload the role");
+    verify(entityStore, Mockito.times(2))
+        .get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, roleName)),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class));
+  }
+
+  @Test
   public void testHasDenyPolicyReloadsEvictedDenyPolicies() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     RoleEntity denyRole =
@@ -1300,24 +1389,27 @@ public class TestJcasbinAuthorizer {
 
     // Requests run on this thread because the static mocks are thread-local. The evictor only
     // touches the loaded-role cache, whose removal listener clears policies under the write lock,
-    // the same way a TTL or size eviction does.
+    // the same way a TTL or size eviction does. It evicts at most once per request, at a random
+    // point in it, so a request never sees more clears than a check may reload; a check that runs
+    // out of reloads fails closed by design, which is covered by testRepeatedEvictionsFailClosed.
+    AtomicLong requestSeq = new AtomicLong();
     AtomicReference<Boolean> running = new AtomicReference<>(true);
     AtomicLong evictions = new AtomicLong();
     Thread evictor =
         new Thread(
             () -> {
+              long evictedSeq = 0L;
               while (running.get()) {
+                long seq = requestSeq.get();
+                if (seq == evictedSeq) {
+                  Thread.yield();
+                  continue;
+                }
+                LockSupport.parkNanos(ThreadLocalRandom.current().nextLong(200_000L));
                 loadedRoles.invalidate(ALLOW_ROLE_ID);
                 loadedRoles.invalidate(DENY_ROLE_ID);
                 evictions.incrementAndGet();
-                // Pace the evictions so that a reload can complete in between. An evictor that
-                // never pauses would exhaust the reload budget, which deliberately fails closed.
-                try {
-                  Thread.sleep(1L);
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                  return;
-                }
+                evictedSeq = seq;
               }
             });
     evictor.setDaemon(true);
@@ -1328,6 +1420,7 @@ public class TestJcasbinAuthorizer {
       mockDirectUserRoles(allowRole);
       for (int i = 0; i < 500; i++) {
         AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+        requestSeq.incrementAndGet();
         assertFalse(
             jcasbinAuthorizer.authorize(
                 currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, ctx));
@@ -1341,6 +1434,7 @@ public class TestJcasbinAuthorizer {
       mockDirectUserRoles(allowRole, denyRole);
       for (int i = 0; i < 500; i++) {
         AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+        requestSeq.incrementAndGet();
         assertFalse(
             jcasbinAuthorizer.authorize(
                 currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, ctx));

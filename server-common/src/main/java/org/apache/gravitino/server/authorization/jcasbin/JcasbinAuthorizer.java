@@ -61,6 +61,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
@@ -175,11 +176,25 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /**
    * roleId -> generation of the most recent clear of that role's policies. A request records the
    * generation before it loads its roles; a bound role whose clear generation is newer has lost
-   * policies the request relies on and must be reloaded before the request evaluates it again.
-   * Entries are kept once written, because dropping one would make a later clear look older than a
-   * request that started before it; each entry is two longs per role ever cleared on this node.
+   * policies the request relies on and must be reloaded before the request evaluates it again. The
+   * map is bounded by {@link #maxRoleClearGenerations}; see {@link #prunedRoleClearGeneration} for
+   * how pruned entries stay safe.
    */
   private final Map<Long, Long> roleClearGenerations = new ConcurrentHashMap<>();
+
+  /**
+   * Upper bound on {@link #roleClearGenerations} entries, set to the role cache size. Guarded by
+   * the write lock of {@link #rolePolicyLock}.
+   */
+  private long maxRoleClearGenerations;
+
+  /**
+   * The newest generation removed from {@link #roleClearGenerations} by pruning. A request whose
+   * recorded generation is older can no longer prove that none of its roles was cleared, so it
+   * reloads its roles once before the next check. Written under the write lock of {@link
+   * #rolePolicyLock} and only ever increases.
+   */
+  private volatile long prunedRoleClearGeneration;
 
   /**
    * The role whose marker {@link #replaceRolePolicies} is removing, or {@code null}. Guarded by the
@@ -262,6 +277,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .get(Configs.GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS);
 
     long ttlMs = TimeUnit.SECONDS.toMillis(cacheExpirationSecs);
+    maxRoleClearGenerations = roleCacheSize;
 
     // Initialize enforcers before caches that reference them in removal listeners
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
@@ -1404,7 +1420,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return groups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
   }
 
-  private void versionCheckAndLoadRoles(
+  /**
+   * Reloads every role in {@code roleIds} whose loaded version is missing or older than the DB.
+   *
+   * @return ids of stale roles whose entity could not be read, so their policies were not reloaded.
+   *     A role that no longer exists is not included: having no policies is correct for it.
+   */
+  private Set<Long> versionCheckAndLoadRoles(
       String metalake, List<Long> roleIds, AuthorizationRequestContext requestContext) {
     List<Long> uniqueRoleIds = roleIds.stream().distinct().collect(Collectors.toList());
 
@@ -1455,9 +1477,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     if (staleRoleVersions.isEmpty()) {
-      return;
+      return Collections.emptySet();
     }
 
+    Set<Long> unreadableRoleIds = new HashSet<>();
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     List<NameIdentifier> roleIdents =
         staleRoleVersions.stream()
@@ -1484,8 +1507,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
                   Entity.EntityType.ROLE,
                   RoleEntity.class));
+        } catch (NoSuchEntityException e) {
+          LOG.debug("Role {} was dropped before its policies could be loaded", rv.getRoleId(), e);
         } catch (Exception e) {
           LOG.warn("Failed to load role policies for roleId {}", rv.getRoleId(), e);
+          unreadableRoleIds.add(rv.getRoleId());
         }
       }
     }
@@ -1526,6 +1552,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             PARTIAL_ROLE_LOAD_RETRY_MS);
       }
     }
+    return unreadableRoleIds;
   }
 
   /**
@@ -1604,7 +1631,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // has no p-row to remove, but in-flight requests must still reload before their next check.
       if (recordEmptyRoleChange
           && Objects.equals(previousClearGeneration, roleClearGenerations.get(roleId))) {
-        roleClearGenerations.put(roleId, rolePolicyGenerationCounter.incrementAndGet());
+        recordRoleClearGeneration(roleId);
       }
     } finally {
       rolePolicyLock.writeLock().unlock();
@@ -1655,8 +1682,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private void clearRolePoliciesAndRecordGeneration(long roleId) {
     if (clearRolePoliciesWithoutLock(roleId)) {
-      roleClearGenerations.put(roleId, rolePolicyGenerationCounter.incrementAndGet());
+      recordRoleClearGeneration(roleId);
     }
+  }
+
+  /**
+   * Records a new clear generation for a role, pruning the older half of the generations when the
+   * map outgrows {@link #maxRoleClearGenerations}. Must be called under the write lock of {@link
+   * #rolePolicyLock}, so that readers see the pruned entries and the raised {@link
+   * #prunedRoleClearGeneration} together.
+   */
+  private void recordRoleClearGeneration(long roleId) {
+    roleClearGenerations.put(roleId, rolePolicyGenerationCounter.incrementAndGet());
+    if (roleClearGenerations.size() <= maxRoleClearGenerations) {
+      return;
+    }
+    long[] generations =
+        roleClearGenerations.values().stream().mapToLong(Long::longValue).sorted().toArray();
+    long cutoff = generations[generations.length / 2];
+    roleClearGenerations.values().removeIf(generation -> generation <= cutoff);
+    prunedRoleClearGeneration = cutoff;
   }
 
   /**
@@ -1701,9 +1746,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
 
       long rolePolicyGeneration = rolePolicyGenerationCounter.get();
+      Set<Long> unreadableRoleIds;
       try {
-        versionCheckAndLoadRoles(
-            metalake, new ArrayList<>(requestContext.getBoundRoleIds()), requestContext);
+        unreadableRoleIds =
+            versionCheckAndLoadRoles(
+                metalake, new ArrayList<>(requestContext.getBoundRoleIds()), requestContext);
       } catch (RuntimeException e) {
         LOG.warn(
             "Failed to reload cleared role policies for roles {}; failing closed",
@@ -1711,16 +1758,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             e);
         return Optional.empty();
       }
-      // versionCheckAndLoadRoles intentionally tolerates failed or partial entity-store reads.
-      // Those outcomes have no loaded marker, so a deny check must not treat their missing p-rows
-      // as proof that no deny policy exists. This only checks the in-memory cache.
-      for (Long roleId : requestContext.getBoundRoleIds()) {
-        if (!loadedRoles.getIfPresent(roleId).isPresent()) {
-          LOG.warn(
-              "Role {} was not fully reloaded after its policies were cleared; failing closed",
-              roleId);
-          return Optional.empty();
-        }
+      // A role whose entity could not be read has lost its policies without a replacement. Its
+      // missing rows prove neither the absence of a deny nor of an allow, so the check cannot be
+      // evaluated. Partially loaded and dropped roles are evaluated as usual: their policy state is
+      // the same one any request would see.
+      if (!unreadableRoleIds.isEmpty()) {
+        LOG.warn(
+            "Failed to read roles {} to reload their cleared policies; failing closed",
+            unreadableRoleIds);
+        return Optional.empty();
       }
       requestContext.setRolePolicyGeneration(rolePolicyGeneration);
     }
@@ -1732,7 +1778,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private boolean hasClearedBoundRole(AuthorizationRequestContext requestContext) {
     long rolePolicyGeneration = requestContext.getRolePolicyGeneration();
-    for (Long roleId : requestContext.getBoundRoleIds()) {
+    List<Long> boundRoleIds = requestContext.getBoundRoleIds();
+    if (!boundRoleIds.isEmpty() && rolePolicyGeneration < prunedRoleClearGeneration) {
+      // A clear of one of these roles may have been pruned from roleClearGenerations.
+      return true;
+    }
+    for (Long roleId : boundRoleIds) {
       Long clearedAt = roleClearGenerations.get(roleId);
       if (clearedAt != null && clearedAt > rolePolicyGeneration) {
         return true;
