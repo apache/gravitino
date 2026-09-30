@@ -149,9 +149,8 @@ public class TestSemanticModelCreateRequest {
     SemanticModelCreateRequest request =
         JsonUtils.objectMapper().readValue(json, SemanticModelCreateRequest.class);
 
-    request.validate();
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, request::toDefinition);
+        assertThrows(IllegalArgumentException.class, request::validate);
     assertEquals("datasets[0] must not be null", exception.getMessage());
   }
 
