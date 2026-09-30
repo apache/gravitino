@@ -595,19 +595,18 @@ makes the feature opt-in. It is a kill switch. This adds a new path to the autho
 and an operator who needs it gone — a wrong decision, or list filtering degrading under
 [Cost](#cost) — should not have to unbind policies one at a time to get there.
 
-**On to off revokes.** Access held only through a tag stops being granted. Revocation is not a
-single event, and neither is removing a tag or unbinding a policy. Four cases, with different
-bounds:
+**On to off revokes.** Access held only through a tag stops being granted. Removing a tag or
+unbinding a policy revokes the same way. Four cases:
 
-| Case                                | Bound                                                                                                                                                                                                                                |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A new request on the changed node   | None. The next decision on that node uses the new state.                                                                                                                                                                             |
-| A new request on another node       | The flag is server-level configuration, so another node keeps enforcing the old value until it is reconfigured. Removing a tag or unbinding a policy needs no reconfiguration and lands on the next request — see [Freshness](#freshness). |
-| An operation already admitted       | Runs to completion. The check happens once, when the request is authorized.                                                                                                                                                              |
-| A storage credential already vended | Until it expires; nothing in Gravitino recalls an issued credential. A static secret-key credential never expires, so there only rotating the catalog's key ends it — see [Credential vending](#credential-vending).                       |
+| Case                                | Bound                                                                                                                                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A new request, on any node          | None, for removing a tag or unbinding a policy — see [Freshness](#freshness).                                                                                                                              |
+| The flag itself, on another node    | The flag is read at startup, so a rolling restart is the bound. Every server configuration behaves this way.                                                                                               |
+| An operation already admitted       | Runs to completion. The check happens once, when the request is authorized.                                                                                                                                |
+| A storage credential already vended | Until it expires, and nothing in Gravitino recalls one. A static secret-key credential never expires, so there only rotating the catalog's key ends access — see [Credential vending](#credential-vending). |
 
-The flag governs decisions taken after it is flipped, not access already handed out. M4 tests the
-first two rows across nodes.
+Only the last outlives the decision that granted it, and it is the one to plan for. The other three
+are how every privilege in Gravitino already behaves. M4 tests the first row across nodes.
 
 **Off to on grants everything authored while it was off.** The authority checks ran when each
 policy was bound, so that access was authorized. The flag decides when it takes effect, not
