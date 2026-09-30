@@ -193,7 +193,7 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
 
 Associate the policy with a tag and attach that tag to the target table, schema,
 or catalog, following the [policy setup walkthrough](./optimizer.md).
-`olderThanDays` defaults to 3 and must be at least 1. `dryRun` defaults to false.
+`olderThanDays` defaults to 3 and must be between 1 and 36500 inclusive (approximately 100 years). This bound rejects impractical retention values before a policy is stored. `dryRun` defaults to false.
 Optional `location` must be the table's storage root or a descendant; submission
 requires the table's `location` metadata to validate a custom path. The Spark job
 rechecks containment and filesystem symlinks with its own credentials before

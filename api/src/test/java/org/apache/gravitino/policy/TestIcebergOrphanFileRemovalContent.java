@@ -60,4 +60,18 @@ class TestIcebergOrphanFileRemovalContent {
     content.validate();
     Assertions.assertEquals("s3://bucket/table/data", content.rules().get("job.options.location"));
   }
+
+  @Test
+  void validatesRetentionUpperBoundary() {
+    long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
+    Assertions.assertDoesNotThrow(
+        () -> PolicyContents.icebergOrphanFileRemoval(maximum, null, true).validate());
+    for (long days : new long[] {maximum + 1, Long.MAX_VALUE}) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> PolicyContents.icebergOrphanFileRemoval(days, null, true).validate());
+      Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
+    }
+  }
 }

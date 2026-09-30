@@ -31,6 +31,9 @@ import org.apache.gravitino.rel.Table;
 
 /** Evaluates orphan cleanup at table level, including for partitioned tables. */
 public class OrphanFileRemovalStrategyHandler extends BaseExpressionStrategyHandler {
+  // Iceberg exposes its storage root through the catalog's "location" table property.
+  private static final String TABLE_LOCATION_PROPERTY = "location";
+
   /** Registered strategy type. */
   public static final String NAME = IcebergOrphanFileRemovalContent.STRATEGY_TYPE_VALUE;
 
@@ -55,6 +58,8 @@ public class OrphanFileRemovalStrategyHandler extends BaseExpressionStrategyHand
         nameIdentifier,
         jobOptions,
         strategy.jobTemplateName(),
-        tableMetadata.properties() == null ? null : tableMetadata.properties().get("location"));
+        tableMetadata.properties() == null
+            ? null
+            : tableMetadata.properties().get(TABLE_LOCATION_PROPERTY));
   }
 }

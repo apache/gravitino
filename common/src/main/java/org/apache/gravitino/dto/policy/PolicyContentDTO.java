@@ -242,7 +242,7 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return whether to list candidates without deleting them
      */
     public boolean dryRun() {
-      return dryRun == null ? false : dryRun;
+      return dryRun == null ? IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN : dryRun;
     }
 
     @Override
@@ -262,6 +262,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @Override
     public void validate() {
+      PolicyContentDTO.super.validate();
       toDomainContent().validate();
     }
 

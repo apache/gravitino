@@ -24,6 +24,7 @@ import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
@@ -82,5 +83,40 @@ class TestOrphanFileRemovalPolicyDTO {
             .readValue(JsonUtils.objectMapper().writeValueAsString(dto), PolicyDTO.class);
     Assertions.assertEquals(dto, restored);
     Assertions.assertEquals(domain, DTOConverters.fromDTO(restored.content()));
+  }
+
+  @Test
+  void createAndUpdateValidateRetentionUpperBoundary() throws Exception {
+    long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
+    for (long days : new long[] {maximum, maximum + 1, Long.MAX_VALUE}) {
+      String content = "{\"olderThanDays\":" + days + "}";
+      PolicyCreateRequest create =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"name\":\"cleanup\",\"policyType\":\"system_iceberg_orphan_file_removal\",\"content\":"
+                      + content
+                      + "}",
+                  PolicyCreateRequest.class);
+      PolicyUpdateRequest update =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_orphan_file_removal\",\"newContent\":"
+                      + content
+                      + "}",
+                  PolicyUpdateRequest.class);
+      if (days == maximum) {
+        Assertions.assertDoesNotThrow(create::validate);
+        Assertions.assertDoesNotThrow(update::validate);
+      } else {
+        Assertions.assertTrue(
+            Assertions.assertThrows(IllegalArgumentException.class, create::validate)
+                .getMessage()
+                .contains("olderThanDays"));
+        Assertions.assertTrue(
+            Assertions.assertThrows(IllegalArgumentException.class, update::validate)
+                .getMessage()
+                .contains("olderThanDays"));
+      }
+    }
   }
 }

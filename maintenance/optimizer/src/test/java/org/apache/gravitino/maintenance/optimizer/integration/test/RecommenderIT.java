@@ -20,7 +20,14 @@
 package org.apache.gravitino.maintenance.optimizer.integration.test;
 
 import com.google.common.collect.ImmutableMap;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +48,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.Orp
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoOrphanFileRemovalJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.AfterAll;
@@ -92,6 +100,54 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
     if (statisticsUpdater != null) {
       statisticsUpdater.close();
     }
+  }
+
+  @Test
+  void testOrphanCleanupRejectsOverflowingRetention() throws Exception {
+    HttpResponse<String> response =
+        policyRequest(
+            "POST",
+            "",
+            "{\"name\":\"overflowing_cleanup\",\"policyType\":\"system_iceberg_orphan_file_removal\","
+                + "\"enabled\":true,\"content\":{\"olderThanDays\":"
+                + Long.MAX_VALUE
+                + "}}");
+    Assertions.assertEquals(400, response.statusCode(), response.body());
+    Assertions.assertTrue(response.body().contains("olderThanDays"));
+  }
+
+  @Test
+  void testOrphanCleanupRejectsInvalidUpdateAndPreservesPolicy() throws Exception {
+    String name = "bounded_cleanup";
+    String type = "system_iceberg_orphan_file_removal";
+    long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
+    metalakeClient.createPolicy(
+        name,
+        type,
+        "maximum retention",
+        true,
+        PolicyContents.icebergOrphanFileRemoval(maximum, null, true));
+    HttpResponse<String> response =
+        policyRequest(
+            "PUT",
+            "/" + name,
+            "{\"updates\":[{\"@type\":\"updateContent\",\"policyType\":\""
+                + type
+                + "\",\"newContent\":{\"olderThanDays\":"
+                + (maximum + 1)
+                + "}}]}");
+    Assertions.assertEquals(400, response.statusCode(), response.body());
+    Assertions.assertTrue(response.body().contains("olderThanDays"));
+    Assertions.assertEquals(
+        String.valueOf(maximum),
+        metalakeClient
+            .getPolicy(name)
+            .content()
+            .rules()
+            .get(
+                IcebergOrphanFileRemovalContent.JOB_OPTIONS_PREFIX
+                    + IcebergOrphanFileRemovalContent.OLDER_THAN_DAYS_KEY)
+            .toString());
   }
 
   @Test
@@ -318,6 +374,24 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
               .map(p -> p.partitionName() + "=" + p.partitionValue())
               .toList());
     }
+  }
+
+  private HttpResponse<String> policyRequest(String method, String suffix, String body)
+      throws Exception {
+    String credentials =
+        Base64.getEncoder()
+            .encodeToString(
+                (System.getProperty("user.name") + ":").getBytes(StandardCharsets.UTF_8));
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(serverUri + "/api/metalakes/" + METALAKE_NAME + "/policies" + suffix))
+            .timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/vnd.gravitino.v1+json")
+            .header("Authorization", "Basic " + credentials)
+            .method(method, HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private List<JobExecutionContext> recommendForOneStrategy(

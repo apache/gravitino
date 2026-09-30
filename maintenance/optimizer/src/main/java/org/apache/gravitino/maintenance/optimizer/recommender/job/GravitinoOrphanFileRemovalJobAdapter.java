@@ -20,9 +20,10 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
 import java.time.Clock;
-import java.time.Duration;
+import java.time.DateTimeException;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
@@ -52,17 +53,25 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
         "jobExecutionContext must be OrphanFileRemovalJobContext");
     OrphanFileRemovalJobContext orphan = (OrphanFileRemovalJobContext) context;
     Map<String, String> options = orphan.jobOptions();
-    long days =
-        Long.parseLong(
-            options.getOrDefault(
-                "olderThanDays",
-                String.valueOf(IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS)));
-    Preconditions.checkArgument(days >= 1, "olderThanDays must be at least 1");
-    String dryRun = options.getOrDefault("dryRun", "false");
+    long days;
+    try {
+      days =
+          Long.parseLong(
+              options.getOrDefault(
+                  IcebergOrphanFileRemovalContent.OLDER_THAN_DAYS_KEY,
+                  String.valueOf(IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS)));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("olderThanDays must be an integer", e);
+    }
+    IcebergOrphanFileRemovalContent.validateOlderThanDays(days);
+    String dryRun =
+        options.getOrDefault(
+            IcebergOrphanFileRemovalContent.DRY_RUN_KEY,
+            String.valueOf(IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN));
     Preconditions.checkArgument(
         "true".equals(dryRun) || "false".equals(dryRun), "dryRun must be true or false");
-    String location = options.getOrDefault("location", "");
-    if (options.containsKey("location")) {
+    String location = options.getOrDefault(IcebergOrphanFileRemovalContent.LOCATION_KEY, "");
+    if (options.containsKey(IcebergOrphanFileRemovalContent.LOCATION_KEY)) {
       Preconditions.checkArgument(
           orphan.tableLocation() != null,
           "Table location is required to validate a custom scan location");
@@ -73,10 +82,19 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
         "table_identifier",
         IdentifierUtils.removeCatalogFromIdentifier(orphan.nameIdentifier()).toString(),
         "older_than",
-        TIMESTAMP.format(clock.instant().minus(Duration.ofDays(days))),
+        cutoff(days),
         "location",
         location,
         "dry_run",
         dryRun);
+  }
+
+  private String cutoff(long days) {
+    try {
+      return TIMESTAMP.format(clock.instant().minus(days, ChronoUnit.DAYS));
+    } catch (DateTimeException | ArithmeticException e) {
+      throw new IllegalArgumentException(
+          "olderThanDays cannot be represented as a cleanup timestamp", e);
+    }
   }
 }

@@ -101,7 +101,7 @@ class TestGravitinoOrphanFileRemovalJobAdapter {
   void rejectsUnsafeOptionsBeforeSubmission() {
     for (String days : new String[] {"0", "-1", "no", "9223372036854775807"}) {
       Assertions.assertThrows(
-          RuntimeException.class,
+          IllegalArgumentException.class,
           () -> adapter.jobConfig(context(Map.of("olderThanDays", days), null)));
     }
     Assertions.assertThrows(
@@ -123,6 +123,33 @@ class TestGravitinoOrphanFileRemovalJobAdapter {
           IllegalArgumentException.class,
           () -> adapter.jobConfig(context(Map.of("location", location), "s3://bucket/table")));
     }
+  }
+
+  @Test
+  void validatesRetentionRangeAndReportsTimestampErrors() {
+    long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
+    Assertions.assertEquals(
+        "1926-10-22 12:30:00Z",
+        adapter
+            .jobConfig(context(Map.of("olderThanDays", String.valueOf(maximum)), null))
+            .get("older_than"));
+    for (String days :
+        new String[] {
+          "0", "-1", "no", String.valueOf(maximum + 1), String.valueOf(Long.MAX_VALUE)
+        }) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> adapter.jobConfig(context(Map.of("olderThanDays", days), null)));
+      Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
+    }
+    GravitinoOrphanFileRemovalJobAdapter ancient =
+        new GravitinoOrphanFileRemovalJobAdapter(Clock.fixed(Instant.MIN, ZoneOffset.UTC));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ancient.jobConfig(context(Map.of(), null)));
+    Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
+    Assertions.assertNotNull(error.getCause());
   }
 
   private OrphanFileRemovalJobContext context(Map<String, String> options, String location) {

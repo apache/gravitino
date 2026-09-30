@@ -109,13 +109,15 @@ public class PolicyContents {
    */
   public static PolicyContent icebergOrphanFileRemoval() {
     return icebergOrphanFileRemoval(
-        IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS, null, false);
+        IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
+        null,
+        IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN);
   }
 
   /**
    * Creates orphan cleanup policy content.
    *
-   * @param olderThanDays minimum file age in days, at least one
+   * @param olderThanDays minimum file age in days, from 1 to 36500 inclusive
    * @param location optional scan location within the table
    * @param dryRun whether to list candidates without deleting them
    * @return orphan cleanup policy content
