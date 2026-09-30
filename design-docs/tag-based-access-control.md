@@ -204,9 +204,10 @@ credential, as the same privilege granted through a role would.
 What a tag cannot reach is secrets. `getSecrets` is a separate endpoint requiring `USE_SECRETS`,
 which is not on the allowlist, so JDBC passwords and cloud access-key pairs stay out of reach.
 
-How far a credential reaches once issued is the catalog's credential provider's business. A token
-provider scopes it to the object's location; a static secret-key provider hands out the catalog's
-key pair. A tag does not change that either way.
+How far a credential reaches once issued, and for how long, is the catalog's credential provider's
+business. A token provider scopes it to the object's location and expires it; a static secret-key
+provider hands out the catalog's key pair, which never expires. A tag does not change that either
+way.
 
 The design does not change a credential once issued — see
 [Enabling the feature](#enabling-the-feature) — and it does not reach an engine that holds its own
@@ -594,19 +595,24 @@ makes the feature opt-in. It is a kill switch. This adds a new path to the autho
 and an operator who needs it gone — a wrong decision, or list filtering degrading under
 [Cost](#cost) — should not have to unbind policies one at a time to get there.
 
-Flipping it either way takes effect immediately on the node serving the request:
+**On to off revokes.** Access held only through a tag stops being granted. Revocation is not a
+single event, and neither is removing a tag or unbinding a policy. Four cases, with different
+bounds:
 
-- **On to off revokes.** Access held only through a tag stops being granted. Three bounds apply.
-  Other nodes converge no faster than the transport in [Freshness](#freshness) allows, which until
-  M4 means a TTL. An operation already admitted runs to completion, since the check happens once
-  when the request is authorized. And a storage credential already vended under
-  [Credential vending](#credential-vending) keeps working until it expires, because nothing in
-  Gravitino recalls an issued credential. The flag governs decisions taken after it is flipped, not
-  access already handed out. The stale-allow interval follows from whichever transport
-  [OQ-1](#oq-1--where-tags-are-evaluated) settles on, and is stated and tested with it in M4.
-- **Off to on grants everything authored while it was off.** The authority checks ran when each
-  policy was bound, so that access was authorized. The flag decides when it takes effect, not
-  whether it was allowed.
+| Case                                | Bound                                                                                                                                                                                                                                |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A new request on the changed node   | None. The next decision on that node uses the new state.                                                                                                                                                                             |
+| A new request on another node       | The flag is server-level configuration, so another node keeps enforcing the old value until it is reconfigured. Removing a tag or unbinding a policy is instead bounded by the transport in [Freshness](#freshness) — until M4, a TTL. |
+| An operation already admitted       | Runs to completion. The check happens once, when the request is authorized.                                                                                                                                                          |
+| A storage credential already vended | Until it expires; nothing in Gravitino recalls an issued credential. A static secret-key credential never expires, so there only rotating the catalog's key ends it — see [Credential vending](#credential-vending).                   |
+
+The flag governs decisions taken after it is flipped, not access already handed out. The
+stale-allow interval in the second row follows from whichever transport
+[OQ-1](#oq-1--where-tags-are-evaluated) settles on, and is stated and tested with it in M4.
+
+**Off to on grants everything authored while it was off.** The authority checks ran when each
+policy was bound, so that access was authorized. The flag decides when it takes effect, not
+whether it was allowed.
 
 The flag is server-wide, so turning it off affects every metalake.
 
