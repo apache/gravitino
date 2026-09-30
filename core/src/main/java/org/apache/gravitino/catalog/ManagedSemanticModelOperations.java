@@ -171,8 +171,6 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
   public boolean dropSemanticModel(NameIdentifier ident) {
     try {
       return store.delete(ident, Entity.EntityType.SEMANTIC_MODEL);
-    } catch (NoSuchEntityException e) {
-      return false;
     } catch (IOException e) {
       throw new RuntimeException("Failed to drop Semantic Model " + ident, e);
     }
