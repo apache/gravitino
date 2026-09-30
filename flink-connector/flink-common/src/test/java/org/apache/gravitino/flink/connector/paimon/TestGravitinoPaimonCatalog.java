@@ -40,6 +40,7 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.DlfSecretKeyCredential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -626,6 +627,25 @@ public abstract class TestGravitinoPaimonCatalog {
         "jdbc-user", catalog.capturedOptions.get(PaimonConstants.PAIMON_JDBC_USER));
     Assertions.assertEquals(
         "jdbc-password", catalog.capturedOptions.get(PaimonConstants.PAIMON_JDBC_PASSWORD));
+  }
+
+  /** Verifies that DLF backend credentials remain Paimon catalog options. */
+  @Test
+  public void testOpenKeepsDlfCredentialsInPaimonOptions() {
+    Catalog mockCatalog =
+        catalogWithCredentials(new DlfSecretKeyCredential("dlf-ak", "dlf-sk", "dlf-token"));
+    Map<String, String> options = new HashMap<>();
+    options.put("warehouse", "file:/tmp/test-paimon-warehouse");
+
+    CapturingPaimonCatalog catalog = new CapturingPaimonCatalog(options, mockCatalog);
+    catalog.open();
+
+    Assertions.assertEquals(
+        "dlf-ak", catalog.capturedOptions.get(PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "dlf-sk", catalog.capturedOptions.get(PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET));
+    Assertions.assertEquals(
+        "dlf-token", catalog.capturedOptions.get(PaimonConstants.PAIMON_DLF_SECURITY_TOKEN));
   }
 
   private static Catalog catalogWithCredentials(Credential... credentials) {

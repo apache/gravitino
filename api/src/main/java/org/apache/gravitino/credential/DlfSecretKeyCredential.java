@@ -27,8 +27,10 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Static Alibaba Cloud DLF (Data Lake Formation) access-key credential for Paimon DLF catalogs.
  *
- * <p>Credential-info keys match Paimon catalog properties: {@code dlf-access-key-id}, {@code
- * dlf-access-key-secret}, and optionally {@code dlf-security-token}.
+ * <p>Credential-info keys match Gravitino Paimon catalog properties: {@code dlf-access-key-id},
+ * {@code dlf-access-key-secret}, and optionally {@code dlf-security-token}. Connectors map these to
+ * Paimon REST keys {@code dlf.access-key-id}, {@code dlf.access-key-secret}, and {@code
+ * dlf.security-token}.
  */
 public class DlfSecretKeyCredential implements Credential {
 

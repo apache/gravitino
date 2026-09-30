@@ -88,6 +88,9 @@ public class CredentialPropertyUtils {
   private static final String PAIMON_S3_SECRET_KEY = "s3.secret-key";
   private static final String PAIMON_OSS_ACCESS_KEY_ID = "fs.oss.accessKeyId";
   private static final String PAIMON_OSS_ACCESS_KEY_SECRET = "fs.oss.accessKeySecret";
+  @VisibleForTesting static final String PAIMON_DLF_ACCESS_KEY_ID = "dlf.access-key-id";
+  @VisibleForTesting static final String PAIMON_DLF_ACCESS_KEY_SECRET = "dlf.access-key-secret";
+  @VisibleForTesting static final String PAIMON_DLF_SECURITY_TOKEN = "dlf.security-token";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
@@ -157,7 +160,7 @@ public class CredentialPropertyUtils {
   }
 
   /**
-   * Injects vended credentials into Paimon catalog properties. Supports JDBC, S3, and OSS
+   * Injects vended credentials into Paimon catalog properties. Supports JDBC, S3, OSS, and DLF
    * credential types.
    *
    * @param credentials the credentials to apply
@@ -177,6 +180,13 @@ public class CredentialPropertyUtils {
         OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
         props.put(PAIMON_OSS_ACCESS_KEY_ID, oss.accessKeyId());
         props.put(PAIMON_OSS_ACCESS_KEY_SECRET, oss.secretAccessKey());
+      } else if (credential instanceof DlfSecretKeyCredential) {
+        DlfSecretKeyCredential dlf = (DlfSecretKeyCredential) credential;
+        props.put(PAIMON_DLF_ACCESS_KEY_ID, dlf.accessKeyId());
+        props.put(PAIMON_DLF_ACCESS_KEY_SECRET, dlf.accessKeySecret());
+        if (dlf.securityToken() != null && !dlf.securityToken().isEmpty()) {
+          props.put(PAIMON_DLF_SECURITY_TOKEN, dlf.securityToken());
+        }
       } else {
         LOG.warn(
             "Received unrecognized credential type '{}' for Paimon catalog, skipping",
