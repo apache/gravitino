@@ -45,12 +45,12 @@ Concretely:
 
 These are deliberate exclusions, not oversights.
 
-- **No CI guard for the orphan case.** A class that carries `gravitino-docker-test` but no
-  `@CoreBackend.*` annotation is excluded from `coreUnitTest` (by the Docker tag) and from every
-  backend lane (no backend tag), so it runs nowhere. The design does not add a CI step that
-  scans for this. Mitigation is developer self-service: `./gradlew :core:coreTestLaneOf`
-  prints an explicit warning for exactly this shape, and the build script comment on
-  `coreBackendTestTags` documents it.
+- **A unit-test guard, not a CI step, for the orphan case.** A class that carries
+  `gravitino-docker-test` but no `@CoreBackend.*` annotation is excluded from `coreUnitTest` (by
+  the Docker tag) and from every backend lane (no backend tag), so it would run nowhere.
+  `TestCoreLaneMembership` runs in `coreUnitTest` and fails, naming each such class. Keeping every
+  test running is still the contributor's job; `./gradlew :core:coreTestLaneOf` lets them check a
+  class locally.
 - **No cross-lane report aggregation.** Each lane writes its own JUnit XML, HTML report, and
   JaCoCo `.exec` under a lane-specific path. CI uploads them as four separate evidence artifacts
   and only the JaCoCo data is merged (for coverage). There is no tool that merges the four JUnit
@@ -215,9 +215,9 @@ and included in `coreH2Test`, that the manifest step passes on the lane output, 
 
 ## Q6. What are the risks?
 
-- **Orphan classes run nowhere and nothing in CI says so.** A `gravitino-docker-test` class with
-  no `@CoreBackend.*` annotation is dropped by every lane. Accepted by design (Q2); mitigated by
-  `coreTestLaneOf`'s explicit warning and by documentation, not enforcement.
+- **Orphan classes would run nowhere.** A `gravitino-docker-test` class with no
+  `@CoreBackend.*` annotation is dropped by every lane. Mitigated by `TestCoreLaneMembership`,
+  which fails `coreUnitTest` for such a class (Q2), and by `coreTestLaneOf` for local checks.
 - **Tag string drift.** `CoreBackend.H2_TAG` / `MYSQL_TAG` / `POSTGRESQL_TAG` must stay equal to
   the values in `coreBackendTestTags`. They are declared in two places (Kotlin build script and
   Java test source) with no shared source. Mitigated by a comment on each side naming the other;
