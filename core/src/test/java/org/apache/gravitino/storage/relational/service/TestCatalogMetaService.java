@@ -448,11 +448,13 @@ public class TestCatalogMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(newSchema, false);
 
-    assertThrows(
-        NonEmptyEntityException.class,
-        () ->
-            ((SupportsConditionalCatalogDelete) backend)
-                .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), allowedIds));
+    NonEmptyEntityException rejection =
+        assertThrows(
+            NonEmptyEntityException.class,
+            () ->
+                ((SupportsConditionalCatalogDelete) backend)
+                    .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), allowedIds));
+    assertTrue(rejection.getMessage().contains(newSchema.name()));
     assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertTrue(backend.exists(allowed.nameIdentifier(), Entity.EntityType.SCHEMA));
     assertTrue(backend.exists(newSchema.nameIdentifier(), Entity.EntityType.SCHEMA));

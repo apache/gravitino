@@ -1423,6 +1423,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 if (schemaEntities.isEmpty()) {
                   deleted = store.delete(ident, EntityType.CATALOG, false);
                 } else {
+                  // Managed-storage catalogs cannot reach this branch: any schema in one blocks
+                  // non-force drop before external schema deletion or secret cleanup starts.
                   Set<Long> allowedSchemaIds =
                       schemaEntities.stream().map(SchemaEntity::id).collect(Collectors.toSet());
                   if (!(store instanceof SupportsConditionalCatalogDelete)) {
@@ -1444,7 +1446,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 }
               } catch (NonEmptyEntityException e) {
                 throw new NonEmptyCatalogException(
-                    "Catalog %s has schemas, please drop them first or use force option", ident);
+                    e, "Catalog %s has schemas, please drop them first or use force option", ident);
               }
             }
             if (deleted) {

@@ -54,8 +54,10 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -460,6 +462,57 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
     assertTrue(legacyRecordExistsInDB(policy.id(), Entity.EntityType.POLICY));
     assertTrue(
         listPolicyVersions(policy.id()).values().stream().allMatch(deletedAt -> deletedAt != 0));
+  }
+
+  @TestTemplate
+  public void testNonCascadeDeleteRemovesOrphanedCatalogChildren() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "orphaned_catalog");
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(METALAKE_NAME, catalog.name()),
+            "orphaned_schema",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("orphaned_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalog.name(), schema.name()))
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    CatalogPO catalogPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    SessionUtils.doWithCommit(
+        CatalogMetaMapper.class,
+        mapper ->
+            mapper.softDeleteCatalogMetasByCatalogId(catalog.id(), catalogPO.getCurrentVersion()));
+    Assertions.assertNotNull(
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id())));
+    assertTrue(countActiveTableVersionRows(table.id()) > 0);
+
+    assertTrue(MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
+
+    Assertions.assertNull(
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id())));
+    assertEquals(0, countActiveTableVersionRows(table.id()));
   }
 
   @TestTemplate

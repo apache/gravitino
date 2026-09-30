@@ -321,7 +321,12 @@ public class RelationalEntityStore
       throws IOException {
     if (!(backend instanceof SupportsConditionalCatalogDelete)) {
       throw new UnsupportedOperationException(
-          "Atomic catalog delete with allowed schemas is not supported by this backend");
+          String.format(
+              "Catalog %s cannot be deleted atomically with its allowed schemas by backend %s. "
+                  + "Use the force option or a backend that implements %s",
+              ident,
+              backend.getClass().getName(),
+              SupportsConditionalCatalogDelete.class.getSimpleName()));
     }
     try {
       return ((SupportsConditionalCatalogDelete) backend)

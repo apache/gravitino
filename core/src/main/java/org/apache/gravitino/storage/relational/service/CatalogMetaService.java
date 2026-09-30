@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -309,15 +310,21 @@ public class CatalogMetaService {
             // added or removed after this point. Anything that goes wrong later in this
             // transaction rolls this soft delete back with it.
             deleteCatalogWithVersion(identifier, catalogPO);
+            List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
             if (!cascade) {
-              List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
-              if (schemaPOs.stream()
-                  .anyMatch(schema -> !allowedSchemaIds.contains(schema.getSchemaId()))) {
+              Optional<SchemaPO> unexpectedSchema =
+                  schemaPOs.stream()
+                      .filter(schema -> !allowedSchemaIds.contains(schema.getSchemaId()))
+                      .findFirst();
+              if (unexpectedSchema.isPresent()) {
                 throw new NonEmptyEntityException(
-                    "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+                    "Catalog %s has unexpected schema %s (ID %s)",
+                    identifier,
+                    unexpectedSchema.get().getSchemaName(),
+                    unexpectedSchema.get().getSchemaId());
               }
             }
-            deleteSchemasWithVersions(identifier, catalogId);
+            deleteSchemasWithVersions(identifier, schemaPOs);
           },
           () ->
               SessionUtils.doWithoutCommit(
@@ -533,8 +540,8 @@ public class CatalogMetaService {
    * Soft-deletes every schema of the catalog, each one guarded by the version read here. The caller
    * must already hold the catalog row, so no schema can appear or disappear in between.
    */
-  private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
-    List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
+  private void deleteSchemasWithVersions(
+      NameIdentifier catalogIdentifier, List<SchemaPO> schemaPOs) {
     OccWriteSupport.deleteChildrenWithVersions(
         catalogIdentifier,
         Entity.EntityType.SCHEMA,

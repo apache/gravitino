@@ -76,6 +76,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -1436,6 +1437,38 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testNonForceDropCatalogWithoutSchemasUsesNonCascadeDelete() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(newMetalakeStore());
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+      NameIdentifier ident = NameIdentifier.of(metalake, "empty_non_force_drop");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          ImmutableMap.of(
+              "provider",
+              "test",
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3"));
+      manager.disableCatalog(ident);
+
+      Assertions.assertTrue(manager.dropCatalog(ident));
+
+      Mockito.verify(store).delete(ident, EntityType.CATALOG, false);
+      Mockito.verify(store, Mockito.never()).deleteCatalogWithAllowedSchemas(eq(ident), any());
+      Assertions.assertFalse(store.exists(ident, EntityType.CATALOG));
+    } finally {
+      store.close();
+    }
+  }
+
+  @Test
   void testNonForceDropCatalogRejectsSchemaCreatedAfterClassification() throws Exception {
     InMemoryEntityStore store = Mockito.spy(newMetalakeStore());
     SecretManager secretManager = Mockito.spy(new SecretManager(config));
@@ -1454,7 +1487,11 @@ public class TestCatalogManager {
           .when(store)
           .deleteCatalogWithAllowedSchemas(ident, Set.of(removedExternally.id()));
 
-      Assertions.assertThrows(NonEmptyCatalogException.class, () -> manager.dropCatalog(ident));
+      NonEmptyCatalogException rejection =
+          Assertions.assertThrows(NonEmptyCatalogException.class, () -> manager.dropCatalog(ident));
+      Assertions.assertTrue(rejection.getMessage().contains(ident.toString()));
+      Assertions.assertInstanceOf(NonEmptyEntityException.class, rejection.getCause());
+      Assertions.assertTrue(rejection.getCause().getMessage().contains(lateSchema.name()));
 
       Assertions.assertTrue(store.exists(ident, EntityType.CATALOG));
       Assertions.assertTrue(store.exists(removedExternally.nameIdentifier(), EntityType.SCHEMA));

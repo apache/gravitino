@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -187,9 +188,14 @@ public class TestMemoryEntityStore {
                     Namespace.of(ident.namespace().level(0), ident.name()),
                     SchemaEntity.class,
                     EntityType.SCHEMA);
-            if (schemas.stream().anyMatch(schema -> !allowedSchemaIds.contains(schema.id()))) {
+            Optional<SchemaEntity> unexpectedSchema =
+                schemas.stream()
+                    .filter(schema -> !allowedSchemaIds.contains(schema.id()))
+                    .findFirst();
+            if (unexpectedSchema.isPresent()) {
               throw new NonEmptyEntityException(
-                  "Entity %s has sub-entities, you should remove sub-entities first", ident);
+                  "Catalog %s has unexpected schema %s (ID %s)",
+                  ident, unexpectedSchema.get().name(), unexpectedSchema.get().id());
             }
             // Mirror the relational store, which removes the allowed schemas with the catalog.
             for (SchemaEntity schema : schemas) {

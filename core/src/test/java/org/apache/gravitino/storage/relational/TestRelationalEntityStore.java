@@ -167,9 +167,12 @@ public class TestRelationalEntityStore {
     FieldUtils.writeField(store, "backend", unsupportedBackend, true);
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
 
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> store.deleteCatalogWithAllowedSchemas(ident, Set.of(123L)));
+    UnsupportedOperationException rejection =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> store.deleteCatalogWithAllowedSchemas(ident, Set.of(123L)));
+    Assertions.assertTrue(rejection.getMessage().contains(ident.toString()));
+    Assertions.assertTrue(rejection.getMessage().contains("Use the force option"));
     Mockito.verifyNoInteractions(unsupportedBackend);
   }
 

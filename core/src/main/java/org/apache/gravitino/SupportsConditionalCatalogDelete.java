@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.Set;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * An optional capability for deleting a catalog after checking its remaining schemas atomically.
@@ -32,7 +33,9 @@ public interface SupportsConditionalCatalogDelete {
    *
    * @param ident the catalog identifier
    * @param allowedSchemaIds IDs of schemas that may be deleted with the catalog
-   * @return true if the catalog was deleted
+   * @return true if the catalog was deleted, or false only if it was already absent
+   * @throws NonEmptyEntityException if a remaining schema is not in {@code allowedSchemaIds}; an
+   *     implementation must not return false for this case
    * @throws IOException if the store operation fails
    */
   boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)

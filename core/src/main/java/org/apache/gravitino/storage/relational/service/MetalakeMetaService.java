@@ -230,7 +230,6 @@ public class MetalakeMetaService {
               deleteCatalogsWithVersions(ident, metalakeId);
               deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
             });
-        operations.addAll(catalogScopedCleanups(metalakeId));
       } else {
         operations.add(
             () -> {
@@ -249,8 +248,14 @@ public class MetalakeMetaService {
                 throw new NonEmptyEntityException(
                     "Entity %s has sub-entities, you should remove sub-entities first", ident);
               }
+              // Preserve the old cascade's cleanup of schemas orphaned by an earlier catalog
+              // deletion, after confirming there are no live catalogs to protect.
+              deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
             });
       }
+      // Preserve the catalog-scoped sweep on both paths. A non-force drop has no live catalogs,
+      // but old metadata under a previously removed catalog must still be soft-deleted.
+      operations.addAll(catalogScopedCleanups(metalakeId));
       // Entities owned by the metalake itself go with it whether or not the drop cascades. Both
       // branches share this list so neither can leave such an entity behind.
       operations.addAll(metalakeScopedCleanups(metalakeId));
