@@ -109,9 +109,10 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   /**
-   * Creates a poller using the metrics source registered by the entity store.
+   * Creates a poller with a custom batch size, using the metrics source registered by the entity
+   * store.
    *
-   * @param pollIntervalSecs interval between successive polling cycles when no backlog remains
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
    * @param batchSize maximum number of change log rows read per polling cycle
    * @param metrics process-local change log metrics
    */
@@ -156,7 +157,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   /**
-   * Initializes the high-water cursor to the current DB tail and schedules periodic polling.
+   * Initializes the high-water cursor to the current DB tail and schedules the first poll one
+   * interval later. A poller cannot be started again after {@link #close()}.
    *
    * <p>On every start (including restarts), the cursor is set to the current maximum change ID in
    * the DB, so historical change records written before this server process started are NOT
@@ -165,6 +167,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * cache.
    */
   public void start() {
+    Preconditions.checkState(!closed, "A closed entity change log poller cannot be restarted");
     entityPollHighWaterId =
         getOrDefault(
             SessionUtils.getWithoutCommit(
@@ -284,6 +287,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
       return false;
     }
     deliver(delivery);
+    // A full batch is the backlog signal. The sampled tail id would be more precise, but that
+    // sample is best-effort and may be missing; a full batch with nothing behind it only costs one
+    // extra empty poll before the normal interval resumes.
     return delivery.changes.size() >= batchSize;
   }
 

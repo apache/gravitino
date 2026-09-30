@@ -19,14 +19,12 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -479,24 +477,27 @@ public class TestEntityChangeLogPoller {
 
   @Test
   void testCloseDropsThePendingPollInsteadOfWaitingForIt() {
+    // Uses the real scheduler, with the pending poll two seconds away. If that delayed task
+    // survived
+    // shutdown, close() would wait for it. No poll may run after close() either. A poll would run
+    // on the scheduler thread, where this thread's static SessionUtils mock is not active, so it is
+    // observed through the poll timer, which counts every attempt, failed or not.
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    long closeMillis;
 
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
-
-      // Uses the real scheduler. The first poll is an hour away, so close() must not wait for it:
-      // if the pending poll survived shutdown, close() would block for its full five-second
-      // termination timeout.
-      EntityChangeLogPoller poller = new EntityChangeLogPoller(3600);
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(2, metrics);
       poller.start();
       long startNanos = System.nanoTime();
       poller.close();
-      long closeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-
-      Assertions.assertTrue(closeMillis < 4000, "close() took " + closeMillis + " ms");
+      closeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+      Assertions.assertThrows(IllegalStateException.class, poller::start);
     }
 
-    verify(mapper, never()).selectEntityChanges(anyLong(), anyInt());
+    Assertions.assertTrue(closeMillis < 1500, "close() took " + closeMillis + " ms");
+    Assertions.assertEquals(0, metrics.getMetricRegistry().timer("poll-duration").getCount());
   }
 
   @Test

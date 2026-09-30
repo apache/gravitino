@@ -332,7 +332,7 @@ server can read and apply batches rather than at a fixed `pollBatchSize / pollIn
 records per second. Once a poll returns fewer records than the batch size, or fails, the server
 waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
 on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
-it.
+it. Each poll holds its whole batch in memory, so raise `pollBatchSize` in moderate steps.
 
 | Configuration Item                              | Description                                                                                                                                         | Default Value       |
 |-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
