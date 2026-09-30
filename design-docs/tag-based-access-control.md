@@ -19,9 +19,8 @@
 
 # Design of Tag-Based Access Control in Gravitino
 
-**Status:** draft for discussion. The [open questions](#open-questions) are deliberately left
-undecided in this revision, each presented with its options; decisions will be folded in after
-review.
+**Status:** draft for discussion. Each question in [Decisions](#decisions) is settled here, with the
+alternatives recorded and the reason for not taking them.
 
 Discussion: [#12619](https://github.com/apache/gravitino/discussions/12619)
 
@@ -113,7 +112,7 @@ exists only as the pile of grants someone remembered to issue.
 
 | Option                                                                 | Pros                                                                                                             | Cons                                                                                                                         | Status       |
 | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| **A `system_access_control` policy type bound to a tag**               | Reuses the entity, relation, selector and resolver; no new REST or client surface; one governance model to learn | The role condition lives in `content` JSON, so lookup by role needs a derived index rather than a foreign key                | **Proposed** |
+| **A `system_access_control` policy type bound to a tag**               | Reuses the entity, relation, selector and resolver; no new REST or client surface; one governance model to learn | The role condition lives in `content` JSON, so lookup by role needs a derived index rather than a foreign key                | **Decided** |
 | A dedicated `tag_access_policy` entity with action and role as columns | Foreign key on role; indexed lookup; cascade on role deletion falls out of the schema                            | New table across three dialects, new REST resource, new client and CLI surface, a second governance model alongside policies | Rejected     |
 | Extend RBAC grants with a tag predicate                                | No new concepts                                                                                                  | The grant table is object-identified; a predicate has no object, and every grant read path would change                      | Rejected     |
 | Evaluate tags in an external engine (OPA and similar)                  | Arbitrary policy language                                                                                        | Moves the decision out of Gravitino, duplicates the tag hierarchy, and cannot use the existing expression path               | Rejected     |
@@ -380,28 +379,29 @@ and stale rows keep granting, which errs towards more access rather than less.
 
 ### Freshness
 
-A node that has already loaded the affected roles still has to learn that tag state changed.
+Tag state is not cached across requests. The evaluator reaches both effective tags and the policies
+bound to them through `listEntitiesByRelation`, which returns `backend.listEntitiesByRelation(...)`
+with nothing in front of it; `RelationalEntityStore` caches entities, and its own comment records
+that relation query results are not among them. Every request reads current state, so no transport
+is needed to propagate a change:
 
-Today the authorizer keeps role policies fresh by version-checking on read: `loadedRoles` maps role
-id to `updated_at`, and a newer `role_meta.updated_at` in the database evicts and reloads that
-role's policies. `groupRoleCache` is validated the same way against `group_meta.updated_at`. Write
-paths additionally call `handleRolePrivilegeChange`, `handleUserRoleRelChange` and
-`handleGroupRoleRelChange` in-process on the node that performed the write, and TTL bounds the rest.
-`JcasbinChangeListener` covers two further surfaces: entity changes through `onEntityChange`, and a
-poll of `owner_meta`.
+| Change                                       | Reaches another node                                                       |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| Tag applied to or removed from an object     | Next request                                                               |
+| Policy bound to or unbound from a tag        | Next request                                                               |
+| Policy created, altered, disabled or dropped | Next request                                                               |
+| Role membership changed                      | `gravitino.authorization.jcasbin.cacheExpirationSecs`, one hour by default |
 
-Tag state reaches none of that, and the transport differs by what changed:
+Only the last is bounded, and it is the existing RBAC bound: roles reach the evaluator through the
+jCasbin cache whether or not a tag is involved. `loadedRoles` version-checks `role_meta.updated_at`
+on read and `groupRoleCache` checks `group_meta.updated_at`, with TTL bounding the rest. This
+design does not change any of it.
 
-| Change                                         | Reaches other nodes today                                                                                                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Tag or policy entity created, altered, dropped | Yes — `entity_change_log` carries `TAG` and `POLICY`, but `JcasbinChangeListener` discards both as virtual-namespace types |
-| Tag applied to or removed from an object       | No — relation changes emit no change-log rows                                                                              |
-| Policy bound to or unbound from a tag          | No — same                                                                                                                  |
-
-The first needs the existing filter relaxed. The second and third need a transport that does not
-exist yet: relation changes emitted into `entity_change_log`, a poll of the relation tables, or a
-TTL accepted as the bound. The rejected option needs the same three signals, and reacts to each by
-rewriting rows rather than by dropping a cache entry.
+Freshness is paid for on every request, in the queries counted in [Cost](#cost). That is the
+trade. Caching tag state across requests would invert it, and is what needs a transport that does
+not exist today: relation changes emitted into `entity_change_log`, or a poll of the relation
+tables. The rejected option needs the same signals for correctness rather than for speed, since it
+materialises rows that must be rewritten.
 
 See [OQ-1](#oq-1--where-tags-are-evaluated).
 
@@ -493,11 +493,11 @@ Three mitigations, in increasing order of what they cost to build:
 - **Batch preload for lists.** Resolve the candidate set's tag and policy state in one round trip
   rather than N walks, as above.
 - **A cache across requests.** Not designed here, and not yet designable: caching tag state beyond
-  one request needs an invalidation signal, and two of the three signals in
-  [Freshness](#freshness) have no carrier today. Performance and freshness are the same problem.
+  one request needs an invalidation signal, and relation changes have no carrier today — see
+  [Freshness](#freshness). Performance and freshness are the same problem, and v1 buys freshness.
 
-The first two land in M3 and M5. The third becomes possible once M4 does, and until then the
-uncached cost above is what the feature costs.
+The first two land in M3 and M5. The third needs a transport that does not exist; until it does,
+the uncached cost above is what the feature costs.
 
 ---
 
@@ -580,7 +580,7 @@ See [OQ-4](#oq-4--authority-to-confer-access-through-a-tag).
 ### Enabling the feature
 
 One server-level configuration turns tag-based access on or off. It defaults to off. No dry-run or
-audit-only mode is proposed for v1.
+audit-only mode is in scope for v1.
 
 **Off.** Policies and tags behave as they do today: they can be created, bound to each other and
 applied to objects, each still requiring the authority in the table above. The authorizer never
@@ -602,13 +602,12 @@ bounds:
 | Case                                | Bound                                                                                                                                                                                                                                |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A new request on the changed node   | None. The next decision on that node uses the new state.                                                                                                                                                                             |
-| A new request on another node       | The flag is server-level configuration, so another node keeps enforcing the old value until it is reconfigured. Removing a tag or unbinding a policy is instead bounded by the transport in [Freshness](#freshness) — until M4, a TTL. |
-| An operation already admitted       | Runs to completion. The check happens once, when the request is authorized.                                                                                                                                                          |
-| A storage credential already vended | Until it expires; nothing in Gravitino recalls an issued credential. A static secret-key credential never expires, so there only rotating the catalog's key ends it — see [Credential vending](#credential-vending).                   |
+| A new request on another node       | The flag is server-level configuration, so another node keeps enforcing the old value until it is reconfigured. Removing a tag or unbinding a policy needs no reconfiguration and lands on the next request — see [Freshness](#freshness). |
+| An operation already admitted       | Runs to completion. The check happens once, when the request is authorized.                                                                                                                                                              |
+| A storage credential already vended | Until it expires; nothing in Gravitino recalls an issued credential. A static secret-key credential never expires, so there only rotating the catalog's key ends it — see [Credential vending](#credential-vending).                       |
 
-The flag governs decisions taken after it is flipped, not access already handed out. The
-stale-allow interval in the second row follows from whichever transport
-[OQ-1](#oq-1--where-tags-are-evaluated) settles on, and is stated and tested with it in M4.
+The flag governs decisions taken after it is flipped, not access already handed out. M4 tests the
+first two rows across nodes.
 
 **Off to on grants everything authored while it was off.** The authority checks ran when each
 policy was bound, so that access was authorized. The flag decides when it takes effect, not
@@ -694,16 +693,17 @@ excludes masking — see [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-de
 
 Ranger is also the only one of the three that documents an answer to [Freshness](#freshness): the
 plugin caches tags locally, polls the tag store for changes, and falls back to the cache file when
-the store is unreachable. It accepts a staleness window rather than eliminating one — which is the
-shape of answer OQ-1 is likely to need.
+the store is unreachable. It buys speed with a staleness window. This design makes the opposite
+trade for v1 — read per request, no window — and Ranger is the reference for what the other side
+of it costs to build.
 
 ---
 
-## Open questions
+## Decisions
 
-None of these are settled. Where this revision has a preference, the option is marked **Proposed**.
+Each is settled below. The alternatives are kept with the reason they were not taken.
 
-|      | Question                                                | Discussed in                                                  | Proposal                                                 |
+|      | Question                                                | Discussed in                                                  | Decision                                                 |
 | ---- | ------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------- |
 | OQ-1 | Where tags are evaluated                                | [Evaluation](#evaluation)                                     | Inside `authorize`, at the privilege leaf                |
 | OQ-2 | Composition when a tag allows and RBAC denies           | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins                                                |
@@ -718,8 +718,10 @@ inherited tags through one nearest-wins resolution per object; expanding rows at
 the permission engine but, because the matcher compares ids for equality, needs a row per
 descendant object and a write-path dependency to maintain them.
 
-What stays open is not the placement but the freshness transport: two of the three signals in
-[Freshness](#freshness) have no carrier today, and both placements need all three.
+The leaf check also settles freshness rather than deferring it to a transport. It reads tag state
+per request, so there is nothing to invalidate and no staleness window to bound — see
+[Freshness](#freshness). The row-expansion option cannot be built until that transport exists,
+which is a second reason not to take it.
 
 ### OQ-2 — composition when a tag allows and RBAC denies
 
@@ -728,7 +730,7 @@ RBAC grant — absence is what sends the decision to tags in the first place.
 
 |              | Option             | Behaviour                                                                                                                                                                                                                         |
 | ------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proposed** | Deny wins          | An RBAC deny suppresses a tag allow unconditionally. Predictable, matches the existing deny semantics, and a tag can never be used to escape an explicit deny. Conflicts are invisible unless surfaced separately as diagnostics. |
+| **Decided** | Deny wins          | An RBAC deny suppresses a tag allow unconditionally. Predictable, matches the existing deny semantics, and a tag can never be used to escape an explicit deny. Conflicts are invisible unless surfaced separately as diagnostics. |
 |              | Refuse the overlap | Treat allow-from-tag over deny-from-RBAC as ambiguous and fail closed. Surfaces the conflict at the point it occurs, at the cost of a third decision outcome the authorizer does not have today.                                  |
 
 Justification: deny wins for free under the placement proposed in [Evaluation](#evaluation).
@@ -745,9 +747,10 @@ Detailed policy information stays in authorized server diagnostics rather than b
 an unauthorized caller. The composition tests must verify this attribution even when normal
 expression short-circuiting would otherwise skip the matching tag rule.
 
-This addresses the request to fail closed and make the competing rules identifiable. Whether a
-distinct client-visible conflict error is also required remains a reviewer decision; the proposed
-v1 behavior retains the existing denial response.
+This addresses the request to fail closed and make the competing rules identifiable. v1 adds no
+distinct client-visible conflict error: the request is denied either way, and telling an
+unauthorized caller which tag rule was suppressed leaks policy structure to exactly the wrong
+audience.
 
 This relies on tag-conferrable privileges being reached through `ANY_*` macros; a bare
 `TYPE::PRIVILEGE` has no deny conjunct. M3 carries a test to keep it that way.
@@ -760,7 +763,7 @@ at one end while allowing it at the other reaches the same state either way.
 
 |              | Option                          | Behaviour                                                                                                                                                                                      |
 | ------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proposed** | Refuse the deletion             | The role cannot be deleted while a policy still references it; the operator clears those references first. No delete in Gravitino is blocked by a reference today, so this would be the first. |
+| **Decided** | Refuse the deletion             | The role cannot be deleted while a policy still references it; the operator clears those references first. No delete in Gravitino is blocked by a reference today, so this would be the first. |
 |              | Delete the referencing policies | No dangling state, but it removes rules the operator may not have known existed. Acceptable only as an explicit, confirmed cascade, which is out of scope here.                                |
 |              | Leave it dangling               | Inert until a role of the same name is created, which silently reactivates the rule against a different population.                                                                            |
 |              | Disable them                    | Deleting a role would then also change policy state, conflating two operations that should stay separate.                                                                                      |
@@ -779,8 +782,8 @@ access on an object becomes authority over who else can reach it.
 
 |              | Option                                                                  | Behaviour                                                                                                                                                                                                                                                                                                           |
 | ------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proposed** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
-| **Proposed** | Require policy authority to bind or widen an access policy               | Covers the other two paths. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once.                                                                                                                                                          |
+| **Decided** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
+| **Decided** | Require policy authority to bind or widen an access policy               | Covers the other two paths. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once.                                                                                                                                                          |
 |              | Leave as is                                                             | Reading an object is enough to change who else can reach it.                                                                                                                                                                                                                                                        |
 |              | Require the applier to hold the privilege the tag confers               | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles.                                                                                                                        |
 
@@ -805,16 +808,15 @@ or privilege is introduced by the current proposal.
 
 ## Implementation milestones
 
-Each milestone names the open questions it rests on. Those are proposals, not decisions — if one
-resolves differently, the milestones marked against it change shape.
+Each milestone names the decision it rests on.
 
 | Milestone                         | What lands                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Rests on                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1 — model and storage            | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist.                                                                                                                                                                      |
 | M2 — authority on the write paths | The authority checks on the three write paths in OQ-4: applying an access-carrying tag, binding a policy to a tag already applied, and widening a bound policy's `content`. Lands before M3 is switched on, or all three confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
 | M3 — enforcement, single node     | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect once the existing caches turn over. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). The component boundaries and test acceptance criteria in [Independently testable evaluation](#independently-testable-evaluation) land here too. Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
-| M4 — freshness                    | A transport for the three signals in [Freshness](#freshness). Makes M3 correct across a cluster; until it lands, the feature is only safe to rely on in a single-node deployment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The transport is the second half of [OQ-1](#oq-1--where-tags-are-evaluated). Both placements need all three signals, so the milestone itself stands either way.                                                                                                                             |
+| M4 — multi-node tests             | Tests that a tag application, a policy bind and a policy edit are each visible on the next request on another node, and that the feature flag is per node. No new transport: [Freshness](#freshness) shows tag state is read per request, so there is nothing to propagate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Nothing. It asserts the behaviour the leaf check already has.                                                                                                                                                                                                                               |
 | M5 — affordable list filtering    | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3.                                                                                                                                                                                                                         |
 | M6 — lifecycle and documentation  | Role deletion, the events in [Events](#events), and the traversal requirement in [Composition with RBAC](#composition-with-rbac).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | [OQ-3](#oq-3--deleting-a-referenced-role), for the deletion behaviour.                                                                                                                                                                                                                      |
 
-M1, M2 and M4 hold whichever way OQ-1 is answered. M3 and M5 are the two that change with it.
+M2 and M6 are independent of where tags are evaluated. M3, M4 and M5 all follow from the leaf check.
