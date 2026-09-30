@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -167,6 +168,24 @@ public class TestOssieSemanticModelDocumentConverter {
   }
 
   @Test
+  public void testQuotedSourceRoundTrip() throws Exception {
+    NameIdentifier source = NameIdentifier.of("sales.eu", "ma`rt", "ord.ers");
+    Dataset dataset = Dataset.builder().withName("orders").withSource(source).build();
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build();
+
+    String document =
+        OssieSemanticModelDocumentConverter.exportDocument(
+            semanticModel(definition, Map.of()), OssieSemanticModelDocumentConverter.Format.JSON);
+    JsonNode json = JSON_MAPPER.readTree(document);
+    assertEquals("`sales.eu`.`ma``rt`.`ord.ers`", json.at("/datasets/0/source").textValue());
+
+    SemanticModelCreateRequest roundTrip =
+        OssieSemanticModelDocumentConverter.importDocument(document);
+    assertEquals(source, roundTrip.toDefinition().datasets()[0].source());
+  }
+
+  @Test
   public void testExportDefaultsMissingOssieVersion() throws Exception {
     SemanticModel semanticModel = semanticModel(definition(), Map.of());
 
@@ -204,14 +223,28 @@ public class TestOssieSemanticModelDocumentConverter {
             + "name: sales\n"
             + "datasets:\n"
             + "  - name: orders\n"
+            + "    source: '`sales.eu.mart.orders'\n",
+        "unterminated quoted segment");
+    assertInvalid(
+        "version: 0.2.0.dev0\n"
+            + "name: sales\n"
+            + "datasets:\n"
+            + "  - name: orders\n"
+            + "    source: 'sales.ma`rt.orders'\n",
+        "backticks must quote an entire segment");
+    assertInvalid(
+        "version: 0.2.0.dev0\n"
+            + "name: sales\n"
+            + "datasets:\n"
+            + "  - name: orders\n"
             + "    source: sales.mart.orders\n"
             + "    fields:\n"
             + "      - name: id\n"
             + "        expression:\n"
             + "          dialects:\n"
-            + "            - dialect: TRINO\n"
+            + "            - dialect: 123\n"
             + "              expression: id\n",
-        "unsupported Apache Ossie dialect 'TRINO'");
+        "dialect: must be a string");
     assertInvalid(
         "version: 0.2.0.dev0\n" + "name: first\n" + "name: second\n" + "datasets: []\n",
         "Duplicate field 'name'");
@@ -222,6 +255,37 @@ public class TestOssieSemanticModelDocumentConverter {
     assertInvalid(
         "x".repeat(OssieSemanticModelDocumentConverter.MAX_DOCUMENT_LENGTH + 1),
         "exceeds the maximum length");
+  }
+
+  @Test
+  public void testRejectsIncorrectOssieTypes() {
+    assertInvalid("version: 0.2.0.dev0\nname: 123\ndatasets: []\n", "$.name: must be a string");
+    assertInvalid(
+        "version: 0.2.0.dev0\n"
+            + "name: sales\n"
+            + "datasets:\n"
+            + "  - name: orders\n"
+            + "    source: sales.mart.orders\n"
+            + "    primary_key: [123]\n",
+        "$.datasets[0].primary_key[0]: must be a string");
+    assertInvalid(
+        "version: 0.2.0.dev0\n"
+            + "name: sales\n"
+            + "datasets:\n"
+            + "  - name: orders\n"
+            + "    source: sales.mart.orders\n"
+            + "    fields:\n"
+            + "      - name: id\n"
+            + "        expression:\n"
+            + "          dialects:\n"
+            + "            - dialect: ANSI_SQL\n"
+            + "              expression: id\n"
+            + "        dimension:\n"
+            + "          is_time: 'true'\n",
+        "$.datasets[0].fields[0].dimension.is_time: must be a boolean");
+    assertInvalid(
+        "version: 0.2.0.dev0\nname: sales\ndatasets: []\nmetrics: [123]\n",
+        "$.metrics[0]: must be an object");
   }
 
   @Test
@@ -239,6 +303,33 @@ public class TestOssieSemanticModelDocumentConverter {
         """;
 
     assertInvalid(document, "property 'ossie-version' conflicts with $.version");
+  }
+
+  @Test
+  public void testLimitsNestedCustomExtensionParsing() throws Exception {
+    String nested = "{}";
+    for (int depth = 0; depth < 110; depth++) {
+      nested = "{\"nested\":" + nested + "}";
+    }
+    String payload =
+        "{\"_apache_gravitino_interchange\":{\"version\":1,\"properties\":{\"domain\":\"sales\"}},\"nested\":"
+            + nested
+            + "}";
+
+    ObjectNode root = JSON_MAPPER.createObjectNode();
+    root.put("version", DEFAULT_OSSIE_VERSION);
+    root.put("name", "sales");
+    ObjectNode dataset = root.putArray("datasets").addObject();
+    dataset.put("name", "orders");
+    dataset.put("source", "sales.mart.orders");
+    ObjectNode extension = root.putArray("custom_extensions").addObject();
+    extension.put("vendor_name", "GRAVITINO");
+    extension.put("data", payload);
+
+    SemanticModelCreateRequest request =
+        OssieSemanticModelDocumentConverter.importDocument(JSON_MAPPER.writeValueAsString(root));
+    assertFalse(request.getProperties().containsKey("domain"));
+    assertEquals(payload, request.toDefinition().customExtensions()[0].data());
   }
 
   @Test
@@ -278,7 +369,7 @@ public class TestOssieSemanticModelDocumentConverter {
   }
 
   @Test
-  public void testRejectsUnsupportedNativeDialectOnExport() {
+  public void testPreservesCustomDialectOnImportAndExport() throws Exception {
     Metric metric =
         Metric.builder()
             .withName("revenue")
@@ -290,14 +381,24 @@ public class TestOssieSemanticModelDocumentConverter {
             .withMetrics(new Metric[] {metric})
             .build();
 
-    IllegalSemanticModelException exception =
-        assertThrows(
-            IllegalSemanticModelException.class,
-            () ->
-                OssieSemanticModelDocumentConverter.exportDocument(
-                    semanticModel(definition, Map.of()),
-                    OssieSemanticModelDocumentConverter.Format.JSON));
-    assertTrue(exception.getMessage().contains("unsupported Apache Ossie dialect 'TRINO'"));
+    String document =
+        OssieSemanticModelDocumentConverter.exportDocument(
+            semanticModel(definition, Map.of()), OssieSemanticModelDocumentConverter.Format.JSON);
+    JsonNode json = JSON_MAPPER.readTree(document);
+    assertEquals(
+        "TRINO",
+        json.path("metrics")
+            .get(0)
+            .path("expression")
+            .path("dialects")
+            .get(0)
+            .path("dialect")
+            .textValue());
+
+    SemanticModelCreateRequest roundTrip =
+        OssieSemanticModelDocumentConverter.importDocument(document);
+    assertEquals(
+        "TRINO", roundTrip.toDefinition().metrics()[0].expression().dialects()[0].dialect());
   }
 
   private static SemanticModel semanticModel(

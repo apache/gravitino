@@ -66,6 +66,7 @@ public class SemanticModelOperations {
   private static final String VND_GRAVITINO_V1_JSON = "application/vnd.gravitino.v1+json";
   private static final String OSSIE_YAML_MEDIA_TYPE = "application/yaml";
   private static final String OSSIE_X_YAML_MEDIA_TYPE = "application/x-yaml";
+  private static final String OSSIE_TEXT_YAML_MEDIA_TYPE = "text/yaml";
 
   private final SemanticModelDispatcher dispatcher;
 
@@ -172,7 +173,12 @@ public class SemanticModelOperations {
    */
   @POST
   @Path("ossie")
-  @Consumes({MediaType.APPLICATION_JSON, OSSIE_YAML_MEDIA_TYPE, OSSIE_X_YAML_MEDIA_TYPE})
+  @Consumes({
+    MediaType.APPLICATION_JSON,
+    OSSIE_YAML_MEDIA_TYPE,
+    OSSIE_X_YAML_MEDIA_TYPE,
+    OSSIE_TEXT_YAML_MEDIA_TYPE
+  })
   @Produces(VND_GRAVITINO_V1_JSON)
   @Timed(name = "import-ossie-semantic-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "import-ossie-semantic-model", absolute = true)

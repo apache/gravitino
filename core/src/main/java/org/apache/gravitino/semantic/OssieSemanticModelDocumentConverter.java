@@ -22,6 +22,7 @@ import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.core.StreamReadFeature;
@@ -33,8 +34,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -54,6 +57,11 @@ public final class OssieSemanticModelDocumentConverter {
   private static final String INTERCHANGE_MARKER = "_apache_gravitino_interchange";
   private static final int INTERCHANGE_MARKER_VERSION = 1;
   private static final int MAX_NESTING_DEPTH = 100;
+  private static final StreamReadConstraints STREAM_READ_CONSTRAINTS =
+      StreamReadConstraints.builder()
+          .maxNestingDepth(MAX_NESTING_DEPTH)
+          .maxStringLength(MAX_DOCUMENT_LENGTH)
+          .build();
 
   private static final Set<String> ROOT_PROPERTIES =
       Set.of(
@@ -93,19 +101,6 @@ public final class OssieSemanticModelDocumentConverter {
   private static final Set<String> DIALECT_EXPRESSION_PROPERTIES = Set.of("dialect", "expression");
   private static final Set<String> DIMENSION_PROPERTIES = Set.of("is_time");
   private static final Set<String> CUSTOM_EXTENSION_PROPERTIES = Set.of("vendor_name", "data");
-  private static final Set<String> OSSIE_DIALECTS =
-      Set.of(
-          "ANSI_SQL",
-          "SNOWFLAKE",
-          "MDX",
-          "TABLEAU",
-          "DATABRICKS",
-          "MAQL",
-          "BIGQUERY",
-          "SIGMA",
-          "THOUGHTSPOT",
-          "DAX",
-          "OSSIE_SQL_2026");
 
   private static final ObjectMapper JSON_MAPPER = createJsonMapper();
   private static final ObjectMapper YAML_MAPPER = createYamlMapper();
@@ -175,7 +170,9 @@ public final class OssieSemanticModelDocumentConverter {
   }
 
   private static ObjectMapper createJsonMapper() {
-    return JsonMapper.builder()
+    JsonFactory factory = JsonFactory.builder().build();
+    factory.setStreamReadConstraints(STREAM_READ_CONSTRAINTS);
+    return JsonMapper.builder(factory)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
         .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
         .build()
@@ -188,11 +185,7 @@ public final class OssieSemanticModelDocumentConverter {
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
             .build();
-    factory.setStreamReadConstraints(
-        StreamReadConstraints.builder()
-            .maxNestingDepth(MAX_NESTING_DEPTH)
-            .maxStringLength(MAX_DOCUMENT_LENGTH)
-            .build());
+    factory.setStreamReadConstraints(STREAM_READ_CONSTRAINTS);
     return new ObjectMapper(factory)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
@@ -223,6 +216,8 @@ public final class OssieSemanticModelDocumentConverter {
 
   private static SemanticModelCreateRequest toCreateRequest(ObjectNode root) {
     validateObject(root, "$", ROOT_PROPERTIES);
+    validateOptionalText(root, "name", "$");
+    validateOptionalText(root, "description", "$");
     String ossieVersion = validateVersion(root.get("version"));
 
     Map<String, String> properties = new LinkedHashMap<>(extractProperties(root));
@@ -302,18 +297,17 @@ public final class OssieSemanticModelDocumentConverter {
 
   private static void transformOssieDataset(ObjectNode dataset, String path) {
     validateObject(dataset, path, DATASET_PROPERTIES);
+    validateOptionalText(dataset, "name", path);
+    validateOptionalText(dataset, "description", path);
+    validateOptionalStringArray(dataset, "primary_key", path);
+    validateOptionalStringArrayArray(dataset, "unique_keys", path);
     JsonNode source = dataset.get("source");
     if (source != null) {
       if (!source.isTextual()) {
         throw invalid(path + ".source", "must be a string");
       }
       String sourceValue = source.textValue();
-      String[] parts = sourceValue.split("\\.", -1);
-      if (parts.length != 3 || StringUtils.isAnyBlank(parts)) {
-        throw invalid(
-            path + ".source",
-            "must be a three-part catalog.schema.entity identifier; query sources are not supported");
-      }
+      String[] parts = parseOssieSource(sourceValue, path + ".source");
       ObjectNode identifier = JSON_MAPPER.createObjectNode();
       identifier.putArray("namespace").add(parts[0]).add(parts[1]);
       identifier.put("name", parts[2]);
@@ -332,13 +326,81 @@ public final class OssieSemanticModelDocumentConverter {
     rename(dataset, "custom_extensions", "customExtensions");
   }
 
+  private static String[] parseOssieSource(String source, String path) {
+    List<String> parts = new ArrayList<>(3);
+    int offset = 0;
+    while (offset < source.length()) {
+      StringBuilder part = new StringBuilder();
+      if (source.charAt(offset) == '`') {
+        offset++;
+        boolean closed = false;
+        while (offset < source.length()) {
+          char current = source.charAt(offset);
+          if (current != '`') {
+            part.append(current);
+            offset++;
+          } else if (offset + 1 < source.length() && source.charAt(offset + 1) == '`') {
+            part.append('`');
+            offset += 2;
+          } else {
+            closed = true;
+            offset++;
+            break;
+          }
+        }
+        if (!closed) {
+          throw invalid(path, "contains an unterminated quoted segment");
+        }
+        if (offset < source.length() && source.charAt(offset) != '.') {
+          throw invalid(path, "quoted segments must be separated by dots");
+        }
+      } else {
+        while (offset < source.length() && source.charAt(offset) != '.') {
+          char current = source.charAt(offset);
+          if (current == '`') {
+            throw invalid(path, "backticks must quote an entire segment");
+          }
+          part.append(current);
+          offset++;
+        }
+      }
+
+      if (StringUtils.isBlank(part)) {
+        throw invalid(path, "source segments must not be blank");
+      }
+      parts.add(part.toString());
+      if (offset < source.length()) {
+        offset++;
+        if (offset == source.length()) {
+          throw invalid(path, "source segments must not be blank");
+        }
+      }
+    }
+
+    if (parts.size() != 3) {
+      throw invalid(
+          path,
+          "must be a three-part catalog.schema.entity identifier; query sources are not supported");
+    }
+    return parts.toArray(new String[0]);
+  }
+
   private static void transformOssieField(ObjectNode field, String path) {
     validateObject(field, path, FIELD_PROPERTIES);
+    validateOptionalText(field, "name", path);
+    validateOptionalText(field, "label", path);
+    validateOptionalText(field, "description", path);
+    validateOptionalText(field, "datatype", path);
     transformOssieExpression(field.get("expression"), path + ".expression");
     JsonNode dimension = field.get("dimension");
-    if (dimension instanceof ObjectNode) {
-      validateObject((ObjectNode) dimension, path + ".dimension", DIMENSION_PROPERTIES);
-      rename((ObjectNode) dimension, "is_time", "isTime");
+    if (dimension != null) {
+      if (!(dimension instanceof ObjectNode)) {
+        throw invalid(path + ".dimension", "must be an object");
+      }
+      ObjectNode dimensionObject = (ObjectNode) dimension;
+      validateObject(dimensionObject, path + ".dimension", DIMENSION_PROPERTIES);
+      validateOptionalBoolean(dimensionObject, "is_time", path + ".dimension");
+      rename(dimensionObject, "is_time", "isTime");
     }
     validateAIContext(field.get("ai_context"), path + ".ai_context");
     transformOssieCustomExtensions(field.get("custom_extensions"), path + ".custom_extensions");
@@ -348,6 +410,11 @@ public final class OssieSemanticModelDocumentConverter {
 
   private static void transformOssieRelationship(ObjectNode relationship, String path) {
     validateObject(relationship, path, RELATIONSHIP_PROPERTIES);
+    validateOptionalText(relationship, "name", path);
+    validateOptionalText(relationship, "from", path);
+    validateOptionalText(relationship, "to", path);
+    validateOptionalStringArray(relationship, "from_columns", path);
+    validateOptionalStringArray(relationship, "to_columns", path);
     validateAIContext(relationship.get("ai_context"), path + ".ai_context");
     transformOssieCustomExtensions(
         relationship.get("custom_extensions"), path + ".custom_extensions");
@@ -359,6 +426,9 @@ public final class OssieSemanticModelDocumentConverter {
 
   private static void transformOssieMetric(ObjectNode metric, String path) {
     validateObject(metric, path, METRIC_PROPERTIES);
+    validateOptionalText(metric, "name", path);
+    validateOptionalText(metric, "description", path);
+    validateOptionalText(metric, "datatype", path);
     transformOssieExpression(metric.get("expression"), path + ".expression");
     validateAIContext(metric.get("ai_context"), path + ".ai_context");
     transformOssieCustomExtensions(metric.get("custom_extensions"), path + ".custom_extensions");
@@ -367,8 +437,11 @@ public final class OssieSemanticModelDocumentConverter {
   }
 
   private static void transformOssieExpression(@Nullable JsonNode expression, String path) {
-    if (!(expression instanceof ObjectNode)) {
+    if (expression == null) {
       return;
+    }
+    if (!(expression instanceof ObjectNode)) {
+      throw invalid(path, "must be an object");
     }
     ObjectNode expressionObject = (ObjectNode) expression;
     validateObject(expressionObject, path, EXPRESSION_PROPERTIES);
@@ -377,14 +450,8 @@ public final class OssieSemanticModelDocumentConverter {
         path + ".dialects",
         (dialectExpression, dialectPath) -> {
           validateObject(dialectExpression, dialectPath, DIALECT_EXPRESSION_PROPERTIES);
-          JsonNode dialect = dialectExpression.get("dialect");
-          if (dialect != null
-              && dialect.isTextual()
-              && !OSSIE_DIALECTS.contains(dialect.textValue())) {
-            throw invalid(
-                dialectPath + ".dialect",
-                "unsupported Apache Ossie dialect '" + dialect.textValue() + "'");
-          }
+          validateOptionalText(dialectExpression, "dialect", dialectPath);
+          validateOptionalText(dialectExpression, "expression", dialectPath);
         });
   }
 
@@ -394,6 +461,8 @@ public final class OssieSemanticModelDocumentConverter {
         path,
         (extension, extensionPath) -> {
           validateObject(extension, extensionPath, CUSTOM_EXTENSION_PROPERTIES);
+          validateOptionalText(extension, "vendor_name", extensionPath);
+          validateOptionalText(extension, "data", extensionPath);
           rename(extension, "vendor_name", "vendorName");
         });
   }
@@ -450,7 +519,11 @@ public final class OssieSemanticModelDocumentConverter {
     }
     dataset.put(
         "source",
-        namespace.get(0).textValue() + "." + namespace.get(1).textValue() + "." + name.textValue());
+        formatOssieSourceSegment(namespace.get(0).textValue())
+            + "."
+            + formatOssieSourceSegment(namespace.get(1).textValue())
+            + "."
+            + formatOssieSourceSegment(name.textValue()));
 
     transformObjectArray(
         dataset.get("fields"),
@@ -461,6 +534,13 @@ public final class OssieSemanticModelDocumentConverter {
     rename(dataset, "uniqueKeys", "unique_keys");
     rename(dataset, "aiContext", "ai_context");
     rename(dataset, "customExtensions", "custom_extensions");
+  }
+
+  private static String formatOssieSourceSegment(String segment) {
+    if (!segment.contains(".") && !segment.contains("`")) {
+      return segment;
+    }
+    return "`" + segment.replace("`", "``") + "`";
   }
 
   private static void transformNativeField(ObjectNode field, String path) {
@@ -654,6 +734,13 @@ public final class OssieSemanticModelDocumentConverter {
     }
   }
 
+  private static void validateOptionalBoolean(ObjectNode object, String name, String path) {
+    JsonNode value = object.get(name);
+    if (value != null && !value.isBoolean()) {
+      throw invalid(path + "." + name, "must be a boolean");
+    }
+  }
+
   private static void validateOptionalStringArray(ObjectNode object, String name, String path) {
     JsonNode value = object.get(name);
     if (value == null) {
@@ -669,17 +756,44 @@ public final class OssieSemanticModelDocumentConverter {
     }
   }
 
+  private static void validateOptionalStringArrayArray(
+      ObjectNode object, String name, String path) {
+    JsonNode value = object.get(name);
+    if (value == null) {
+      return;
+    }
+    if (!(value instanceof ArrayNode)) {
+      throw invalid(path + "." + name, "must be an array of string arrays");
+    }
+    for (int outerIndex = 0; outerIndex < value.size(); outerIndex++) {
+      JsonNode nestedValue = value.get(outerIndex);
+      if (!(nestedValue instanceof ArrayNode)) {
+        throw invalid(path + "." + name + "[" + outerIndex + "]", "must be an array of strings");
+      }
+      for (int innerIndex = 0; innerIndex < nestedValue.size(); innerIndex++) {
+        if (!nestedValue.get(innerIndex).isTextual()) {
+          throw invalid(
+              path + "." + name + "[" + outerIndex + "][" + innerIndex + "]", "must be a string");
+        }
+      }
+    }
+  }
+
   private static void transformObjectArray(
       @Nullable JsonNode node, String path, ObjectTransformer transformer) {
-    if (!(node instanceof ArrayNode)) {
+    if (node == null) {
       return;
+    }
+    if (!(node instanceof ArrayNode)) {
+      throw invalid(path, "must be an array of objects");
     }
     ArrayNode array = (ArrayNode) node;
     for (int index = 0; index < array.size(); index++) {
       JsonNode item = array.get(index);
-      if (item instanceof ObjectNode) {
-        transformer.transform((ObjectNode) item, path + "[" + index + "]");
+      if (!(item instanceof ObjectNode)) {
+        throw invalid(path + "[" + index + "]", "must be an object");
       }
+      transformer.transform((ObjectNode) item, path + "[" + index + "]");
     }
   }
 

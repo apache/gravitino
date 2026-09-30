@@ -626,6 +626,40 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testImportOssieTextYamlDocument() {
+    NameIdentifier ident = semanticModelIdentifier("marketing");
+    when(dispatcher.createSemanticModel(
+            eq(ident),
+            eq(null),
+            any(SemanticModelDefinition.class),
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION))))
+        .thenReturn(semanticModel("marketing", null));
+
+    String yaml =
+        """
+        version: 0.2.0.dev0
+        name: marketing
+        datasets:
+          - name: campaigns
+            source: semantic_model_catalog.semantic_model_schema.campaigns
+            fields: []
+        """;
+    Response response = postDocument(semanticModelPath() + "/ossie", yaml, "text/yaml");
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    SemanticModelResponse body = response.readEntity(SemanticModelResponse.class);
+    body.validate();
+    Assertions.assertEquals("marketing", body.getSemanticModel().name());
+    verify(dispatcher)
+        .createSemanticModel(
+            eq(ident),
+            eq(null),
+            any(SemanticModelDefinition.class),
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION)));
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
   void testExportOssieYamlAndJsonDocuments() throws Exception {
     NameIdentifier ident = semanticModelIdentifier("sales");
     when(dispatcher.loadSemanticModel(ident))
