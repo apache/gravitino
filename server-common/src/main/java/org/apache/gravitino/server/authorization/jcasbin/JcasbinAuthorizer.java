@@ -724,17 +724,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    try {
-      metadataObject = JcasbinAuthorizationLookups.normalizeModelName(metadataObject, metalake);
-    } catch (RuntimeException e) {
-      // The owner change is already committed. If the catalog capability cannot be read, clear
-      // both caches rather than leave an unknown canonical name or owner relation cached.
-      metadataIdCache.invalidateAll();
-      ownerRelCache.invalidateAll();
-      LOG.warn(
-          "Failed to normalize metadata name for owner cache invalidation: {}", metadataObject, e);
-      return;
-    }
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
     metadataIdCache.invalidate(
