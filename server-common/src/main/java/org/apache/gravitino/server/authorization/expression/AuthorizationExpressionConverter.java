@@ -185,7 +185,6 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
-              ( entityType == 'MODEL_VERSION' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s))
               """
             .formatted(
@@ -203,7 +202,6 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
-                LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                 LOAD_FUNCTION_AUTHORIZATION_EXPRESSION));
   }
 
@@ -297,16 +295,15 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_USE_SECRETS",
-            "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-                + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE,"
-                + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))");
+            "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL))"
+                + " && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_INCLUDE_CREDENTIAL_SECRETS",
             "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
-                + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS,"
-                + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-                + " MODEL_VERSION)))");
+                + " FILESET, MODEL)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG,"
+                + " SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_LINK_MODEL_VERSION",
