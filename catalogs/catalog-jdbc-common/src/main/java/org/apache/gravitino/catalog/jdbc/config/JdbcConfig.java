@@ -87,13 +87,17 @@ public class JdbcConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
+  /**
+   * The maximum number of idle connections a catalog pool retains. The default matches the DBCP
+   * default that catalog pools used before this setting existed.
+   */
   public static final ConfigEntry<Integer> POOL_MAX_IDLE =
       new ConfigBuilder("jdbc.pool.max-idle")
           .doc("The maximum number of idle connections retained in the pool")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(10);
+          .createWithDefault(8);
 
   public static final ConfigEntry<Boolean> TEST_ON_BORROW =
       new ConfigBuilder("jdbc.pool.test-on-borrow")
@@ -134,6 +138,11 @@ public class JdbcConfig extends Config {
     return get(POOL_MAX_SIZE);
   }
 
+  /**
+   * Returns the effective idle-connection limit, capped by the maximum pool size.
+   *
+   * @return the maximum number of idle connections to retain
+   */
   public int getPoolMaxIdle() {
     return Math.min(get(POOL_MAX_IDLE), getPoolMaxSize());
   }

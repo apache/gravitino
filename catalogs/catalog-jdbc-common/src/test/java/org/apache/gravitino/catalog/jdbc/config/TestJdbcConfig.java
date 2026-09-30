@@ -35,7 +35,7 @@ public class TestJdbcConfig {
   @Test
   public void testMaxIdleDefaultsAndCap() {
     JdbcConfig defaultConfig = new JdbcConfig(Maps.newHashMap());
-    Assertions.assertEquals(10, defaultConfig.getPoolMaxIdle());
+    Assertions.assertEquals(8, defaultConfig.getPoolMaxIdle());
 
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "6");
