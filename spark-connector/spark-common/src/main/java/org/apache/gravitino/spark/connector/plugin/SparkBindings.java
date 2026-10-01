@@ -43,12 +43,12 @@ import scala.Function1;
 public final class SparkBindings {
 
   /**
-   * The catalog kinds every connector build must supply. Paimon is absent because Paimon publishes
-   * no artifact for every supported Spark and Scala version, so some builds legitimately ship no
-   * Paimon catalog.
+   * The catalog kinds every connector build must supply. Paimon and governed Doris are absent
+   * because their external connectors are unavailable for some supported Spark and Scala versions.
    */
   private static final Set<SparkCatalogKind> REQUIRED_KINDS =
-      EnumSet.complementOf(EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON));
+      EnumSet.complementOf(
+          EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON, SparkCatalogKind.JDBC_DORIS));
 
   private final Map<SparkCatalogKind, String> catalogClassNames;
   private final String authorizationExtension;
@@ -108,8 +108,8 @@ public final class SparkBindings {
     /**
      * Binds a catalog kind to the class implementing it, by name. Prefer {@link
      * #catalog(SparkCatalogKind, Class)}, whose argument the compiler checks is a catalog at all;
-     * this overload is for a catalog whose class a build may compile out, such as Paimon on Scala
-     * 2.13.
+     * this overload is for a catalog whose class a build may compile out, such as Paimon or
+     * governed Doris on Scala 2.13.
      *
      * @param kind the kind of catalog
      * @param catalogClassName the name of the class implementing it

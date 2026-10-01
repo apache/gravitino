@@ -47,9 +47,45 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                          | (none)        | Yes      |
 | `jdbc-user`             | The JDBC user name.                                                                               | (none)        | Yes      |
 | `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
+| `doris-fenodes`         | Comma-separated Doris FE endpoints in `host:port` format, used by the specialized Spark adapter. | (none)        | No       |
+| `doris-query-port`      | Doris MySQL-protocol query port, used by the specialized Spark adapter.                           | (none)        | No       |
+| `doris-write-mode`      | Governed Spark write mode: `disabled` or `batch`.                                                  | `disabled`    | No       |
+| `doris-write-overwrite-mode` | Governed Spark overwrite mode: `reject` or non-atomic `truncate`.                           | `reject`      | No       |
+| `doris-jdbc-partition-column` | Spark JDBC `partitionColumn` for the specialized SQL read lane.                             | (none)        | No       |
+| `doris-jdbc-lower-bound` | Spark JDBC `lowerBound` for the specialized SQL read lane.                                      | (none)        | No       |
+| `doris-jdbc-upper-bound` | Spark JDBC `upperBound` for the specialized SQL read lane.                                      | (none)        | No       |
+| `doris-jdbc-num-partitions` | Spark JDBC `numPartitions` for the specialized SQL read lane.                                | (none)        | No       |
+| `doris-jdbc-fetch-size` | Spark JDBC `fetchsize` for the specialized SQL read lane.                                        | (none)        | No       |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
+
+:::note
+`doris-fenodes` and `doris-query-port` are optional for server-side metadata and DDL operations.
+They are required when the opt-in Spark Doris batch read/write adapter is enabled. Endpoints must use
+the comma-separated `host:port` form; URI schemes, paths, query strings, and IPv6 literals are
+rejected.
+
+Governed Spark writes are disabled by default. Set `doris-write-mode=batch` to enable batch append.
+Full-table truncate-then-load overwrite additionally requires
+`doris-write-overwrite-mode=truncate`. Truncate overwrite is non-atomic: if the subsequent Stream
+Load fails, the table may remain empty or partially populated.
+
+The four partition properties (`doris-jdbc-partition-column`, `doris-jdbc-lower-bound`,
+`doris-jdbc-upper-bound`, and `doris-jdbc-num-partitions`) must be configured together.
+`doris-jdbc-num-partitions` and `doris-jdbc-fetch-size` must be positive integers. These properties
+are validated when the specialized Spark catalog is initialized.
+
+The credential vended to Spark must have Doris `SELECT_PRIV` for reads and physical schema
+inspection, and `LOAD_PRIV` for governed Stream Load writes. The official Doris Spark Connector
+executes SQL `TRUNCATE TABLE` for full-table overwrite, but exact native privilege requirements
+remain Doris-version and deployment dependent; the Gravitino adapter delegates that decision to
+Doris and does not introspect or synthesize grants. The Doris 3.0.6.2 and 4.0.6 test images both
+permit this operation with `SELECT_PRIV` and `LOAD_PRIV` without `DROP_PRIV`; deployments whose
+Doris policy requires `DROP_PRIV` must grant it. `ALTER_PRIV` is not required by the tested path.
+Gravitino `SELECT_TABLE` and `MODIFY_TABLE` authorization does not replace these Doris-native
+privileges.
+:::
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.

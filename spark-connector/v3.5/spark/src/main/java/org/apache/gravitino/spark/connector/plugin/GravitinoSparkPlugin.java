@@ -32,6 +32,7 @@ import org.apache.spark.api.plugin.ExecutorPlugin;
 import org.apache.spark.api.plugin.SparkPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.util.Properties$;
 
 /**
  * The entrypoint for Apache Gravitino Spark connector on Spark 3.5.
@@ -46,14 +47,19 @@ public class GravitinoSparkPlugin implements SparkPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoSparkPlugin.class);
 
   /**
-   * The Paimon catalog is the one binding that cannot be a class reference: the build takes its
-   * Paimon dependency only under Scala 2.12 and excludes the Paimon package otherwise, so the class
-   * is absent from the 2.13 jar. Resolved by presence below, and checked against the real class by
-   * a test in that package, which the same build exclusion drops on 2.13.
+   * The Paimon binding cannot be a class reference: the build takes its Paimon dependency only
+   * under Scala 2.12 and excludes the Paimon package otherwise, so the class is absent from the
+   * 2.13 jar. Resolved by presence below, and checked against the real class by a test in that
+   * package, which the same build exclusion drops on 2.13.
    */
   @VisibleForTesting
   public static final String PAIMON_CATALOG =
       "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35";
+
+  /** The governed Doris catalog, which this module compiles only for Scala 2.12. */
+  @VisibleForTesting
+  public static final String DORIS_CATALOG =
+      "org.apache.gravitino.spark.connector.jdbc.doris.GravitinoDorisCatalogSpark35";
 
   @Override
   public DriverPlugin driverPlugin() {
@@ -77,7 +83,16 @@ public class GravitinoSparkPlugin implements SparkPlugin {
     if (isPresent(PAIMON_CATALOG)) {
       builder.catalog(SparkCatalogKind.LAKEHOUSE_PAIMON, PAIMON_CATALOG);
     }
+    if (isScala212()) {
+      // Use a class name so the Scala 2.13 build can compile after excluding the Doris package.
+      // The driver validates the external Doris Connector only when specialized mode is enabled.
+      builder.catalog(SparkCatalogKind.JDBC_DORIS, DORIS_CATALOG);
+    }
     return builder.build();
+  }
+
+  private static boolean isScala212() {
+    return Properties$.MODULE$.versionNumberString().startsWith("2.12");
   }
 
   private static boolean isPresent(String className) {

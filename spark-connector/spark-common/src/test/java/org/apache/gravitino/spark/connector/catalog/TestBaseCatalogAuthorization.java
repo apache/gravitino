@@ -20,10 +20,12 @@
 package org.apache.gravitino.spark.connector.catalog;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
@@ -133,6 +135,21 @@ public class TestBaseCatalogAuthorization {
 
     verify(gravitinoTableCatalog)
         .loadTable(gravitinoIdentifier, ImmutableSet.of(Privilege.Name.MODIFY_TABLE));
+  }
+
+  @Test
+  void testDeniedWriteNeverLoadsPhysicalSparkTable() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.MODIFY_TABLE))))
+        .thenThrow(new ForbiddenException("denied"));
+
+    ForbiddenException failure =
+        assertThrows(ForbiddenException.class, () -> catalog.loadForWriting(identifier));
+
+    assertTrue(failure.getMessage().contains("table_a: MODIFY_TABLE"));
+    verifyNoInteractions(sparkCatalog);
   }
 
   private static class TestCatalog extends BaseCatalog {

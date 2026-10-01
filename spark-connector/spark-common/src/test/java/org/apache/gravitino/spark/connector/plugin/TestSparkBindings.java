@@ -52,11 +52,11 @@ public class TestSparkBindings {
   }
 
   /**
-   * Paimon is the one kind a build may legitimately omit, since Paimon publishes no artifact for
-   * every supported Spark and Scala version.
+   * Paimon and governed Doris may be omitted because their external connectors are unavailable for
+   * some supported Spark and Scala versions.
    */
   @Test
-  void testPaimonMayBeOmitted() {
+  void testVersionSpecificCatalogsMayBeOmitted() {
     SparkBindings bindings =
         everyRequiredCatalog(SparkBindings.builder())
             .authorizationExtension("org.example.AuthorizationExtensions")
@@ -64,6 +64,7 @@ public class TestSparkBindings {
 
     Assertions.assertFalse(
         bindings.catalogClassNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON));
+    Assertions.assertFalse(bindings.catalogClassNames().containsKey(SparkCatalogKind.JDBC_DORIS));
     Assertions.assertEquals(5, bindings.catalogClassNames().size());
   }
 
