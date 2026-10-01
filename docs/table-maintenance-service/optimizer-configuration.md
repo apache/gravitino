@@ -145,7 +145,7 @@ settings described above. Its job-specific `jobConf` keys are:
 | ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
 | `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
 | `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
-| `older_than`       | Timestamp in the Spark session time zone; must be at least 24 hours old               | Three days ago (Iceberg default) |
+| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old | Three days ago (Iceberg default) |
 | `location`         | Scan only this directory within the table's storage location                          | Table location                   |
 | `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
 | `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
@@ -194,8 +194,14 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
 Associate the policy with a tag and attach that tag to the target table, schema,
 or catalog, following the [policy setup walkthrough](./optimizer.md).
 `olderThanDays` defaults to 3 and must be between 1 and 36500 inclusive (approximately 100 years). This bound rejects impractical retention values before a policy is stored. `dryRun` defaults to false.
-Optional `location` must be the table's storage root or a descendant; submission
-requires the table's `location` metadata to validate a custom path. The Spark job
+
+The policy adapter subtracts `olderThanDays` from the current instant and always
+emits `older_than` as an explicit UTC timestamp ending in `Z`. Policy retention
+is therefore independent of `spark.sql.session.timeZone`. For direct job
+submission, timestamps without an offset use the Spark session time zone.
+
+Optional `location` must not have leading or trailing whitespace and must be the
+table's storage root or a descendant; submission requires the table's `location` metadata to validate a custom path. The Spark job
 rechecks containment and filesystem symlinks with its own credentials before
 listing or deleting files.
 

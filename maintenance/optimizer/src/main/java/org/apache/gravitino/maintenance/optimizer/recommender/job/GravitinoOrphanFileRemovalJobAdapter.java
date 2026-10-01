@@ -33,6 +33,10 @@ import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 
 /** Converts orphan cleanup options to the existing Spark template's configuration. */
 public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter {
+  private static final String TABLE_IDENTIFIER_KEY = "table_identifier";
+  private static final String OLDER_THAN_KEY = "older_than";
+  private static final String LOCATION_KEY = "location";
+  private static final String DRY_RUN_KEY = "dry_run";
   private static final DateTimeFormatter TIMESTAMP =
       DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ssXXX").withZone(ZoneOffset.UTC);
   private final Clock clock;
@@ -79,13 +83,13 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
       location = OrphanFileLocationUtils.normalizeLocation(location).toString();
     }
     return Map.of(
-        "table_identifier",
+        TABLE_IDENTIFIER_KEY,
         IdentifierUtils.removeCatalogFromIdentifier(orphan.nameIdentifier()).toString(),
-        "older_than",
+        OLDER_THAN_KEY,
         cutoff(days),
-        "location",
+        LOCATION_KEY,
         location,
-        "dry_run",
+        DRY_RUN_KEY,
         dryRun);
   }
 

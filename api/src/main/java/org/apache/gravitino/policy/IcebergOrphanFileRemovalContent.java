@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Configuration for table-level Iceberg orphan cleanup on an optimizer invocation. */
@@ -120,14 +121,6 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
     return Collections.unmodifiableMap(rules);
   }
 
-  @Override
-  public void validate() {
-    PolicyContent.super.validate();
-    validateOlderThanDays(olderThanDays);
-    Preconditions.checkArgument(
-        location == null || !location.trim().isEmpty(), "location must not be blank");
-  }
-
   /**
    * Validates retention before storing a policy or submitting a job.
    *
@@ -139,6 +132,17 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
         days >= 1 && days <= MAX_OLDER_THAN_DAYS,
         "olderThanDays must be between 1 and %s",
         MAX_OLDER_THAN_DAYS);
+  }
+
+  @Override
+  public void validate() {
+    PolicyContent.super.validate();
+    validateOlderThanDays(olderThanDays);
+    Preconditions.checkArgument(
+        location == null || StringUtils.isNotBlank(location), "location must not be blank");
+    Preconditions.checkArgument(
+        location == null || location.equals(StringUtils.strip(location.trim())),
+        "location must not have leading or trailing whitespace");
   }
 
   @Override

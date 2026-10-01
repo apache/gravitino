@@ -62,6 +62,26 @@ class TestIcebergOrphanFileRemovalContent {
   }
 
   @Test
+  void rejectsLocationWhitespace() {
+    for (String location :
+        new String[] {
+          "  s3://bucket/table/data",
+          "s3://bucket/table/data ",
+          "\ts3://bucket/table/data",
+          "s3://bucket/table/data\n",
+          "\u2003s3://bucket/table/data",
+          "s3://bucket/table/data\u2003",
+          "\u2003"
+        }) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> PolicyContents.icebergOrphanFileRemoval(3, location, true).validate());
+      Assertions.assertTrue(error.getMessage().contains("location"));
+    }
+  }
+
+  @Test
   void validatesRetentionUpperBoundary() {
     long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
     Assertions.assertDoesNotThrow(

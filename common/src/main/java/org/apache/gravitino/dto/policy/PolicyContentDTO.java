@@ -206,6 +206,7 @@ public interface PolicyContentDTO extends PolicyContent {
           rewriteOptions());
     }
   }
+
   /** Typed orphan cleanup policy content for REST requests and responses. */
   @EqualsAndHashCode
   @ToString
@@ -231,6 +232,7 @@ public interface PolicyContentDTO extends PolicyContent {
           ? IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS
           : olderThanDays;
     }
+
     /**
      * @return optional scan location
      */
@@ -238,6 +240,7 @@ public interface PolicyContentDTO extends PolicyContent {
     public String location() {
       return location;
     }
+
     /**
      * @return whether to list candidates without deleting them
      */

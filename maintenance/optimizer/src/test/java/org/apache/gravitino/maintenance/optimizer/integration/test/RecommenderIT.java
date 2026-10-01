@@ -103,6 +103,52 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
   }
 
   @Test
+  void testOrphanCleanupRejectsLocationWhitespace() throws Exception {
+    String name = "location_cleanup";
+    String type = "system_iceberg_orphan_file_removal";
+    String validLocation = "s3://bucket/table/data";
+    metalakeClient.createPolicy(
+        name,
+        type,
+        "valid location",
+        true,
+        PolicyContents.icebergOrphanFileRemoval(3, validLocation, true));
+    for (String location :
+        new String[] {
+          "  " + validLocation,
+          validLocation + "  ",
+          "\u2003" + validLocation,
+          validLocation + "\u2003"
+        }) {
+      HttpResponse<String> create =
+          policyRequest(
+              "POST",
+              "",
+              "{\"name\":\"invalid_location_cleanup\",\"policyType\":\""
+                  + type
+                  + "\",\"enabled\":true,\"content\":{\"location\":\""
+                  + location
+                  + "\"}}");
+      Assertions.assertEquals(400, create.statusCode(), create.body());
+      Assertions.assertTrue(create.body().contains("location"));
+      HttpResponse<String> update =
+          policyRequest(
+              "PUT",
+              "/" + name,
+              "{\"updates\":[{\"@type\":\"updateContent\",\"policyType\":\""
+                  + type
+                  + "\",\"newContent\":{\"location\":\""
+                  + location
+                  + "\"}}]}");
+      Assertions.assertEquals(400, update.statusCode(), update.body());
+      Assertions.assertTrue(update.body().contains("location"));
+      Assertions.assertEquals(
+          validLocation,
+          metalakeClient.getPolicy(name).content().rules().get("job.options.location"));
+    }
+  }
+
+  @Test
   void testOrphanCleanupRejectsOverflowingRetention() throws Exception {
     HttpResponse<String> response =
         policyRequest(
