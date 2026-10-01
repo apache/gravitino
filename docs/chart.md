@@ -116,17 +116,11 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 
 Then manually create a PersistentVolume (PV).
 
-### Deploy Gravitino Using an Existed MySQL Database
+### Deploy Gravitino Using an Existing MySQL Database
 
 Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
 
-Before deploying Gravitino, initialize your existing MySQL instance and create the necessary tables required for Gravitino to function properly.
-
-```console
-mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
-```
-
-Use Helm to install or upgrade Gravitino, specifying the MySQL connection details.
+Helm can initialize the database schema automatically for an external MySQL instance. Enable the schema initialization Job and provide the connection details:
 
 ```console
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
@@ -134,13 +128,54 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" \
   --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" \
   --set entity.jdbcUser="admin" \
-  --set entity.jdbcPassword="admin123"
+  --set entity.jdbcPassword="admin123" \
+  --set entity.initializeSchema.enabled=true \
+  --set entity.initializeSchema.databaseType=mysql \
+  --set entity.initializeSchema.host=database-1.***.***.rds.amazonaws.com \
+  --set entity.initializeSchema.port=3306 \
+  --set entity.initializeSchema.database=gravitino
 ```
 
-_Note: \
-Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
-Change admin and admin123 to your actual MySQL username and password. \
-Ensure the target MySQL database (gravitino) exists before deployment._
+The schema initialization Job runs as a `pre-install` and `pre-upgrade` hook, so it automatically applies the required schema and upgrade scripts whenever you install or upgrade Gravitino. The target database (`gravitino`) must already exist.
+
+If you store the database password in a Kubernetes Secret, reference it instead of setting `entity.jdbcPassword`:
+
+```console
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
+  -n <NAMESPACE> --create-namespace \
+  --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" \
+  --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" \
+  --set entity.jdbcUser="admin" \
+  --set entity.initializeSchema.enabled=true \
+  --set entity.initializeSchema.databaseType=mysql \
+  --set entity.initializeSchema.host=database-1.***.***.rds.amazonaws.com \
+  --set entity.initializeSchema.port=3306 \
+  --set entity.initializeSchema.database=gravitino \
+  --set entity.initializeSchema.passwordSecret=mysql-credentials \
+  --set entity.initializeSchema.passwordSecretKey=mysql-password
+```
+
+### Deploy Gravitino Using an Existing PostgreSQL Database
+
+Ensure you have the following PostgreSQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
+
+Enable the schema initialization Job and provide the PostgreSQL connection details:
+
+```console
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
+  -n <NAMESPACE> --create-namespace \
+  --set entity.jdbcUrl="jdbc:postgresql://pg.example.com:5432/gravitino" \
+  --set entity.jdbcDriver="org.postgresql.Driver" \
+  --set entity.jdbcUser="admin" \
+  --set entity.jdbcPassword="admin123" \
+  --set entity.initializeSchema.enabled=true \
+  --set entity.initializeSchema.databaseType=postgresql \
+  --set entity.initializeSchema.host=pg.example.com \
+  --set entity.initializeSchema.port=5432 \
+  --set entity.initializeSchema.database=gravitino
+```
+
+The schema initialization Job runs as a `pre-install` and `pre-upgrade` hook, so it automatically applies the required schema and upgrade scripts whenever you install or upgrade Gravitino. The target database (`gravitino`) must already exist.
 
 ### Deploy Gravitino with GCS as Object Store
 
