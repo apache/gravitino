@@ -48,6 +48,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_UNAUTHORIZED = 1045;
   static final int CODE_NO_SUCH_COLUMN = 1054;
   static final int CODE_OTHER = 1105;
+  static final int CODE_UNKNOWN_TABLE = 1109;
   static final int CODE_DELETE_NON_EXISTING_PARTITION = 1507;
   static final int CODE_PARTITION_ALREADY_EXISTS = 1517;
   static final int CODE_BUCKETS_AUTO_NOT_SUPPORTED = 1064;
@@ -112,6 +113,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       case CODE_UNKNOWN_DATABASE:
         return new NoSuchSchemaException(se, message);
       case CODE_NO_SUCH_TABLE:
+      case CODE_UNKNOWN_TABLE:
         return new NoSuchTableException(se, message);
       case CODE_UNAUTHORIZED:
         return new UnauthorizedException(se, message);

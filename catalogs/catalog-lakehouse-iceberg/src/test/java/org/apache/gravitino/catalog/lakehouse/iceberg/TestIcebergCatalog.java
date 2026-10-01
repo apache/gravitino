@@ -370,11 +370,10 @@ public class TestIcebergCatalog {
   }
 
   @Test
-  void testExplicitCredentialProvidersNotOverridden() {
+  void testExplicitCredentialProvidersStillGetsJdbc() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    // Test that explicit credential-providers setting is not overridden
     Map<String, String> explicitProps = Maps.newHashMap();
     explicitProps.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
     explicitProps.put(IcebergConstants.URI, "jdbc:sqlite::memory:");
@@ -397,9 +396,9 @@ public class TestIcebergCatalog {
         new IcebergCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
     Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
-    // Should keep explicit credential providers, not override
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertEquals("custom-provider", credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
   }
 
   @Test
