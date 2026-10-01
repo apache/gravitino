@@ -42,7 +42,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class TestIcebergUpdateManifestStatsJobWithSpark {
+/** Tests manifest statistics collection against real Spark and Iceberg tables. */
+public class TestIcebergUpdateManifestStatsJobWithSpark {
   private static final String CATALOG_NAME = "manifest_catalog";
   @TempDir static File tempDir;
   private static SparkSession spark;
@@ -72,8 +73,9 @@ class TestIcebergUpdateManifestStatsJobWithSpark {
     }
   }
 
+  /** Verifies collection targets one spec while preserving other spec measurements. */
   @Test
-  void testManifestStatisticsAcrossPartitionEvolution() {
+  public void testManifestStatisticsAcrossPartitionEvolution() {
     String name = CATALOG_NAME + ".db.manifest_evolution";
     spark.sql("CREATE TABLE " + name + " (id INT, ds STRING) USING iceberg PARTITIONED BY (ds)");
     try {
@@ -127,8 +129,9 @@ class TestIcebergUpdateManifestStatsJobWithSpark {
     }
   }
 
+  /** Verifies an empty table publishes a complete zero-valued measurement. */
   @Test
-  void testPublishesEmptyUnpartitionedTable() {
+  public void testPublishesEmptyUnpartitionedTable() {
     String name = CATALOG_NAME + ".db.empty";
     spark.sql("CREATE TABLE " + name + " (id INT) USING iceberg");
     try {

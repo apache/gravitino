@@ -100,6 +100,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       sparkConfigs.forEach(builder::config);
       SparkSession spark = builder.getOrCreate();
       try {
+        IcebergJobUtils.requireIcebergSparkRuntime();
         updateStatistics(spark, updater, catalog, table, specId);
       } finally {
         spark.stop();

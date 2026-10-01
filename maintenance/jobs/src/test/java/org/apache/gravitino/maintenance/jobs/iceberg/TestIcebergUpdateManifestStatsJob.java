@@ -36,9 +36,11 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJobTemplateProvider;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.Test;
 
-class TestIcebergUpdateManifestStatsJob {
+/** Tests the standalone manifest statistics template and argument validation. */
+public class TestIcebergUpdateManifestStatsJob {
+  /** Verifies manifest statistics use an independent built-in template. */
   @Test
-  void testIndependentTemplateRegistration() {
+  public void testIndependentTemplateRegistration() {
     Map<String, JobTemplate> templates =
         new BuiltInJobTemplateProvider()
             .jobTemplates().stream()
@@ -63,8 +65,9 @@ class TestIcebergUpdateManifestStatsJob {
         () -> IcebergUpdateStatsAndMetricsJob.parseUpdateMode("manifests"));
   }
 
+  /** Verifies optional spec IDs and invalid spec arguments. */
   @Test
-  void testSpecArgument() {
+  public void testSpecArgument() {
     assertNull(IcebergUpdateManifestStatsJob.parseSpecId(null));
     assertNull(IcebergUpdateManifestStatsJob.parseSpecId(""));
     assertEquals(0, IcebergUpdateManifestStatsJob.parseSpecId("0"));
@@ -75,8 +78,9 @@ class TestIcebergUpdateManifestStatsJob {
     }
   }
 
+  /** Verifies catalog and table identifiers are validated and escaped. */
   @Test
-  void testTableIdentifierValidationAndEscaping() {
+  public void testTableIdentifierValidationAndEscaping() {
     assertEquals(
         "`cat``alog`.`db`.`tbl``name`",
         IcebergUpdateManifestStatsJob.buildTableIdentifier("cat`alog", "db.tbl`name"));
@@ -93,8 +97,9 @@ class TestIcebergUpdateManifestStatsJob {
         () -> IcebergUpdateManifestStatsJob.main(new String[] {"--table", "db.table"}));
   }
 
+  /** Verifies updater configuration aliases and required properties. */
   @Test
-  void testUpdaterConfiguration() {
+  public void testUpdaterConfiguration() {
     Map<String, String> options = new HashMap<>();
     options.put("gravitino_uri", " http://localhost:8090 ");
     options.put("metalake", " test ");

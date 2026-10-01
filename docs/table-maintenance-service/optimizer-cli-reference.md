@@ -331,6 +331,23 @@ merges, and writes under the same table lock used by statistics readers, and per
 in one batch. Concurrent collectors using the same Gravitino server preserve each other's spec
 entries. This coordination uses the server's existing in-process tree lock, not a distributed
 lock across independent server instances. Route these collectors to the same server.
+Java clients call `table.supportsStatistics().mergeStatistics(values)`; Python clients call
+`table.supports_statistics().merge_statistics(values)`. Supply both object-valued measurements
+in one call. For example, in Python:
+
+```python
+from gravitino.api.stats.statistic_values import StatisticValues
+
+table.supports_statistics().merge_statistics({
+    "custom-manifest-number-by-spec": StatisticValues.object_value({
+        "1": StatisticValues.long_value(120)
+    }),
+    "custom-avg-manifest-size-by-spec": StatisticValues.object_value({
+        "1": StatisticValues.double_value(4194304.0)
+    }),
+})
+```
+
 `PUT` continues to replace complete statistic values. An older server rejects the new PATCH
 operation, and custom statistics updaters must implement `mergeTableStatistics`; there is no
 unsafe fallback to client-side read/modify/write.

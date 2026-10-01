@@ -496,7 +496,8 @@ public class StatisticOperations {
     String statisticNames = getStatisticNames(request);
     try {
       LOG.info(
-          "Received update statistics request for object full name: {} type: {} in the metalake {}",
+          "Received {} statistics request for object full name: {} type: {} in the metalake {}",
+          merge ? "merge" : "update",
           fullName,
           type,
           metalake);

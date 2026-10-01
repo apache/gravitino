@@ -176,9 +176,11 @@ public class TestStatisticsEventDispatcher {
         "metalake",
         MetadataObjects.of(Lists.newArrayList("catalog", "db", "table"), MetadataObject.Type.TABLE),
         stats);
-    Assertions.assertEquals(
-        UpdateStatisticsPreEvent.class, dummyEventListener.popPreEvent().getClass());
+    UpdateStatisticsPreEvent preEvent = (UpdateStatisticsPreEvent) dummyEventListener.popPreEvent();
+    Assertions.assertEquals(stats, preEvent.statistics());
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, preEvent.operationType());
     UpdateStatisticsEvent event = (UpdateStatisticsEvent) dummyEventListener.popPostEvent();
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, event.operationType());
     Assertions.assertEquals(stats, event.statistics());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
@@ -198,8 +200,12 @@ public class TestStatisticsEventDispatcher {
                 MetadataObjects.of(
                     Lists.newArrayList("catalog", "db", "table"), MetadataObject.Type.TABLE),
                 stats));
+    UpdateStatisticsPreEvent preEvent = (UpdateStatisticsPreEvent) dummyEventListener.popPreEvent();
+    Assertions.assertEquals(stats, preEvent.statistics());
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, preEvent.operationType());
     UpdateStatisticsFailureEvent event =
         (UpdateStatisticsFailureEvent) dummyEventListener.popPostEvent();
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, event.operationType());
     Assertions.assertEquals(stats, event.statistics());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }

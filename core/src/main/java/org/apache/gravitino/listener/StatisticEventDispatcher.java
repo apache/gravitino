@@ -99,6 +99,12 @@ public class StatisticEventDispatcher implements StatisticDispatcher {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Reuses the update-statistics events with the caller's partial merge payload. These events do
+   * not distinguish merging from replacement or contain the complete persisted object values.
+   */
   @Override
   public void mergeStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
