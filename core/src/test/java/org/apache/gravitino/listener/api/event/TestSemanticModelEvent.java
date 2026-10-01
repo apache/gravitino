@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
@@ -328,6 +329,73 @@ public class TestSemanticModelEvent {
     changes[0] = SemanticModelChange.rename("renamed");
     Assertions.assertEquals(
         SemanticModelChange.setProperty("a", "b"), event.semanticModelChanges()[0]);
+  }
+
+  @Test
+  void testAlterSuccessChangesAreIsolatedBetweenListeners() {
+    SemanticModelChange[] changes = {SemanticModelChange.setProperty("a", "b")};
+    AlterSemanticModelEvent event =
+        new AlterSemanticModelEvent(
+            "user",
+            NameIdentifier.of(NAMESPACE, "model"),
+            changes,
+            new SemanticModelInfo(semanticModel));
+    changes[0] = SemanticModelChange.rename("caller_mutation");
+    assertChangesIsolatedBetweenListeners(
+        event, e -> ((AlterSemanticModelEvent) e).semanticModelChanges());
+  }
+
+  @Test
+  void testAlterPreChangesAreIsolatedBetweenListeners() {
+    SemanticModelChange[] changes = {SemanticModelChange.setProperty("a", "b")};
+    AlterSemanticModelPreEvent event =
+        new AlterSemanticModelPreEvent("user", NameIdentifier.of(NAMESPACE, "model"), changes);
+    changes[0] = SemanticModelChange.rename("caller_mutation");
+    assertChangesIsolatedBetweenListeners(
+        event, e -> ((AlterSemanticModelPreEvent) e).semanticModelChanges());
+  }
+
+  @Test
+  void testAlterFailureChangesAreIsolatedBetweenListeners() {
+    SemanticModelChange[] changes = {SemanticModelChange.setProperty("a", "b")};
+    AlterSemanticModelFailureEvent event =
+        new AlterSemanticModelFailureEvent(
+            "user",
+            NameIdentifier.of(NAMESPACE, "model"),
+            new GravitinoRuntimeException("alter failed"),
+            changes);
+    changes[0] = SemanticModelChange.rename("caller_mutation");
+    assertChangesIsolatedBetweenListeners(
+        event, e -> ((AlterSemanticModelFailureEvent) e).semanticModelChanges());
+  }
+
+  private void assertChangesIsolatedBetweenListeners(
+      BaseEvent event, Function<BaseEvent, SemanticModelChange[]> changesAccessor) {
+    DummyEventListener mutatingListener =
+        new DummyEventListener() {
+          @Override
+          public void onPreEvent(PreEvent preEvent) {
+            changesAccessor.apply(preEvent)[0] = SemanticModelChange.rename("listener_mutation");
+          }
+
+          @Override
+          public void onPostEvent(Event postEvent) {
+            changesAccessor.apply(postEvent)[0] = SemanticModelChange.rename("listener_mutation");
+          }
+        };
+    DummyEventListener observingListener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Arrays.asList(mutatingListener, observingListener));
+
+    eventBus.dispatchEvent(event);
+
+    BaseEvent observedEvent =
+        event instanceof PreEvent
+            ? observingListener.popPreEvent()
+            : observingListener.popPostEvent();
+    Assertions.assertSame(event, observedEvent);
+    Assertions.assertArrayEquals(
+        new SemanticModelChange[] {SemanticModelChange.setProperty("a", "b")},
+        changesAccessor.apply(observedEvent));
   }
 
   private void checkSemanticModelInfo(SemanticModelInfo info, SemanticModel semanticModel) {
