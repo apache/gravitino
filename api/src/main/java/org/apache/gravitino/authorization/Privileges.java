@@ -81,8 +81,7 @@ public class Privileges {
           MetadataObject.Type.VIEW,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.FILESET,
-          MetadataObject.Type.MODEL,
-          MetadataObject.Type.MODEL_VERSION);
+          MetadataObject.Type.MODEL);
 
   private static final Set<MetadataObject.Type> FUNCTION_SUPPORTED_TYPES =
       Sets.immutableEnumSet(

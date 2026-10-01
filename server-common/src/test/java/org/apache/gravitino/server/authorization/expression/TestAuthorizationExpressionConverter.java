@@ -134,9 +134,9 @@ public class TestAuthorizationExpressionConverter {
   public void testReplaceAnyPrivilegeForAnyUseSecretss() {
     String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_SECRETS");
     Assertions.assertEquals(
-        "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-            + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE,"
-            + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
+        "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL))"
+            + " && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+            + " FILESET, MODEL)))",
         replaced);
   }
 
@@ -146,9 +146,8 @@ public class TestAuthorizationExpressionConverter {
         AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_INCLUDE_CREDENTIAL_SECRETS");
     Assertions.assertEquals(
         "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
-            + " FILESET, MODEL, MODEL_VERSION)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS,"
-            + " METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-            + " MODEL_VERSION)))",
+            + " FILESET, MODEL)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG,"
+            + " SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL)))",
         replaced);
   }
 

@@ -476,7 +476,6 @@ public class TestSecurableObjects {
     Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.TOPIC));
     Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.MODEL));
-    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.MODEL_VERSION));
     Assertions.assertFalse(useSecrets.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(useSecrets.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertFalse(useSecrets.canBindTo(MetadataObject.Type.FUNCTION));
@@ -489,7 +488,6 @@ public class TestSecurableObjects {
     Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.TOPIC));
     Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.MODEL));
-    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.MODEL_VERSION));
     Assertions.assertFalse(includeCredentialSecrets.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(includeCredentialSecrets.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertFalse(includeCredentialSecrets.canBindTo(MetadataObject.Type.FUNCTION));

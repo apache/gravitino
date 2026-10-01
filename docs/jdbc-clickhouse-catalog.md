@@ -37,6 +37,8 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 |--------------------------------|-------------------------------------------|
 | `24.8.x` (including `24.8.14`) | `0.7.1 ~ 0.8.4`                           |
 
+The `DATA_SKIPPING_VECTOR_SIMILARITY` index requires ClickHouse `25.8` or later. This feature-specific requirement does not change the compatibility baseline for other catalog capabilities.
+
 :::tip
 For other ClickHouse versions (not 24.8.x), the required JDBC driver version may be different.
 Use your staging validation results and the official ClickHouse documentation as the final reference.
@@ -172,10 +174,25 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
 | Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; `PARTITION BY` supports single-column identity and the function expressions listed below. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, `DATA_SKIPPING_SET`, `DATA_SKIPPING_NGRAMBFV1`, and `DATA_SKIPPING_TOKENBFV1` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                                                   |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, `DATA_SKIPPING_SET`, `DATA_SKIPPING_NGRAMBFV1`, `DATA_SKIPPING_TOKENBFV1`, and `DATA_SKIPPING_VECTOR_SIMILARITY` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine and connector-owned property changes after creation; mixing table setting changes with schema changes; auto-increment columns.                                                                                                                                                                                                                                                                                                                                    |
+
+Projection round-trip requires `system.projections` (ClickHouse 24.9 or later) and supports
+safely reconstructable `Normal` and `Aggregate` definitions on these non-replicated MergeTree-family
+engines: `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`,
+`CollapsingMergeTree`, `VersionedCollapsingMergeTree`, and `GraphiteMergeTree`. Projection-level
+`WHERE` filters, lightweight `_part_offset` projections, and compact `PROJECTION ... INDEX` syntax
+are outside this scope. If projection validation rejects any definition or setting, `loadTable` logs
+a warning and omits the entire `clickhouse.projections` property while loading the other table
+metadata. Recreating a table from that metadata omits all source projections, including otherwise
+supported ones.
+
+ClickHouse 24.9 does not expose the system table's optional `settings` column; when a newer server
+exposes it, safely reconstructable projection settings are preserved. ClickHouse 24.8 projection
+round-trip is deferred, while ordinary catalog metadata loading remains supported. Projection data
+is not copied or materialized, and Gravitino does not manage projection `ALTER TABLE` operations.
 
 ### Table Column Types
 
@@ -213,6 +230,9 @@ Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
   contain multiple setting operations of the same form, but cannot mix set and remove operations
   or combine settings with schema, comment, or index changes.
 - The `engine` value is immutable after creation.
+- `clickhouse.projections` is an immutable structured property for preserving projection names,
+  types, queries, and safely reconstructable settings during CREATE TABLE. The `settings` object is
+  empty on ClickHouse 24.9, whose `system.projections` table has no `settings` column.
 :::
 
 :::warning
@@ -242,6 +262,21 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 | `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral)                                                      | (none)        | No\*\*   | No       | No        |
 | `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<scalar-literal>`; supports settings-only set or remove requests after creation                       | (none)        | No       | No       | No        |
 | `partition-key`           | ClickHouse's canonical native partition expression (from `system.tables.partition_key`). Read-only; always present on load, empty string means unpartitioned. | `""`          | No       | Yes      | Yes       |
+| `clickhouse.projections`  | Structured projection definitions read from `system.projections`; used to recreate definitions during CREATE TABLE. Read-only after creation.                 | (none)        | No       | No       | Yes       |
+
+The `clickhouse.projections` value is a JSON array. Projection setting values are strings containing
+supported ClickHouse scalar literals.
+
+```json
+[
+  {
+    "name": "by_event_date",
+    "type": "Normal",
+    "query": "SELECT event_date, id ORDER BY event_date, id",
+    "settings": {}
+  }
+]
+```
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
@@ -258,10 +293,19 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
   - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
   - `DATA_SKIPPING_NGRAMBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `ngram_size`, `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
   - `DATA_SKIPPING_TOKENBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
+  - `DATA_SKIPPING_VECTOR_SIMILARITY` (requires ClickHouse 25.8+; default `GRANULARITY 100000000`; requires `type=hnsw`, `distance_function`, and `dimensions` in `Index.properties()`)
+
+  `DATA_SKIPPING_VECTOR_SIMILARITY` supports `distance_function` values `L2Distance` and `cosineDistance` on ClickHouse 25.8+. Optional properties are `quantization` (`f64`, `f32`, `f16`, `bf16`, `i8`, or `b1`; default `bf16`), `hnsw_max_connections_per_layer` (default 32), and `hnsw_candidate_list_size_for_construction` (default 128). A value of 0 for either HNSW numeric property requests the ClickHouse default. Custom `granularity` must be a positive integer. See the [ClickHouse vector similarity index documentation](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/annindexes) for server-side vector-column restrictions.
+
+  When adding a data-skipping index to an existing table through Gravitino's `ALTER TABLE ADD INDEX`, existing data parts are not synchronously backfilled, and Gravitino does not issue a materialization command. To materialize the index on existing data, run `ALTER TABLE <table> MATERIALIZE INDEX <index_name>` directly in ClickHouse. This can take time, especially for vector indexes; ClickHouse may also materialize indexes during later background merges, depending on its settings.
 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
   On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
+  For `DATA_SKIPPING_VECTOR_SIMILARITY`, Gravitino restores parameters from the legacy `type` value when present. If the legacy value is bare and cannot provide the required parameters, the index is skipped with a warning.
+
+  ClickHouse 26.4 and later can create native `vector_similarity` indexes with `dotProduct`. Gravitino skips native vector indexes with unsupported parameter values, including `dotProduct`, and logs a warning when loading the table. Skipped indexes are absent from the returned table metadata and will not be recreated from it. Creating or adding a `dotProduct` vector index through Gravitino remains unsupported.
 
   ClickHouse data-skipping indexes whose field expressions cannot be represented as Gravitino field names, such as `lower(name)` or `name + 1`, are skipped with a warning when the table is loaded and are not recreated. Direct column references and tuples containing only column references remain supported.
 
