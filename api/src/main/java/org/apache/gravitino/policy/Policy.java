@@ -42,6 +42,9 @@ public interface Policy extends Auditable {
     ICEBERG_COMPACTION(
         BUILT_IN_TYPE_PREFIX + "iceberg_compaction", IcebergDataCompactionContent.class),
 
+    /** Built-in policy type for access conferred by a tag. */
+    ACCESS_CONTROL(BUILT_IN_TYPE_PREFIX + "access_control", AccessControlContent.class),
+
     /**
      * Custom policy type. "custom" is a fixed string that indicates the policy is a non-built-in
      * type.
