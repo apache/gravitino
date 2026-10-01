@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.semantic;
 
+import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
 import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,6 +39,8 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /** Tests standalone Apache Ossie document import, export, and conversion diagnostics. */
 public class TestOssieSemanticModelDocumentConverter {
@@ -76,8 +80,8 @@ public class TestOssieSemanticModelDocumentConverter {
         custom_extensions:
           - vendor_name: EXAMPLE
             data: '{"certified":true}'
-          - vendor_name: GRAVITINO
-            data: '{"_apache_gravitino_interchange":{"version":1,"properties":{"domain":"sales"}}}'
+          - vendor_name: GRAVITINO_PROPERTIES
+            data: '{"domain":"sales"}'
         """;
 
     SemanticModelCreateRequest yamlRequest =
@@ -143,11 +147,11 @@ public class TestOssieSemanticModelDocumentConverter {
     assertFalse(json.has("definition"));
     assertFalse(json.has("properties"));
     assertFalse(json.has("audit"));
-    assertEquals("GRAVITINO", json.at("/custom_extensions/1/vendor_name").textValue());
-    JsonNode marker = JSON_MAPPER.readTree(json.at("/custom_extensions/1/data").textValue());
     assertEquals(
-        "sales", marker.at("/_apache_gravitino_interchange/properties/domain").textValue());
-    assertFalse(marker.at("/_apache_gravitino_interchange/properties").has(PROPERTY_OSSIE_VERSION));
+        GRAVITINO_PROPERTIES_VENDOR, json.at("/custom_extensions/1/vendor_name").textValue());
+    JsonNode properties = JSON_MAPPER.readTree(json.at("/custom_extensions/1/data").textValue());
+    assertEquals(JSON_MAPPER.readTree("{\"domain\":\"sales\"}"), properties);
+    assertFalse(properties.has(PROPERTY_OSSIE_VERSION));
 
     SemanticModelCreateRequest jsonRoundTrip =
         OssieSemanticModelDocumentConverter.importDocument(jsonDocument);
@@ -251,9 +255,6 @@ public class TestOssieSemanticModelDocumentConverter {
         "version: 0.2.0.dev0\nname: first\ndatasets: []\n"
             + "---\nversion: 0.2.0.dev0\nname: second\ndatasets: []\n",
         "Trailing token");
-    assertInvalid(
-        "x".repeat(OssieSemanticModelDocumentConverter.MAX_DOCUMENT_LENGTH + 1),
-        "exceeds the maximum length");
   }
 
   @Test
@@ -309,19 +310,6 @@ public class TestOssieSemanticModelDocumentConverter {
         OssieDocument.json("{\"name\":\"first\",\"name\":\"second\"}"), "Duplicate field 'name'");
     assertInvalid(OssieDocument.json("{} {}"), "Trailing token");
     assertInvalid(OssieDocument.json("{\"name\":}"), "Cannot parse Apache Ossie JSON");
-    assertInvalid(
-        OssieDocument.json("x".repeat(OssieSemanticModelDocumentConverter.MAX_DOCUMENT_LENGTH + 1)),
-        "exceeds the maximum length");
-  }
-
-  @Test
-  public void testLimitsDocumentNesting() {
-    String arrays = "[".repeat(110) + "0" + "]".repeat(110);
-    assertInvalid(OssieDocument.json("{\"nested\":" + arrays + "}"), "nesting depth");
-    assertInvalid(OssieDocument.yaml("nested: " + arrays), "nesting depth");
-    String objects = "{\"nested\":".repeat(110) + "0" + "}".repeat(110);
-    assertInvalid(OssieDocument.json(objects), "nesting depth");
-    assertInvalid(OssieDocument.yaml(objects), "nesting depth");
   }
 
   @Test
@@ -334,43 +322,139 @@ public class TestOssieSemanticModelDocumentConverter {
           - name: orders
             source: sales.mart.orders
         custom_extensions:
-          - vendor_name: GRAVITINO
-            data: '{"_apache_gravitino_interchange":{"version":1,"properties":{"ossie-version":"extension-version"}}}'
+          - vendor_name: GRAVITINO_PROPERTIES
+            data: '{"ossie-version":"extension-version"}'
         """;
 
     assertInvalid(document, "property 'ossie-version' conflicts with $.version");
   }
 
-  @Test
-  public void testLimitsNestedCustomExtensionParsing() throws Exception {
-    String nested = "{}";
-    for (int depth = 0; depth < 110; depth++) {
-      nested = "{\"nested\":" + nested + "}";
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testRejectsInvalidPropertiesExtensionData(OssieFormat format) throws Exception {
+    String[] payloads = {
+      "",
+      "{",
+      "{} {}",
+      "{\"domain\":\"sales\",\"domain\":\"other\"}",
+      "null",
+      "[]",
+      "123",
+      "\"sales\""
+    };
+    for (String payload : payloads) {
+      assertInvalid(
+          ossieDocument(documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, payload), format),
+          "$.custom_extensions[0].data");
     }
-    String payload =
-        "{\"_apache_gravitino_interchange\":{\"version\":1,\"properties\":{\"domain\":\"sales\"}},\"nested\":"
-            + nested
-            + "}";
-
-    SemanticModelCreateRequest request = importWithGravitinoExtension(payload);
-    assertFalse(request.getProperties().containsKey("domain"));
-    assertEquals(payload, request.toDefinition().customExtensions()[0].data());
+    for (String value : new String[] {"null", "true", "1", "[]", "{}"}) {
+      assertInvalid(
+          ossieDocument(
+              documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, "{\"domain\":" + value + "}"),
+              format),
+          "Gravitino property 'domain' must be a string");
+    }
   }
 
   @Test
-  public void testPreservesMalformedCustomExtensionJsonWithoutExtractingProperties()
-      throws Exception {
-    String marker =
-        "{\"_apache_gravitino_interchange\":{\"version\":1,\"properties\":{\"domain\":\"sales\"}}}";
+  public void testValidatesPropertiesExtensionBeforeConsumingIt() throws Exception {
+    ObjectNode document = documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, "{}");
+    ObjectNode extension = (ObjectNode) document.path("custom_extensions").get(0);
+    extension.put("extra", "not allowed");
+    assertInvalid(ossieDocument(document, OssieFormat.JSON), "$.custom_extensions[0].extra");
+    extension.remove("extra");
+    extension.put("data", 123);
+    assertInvalid(ossieDocument(document, OssieFormat.JSON), "$.custom_extensions[0].data");
+    extension.remove("data");
+    assertInvalid(ossieDocument(document, OssieFormat.JSON), "$.custom_extensions[0].data");
+  }
+
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testRejectsDuplicatePropertiesExtensions(OssieFormat format) throws Exception {
+    ObjectNode document = documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, "{}");
+    document
+        .withArray("custom_extensions")
+        .add(document.path("custom_extensions").get(0).deepCopy());
+    assertInvalid(
+        ossieDocument(document, format), "contains multiple GRAVITINO_PROPERTIES extensions");
+  }
+
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testConsumesEmptyPropertiesExtension(OssieFormat format) throws Exception {
+    SemanticModelCreateRequest request =
+        OssieSemanticModelDocumentConverter.importDocument(
+            ossieDocument(documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, "{}"), format));
+    assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION), request.getProperties());
+    assertNull(request.toDefinition().customExtensions());
+  }
+
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testPreservesOrdinaryGravitinoExtensions(OssieFormat format) throws Exception {
     String[] payloads = {
-      marker + " {}",
-      marker.substring(0, marker.length() - 1) + ",\"_apache_gravitino_interchange\":{}}"
+      "{\"_apache_gravitino_interchange\":1}",
+      "{\"_apache_gravitino_interchange\":{\"version\":1,\"properties\":{\"domain\":\"sales\"}}}",
+      "{\"domain\":\"sales\"}",
+      "{\"domain\":\"sales\",\"domain\":\"other\"}",
+      "{} {}",
+      "not JSON"
     };
     for (String payload : payloads) {
-      SemanticModelCreateRequest request = importWithGravitinoExtension(payload);
-      assertFalse(request.getProperties().containsKey("domain"));
+      SemanticModelCreateRequest request =
+          OssieSemanticModelDocumentConverter.importDocument(
+              ossieDocument(documentWithExtension("GRAVITINO", payload), format));
+      assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION), request.getProperties());
       assertEquals(payload, request.toDefinition().customExtensions()[0].data());
+
+      SemanticModel model =
+          semanticModel(
+              request.toDefinition(),
+              Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION));
+      SemanticModelCreateRequest roundTrip =
+          OssieSemanticModelDocumentConverter.importDocument(
+              OssieSemanticModelDocumentConverter.exportDocument(model, format));
+      assertEquals(model.definition(), roundTrip.toDefinition());
+      assertEquals(model.properties(), roundTrip.getProperties());
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testPreservesNestedPropertiesVendorExtension(OssieFormat format) throws Exception {
+    CustomExtension nested =
+        CustomExtension.builder()
+            .withVendorName(GRAVITINO_PROPERTIES_VENDOR)
+            .withData("{\"nested\":true}")
+            .build();
+    Dataset dataset =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withCustomExtensions(new CustomExtension[] {nested})
+            .build();
+    SemanticModel model =
+        semanticModel(
+            SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build(),
+            Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION));
+
+    SemanticModelCreateRequest roundTrip =
+        OssieSemanticModelDocumentConverter.importDocument(
+            OssieSemanticModelDocumentConverter.exportDocument(model, format));
+    assertEquals(model.definition(), roundTrip.toDefinition());
+    assertEquals(model.properties(), roundTrip.getProperties());
+  }
+
+  @Test
+  public void testDoesNotExportPropertiesExtensionForVersionOnly() throws Exception {
+    SemanticModel model =
+        semanticModel(definition(), Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION));
+    JsonNode document =
+        JSON_MAPPER.readTree(
+            OssieSemanticModelDocumentConverter.exportDocument(model, OssieFormat.JSON).content());
+    assertEquals(1, document.path("custom_extensions").size());
+    assertEquals("EXAMPLE", document.at("/custom_extensions/0/vendor_name").textValue());
   }
 
   @Test
@@ -390,8 +474,8 @@ public class TestOssieSemanticModelDocumentConverter {
   public void testRejectsReservedExtensionCollisionOnExport() {
     CustomExtension reserved =
         CustomExtension.builder()
-            .withVendorName("GRAVITINO")
-            .withData("{\"_apache_gravitino_interchange\":{\"version\":1,\"properties\":{}}}")
+            .withVendorName(GRAVITINO_PROPERTIES_VENDOR)
+            .withData("{}")
             .build();
     SemanticModelDefinition definition =
         SemanticModelDefinition.builder()
@@ -405,7 +489,7 @@ public class TestOssieSemanticModelDocumentConverter {
             () ->
                 OssieSemanticModelDocumentConverter.exportDocument(
                     semanticModel(definition, Map.of()), OssieFormat.JSON));
-    assertTrue(exception.getMessage().contains("reserved Gravitino interchange marker"));
+    assertTrue(exception.getMessage().contains("reserved for Gravitino properties"));
   }
 
   @Test
@@ -441,8 +525,7 @@ public class TestOssieSemanticModelDocumentConverter {
         "TRINO", roundTrip.toDefinition().metrics()[0].expression().dialects()[0].dialect());
   }
 
-  private static SemanticModelCreateRequest importWithGravitinoExtension(String payload)
-      throws Exception {
+  private static ObjectNode documentWithExtension(String vendorName, String payload) {
     ObjectNode root = JSON_MAPPER.createObjectNode();
     root.put("version", DEFAULT_OSSIE_VERSION);
     root.put("name", "sales");
@@ -450,10 +533,14 @@ public class TestOssieSemanticModelDocumentConverter {
     dataset.put("name", "orders");
     dataset.put("source", "sales.mart.orders");
     ObjectNode extension = root.putArray("custom_extensions").addObject();
-    extension.put("vendor_name", "GRAVITINO");
+    extension.put("vendor_name", vendorName);
     extension.put("data", payload);
-    return OssieSemanticModelDocumentConverter.importDocument(
-        OssieDocument.json(JSON_MAPPER.writeValueAsString(root)));
+    return root;
+  }
+
+  private static OssieDocument ossieDocument(ObjectNode root, OssieFormat format) throws Exception {
+    String content = JSON_MAPPER.writeValueAsString(root);
+    return format == OssieFormat.JSON ? OssieDocument.json(content) : OssieDocument.yaml(content);
   }
 
   private static SemanticModel semanticModel(

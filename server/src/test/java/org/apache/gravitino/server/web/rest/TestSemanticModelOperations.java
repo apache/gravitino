@@ -578,8 +578,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
                       expression: orders.order_id
                 datatype: String
         custom_extensions:
-          - vendor_name: GRAVITINO
-            data: '{"_apache_gravitino_interchange":{"version":1,"properties":{"domain":"sales"}}}'
+          - vendor_name: GRAVITINO_PROPERTIES
+            data: '{"domain":"sales"}'
         """;
     Response yamlResponse = postDocument(semanticModelPath() + "/ossie", yaml, "application/yaml");
 

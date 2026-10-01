@@ -167,6 +167,10 @@ public class SemanticModelOperations {
   /**
    * Imports a standalone Apache Ossie YAML or JSON document as a Semantic Model.
    *
+   * <p>The request body is raw document text, not a JSON-encoded string. The {@code Content-Type}
+   * header selects the document format; an absent header defaults to YAML. Parsing does not fall
+   * back to another format if the document is invalid for the selected parser.
+   *
    * @param metalake The metalake name.
    * @param catalog The catalog name.
    * @param schema The schema name.

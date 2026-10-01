@@ -18,17 +18,14 @@
  */
 package org.apache.gravitino.semantic;
 
+import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
 import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.core.util.JsonParserDelegate;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,19 +50,6 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 
 /** Converts between standalone Apache Ossie documents and Gravitino Semantic Models. */
 public final class OssieSemanticModelDocumentConverter {
-
-  /** Maximum accepted document length in characters. */
-  public static final int MAX_DOCUMENT_LENGTH = 4 * 1024 * 1024;
-
-  private static final String GRAVITINO_VENDOR = "GRAVITINO";
-  private static final String INTERCHANGE_MARKER = "_apache_gravitino_interchange";
-  private static final int INTERCHANGE_MARKER_VERSION = 1;
-  private static final int MAX_NESTING_DEPTH = 100;
-  private static final StreamReadConstraints STREAM_READ_CONSTRAINTS =
-      StreamReadConstraints.builder()
-          .maxNestingDepth(MAX_NESTING_DEPTH)
-          .maxStringLength(MAX_DOCUMENT_LENGTH)
-          .build();
 
   private static final Set<String> ROOT_PROPERTIES =
       Set.of(
@@ -170,7 +154,6 @@ public final class OssieSemanticModelDocumentConverter {
   private static ObjectMapper createJsonMapper() {
     JsonFactory factory =
         JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
-    factory.setStreamReadConstraints(STREAM_READ_CONSTRAINTS);
     return JsonMapper.builder(factory)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
         .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
@@ -184,7 +167,6 @@ public final class OssieSemanticModelDocumentConverter {
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
             .build();
-    factory.setStreamReadConstraints(STREAM_READ_CONSTRAINTS);
     return new ObjectMapper(factory)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
@@ -197,14 +179,11 @@ public final class OssieSemanticModelDocumentConverter {
     if (StringUtils.isBlank(content)) {
       throw new IllegalSemanticModelException("Apache Ossie document must not be empty");
     }
-    if (content.length() > MAX_DOCUMENT_LENGTH) {
-      throw new IllegalSemanticModelException(
-          "Apache Ossie document exceeds the maximum length of %s characters", MAX_DOCUMENT_LENGTH);
-    }
-
     try {
       ObjectMapper mapper = document.format() == OssieFormat.JSON ? JSON_MAPPER : YAML_MAPPER;
-      JsonNode parsed = readDocumentTree(mapper, content);
+      // Check the whole document, without enabling this on nested DTO deserializers.
+      JsonNode parsed =
+          mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(content);
       if (!(parsed instanceof ObjectNode)) {
         throw invalid("$", "document root must be an object");
       }
@@ -212,22 +191,6 @@ public final class OssieSemanticModelDocumentConverter {
     } catch (IOException e) {
       throw new IllegalSemanticModelException(
           e, "Cannot parse Apache Ossie %s: %s", document.format(), originalMessage(e));
-    }
-  }
-
-  private static JsonNode readDocumentTree(ObjectMapper mapper, String content) throws IOException {
-    // Older YAML parsers do not enforce StreamReadConstraints on nesting depth.
-    try (JsonParser parser =
-        new JsonParserDelegate(mapper.createParser(content)) {
-          @Override
-          public JsonToken nextToken() throws IOException {
-            JsonToken token = super.nextToken();
-            STREAM_READ_CONSTRAINTS.validateNestingDepth(getParsingContext().getNestingDepth());
-            return token;
-          }
-        }) {
-      // Check the whole document, without enabling this on nested DTO deserializers.
-      return mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(parser);
     }
   }
 
@@ -265,7 +228,6 @@ public final class OssieSemanticModelDocumentConverter {
       SemanticModelCreateRequest request =
           JSON_MAPPER.treeToValue(requestNode, SemanticModelCreateRequest.class);
       request.validate();
-      request.toDefinition();
       return request;
     } catch (JsonProcessingException | IllegalArgumentException e) {
       throw new IllegalSemanticModelException(
@@ -615,20 +577,15 @@ public final class OssieSemanticModelDocumentConverter {
     } else {
       throw invalid("$.custom_extensions", "must be an array");
     }
-    ensureNoReservedMarker(extensions);
+    ensureNoPropertiesExtension(extensions);
 
     if (interchangeProperties.isEmpty()) {
       return;
     }
 
-    ObjectNode payload = JSON_MAPPER.createObjectNode();
-    ObjectNode marker = payload.putObject(INTERCHANGE_MARKER);
-    marker.put("version", INTERCHANGE_MARKER_VERSION);
-    marker.set("properties", JSON_MAPPER.valueToTree(interchangeProperties));
-
     ObjectNode extension = extensions.addObject();
-    extension.put("vendor_name", GRAVITINO_VENDOR);
-    extension.put("data", writeExtensionData(payload));
+    extension.put("vendor_name", GRAVITINO_PROPERTIES_VENDOR);
+    extension.put("data", writeExtensionData(JSON_MAPPER.valueToTree(interchangeProperties)));
   }
 
   private static Map<String, String> extractProperties(ObjectNode root) {
@@ -640,52 +597,41 @@ public final class OssieSemanticModelDocumentConverter {
     ArrayNode extensions = (ArrayNode) extensionsNode;
     Map<String, String> properties = new LinkedHashMap<>();
     boolean found = false;
+    int index = 0;
     Iterator<JsonNode> iterator = extensions.iterator();
     while (iterator.hasNext()) {
       JsonNode candidate = iterator.next();
+      String path = "$.custom_extensions[" + index++ + "]";
       if (!(candidate instanceof ObjectNode)) {
         continue;
       }
       ObjectNode extension = (ObjectNode) candidate;
-      if (!GRAVITINO_VENDOR.equals(extension.path("vendor_name").asText(null))) {
+      if (!GRAVITINO_PROPERTIES_VENDOR.equals(extension.path("vendor_name").asText(null))) {
         continue;
       }
 
-      ObjectNode payload = parseExtensionData(extension.path("data").asText(null));
-      JsonNode markerNode = payload == null ? null : payload.get(INTERCHANGE_MARKER);
-      if (markerNode == null) {
-        continue;
-      }
       if (found) {
-        throw invalid("$.custom_extensions", "contains multiple Gravitino interchange markers");
-      }
-      if (!(markerNode instanceof ObjectNode)
-          || markerNode.path("version").asInt(-1) != INTERCHANGE_MARKER_VERSION
-          || !(markerNode.get("properties") instanceof ObjectNode)) {
         throw invalid(
-            "$.custom_extensions", "contains an unsupported Gravitino interchange marker");
+            "$.custom_extensions",
+            "contains multiple " + GRAVITINO_PROPERTIES_VENDOR + " extensions");
       }
 
-      ObjectNode propertyNode = (ObjectNode) markerNode.get("properties");
+      validateObject(extension, path, CUSTOM_EXTENSION_PROPERTIES);
+      ObjectNode propertyNode = parsePropertiesData(extension.get("data"), path + ".data");
       propertyNode
           .fields()
           .forEachRemaining(
               entry -> {
                 if (!entry.getValue().isTextual()) {
                   throw invalid(
-                      "$.custom_extensions",
+                      path + ".data",
                       "Gravitino property '" + entry.getKey() + "' must be a string");
                 }
                 properties.put(entry.getKey(), entry.getValue().textValue());
               });
       found = true;
 
-      payload.remove(INTERCHANGE_MARKER);
-      if (payload.isEmpty()) {
-        iterator.remove();
-      } else {
-        extension.put("data", writeExtensionData(payload));
-      }
+      iterator.remove();
     }
     if (extensions.isEmpty()) {
       root.remove("custom_extensions");
@@ -693,31 +639,33 @@ public final class OssieSemanticModelDocumentConverter {
     return properties;
   }
 
-  private static void ensureNoReservedMarker(ArrayNode extensions) {
-    for (JsonNode candidate : extensions) {
-      if (!(candidate instanceof ObjectNode)
-          || !GRAVITINO_VENDOR.equals(candidate.path("vendor_name").asText(null))) {
-        continue;
-      }
-      ObjectNode payload = parseExtensionData(candidate.path("data").asText(null));
-      if (payload != null && payload.has(INTERCHANGE_MARKER)) {
+  private static void ensureNoPropertiesExtension(ArrayNode extensions) {
+    for (int index = 0; index < extensions.size(); index++) {
+      if (GRAVITINO_PROPERTIES_VENDOR.equals(
+          extensions.get(index).path("vendor_name").asText(null))) {
         throw invalid(
-            "$.custom_extensions", "already contains a reserved Gravitino interchange marker");
+            "$.custom_extensions[" + index + "].vendor_name",
+            "'" + GRAVITINO_PROPERTIES_VENDOR + "' is reserved for Gravitino properties");
       }
     }
   }
 
-  @Nullable
-  private static ObjectNode parseExtensionData(@Nullable String data) {
-    if (data == null) {
-      return null;
+  private static ObjectNode parsePropertiesData(@Nullable JsonNode data, String path) {
+    if (data == null || !data.isTextual()) {
+      throw invalid(path, "must be a JSON string containing an object with string values");
     }
     try {
       JsonNode parsed =
-          JSON_MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(data);
-      return parsed instanceof ObjectNode ? (ObjectNode) parsed : null;
+          JSON_MAPPER
+              .reader()
+              .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+              .readTree(data.textValue());
+      if (!(parsed instanceof ObjectNode)) {
+        throw invalid(path, "must contain a JSON object with string values");
+      }
+      return (ObjectNode) parsed;
     } catch (JsonProcessingException e) {
-      return null;
+      throw invalid(path, "cannot parse Gravitino properties: " + e.getOriginalMessage());
     }
   }
 
@@ -726,7 +674,7 @@ public final class OssieSemanticModelDocumentConverter {
       return JSON_MAPPER.writeValueAsString(payload);
     } catch (JsonProcessingException e) {
       throw new IllegalSemanticModelException(
-          e, "Cannot serialize Gravitino interchange extension: %s", e.getOriginalMessage());
+          e, "Cannot serialize Gravitino properties extension: %s", e.getOriginalMessage());
     }
   }
 

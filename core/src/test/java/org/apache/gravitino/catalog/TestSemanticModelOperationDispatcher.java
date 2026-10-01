@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
 import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -49,6 +50,7 @@ import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
@@ -140,6 +142,42 @@ public class TestSemanticModelOperationDispatcher {
             dispatcher.createSemanticModel(
                 MODEL_IDENT, null, validDefinition(), Map.of(PROPERTY_OSSIE_VERSION, " ")));
     verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testCreateRejectsReservedPropertiesExtensionWithoutPersisting() {
+    IllegalSemanticModelException exception =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () ->
+                dispatcher.createSemanticModel(
+                    MODEL_IDENT, "Sales", definitionWithReservedExtension(), Map.of()));
+
+    assertTrue(exception.getMessage().contains("reserved for Gravitino properties"));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+  }
+
+  @Test
+  public void testReplaceRejectsReservedPropertiesExtensionWithoutPersistingOtherChanges() {
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT, "Original", validDefinition(), Map.of("owner", "sales"));
+
+    IllegalSemanticModelException exception =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () ->
+                dispatcher.alterSemanticModel(
+                    MODEL_IDENT,
+                    SemanticModelChange.updateComment("Must not persist"),
+                    SemanticModelChange.setProperty("owner", "changed"),
+                    SemanticModelChange.replaceDefinition(definitionWithReservedExtension())));
+
+    assertTrue(exception.getMessage().contains("reserved for Gravitino properties"));
+    SemanticModel loaded = dispatcher.loadSemanticModel(MODEL_IDENT);
+    assertEquals(original.comment(), loaded.comment());
+    assertEquals(original.properties(), loaded.properties());
+    assertEquals(original.definition(), loaded.definition());
   }
 
   @Test
@@ -286,11 +324,23 @@ public class TestSemanticModelOperationDispatcher {
   @ParameterizedTest
   @EnumSource(OssieFormat.class)
   public void testOssieExportImportRoundTrip(OssieFormat format) {
+    CustomExtension ordinary =
+        CustomExtension.builder()
+            .withVendorName("GRAVITINO")
+            .withData("{\"_apache_gravitino_interchange\":1}")
+            .build();
+    SemanticModelDefinition baseDefinition = validDefinition();
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder()
+            .withDatasets(baseDefinition.datasets())
+            .withRelationships(baseDefinition.relationships())
+            .withCustomExtensions(new CustomExtension[] {ordinary})
+            .build();
     SemanticModel original =
         dispatcher.createSemanticModel(
             MODEL_IDENT,
             "Sales",
-            validDefinition(),
+            definition,
             Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, "future-version"));
 
     OssieDocument document = dispatcher.exportOssieSemanticModel(MODEL_IDENT, format);
@@ -382,6 +432,18 @@ public class TestSemanticModelOperationDispatcher {
     return SemanticModelDefinition.builder()
         .withDatasets(new Dataset[] {orders, customers})
         .withRelationships(new Relationship[] {relationship})
+        .build();
+  }
+
+  private static SemanticModelDefinition definitionWithReservedExtension() {
+    CustomExtension extension =
+        CustomExtension.builder()
+            .withVendorName(GRAVITINO_PROPERTIES_VENDOR)
+            .withData("not JSON")
+            .build();
+    return SemanticModelDefinition.builder()
+        .withDatasets(validDefinition().datasets())
+        .withCustomExtensions(new CustomExtension[] {extension})
         .build();
   }
 
