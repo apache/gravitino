@@ -63,6 +63,7 @@ public class OrphanFileRemovalJobContext implements JobExecutionContext {
   public String jobTemplateName() {
     return jobTemplateName;
   }
+
   /**
    * @return table storage root, or null if absent from metadata
    */

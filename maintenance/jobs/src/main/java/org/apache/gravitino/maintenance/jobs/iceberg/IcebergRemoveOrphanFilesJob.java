@@ -101,7 +101,11 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     Table table =
         Spark3Util.loadIcebergTable(
             spark, IcebergJobUtils.escapeSqlIdentifier(catalog) + "." + identifier);
-    String location = options.getOrDefault("location", table.location());
+    String location = options.get("location");
+    // Direct callers may pass an empty template value without CLI argument parsing.
+    if (location == null || location.codePoints().allMatch(Character::isWhitespace)) {
+      location = table.location();
+    }
     validateLocation(table.location(), location);
     validateLocalLocation(table.location(), location);
     validateRemoteLocation(spark, table.location(), location);

@@ -26,6 +26,7 @@ import java.util.Objects;
 /** Lexical containment checks shared by orphan cleanup submission and execution. */
 public final class OrphanFileLocationUtils {
   private OrphanFileLocationUtils() {}
+
   /**
    * Validates that a scan is within the table root. Filesystem symlink validation must also run in
    * the job, using its storage credentials and filesystem view.

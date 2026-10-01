@@ -96,6 +96,26 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     assertEquals(0, IcebergRemoveOrphanFilesJob.execute(spark, args));
   }
 
+  /** Verifies blank locations default to the table root without CLI argument parsing. */
+  @Test
+  public void testBlankLocationDefaultsToTableRoot() throws Exception {
+    spark.sql("CREATE TABLE test_catalog.db.blank_location (id INT) USING iceberg");
+    Path root = tempDir.resolve("db/blank_location");
+    Path old = Files.write(root.resolve("old-orphan"), new byte[] {1});
+    Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(5, ChronoUnit.DAYS)));
+    Map<String, String> options = args("blank_location");
+    options.put("dry-run", "true");
+    for (String location : new String[] {"", " ", "\t", "\u2003"}) {
+      options.put("location", location);
+      assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+      assertTrue(Files.exists(old));
+    }
+    options.put("location", "");
+    options.put("dry-run", "false");
+    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+    assertFalse(Files.exists(old));
+  }
+
   /** Verifies custom location and outside rejection. */
   @Test
   public void testCustomLocationAndOutsideRejection() throws Exception {

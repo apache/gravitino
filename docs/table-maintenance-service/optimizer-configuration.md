@@ -208,7 +208,13 @@ listing or deleting files.
 The strategy operates on the whole table, including partitioned tables, and does
 not need table or partition statistics. Each explicit optimizer invocation makes
 an enabled, selected cleanup policy eligible with score 1. This does not install
-a periodic scheduler, cooldown, or last-run tracking.
+a periodic scheduler, cooldown, or last-run tracking. Because the trigger is always
+true and the score is always 1, every explicit `submit-strategy-jobs` invocation
+for an enabled, selected orphan policy submits a Spark cleanup job. Unlike
+threshold-based compaction, there is no metric gate to suppress repeated runs.
+Operators must control the invocation rate through external scheduling. Start
+with `dryRun: true` to inspect candidates; dry-run jobs still consume Spark
+resources and also need rate limiting.
 
 Use `submit-strategy-jobs --strategy-name orphan_cleanup` with the target
 identifiers. The CLI `--dry-run` previews recommendations without submitting jobs;
