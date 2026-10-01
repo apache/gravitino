@@ -49,10 +49,10 @@ public final class AlterSemanticModelFailureEvent extends SemanticModelFailureEv
   /**
    * Returns the Semantic Model changes that failed to apply.
    *
-   * @return The Semantic Model changes.
+   * @return A copy of the Semantic Model changes.
    */
   public SemanticModelChange[] semanticModelChanges() {
-    return semanticModelChanges;
+    return semanticModelChanges.clone();
   }
 
   @Override

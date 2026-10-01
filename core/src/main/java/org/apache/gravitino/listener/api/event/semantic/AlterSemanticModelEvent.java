@@ -52,10 +52,10 @@ public final class AlterSemanticModelEvent extends SemanticModelEvent {
   /**
    * Returns the applied Semantic Model changes.
    *
-   * @return The Semantic Model changes.
+   * @return A copy of the Semantic Model changes.
    */
   public SemanticModelChange[] semanticModelChanges() {
-    return semanticModelChanges;
+    return semanticModelChanges.clone();
   }
 
   /**

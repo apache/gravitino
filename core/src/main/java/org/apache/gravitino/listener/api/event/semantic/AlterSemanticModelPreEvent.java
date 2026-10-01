@@ -45,10 +45,10 @@ public class AlterSemanticModelPreEvent extends SemanticModelPreEvent {
   /**
    * Returns the changes to apply to the Semantic Model.
    *
-   * @return The Semantic Model changes.
+   * @return A copy of the Semantic Model changes.
    */
   public SemanticModelChange[] semanticModelChanges() {
-    return semanticModelChanges;
+    return semanticModelChanges.clone();
   }
 
   @Override
