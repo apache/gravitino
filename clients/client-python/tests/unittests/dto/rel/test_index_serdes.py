@@ -176,3 +176,32 @@ class TestIndexSerdes(unittest.TestCase):
         self.assertEqual(annoy_properties, round_tripped[0].properties())
         self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, round_tripped[1].type())
         self.assertEqual(usearch_properties, round_tripped[1].properties())
+
+    def test_vector_similarity_index_properties_round_trip(self):
+        json_string = """
+        {
+            "indexes": [
+                {
+                    "indexType": "DATA_SKIPPING_VECTOR_SIMILARITY",
+                    "name": "idx_vector",
+                    "fieldNames": [["embedding"]],
+                    "properties": {
+                        "type": "hnsw",
+                        "distance_function": "L2Distance",
+                        "dimensions": "3"
+                    }
+                }
+            ]
+        }
+        """
+
+        index = MockDataClass.from_json(json_string).indexes[0]
+        self.assertEqual(index.type(), Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY)
+        self.assertEqual(
+            index.properties(),
+            {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
+        )
+        self.assertDictEqual(
+            json.loads(json_string),
+            json.loads(MockDataClass(indexes=[index]).to_json()),
+        )

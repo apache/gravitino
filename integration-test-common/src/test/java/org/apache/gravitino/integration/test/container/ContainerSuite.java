@@ -29,12 +29,15 @@ import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -66,6 +69,7 @@ public class ContainerSuite implements Closeable {
   private static final String NETWORK_NAME = "gravitino-ci-network";
   private static final int CLICKHOUSE_CLUSTER_SIZE = 3;
   private static final String CLICKHOUSE_CLUSTER_HOST_PREFIX = "gravitino-ci-clickhouse-cluster-";
+  private static final String CLICKHOUSE_TEST_IMAGE_ENV = "GRAVITINO_CLICKHOUSE_TEST_IMAGE";
 
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
@@ -585,6 +589,8 @@ public class ContainerSuite implements Closeable {
           // Start ClickHouse container
           ClickHouseContainer.Builder clickHouseBuilder =
               ClickHouseContainer.builder()
+                  .withImage(resolveClickHouseImage())
+                  .withFilesToMount(resolveClickHouseTestFiles())
                   .withHostName("gravitino-ci-clickhouse")
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
@@ -617,6 +623,8 @@ public class ContainerSuite implements Closeable {
           for (int node = 1; node <= CLICKHOUSE_CLUSTER_SIZE; node++) {
             ClickHouseContainer.Builder clickHouseBuilder =
                 ClickHouseContainer.builder()
+                    .withImage(resolveClickHouseImage())
+                    .withFilesToMount(resolveClickHouseTestFiles())
                     .withHostName(CLICKHOUSE_CLUSTER_HOST_PREFIX + node)
                     .withEnvVars(
                         ImmutableMap.<String, String>builder()
@@ -980,6 +988,33 @@ public class ContainerSuite implements Closeable {
       pgContainerMap.clear();
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);
+    }
+  }
+
+  private static String resolveClickHouseImage() {
+    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
+    return configuredImage == null || configuredImage.isBlank()
+        ? ClickHouseContainer.DEFAULT_IMAGE
+        : configuredImage.trim();
+  }
+
+  private static Map<String, String> resolveClickHouseTestFiles() {
+    // The feature-specific ClickHouse test image is 25.8+, where Time types require this setting.
+    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
+    if (configuredImage == null || configuredImage.isBlank()) {
+      return ImmutableMap.of();
+    }
+
+    try (InputStream settings =
+        Objects.requireNonNull(
+            ContainerSuite.class.getResourceAsStream("/clickhouse-test-users.xml"))) {
+      Path settingsPath = Files.createTempFile("gravitino-clickhouse-test-users-", ".xml");
+      Files.copy(settings, settingsPath, StandardCopyOption.REPLACE_EXISTING);
+      settingsPath.toFile().deleteOnExit();
+      return ImmutableMap.of(
+          "/etc/clickhouse-server/users.d/gravitino-test-settings.xml", settingsPath.toString());
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to resolve ClickHouse test user settings", e);
     }
   }
 }

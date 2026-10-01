@@ -24,13 +24,14 @@ from typing import List, Optional
 class Index(ABC):
     """The Index interface defines methods for implementing table index columns.
 
-    Currently, settings for `PRIMARY_KEY` and `UNIQUE_KEY` are provided.
+    Catalogs may provide key and connector-specific index types.
     """
 
     @unique
     class IndexType(str, Enum):
         """The enum IndexType defines the type of the index.
 
+        Catalogs may support generic key types and connector-specific index types.
         `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` are exposed for reading legacy
         ClickHouse index metadata only.
         """
@@ -56,6 +57,9 @@ class Index(ABC):
 
         DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
         """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
+
+        DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
+        """ClickHouse vector similarity data skipping index."""
 
     @abstractmethod
     def type(self) -> IndexType:
@@ -88,5 +92,5 @@ class Index(ABC):
         pass  # pragma: no cover
 
     def properties(self) -> dict[str, str]:
-        """Returns extra index properties, or an empty dictionary when none are set."""
+        """Returns the index properties, or an empty map when none are defined."""
         return {}
