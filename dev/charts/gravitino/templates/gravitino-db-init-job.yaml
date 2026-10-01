@@ -1,0 +1,160 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+  
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
+{{- if and .Values.entity.initializeSchema.enabled (not .Values.mysql.enabled) (not .Values.postgresql.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-init
+  namespace: {{ include "gravitino.namespace" . }}
+  labels:
+    {{- include "gravitino.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-5"
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: {{ include "gravitino.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: sqlfile
+          image: {{ include "gravitino.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              cp -r /opt/gravitino/scripts/* /tmp/scripts/
+              VERSION=$(ls /opt/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
+              echo $VERSION > /tmp/scripts/version.txt
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - mountPath: /tmp/scripts/
+              name: scripts-emptydir
+      containers:
+        - name: db-init
+          image: {{ include "db-init.image" . }}
+          imagePullPolicy: "{{ .Values.entity.initializeSchema.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              {{- if eq .Values.entity.initializeSchema.databaseType "postgresql" }}
+              while ! psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT 1" >/dev/null 2>&1; do
+                echo "Waiting for PostgreSQL to be ready..."
+                sleep 2
+              done
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR: Please set VERSION"
+                exit 1
+              fi
+              dir="/scripts/postgresql"
+              schema_file=$(ls $dir/schema-*-postgresql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$schema_file" ]; then
+                echo "ERROR: Failed to find schema file $schema_file"
+                exit 1
+              fi
+              upgrade_file=$(ls $dir/upgrade-*-to-*-postgresql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$upgrade_file" ]; then
+                echo "ERROR: Failed to find upgrade file $upgrade_file"
+                exit 1
+              fi
+              echo "Schema file: $schema_file"
+              echo "Upgrade file: $upgrade_file"
+              if ! psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f "$upgrade_file"; then
+                echo "WARNING: Upgrade script failed: $upgrade_file" >&2
+                echo "Continuing with schema script..." >&2
+              fi
+              psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f "$schema_file"
+              {{- else }}
+              while ! mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -D $DB_NAME -e "SELECT 1" >/dev/null 2>&1; do
+                echo "Waiting for MySQL to be ready..."
+                sleep 2
+              done
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR: Please set VERSION"
+                exit 1
+              fi
+              dir="/scripts/mysql"
+              schema_file=$(ls $dir/schema-*-mysql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$schema_file" ]; then
+                echo "ERROR: Failed to find schema file $schema_file"
+                exit 1
+              fi
+              upgrade_file=$(ls $dir/upgrade-*-to-*-mysql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$upgrade_file" ]; then
+                echo "ERROR: Failed to find upgrade file $upgrade_file"
+                exit 1
+              fi
+              echo "Schema file: $schema_file"
+              echo "Upgrade file: $upgrade_file"
+              if ! mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -D $DB_NAME <"$upgrade_file"; then
+                echo "WARNING: Upgrade script failed: $upgrade_file" >&2
+                echo "Continuing with schema script..." >&2
+              fi
+              mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -D $DB_NAME <"$schema_file"
+              {{- end }}
+          env:
+            - name: DB_HOST
+              value: {{ .Values.entity.initializeSchema.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.entity.initializeSchema.port | quote }}
+            - name: DB_USER
+              value: {{ .Values.entity.jdbcUser | quote }}
+            - name: DB_NAME
+              value: {{ .Values.entity.initializeSchema.database | quote }}
+            {{- if eq .Values.entity.initializeSchema.databaseType "postgresql" }}
+            - name: PGPASSWORD
+            {{- else }}
+            - name: MYSQL_PWD
+            {{- end }}
+              {{- if .Values.entity.initializeSchema.passwordSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.entity.initializeSchema.passwordSecret }}
+                  key: {{ .Values.entity.initializeSchema.passwordSecretKey }}
+              {{- else }}
+              value: {{ .Values.entity.jdbcPassword | quote }}
+              {{- end }}
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
+      volumes:
+        - emptyDir: {}
+          name: scripts-emptydir
+{{- end }}

@@ -144,6 +144,53 @@ entity:
   ## Leave unset to use the server default. Production recommendation: 200.
   ##
   maxConnections: ""
+  ## The configuration for the Helm Job that initializes the entity store schema
+  ## in an external database. This is only needed when using an external database
+  ## (i.e., mysql.enabled=false and postgresql.enabled=false); the bundled MySQL
+  ## and PostgreSQL sub-charts are initialized by init containers.
+  ##
+  initializeSchema:
+    ## Enable/disable the DB schema initialization Job. The Job runs as a
+    ## pre-install and pre-upgrade Helm hook.
+    ##
+    enabled: false
+    ## The database type, either "mysql" or "postgresql".
+    ##
+    databaseType: mysql
+    ## The host of the external database.
+    ##
+    host: ""
+    ## The port of the external database.
+    ##
+    port: 3306
+    ## The name of the database to initialize. The database must already exist.
+    ##
+    database: gravitino
+    ## Optional name of an existing Secret that holds the database password.
+    ## When set, the password is read from the Secret key below instead of
+    ## entity.jdbcPassword.
+    ##
+    passwordSecret: ""
+    ## The key in passwordSecret that holds the database password.
+    ##
+    passwordSecretKey: password
+    ## The database client image used by the Job.
+    ##
+    image:
+      ## The registry of the database client image.
+      ##
+      registry: docker.io
+      ## The repository of the database client image. Defaults are derived from
+      ## databaseType: "mysql" for mysql, "postgres" for postgresql.
+      ##
+      repository: ""
+      ## The tag of the database client image. Defaults are derived from
+      ## databaseType: "8.0" for mysql, "16-alpine" for postgresql.
+      ##
+      tag: ""
+      ## The image pull policy of the database client image.
+      ##
+      pullPolicy: IfNotPresent
 
 ## THE CONFIGURATION FOR Gravitino TREE LOCK
 ##
