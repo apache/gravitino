@@ -21,7 +21,9 @@ package org.apache.gravitino.storage.relational.utils;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -844,33 +847,107 @@ public class TestPOConverters {
     assertEquals(updatedFileset.storageLocations(), storageLocations);
     assertEquals(2, updatePO1.getCurrentVersion());
     assertEquals(2, updatePO1.getLastVersion());
+    assertEquals(2, updatePO1.getOccVersion());
     assertEquals(2, updatePO1.getFilesetVersionPOs().get(0).getVersion());
     Map<String, String> updatedProperties =
         JsonUtils.anyFieldMapper()
             .readValue(updatePO1.getFilesetVersionPOs().get(0).getProperties(), Map.class);
     assertEquals("value1", updatedProperties.get("key"));
 
-    // Metadata-only changes must also advance the OCC token. Reads join the version table through
-    // current_version, so the converter writes the unchanged content as a new complete snapshot.
+    // A rename changes nothing that fileset_version_info stores, so it advances the OCC token
+    // alone. The history version stays where it is and no snapshot is written, which leaves the
+    // metadata row still pointing at the snapshot reads join through current_version.
     FilesetPO updatePO2 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, null);
-    Map<String, String> storageLocations2 =
-        updatePO2.getFilesetVersionPOs().stream()
-            .collect(
-                Collectors.toMap(
-                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
-    assertEquals(filesetEntity.storageLocation(), storageLocations2.get(LOCATION_NAME_UNKNOWN));
-    assertEquals(filesetEntity.storageLocations(), storageLocations2);
-    assertEquals(2, updatePO2.getCurrentVersion());
-    assertEquals(2, updatePO2.getLastVersion());
-    assertEquals(2, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
+    assertEquals(2, updatePO2.getOccVersion());
+    assertEquals(1, updatePO2.getCurrentVersion());
+    assertEquals(1, updatePO2.getLastVersion());
+    assertTrue(updatePO2.getFilesetVersionPOs().isEmpty());
 
     // A snapshot stored above the version the metadata row records must not be rebuilt: the next
     // version starts above every snapshot the fileset still owns.
     FilesetPO updatePO3 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, 7L);
     assertEquals(8, updatePO3.getCurrentVersion());
     assertEquals(8, updatePO3.getLastVersion());
+    assertEquals(2, updatePO3.getOccVersion());
     assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
+  }
+
+  @Test
+  public void testUpdateFilesetPOVersionComparesPropertiesByValue() throws JsonProcessingException {
+    // The stored snapshot keeps this key order. For these keys a HashMap iterates differently.
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("team", "data");
+    properties.put("retention", "7d");
+    properties.put("gravitino.identifier", "id");
+    Map<String, String> reordered = new HashMap<>(properties);
+    assertNotEquals(
+        JsonUtils.anyFieldMapper().writeValueAsString(properties),
+        JsonUtils.anyFieldMapper().writeValueAsString(reordered));
+
+    Namespace namespace = NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema");
+    Map<String, String> locations =
+        ImmutableMap.of("first", "hdfs://localhost/first", "second", "hdfs://localhost/second");
+    FilesetEntity original =
+        createFileset(1L, "test", namespace, "this is test", "hdfs://localhost/first", properties);
+    FilesetEntity.Builder filesetBuilder =
+        FilesetEntity.builder()
+            .withId(original.id())
+            .withName(original.name())
+            .withNamespace(namespace)
+            .withFilesetType(original.filesetType())
+            .withStorageLocations(locations)
+            .withComment(original.comment())
+            .withProperties(properties)
+            .withAuditInfo(original.auditInfo());
+    FilesetEntity filesetEntity = filesetBuilder.build();
+    FilesetEntity renamedFileset =
+        filesetBuilder.withName("test1").withProperties(reordered).build();
+
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
+
+    // Same properties in a different order: the rename writes no snapshot.
+    FilesetPO renamedPO = POConverters.updateFilesetPOWithVersion(initPO, renamedFileset, null);
+    assertEquals(2, renamedPO.getOccVersion());
+    assertEquals(1, renamedPO.getCurrentVersion());
+    assertTrue(renamedPO.getFilesetVersionPOs().isEmpty());
+    assertEquals(2, initPO.getFilesetVersionPOs().size());
+
+    // A real property change still writes a complete snapshot for both locations.
+    Map<String, String> changedProperties = new HashMap<>(reordered);
+    changedProperties.put("retention", "14d");
+    FilesetPO changedPO =
+        POConverters.updateFilesetPOWithVersion(
+            initPO, filesetBuilder.withProperties(changedProperties).build(), null);
+    assertEquals(2, changedPO.getCurrentVersion());
+    assertEquals(2, changedPO.getOccVersion());
+    assertEquals(2, changedPO.getFilesetVersionPOs().size());
+    for (FilesetVersionPO version : changedPO.getFilesetVersionPOs()) {
+      assertEquals(
+          changedProperties,
+          JsonUtils.anyFieldMapper().readValue(version.getProperties(), Map.class));
+    }
+
+    // Comparing shared fields once must not skip changes to any location, including a row
+    // other than the first one used for the shared fields.
+    String changedLocationName = initPO.getFilesetVersionPOs().get(1).getLocationName();
+    Map<String, String> changedLocations = new HashMap<>(locations);
+    changedLocations.put(changedLocationName, "hdfs://localhost/changed");
+    FilesetPO changedLocationPO =
+        POConverters.updateFilesetPOWithVersion(
+            initPO,
+            filesetBuilder.withProperties(reordered).withStorageLocations(changedLocations).build(),
+            null);
+    assertEquals(2, changedLocationPO.getCurrentVersion());
+    assertEquals(2, changedLocationPO.getOccVersion());
+    assertEquals(
+        changedLocations,
+        changedLocationPO.getFilesetVersionPOs().stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation)));
   }
 
   @Test
@@ -1771,6 +1848,7 @@ public class TestPOConverters {
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
+        .withOccVersion(1L)
         .withDeletedAt(0L)
         .withFilesetVersionPOs(ImmutableList.of(filesetVersionPO))
         .build();
@@ -1836,6 +1914,7 @@ public class TestPOConverters {
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
+        .withOccVersion(1L)
         .withDeletedAt(0L)
         .withPolicyVersionPO(policyVersionPO)
         .build();

@@ -26,10 +26,10 @@ repositories {
   mavenCentral()
 }
 
-val flinkVersion: String = libs.versions.flink18.get()
+val flinkVersion: String = libs.versions.flink119.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4flink18.get()
-val paimonVersion: String = libs.versions.paimon4flink18.get()
+val icebergVersion: String = libs.versions.iceberg4flink119.get()
+val paimonVersion: String = libs.versions.paimon4flink119.get()
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:
@@ -58,7 +58,7 @@ dependencies {
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
   compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
-  compileOnly(libs.flinkjdbc18)
+  compileOnly(libs.flinkjdbc119)
 
   compileOnly(libs.hive2.exec) {
     artifact {
@@ -101,7 +101,7 @@ dependencies {
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.metrics.core)
-  testImplementation(libs.flinkjdbc18)
+  testImplementation(libs.flinkjdbc119)
   testImplementation(libs.minikdc)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

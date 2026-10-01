@@ -441,6 +441,10 @@
    Apache HttpComponents Core5
    Helger Profiler
    OpenAPI Tools Jackson Databind Nullable
+   dnsjava
+   PostgreSQL JDBC Driver
+   SQLLine
+   ThreeTen-Extra
 
    This product bundles various third-party components also under the
    MIT license
@@ -457,6 +461,7 @@
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
    tkem/cachetools
+   gethostname4j
 
    This product bundles various third-party components also under the
    Boost Software License 1.0

@@ -19,6 +19,8 @@
 
 import unittest
 
+from gravitino.api.credential.aws_secret_key_credential import AwsSecretKeyCredential
+from gravitino.api.credential.dlf_secret_key_credential import DlfSecretKeyCredential
 from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
@@ -184,4 +186,46 @@ class TestCredentialFactory(unittest.TestCase):
         self.assertIsInstance(check_credential, AzureAccountKeyCredential)
         self.assertEqual("account_name", check_credential.account_name())
         self.assertEqual("account_key", check_credential.account_key())
+        self.assertEqual(0, check_credential.expire_time_in_ms())
+
+    def test_aws_secret_key_credential(self):
+        aws_credential_info = {
+            AwsSecretKeyCredential._ACCESS_KEY_ID: "access_key",
+            AwsSecretKeyCredential._SECRET_ACCESS_KEY: "secret_key",
+        }
+        aws_credential = AwsSecretKeyCredential(aws_credential_info, 0)
+        check_credential = CredentialFactory.create(
+            aws_credential.credential_type(),
+            aws_credential.credential_info(),
+            aws_credential.expire_time_in_ms(),
+        )
+        self.assertEqual(
+            AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+        self.assertIsInstance(check_credential, AwsSecretKeyCredential)
+        self.assertEqual("access_key", check_credential.access_key_id())
+        self.assertEqual("secret_key", check_credential.secret_access_key())
+        self.assertEqual(0, check_credential.expire_time_in_ms())
+
+    def test_dlf_secret_key_credential(self):
+        dlf_credential_info = {
+            DlfSecretKeyCredential._ACCESS_KEY_ID: "dlf_ak",
+            DlfSecretKeyCredential._ACCESS_KEY_SECRET: "dlf_sk",
+            DlfSecretKeyCredential._SECURITY_TOKEN: "dlf_token",
+        }
+        dlf_credential = DlfSecretKeyCredential(dlf_credential_info, 0)
+        check_credential = CredentialFactory.create(
+            dlf_credential.credential_type(),
+            dlf_credential.credential_info(),
+            dlf_credential.expire_time_in_ms(),
+        )
+        self.assertEqual(
+            DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
+            check_credential.credential_type(),
+        )
+        self.assertIsInstance(check_credential, DlfSecretKeyCredential)
+        self.assertEqual("dlf_ak", check_credential.access_key_id())
+        self.assertEqual("dlf_sk", check_credential.access_key_secret())
+        self.assertEqual("dlf_token", check_credential.security_token())
         self.assertEqual(0, check_credential.expire_time_in_ms())

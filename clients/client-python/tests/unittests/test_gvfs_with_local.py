@@ -60,6 +60,10 @@ def generate_unique_random_string(length):
 
 
 @patch(
+    "gravitino.client.fileset_catalog.FilesetCatalog.get_credentials",
+    return_value=[],
+)
+@patch(
     "gravitino.client.generic_fileset.GenericFileset.get_credentials",
     return_value=[],
 )

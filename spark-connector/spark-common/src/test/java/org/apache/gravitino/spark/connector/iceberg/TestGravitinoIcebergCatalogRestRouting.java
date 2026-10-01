@@ -19,19 +19,37 @@
 
 package org.apache.gravitino.spark.connector.iceberg;
 
+import static org.mockito.Mockito.mock;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /** Tests Iceberg REST endpoint selection for Spark catalogs. */
 public class TestGravitinoIcebergCatalogRestRouting {
+
+  @BeforeAll
+  static void initCatalogManager() {
+    GravitinoClient gravitinoClient = mock(GravitinoClient.class);
+    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
+  }
+
+  @AfterAll
+  static void cleanupCatalogManager() {
+    GravitinoCatalogManager.get().close();
+  }
 
   @Test
   void testRoutingDisabledSkipsDiscovery() {
@@ -226,6 +244,42 @@ public class TestGravitinoIcebergCatalogRestRouting {
     Assertions.assertEquals("admin", result.get("rest.auth.basic.username"));
   }
 
+  @Test
+  void testRoutedCatalogDoesNotRequireBackendJdbcDriver() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI, "http://manual/iceberg");
+
+    Map<String, String> result =
+        new GravitinoIcebergCatalog()
+            .buildSparkCatalogProperties(
+                "iceberg_jdbc",
+                CaseInsensitiveStringMap.empty(),
+                jdbcPropertiesWithMissingDriver(),
+                sparkConf,
+                Optional::empty);
+
+    Assertions.assertEquals("http://manual/iceberg", result.get(IcebergConstants.URI));
+  }
+
+  @Test
+  void testLegacyCatalogPreloadsBackendJdbcDriver() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED, "false");
+
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                new GravitinoIcebergCatalog()
+                    .buildSparkCatalogProperties(
+                        "iceberg_jdbc",
+                        CaseInsensitiveStringMap.empty(),
+                        jdbcPropertiesWithMissingDriver(),
+                        sparkConf,
+                        Optional::empty));
+    Assertions.assertInstanceOf(ClassNotFoundException.class, exception.getCause());
+  }
+
   private static ImmutableMap<String, String> hiveProperties() {
     return ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "hive");
   }
@@ -242,5 +296,19 @@ public class TestGravitinoIcebergCatalogRestRouting {
     return ImmutableMap.of(
         IcebergConstants.CATALOG_BACKEND, "hive",
         IcebergConstants.WAREHOUSE, "s3://bucket/path");
+  }
+
+  private static ImmutableMap<String, String> jdbcPropertiesWithMissingDriver() {
+    return ImmutableMap.of(
+        IcebergConstants.CATALOG_BACKEND,
+        "jdbc",
+        IcebergConstants.URI,
+        "jdbc:postgresql://localhost:5432/iceberg",
+        IcebergConstants.GRAVITINO_JDBC_DRIVER,
+        "org.example.MissingDriver",
+        IcebergConstants.WAREHOUSE,
+        "s3://bucket/path",
+        CredentialConstants.CREDENTIAL_PROVIDERS,
+        "s3-token");
   }
 }

@@ -31,6 +31,8 @@ class IndexSerdes(SerdesUtilsBase, JsonSerializable[Index]):
         if value.name() is not None:
             result[cls.INDEX_NAME] = value.name()
         result[cls.INDEX_FIELD_NAMES] = value.field_names()
+        if value.properties():
+            result["properties"] = value.properties()
 
         return result
 
@@ -51,5 +53,8 @@ class IndexSerdes(SerdesUtilsBase, JsonSerializable[Index]):
         index_type = Index.IndexType(data[cls.INDEX_TYPE].upper())
 
         return IndexDTO(
-            index_type, data.get(cls.INDEX_NAME), data[cls.INDEX_FIELD_NAMES]
+            index_type,
+            data.get(cls.INDEX_NAME),
+            data[cls.INDEX_FIELD_NAMES],
+            data.get("properties"),
         )

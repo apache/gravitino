@@ -73,7 +73,7 @@ public class TestSparkPiJob {
 
     assertNotNull(template.arguments());
     assertEquals(1, template.arguments().size());
-    assertEquals("{{slices}}", template.arguments().get(0));
+    assertEquals("{{slices:-2}}", template.arguments().get(0));
   }
 
   @Test
@@ -93,11 +93,11 @@ public class TestSparkPiJob {
     assertTrue(configs.containsKey("spark.driver.memory"));
 
     // Verify placeholders
-    assertEquals("{{spark_master}}", configs.get("spark.master"));
-    assertEquals("{{spark_executor_instances}}", configs.get("spark.executor.instances"));
-    assertEquals("{{spark_executor_cores}}", configs.get("spark.executor.cores"));
-    assertEquals("{{spark_executor_memory}}", configs.get("spark.executor.memory"));
-    assertEquals("{{spark_driver_memory}}", configs.get("spark.driver.memory"));
+    assertEquals("{{spark_master:-local[*]}}", configs.get("spark.master"));
+    assertEquals("{{spark_executor_instances:-1}}", configs.get("spark.executor.instances"));
+    assertEquals("{{spark_executor_cores:-1}}", configs.get("spark.executor.cores"));
+    assertEquals("{{spark_executor_memory:-1g}}", configs.get("spark.executor.memory"));
+    assertEquals("{{spark_driver_memory:-1g}}", configs.get("spark.driver.memory"));
   }
 
   @Test
@@ -110,7 +110,7 @@ public class TestSparkPiJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v1", version);
+    assertEquals("v2", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 

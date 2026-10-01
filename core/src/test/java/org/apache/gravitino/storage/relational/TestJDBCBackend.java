@@ -252,6 +252,10 @@ public abstract class TestJDBCBackend {
         tableName = "function_meta";
         idColumnName = "function_id";
         break;
+      case SEMANTIC_MODEL:
+        tableName = "semantic_model_meta";
+        idColumnName = "semantic_model_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
@@ -289,6 +293,32 @@ public abstract class TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return versionDeletedTime;
+  }
+
+  /**
+   * Counts the rows a fileset holds in {@code fileset_version_info}.
+   *
+   * <p>A snapshot is one row per storage location, so the row count, unlike the number of distinct
+   * versions, shows what an alter that allocates a version actually costs.
+   *
+   * @param filesetId the fileset ID
+   * @return the number of active and deleted version rows
+   */
+  protected int countFilesetVersionRows(Long filesetId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT COUNT(*) AS row_count FROM fileset_version_info WHERE fileset_id = %d",
+                    filesetId))) {
+      rs.next();
+      return rs.getInt("row_count");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 
   protected Map<Integer, Long> listPolicyVersions(Long policyId) {
