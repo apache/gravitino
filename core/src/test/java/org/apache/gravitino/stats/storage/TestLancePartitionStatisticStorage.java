@@ -424,4 +424,52 @@ public class TestLancePartitionStatisticStorage {
       storage.close();
     }
   }
+
+  @Test
+  public void testDropPartitionStatisticsWithSingleQuotePartitionName() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(202L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_quote_drop_test").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+
+    try {
+      Map<String, StatisticValue<?>> statistics = Maps.newHashMap();
+      statistics.put("statistic0", StatisticValues.longValue(1L));
+
+      List<MetadataObjectStatisticsUpdate> updates =
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update("part'ition0", statistics))));
+      storage.updateStatistics(metalakeName, updates);
+
+      List<MetadataObjectStatisticsDrop> drops =
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          "part'ition0", Lists.newArrayList("statistic0")))));
+
+      Assertions.assertDoesNotThrow(() -> storage.dropStatistics(metalakeName, drops));
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
+  }
 }
