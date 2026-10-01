@@ -55,6 +55,10 @@ public class Configs {
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS =
       "gravitino.entity.store.relational.maxConnections";
 
+  /** Configuration key for the entity-store pool's maximum idle connections. */
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS_KEY =
+      "gravitino.entity.store.relational.maxIdleConnections";
+
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY =
       "gravitino.entity.store.relational.maxWaitMillis";
 
@@ -95,6 +99,9 @@ public class Configs {
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
+
+  /** Default maximum idle connections retained by the entity-store pool on each server. */
+  public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 32;
 
   public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
 
@@ -161,6 +168,15 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_9_0)
           .intConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
+
+  /** Maximum idle connections retained by the entity-store pool, capped by maxConnections. */
+  public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS_KEY)
+          .doc("The maximum number of idle connections retained by the JDBC Backend pool")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS);
 
   public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY)
