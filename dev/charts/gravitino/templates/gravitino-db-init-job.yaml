@@ -31,12 +31,18 @@ metadata:
     "helm.sh/hook-weight": "-5"
 spec:
   backoffLimit: 6
+  activeDeadlineSeconds: 600
   template:
     metadata:
       labels:
         app: {{ include "gravitino.name" . }}
         release: {{ .Release.Name }}
     spec:
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       restartPolicy: Never
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
@@ -79,19 +85,19 @@ spec:
                 exit 1
               fi
               dir="/scripts/postgresql"
-              schema_file=$(ls $dir/schema-*-postgresql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+              schema_file=$(ls $dir/schema-*-postgresql.sql | sort -V | awk -F'[-]' -v v="$VERSION" '$2 <= v {print $0}' | tail -n 1)
               if [ ! -f "$schema_file" ]; then
                 echo "ERROR: Failed to find schema file $schema_file"
                 exit 1
               fi
-              upgrade_file=$(ls $dir/upgrade-*-to-*-postgresql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+              upgrade_file=$(ls $dir/upgrade-*-to-*-postgresql.sql | sort -V | awk -F'[-]' -v v="$VERSION" '$4 <= v {print $0}' | tail -n 1)
               if [ ! -f "$upgrade_file" ]; then
                 echo "ERROR: Failed to find upgrade file $upgrade_file"
                 exit 1
               fi
               echo "Schema file: $schema_file"
               echo "Upgrade file: $upgrade_file"
-              if ! psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f "$upgrade_file"; then
+              if ! psql -v ON_ERROR_STOP=1 -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f "$upgrade_file"; then
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2
               fi
@@ -107,12 +113,12 @@ spec:
                 exit 1
               fi
               dir="/scripts/mysql"
-              schema_file=$(ls $dir/schema-*-mysql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+              schema_file=$(ls $dir/schema-*-mysql.sql | sort -V | awk -F'[-]' -v v="$VERSION" '$2 <= v {print $0}' | tail -n 1)
               if [ ! -f "$schema_file" ]; then
                 echo "ERROR: Failed to find schema file $schema_file"
                 exit 1
               fi
-              upgrade_file=$(ls $dir/upgrade-*-to-*-mysql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+              upgrade_file=$(ls $dir/upgrade-*-to-*-mysql.sql | sort -V | awk -F'[-]' -v v="$VERSION" '$4 <= v {print $0}' | tail -n 1)
               if [ ! -f "$upgrade_file" ]; then
                 echo "ERROR: Failed to find upgrade file $upgrade_file"
                 exit 1
@@ -157,4 +163,12 @@ spec:
       volumes:
         - emptyDir: {}
           name: scripts-emptydir
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
 {{- end }}

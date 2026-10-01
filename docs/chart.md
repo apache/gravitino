@@ -138,7 +138,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 
 The schema initialization Job runs as a `pre-install` and `pre-upgrade` hook, so it automatically applies the required schema and upgrade scripts whenever you install or upgrade Gravitino. The target database (`gravitino`) must already exist.
 
-If you store the database password in a Kubernetes Secret, reference it instead of setting `entity.jdbcPassword`:
+If you store the database password in a Kubernetes Secret, reference it with `passwordSecret` and `passwordSecretKey` so the password does not appear in the schema-initialization Job manifest. The server still needs `entity.jdbcPassword` for its own connection:
 
 ```console
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
@@ -146,6 +146,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" \
   --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" \
   --set entity.jdbcUser="admin" \
+  --set entity.jdbcPassword="admin123" \
   --set entity.initializeSchema.enabled=true \
   --set entity.initializeSchema.databaseType=mysql \
   --set entity.initializeSchema.host=database-1.***.***.rds.amazonaws.com \
@@ -176,6 +177,8 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 ```
 
 The schema initialization Job runs as a `pre-install` and `pre-upgrade` hook, so it automatically applies the required schema and upgrade scripts whenever you install or upgrade Gravitino. The target database (`gravitino`) must already exist.
+
+Note: The Job applies the highest upgrade script and the full schema script for the server version. If you are upgrading Gravitino across multiple minor versions and your database is at an older schema version, apply the required intermediate upgrade scripts manually first.
 
 ### Deploy Gravitino with GCS as Object Store
 

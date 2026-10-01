@@ -132,6 +132,9 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
           pattern: 'dir="/scripts/mysql"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'awk -F''\[-\]'' -v v="\$VERSION"'
       - contains:
           path: spec.template.spec.volumes
           content:
@@ -185,3 +188,6 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
           pattern: 'dir="/scripts/postgresql"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'awk -F''\[-\]'' -v v="\$VERSION"'
