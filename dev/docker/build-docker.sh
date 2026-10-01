@@ -132,8 +132,8 @@ elif [ "${component_type}" == "trino-connectors" ] || \
     exit 1
   fi
   echo "INFO : IMAGE_VERSION=${image_version} (from gradle.properties)"
-  # Build the connector jars, stage them under packages/, and stage each
-  # artifact's own LICENSE/NOTICE under licenses/ (done by the dependency script).
+  # Build the connector jars, stage them under packages/, and copy the
+  # repository-root LICENSE/NOTICE into licenses/ (done by the dependency script).
   . "${script_dir}/${component_type}/${component_type}-dependency.sh"
   build_args="--build-arg IMAGE_VERSION=${image_version}"
 else
@@ -143,6 +143,22 @@ else
 fi
 
 build_args="${build_args} --build-arg IMAGE_NAME=${image_name} --build-arg TAG_NAME=${tag_name}"
+
+# Standard OCI labels so a published image points at the commit it was built
+# from. Callers may set OCI_IMAGE_VERSION, OCI_IMAGE_REVISION, and
+# OCI_IMAGE_SOURCE. When unset, version is the image tag, revision is this
+# checkout, and source is apache/gravitino.
+oci_version="${OCI_IMAGE_VERSION:-${tag_name:-}}"
+oci_revision="${OCI_IMAGE_REVISION:-}"
+if [ -z "${oci_revision}" ]; then
+  oci_revision="$(git -C "${script_dir}" rev-parse HEAD 2>/dev/null || true)"
+fi
+oci_source="${OCI_IMAGE_SOURCE:-https://github.com/apache/gravitino}"
+oci_labels=""
+if [ -n "${oci_version}" ] && [ -n "${oci_revision}" ]; then
+  oci_labels="--label org.opencontainers.image.version=${oci_version} --label org.opencontainers.image.revision=${oci_revision} --label org.opencontainers.image.source=${oci_source}"
+  echo "INFO : OCI labels version=${oci_version} revision=${oci_revision} source=${oci_source}"
+fi
 
 # Create multi-arch builder
 BUILDER_NAME="gravitino-builder"
@@ -157,14 +173,14 @@ fi
 cd ${script_dir}/${component_type}
 if [[ "${platform_type}" == "all" ]]; then
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} ${oci_labels} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} ${oci_labels} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} ${oci_labels} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} ${oci_labels} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 fi
