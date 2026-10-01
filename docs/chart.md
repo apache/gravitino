@@ -120,7 +120,7 @@ Then manually create a PersistentVolume (PV).
 
 Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
 
-Before deploying Gravitino, initialize your existing MySQL instance and create the necessary tables required for Gravitino to function properly.
+If you prefer to initialize the database yourself, you can manually create the necessary tables before deploying Gravitino. This step is optional: the chart now performs schema migration automatically for external databases via a pre-install/pre-upgrade hook Job (see [Automatic Schema Migration for an Existing Database](#automatic-schema-migration-for-an-existing-database) below). Manually running the schema SQL remains harmless, because it uses `CREATE TABLE IF NOT EXISTS`.
 
 ```console
 mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
