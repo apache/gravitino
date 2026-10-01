@@ -145,6 +145,32 @@ entity:
   ##
   maxConnections: ""
 
+## THE CONFIGURATION FOR SCHEMA MIGRATION
+##
+## The schema migration Job applies database schema upgrades before Gravitino
+## pods are created or updated. It is rendered only when an external
+## (pre-existing) MySQL or PostgreSQL database is configured via entity.jdbcUrl
+## and no bundled in-chart database is enabled. Bundled databases continue to
+## use init containers.
+##
+schemaMigration:
+  ## @param schemaMigration.enabled Whether to run schema migration as a Kubernetes Job
+  ## before install/upgrade for external MySQL/PostgreSQL databases
+  ##
+  enabled: true
+  ## @param schemaMigration.backoffLimit Number of retries before the migration Job is
+  ## considered failed
+  ##
+  backoffLimit: 4
+  ## @param schemaMigration.activeDeadlineSeconds Hard cap on the total Job duration in
+  ## seconds. Leave empty to disable.
+  ##
+  activeDeadlineSeconds: ""
+  ## @param schemaMigration.ttlSecondsAfterFinished TTL in seconds before a finished
+  ## migration Job is cleaned up. Leave empty to keep the Job after completion.
+  ##
+  ttlSecondsAfterFinished: ""
+
 ## THE CONFIGURATION FOR Gravitino TREE LOCK
 ##
 lock:
