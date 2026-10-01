@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#  http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -14,20 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-
-# the tools to publish the python client to Pypi
-requests==2.32.5
-dataclasses-json==0.6.7
-simplejson==3.20.1
-readerwriterlock==1.0.9
-fsspec==2026.2.0
-pyarrow==23.0.1
-cachetools==7.1.4
-gcsfs==2026.2.0
-s3fs==2026.2.0
-ossfs==2025.5.0
-adlfs==2026.2.0
-black==26.3.1
-flake8==7.0.0
-pre-commit==3.5.0
