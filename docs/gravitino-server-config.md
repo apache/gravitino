@@ -326,9 +326,18 @@ Caches are local to each server, so a metalake modified on one server would othe
 its neighbors. Every server writes its changes to an entity change log table and polls that table
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
+Each poll reads at most `pollBatchSize` records. When a poll returns a full batch, the next poll
+starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
+server can read and apply batches rather than at a fixed `pollBatchSize / pollIntervalSecs`
+records per second. Once a poll returns fewer records than the batch size, or fails, the server
+waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
+on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
+it. Each poll holds its whole batch in memory, so raise `pollBatchSize` in moderate steps.
+
 | Configuration Item                              | Description                                                                                                                                         | Default Value       |
 |-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls. Must be positive.                                                                                                | `3`                 |
+| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls once a server has caught up. Must be positive.                                                                    | `3`                 |
+| `gravitino.entityChangeLog.pollBatchSize`       | Maximum number of change log records read per poll. A full batch is followed by another poll right away. Must be positive.                          | `2000`              |
 | `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`. | `2592000` (30 days) |
 | `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                         | `86400` (1 day)     |
 
