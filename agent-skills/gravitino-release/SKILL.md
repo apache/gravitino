@@ -453,16 +453,16 @@ export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
 
 ### Vote (between docker and finalize)
 
-No script covers this, but it is most of the calendar time and all of the judgement.
+No script covers this stage.
 
 **Send `[VOTE]` to dev@gravitino.apache.org** once the RC artifacts, PyPI staging, Maven staging and Docker images are all verified. The mail must carry the git tag and commit, the `dist/dev` URL, the staging repository, the KEYS URL, and how to verify signatures.
 
-**The rules:**
-- Open at least **72 hours**.
-- Needs **at least 3 binding +1** votes. Binding means PMC member; others are welcome and are counted separately as non-binding.
-- Any **-1** stops the release. Fix the problem, cut the next RC, and start a new vote thread.
+**The rules** ([ASF release policy](https://www.apache.org/legal/release-policy.html#release-approval)):
+- Open at least **72 hours**. A shorter period must be justified in the mail.
+- Needs **at least 3 binding +1**, and more binding +1 than binding -1. Binding means PMC member; non-binding votes are encouraged and tallied separately.
+- Releases **may not be vetoed** — a single -1 does not by itself block the vote. In practice, if anyone reports a real problem the release manager cancels the vote rather than carrying it.
 
-**On a -1:** do not argue the vote. Fix, re-cut, re-vote. The RC number increments; the version does not.
+**On a -1:** answer the technical point on the thread. If it holds, cancel, fix, and cut the next RC — the RC number increments, the version does not.
 
 **When it passes**, send `[RESULT][VOTE]` as a **new thread**, not a reply. List every voter, marked binding or non-binding, and give the tally.
 
@@ -561,13 +561,13 @@ Every past release has a GitHub release page carrying the same artifacts as `dis
 
 **Independent of the `svn mv`.** It needs only the pushed `v{VERSION}` tag and the RC artifacts, so it can be done while waiting on PMC karma for `dist/release`.
 
-**Artifacts:** take the list from the dist directory rather than a glob — the working directory also holds the Python sdists, which are not part of the ASF distribution.
+**Artifacts:** export the RC directory into a clean directory and upload exactly what is in it. Do not glob the release working directory — that also holds the Python sdists, which are not part of the ASF distribution.
 
 ```bash
 mkdir -p ~/v{VERSION}-assets && cd ~/v{VERSION}-assets
 svn export --force https://dist.apache.org/repos/dist/dev/gravitino/v{VERSION}-rc{RC} .
-ls *.tar.gz *.tar.gz.asc *.tar.gz.sha512 | wc -l    # expect 30
-sha512sum -c *.sha512                                # all must print OK
+ls | wc -l                   # note this count; the release page must end up matching it
+shasum -a 512 -c *.sha512    # all must print OK
 ```
 
 **Create it:**
@@ -582,7 +582,7 @@ Use `--draft` if the release notes are still in review, then `gh release edit "v
 
 **Verify the asset count, do not trust the exit code:**
 ```bash
-gh release view "v{VERSION}" -R apache/gravitino --json assets --jq '.assets|length'   # expect 30
+gh release view "v{VERSION}" -R apache/gravitino --json assets --jq '.assets|length'   # must match the dist count above
 ```
 
 A partial upload still reports success and leaves the release missing its signatures. If assets are missing, use `gh release upload --clobber` rather than re-running `create`, which fails on an existing release.
