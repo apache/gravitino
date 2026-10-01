@@ -54,8 +54,8 @@ public interface Index {
   }
 
   /**
-   * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
-   * supported.
+   * Identifies an index type in the Gravitino table model. The index types and operations supported
+   * by a catalog implementation may vary.
    */
   enum IndexType {
     /**
@@ -144,5 +144,8 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /** Full-text data skipping index in ClickHouse. */
+    DATA_SKIPPING_TEXT,
   }
 }
