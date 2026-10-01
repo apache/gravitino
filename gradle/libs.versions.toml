@@ -122,7 +122,7 @@ flinkjdbc120 = "3.3.0-1.20"
 # flink-connector-jdbc artifact was split into flink-connector-jdbc-core plus one artifact per
 # database (flink-connector-jdbc-mysql, flink-connector-jdbc-postgres, ...), and this split line
 # is what publishes real Flink 2.x builds.
-flinkjdbc21 = "4.1.0-2.1"
+flinkjdbc21 = "4.1.0-2.2"
 # flink-connector-hive has not published a build targeting the Flink 2.x line yet either;
 # reuse the newest externalized release (built against 1.20) until an official 2.x build ships.
 flinkHive21 = "3.0.0-1.20"
