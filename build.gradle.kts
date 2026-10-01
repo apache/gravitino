@@ -1710,34 +1710,40 @@ fun checkMacDockerConnector() {
     return
   }
 
-  try {
-    val processName = "docker-connector"
-    val command = "pgrep -x -q $processName"
+  // `pgrep` exits with 0 when at least one process matches the given name and with 1 when no
+  // process matches, so exit code 1 only tells us that `docker-connector` is not running.
+  val exitCode =
+    try {
+      ProcessBuilder("pgrep", "-x", "-q", "docker-connector").start().waitFor()
+    } catch (e: IOException) {
+      println("checkMacDockerConnector failed: unable to run `pgrep`: ${e.message}")
+      return
+    }
 
-    val execResult = project.exec {
-      commandLine("bash", "-c", command)
-    }
-    if (execResult.exitValue == 0) {
-      project.extra["macDockerConnector"] = true
-    }
-  } catch (e: Exception) {
-    println("checkContainerRunning failed: ${e.message}")
+  if (exitCode == 0) {
+    project.extra["macDockerConnector"] = true
+  } else if (exitCode != 1) {
+    println(
+      "checkMacDockerConnector failed: `pgrep -x -q docker-connector` exited with code $exitCode"
+    )
   }
 }
 
 fun checkDockerStatus() {
-  try {
-    val process = ProcessBuilder("docker", "info").start()
-    val exitCode = process.waitFor()
-
-    if (exitCode == 0) {
-      project.extra["dockerRunning"] = true
-    } else {
-      println("checkDockerStatus failed with exit code $exitCode")
+  val exitCode =
+    try {
+      ProcessBuilder("docker", "info").start().waitFor()
+    } catch (e: IOException) {
+      // The `docker` command is not installed or not on the PATH. The status summary and the tips
+      // printed by `printDockerCheckInfo` already tell the user what to do about it.
+      return
     }
-  } catch (e: IOException) {
-    println("checkDockerStatus failed: ${e.message}")
+
+  if (exitCode == 0) {
+    project.extra["dockerRunning"] = true
   }
+  // A non-zero exit code means that the Docker server is not running, which is not an error.
+  // The status summary and the tips printed by `printDockerCheckInfo` report it to the user.
 }
 
 fun checkOrbStackStatus() {
@@ -1745,18 +1751,22 @@ fun checkOrbStackStatus() {
     return
   }
 
-  try {
-    val process = ProcessBuilder("docker", "context", "show").start()
-    val exitCode = process.waitFor()
-    if (exitCode == 0) {
-      val currentContext = process.inputStream.bufferedReader().readText()
-      println("Current docker context is: $currentContext")
-      project.extra["isOrbStack"] = currentContext.lowercase().contains("orbstack")
-    } else {
-      println("checkOrbStackStatus failed with exit code $exitCode")
+  val process =
+    try {
+      ProcessBuilder("docker", "context", "show").start()
+    } catch (e: IOException) {
+      // The `docker` command is not installed or not on the PATH, so OrbStack cannot be in use.
+      // The status summary printed by `printDockerCheckInfo` reports this to the user.
+      return
     }
-  } catch (e: IOException) {
-    println("checkOrbStackStatus failed: ${e.message}")
+
+  val exitCode = process.waitFor()
+  if (exitCode == 0) {
+    val currentContext = process.inputStream.bufferedReader().readText()
+    println("Current docker context is: $currentContext")
+    project.extra["isOrbStack"] = currentContext.lowercase().contains("orbstack")
+  } else {
+    println("checkOrbStackStatus failed: `docker context show` exited with code $exitCode")
   }
 }
 
