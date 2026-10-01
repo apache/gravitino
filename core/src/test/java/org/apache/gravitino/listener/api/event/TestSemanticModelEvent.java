@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -30,7 +31,9 @@ import java.util.Map;
 import java.util.function.Function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
@@ -367,6 +370,46 @@ public class TestSemanticModelEvent {
     changes[0] = SemanticModelChange.rename("caller_mutation");
     assertChangesIsolatedBetweenListeners(
         event, e -> ((AlterSemanticModelFailureEvent) e).semanticModelChanges());
+  }
+
+  @Test
+  void testAlterNullChangesPreservesValidationAndFailureEvent() {
+    assertInvalidAlterChangesEmitFailure(null);
+  }
+
+  @Test
+  void testAlterEmptyChangesPreservesValidationAndFailureEvent() {
+    assertInvalidAlterChangesEmitFailure(new SemanticModelChange[0]);
+  }
+
+  private void assertInvalidAlterChangesEmitFailure(SemanticModelChange[] changes) {
+    DummyEventListener listener = new DummyEventListener();
+    SemanticModelDispatcher underlyingDispatcher = mock(SemanticModelDispatcher.class);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    SemanticModelEventDispatcher eventDispatcher =
+        new SemanticModelEventDispatcher(
+            new EventBus(Arrays.asList(listener)),
+            new SemanticModelNormalizeDispatcher(underlyingDispatcher, catalogManager));
+    NameIdentifier identifier = NameIdentifier.of(NAMESPACE, "model");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> eventDispatcher.alterSemanticModel(identifier, changes));
+
+    Assertions.assertEquals("At least one change is required", exception.getMessage());
+    Assertions.assertEquals(1, listener.getPreEvents().size());
+    Assertions.assertEquals(1, listener.getPostEvents().size());
+    AlterSemanticModelPreEvent preEvent =
+        Assertions.assertInstanceOf(AlterSemanticModelPreEvent.class, listener.popPreEvent());
+    AlterSemanticModelFailureEvent failureEvent =
+        Assertions.assertInstanceOf(AlterSemanticModelFailureEvent.class, listener.popPostEvent());
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(identifier, failureEvent.identifier());
+    Assertions.assertSame(exception, failureEvent.exception());
+    Assertions.assertArrayEquals(changes, preEvent.semanticModelChanges());
+    Assertions.assertArrayEquals(changes, failureEvent.semanticModelChanges());
+    verifyNoInteractions(underlyingDispatcher, catalogManager);
   }
 
   private void assertChangesIsolatedBetweenListeners(
