@@ -85,6 +85,7 @@ spec:
               echo "Waiting for MySQL to be ready..."
               DB_URL=${JDBC_URL#jdbc:mysql://}
               DB_HOST=${DB_URL%%:*}
+              DB_HOST=${DB_HOST%%/*}
               DB_PORT=$(echo "$DB_URL" | sed -n 's/^[^:]*:\([0-9]*\)\/.*/\1/p')
               [ -z "$DB_PORT" ] && DB_PORT=3306
               DB_NAME=${DB_URL#*/}
@@ -128,6 +129,7 @@ spec:
               echo "Waiting for PostgreSQL to be ready..."
               DB_URL=${JDBC_URL#jdbc:postgresql://}
               DB_HOST=${DB_URL%%:*}
+              DB_HOST=${DB_HOST%%/*}
               DB_PORT=$(echo "$DB_URL" | sed -n 's/^[^:]*:\([0-9]*\)\/.*/\1/p')
               [ -z "$DB_PORT" ] && DB_PORT=5432
               DB_NAME=${DB_URL#*/}
