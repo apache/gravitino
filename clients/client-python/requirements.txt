@@ -23,7 +23,7 @@ readerwriterlock==1.0.9
 fsspec==2026.2.0
 pyarrow==23.0.1
 cachetools==7.1.4
-gcsfs==2026.2.0
+gcsfs==2026.8.1
 s3fs==2026.2.0
 ossfs==2025.5.0
 adlfs==2026.2.0
