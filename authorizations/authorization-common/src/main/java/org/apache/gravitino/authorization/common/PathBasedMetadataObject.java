@@ -52,8 +52,29 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
             MetadataObject.Type.FILESET);
     private final MetadataObject.Type metadataType;
 
+    /**
+     * Get the path type for the given metadata object type. The method returns the cached path type
+     * instance so that reference comparison ({@code ==}) between two path types of the same
+     * metadata object type is always correct.
+     *
+     * @param type The metadata object type.
+     * @return The path type of the metadata object.
+     */
     public static PathType get(MetadataObject.Type type) {
-      return new PathType(type);
+      switch (type) {
+        case METALAKE:
+          return METALAKE_PATH;
+        case CATALOG:
+          return CATALOG_PATH;
+        case SCHEMA:
+          return SCHEMA_PATH;
+        case TABLE:
+          return TABLE_PATH;
+        case FILESET:
+          return FILESET_PATH;
+        default:
+          throw new IllegalArgumentException("The type isn't allow to create path type");
+      }
     }
 
     private PathType(MetadataObject.Type type) {

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization.common;
 
+import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -105,5 +106,67 @@ public class TestPathBasedMetadataObject {
         new PathBasedMetadataObject(
             "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, true);
     Assertions.assertEquals(recursiveObject, recursiveObject2);
+  }
+
+  @Test
+  public void testPathTypeGetReturnsCachedInstances() {
+    Assertions.assertSame(
+        PathBasedMetadataObject.METALAKE_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.METALAKE));
+    Assertions.assertSame(
+        PathBasedMetadataObject.CATALOG_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.CATALOG));
+    Assertions.assertSame(
+        PathBasedMetadataObject.SCHEMA_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
+    Assertions.assertSame(
+        PathBasedMetadataObject.TABLE_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE));
+    Assertions.assertSame(
+        PathBasedMetadataObject.FILESET_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
+  }
+
+  @Test
+  public void testPathTypeGetEquality() {
+    Assertions.assertEquals(
+        PathBasedMetadataObject.SCHEMA_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
+    Assertions.assertEquals(
+        PathBasedMetadataObject.TABLE_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE));
+    Assertions.assertNotEquals(
+        PathBasedMetadataObject.SCHEMA_PATH,
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE));
+  }
+
+  @Test
+  public void testPathTypeGetUnsupportedType() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PathBasedMetadataObject.PathType.get(MetadataObject.Type.COLUMN));
+  }
+
+  @Test
+  public void testMetadataObjectTypeReferenceComparison() {
+    // The path type is a non-enum class, but the cached instances returned by `PathType.get()`
+    // guarantee that the reference comparison is correct as well.
+    PathBasedMetadataObject schemaMetadataObject =
+        new PathBasedMetadataObject(
+            "parent",
+            "schema",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
+    schemaMetadataObject.validateAuthorizationMetadataObject();
+    Assertions.assertTrue(schemaMetadataObject.type() == PathBasedMetadataObject.SCHEMA_PATH);
+
+    PathBasedMetadataObject tableMetadataObject =
+        new PathBasedMetadataObject(
+            "parent",
+            "table",
+            "path",
+            PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE));
+    tableMetadataObject.validateAuthorizationMetadataObject();
+    Assertions.assertTrue(tableMetadataObject.type() == PathBasedMetadataObject.TABLE_PATH);
   }
 }
