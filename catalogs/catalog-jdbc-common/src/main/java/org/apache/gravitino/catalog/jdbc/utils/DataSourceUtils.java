@@ -38,9 +38,6 @@ import org.apache.gravitino.utils.JdbcUrlUtils;
  */
 public class DataSourceUtils {
 
-  /** SQL statements for database connection pool testing. */
-  private static final String POOL_TEST_QUERY = "SELECT 1";
-
   // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
   // config map is handed to BasicDataSourceFactory, so allowing these would either run arbitrary
   // code or let a raw property override the validated canonical connection fields:
@@ -136,6 +133,10 @@ public class DataSourceUtils {
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
     JdbcUrlUtils.validateJdbcConfig(
         jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
+    // Keep DBCP's default Connection.isValid() validation unless a validationQuery is explicitly
+    // configured. DBCP caches a validation query as a prepared statement, and MySQL Connector/J
+    // switches back to the database captured at prepare time when executing it. That switch fails
+    // when the captured database is empty, so healthy connections would be discarded.
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -153,10 +154,8 @@ public class DataSourceUtils {
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
-    // Set each time a connection is taken out from the connection pool, a test statement will be
-    // executed to confirm whether the connection is valid.
+    // Validate connections on borrow when enabled.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
-    basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
   }
