@@ -116,3 +116,33 @@ class TestIndexSerdes(unittest.TestCase):
         json_dict = json.loads(json_string)
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
+
+    def test_text_index_properties_round_trip(self):
+        indexes_json = {
+            "indexes": [
+                {
+                    "indexType": "DATA_SKIPPING_TEXT",
+                    "name": "idx_tokens",
+                    "fieldNames": [["body"]],
+                    "properties": {"tokenizer": "tokens"},
+                },
+                {
+                    "indexType": "DATA_SKIPPING_TEXT",
+                    "name": "idx_ngrams",
+                    "fieldNames": [["body"]],
+                    "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+                },
+            ]
+        }
+
+        decoded = MockDataClass.from_json(json.dumps(indexes_json))
+        self.assertEqual(
+            [index.type() for index in decoded.indexes],
+            [Index.IndexType.DATA_SKIPPING_TEXT] * 2,
+        )
+        self.assertEqual(decoded.indexes[0].properties(), {"tokenizer": "tokens"})
+        self.assertEqual(
+            decoded.indexes[1].properties(),
+            {"tokenizer": "ngrams", "ngram_size": "3"},
+        )
+        self.assertDictEqual(json.loads(decoded.to_json()), indexes_json)

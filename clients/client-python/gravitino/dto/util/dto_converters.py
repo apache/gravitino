@@ -575,6 +575,7 @@ class DTOConverters:
             index_type=obj.type(),
             name=obj.name(),
             field_names=obj.field_names(),
+            properties=obj.properties(),
         )
 
     @to_dto.register
