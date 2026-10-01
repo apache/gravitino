@@ -22,9 +22,11 @@ package org.apache.gravitino.server.authorization;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -41,6 +43,9 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.Fileset;
@@ -230,6 +235,55 @@ public class TestMetadataIdConverter {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "entityStore", originalEntityStore, true);
     }
+  }
+
+  @Test
+  void testTableAuthorizationResolvesPhysicalNameSameAsDispatcher() {
+    // The authorization path must resolve a table to the same physical name the dispatcher operates
+    // on. Here the catalog's ops implements SupportsTableNameResolution and maps the normalized
+    // name T_NORM to the stored physical name t_phys; normalizeCaseSensitive (used by getID for
+    // authorization) must return t_phys, so authorization and the operation target the same table.
+    NameIdentifier tableIdent = NameIdentifier.of("metalake", "catalog", "schema", "T_NORM");
+    NameIdentifier physical = NameIdentifier.of("metalake", "catalog", "schema", "t_phys");
+
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+
+    // A capability that leaves the name unchanged, to isolate the resolution step.
+    Capability identityCapability = new Capability() {};
+    CatalogOperations resolvingOps =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) resolvingOps).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier norm = invocation.getArgument(0);
+              return "T_NORM".equals(norm.name()) ? physical : norm;
+            });
+    BaseCatalog<?> mockCatalog = mock(BaseCatalog.class);
+    when(mockCatalog.capability()).thenReturn(identityCapability);
+    when(mockCatalog.ops()).thenReturn(resolvingOps);
+
+    // doWithCatalog runs the callback with the mock catalog (used by both getCapability and the
+    // shared resolver inside normalizeCaseSensitive).
+    doAnswer(
+            invocation -> {
+              org.apache.gravitino.utils.ThrowableFunction<BaseCatalog, Object> fn =
+                  invocation.getArgument(1);
+              return fn.apply(mockCatalog);
+            })
+        .when(mockCatalogManager)
+        .doWithCatalog(any(), any());
+
+    NameIdentifier authorized =
+        MetadataIdConverter.normalizeCaseSensitive(
+            tableIdent, Capability.Scope.TABLE, mockCatalogManager);
+
+    Assertions.assertEquals(
+        "t_phys",
+        authorized.name(),
+        "authorization must resolve to the physical name the dispatcher operates on");
+    Assertions.assertEquals(physical, authorized);
   }
 
   private void initTestNameIdentifier() {
