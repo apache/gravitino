@@ -25,17 +25,23 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
@@ -44,23 +50,29 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
 /** Tests catalog-backed validation independently of model persistence. */
 public class TestSemanticModelSourceValidator {
-  private final TableDispatcher tables = mock(TableDispatcher.class);
-  private final ViewDispatcher views = mock(ViewDispatcher.class);
-  private GravitinoAuthorizer authorizer = new PassThroughAuthorizer();
-  private final SemanticModelSourceValidator validator =
-      new SemanticModelSourceValidator(tables, views, () -> authorizer);
   private static final NameIdentifier SOURCE =
       NameIdentifier.of("other_catalog", "schema", "orders");
   private static final NameIdentifier FULL_SOURCE =
       NameIdentifier.of("metalake", "other_catalog", "schema", "orders");
+
+  private final TableDispatcher tables = mock(TableDispatcher.class);
+  private final ViewDispatcher views = mock(ViewDispatcher.class);
+  private GravitinoAuthorizer authorizer = new PassThroughAuthorizer();
+  private final SemanticModelSourceValidator validator =
+      new SemanticModelSourceValidator(tables, views, () -> authorizer, ident -> true);
 
   @Test
   void testCrossCatalogSourceAndKeysWithDisabledAuthorization() {
@@ -185,6 +197,52 @@ public class TestSemanticModelSourceValidator {
         IllegalSemanticModelException.class,
         () -> validator.validate("metalake", definition(dataset)));
     verifyNoInteractions(tables, views);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testViewSupportCheckedBeforeFallback(boolean supportsViews) {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog catalog = mock(BaseCatalog.class);
+    CatalogOperations operations =
+        supportsViews
+            ? mock(CatalogOperations.class, withSettings().extraInterfaces(ViewCatalog.class))
+            : mock(CatalogOperations.class);
+    when(catalog.ops()).thenReturn(operations);
+    when(catalogs.doWithCatalog(eq(NameIdentifier.of("metalake", "other_catalog")), any()))
+        .thenAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, Boolean> callback = invocation.getArgument(1);
+              return callback.apply(catalog);
+            });
+    when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
+    when(views.loadView(FULL_SOURCE)).thenThrow(new NoSuchViewException("missing"));
+    try (MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = mock(GravitinoEnv.class);
+      environments.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.catalogManager()).thenReturn(catalogs);
+      SemanticModelSourceValidator checking =
+          new SemanticModelSourceValidator(tables, views, () -> authorizer);
+      assertThrows(
+          IllegalSemanticModelException.class,
+          () -> checking.validate("metalake", definition(dataset("orders", null, null))));
+      if (supportsViews) {
+        verify(views).loadView(FULL_SOURCE);
+      } else {
+        verifyNoInteractions(views);
+      }
+      verify(catalogs).doWithCatalog(eq(NameIdentifier.of("metalake", "other_catalog")), any());
+    }
+  }
+
+  @Test
+  void testSupportedViewOperationFailureIsNotHidden() {
+    when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
+    when(views.loadView(FULL_SOURCE))
+        .thenThrow(new UnsupportedOperationException("connector failure"));
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
   }
 
   private void authorizeOnly(MetadataObject.Type type, Privilege.Name privilege) {

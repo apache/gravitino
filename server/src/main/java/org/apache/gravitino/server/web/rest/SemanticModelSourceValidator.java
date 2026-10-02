@@ -23,9 +23,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.inject.Inject;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -35,6 +37,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -48,6 +51,7 @@ public class SemanticModelSourceValidator {
   private final TableDispatcher tables;
   private final ViewDispatcher views;
   private final Supplier<GravitinoAuthorizer> authorizer;
+  private final Predicate<NameIdentifier> supportsViews;
 
   /**
    * Creates a validator using the server's authorizer, including its disabled-mode pass-through.
@@ -62,6 +66,24 @@ public class SemanticModelSourceValidator {
 
   SemanticModelSourceValidator(
       TableDispatcher tables, ViewDispatcher views, Supplier<GravitinoAuthorizer> authorizer) {
+    this(
+        tables,
+        views,
+        authorizer,
+        ident ->
+            GravitinoEnv.getInstance()
+                .catalogManager()
+                .doWithCatalog(
+                    NameIdentifierUtil.getCatalogIdentifier(ident),
+                    catalog -> catalog.ops() instanceof ViewCatalog));
+  }
+
+  SemanticModelSourceValidator(
+      TableDispatcher tables,
+      ViewDispatcher views,
+      Supplier<GravitinoAuthorizer> authorizer,
+      Predicate<NameIdentifier> supportsViews) {
+    this.supportsViews = supportsViews;
     this.tables = tables;
     this.views = views;
     this.authorizer = authorizer;
@@ -138,7 +160,9 @@ public class SemanticModelSourceValidator {
             context);
     if (viewAllowed) {
       try {
-        return columnNames(ident, views.loadView(ident).columns());
+        if (supportsViews.test(ident)) {
+          return columnNames(ident, views.loadView(ident).columns());
+        }
       } catch (NotFoundException missing) {
         // Do not disclose whether the other, inaccessible object type exists.
       }

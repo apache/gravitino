@@ -19,6 +19,7 @@
 package org.apache.gravitino.semantic;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -36,6 +37,19 @@ public class TestSemanticModelCatalog {
 
     assertTrue(catalog.semanticModelExists(NameIdentifier.of("schema", "existing")));
     assertFalse(catalog.semanticModelExists(NameIdentifier.of("schema", "missing")));
+  }
+
+  @Test
+  public void testOssieOperationsAreUnsupportedByDefault() {
+    SemanticModelCatalog catalog = new ExistsOnlySemanticModelCatalog();
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.importOssieSemanticModel(Namespace.of("schema"), OssieDocument.yaml("")));
+    assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            catalog.exportOssieSemanticModel(
+                NameIdentifier.of("schema", "existing"), OssieFormat.YAML));
   }
 
   private static class ExistsOnlySemanticModelCatalog implements SemanticModelCatalog {

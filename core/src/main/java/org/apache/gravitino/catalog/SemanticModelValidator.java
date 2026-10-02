@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
+
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
@@ -42,7 +45,7 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
  * <p>The API value-object builders enforce value-level invariants, including required values, array
  * element validity, relationship column shapes, and expression dialect uniqueness. This validator
  * handles constraints that span value objects: name uniqueness, relationship endpoint resolution,
- * and Semantic Model source identifier shape.
+ * Semantic Model source identifier shape, and the reserved root properties extension vendor.
  *
  * <p>Validation is deterministic and performs no catalog I/O. Catalog-backed source validation,
  * including existence, columns, and authorization, must be completed by the caller before this
@@ -66,6 +69,20 @@ final class SemanticModelValidator {
 
     validateRelationships(definition.relationships(), datasetNames);
     validateMetrics(definition.metrics());
+    validateRootCustomExtensions(definition.customExtensions());
+  }
+
+  private static void validateRootCustomExtensions(@Nullable CustomExtension[] extensions) {
+    if (extensions == null) {
+      return;
+    }
+    for (int index = 0; index < extensions.length; index++) {
+      if (GRAVITINO_PROPERTIES_VENDOR.equals(extensions[index].vendorName())) {
+        throw invalid(
+            "customExtensions[" + index + "].vendorName",
+            "'" + GRAVITINO_PROPERTIES_VENDOR + "' is reserved for Gravitino properties");
+      }
+    }
   }
 
   private static void validateDataset(
