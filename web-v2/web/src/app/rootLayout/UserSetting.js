@@ -50,12 +50,17 @@ export default function UserSetting() {
   const currentMetalake = searchParams.get('metalake')
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
+  const isAuthReady = !!auth.authType && (auth.authType !== 'oauth' || !!auth.authToken)
 
   useEffect(() => {
+    if (!isAuthReady) {
+      return
+    }
+
     if (pathname && !['/', '/ui', '/login', '/ui/login', '/oauth/callback', '/ui/oauth/callback'].includes(pathname)) {
       dispatch(fetchMetalakes())
     }
-  }, [dispatch, pathname])
+  }, [dispatch, pathname, isAuthReady])
 
   const handleCreateMetalake = () => {
     setOpenCreateMeta(true)
