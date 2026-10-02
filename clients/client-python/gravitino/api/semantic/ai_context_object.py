@@ -23,8 +23,6 @@ from typing import Any, Final, Optional
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
 
-MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH: Final[int] = 100
-
 _STANDARD_PROPERTIES: Final[frozenset] = frozenset(
     {"instructions", "synonyms", "examples"}
 )
@@ -121,13 +119,11 @@ def _normalize_additional_properties(
             name not in _STANDARD_PROPERTIES,
             f"additional property must not duplicate standard property: {name}",
         )
-        normalized[name] = _normalize_json_value(value, name, set(), 0)
+        normalized[name] = _normalize_json_value(value, name, set())
     return normalized
 
 
-def _normalize_json_value(
-    value: Any, path: str, visiting: set[int], container_depth: int
-) -> Any:
+def _normalize_json_value(value: Any, path: str, visiting: set[int]) -> Any:
     if value is None or isinstance(value, (str, bool)):
         return value
 
@@ -146,10 +142,10 @@ def _normalize_json_value(
         return value
 
     if isinstance(value, dict):
-        return _normalize_json_dict(value, path, visiting, container_depth + 1)
+        return _normalize_json_dict(value, path, visiting)
 
     if isinstance(value, (list, tuple)):
-        return _normalize_json_list(value, path, visiting, container_depth + 1)
+        return _normalize_json_list(value, path, visiting)
 
     raise IllegalArgumentException(
         f"Additional property {path} has non-JSON-compatible value type: "
@@ -157,10 +153,8 @@ def _normalize_json_value(
     )
 
 
-def _normalize_json_dict(
-    value: dict, path: str, visiting: set[int], container_depth: int
-) -> dict[str, Any]:
-    _enter_container(value, path, visiting, container_depth)
+def _normalize_json_dict(value: dict, path: str, visiting: set[int]) -> dict[str, Any]:
+    _enter_container(value, path, visiting)
     try:
         normalized = {}
         for key, item in value.items():
@@ -168,35 +162,24 @@ def _normalize_json_dict(
                 isinstance(key, str),
                 f"Additional property {path} contains a map key that is not a string",
             )
-            normalized[key] = _normalize_json_value(
-                item, f"{path}.{key}", visiting, container_depth
-            )
+            normalized[key] = _normalize_json_value(item, f"{path}.{key}", visiting)
         return normalized
     finally:
         visiting.discard(id(value))
 
 
-def _normalize_json_list(
-    value, path: str, visiting: set[int], container_depth: int
-) -> list[Any]:
-    _enter_container(value, path, visiting, container_depth)
+def _normalize_json_list(value, path: str, visiting: set[int]) -> list[Any]:
+    _enter_container(value, path, visiting)
     try:
         return [
-            _normalize_json_value(item, f"{path}[{index}]", visiting, container_depth)
+            _normalize_json_value(item, f"{path}[{index}]", visiting)
             for index, item in enumerate(value)
         ]
     finally:
         visiting.discard(id(value))
 
 
-def _enter_container(
-    value: Any, path: str, visiting: set[int], container_depth: int
-) -> None:
-    Precondition.check_argument(
-        container_depth <= MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH,
-        f"Additional property {path} exceeds maximum nesting depth of "
-        f"{MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH}",
-    )
+def _enter_container(value: Any, path: str, visiting: set[int]) -> None:
     Precondition.check_argument(
         id(value) not in visiting,
         f"Additional property {path} contains a cyclic value",
