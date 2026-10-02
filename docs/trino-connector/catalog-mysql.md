@@ -15,6 +15,9 @@ Join data between different systems like MySQL and Hive, or between two differen
 To connect to MySQL, you need:
 - MySQL 5.7, 8.0 or higher.
 - Network access from the Trino coordinator and workers to MySQL. Port 3306 is the default port.
+- MySQL Connector/J 8.0.16 or higher in the Gravitino MySQL catalog, otherwise the fractional seconds precision of
+  `TIME`, `DATETIME` and `TIMESTAMP` columns is reported as 0, see
+  [Driver Version Compatibility](../jdbc-mysql-catalog.md#driver-version-compatibility).
 
 ## Create Table
 
@@ -24,6 +27,20 @@ The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 :::note
 `CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
 :::
+
+### Time type mapping
+
+`TIME`, `TIMESTAMP` and `TIMESTAMP WITH TIME ZONE` columns keep their precision in both directions, the same way
+the native Trino MySQL connector does:
+
+| Trino type                    | MySQL type     |
+|-------------------------------|----------------|
+| `TIME(n)`                     | `TIME(n)`      |
+| `TIMESTAMP(n)`                | `DATETIME(n)`  |
+| `TIMESTAMP(n) WITH TIME ZONE` | `TIMESTAMP(n)` |
+
+`n` ranges from 0 to 6, a higher precision is reduced to 6. `TIMESTAMP` without a precision is `TIMESTAMP(3)` in
+Trino, so it creates a `DATETIME(3)` column.
 
 ## Alter Table
 

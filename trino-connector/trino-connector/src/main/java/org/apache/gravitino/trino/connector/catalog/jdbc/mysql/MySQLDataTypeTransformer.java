@@ -24,6 +24,7 @@ import io.trino.spi.type.CharType;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
+import java.util.Optional;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Type.Name;
 import org.apache.gravitino.rel.types.Types;
@@ -49,19 +50,41 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      if (timestampType.hasTimeZone()) {
-        return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
-      } else {
-        return TimestampType.TIMESTAMP_SECONDS;
-      }
+      // When the precision is unknown (the MySQL catalog reports it only with MySQL Connector/J
+      // 8.0.16 or later) fall back to the MySQL default fractional seconds precision of 0.
+      int precision =
+          timestampType.hasPrecisionSet()
+              ? toMySQLFractionalSecondsPrecision(timestampType.precision())
+              : TRINO_SECONDS_PRECISION;
+      return timestampType.hasTimeZone()
+          ? TimestampWithTimeZoneType.createTimestampWithTimeZoneType(precision)
+          : TimestampType.createTimestampType(precision);
     } else if (Name.TIME == type.name()) {
-      return TimeType.TIME_SECONDS;
+      Types.TimeType timeType = (Types.TimeType) type;
+      // Precision unknown, same fallback as TIMESTAMP above.
+      int precision =
+          timeType.hasPrecisionSet()
+              ? toMySQLFractionalSecondsPrecision(timeType.precision())
+              : TRINO_SECONDS_PRECISION;
+      return TimeType.createTimeType(precision);
     } else if (Name.EXTERNAL == type.name()) {
       String catalogString = ((Types.ExternalType) type).catalogString();
       return MySQLExternalDataType.safeValueOf(catalogString).getTrinoType();
     }
 
     return super.getTrinoType(type);
+  }
+
+  @Override
+  public Optional<io.trino.spi.type.Type> getSupportedType(io.trino.spi.type.Type type) {
+    if (type instanceof TimeType
+        || type instanceof TimestampType
+        || type instanceof TimestampWithTimeZoneType) {
+      // The column is created with the precision kept by getGravitinoType, at most 6 for MySQL.
+      io.trino.spi.type.Type supported = getTrinoType(getGravitinoType(type));
+      return supported.equals(type) ? Optional.empty() : Optional.of(supported);
+    }
+    return super.getSupportedType(type);
   }
 
   @Override
@@ -104,16 +127,32 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
     } else if (typeClass == JSON_TYPE.getClass()) {
       return Types.ExternalType.of(MySQLExternalDataType.JSON.getMysqlTypeName());
     } else if (io.trino.spi.type.TimeType.class.isAssignableFrom(typeClass)) {
-      // MySQL only supports time type with second (0) precision
-      return Types.TimeType.of(TRINO_SECONDS_PRECISION);
+      // Same as the native Trino MySQL connector: time(p) is stored as TIME(p), p capped at 6
+      return Types.TimeType.of(toMySQLFractionalSecondsPrecision(((TimeType) type).getPrecision()));
     } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
-      // MySQL only supports timestamp type (without time zone) with second (0) precision
-      return Types.TimestampType.withoutTimeZone(TRINO_SECONDS_PRECISION);
+      // timestamp(p) is stored as DATETIME(p), p capped at 6
+      return Types.TimestampType.withoutTimeZone(
+          toMySQLFractionalSecondsPrecision(((TimestampType) type).getPrecision()));
     } else if (io.trino.spi.type.TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
-      // MySQL only supports timestamp with time zone type with second (0) precision
-      return Types.TimestampType.withTimeZone(TRINO_SECONDS_PRECISION);
+      // timestamp(p) with time zone is stored as TIMESTAMP(p), p capped at 6
+      return Types.TimestampType.withTimeZone(
+          toMySQLFractionalSecondsPrecision(((TimestampWithTimeZoneType) type).getPrecision()));
     }
 
     return super.getGravitinoType(type);
+  }
+
+  /**
+   * Maps a time/timestamp precision between Gravitino and Trino. The Trino type must carry the same
+   * precision as the MySQL column, otherwise Trino rejects the values read from MySQL (for example,
+   * "Expected 0s for digits beyond precision 0").
+   *
+   * @param precision the precision of the Gravitino or Trino type.
+   * @return the precision to use for the other side, capped at the MySQL maximum of 6.
+   */
+  private static int toMySQLFractionalSecondsPrecision(int precision) {
+    // MySQL supports a fractional seconds precision from 0 to 6 (microseconds precision), see
+    // https://dev.mysql.com/doc/refman/8.0/en/fractional-seconds.html
+    return Math.min(TRINO_MICROS_PRECISION, precision);
   }
 }
