@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -16,35 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.postgresql.operation;
+package org.apache.gravitino.catalog.hologres.operation;
 
 import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestPostgreSqlSchemaOperationsSqlGeneration {
-
-  @Test
-  public void testEscapeCommentInGeneratedSql() {
-    PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
-
-    String sql =
-        operations.generateCreateDatabaseSql(
-            "test_schema", "owner\\'s comment; DROP SCHEMA marker; --", Collections.emptyMap());
-
-    Assertions.assertEquals(
-        "CREATE SCHEMA \"test_schema\";COMMENT ON SCHEMA \"test_schema\" "
-            + "IS E'owner\\\\''s comment; DROP SCHEMA marker; --'",
-        sql);
-  }
+public class TestHologresSchemaOperationsSqlGeneration {
 
   @Test
   public void testGenerateCreateDatabaseSqlValidatesSchemaName() {
-    PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
+    HologresSchemaOperations operations = new HologresSchemaOperations();
 
     Assertions.assertEquals(
-        "CREATE SCHEMA \"test_schema\";",
-        operations.generateCreateDatabaseSql("test_schema", null, Collections.emptyMap()));
+        "CREATE SCHEMA \"test_schema\";COMMENT ON SCHEMA \"test_schema\" IS 'Jandy''s schema'",
+        operations.generateCreateDatabaseSql(
+            "test_schema", "Jandy's schema", Collections.emptyMap()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -54,7 +41,7 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
 
   @Test
   public void testGenerateDropDatabaseSqlValidatesSchemaName() {
-    PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
+    HologresSchemaOperations operations = new HologresSchemaOperations();
 
     Assertions.assertEquals(
         "DROP SCHEMA \"test_schema\" CASCADE",
