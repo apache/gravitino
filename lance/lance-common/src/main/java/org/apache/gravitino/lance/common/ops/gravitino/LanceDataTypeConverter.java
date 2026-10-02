@@ -48,6 +48,19 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
   public Field toArrowField(String name, Type type, boolean nullable) {
     switch (type.name()) {
+      case VECTOR:
+        Types.VectorType vectorType = (Types.VectorType) type;
+        Preconditions.checkArgument(
+            vectorType.hasDimensionSet(),
+            "Cannot convert vector with an unspecified dimension to an Arrow field: %s",
+            vectorType.simpleString());
+        FieldType vectorField =
+            new FieldType(nullable, new ArrowType.FixedSizeList(vectorType.dimension()), null);
+        return new Field(
+            name,
+            vectorField,
+            Lists.newArrayList(toArrowField("element", vectorType.elementType(), true)));
+
       case LIST:
         Types.ListType listType = (Types.ListType) type;
         FieldType listField = new FieldType(nullable, ArrowType.List.INSTANCE, null);
@@ -216,6 +229,18 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
         Type elementType = toGravitino(arrowField.getChildren().get(0));
         boolean containsNull = arrowField.getChildren().get(0).isNullable();
         return Types.ListType.of(elementType, containsNull);
+
+      case FixedSizeList:
+        if (arrowField.getChildren().size() == 1) {
+          Type fixedSizeListElementType = toGravitino(arrowField.getChildren().get(0));
+          if (fixedSizeListElementType instanceof Type.NumericType
+              || fixedSizeListElementType instanceof Types.VectorType) {
+            return Types.VectorType.of(
+                fixedSizeListElementType,
+                ((ArrowType.FixedSizeList) fieldType.getType()).getListSize());
+          }
+        }
+        break;
 
       case Struct:
         Types.StructType.Field[] fields =

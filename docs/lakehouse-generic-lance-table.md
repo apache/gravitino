@@ -72,9 +72,14 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Time`/`Time(9)`                 | `Time Nanosecond`                       |
 | `Null`                           | `Null`                                  |
 | `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
+| `Vector(elementType, dimension)` | `Fixed-Size List(elementType, dimension)` |
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
+
+Lance requires `Vector` dimensions to be positive. Gravitino also represents an unspecified
+dimension as `-1` for compatibility with systems whose array metadata has no dimension, but such
+a vector cannot be written to Lance or used to create a Lance vector index.
 
 ### External Types
 
@@ -95,7 +100,6 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 | `Large Utf8`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}")`                                                                                                                                           |
 | `Large Binary`    | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largebinary\"},\"children\":[]}")`                                                                                                                                         |
 | `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`                     |
-| `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
 
 ### Table Properties
 
