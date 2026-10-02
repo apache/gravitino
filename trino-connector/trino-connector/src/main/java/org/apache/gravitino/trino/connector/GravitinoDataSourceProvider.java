@@ -29,6 +29,12 @@ import io.trino.spi.connector.DynamicFilter;
 import java.util.List;
 
 /** This class provides a ConnectorPageSource for Trino read data from internal connector. */
+// This shared shape serves Trino 440-481, where the split-based createPageSource below is the SPI
+// entry point (deprecated for removal since Trino 481). Trino 480 added a credential-aware variant
+// that GravitinoConnector480/481 wire through GravitinoDataSourceProvider480/481; Trino 482
+// removed the split-based variant entirely, so the 482-483 segment replaces this class at compile
+// time with a same-named local copy (the shared file is excluded from its source set).
+@SuppressWarnings("removal")
 public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
 
   ConnectorPageSourceProvider internalPageSourceProvider;

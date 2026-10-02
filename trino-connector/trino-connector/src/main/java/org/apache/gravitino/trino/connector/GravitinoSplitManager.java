@@ -29,8 +29,17 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.DynamicFilter;
 
-/** This class delegates the retrieval of split data sources to optimize query performance. */
+/**
+ * This class delegates the retrieval of split data sources to optimize query performance.
+ *
+ * <p>This shared shape serves Trino 440-481, where {@code ConnectorSplitManager.getSplits} takes a
+ * {@link DynamicFilter}. Trino 482 replaced that overload with a {@code Set<ColumnHandle>} variant;
+ * the 482-483 segment replaces this class at compile time with a same-named local copy that
+ * implements the new shape (the shared file is excluded from its source set).
+ */
+@SuppressWarnings("removal")
 public class GravitinoSplitManager implements ConnectorSplitManager {
+
   private final ConnectorSplitManager internalSplitManager;
 
   /**
