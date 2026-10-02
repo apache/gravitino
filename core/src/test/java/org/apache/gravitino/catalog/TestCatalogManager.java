@@ -675,6 +675,15 @@ public class TestCatalogManager {
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
     catalogManager.getCatalogCache().invalidateAll();
 
+    Catalog[] catalogDescriptors = catalogManager.listCatalogsInfo(relIdent.namespace(), false);
+    Assertions.assertEquals(2, catalogDescriptors.length);
+    for (Catalog catalog : catalogDescriptors) {
+      Assertions.assertEquals(provider, catalog.provider());
+      Assertions.assertTrue(catalog.properties().isEmpty());
+    }
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+
     Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
     Assertions.assertEquals(2, catalogs.length);
     for (Catalog catalog : catalogs) {

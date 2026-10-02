@@ -216,9 +216,20 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   @Override
   public Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
-
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
+    return listCatalogsInfo(params);
+  }
+
+  @Override
+  public Catalog[] listCatalogsInfo(boolean includeProperties) throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    params.put("includeProperties", Boolean.toString(includeProperties));
+    return listCatalogsInfo(params);
+  }
+
+  private Catalog[] listCatalogsInfo(Map<String, String> params) {
     CatalogListResponse resp =
         restClient.get(
             String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),

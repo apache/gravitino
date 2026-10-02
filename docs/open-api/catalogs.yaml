@@ -29,6 +29,7 @@ paths:
       operationId: listCatalogs
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "#/components/parameters/includeProperties"
       responses:
         "200":
           description: Returns the list of catalog objects if {details} is true, otherwise returns the list of catalog identifiers
@@ -371,6 +372,14 @@ components:
       schema:
         type: boolean
         default: false
+    includeProperties:
+      name: includeProperties
+      in: query
+      description: Include resolved catalog properties when details is true
+      required: false
+      schema:
+        type: boolean
+        default: true
 
   schemas:
 
