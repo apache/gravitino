@@ -60,6 +60,7 @@ import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.FunctionHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.hook.ViewHookDispatcher;
@@ -143,6 +144,10 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.internalModelDispatcher());
       assertNotNull(env.internalFunctionDispatcher());
       assertNotNull(env.internalViewDispatcher());
+      assertDispatcherChain(
+          env.internalSemanticModelDispatcher(),
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelOperationDispatcher.class);
       assertDispatcherChain(
           env.semanticModelDispatcher(),
           SemanticModelNormalizeDispatcher.class,
@@ -234,12 +239,6 @@ class TestGravitinoEnvMetadataComponents {
       env.initializeFullComponents(config);
 
       assertDispatcherChain(
-          env.semanticModelDispatcher(),
-          SemanticModelEventDispatcher.class,
-          SemanticModelNormalizeDispatcher.class,
-          SemanticModelOperationDispatcher.class);
-
-      assertDispatcherChain(
           env.filesetDispatcher(),
           FilesetEventDispatcher.class,
           FilesetNormalizeDispatcher.class,
@@ -275,6 +274,16 @@ class TestGravitinoEnvMetadataComponents {
           FunctionNormalizeDispatcher.class,
           FunctionHookDispatcher.class,
           FunctionOperationDispatcher.class);
+      assertDispatcherChain(
+          env.internalSemanticModelDispatcher(),
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelOperationDispatcher.class);
+      assertDispatcherChain(
+          env.semanticModelDispatcher(),
+          SemanticModelEventDispatcher.class,
+          SemanticModelNormalizeDispatcher.class,
+          SemanticModelHookDispatcher.class,
+          SemanticModelOperationDispatcher.class);
       assertDispatcherChain(
           env.viewDispatcher(),
           ViewEventDispatcher.class,
