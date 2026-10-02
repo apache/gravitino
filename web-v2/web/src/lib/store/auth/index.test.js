@@ -17,8 +17,13 @@
  * under the License.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import authReducer, { getAuthMe, setAuthUser } from '@/lib/store/auth'
+
+// Reducer tests do not need the HTTP client's React session provider dependencies.
+vi.mock('@/lib/utils/axios', () => ({
+  defHttp: { get: vi.fn(), post: vi.fn() }
+}))
 
 describe('auth store', () => {
   beforeEach(() => {
