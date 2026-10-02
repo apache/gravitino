@@ -25,6 +25,7 @@ import java.util.List;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
@@ -92,5 +93,86 @@ public class TestJdbcCatalogOperations {
             new SqliteColumnDefaultValueConverter());
 
     Assertions.assertDoesNotThrow(catalogOperations::close);
+  }
+
+  @Test
+  public void testLoadSchemaWithoutGravitinoId() {
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            return JdbcSchema.builder()
+                .withName(databaseName)
+                .withComment("user authored comment without id")
+                .build();
+          }
+        };
+
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            databaseOperations,
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "test_schema");
+      JdbcSchema schema = catalogOperations.loadSchema(ident);
+      Assertions.assertEquals("test_schema", schema.name());
+      Assertions.assertEquals("user authored comment without id", schema.comment());
+      Assertions.assertNull(StringIdentifier.fromProperties(schema.properties()));
+    }
+  }
+
+  @Test
+  public void testLoadSchemaWithNullComment() {
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            return JdbcSchema.builder().withName(databaseName).withComment(null).build();
+          }
+        };
+
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            databaseOperations,
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "test_schema");
+      JdbcSchema schema = catalogOperations.loadSchema(ident);
+      Assertions.assertEquals("test_schema", schema.name());
+      Assertions.assertNull(schema.comment());
+      Assertions.assertNull(StringIdentifier.fromProperties(schema.properties()));
+    }
+  }
+
+  @Test
+  public void testLoadSchemaWithGravitinoId() {
+    String comment =
+        StringIdentifier.addToComment(StringIdentifier.fromId(12345L), "user comment");
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            return JdbcSchema.builder().withName(databaseName).withComment(comment).build();
+          }
+        };
+
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            databaseOperations,
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "test_schema");
+      JdbcSchema schema = catalogOperations.loadSchema(ident);
+      Assertions.assertEquals("test_schema", schema.name());
+      Assertions.assertEquals("user comment", schema.comment());
+      Assertions.assertNotNull(StringIdentifier.fromProperties(schema.properties()));
+      Assertions.assertEquals(12345L, StringIdentifier.fromProperties(schema.properties()).id());
+    }
   }
 }
