@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -30,11 +31,13 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
@@ -47,6 +50,9 @@ import org.apache.gravitino.meta.UserEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 public class TestFutureGrantManager {
   private static EntityStore entityStore = mock(EntityStore.class);
@@ -82,6 +88,11 @@ public class TestFutureGrantManager {
 
     // test no securable objects
     RoleEntity roleEntity = mock(RoleEntity.class);
+    when(roleEntity.id()).thenReturn(2L);
+    when(roleEntity.name()).thenReturn("role1");
+    when(roleEntity.namespace()).thenReturn(Namespace.of(METALAKE));
+    when(roleEntity.auditInfo()).thenReturn(metalakeEntity.auditInfo());
+    when(roleEntity.properties()).thenReturn(Collections.emptyMap());
     when(relationOperations.listEntitiesByRelation(
             SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
             NameIdentifier.of(METALAKE),
@@ -124,6 +135,7 @@ public class TestFutureGrantManager {
 
     SecurableObject securableObject = mock(SecurableObject.class);
     when(securableObject.type()).thenReturn(MetadataObject.Type.METALAKE);
+    when(securableObject.fullName()).thenReturn(METALAKE);
     when(securableObject.privileges())
         .thenReturn(Lists.newArrayList(Privileges.CreateTable.allow()));
     when(roleEntity.securableObjects()).thenReturn(Lists.newArrayList(securableObject));
@@ -177,6 +189,84 @@ public class TestFutureGrantManager {
     verify(authorizationPlugin).onOwnerSet(any(), any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToUser(any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToGroup(any(), any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testMixedRoleFutureGrants(boolean grantToUser) throws IOException {
+    EntityStore store = mock(EntityStore.class);
+    OwnerManager owners = mock(OwnerManager.class);
+    SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
+    when(store.relationOperations()).thenReturn(relations);
+    when(owners.getOwner(any(), any())).thenReturn(Optional.empty());
+    BaseCatalog newCatalog = mock(BaseCatalog.class);
+    when(newCatalog.name()).thenReturn("new_catalog");
+    AuthorizationPlugin plugin = mock(AuthorizationPlugin.class);
+    when(newCatalog.getAuthorizationPlugin()).thenReturn(plugin);
+    SecurableObject inherited =
+        SecurableObjects.ofMetalake(
+            METALAKE,
+            Lists.newArrayList(
+                Privileges.SelectTable.allow(), Privileges.SelectSemanticModel.allow()));
+    SecurableObject semanticModel =
+        SecurableObjects.parse(
+            "old_catalog.schema.model",
+            MetadataObject.Type.SEMANTIC_MODEL,
+            Lists.newArrayList(Privileges.SelectSemanticModel.allow()));
+    SecurableObject otherTable =
+        SecurableObjects.parse(
+            "old_catalog.schema.table",
+            MetadataObject.Type.TABLE,
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(2L)
+            .withName("mixed_role")
+            .withNamespace(Namespace.of(METALAKE))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(Collections.emptyMap())
+            .withSecurableObjects(Lists.newArrayList(inherited, semanticModel, otherTable))
+            .build();
+    when(relations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+            NameIdentifier.of(METALAKE),
+            Entity.EntityType.METALAKE))
+        .thenReturn(Lists.newArrayList(role));
+    UserEntity user = mock(UserEntity.class);
+    GroupEntity group = mock(GroupEntity.class);
+    when(relations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.ROLE_USER_REL,
+            role.nameIdentifier(),
+            Entity.EntityType.ROLE))
+        .thenReturn(grantToUser ? Lists.newArrayList(user) : Collections.emptyList());
+    when(relations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.ROLE_GROUP_REL,
+            role.nameIdentifier(),
+            Entity.EntityType.ROLE))
+        .thenReturn(grantToUser ? Collections.emptyList() : Lists.newArrayList(group));
+
+    new FutureGrantManager(store, owners).grantNewlyCreatedCatalog(METALAKE, newCatalog);
+
+    ArgumentCaptor<List<Role>> roles = ArgumentCaptor.forClass(List.class);
+    if (grantToUser) {
+      verify(plugin).onGrantedRolesToUser(roles.capture(), eq(user));
+      verify(plugin, never()).onGrantedRolesToGroup(any(), any());
+    } else {
+      verify(plugin).onGrantedRolesToGroup(roles.capture(), eq(group));
+      verify(plugin, never()).onGrantedRolesToUser(any(), any());
+    }
+    Assertions.assertEquals(1, roles.getValue().size());
+    Role filtered = roles.getValue().get(0);
+    Assertions.assertEquals(role.name(), filtered.name());
+    Assertions.assertEquals(1, filtered.securableObjects().size());
+    Assertions.assertEquals(
+        MetadataObject.Type.METALAKE, filtered.securableObjects().get(0).type());
+    Assertions.assertEquals(
+        Lists.newArrayList(Privileges.SelectTable.allow()),
+        filtered.securableObjects().get(0).privileges());
+    Assertions.assertEquals(3, role.securableObjects().size());
+    Assertions.assertEquals(2, role.securableObjects().get(0).privileges().size());
   }
 
   @Test
