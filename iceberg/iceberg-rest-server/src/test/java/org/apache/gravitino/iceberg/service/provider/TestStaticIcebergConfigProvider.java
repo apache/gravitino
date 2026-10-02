@@ -112,4 +112,24 @@ public class TestStaticIcebergConfigProvider {
     Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
     Assertions.assertEquals(Optional.empty(), config);
   }
+
+  @Test
+  public void testGetMetalakeNameWithCustomValue() {
+    Map<String, String> config = Maps.newHashMap();
+    config.put(IcebergConstants.GRAVITINO_METALAKE, "testlake");
+
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    provider.initialize(config);
+
+    Assertions.assertEquals("testlake", provider.getMetalakeName());
+  }
+
+  @Test
+  public void testGetMetalakeNameDefaultsToGravitino() {
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    provider.initialize(Maps.newHashMap());
+
+    Assertions.assertEquals(
+        IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE, provider.getMetalakeName());
+  }
 }
