@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -30,7 +31,7 @@ public class PolicyMetaBaseSQLProvider {
 
   public String listPolicyPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -51,7 +52,7 @@ public class PolicyMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"
         + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -73,38 +74,20 @@ public class PolicyMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String insertPolicyMetaOnDuplicateKeyUpdate(@Param("policyMeta") PolicyPO policyPO) {
-    return "INSERT INTO "
-        + POLICY_META_TABLE_NAME
-        + " (policy_id, policy_name, policy_type, metalake_id,"
-        + " audit_info, current_version, last_version, deleted_at)"
-        + " VALUES (#{policyMeta.policyId}, #{policyMeta.policyName}, #{policyMeta.policyType},"
-        + " #{policyMeta.metalakeId}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
-        + " #{policyMeta.lastVersion}, #{policyMeta.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " policy_name = #{policyMeta.policyName},"
-        + " policy_type = #{policyMeta.policyType},"
-        + " metalake_id = #{policyMeta.metalakeId},"
-        + " audit_info = #{policyMeta.auditInfo},"
-        + " current_version = #{policyMeta.currentVersion},"
-        + " last_version = #{policyMeta.lastVersion},"
-        + " deleted_at = #{policyMeta.deletedAt}";
-  }
-
   public String insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO) {
     return "INSERT INTO "
         + POLICY_META_TABLE_NAME
         + " (policy_id, policy_name, policy_type, metalake_id,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, occ_version, deleted_at)"
         + " VALUES (#{policyMeta.policyId}, #{policyMeta.policyName}, #{policyMeta.policyType},"
         + " #{policyMeta.metalakeId}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
-        + " #{policyMeta.lastVersion}, #{policyMeta.deletedAt})";
+        + " #{policyMeta.lastVersion}, #{policyMeta.occVersion}, #{policyMeta.deletedAt})";
   }
 
   public String selectPolicyMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -133,28 +116,22 @@ public class PolicyMetaBaseSQLProvider {
         + " audit_info = #{newPolicyMeta.auditInfo},"
         + " current_version = #{newPolicyMeta.currentVersion},"
         + " last_version = #{newPolicyMeta.lastVersion},"
+        + " occ_version = #{newPolicyMeta.occVersion},"
         + " deleted_at = #{newPolicyMeta.deletedAt}"
         + " WHERE policy_id = #{oldPolicyMeta.policyId}"
-        + " AND policy_name = #{oldPolicyMeta.policyName}"
-        + " AND policy_type = #{oldPolicyMeta.policyType}"
-        + " AND metalake_id = #{oldPolicyMeta.metalakeId}"
-        + " AND audit_info = #{oldPolicyMeta.auditInfo}"
-        + " AND current_version = #{oldPolicyMeta.currentVersion}"
-        + " AND last_version = #{oldPolicyMeta.lastVersion}"
+        + " AND occ_version = #{oldPolicyMeta.occVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeletePolicyByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+  /** Returns SQL that soft-deletes a policy using its stable ID and observed OCC version. */
+  public String softDeletePolicyByIdAndVersion(
+      @Param("policyId") Long policyId, @Param("occVersion") Long occVersion) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " pm SET pm.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE pm.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND pm.policy_name = #{policyName} AND pm.deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE policy_id = #{policyId} AND occ_version = #{occVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String deletePolicyMetasByLegacyTimeline(
@@ -167,14 +144,14 @@ public class PolicyMetaBaseSQLProvider {
   public String softDeletePolicyMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at"
         + " FROM "
         + POLICY_META_TABLE_NAME
@@ -184,27 +161,29 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
-  public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
+  /** Returns SQL that selects and exclusively locks an active policy by ID. */
+  public String selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId) {
+    return selectPolicyByPolicyId(policyId) + " FOR UPDATE";
+  }
+
+  /**
+   * Returns SQL that selects and exclusively locks several active policies, ordered by policy ID so
+   * that concurrent callers take the row locks in the same order.
+   */
+  public String listPolicyPOsByPolicyIdsForUpdate(@Param("policyIds") List<Long> policyIds) {
     return "<script>"
-        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
-        + " pm.deleted_at"
-        + " FROM "
-        + POLICY_META_TABLE_NAME
-        + " pm"
-        + " WHERE pm.deleted_at = 0"
-        + " AND pm.policy_id IN ("
-        + "<foreach collection='policyIds' item='policyId' separator=','>"
-        + "#{policyId}"
-        + "</foreach>"
-        + ")"
-        + "</script>";
+        + selectPolicyPOsByPolicyIdsBody()
+        + " ORDER BY pm.policy_id FOR UPDATE</script>";
+  }
+
+  public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
+    return "<script>" + selectPolicyPOsByPolicyIdsBody() + "</script>";
   }
 
   public String selectPolicyMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at"
         + " FROM "
         + POLICY_META_TABLE_NAME
@@ -215,11 +194,17 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
+  /** Returns SQL that selects and exclusively locks an active policy by its natural key. */
+  public String selectPolicyMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
+    return selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName) + " FOR UPDATE";
+  }
+
   public String batchSelectPolicyByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"
         + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version, pm.deleted_at,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version, pm.deleted_at,"
         + " pv.id, pv.metalake_id as version_metalake_id, pv.policy_id as version_policy_id,"
         + " pv.version, pv.policy_comment, pv.enabled, pv.content, pv.deleted_at as version_deleted_at"
         + " FROM "
@@ -239,5 +224,24 @@ public class PolicyMetaBaseSQLProvider {
         + " )"
         + " AND pm.deleted_at = 0 AND pv.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+
+  /**
+   * Returns the shared body of the by-ID list queries, without the enclosing {@code <script>} tag,
+   * so the plain and the locking variant cannot drift apart when the selected columns change.
+   */
+  private String selectPolicyPOsByPolicyIdsBody() {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
+        + " pm.deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm"
+        + " WHERE pm.deleted_at = 0"
+        + " AND pm.policy_id IN ("
+        + "<foreach collection='policyIds' item='policyId' separator=','>"
+        + "#{policyId}"
+        + "</foreach>"
+        + ")";
   }
 }

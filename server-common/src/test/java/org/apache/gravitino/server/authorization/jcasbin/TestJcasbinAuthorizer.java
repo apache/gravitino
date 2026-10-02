@@ -23,7 +23,9 @@ import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -45,6 +47,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.Principal;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,10 +57,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -72,17 +78,27 @@ import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -102,6 +118,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.casbin.jcasbin.main.Enforcer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -387,6 +404,17 @@ public class TestJcasbinAuthorizer {
   public void testIsMetalakeUserUsesUserInfoCache() {
     assertTrue(jcasbinAuthorizer.isMetalakeUser(METALAKE, new AuthorizationRequestContext()));
     verify(userMetaMapper).getUserUpdatedAt(METALAKE, USERNAME);
+  }
+
+  @Test
+  public void testIsServiceAdminUsesInternalDispatcher() {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.isServiceAdmin(USERNAME)).thenReturn(true);
+
+    assertTrue(jcasbinAuthorizer.isServiceAdmin());
+
+    verify(dispatcher).isServiceAdmin(USERNAME);
   }
 
   @Test
@@ -691,7 +719,7 @@ public class TestJcasbinAuthorizer {
   public void testStaleRemovalDoesNotClearReloadedPolicies() throws Exception {
     Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
     GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-    ReentrantLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
+    ReentrantReadWriteLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
     String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
     String[] policyRow =
         new String[] {
@@ -706,7 +734,7 @@ public class TestJcasbinAuthorizer {
 
     CountDownLatch invalidationStarted = new CountDownLatch(1);
     AtomicReference<Throwable> failure = new AtomicReference<>();
-    rolePolicyLock.lock();
+    rolePolicyLock.writeLock().lock();
     Thread invalidator =
         new Thread(
             () -> {
@@ -737,7 +765,7 @@ public class TestJcasbinAuthorizer {
       allowEnforcer.addPolicy(policyRow);
       loadedRoles.put(ALLOW_ROLE_ID, 2L);
     } finally {
-      rolePolicyLock.unlock();
+      rolePolicyLock.writeLock().unlock();
     }
 
     invalidator.join(5000L);
@@ -809,6 +837,106 @@ public class TestJcasbinAuthorizer {
         "the completed load's policies must survive a late partial result");
   }
 
+  @Test
+  public void testConcurrentAuthorizationWaitsForPolicyReload() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, new AuthorizationRequestContext()));
+    List<List<String>> policyRows = allowEnforcer.getFilteredPolicy(0, roleIdStr);
+    assertFalse(policyRows.isEmpty());
+
+    ReentrantReadWriteLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
+    rolePolicyLock.writeLock().lock();
+    ExecutorService executor = Executors.newFixedThreadPool(16);
+    List<Future<Boolean>> futures = new ArrayList<>();
+    try {
+      allowEnforcer.removeFilteredPolicy(0, roleIdStr);
+      CountDownLatch start = new CountDownLatch(1);
+      CountDownLatch started = new CountDownLatch(16);
+      for (int i = 0; i < 16; i++) {
+        futures.add(
+            executor.submit(
+                () -> {
+                  assertTrue(start.await(5, TimeUnit.SECONDS));
+                  started.countDown();
+                  return invokeAuthorizeByJcasbin(
+                      jcasbinAuthorizer,
+                      USER_ID,
+                      METALAKE,
+                      catalog,
+                      CATALOG_ID,
+                      USE_CATALOG,
+                      new AuthorizationRequestContext());
+                }));
+      }
+
+      start.countDown();
+      assertTrue(started.await(5, TimeUnit.SECONDS));
+      for (List<String> policyRow : policyRows) {
+        allowEnforcer.addPolicy(policyRow);
+      }
+    } finally {
+      rolePolicyLock.writeLock().unlock();
+    }
+
+    try {
+      for (Future<Boolean> future : futures) {
+        assertTrue(future.get(5, TimeUnit.SECONDS));
+      }
+    } finally {
+      executor.shutdown();
+    }
+    assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testLoadedRoleExpirationCleanerCanTakeWriteLockAfterDiagnosticRead()
+      throws Exception {
+    ReentrantReadWriteLock rolePolicyLock = getRolePolicyLock(jcasbinAuthorizer);
+    JcasbinLoadedRolesCache expiringLoadedRoles =
+        new JcasbinLoadedRolesCache(
+            1,
+            10,
+            roleId -> {
+              rolePolicyLock.writeLock().lock();
+              try {
+                // Simulate the authorizer cleanup path entered by Caffeine's synchronous removal
+                // listener. The test fails by timeout if a caller still holds readLock while
+                // touching loadedRoles.
+              } finally {
+                rolePolicyLock.writeLock().unlock();
+              }
+            });
+
+    expiringLoadedRoles.put(ALLOW_ROLE_ID, 1L);
+    Thread.sleep(10L);
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(2),
+        () -> {
+          Map<String, Integer> rolePolicyCounts = new HashMap<>();
+          rolePolicyLock.readLock().lock();
+          try {
+            rolePolicyCounts.put(String.valueOf(ALLOW_ROLE_ID), 0);
+          } finally {
+            rolePolicyLock.readLock().unlock();
+          }
+
+          for (String roleIdStr : rolePolicyCounts.keySet()) {
+            expiringLoadedRoles.getIfPresent(Long.parseLong(roleIdStr));
+          }
+        });
+  }
+
   /** Reflectively invoke the private versionCheckAndLoadRoles. */
   private static void invokeVersionCheckAndLoadRoles(
       JcasbinAuthorizer authorizer,
@@ -824,6 +952,42 @@ public class TestJcasbinAuthorizer {
             AuthorizationRequestContext.class);
     m.setAccessible(true);
     m.invoke(authorizer, metalake, roleIds, requestContext);
+  }
+
+  /** Reflectively invoke the allow-side JCasbin authorization step. */
+  private static boolean invokeAuthorizeByJcasbin(
+      JcasbinAuthorizer authorizer,
+      long userId,
+      String metalake,
+      MetadataObject metadataObject,
+      Long metadataId,
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("allowInternalAuthorizer");
+    field.setAccessible(true);
+    Object allowInternalAuthorizer = field.get(authorizer);
+    Method method =
+        allowInternalAuthorizer
+            .getClass()
+            .getDeclaredMethod(
+                "authorizeByJcasbin",
+                long.class,
+                String.class,
+                MetadataObject.class,
+                Long.class,
+                String.class,
+                AuthorizationRequestContext.class);
+    method.setAccessible(true);
+    return (Boolean)
+        method.invoke(
+            allowInternalAuthorizer,
+            userId,
+            metalake,
+            metadataObject,
+            metadataId,
+            privilege.name(),
+            requestContext);
   }
 
   private static boolean invokeReplaceRolePolicies(
@@ -877,6 +1041,36 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
+  /** Reusing entry state avoids another SQL prefetch even for a different privilege check. */
+  @Test
+  public void testReadScopeReusesEntryRolePrefetch() throws Exception {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity role =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(role);
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    AuthorizationRequestContext entryContext = new AuthorizationRequestContext();
+    assertTrue(
+        jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, entryContext));
+    Mockito.clearInvocations(userMetaMapper, roleMetaMapper);
+
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      scope.bind(METALAKE, entryContext);
+      AuthorizationRequestContext filterContext = AuthorizationRequestScope.getOrCreate(METALAKE);
+      assertSame(entryContext, filterContext);
+      assertFalse(
+          jcasbinAuthorizer.authorize(principal, METALAKE, catalog, SELECT_TABLE, filterContext));
+      verify(userMetaMapper, Mockito.never())
+          .batchGetAuthSubjectsForUser(anyString(), anyString(), anyList());
+      verify(roleMetaMapper, Mockito.never()).batchGetRoleUpdatedAt(any());
+    }
+
+    // A subsequent request must revalidate SQL versions, even with warm shared role caches.
+    AuthorizationRequestContext nextContext = AuthorizationRequestScope.getOrCreate(METALAKE);
+    assertTrue(jcasbinAuthorizer.authorize(principal, METALAKE, catalog, USE_CATALOG, nextContext));
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
   }
 
   @Test
@@ -2015,6 +2209,139 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testSemanticModelRenameDropAndNameReuseInvalidateLocalCache() throws Exception {
+    GravitinoCache<String, Long> cache = getMetadataIdCache(jcasbinAuthorizer);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(cache, getOwnerRelCache(jcasbinAuthorizer));
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("case insensitive");
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
+    NameIdentifier oldIdent = NameIdentifier.of(METALAKE, "catalog", "schema", "SalesModel");
+    NameIdentifier newIdent = NameIdentifier.of(oldIdent.namespace(), "RenamedModel");
+    MetadataObject oldObject =
+        MetadataObjects.parse("catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL);
+    MetadataObject newObject =
+        MetadataObjects.parse("catalog.ScHeMa.RenamedModel", MetadataObject.Type.SEMANTIC_MODEL);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+        .thenReturn(Optional.of(100L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+        .thenReturn(Optional.of(200L));
+    assertEquals(
+        Optional.of(100L),
+        lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+    assertEquals(
+        Optional.of(200L),
+        lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+    SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+    SemanticModel renamed = mock(SemanticModel.class);
+    when(renamed.name()).thenReturn(newIdent.name());
+    SemanticModelChange rename = SemanticModelChange.rename(newIdent.name());
+    when(dispatcher.alterSemanticModel(oldIdent, rename)).thenReturn(renamed);
+    when(dispatcher.dropSemanticModel(newIdent)).thenReturn(true);
+    when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);
+    SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher, () -> null);
+    try {
+      hook.alterSemanticModel(oldIdent, rename);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .thenReturn(Optional.empty());
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .thenReturn(Optional.of(100L));
+      assertEquals(
+          Optional.empty(),
+          lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+      hook.dropSemanticModel(newIdent);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .thenReturn(Optional.of(300L));
+      assertEquals(
+          Optional.of(300L),
+          lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .thenReturn(Optional.of(400L));
+      assertEquals(
+          Optional.of(400L),
+          lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+    } finally {
+      when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(null);
+      when(gravitinoEnv.catalogManager()).thenReturn(null);
+    }
+  }
+
+  @Test
+  public void testSemanticModelCacheKeepsCaseSensitiveSchemasDistinct() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(
+            getMetadataIdCache(jcasbinAuthorizer), getOwnerRelCache(jcasbinAuthorizer));
+    MetadataObject lower =
+        MetadataObjects.parse("catalog.schema.SalesModel", MetadataObject.Type.SEMANTIC_MODEL);
+    MetadataObject upper =
+        MetadataObjects.parse("catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(lower, METALAKE))
+        .thenReturn(Optional.of(100L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(upper, METALAKE))
+        .thenReturn(Optional.of(200L));
+    try {
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(lower, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(200L),
+          lookups.resolveMetadataId(upper, METALAKE, new AuthorizationRequestContext()));
+      jcasbinAuthorizer.handleEntityNameIdMappingChange(
+          METALAKE,
+          NameIdentifier.of(METALAKE, "catalog", "SCHEMA", "SalesModel"),
+          Entity.EntityType.SEMANTIC_MODEL);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(upper, METALAKE))
+          .thenReturn(Optional.of(300L));
+      assertEquals(
+          Optional.of(300L),
+          lookups.resolveMetadataId(upper, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(lower, METALAKE, new AuthorizationRequestContext()));
+    } finally {
+      when(gravitinoEnv.catalogManager()).thenReturn(null);
+    }
+  }
+
+  @Test
   public void testOwnerCacheInvalidation() throws Exception {
     // Get the ownerRel cache via reflection
     GravitinoCache<Long, Optional<OwnerInfo>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
@@ -2609,10 +2936,11 @@ public class TestJcasbinAuthorizer {
     return (GravitinoCache<Long, Long>) field.get(authorizer);
   }
 
-  private static ReentrantLock getRolePolicyLock(JcasbinAuthorizer authorizer) throws Exception {
+  private static ReentrantReadWriteLock getRolePolicyLock(JcasbinAuthorizer authorizer)
+      throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("rolePolicyLock");
     field.setAccessible(true);
-    return (ReentrantLock) field.get(authorizer);
+    return (ReentrantReadWriteLock) field.get(authorizer);
   }
 
   @SuppressWarnings("unchecked")

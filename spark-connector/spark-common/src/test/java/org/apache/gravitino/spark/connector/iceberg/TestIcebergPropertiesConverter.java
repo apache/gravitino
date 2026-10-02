@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -139,5 +140,194 @@ public class TestIcebergPropertiesConverter {
             IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
             "custom-warehouse"),
         properties);
+  }
+
+  @Test
+  void testIcebergRestPropertiesFromHiveBackendExcludesStaticCredentials() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+            "thrift://hive-metastore:9083",
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+            "s3://bucket/warehouse",
+            "s3-access-key-id",
+            "AKIDEXAMPLE",
+            "s3-secret-access-key",
+            "secret");
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+
+    Assertions.assertEquals(
+        "rest", properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE));
+    Assertions.assertEquals(
+        "http://gravitino:9001/iceberg",
+        properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_URI));
+    Assertions.assertEquals(
+        "my_catalog", properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE));
+    Assertions.assertEquals("my_catalog", properties.get("prefix"));
+    Assertions.assertEquals(
+        "vended-credentials", properties.get("header.X-Iceberg-Access-Delegation"));
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
+
+    // The REST protocol vends its own credentials, so no static secret should be present.
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_JDBC_USER));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_JDBC_PASSWORD));
+  }
+
+  @Test
+  void testIcebergRestPropertiesFromJdbcBackendExcludesStaticCredentials() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_JDBC,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+            "jdbc:postgresql://db:5432/iceberg",
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_USER,
+            "user",
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_PASSWORD,
+            "passwd");
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+
+    Assertions.assertEquals(
+        "rest", properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_JDBC_USER));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_JDBC_PASSWORD));
+  }
+
+  @Test
+  void testIcebergRestPropertiesRespectsExplicitIoImpl() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+            "s3://bucket/warehouse",
+            IcebergConstants.IO_IMPL,
+            "com.example.CustomFileIO");
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+
+    Assertions.assertEquals("com.example.CustomFileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testIcebergRestPropertiesDerivesNativeFileIoPerScheme() {
+    Assertions.assertEquals(
+        "org.apache.iceberg.gcp.gcs.GCSFileIO", fileIoForWarehouse("gs://bucket/warehouse"));
+    Assertions.assertEquals(
+        "org.apache.iceberg.azure.adlsv2.ADLSFileIO",
+        fileIoForWarehouse("abfss://container@account.dfs.core.windows.net/warehouse"));
+    Assertions.assertEquals(
+        "org.apache.iceberg.aliyun.oss.OSSFileIO", fileIoForWarehouse("oss://bucket/warehouse"));
+  }
+
+  private String fileIoForWarehouse(String warehouse) {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+            warehouse);
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+    return properties.get(IcebergConstants.IO_IMPL);
+  }
+
+  @Test
+  void testIcebergRestPropertiesWarehouseSchemeWithoutNativeFileIo() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+            "hdfs://namenode/warehouse");
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testIcebergRestPropertiesBypassAndReservedKeyOverride() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            "spark.bypass.some-custom-property",
+            "custom-value",
+            // Attempting to override a reserved routing key via spark.bypass must be ignored.
+            "spark.bypass." + IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
+            "http://attacker-controlled/iceberg");
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+
+    Assertions.assertEquals("custom-value", properties.get("some-custom-property"));
+    Assertions.assertEquals(
+        "http://gravitino:9001/iceberg",
+        properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_URI));
+  }
+
+  @Test
+  void testReapplyReservedRestPropertiesUndoesSparkOptionsOverride() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
+    Map<String, String> properties =
+        new HashMap<>(
+            icebergPropertiesConverter.buildIcebergRestProperties(
+                "my_catalog",
+                "http://gravitino:9001/iceberg",
+                gravitinoProperties,
+                ImmutableMap.of()));
+
+    // Simulate a Spark-level catalog option redirecting the reserved routing keys, the way
+    // buildAutoRoutedIcebergRestProperties merges `options` in after buildIcebergRestProperties.
+    properties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_URI, "http://attacker-controlled");
+    properties.put(IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX, "other_catalog");
+
+    icebergPropertiesConverter.reapplyReservedRestProperties(
+        "my_catalog", "http://gravitino:9001/iceberg", properties);
+
+    Assertions.assertEquals(
+        "http://gravitino:9001/iceberg",
+        properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_URI));
+    Assertions.assertEquals(
+        "my_catalog", properties.get(IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX));
+  }
+
+  @Test
+  void testIcebergRestPropertiesRestClientConfigPassthrough() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog",
+            "http://gravitino:9001/iceberg",
+            gravitinoProperties,
+            ImmutableMap.of("rest.auth.type", "basic", "rest.auth.basic.username", "admin"));
+
+    Assertions.assertEquals("basic", properties.get("rest.auth.type"));
+    Assertions.assertEquals("admin", properties.get("rest.auth.basic.username"));
   }
 }

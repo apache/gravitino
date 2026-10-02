@@ -1,0 +1,43 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+public class TestJobMetaPostgreSQLProvider {
+
+  @Test
+  void testInsertJobMetaOnDuplicateKeyUpdateIncludesRuntimeJobTemplateColumn() {
+    String sql = new JobMetaPostgreSQLProvider().insertJobMetaOnDuplicateKeyUpdate(null);
+    String conflictClause = sql.substring(sql.indexOf("ON CONFLICT"));
+
+    // PostgreSQL's ON CONFLICT rewrite (as opposed to MySQL/H2's ON DUPLICATE KEY UPDATE) is a
+    // separate override from the base provider, so the new column has to be added here too.
+    Assertions.assertTrue(
+        sql.substring(0, sql.indexOf("VALUES")).contains("runtime_job_template"),
+        () -> "Column list must include runtime_job_template, but got: " + sql);
+    Assertions.assertTrue(
+        sql.contains("#{jobMeta.runtimeJobTemplate}"),
+        () -> "VALUES clause must bind runtimeJobTemplate, but got: " + sql);
+    Assertions.assertTrue(
+        conflictClause.contains("runtime_job_template = #{jobMeta.runtimeJobTemplate}"),
+        () -> "ON CONFLICT DO UPDATE SET must overwrite runtime_job_template, but got: " + sql);
+  }
+}

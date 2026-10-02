@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /** List the properties of a metalake. */
 public class ListProperties extends Command {
@@ -37,6 +40,27 @@ public class ListProperties extends Command {
   @Override
   public void handle() {
     /* Do nothing */
+  }
+
+  /**
+   * Merges masked {@code properties()} with plaintext from {@link SupportsSecrets#getSecrets()},
+   * matching Spark/Flink/GVFS so name-masked credential values are recoverable in CLI listings.
+   *
+   * @param properties properties from {@code load*().properties()} (may be null)
+   * @param secrets the object's {@link SupportsSecrets} (may be null)
+   * @return a new map with secrets overlaid on properties; never null
+   */
+  protected static Map<String, String> propertiesWithSecrets(
+      Map<String, String> properties, SupportsSecrets secrets) {
+    Map<String, String> merged =
+        new HashMap<>(properties == null ? Collections.emptyMap() : properties);
+    if (secrets != null) {
+      Map<String, String> secretProps = secrets.getSecrets();
+      if (secretProps != null && !secretProps.isEmpty()) {
+        merged.putAll(secretProps);
+      }
+    }
+    return merged;
   }
 
   /**

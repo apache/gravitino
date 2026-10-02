@@ -33,6 +33,7 @@ import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRela
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -44,8 +45,6 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 public class OrphanedMetadataObjectRelationService {
   private static final OrphanedMetadataObjectRelationService INSTANCE =
       new OrphanedMetadataObjectRelationService();
-
-  private static final String SEMANTIC_MODEL_META_TABLE_NAME = "semantic_model_meta";
 
   private static final Map<MetadataObject.Type, EntityTable> ENTITY_TABLES =
       ImmutableMap.<MetadataObject.Type, EntityTable>builder()
@@ -62,6 +61,9 @@ public class OrphanedMetadataObjectRelationService {
               new EntityTable(FilesetMetaMapper.META_TABLE_NAME, "fileset_id"))
           .put(MetadataObject.Type.TABLE, new EntityTable(TableMetaMapper.TABLE_NAME, "table_id"))
           .put(MetadataObject.Type.VIEW, new EntityTable(ViewMetaMapper.TABLE_NAME, "view_id"))
+          .put(
+              MetadataObject.Type.SEMANTIC_MODEL,
+              new EntityTable(SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id"))
           .put(MetadataObject.Type.TOPIC, new EntityTable(TopicMetaMapper.TABLE_NAME, "topic_id"))
           .put(
               MetadataObject.Type.COLUMN,
@@ -79,11 +81,6 @@ public class OrphanedMetadataObjectRelationService {
           .put(
               MetadataObject.Type.FUNCTION,
               new EntityTable(FunctionMetaMapper.TABLE_NAME, "function_id"))
-          // TODO(#12600): Reference SemanticModelMetaMapper.TABLE_NAME once the Semantic Model
-          // relational persistence layer introduces the mapper.
-          .put(
-              MetadataObject.Type.SEMANTIC_MODEL,
-              new EntityTable(SEMANTIC_MODEL_META_TABLE_NAME, "semantic_model_id"))
           .build();
 
   private OrphanedMetadataObjectRelationService() {}
@@ -123,12 +120,6 @@ public class OrphanedMetadataObjectRelationService {
                     deletedAt,
                     limit)
                 + mapper.softDeleteOrphanedTagRelations(
-                    entityTable.tableName,
-                    entityTable.idColumn,
-                    metadataObjectType.name(),
-                    deletedAt,
-                    limit)
-                + mapper.softDeleteOrphanedPolicyRelations(
                     entityTable.tableName,
                     entityTable.idColumn,
                     metadataObjectType.name(),

@@ -19,14 +19,22 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Optional;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Two-tier metadata-id and owner resolution for {@link JcasbinAuthorizer}.
@@ -70,8 +78,23 @@ public class JcasbinAuthorizationLookups {
    */
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
-    String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject);
     try {
+      MetadataObject cacheObject = metadataObject;
+      // Hooks and change-log records use normalized parents. Cache the same key for every
+      // equivalent request spelling, while preserving the Gravitino-owned model leaf.
+      if (metadataObject.type() == MetadataObject.Type.SEMANTIC_MODEL) {
+        NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+        Capability capability =
+            CapabilityHelpers.getCapability(ident, GravitinoEnv.getInstance().catalogManager());
+        NameIdentifier normalized =
+            NameIdentifier.of(
+                CapabilityHelpers.applyCaseSensitive(
+                    ident.namespace(), Capability.Scope.SEMANTIC_MODEL, capability),
+                ident.name());
+        cacheObject =
+            NameIdentifierUtil.toMetadataObject(normalized, Entity.EntityType.SEMANTIC_MODEL);
+      }
+      String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);
       // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
       // by throwing through the loaders and translated back to Optional.empty() here. This caches
       // only positive results, never a negative one.
@@ -79,7 +102,7 @@ public class JcasbinAuthorizationLookups {
           requestContext.computeMetadataIdIfAbsent(
               cacheKey,
               k -> metadataIdCache.get(k, ignored -> loadMetadataId(metadataObject, metalake))));
-    } catch (NoSuchMetadataObjectException e) {
+    } catch (NotFoundException e) {
       return Optional.empty();
     }
   }

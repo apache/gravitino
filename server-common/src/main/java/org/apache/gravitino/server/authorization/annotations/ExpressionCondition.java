@@ -20,5 +20,7 @@ package org.apache.gravitino.server.authorization.annotations;
 
 public enum ExpressionCondition {
   NEVER,
-  REQUIRED_MODIFY_PRIVILEGES
+  REQUIRED_MODIFY_PRIVILEGES,
+  /** The request carries proposed changes that are not saved, for example in its request body. */
+  HAS_PROPOSED_CHANGES
 }

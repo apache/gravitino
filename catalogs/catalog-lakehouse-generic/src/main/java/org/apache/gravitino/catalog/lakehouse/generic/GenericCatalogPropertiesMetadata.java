@@ -36,6 +36,13 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
+  /**
+   * The name of the {@link TableLocationProvider} that provisions and unprovisions the locations of
+   * this catalog's tables. Defaults to {@link DefaultTableLocationProvider#NAME} and is immutable
+   * once the catalog is created.
+   */
+  public static final String TABLE_LOCATION_PROVIDER = "table-location-provider";
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {
@@ -54,6 +61,15 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null, /* defaultValue */
                 false /* hidden */,
                 false /* reserved */),
+            stringOptionalPropertyEntry(
+                TABLE_LOCATION_PROVIDER,
+                "The name of the table location provider that provisions and unprovisions the"
+                    + " locations of this catalog's tables. It is fixed when the catalog is"
+                    + " created, because switching it would leave the tables of a single catalog"
+                    + " spread over two different location schemes.",
+                true /* immutable */,
+                DefaultTableLocationProvider.NAME, /* defaultValue */
+                false /* hidden */),
             enumPropertyEntry(
                 LANCE_SCHEMA_REFRESH_MODE,
                 "Controls when Lance table schemas are refreshed from the underlying dataset.",

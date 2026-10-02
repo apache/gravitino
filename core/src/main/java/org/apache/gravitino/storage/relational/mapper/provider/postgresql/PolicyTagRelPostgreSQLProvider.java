@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper.POLICY_TAG_RELATION_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyTagRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.ibatis.annotations.Param;
@@ -50,6 +51,6 @@ public class PolicyTagRelPostgreSQLProvider extends PolicyTagRelBaseSQLProvider 
 
   @Override
   protected String deletedAtNowExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+    return DatabaseTimeSQL.POSTGRESQL;
   }
 }

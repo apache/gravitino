@@ -34,6 +34,7 @@ import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.Utils;
 
 /**
@@ -41,13 +42,14 @@ import org.apache.gravitino.server.web.Utils;
  * semantics as the main Gravitino server.
  *
  * <ul>
- *   <li>{@code GET /iceberg/health/live} — liveness, 200 as long as the HTTP thread can respond
+ *   <li>{@code GET /iceberg/health/live} — liveness, 200 when the HTTP thread can respond and no
+ *       OOM has been observed
  *   <li>{@code GET /iceberg/health/ready} — readiness, 200 when the catalog wrapper manager is
  *       initialized
  *   <li>{@code GET /iceberg/health} — aggregate, 200 when both pass
  * </ul>
  *
- * All endpoints return 503 with a JSON body describing the failed check(s) when unhealthy.
+ * All endpoints return 503 after an observed OOM until process restart, or when their checks fail.
  */
 @Path("/health")
 @Produces(MediaType.APPLICATION_JSON)
@@ -56,21 +58,32 @@ public class IcebergHealthOperations {
   private static final String CHECK_HTTP_SERVER = "httpServer";
   private static final String CHECK_CATALOG_WRAPPER_MANAGER = "catalogWrapperManager";
 
+  private final ServerHealth serverHealth;
+
   @Inject private IcebergCatalogWrapperManager catalogWrapperManager;
 
   /** Default constructor for Jersey auto-discovery. */
-  public IcebergHealthOperations() {}
+  public IcebergHealthOperations() {
+    this(ServerHealth.getInstance());
+  }
+
+  IcebergHealthOperations(ServerHealth serverHealth) {
+    this.serverHealth = serverHealth;
+  }
 
   /**
-   * Liveness probe. Returns 200 as long as the HTTP thread can respond.
+   * Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed.
    *
-   * @return 200 OK with an UP {@link HealthResponse}
+   * @return 200 OK when live, or 503 with a JVM failure after an observed OOM
    */
   @GET
   @Path("/live")
   @Timed(name = "iceberg.health.live." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg.health.live", absolute = true)
   public Response live() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
     return Utils.ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
   }
@@ -86,7 +99,13 @@ public class IcebergHealthOperations {
   @Timed(name = "iceberg.health.ready." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg.health.ready", absolute = true)
   public Response ready() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     HealthCheckDTO managerCheck = checkCatalogWrapperManager();
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     HealthCheckDTO.Status overall = managerCheck.getStatus();
     HealthResponse body = new HealthResponse(overall, Collections.singletonList(managerCheck));
     return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
@@ -101,9 +120,15 @@ public class IcebergHealthOperations {
   @Timed(name = "iceberg.health." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg.health", absolute = true)
   public Response health() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     List<HealthCheckDTO> checks = new ArrayList<>(2);
     checks.add(up(CHECK_HTTP_SERVER, Collections.emptyMap()));
     checks.add(checkCatalogWrapperManager());
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
 
     HealthCheckDTO.Status overall =
         checks.stream().anyMatch(c -> c.getStatus() == HealthCheckDTO.Status.DOWN)

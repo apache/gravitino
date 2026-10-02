@@ -172,11 +172,16 @@ public class TestJcasbinChangePoller {
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
-    poller.onEntityChange(List.of(change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1")));
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1"),
+            change(2L, MetadataObject.Type.FUNCTION, "ml1.cat1.sch1.func1")));
 
-    // A FILESET has nothing nested under it, so it is removed by its exact key, not by prefix.
+    // Leaf objects have nothing nested under them, so they are removed by exact key, not prefix.
     Assertions.assertEquals(
-        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FILESET", "fs1")),
+        List.of(
+            key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FILESET", "fs1"),
+            key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FUNCTION", "func1")),
         metadataIdCache.invalidatedKeys);
     Assertions.assertEquals(List.of(), metadataIdCache.invalidatedPrefixes);
     Assertions.assertEquals(0, metadataIdCache.invalidateAllCalls);

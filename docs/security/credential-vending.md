@@ -13,14 +13,14 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 | Catalog type | Vends                           |
 |--------------|---------------------------------|
-| Fileset      | S3, OSS, GCS, ADLS              |
+| Fileset      | S3, OSS, GCS, ADLS, COS         |
 | Hive         | S3, OSS, GCS, ADLS              |
 | Iceberg      | S3, OSS, GCS, ADLS              |
 | Glue         | S3                              |
 | JDBC         | JDBC user and password          |
 | Paimon       | S3, OSS, JDBC user and password |
 
-S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, and ADLS is Azure Data Lake Storage. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs.
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs.
 
 ## Quick Start
 
@@ -113,7 +113,11 @@ Catalogs defined in `gravitino.conf` are not registered in a metalake, so Gravit
 | `adls-token`         | ADLS    | A user delegation SAS token                                |
 | `azure-account-key`  | ADLS    | The configured static storage account key                  |
 | `gcs-token`          | GCS     | A downscoped access token                                  |
+| `cos-token`          | COS     | A temporary STS token                                      |
+| `cos-secret-key`     | COS     | The configured static access key and secret                |
 | `jdbc-user-password` | JDBC    | The configured JDBC username and password                  |
+| `aws-secret-key`     | Glue    | The configured AWS access key and secret for Glue API auth |
+| `dlf-secret-key`     | Paimon  | The configured DLF access key and secret (optional token)  |
 
 Each value has its own properties, listed in the sections below. To vend for more than one storage type on a catalog, separate values with a comma. Custom providers can be added by implementing `CredentialProvider`, described under [Custom Credentials](#custom-credentials).
 
@@ -127,10 +131,37 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
 | `gcs-service-account-file`                                   | `gcs-token`         |
+| `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
+| `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 
 JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
+
+### Static providers and `getCredentials` privilege risk
+
+Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
+`jdbc-user-password`, `aws-secret-key`, and `dlf-secret-key` return the configured long-lived
+plaintext keys from `getCredentials` / `GET .../credentials`. That endpoint does **not** require a
+dedicated privilege beyond being able to load the metadata object (unlike `getSecrets`, which
+requires `USE_SECRETS`, with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+
+**Risk:** any principal that can load a catalog (or fileset) configured with these static providers
+can retrieve the same static AK/SK or JDBC password that Gravitino uses server-side.
+
+**Temporary mitigation** until provider-level authorization is tightened:
+
+- Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
+  `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
+  whenever possible.
+- When static providers are unavoidable, grant load / use privileges only to trusted principals
+  (connectors and operators that must recover credentials).
+- Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /
+  `INCLUDE_CREDENTIAL_SECRETS` and `getSecrets` when you need privilege-gated plaintext access.
+
+A follow-up should track a lasting fix (for example privilege checks specific to static
+credentials, or refusing to vend static secret-key credentials through `getCredentials` when
+authorization is enabled).
 
 ## S3
 
@@ -278,6 +309,85 @@ The key is long-lived, carries whatever permissions its RAM user has, and is not
 | `oss-access-key-id`     | The static access key ID used to access OSS data.     | (none)        | Yes      |
 | `oss-secret-access-key` | The static secret access key used to access OSS data. | (none)        | Yes      |
 
+## COS
+
+### `cos-token`
+
+Gravitino calls Tencent Cloud STS [AssumeRole](https://www.tencentcloud.com/document/product/598/33416) and returns temporary credentials scoped to the table path. The role is a Cloud Access Management (CAM) role on Tencent Cloud; the CAM abbreviation is used throughout this section.
+
+Also set `cos-access-key-id` and `cos-secret-access-key`. Gravitino uses them to call AssumeRole, not to reach data, and they are never sent to the engine.
+
+| Property                   | Description                                                                                                                 | Default value | Required |
+|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `cos-access-key-id`        | The static access key ID (Tencent Cloud `SecretId`) used by Gravitino to call STS `AssumeRole`.                             | (none)        | Yes      |
+| `cos-secret-access-key`    | The static secret access key (Tencent Cloud `SecretKey`) used by Gravitino to call STS `AssumeRole`.                        | (none)        | Yes      |
+| `cos-role-arn`             | The ARN of the CAM role to assume, e.g. `qcs::cam::uin/100012345678:roleName/GravitinoCOSAccess`.                           | (none)        | Yes      |
+| `cos-region`               | The region of the bucket, e.g. `ap-guangzhou`. Used to build the STS endpoint and the resource ARN.                         | (none)        | Yes      |
+| `cos-app-id`               | The numeric Tencent Cloud AppId of the bucket owner (the trailing segment of the bucket name, e.g. `1250000000`).           | (none)        | Yes      |
+| `cos-external-id`          | Optional `ExternalId` propagated to STS `AssumeRole` to lock the role's trust policy to Gravitino.                          | (none)        | No       |
+| `cos-token-expire-in-secs` | The COS security token expire time in secs. Must not exceed the role's max session duration.                                | 3600          | No       |
+
+#### Trust Policy on the CAM Role
+
+The role in `cos-role-arn` must allow the `cos-access-key-id` principal to assume it. If `cos-external-id` is set, the trust policy must require the same value.
+
+```json
+{
+  "version": "2.0",
+  "statement": [{
+    "effect": "allow",
+    "action": "name/sts:AssumeRole",
+    "principal": { "qcs": ["qcs::cam::uin/{account_uin}:uin/{account_uin}"] },
+    "condition": {
+      "string_equal": { "sts:external_id": "{external_id}" }
+    }
+  }]
+}
+```
+
+#### Permission Policy on the CAM Role
+
+The vended credentials inherit this policy, narrowed to the table path.
+
+```json
+{
+  "version": "2.0",
+  "statement": [
+    {
+      "effect": "allow",
+      "action": [
+        "cos:GetObject",
+        "cos:HeadObject",
+        "cos:PutObject",
+        "cos:DeleteObject",
+        "cos:InitiateMultipartUpload",
+        "cos:UploadPart",
+        "cos:ListParts",
+        "cos:CompleteMultipartUpload",
+        "cos:AbortMultipartUpload"
+      ],
+      "resource": "qcs::cos:{region}:uid/{app_id}:{bucket_name}-{app_id}/{warehouse_path}/*"
+    },
+    {
+      "effect": "allow",
+      "action": ["cos:GetBucket", "cos:HeadBucket", "cos:GetBucketLocation"],
+      "resource": "qcs::cos:{region}:uid/{app_id}:{bucket_name}-{app_id}/*"
+    }
+  ]
+}
+```
+
+### `cos-secret-key`
+
+Returns the catalog's configured access key and secret to the client, unchanged.
+
+The key is long-lived, carries whatever permissions its CAM user has, and is not scoped to the table path. Any client that can load a table receives it, and it stays valid after the query finishes. Prefer `cos-token`. Use `cos-secret-key` to confirm the vending path works before configuring a role.
+
+| Property                | Description                                           | Default value | Required |
+|-------------------------|-------------------------------------------------------|---------------|----------|
+| `cos-access-key-id`     | The static access key ID used to access COS data.     | (none)        | Yes      |
+| `cos-secret-access-key` | The static secret access key used to access COS data. | (none)        | Yes      |
+
 ## ADLS
 
 ### `adls-token`
@@ -322,7 +432,7 @@ There is no role to assume. The identity is the service account in `gcs-service-
 |----------------------------|------------------------------------------|-------------------------------------|----------|
 | `gcs-service-account-file` | The location of the GCS credential file. | GCS Application default credential. | No       |
 
-For the IRC, ensure that the credential file is accessible by that server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
+`gcs-service-account-file` is used both to vend downscoped tokens and to authenticate Iceberg `GCSFileIO` on the server (Gravitino injects `gcs.oauth2.token` at catalog load because Iceberg has no service-account-file property). Ensure the file is readable by the server process. If the property is unset, FileIO and token vending fall back to Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 
 ## Requesting Vended Credentials
 
@@ -399,7 +509,8 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response. Retrieve secret-manager-backed properties (including those keys when stored as secret URNs) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The credentials API (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` / `dlf-security-token` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner); cloud access-key pairs are included only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). Connectors typically use `USE_SECRETS` plus `getCredentials` / `GET .../credentials` (no dedicated privilege) to recover S3/OSS/COS/Azure/JDBC cloud keys, as well as Glue AWS API keys (`AwsSecretKeyCredential`) and Paimon DLF pairs (`DlfSecretKeyCredential`). Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 

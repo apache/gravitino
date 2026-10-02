@@ -54,12 +54,17 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RequestContext;
 
 /**
  * {@code TableEventDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
  * table operations to the underlying catalog dispatcher but also dispatches corresponding events to
  * an {@link org.apache.gravitino.listener.EventBus} after each operation is completed. This allows
  * for event-driven workflows or monitoring of table operations.
+ *
+ * <p>Create, alter, and load attach optional extras stashed on {@link RequestContext} so an inner
+ * dispatcher can contribute {@code customInfo} to the terminal event without publishing a sibling
+ * event that consumers would have to correlate.
  */
 public class TableEventDispatcher implements TableDispatcher {
 
@@ -101,12 +106,19 @@ public class TableEventDispatcher implements TableDispatcher {
     eventBus.dispatchEvent(new LoadTablePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Table table = dispatcher.loadTable(ident);
+      Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
-          new LoadTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table)));
+          extras.isEmpty()
+              ? new LoadTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table))
+              : new LoadTableEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table), extras));
       return table;
     } catch (Exception e) {
+      Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
-          new LoadTableFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+          extras.isEmpty()
+              ? new LoadTableFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e)
+              : new LoadTableFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e, extras));
       throw e;
     }
   }
@@ -139,13 +151,22 @@ public class TableEventDispatcher implements TableDispatcher {
       Table table =
           dispatcher.createTable(
               ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+      Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
-          new CreateTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table)));
+          extras.isEmpty()
+              ? new CreateTableEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table))
+              : new CreateTableEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table), extras));
       return table;
     } catch (Exception e) {
+      Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
-          new CreateTableFailureEvent(
-              PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest));
+          extras.isEmpty()
+              ? new CreateTableFailureEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest)
+              : new CreateTableFailureEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest, extras));
       throw e;
     }
   }
@@ -157,13 +178,25 @@ public class TableEventDispatcher implements TableDispatcher {
         new AlterTablePreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Table table = dispatcher.alterTable(ident, changes);
+      Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
-          new AlterTableEvent(
-              PrincipalUtils.getCurrentUserName(), ident, changes, new TableInfo(table)));
+          extras.isEmpty()
+              ? new AlterTableEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, changes, new TableInfo(table))
+              : new AlterTableEvent(
+                  PrincipalUtils.getCurrentUserName(),
+                  ident,
+                  changes,
+                  new TableInfo(table),
+                  extras));
       return table;
     } catch (Exception e) {
+      Map<String, String> extras = RequestContext.takeAuditExtras();
       eventBus.dispatchEvent(
-          new AlterTableFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e, changes));
+          extras.isEmpty()
+              ? new AlterTableFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e, changes)
+              : new AlterTableFailureEvent(
+                  PrincipalUtils.getCurrentUserName(), ident, e, changes, extras));
       throw e;
     }
   }

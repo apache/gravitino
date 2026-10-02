@@ -43,6 +43,7 @@ import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -57,6 +58,7 @@ import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
@@ -87,6 +89,9 @@ public class MetadataObjectService {
               .put(MetadataObject.Type.FUNCTION, MetadataObjectService::getFunctionObjectsFullName)
               .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
               .put(MetadataObject.Type.VIEW, MetadataObjectService::getViewObjectsFullName)
+              .put(
+                  MetadataObject.Type.SEMANTIC_MODEL,
+                  MetadataObjectService::getSemanticModelObjectsFullName)
               .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
               .put(MetadataObject.Type.TAG, MetadataObjectService::getTagObjectsFullName)
               .put(MetadataObject.Type.POLICY, MetadataObjectService::getPolicyObjectsFullName)
@@ -94,9 +99,6 @@ public class MetadataObjectService {
               .put(
                   MetadataObject.Type.JOB_TEMPLATE,
                   MetadataObjectService::getJobTemplateObjectsFullName)
-              // TODO(#12600): Add MetadataObject.Type.SEMANTIC_MODEL once the Semantic Model PO and
-              // mapper exist. Listing the objects a tag is attached to needs full-name resolution
-              // for Semantic Models.
               .build();
 
   static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =
@@ -475,6 +477,13 @@ public class MetadataObjectService {
 
     columnPOs.forEach(
         columnPO -> {
+          // A dropped column keeps a live row whose op type is DELETE, so it must be reported as
+          // deleted instead of returning its last name.
+          if (columnPO.getColumnOpType() == ColumnPO.ColumnOpType.DELETE.value()) {
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
           // since the table can be deleted, we need to check the null value,
           // and when the table is deleted, we will set fullName of column to
           // null
@@ -657,5 +666,32 @@ public class MetadataObjectService {
         });
 
     return schemaIdAndNameMap;
+  }
+
+  private static Map<Long, String> getSemanticModelObjectsFullName(List<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return Maps.newHashMap();
+    }
+    List<SemanticModelPO> models =
+        SessionUtils.getWithoutCommit(
+            SemanticModelMetaMapper.class, mapper -> mapper.listSemanticModelPOsByIds(ids));
+    if (models == null || models.isEmpty()) {
+      return Maps.newHashMap();
+    }
+    Map<Long, String> schemas =
+        getSchemaObjectsFullName(
+            models.stream()
+                .map(SemanticModelPO::getSchemaId)
+                .distinct()
+                .collect(Collectors.toList()));
+    Map<Long, String> names = Maps.newHashMap();
+    models.forEach(
+        model -> {
+          String schema = schemas.get(model.getSchemaId());
+          names.put(
+              model.getSemanticModelId(),
+              schema == null ? null : DOT_JOINER.join(schema, model.getSemanticModelName()));
+        });
+    return names;
   }
 }

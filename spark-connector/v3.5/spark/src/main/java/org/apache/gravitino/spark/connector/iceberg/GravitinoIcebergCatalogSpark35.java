@@ -18,16 +18,45 @@
  */
 package org.apache.gravitino.spark.connector.iceberg;
 
-import java.util.Set;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import java.lang.reflect.InvocationTargetException;
+import org.apache.iceberg.spark.procedures.SparkProcedures;
+import org.apache.spark.sql.catalyst.analysis.NoSuchProcedureException;
 import org.apache.spark.sql.connector.catalog.Identifier;
-import org.apache.spark.sql.connector.catalog.Table;
-import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
+import org.apache.spark.sql.connector.iceberg.catalog.Procedure;
+import org.apache.spark.sql.connector.iceberg.catalog.ProcedureCatalog;
 
-public class GravitinoIcebergCatalogSpark35 extends GravitinoIcebergCatalogSpark34 {
+/**
+ * Spark 3.5 specific Gravitino Iceberg catalog implementation. {@link ProcedureCatalog} is declared
+ * here rather than in the shared base because on Spark 3.x it is a class Iceberg ships, returning
+ * Iceberg's {@link Procedure}, while Spark 4 ships its own with a different return type.
+ */
+public class GravitinoIcebergCatalogSpark35 extends GravitinoIcebergCatalog
+    implements ProcedureCatalog {
+
+  /**
+   * Procedures validate that the catalog registered with Spark's catalogManager is the same one
+   * passed to the {@code ProcedureBuilder} that invokes loadProcedure(). Pass this catalog rather
+   * than the internal Spark catalog to satisfy that check.
+   */
   @Override
-  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
-      throws NoSuchTableException {
-    return loadTableForWriting(ident);
+  public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
+    String[] namespace = identifier.namespace();
+    String name = identifier.name();
+
+    try {
+      if (isSystemNamespace(namespace)) {
+        SparkProcedures.ProcedureBuilder builder = SparkProcedures.newBuilder(name);
+        if (builder != null) {
+          return builder.withTableCatalog(this).build();
+        }
+      }
+    } catch (NoSuchMethodException
+        | IllegalAccessException
+        | InvocationTargetException
+        | ClassNotFoundException e) {
+      throw new RuntimeException("Failed to load Iceberg Procedure " + identifier, e);
+    }
+
+    throw new NoSuchProcedureException(identifier);
   }
 }

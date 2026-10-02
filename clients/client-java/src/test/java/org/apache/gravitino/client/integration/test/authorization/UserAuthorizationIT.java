@@ -31,10 +31,18 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.client.ErrorHandlers;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.RESTClient;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.requests.BulkRemoveRequest;
+import org.apache.gravitino.dto.requests.BulkUserAddRequest;
+import org.apache.gravitino.dto.requests.UserAddRequest;
+import org.apache.gravitino.dto.responses.BulkRemoveResponse;
+import org.apache.gravitino.dto.responses.BulkUserResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.rest.RESTUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -97,6 +105,54 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(3)
+  public void testBulkUserInterfaces() throws Exception {
+    String bulkUserManager = "bulk_user_manager";
+    String bulkUser1 = "bulk_user_it_1";
+    String bulkUser2 = "bulk_user_it_2";
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.addUser(bulkUserManager);
+
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            bulkAddUsers(
+                restClient(normalUserClient),
+                new BulkUserAddRequest(new UserAddRequest[] {new UserAddRequest(bulkUser1)})));
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            bulkRemoveUsers(
+                restClient(normalUserClient), new BulkRemoveRequest(new String[] {bulkUser1})));
+
+    gravitinoMetalake.createRole("bulk_user_role", new HashMap<>(), Collections.emptyList());
+    gravitinoMetalake.grantPrivilegesToRole(
+        "bulk_user_role",
+        MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+        ImmutableList.of(Privileges.ManageUsers.allow()));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of("bulk_user_role"), bulkUserManager);
+
+    GravitinoAdminClient bulkUserManagerClient = getClientByUser(bulkUserManager);
+    BulkUserResponse addResponse =
+        bulkAddUsers(
+            restClient(bulkUserManagerClient),
+            new BulkUserAddRequest(
+                new UserAddRequest[] {
+                  new UserAddRequest(bulkUser1), new UserAddRequest(bulkUser2)
+                }));
+    assertEquals(2, addResponse.getUsers().length);
+    assertEquals(0, addResponse.getErrors().length);
+
+    BulkRemoveResponse removeResponse =
+        bulkRemoveUsers(
+            restClient(bulkUserManagerClient),
+            new BulkRemoveRequest(new String[] {bulkUser1, bulkUser2}));
+    Assertions.assertArrayEquals(new String[] {bulkUser1, bulkUser2}, removeResponse.getNames());
+    assertEquals(0, removeResponse.getErrors().length);
+    gravitinoMetalake.removeUser(bulkUserManager);
+  }
+
+  @Test
+  @Order(4)
   public void testRemoveUser() {
     GravitinoAdminClient user1Client = getClientByUser("user1");
     assertThrows(
@@ -130,7 +186,7 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
-  @Order(4)
+  @Order(5)
   public void testListUsersWithNonExistentMetalake() throws Exception {
     // Test that listUsers with @AuthorizationExpression returns 403 Forbidden
     // when the metalake doesn't exist, instead of 404 response
@@ -187,5 +243,29 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
         GravitinoAdminClient.builder(serverUri).withSimpleAuth(username).build();
     closer.register(client);
     return client;
+  }
+
+  private BulkUserResponse bulkAddUsers(RESTClient restClient, BulkUserAddRequest request) {
+    BulkUserResponse response =
+        restClient.post(
+            String.format("api/bulk/metalakes/%s/users/add", RESTUtils.encodeString(METALAKE)),
+            request,
+            BulkUserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    response.validate();
+    return response;
+  }
+
+  private BulkRemoveResponse bulkRemoveUsers(RESTClient restClient, BulkRemoveRequest request) {
+    BulkRemoveResponse response =
+        restClient.post(
+            String.format("api/bulk/metalakes/%s/users/remove", RESTUtils.encodeString(METALAKE)),
+            request,
+            BulkRemoveResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    response.validate();
+    return response;
   }
 }

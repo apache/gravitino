@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -98,32 +99,6 @@ public class FunctionMetaBaseSQLProvider {
         + " #{functionMeta.functionCurrentVersion},"
         + " #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
         + " #{functionMeta.deletedAt})";
-  }
-
-  public String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return "INSERT INTO "
-        + TABLE_NAME
-        + " (function_id, function_name, metalake_id, catalog_id, schema_id,"
-        + " function_type, `deterministic`,"
-        + " function_current_version, function_latest_version, audit_info, deleted_at)"
-        + " VALUES (#{functionMeta.functionId}, #{functionMeta.functionName},"
-        + " #{functionMeta.metalakeId}, #{functionMeta.catalogId}, #{functionMeta.schemaId},"
-        + " #{functionMeta.functionType}, #{functionMeta.deterministic},"
-        + " #{functionMeta.functionCurrentVersion},"
-        + " #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
-        + " #{functionMeta.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " function_name = #{functionMeta.functionName},"
-        + " metalake_id = #{functionMeta.metalakeId},"
-        + " catalog_id = #{functionMeta.catalogId},"
-        + " schema_id = #{functionMeta.schemaId},"
-        + " function_type = #{functionMeta.functionType},"
-        + " `deterministic` = #{functionMeta.deterministic},"
-        + " function_current_version = #{functionMeta.functionCurrentVersion},"
-        + " function_latest_version = #{functionMeta.functionLatestVersion},"
-        + " audit_info = #{functionMeta.auditInfo},"
-        + " deleted_at = #{functionMeta.deletedAt}";
   }
 
   public String selectFunctionMetaByFullQualifiedName(
@@ -201,6 +176,26 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE fm.schema_id = #{schemaId} AND fm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  /**
+   * Returns the active function metadata row and holds it exclusively for the transaction.
+   *
+   * <p>The version table is deliberately not joined: PostgreSQL rejects locking the nullable side
+   * of an outer join, and conflict classification only needs the root row's identity and version.
+   *
+   * @param functionId the function ID
+   * @return the locking select SQL
+   */
+  public String selectFunctionMetaByIdForUpdate(@Param("functionId") Long functionId) {
+    return "SELECT function_id as functionId, function_name as functionName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+        + " function_current_version as functionCurrentVersion,"
+        + " function_latest_version as functionLatestVersion,"
+        + " audit_info as auditInfo, deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE function_id = #{functionId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String listFunctionPOsByFunctionIds(@Param("functionIds") List<Long> functionIds) {
     return "<script>"
         + " SELECT function_id, function_name, schema_id"
@@ -234,6 +229,26 @@ public class FunctionMetaBaseSQLProvider {
         + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  /**
+   * Returns SQL that locks an active function by natural key without joining its version row.
+   *
+   * <p>This query is reserved for overwrite decisions. Normal reads keep using the inner-joined
+   * query above so a broken current-version invariant is reported as missing instead of producing a
+   * partially populated {@code FunctionPO}.
+   */
+  public String selectFunctionMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
+    return "SELECT function_id as functionId, function_name as functionName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+        + " function_current_version as functionCurrentVersion,"
+        + " function_latest_version as functionLatestVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND function_name = #{functionName}"
+        + " AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String selectFunctionIdBySchemaIdAndFunctionName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
     return "SELECT function_id"
@@ -242,27 +257,36 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND function_name = #{functionName} AND deleted_at = 0";
   }
 
-  public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
+  /**
+   * Returns SQL that deletes only the function version observed by the caller.
+   *
+   * @param functionId the function ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE function_id = #{functionId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE function_id = #{functionId}"
+        + " AND function_current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
   public String softDeleteFunctionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -270,8 +294,8 @@ public class FunctionMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -287,6 +311,13 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
+  /**
+   * Returns SQL that updates a function only while its OCC version is unchanged.
+   *
+   * @param newFunctionPO the function values to write
+   * @param oldFunctionPO the function values and OCC version read by the caller
+   * @return the version-checked update SQL
+   */
   public String updateFunctionMeta(
       @Param("newFunctionMeta") FunctionPO newFunctionPO,
       @Param("oldFunctionMeta") FunctionPO oldFunctionPO) {
@@ -303,14 +334,7 @@ public class FunctionMetaBaseSQLProvider {
         + " audit_info = #{newFunctionMeta.auditInfo},"
         + " deleted_at = #{newFunctionMeta.deletedAt}"
         + " WHERE function_id = #{oldFunctionMeta.functionId}"
-        + " AND function_name = #{oldFunctionMeta.functionName}"
-        + " AND metalake_id = #{oldFunctionMeta.metalakeId}"
-        + " AND catalog_id = #{oldFunctionMeta.catalogId}"
-        + " AND schema_id = #{oldFunctionMeta.schemaId}"
-        + " AND function_type = #{oldFunctionMeta.functionType}"
         + " AND function_current_version = #{oldFunctionMeta.functionCurrentVersion}"
-        + " AND function_latest_version = #{oldFunctionMeta.functionLatestVersion}"
-        + " AND audit_info = #{oldFunctionMeta.auditInfo}"
         + " AND deleted_at = 0";
   }
 }

@@ -278,7 +278,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
   @Test
   void testCreateTableWithArrayType() {
     String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
-    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), true), "col_4_comment");
     Column[] columns = new Column[] {col};
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -1630,6 +1630,24 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals(Types.ExternalType.of("bit"), loadedTable.columns()[0].dataType());
+  }
+
+  @Test
+  void testUnconstrainedNumericAndArrayTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_numeric_array_type");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (numeric_col numeric, numeric_col_2 numeric(10,2), array_col integer[]);",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    // An unconstrained numeric holds values whose precision and scale vary per row
+    Assertions.assertEquals(Types.ExternalType.of("numeric"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), loadedTable.columns()[1].dataType());
+    // PostgreSQL array elements are always nullable
+    Assertions.assertEquals(
+        Types.ListType.of(Types.IntegerType.get(), true), loadedTable.columns()[2].dataType());
   }
 
   @Test

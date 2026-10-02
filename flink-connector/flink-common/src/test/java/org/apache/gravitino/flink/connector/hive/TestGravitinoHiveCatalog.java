@@ -18,21 +18,33 @@
  */
 package org.apache.gravitino.flink.connector.hive;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.Map;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGravitinoHiveCatalog {
+public abstract class TestGravitinoHiveCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
 
   @Test
   public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
@@ -41,7 +53,8 @@ public class TestGravitinoHiveCatalog {
     ForbiddenException forbiddenException = new ForbiddenException("denied");
     Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
     Mockito.when(tableCatalog.loadTable(Mockito.any())).thenThrow(forbiddenException);
-    TestableGravitinoHiveCatalog catalog = new TestableGravitinoHiveCatalog(gravitinoCatalog);
+    TestableGravitinoHiveCatalog catalog =
+        new TestableGravitinoHiveCatalog(catalogCompat(), gravitinoCatalog);
 
     CatalogException catalogException =
         Assertions.assertThrows(
@@ -50,10 +63,88 @@ public class TestGravitinoHiveCatalog {
     Assertions.assertSame(forbiddenException, catalogException.getCause());
   }
 
-  private static class TestableGravitinoHiveCatalog extends GravitinoHiveCatalog {
-    private final Catalog gravitinoCatalog;
+  @Test
+  public void testGenericTableAlterSkipsCallWhenNoChanges() throws Exception {
+    // Existing table and the resolved new table describe the same state (same properties, same
+    // comment), so no TableChange is produced. The connector must not forward an empty update
+    // list to Gravitino, which would fail server-side with "updates must not be empty".
+    Map<String, String> sameProperties =
+        ImmutableMap.of("flink.connector", "kafka", "is_generic", "true");
 
-    TestableGravitinoHiveCatalog(Catalog gravitinoCatalog) {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Table existingTable = Mockito.mock(Table.class);
+    Mockito.when(existingTable.properties()).thenReturn(sameProperties);
+    Mockito.when(existingTable.comment()).thenReturn("same comment");
+
+    ResolvedCatalogTable newTable = resolvedTable("same comment");
+
+    TestableGravitinoHiveCatalog catalog =
+        new TestableGravitinoHiveCatalog(catalogCompat(), gravitinoCatalog, sameProperties);
+
+    catalog.applyGenericTableAlter(new ObjectPath("db", "tbl"), existingTable, newTable);
+
+    // The alter call is skipped entirely because there is nothing to change.
+    Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  public void testGenericTableAlterCallsAlterWhenPropertiesChange() throws Exception {
+    // The resolved new table changes a property, so the connector must forward the update.
+    Map<String, String> currentProperties =
+        ImmutableMap.of("flink.connector", "kafka", "is_generic", "true");
+    Map<String, String> updatedProperties =
+        ImmutableMap.of(
+            "flink.connector", "kafka", "flink.topic", "new-topic", "is_generic", "true");
+
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Table existingTable = Mockito.mock(Table.class);
+    Mockito.when(existingTable.properties()).thenReturn(currentProperties);
+    Mockito.when(existingTable.comment()).thenReturn("comment");
+
+    ResolvedCatalogTable newTable = resolvedTable("comment");
+
+    TestableGravitinoHiveCatalog catalog =
+        new TestableGravitinoHiveCatalog(catalogCompat(), gravitinoCatalog, updatedProperties);
+
+    catalog.applyGenericTableAlter(new ObjectPath("db", "tbl"), existingTable, newTable);
+
+    // A real change was present, so the alter call is forwarded to Gravitino.
+    Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @SuppressWarnings("deprecation")
+  private ResolvedCatalogTable resolvedTable(String comment) {
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogTable table =
+        catalogCompat()
+            .createCatalogTable(schema, comment, Collections.emptyList(), Collections.emptyMap());
+    ResolvedSchema resolvedSchema =
+        new ResolvedSchema(
+            Collections.singletonList(Column.physical("id", DataTypes.INT())),
+            Collections.emptyList(),
+            null);
+    return new ResolvedCatalogTable(table, resolvedSchema);
+  }
+
+  private static class TestableGravitinoHiveCatalog extends GravitinoHiveCatalog {
+    private final CatalogCompat catalogCompat;
+    private final Catalog gravitinoCatalog;
+    private final Map<String, String> genericTableProperties;
+
+    TestableGravitinoHiveCatalog(CatalogCompat catalogCompat, Catalog gravitinoCatalog) {
+      this(catalogCompat, gravitinoCatalog, Collections.emptyMap());
+    }
+
+    TestableGravitinoHiveCatalog(
+        CatalogCompat catalogCompat,
+        Catalog gravitinoCatalog,
+        Map<String, String> genericTableProperties) {
       super(
           "test",
           "default",
@@ -62,7 +153,14 @@ public class TestGravitinoHiveCatalog {
           Mockito.mock(PartitionConverter.class),
           hiveConf(),
           null);
+      this.catalogCompat = catalogCompat;
       this.gravitinoCatalog = gravitinoCatalog;
+      this.genericTableProperties = genericTableProperties;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return catalogCompat;
     }
 
     @Override
@@ -73,6 +171,11 @@ public class TestGravitinoHiveCatalog {
     @Override
     protected Catalog catalog() {
       return gravitinoCatalog;
+    }
+
+    @Override
+    protected Map<String, String> toGravitinoGenericTableProperties(ResolvedCatalogTable table) {
+      return genericTableProperties;
     }
 
     private static HiveConf hiveConf() {

@@ -37,6 +37,7 @@ import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -60,9 +61,6 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
 
-  // TODO(#12600): Add Entity.EntityType.SEMANTIC_MODEL here, and a matching branch in
-  // getEntityIdsRequiringSchemaIds, once SemanticModelMetaService can resolve a Semantic Model id
-  // from its schema id and name. Tag association for Semantic Models needs that resolution.
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_SCHEMA_IDS =
       ImmutableSet.of(
           Entity.EntityType.SCHEMA,
@@ -72,7 +70,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.MODEL,
           Entity.EntityType.COLUMN,
           Entity.EntityType.FUNCTION,
-          Entity.EntityType.VIEW);
+          Entity.EntityType.VIEW,
+          Entity.EntityType.SEMANTIC_MODEL);
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
@@ -237,6 +236,17 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getViewIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new NamespacedEntityId(
             viewId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
+      case SEMANTIC_MODEL:
+        long semanticModelId =
+            SemanticModelMetaService.getInstance()
+                .getSemanticModelIdBySchemaIdAndName(
+                    schemaIds.getSchemaId(), nameIdentifier.name());
+        return new NamespacedEntityId(
+            semanticModelId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
 
       case FUNCTION:
         long functionId =

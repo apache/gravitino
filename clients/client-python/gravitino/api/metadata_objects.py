@@ -98,7 +98,7 @@ class MetadataObjects:
         )
         Precondition.check_argument(
             names_len != 4 or type_ in MetadataObjects._NAMES_LEN_CONDS[4],
-            "If the length of names is 4, it must be COLUMN",
+            "If the length of names is 4, it must be the COLUMN type",
         )
         names = name_or_names
         for name in names:

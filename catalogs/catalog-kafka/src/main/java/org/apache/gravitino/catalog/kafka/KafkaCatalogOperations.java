@@ -66,6 +66,7 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -153,10 +154,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       adminClient = AdminClient.create(adminClientConfig);
     } catch (KafkaException e) {
       if (e.getCause() instanceof ConfigException) {
-        throw new IllegalArgumentException(
-            "Invalid configuration for Kafka AdminClient: " + e.getCause().getMessage(), e);
+        throw ExceptionMessages.illegalArgument("Invalid configuration for Kafka AdminClient", e);
       }
-      throw new RuntimeException("Failed to create Kafka AdminClient", e);
+      throw ExceptionMessages.wrap("Failed to create Kafka AdminClient", e);
     }
     createDefaultSchemaIfNecessary();
   }
@@ -173,13 +173,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
           .map(name -> NameIdentifier.of(namespace, name))
           .toArray(NameIdentifier[]::new);
     } catch (ExecutionException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to list topics under the schema %s: %s",
-              namespace, e.getCause().getMessage()),
-          e);
+      throw ExceptionMessages.wrap("Failed to list topics under the schema " + namespace, e);
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to list topics under the schema " + namespace, e);
+      throw ExceptionMessages.wrap("Failed to list topics under the schema " + namespace, e);
     }
   }
 
@@ -226,10 +222,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       if (e.getCause() instanceof UnknownTopicOrPartitionException) {
         throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
       } else {
-        throw new RuntimeException("Failed to load topic " + ident.name() + " from Kafka", e);
+        throw ExceptionMessages.wrap("Failed to load topic " + ident.name() + " from Kafka", e);
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to load topic " + ident.name() + " from Kafka", e);
+      throw ExceptionMessages.wrap("Failed to load topic " + ident.name() + " from Kafka", e);
     }
 
     LOG.info("Loaded topic {} from Kafka", ident);
@@ -297,18 +293,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
 
       } else if (e.getCause() instanceof InvalidReplicationFactorException) {
-        throw new IllegalArgumentException(
-            "Invalid replication factor for topic " + ident + e.getCause().getMessage(), e);
+        throw ExceptionMessages.illegalArgument("Invalid replication factor for topic " + ident, e);
 
       } else if (e.getCause() instanceof InvalidConfigurationException) {
-        throw new IllegalArgumentException(
-            "Invalid properties for topic " + ident + e.getCause().getMessage(), e);
+        throw ExceptionMessages.illegalArgument("Invalid properties for topic " + ident, e);
 
       } else {
-        throw new RuntimeException("Failed to create topic in Kafka" + ident, e);
+        throw ExceptionMessages.wrap("Failed to create topic in Kafka " + ident, e);
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to create topic in Kafka" + ident, e);
+      throw ExceptionMessages.wrap("Failed to create topic in Kafka " + ident, e);
     }
   }
 
@@ -381,10 +375,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       if (e.getCause() instanceof UnknownTopicOrPartitionException) {
         return false;
       } else {
-        throw new RuntimeException("Failed to drop topic " + ident.name() + " from Kafka", e);
+        throw ExceptionMessages.wrap("Failed to drop topic " + ident.name() + " from Kafka", e);
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to drop topic " + ident.name() + " from Kafka", e);
+      throw ExceptionMessages.wrap("Failed to drop topic " + ident.name() + " from Kafka", e);
     }
   }
 
@@ -397,7 +391,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
           .map(s -> NameIdentifier.of(namespace, s.name()))
           .toArray(NameIdentifier[]::new);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to list schemas under namespace " + namespace, e);
+      throw ExceptionMessages.wrap("Failed to list schemas under namespace " + namespace, e);
     }
   }
 
@@ -426,7 +420,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (NoSuchEntityException exception) {
       throw new NoSuchSchemaException(exception, "Schema %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load schema " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to load schema " + ident, ioe);
     }
   }
 
@@ -534,8 +528,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
               Collections.singletonMap(topicName, NewPartitions.increaseTo(newPartitionCount)))
           .all()
           .get();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to increase partition count for topic " + topicName, e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof InvalidConfigurationException
+          || e.getCause() instanceof IllegalArgumentException) {
+        throw ExceptionMessages.illegalArgument(
+            "Failed to increase partition count for topic " + topicName, e);
+      }
+      throw ExceptionMessages.wrap("Failed to increase partition count for topic " + topicName, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw ExceptionMessages.wrap("Failed to increase partition count for topic " + topicName, e);
     }
   }
 
@@ -546,10 +548,19 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
           .incrementalAlterConfigs(Collections.singletonMap(topicResource, alterConfigOps))
           .all()
           .get();
-    } catch (UnknownTopicOrPartitionException e) {
-      throw new NoSuchTopicException(e, "Topic %s does not exist", topicName);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to alter topic properties for topic " + topicName, e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof UnknownTopicOrPartitionException) {
+        throw new NoSuchTopicException(e, "Topic %s does not exist", topicName);
+      }
+      if (e.getCause() instanceof InvalidConfigurationException
+          || e.getCause() instanceof IllegalArgumentException) {
+        throw ExceptionMessages.illegalArgument(
+            "Failed to alter topic properties for topic " + topicName, e);
+      }
+      throw ExceptionMessages.wrap("Failed to alter topic properties for topic " + topicName, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw ExceptionMessages.wrap("Failed to alter topic properties for topic " + topicName, e);
     }
   }
 
@@ -590,7 +601,8 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         return;
       }
     } catch (IOException e) {
-      throw new RuntimeException("Failed to check if schema " + defaultSchemaIdent + " exists", e);
+      throw ExceptionMessages.wrap(
+          "Failed to check if schema " + defaultSchemaIdent + " exists", e);
     }
 
     // Create the default schema
@@ -617,7 +629,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     try {
       store.put(defaultSchema, true /* overwrite */);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to create default schema for Kafka catalog", ioe);
+      throw ExceptionMessages.wrap("Failed to create default schema for Kafka catalog", ioe);
     }
   }
 }

@@ -15,11 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Optional
+
 import httpx
 
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
+    MetalakeOperation,
     ModelOperation,
     PolicyOperation,
     SchemaOperation,
@@ -35,6 +38,9 @@ from mcp_server.client.plain.plain_rest_client_fileset_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
+)
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
 )
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
@@ -68,7 +74,14 @@ from mcp_server.client.topic_operation import TopicOperation
 
 # pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
-    def __init__(self, metalake_name: str, uri: str, authorization: str = ""):
+    def __init__(
+        self,
+        metalake_name: str,
+        uri: str,
+        authorization: str = "",
+        *,
+        auth: Optional[httpx.Auth] = None,
+    ):
         """Create a REST client for one identity.
 
         Args:
@@ -78,11 +91,15 @@ class PlainRESTClientOperation(GravitinoOperation):
                 on every request (for example ``"Bearer <token>"`` for OAuth2 or
                 ``"Basic <base64(user:secret)>"`` for simple or Basic auth).
                 Empty string means anonymous (no header sent).
+            auth: Optional httpx auth hook used instead of a frozen header
+                (OAuth client-credentials refresh).
         """
         headers = {}
         if authorization:
             headers["Authorization"] = authorization
-        _rest_client = httpx.AsyncClient(base_url=uri, headers=headers)
+        _rest_client = httpx.AsyncClient(
+            base_url=uri, headers=headers, auth=auth
+        )
         # Kept so the shared connection pool can be closed (see close()).
         self._rest_client = _rest_client
         self._catalog_operation = PlainRESTClientCatalogOperation(
@@ -121,10 +138,17 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._view_operation = PlainRESTClientViewOperation(
             metalake_name, _rest_client
         )
+        # Not metalake-scoped: addresses the server's top-level endpoint.
+        self._metalake_operation = PlainRESTClientMetalakeOperation(
+            _rest_client
+        )
 
     async def close(self) -> None:
         """Close the shared httpx client and release its connection pool."""
         await self._rest_client.aclose()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return self._metalake_operation
 
     def as_catalog_operation(self) -> CatalogOperation:
         return self._catalog_operation

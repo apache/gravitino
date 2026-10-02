@@ -16,6 +16,10 @@ Creating a table through Gravitino creates it in the source system, and listing 
 source at request time, so a table created directly in Hive appears the next time Gravitino is
 asked.
 
+When authorization is enabled, a table whose local name contains one or more dots is an exception:
+it can cause the entire table list request to fail. See
+[Local names containing one or more dots](./security/access-control.md#names-containing-dots).
+
 What Gravitino adds is a single shape across all of them. The same call describes a Hive table and
 an Iceberg table, columns carry the same type system, and tags, policies, ownership, and statistics
 attach the same way regardless of the system underneath.
@@ -180,20 +184,30 @@ Views can carry tags, and appear in listings alongside tables.
 Opening a schema lists its tables and views. Selecting a table shows its columns with their types,
 its properties, and its tags.
 
-Tags attach from the table row and from individual column rows, which is the fastest way to classify
-a specific field rather than a whole table. Policies attach at the table level.
+Assign tags from the table row and from individual column rows to classify a whole table or
+a specific field. Object policies are derived from those tag assignments.
 
 ## Permissions
 
 | Privilege      | Grantable on                        | What it allows                  |
 |----------------|-------------------------------------|---------------------------------|
-| `CREATE_TABLE` | Metalake, catalog, or schema        | Creating tables and views       |
-| `SELECT_TABLE` | Metalake, catalog, schema, or table | Reading a table or view         |
+| `CREATE_TABLE` | Metalake, catalog, or schema        | Creating tables                 |
+| `SELECT_TABLE` | Metalake, catalog, schema, or table | Reading table metadata          |
 | `MODIFY_TABLE` | Metalake, catalog, schema, or table | Writing to and altering a table |
+| `CREATE_VIEW`  | Metalake, catalog, or schema        | Creating views                  |
+| `SELECT_VIEW`  | Metalake, catalog, schema, or view  | Reading view metadata           |
 
 Granting at a wider scope covers everything beneath it. Dropping a table is reserved for the
 metalake owner and the object owner, and ownership resolves down the hierarchy, so the owner of a
 catalog has the owner path to every table in it.
+
+When metadata authorization is enabled, listing views first requires access to the schema and then
+returns only views the caller owns or can read with `SELECT_VIEW`. Creating a view requires
+`CREATE_VIEW` in scope and makes the caller its owner; altering and dropping a view are owner-only.
+
+View permissions cover metadata operations only. The API does not yet define an `INVOKER` or
+`DEFINER` execution mode, so access to referenced data remains subject to the engine's
+authorization.
 
 ## Using the API
 

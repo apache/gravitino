@@ -32,7 +32,7 @@ import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.analysis.NoSuchPartitionException;
-import org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException;
+import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsPartitionManagement;
 import org.apache.spark.sql.connector.expressions.Transform;
@@ -87,7 +87,7 @@ public class SparkHiveTable extends HiveTable implements SupportsPartitionManage
 
   @Override
   public void createPartition(InternalRow ident, Map<String, String> properties)
-      throws PartitionAlreadyExistsException, UnsupportedOperationException {
+      throws PartitionsAlreadyExistException, UnsupportedOperationException {
     hiveGravitinoOperationOperator.createPartition(ident, properties, partitionSchema());
   }
 

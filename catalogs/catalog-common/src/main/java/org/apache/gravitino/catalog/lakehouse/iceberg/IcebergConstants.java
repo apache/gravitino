@@ -24,6 +24,9 @@ public class IcebergConstants {
   public static final String CATALOG_BACKEND = "catalog-backend";
   public static final String CATALOG_BACKEND_IMPL = "catalog-backend-impl";
 
+  /** Internal property containing the unique identifier of a Gravitino catalog. */
+  public static final String CATALOG_UUID = "catalog_uuid";
+
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
 
@@ -61,6 +64,32 @@ public class IcebergConstants {
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME =
       "adls.auth.shared-key.account.name";
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
+
+  /** Iceberg property that specifies the ADLS token credential provider implementation. */
+  public static final String ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER =
+      "adls.token-credential-provider";
+
+  /** Prefix for properties passed to the Iceberg ADLS token credential provider. */
+  public static final String ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
+      ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
+
+  /** Gravitino's Azure client-secret token credential provider implementation. */
+  public static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
+      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
+
+  /** Iceberg GCSFileIO OAuth2 access token property. */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN = "gcs.oauth2.token";
+
+  /** Iceberg GCSFileIO OAuth2 token expiry property (epoch millis). */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  /**
+   * Whether Iceberg GCSFileIO should refresh OAuth2 tokens via a credentials endpoint. Defaults to
+   * true in Iceberg; Gravitino disables it when minting a token from {@code
+   * gcs-service-account-file} because that path has no table credentials refresh endpoint.
+   */
+  public static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENABLED =
+      "gcs.oauth2.refresh-credentials-enabled";
 
   // Iceberg Table properties constants
 

@@ -23,26 +23,19 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.utils.MapUtils;
-import org.apache.iceberg.BaseMetadataTable;
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
@@ -51,11 +44,8 @@ import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.AlreadyExistsException;
-import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.inmemory.InMemoryFileIO;
-import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.ErrorHandlers;
 import org.apache.iceberg.rest.HTTPClient;
 import org.apache.iceberg.rest.ParserContext;
@@ -66,11 +56,11 @@ import org.apache.iceberg.rest.ResourcePaths;
 import org.apache.iceberg.rest.auth.AuthManager;
 import org.apache.iceberg.rest.auth.AuthManagers;
 import org.apache.iceberg.rest.auth.AuthSession;
-import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -80,12 +70,12 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
  * {@link RESTCatalog}).
  *
  * <p>Federation-specific behavior is expressed through polymorphic overrides instead of {@code
- * instanceof RESTCatalog} checks scattered across the base class. Table operations are routed to
- * federation-aware {@code *Internal} methods so client-facing FileIO and credential properties are
- * extracted from the remote catalog's {@code table.io()}. Credentials are vended by the remote
- * catalog, so this wrapper never injects Gravitino-generated credentials.
+ * instanceof RESTCatalog} checks scattered across the base class. Table load, create and register
+ * use authenticated REST calls so {@code X-Iceberg-Access-Delegation} can be forwarded when the
+ * client requested credential vending. Update still uses the Iceberg Catalog API. This wrapper
+ * never injects Gravitino-generated credentials.
  *
- * <p>Portions of the table create and update handling are derived from Apache Iceberg's {@code
+ * <p>Portions of the table update handling are derived from Apache Iceberg's {@code
  * org.apache.iceberg.rest.CatalogHandlers}:
  * https://github.com/apache/iceberg/blob/2abac79fcae94b5ad039bd09f7235be191b0761e/core/src/main/java/org/apache/iceberg/rest/CatalogHandlers.java
  */
@@ -93,6 +83,15 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   private static final String FORMAT_VERSION = "format-version";
   private static final Schema EMPTY_SCHEMA = new Schema();
+  private static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
+  private static final String VENDED_CREDENTIALS = "vended-credentials";
+
+  /**
+   * Caches whether the remote catalog advertises the scan-plan endpoint. Only successful lookups
+   * are cached, so a failure to reach the remote can be retried. Races just repeat an idempotent
+   * lookup.
+   */
+  private volatile Boolean remoteSupportsScanPlan;
 
   /**
    * Creates a federated wrapper.
@@ -104,24 +103,63 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     super(catalogName, config);
   }
 
+  /**
+   * Creates a table on the remote REST catalog.
+   *
+   * <p>Always uses a dedicated REST POST, including staged create, rather than Iceberg's Catalog
+   * API. When credential vending is requested the {@code X-Iceberg-Access-Delegation:
+   * vended-credentials} header is forwarded so the remote catalog returns {@code
+   * storage-credentials} inline. Upstream credential refresh endpoints are rewritten to this IRC
+   * catalog.
+   *
+   * @param namespace the namespace that will own the table.
+   * @param request the create-table request.
+   * @param requestCredential whether the client requested vended credentials.
+   * @return the create response, including rewritten remote credentials when requested.
+   */
   @Override
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    // The remote REST catalog vends its own credentials, so the requestCredential flag is not used
-    // here; FileIO-derived client config is extracted by createTableInternal.
-    return createTableInternal(namespace, request);
+    return createTableViaREST(namespace, request, requestCredential);
   }
 
+  /**
+   * Loads a table from the remote REST catalog.
+   *
+   * <p>Always uses a dedicated REST GET rather than Iceberg's {@link RESTCatalog#loadTable}, which
+   * cannot send {@code X-Iceberg-Access-Delegation}. When credential vending is requested the
+   * header is forwarded so the remote catalog returns {@code storage-credentials} inline. Upstream
+   * credential refresh endpoints are rewritten to this IRC catalog. The {@code privilege} is
+   * ignored because the remote catalog decides what to vend.
+   *
+   * @param identifier the table identifier.
+   * @param requestCredential whether the client requested vended credentials.
+   * @param privilege ignored; the remote REST catalog vends its own credentials.
+   * @return the load-table response, including rewritten remote credentials when requested.
+   */
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    return loadTableInternal(identifier);
+    return loadTableViaREST(identifier, requestCredential);
   }
 
+  /**
+   * Registers a table on the remote REST catalog.
+   *
+   * <p>Always uses a dedicated REST POST rather than Iceberg's Catalog API. When credential vending
+   * is requested the {@code X-Iceberg-Access-Delegation: vended-credentials} header is forwarded so
+   * the remote catalog returns {@code storage-credentials} inline. Upstream credential refresh
+   * endpoints are rewritten to this IRC catalog.
+   *
+   * @param namespace the namespace that will own the table.
+   * @param request the register-table request.
+   * @param requestCredential whether the client requested vended credentials.
+   * @return the register response, including rewritten remote credentials when requested.
+   */
   @Override
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTableInternal(namespace, request);
+    return registerTableViaREST(namespace, request, requestCredential);
   }
 
   @Override
@@ -188,11 +226,110 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
         catalogCredentialManager.catalogName(), tableIdentifier, response);
   }
 
+  /**
+   * Reports whether the remote catalog advertises the scan-plan endpoint, since {@link
+   * #planTableScan} delegates planning to it rather than planning locally.
+   *
+   * <p>The answer comes from the remote catalog's own {@code /v1/config} response and is cached for
+   * the lifetime of this wrapper, so the remote is queried at most once rather than on every local
+   * {@code /v1/config} call.
+   *
+   * <p>A remote that omits {@code endpoints} is treated as not supporting scan planning. That
+   * matches the Iceberg client, which falls back to a default endpoint set that predates scan
+   * planning when the field is absent.
+   *
+   * <p>If the remote cannot be reached the result is not cached and the endpoint is not advertised,
+   * so a later call can still resolve it once the remote recovers. Not advertising is the safe
+   * direction here: the endpoint would fail anyway while the remote is unreachable.
+   *
+   * @return {@code true} if the remote catalog advertises {@code V1_SUBMIT_TABLE_SCAN_PLAN}.
+   */
+  @Override
+  public boolean supportsScanPlanOperations() {
+    Boolean cached = remoteSupportsScanPlan;
+    if (cached != null) {
+      return cached;
+    }
+
+    try {
+      boolean supported =
+          fetchRemoteConfig().endpoints().contains(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN);
+      remoteSupportsScanPlan = supported;
+      return supported;
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to read the endpoints advertised by the remote catalog of {}; not advertising the"
+              + " scan plan endpoint",
+          catalogCredentialManager.catalogName(),
+          e);
+      return false;
+    }
+  }
+
+  /**
+   * Fetches the remote catalog's {@code /v1/config} response.
+   *
+   * <p>The {@code warehouse} query parameter is forwarded when configured, so a remote serving
+   * several warehouses returns the endpoint set for the one this catalog federates.
+   *
+   * <p>{@code RESTCatalog} already fetched this at init but keeps the endpoint set private, so it
+   * has to be re-fetched here.
+   *
+   * @return the remote catalog's config response.
+   */
+  private ConfigResponse fetchRemoteConfig() {
+    RESTCatalog restCatalog = (RESTCatalog) getCatalog();
+    String warehouse = restCatalog.properties().get(CatalogProperties.WAREHOUSE_LOCATION);
+    Map<String, String> queryParams =
+        warehouse == null || warehouse.isEmpty()
+            ? Collections.emptyMap()
+            : ImmutableMap.of(CatalogProperties.WAREHOUSE_LOCATION, warehouse);
+
+    return callRemoteCatalog(
+        restCatalog,
+        "reading the remote catalog config",
+        client ->
+            client.get(
+                ResourcePaths.config(),
+                queryParams,
+                ConfigResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.configErrorHandler()));
+  }
+
   private static LoadCredentialsResponse getRESTTableCredentials(
       RESTCatalog restCatalog, TableIdentifier identifier) {
     Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
     String credentialsPath =
         ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
+
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("loading credentials for table: %s", identifier),
+        client ->
+            client.get(
+                credentialsPath,
+                LoadCredentialsResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.tableErrorHandler()));
+  }
+
+  /**
+   * Runs an action against the remote REST catalog through a short-lived authenticated client.
+   *
+   * <p>Centralizes the auth manager, HTTP client and auth session lifecycle shared by the federated
+   * credential, scan-plan and config requests. Resources are closed in reverse order of creation,
+   * and a close failure on one does not prevent the others from being closed.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param description what the action is doing, used in close-failure log messages.
+   * @param action invoked with a client bound to an authenticated session.
+   * @param <T> the action's result type.
+   * @return the action's result.
+   */
+  private static <T> T callRemoteCatalog(
+      RESTCatalog restCatalog, String description, Function<RESTClient, T> action) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
 
     AuthManager authManager = null;
     RESTClient client = null;
@@ -205,40 +342,24 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
               .withHeaders(RESTUtil.configHeaders(properties))
               .build();
       authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .get(
-              credentialsPath,
-              LoadCredentialsResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
+      return action.apply(client.withAuthSession(authSession));
     } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when loading credentials for table: {}", identifier, e);
-        }
-      }
+      closeQuietly(authSession, "auth session", description);
+      closeQuietly(client, "REST client", description);
+      closeQuietly(authManager, "auth manager", description);
+    }
+  }
 
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when loading credentials for table: {}", identifier, e);
-        }
-      }
+  private static void closeQuietly(
+      AutoCloseable closeable, String resourceName, String description) {
+    if (closeable == null) {
+      return;
+    }
 
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when loading credentials for table: {}", identifier, e);
-        }
-      }
+    try {
+      closeable.close();
+    } catch (Exception e) {
+      LOG.warn("Failed to close {} when {}", resourceName, description, e);
     }
   }
 
@@ -269,10 +390,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
     String planPath = ResourcePaths.forCatalogProperties(properties).planTableScan(identifier);
 
-    Map<String, String> headers =
-        requestCredentialVending
-            ? ImmutableMap.of("X-Iceberg-Access-Delegation", "vended-credentials")
-            : Collections.emptyMap();
+    Map<String, String> headers = accessDelegationHeaders(requestCredentialVending);
 
     ParserContext parserContext =
         ParserContext.builder()
@@ -280,161 +398,139 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
             .add("caseSensitive", scanRequest.caseSensitive())
             .build();
 
-    AuthManager authManager = null;
-    RESTClient client = null;
-    AuthSession authSession = null;
-    try {
-      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
-      client =
-          HTTPClient.builder(properties)
-              .uri(properties.get(CatalogProperties.URI))
-              .withHeaders(RESTUtil.configHeaders(properties))
-              .build();
-      authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .post(
-              planPath,
-              scanRequest,
-              PlanTableScanResponse.class,
-              headers,
-              ErrorHandlers.planErrorHandler(),
-              ignored -> {},
-              parserContext);
-    } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when planning table scan for table: {}", identifier, e);
-        }
-      }
-
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when planning table scan for table: {}", identifier, e);
-        }
-      }
-
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when planning table scan for table: {}", identifier, e);
-        }
-      }
-    }
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("planning table scan for table: %s", identifier),
+        client ->
+            client.post(
+                planPath,
+                scanRequest,
+                PlanTableScanResponse.class,
+                headers,
+                ErrorHandlers.planErrorHandler(),
+                ignored -> {},
+                parserContext));
   }
 
   /**
-   * Federation-aware {@code createTable}: creates the table on the underlying (remote) catalog and
-   * extracts client-facing FileIO/credential properties from {@code table.io()}.
+   * Sends a {@code GET {table}} request to the remote REST catalog.
+   *
+   * <p>Follows the same HTTP client lifecycle as {@link #getRESTTableCredentials}. When credential
+   * vending is requested, the {@code X-Iceberg-Access-Delegation: vended-credentials} header is
+   * included so the remote catalog returns credentials inline in the load-table response.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param identifier the table to load.
+   * @param requestCredentialVending whether to include the access-delegation header.
+   * @return the load-table response from the remote catalog.
    */
-  private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
-    Catalog loadedCatalog = getCatalog();
+  private static LoadTableResponse getRESTLoadTable(
+      RESTCatalog restCatalog, TableIdentifier identifier, boolean requestCredentialVending) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String tablePath = ResourcePaths.forCatalogProperties(properties).table(identifier);
+    Map<String, String> queryParams = ImmutableMap.of("snapshots", IcebergRESTUtils.SNAPSHOT_ALL);
 
-    request.validate();
-
-    if (request.stageCreate()) {
-      return stageTableCreateInternal(namespace, request);
-    }
-
-    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table =
-        loadedCatalog
-            .buildTable(ident, request.schema())
-            .withLocation(request.location())
-            .withPartitionSpec(request.spec())
-            .withSortOrder(request.writeOrder())
-            .withProperties(request.properties())
-            .create();
-
-    if (table instanceof BaseTable) {
-      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
-    }
-
-    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
-  }
-
-  private LoadTableResponse stageTableCreateInternal(
-      Namespace namespace, CreateTableRequest request) {
-    Catalog loadedCatalog = getCatalog();
-    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    if (loadedCatalog.tableExists(ident)) {
-      throw new AlreadyExistsException("Table already exists: %s", ident);
-    }
-
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("created-at", OffsetDateTime.now(ZoneOffset.UTC).toString());
-    properties.putAll(request.properties());
-
-    Map<String, String> config = Maps.newHashMap();
-    Catalog.TableBuilder tableBuilder =
-        loadedCatalog
-            .buildTable(ident, request.schema())
-            .withPartitionSpec(request.spec())
-            .withSortOrder(request.writeOrder())
-            .withProperties(properties);
-
-    Table table;
-    if (request.location() != null) {
-      table = tableBuilder.withLocation(request.location()).createTransaction().table();
-    } else {
-      table = tableBuilder.createTransaction().table();
-    }
-
-    Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
-    Map<String, String> filteredCredentialProperties =
-        CredentialPropertyUtils.filterCredentialProperties(tableProperties);
-    config.putAll(
-        MapUtils.getFilteredMap(
-            tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
-    config.putAll(filteredCredentialProperties);
-    config.putAll(
-        IcebergRESTUtils.buildRefreshProps(
-            catalogCredentialManager.catalogName(), ident, filteredCredentialProperties));
-
-    List<Credential> credentials =
-        IcebergRESTUtils.buildStorageCreds(
-            catalogCredentialManager.catalogName(), ident, table.io());
-
-    TableMetadata metadata =
-        TableMetadata.newTableMetadata(
-            request.schema(),
-            request.spec() != null ? request.spec() : PartitionSpec.unpartitioned(),
-            request.writeOrder() != null ? request.writeOrder() : SortOrder.unsorted(),
-            table.location(),
-            properties);
-
-    return LoadTableResponse.builder()
-        .withTableMetadata(metadata)
-        .addAllConfig(config)
-        .addAllCredentials(credentials)
-        .build();
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("loading table: %s", identifier),
+        client ->
+            client.get(
+                tablePath,
+                queryParams,
+                LoadTableResponse.class,
+                accessDelegationHeaders(requestCredentialVending),
+                ErrorHandlers.tableErrorHandler()));
   }
 
   /**
-   * Federation-aware {@code registerTable}: registers the existing table metadata on the underlying
-   * (remote) catalog via {@link CatalogHandlers#registerTable} and extracts client-facing FileIO
-   * and credential properties from {@code table.io()}, mirroring {@link
-   * #loadTableInternal(TableIdentifier)}.
+   * Sends a {@code POST {namespace}/tables} request to the remote REST catalog.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param namespace the namespace that will own the table.
+   * @param request the create-table request (including staged create).
+   * @param requestCredentialVending whether to include the access-delegation header.
+   * @return the create response from the remote catalog.
    */
-  private LoadTableResponse registerTableInternal(
-      Namespace namespace, RegisterTableRequest request) {
-    CatalogHandlers.registerTable(getCatalog(), namespace, request);
-    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table = getCatalog().loadTable(ident);
+  private static LoadTableResponse getRESTCreateTable(
+      RESTCatalog restCatalog,
+      Namespace namespace,
+      CreateTableRequest request,
+      boolean requestCredentialVending) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String tablesPath = ResourcePaths.forCatalogProperties(properties).tables(namespace);
 
-    if (table instanceof BaseTable) {
-      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
-    }
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("creating table: %s.%s", namespace, request.name()),
+        client ->
+            client.post(
+                tablesPath,
+                request,
+                LoadTableResponse.class,
+                accessDelegationHeaders(requestCredentialVending),
+                ErrorHandlers.createTableErrorHandler()));
+  }
 
-    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
+  /**
+   * Sends a {@code POST {namespace}/register} request to the remote REST catalog.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param namespace the namespace that will own the table.
+   * @param request the register-table request.
+   * @param requestCredentialVending whether to include the access-delegation header.
+   * @return the register response from the remote catalog.
+   */
+  private static LoadTableResponse getRESTRegisterTable(
+      RESTCatalog restCatalog,
+      Namespace namespace,
+      RegisterTableRequest request,
+      boolean requestCredentialVending) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String registerPath = ResourcePaths.forCatalogProperties(properties).register(namespace);
+
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("registering table: %s.%s", namespace, request.name()),
+        client ->
+            client.post(
+                registerPath,
+                request,
+                LoadTableResponse.class,
+                accessDelegationHeaders(requestCredentialVending),
+                ErrorHandlers.tableErrorHandler()));
+  }
+
+  private static Map<String, String> accessDelegationHeaders(boolean requestCredentialVending) {
+    return requestCredentialVending
+        ? ImmutableMap.of(X_ICEBERG_ACCESS_DELEGATION, VENDED_CREDENTIALS)
+        : Collections.emptyMap();
+  }
+
+  private LoadTableResponse createTableViaREST(
+      Namespace namespace, CreateTableRequest request, boolean requestCredential) {
+    LoadTableResponse upstream =
+        getRESTCreateTable((RESTCatalog) getCatalog(), namespace, request, requestCredential);
+    return rewriteRemoteLoadTable(TableIdentifier.of(namespace, request.name()), upstream);
+  }
+
+  private LoadTableResponse loadTableViaREST(
+      TableIdentifier identifier, boolean requestCredential) {
+    LoadTableResponse upstream =
+        getRESTLoadTable((RESTCatalog) getCatalog(), identifier, requestCredential);
+    return rewriteRemoteLoadTable(identifier, upstream);
+  }
+
+  private LoadTableResponse registerTableViaREST(
+      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
+    LoadTableResponse upstream =
+        getRESTRegisterTable((RESTCatalog) getCatalog(), namespace, request, requestCredential);
+    return rewriteRemoteLoadTable(TableIdentifier.of(namespace, request.name()), upstream);
+  }
+
+  private LoadTableResponse rewriteRemoteLoadTable(
+      TableIdentifier identifier, LoadTableResponse upstream) {
+    return IcebergRESTUtils.rewriteLoadTableCredentials(
+        catalogCredentialManager.catalogName(), identifier, upstream);
   }
 
   /**
@@ -485,52 +581,6 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     } else {
       return CatalogHandlers.updateTable(getCatalog(), ident, request);
     }
-  }
-
-  /**
-   * Federation-aware {@code loadTable}: loads the table from the underlying (remote) catalog and
-   * extracts client-facing FileIO/credential properties from {@code table.io()}.
-   */
-  private LoadTableResponse loadTableInternal(TableIdentifier ident) {
-    Table table = getCatalog().loadTable(ident);
-
-    if (table instanceof BaseTable) {
-      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
-    } else if (table instanceof BaseMetadataTable) {
-      // metadata tables are loaded on the client side, return NoSuchTableException for now
-      throw new NoSuchTableException("Table does not exist: %s", ident.toString());
-    }
-
-    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
-  }
-
-  /**
-   * Builds a {@link LoadTableResponse} from a remote {@link BaseTable}, exposing the client-facing
-   * FileIO and credential properties extracted from {@code table.io()}, including the refreshable
-   * vended credentials and refresh properties for the remote storage.
-   *
-   * @param ident the table identifier, used to build the credential-refresh endpoint.
-   * @param table the remote base table whose {@code io()} carries the storage credentials.
-   * @return the load-table response including FileIO-derived client config and vended credentials.
-   */
-  private LoadTableResponse buildLoadTableResponseFromFileIo(
-      TableIdentifier ident, BaseTable table) {
-    Map<String, String> properties = retrieveFileIOProperties(table.io());
-    Map<String, String> filteredCredentialProperties =
-        CredentialPropertyUtils.filterCredentialProperties(properties);
-    return LoadTableResponse.builder()
-        .withTableMetadata(table.operations().current())
-        .addAllConfig(
-            MapUtils.getFilteredMap(properties, key -> catalogPropertiesToClientKeys.contains(key)))
-        // Keep only credential fields from FileIO properties before returning them to the client.
-        .addAllConfig(filteredCredentialProperties)
-        .addAllConfig(
-            IcebergRESTUtils.buildRefreshProps(
-                catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
-        .addAllCredentials(
-            IcebergRESTUtils.buildStorageCreds(
-                catalogCredentialManager.catalogName(), ident, table.io()))
-        .build();
   }
 
   private static boolean isCreate(UpdateTableRequest request) {
@@ -626,11 +676,5 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     }
 
     return true;
-  }
-
-  private static Map<String, String> retrieveFileIOProperties(FileIO fileIO) {
-    return fileIO instanceof InMemoryFileIO
-        ? Maps.newHashMap()
-        : new HashMap<>(fileIO.properties());
   }
 }

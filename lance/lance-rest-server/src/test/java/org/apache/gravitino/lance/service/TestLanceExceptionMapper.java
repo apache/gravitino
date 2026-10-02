@@ -1,0 +1,166 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.lance.service;
+
+import java.io.IOException;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.core.Application;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.rest.RESTUtils;
+import org.glassfish.jersey.jackson.JacksonFeature;
+import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.model.ErrorResponse;
+
+/** Tests for {@link LanceExceptionMapper}. */
+public class TestLanceExceptionMapper extends JerseyTest {
+
+  /** A resource that raises an error outside the operation-level exception handlers. */
+  @Path("error")
+  public static class ErrorResource {
+
+    /**
+     * Raises an assertion error.
+     *
+     * @return never returns normally
+     */
+    @GET
+    public String fail() {
+      AssertionError error = new AssertionError("assertion failure");
+      error.initCause(new IllegalStateException("root cause"));
+      throw error;
+    }
+  }
+
+  /**
+   * Configures the test resource and Lance exception mapper.
+   *
+   * @return the test application
+   */
+  @Override
+  protected Application configure() {
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return new ResourceConfig()
+        .register(ErrorResource.class)
+        .register(LanceExceptionMapper.class)
+        .register(JacksonFeature.class);
+  }
+
+  /** Verifies that an uncaught error is converted to a Lance internal error response. */
+  @Test
+  public void testErrorResponse() {
+    try (Response response = target("error").request(MediaType.APPLICATION_JSON_TYPE).get()) {
+      Assertions.assertEquals(
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+      ErrorResponse entity = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals("Internal server error", entity.getError());
+      Assertions.assertEquals("", entity.getInstance());
+      Assertions.assertEquals("", entity.getDetail());
+    }
+  }
+
+  /** Verifies backend authorization failures use the Lance forbidden response. */
+  @Test
+  public void testBackendForbidden() {
+    assertAuthenticationError(new ForbiddenException("Access denied"), 403);
+  }
+
+  /** Verifies backend authentication failures use the Lance unauthenticated response. */
+  @Test
+  public void testBackendUnauthorized() {
+    assertAuthenticationError(new UnauthorizedException("Invalid credentials"), 401);
+  }
+
+  /** Verifies unexpected exceptions do not expose internal details in the response. */
+  @Test
+  public void testInternalFailureDoesNotExposeException() {
+    try (Response response =
+        LanceExceptionMapper.toRESTResponse(
+            "catalog.schema.table", new RuntimeException("private-backend-detail"))) {
+      Assertions.assertEquals(500, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("Internal server error", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  /** Verifies intentional protocol validation details remain available to callers. */
+  @Test
+  public void testProtocolValidationDetailsArePreserved() {
+    try (Response response =
+        LanceExceptionMapper.toRESTResponse(
+            "table",
+            new InvalidInputException("Invalid field", "field must be positive", "table"))) {
+      Assertions.assertEquals(400, response.getStatus());
+      Assertions.assertEquals(
+          "field must be positive", ((ErrorResponse) response.getEntity()).getDetail());
+    }
+  }
+
+  private void assertAuthenticationError(Exception exception, int status) {
+    try (Response response = LanceExceptionMapper.toRESTResponse("catalog", exception)) {
+      Assertions.assertEquals(status, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(exception.getMessage(), error.getError());
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertEquals("catalog", error.getInstance());
+    }
+  }
+
+  /** Verifies that the error detail omits the stack trace when disabled. */
+  @Test
+  public void testErrorDetailFollowsSetting() {
+    IllegalArgumentException failure = new IllegalArgumentException("failure");
+    try {
+      Assertions.assertTrue(
+          LanceExceptionMapper.errorDetail(failure)
+              .contains("java.lang.IllegalArgumentException: failure"));
+
+      LanceExceptionMapper.setIncludeErrorStackTrace(false);
+      Assertions.assertEquals("", LanceExceptionMapper.errorDetail(failure));
+      Response response = LanceExceptionMapper.toRESTResponse("", failure);
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("failure", entity.getError());
+      Assertions.assertEquals("", entity.getDetail());
+
+      // Lance exceptions that already carry a detail keep it; only generated stacks are omitted.
+      Response nativeResponse =
+          LanceExceptionMapper.toRESTResponse(
+              "instance", new InvalidInputException("bad input", "native detail", "instance"));
+      Assertions.assertEquals(
+          "native detail", ((ErrorResponse) nativeResponse.getEntity()).getDetail());
+    } finally {
+      LanceExceptionMapper.setIncludeErrorStackTrace(true);
+    }
+  }
+}

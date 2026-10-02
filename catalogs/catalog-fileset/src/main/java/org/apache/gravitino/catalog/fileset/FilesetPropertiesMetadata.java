@@ -28,9 +28,9 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.cloud.storage.CloudPropertiesMetadata;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class FilesetPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -75,7 +75,7 @@ public class FilesetPropertiesMetadata extends BasePropertiesMetadata {
                 false /* hidden */))
         .putAll(KERBEROS_PROPERTY_ENTRIES)
         .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
-        .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
+        .putAll(CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES);
     return builder.build();
   }
 }

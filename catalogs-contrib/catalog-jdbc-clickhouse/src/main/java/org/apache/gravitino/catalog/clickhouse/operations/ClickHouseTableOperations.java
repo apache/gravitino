@@ -18,12 +18,26 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.BLOOM_FILTER_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_NGRAMBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TOKENBFV1;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_VECTOR_SIMILARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HASH_FUNCTIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HNSW_MAX_CONNECTIONS_PER_LAYER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.NGRAM_SIZE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DIMENSIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_QUANTIZATION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_TYPE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.escapeSingleQuotes;
@@ -31,22 +45,26 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -64,6 +82,7 @@ import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.catalog.jdbc.bean.JdbcIndexBean;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
@@ -82,7 +101,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
@@ -92,8 +110,37 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
-  /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
+  private static final String INVALID_SETTINGS_METADATA_MSG =
+      "Invalid ClickHouse table SETTINGS metadata";
+  private static final int ERROR_CODE_UNKNOWN_TABLE = 60;
+  private static final Set<String> REQUIRED_PROJECTION_COLUMNS = Set.of("name", "type", "query");
+  /** Default GRANULARITY for ordinary data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
+
+  private static final int DEFAULT_VECTOR_SIMILARITY_GRANULARITY = 100_000_000;
+  private static final int DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER = 32;
+  private static final int DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION = 128;
+  private static final String DEFAULT_VECTOR_SIMILARITY_TYPE = "hnsw";
+  private static final String DEFAULT_VECTOR_SIMILARITY_QUANTIZATION = "bf16";
+  private static final Set<String> VECTOR_SIMILARITY_DISTANCE_FUNCTIONS =
+      Set.of("L2Distance", "cosineDistance");
+  private static final Set<String> VECTOR_SIMILARITY_QUANTIZATIONS =
+      Set.of("f64", "f32", "f16", "bf16", "i8", "b1");
+  private static final Set<String> VECTOR_SIMILARITY_PROPERTIES =
+      Set.of(
+          VECTOR_SIMILARITY_TYPE,
+          VECTOR_SIMILARITY_DISTANCE_FUNCTION,
+          VECTOR_SIMILARITY_DIMENSIONS,
+          VECTOR_SIMILARITY_QUANTIZATION,
+          HNSW_MAX_CONNECTIONS_PER_LAYER,
+          HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION,
+          GRANULARITY);
+
+  private static final BigInteger MIN_SET_MAX_VALUES = BigInteger.ZERO;
+  private static final BigInteger MAX_SET_MAX_VALUES = BigInteger.valueOf(Integer.MAX_VALUE);
+  private static final String SET_MAX_VALUES_RANGE =
+      "[%s, %s]".formatted(MIN_SET_MAX_VALUES, MAX_SET_MAX_VALUES);
+  private static final Pattern SET_MAX_VALUES_PATTERN = Pattern.compile("[+-]?[0-9]+");
 
   private static final Set<ENGINE> GENERIC_ENGINE_PARAMETER_ENGINES =
       Collections.unmodifiableSet(
@@ -102,16 +149,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
               ENGINE.SUMMINGMERGETREE,
               ENGINE.COLLAPSINGMERGETREE,
               ENGINE.VERSIONEDCOLLAPSINGMERGETREE));
-  private static final Pattern PARTITION_BY_PATTERN =
-      Pattern.compile(
-          "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
-  private static final Pattern SETTINGS_PATTERN =
-      Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
   /** Matches ClickHouse wide integer type names (Int128/256, UInt128/256, and future variants). */
   private static final Pattern WIDE_INTEGER_PATTERN = Pattern.compile("^U?INT\\d+$");
+
+  private static final Pattern TABLE_SETTING_NAME_PATTERN =
+      Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+  private static final Pattern NUMERIC_SETTING_LITERAL_PATTERN =
+      Pattern.compile("^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$");
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -126,8 +173,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       WHERE system.tables.primary_key <> ''
         AND system.tables.database = '%s'
         AND system.tables.name = '%s'
-      ORDER BY COLUMN_NAME
+      ORDER BY PK_NAME, KEY_SEQ
       """;
+
+  private static final String SECONDARY_INDEX_QUERY =
+      "SELECT name, type, type_full, expr, granularity FROM system.data_skipping_indices "
+          + "WHERE database = ? AND table = ? ORDER BY name";
+  private static final String LEGACY_SECONDARY_INDEX_QUERY =
+      "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
+          + "WHERE database = ? AND table = ? ORDER BY name";
+
+  private final AtomicBoolean projectionSourceUnavailableWarningLogged = new AtomicBoolean();
 
   @Override
   public void create(
@@ -243,12 +299,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
-      List<Index> indexes = new ArrayList<>();
+      Map<String, List<JdbcIndexBean>> primaryKeysByName = new LinkedHashMap<>();
       while (resultSet.next()) {
+        // ClickHouse exposes one primary-key expression without a constraint name; the query
+        // synthesizes PRIMARY to match Gravitino's default primary-key name.
         String indexName = resultSet.getString("PK_NAME");
         String columnName = resultSet.getString("COLUMN_NAME");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        int keySequence = resultSet.getInt("KEY_SEQ");
+        Preconditions.checkArgument(
+            !resultSet.wasNull() && keySequence > 0,
+            "Primary key %s column %s has invalid KEY_SEQ %s",
+            indexName,
+            columnName,
+            keySequence);
+        primaryKeysByName
+            .computeIfAbsent(indexName, ignored -> new ArrayList<>())
+            .add(
+                new JdbcIndexBean(Index.IndexType.PRIMARY_KEY, columnName, indexName, keySequence));
+      }
+
+      List<Index> indexes = new ArrayList<>();
+      for (Map.Entry<String, List<JdbcIndexBean>> entry : primaryKeysByName.entrySet()) {
+        Set<Integer> keySequences = new HashSet<>();
+        for (JdbcIndexBean primaryKeyColumn : entry.getValue()) {
+          Preconditions.checkArgument(
+              keySequences.add(primaryKeyColumn.getOrder()),
+              "Primary key %s has duplicate KEY_SEQ %s",
+              entry.getKey(),
+              primaryKeyColumn.getOrder());
+        }
+        List<String> columnNames =
+            entry.getValue().stream()
+                .sorted(Comparator.comparingInt(JdbcIndexBean::getOrder))
+                .map(JdbcIndexBean::getColName)
+                .collect(Collectors.toList());
+        indexes.add(Indexes.primary(entry.getKey(), convertIndexFieldNames(columnNames)));
       }
       indexes.addAll(getSecondaryIndexes(connection, databaseName, tableName));
       return indexes;
@@ -287,7 +372,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SortOrder[] sortOrders) {
 
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
+        Distributions.isNone(distribution), "ClickHouse does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
 
@@ -299,12 +384,32 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Add Create table clause; capture whether ON CLUSTER is in use
     boolean onCluster = appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> projections =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(
+            notNullProperties.get(CLICKHOUSE_PROJECTIONS_KEY));
+    if (!projections.isEmpty()) {
+      Preconditions.checkArgument(
+          ArrayUtils.isNotEmpty(columns),
+          "ClickHouse projections require an explicit column definition");
+      String configuredEngine = notNullProperties.get(GRAVITINO_ENGINE_KEY);
+      ENGINE projectionEngine =
+          StringUtils.isBlank(configuredEngine)
+              ? ENGINE_PROPERTY_ENTRY.getDefaultValue()
+              : ENGINE.fromString(configuredEngine);
+      Preconditions.checkArgument(
+          projectionEngine.acceptPartition(),
+          "ClickHouse projections are supported only for MergeTree-family engines");
+    }
+
     // We still allow empty columns when the engine is distributed.
     if (columns.length > 0) {
       buildColumnsDefinition(columns, sqlBuilder);
 
       // Index definition
       appendIndexesSql(indexes, sqlBuilder);
+
+      // Projection definitions are part of the parenthesized CREATE TABLE definition.
+      sqlBuilder.append(ClickHouseTableSqlUtils.formatProjectionClauses(projections));
 
       sqlBuilder.append("\n)");
     }
@@ -612,37 +717,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
-          sqlBuilder
-              .append(" ")
-              .append(
-                  buildDataSkippingIndexDdl(
-                      index.name(),
-                      fieldStr,
-                      DATA_SKIPPING_MINMAX_VALUE,
-                      resolveGranularity(index.properties(), 1)));
-          break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          sqlBuilder
-              .append(" ")
-              .append(
-                  buildDataSkippingIndexDdl(
-                      index.name(),
-                      fieldStr,
-                      DATA_SKIPPING_BLOOM_FILTER,
-                      resolveGranularity(index.properties(), 1)));
-          break;
         case DATA_SKIPPING_SET:
-          // SET index: set(N) max unique values default to 0 (unlimited), configurable via
-          // set_max_values property. GRANULARITY defaults to 1, configurable via granularity
-          // property, consistent with minmax and bloom_filter indexes.
+        case DATA_SKIPPING_NGRAMBFV1:
+        case DATA_SKIPPING_TOKENBFV1:
+        case DATA_SKIPPING_VECTOR_SIMILARITY:
           sqlBuilder
               .append(" ")
               .append(
                   buildDataSkippingIndexDdl(
-                      index.name(),
-                      fieldStr,
-                      "set(" + resolveSetMaxValues(index.properties()) + ")",
-                      resolveGranularity(index.properties(), 1)));
+                      index.name(), fieldStr, index.type(), index.properties()));
           break;
         default:
           throw new IllegalArgumentException(
@@ -676,6 +760,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
+    validateTableSettingChanges(changes);
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       String sql = generateAlterTableSql(databaseName, tableName, changes);
@@ -691,67 +776,115 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  public void rename(String databaseName, String oldTableName, String newTableName)
+      throws NoSuchTableException {
+    LOG.info(
+        "Attempting to rename table {}/{} to {}/{}",
+        databaseName,
+        oldTableName,
+        databaseName,
+        newTableName);
+    try (Connection connection = getConnection(databaseName)) {
+      TablePropertiesWithClusterMetadata metadata =
+          loadTablePropertiesWithClusterMetadata(connection, oldTableName);
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          generateRenameTableSql(
+              oldTableName, newTableName, metadata.hasClusterMetadata(), metadata.clusterName()));
+      LOG.info(
+          "Renamed table {}/{} to {}/{}", databaseName, oldTableName, databaseName, newTableName);
+    } catch (final SQLException se) {
+      throw exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @VisibleForTesting
+  String generateRenameTableSql(
+      String oldTableName,
+      String newTableName,
+      boolean hasClusterMetadata,
+      @Nullable String clusterName) {
+    if (hasClusterMetadata) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(clusterName),
+          "ClickHouse cluster metadata for table %s is missing a cluster name",
+          oldTableName);
+      return "RENAME TABLE %s TO %s ON CLUSTER %s"
+          .formatted(
+              quoteIdentifier(oldTableName),
+              quoteIdentifier(newTableName),
+              quoteIdentifier(clusterName));
+    }
+    return "RENAME TABLE %s TO %s"
+        .formatted(quoteIdentifier(oldTableName), quoteIdentifier(newTableName));
+  }
+
+  @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
+    return loadTablePropertiesWithClusterMetadata(connection, tableName).properties();
+  }
+
+  private TablePropertiesWithClusterMetadata loadTablePropertiesWithClusterMetadata(
+      Connection connection, String tableName) throws SQLException {
     try (PreparedStatement statement =
-        connection.prepareStatement("select * from system.tables where name = ? ")) {
+        connection.prepareStatement(
+            "SELECT comment, engine, engine_full FROM system.tables "
+                + "WHERE database = currentDatabase() AND name = ?")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
-        while (resultSet.next()) {
-          String name = resultSet.getString("name");
-          if (Objects.equals(name, tableName)) {
-            Map<String, String> tableProperties = new HashMap<>();
+        if (!resultSet.next()) {
+          throw new NoSuchTableException(
+              "Table %s does not exist in %s.", tableName, connection.getCatalog());
+        }
 
-            // Extract cluster name embedded in the COMMENT at create time.
-            // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
-            String storedComment = resultSet.getString(COMMENT);
-            String clusterName = ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+        Map<String, String> tableProperties = new HashMap<>();
+
+        // Extract cluster name embedded in the COMMENT at create time.
+        // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
+        String storedComment = resultSet.getString(COMMENT);
+        boolean hasClusterMetadata = ClickHouseClusterUtils.hasClusterMetadata(storedComment);
+        String clusterName = ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+        tableProperties.put(COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
+        String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
+        String engineFull = resultSet.getString("engine_full");
+        tableProperties.put(GRAVITINO_ENGINE_KEY, engine);
+        if (StringUtils.isNotBlank(clusterName)) {
+          tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+          tableProperties.put(ClusterConstants.CLUSTER_NAME, clusterName);
+        } else {
+          tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+        }
+
+        if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
+          Matcher distributedEngineMatcher =
+              DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
+          if (distributedEngineMatcher.matches()) {
+            String distributedClusterName = unquote(distributedEngineMatcher.group(1));
+            tableProperties.put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
             tableProperties.put(
-                COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
-            String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
-            String engineFull = resultSet.getString("engine_full");
-            tableProperties.put(GRAVITINO_ENGINE_KEY, engine);
-            if (StringUtils.isNotBlank(clusterName)) {
-              tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
-              tableProperties.put(ClusterConstants.CLUSTER_NAME, clusterName);
-            } else {
-              tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
-            }
-
-            if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
-              Matcher distributedEngineMatcher =
-                  DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
-              if (distributedEngineMatcher.matches()) {
-                String distributedClusterName = unquote(distributedEngineMatcher.group(1));
-                tableProperties.put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
-                tableProperties.put(
-                    DistributedTableConstants.REMOTE_DATABASE,
-                    unquote(distributedEngineMatcher.group(2)));
-                tableProperties.put(
-                    DistributedTableConstants.REMOTE_TABLE,
-                    unquote(distributedEngineMatcher.group(3)));
-                tableProperties.put(
-                    DistributedTableConstants.SHARDING_KEY,
-                    StringUtils.trim(distributedEngineMatcher.group(4)));
-              }
-            } else if (StringUtils.equalsIgnoreCase(engine, ENGINE.GRAPHITEMERGETREE.getValue())) {
-              String graphiteConfig = extractGraphiteConfig(engineFull);
-              if (StringUtils.isNotBlank(graphiteConfig)) {
-                tableProperties.put(TableConstants.GRAPHITE_CONFIG, graphiteConfig);
-              }
-            } else if (isGenericEngineParameterEngine(engine)) {
-              String engineParams = extractEngineParams(engine, engineFull);
-              if (StringUtils.isNotBlank(engineParams)) {
-                tableProperties.put(TableConstants.ENGINE_PARAMETERS, engineParams);
-              }
-            }
-
-            return Collections.unmodifiableMap(tableProperties);
+                DistributedTableConstants.REMOTE_DATABASE,
+                unquote(distributedEngineMatcher.group(2)));
+            tableProperties.put(
+                DistributedTableConstants.REMOTE_TABLE, unquote(distributedEngineMatcher.group(3)));
+            tableProperties.put(
+                DistributedTableConstants.SHARDING_KEY,
+                StringUtils.trim(distributedEngineMatcher.group(4)));
+          }
+        } else if (StringUtils.equalsIgnoreCase(engine, ENGINE.GRAPHITEMERGETREE.getValue())) {
+          String graphiteConfig = extractGraphiteConfig(engineFull);
+          if (StringUtils.isNotBlank(graphiteConfig)) {
+            tableProperties.put(TableConstants.GRAPHITE_CONFIG, graphiteConfig);
+          }
+        } else if (isGenericEngineParameterEngine(engine)) {
+          String engineParams = extractEngineParams(engine, engineFull);
+          if (StringUtils.isNotBlank(engineParams)) {
+            tableProperties.put(TableConstants.ENGINE_PARAMETERS, engineParams);
           }
         }
 
-        throw new NoSuchTableException(
-            "Table %s does not exist in %s.", tableName, connection.getCatalog());
+        return new TablePropertiesWithClusterMetadata(
+            Collections.unmodifiableMap(tableProperties), hasClusterMetadata, clusterName);
       }
     }
   }
@@ -806,12 +939,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
       SystemTableMetadata systemTableMetadata =
           getSystemTableMetadata(connection, databaseName, tableName);
-      ShowCreateTableMetadata showCreateMetadata = parseShowCreateTable(connection, tableName);
-      Transform[] partitioning = showCreateMetadata.partitioning;
-      if (ArrayUtils.isEmpty(partitioning)) {
-        partitioning = getTablePartitioning(connection, databaseName, tableName);
-      }
-      jdbcTableBuilder.withPartitioning(partitioning);
+      String partitionKey = getPartitionKey(connection, databaseName, tableName);
+      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey));
       jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
@@ -823,12 +952,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       // mistaken for table SETTINGS. These values take precedence
       // over any settings.* keys that might exist in system.tables (though getTableProperties()
       // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
-      if (!systemTableMetadata.settings().isEmpty()) {
-        Map<String, String> merged = new HashMap<>(tableProperties);
-        merged.putAll(systemTableMetadata.settings());
-        tableProperties = Collections.unmodifiableMap(merged);
+      Map<String, String> merged = new HashMap<>(tableProperties);
+      String projectionProperty = getProjectionProperty(connection, databaseName, tableName);
+      if (StringUtils.isNotEmpty(projectionProperty)) {
+        merged.put(CLICKHOUSE_PROJECTIONS_KEY, projectionProperty);
       }
-      jdbcTableBuilder.withProperties(tableProperties);
+      if (!systemTableMetadata.settings().isEmpty()) {
+        merged.putAll(systemTableMetadata.settings());
+      }
+      // Expose ClickHouse's canonical native partition expression. Unpartitioned tables expose an
+      // empty string so that the property key is always present.
+      merged.put(TableConstants.PARTITION_KEY, StringUtils.defaultString(partitionKey));
+      jdbcTableBuilder.withProperties(Collections.unmodifiableMap(merged));
 
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
 
@@ -875,9 +1010,103 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
   }
 
+  @VisibleForTesting
+  @Nullable
+  String getProjectionProperty(Connection connection, String databaseName, String tableName)
+      throws SQLException {
+    // Probe the stable columns directly so ClickHouse 24.8, which has no system.projections table,
+    // can continue serving ordinary catalog metadata. Only UNKNOWN_TABLE means the capability is
+    // unavailable; access and other query errors must remain visible to the caller.
+    try (PreparedStatement probe =
+            connection.prepareStatement("SELECT database FROM system.projections LIMIT 0");
+        ResultSet probeResult = probe.executeQuery()) {
+      if (probeResult.next()) {
+        throw new SQLException(
+            "Unexpected row returned by the system.projections capability probe");
+      }
+    } catch (SQLException e) {
+      if (e.getErrorCode() == ERROR_CODE_UNKNOWN_TABLE) {
+        if (projectionSourceUnavailableWarningLogged.compareAndSet(false, true)) {
+          LOG.warn(
+              "ClickHouse does not provide system.projections; projection metadata round-trip "
+                  + "requires ClickHouse 24.9 or later");
+        }
+        return null;
+      }
+      throw e;
+    }
+
+    Set<String> projectionColumns = new HashSet<>();
+    try (PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT name FROM system.columns "
+                    + "WHERE database = 'system' AND table = 'projections'");
+        ResultSet resultSet = statement.executeQuery()) {
+      while (resultSet.next()) {
+        projectionColumns.add(resultSet.getString("name"));
+      }
+    }
+    if (!projectionColumns.containsAll(REQUIRED_PROJECTION_COLUMNS)) {
+      Set<String> missingColumns = new HashSet<>(REQUIRED_PROJECTION_COLUMNS);
+      missingColumns.removeAll(projectionColumns);
+      throw new SQLException(
+          "system.projections is missing required columns: "
+              + missingColumns.stream().sorted().collect(Collectors.joining(", ")));
+    }
+
+    boolean hasSettingsColumn = projectionColumns.contains("settings");
+    String query =
+        "SELECT name, type, query"
+            + (hasSettingsColumn ? ", toJSONString(settings) AS settings_json" : "")
+            + " FROM system.projections WHERE database = ? AND table = ? ORDER BY name";
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions = new ArrayList<>();
+    try (PreparedStatement statement = connection.prepareStatement(query)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          Map<String, String> settings;
+          try {
+            settings =
+                hasSettingsColumn
+                    ? ClickHouseTableSqlUtils.parseProjectionSettings(
+                        resultSet.getString("settings_json"))
+                    : Collections.emptyMap();
+          } catch (IllegalArgumentException e) {
+            LOG.warn(
+                "Skip projection metadata of {}.{}: {}", databaseName, tableName, e.getMessage());
+            return null;
+          }
+          definitions.add(
+              new ClickHouseTableSqlUtils.ProjectionDefinition(
+                  resultSet.getString("name"),
+                  resultSet.getString("type"),
+                  resultSet.getString("query"),
+                  settings));
+        }
+      }
+    }
+    if (definitions.isEmpty()) {
+      return null;
+    }
+    try {
+      return ClickHouseTableSqlUtils.serializeProjectionDefinitions(definitions);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Skip projection metadata of {}.{}: {}", databaseName, tableName, e.getMessage());
+      return null;
+    }
+  }
+
   @Override
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
+    return parsePartitioning(getPartitionKey(connection, databaseName, tableName));
+  }
+
+  @VisibleForTesting
+  @Nullable
+  String getPartitionKey(Connection connection, String databaseName, String tableName)
+      throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
             "SELECT partition_key FROM system.tables WHERE database = ? AND name = ?")) {
@@ -885,22 +1114,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       statement.setString(2, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
         if (resultSet.next()) {
-          String partitionKey = resultSet.getString("partition_key");
-          try {
-            return parsePartitioning(partitionKey);
-          } catch (IllegalArgumentException | UnsupportedOperationException e) {
-            LOG.warn(
-                "Skip unsupported partition expression {} for {}.{}",
-                partitionKey,
-                databaseName,
-                tableName);
-            return Transforms.EMPTY_TRANSFORM;
-          }
+          return resultSet.getString("partition_key");
         }
       }
     }
 
-    return Transforms.EMPTY_TRANSFORM;
+    return null;
   }
 
   @Override
@@ -973,20 +1192,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
+    List<TableChange.RemoveProperty> removeProperties = new ArrayList<>();
     List<String> alterSql = new ArrayList<>();
+
+    collectAndValidateTableSettingChanges(changes, setProperties, removeProperties);
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.UpdateComment) {
         updateComment = (TableChange.UpdateComment) change;
 
-      } else if (change instanceof TableChange.SetProperty setProperty) {
-        // The set attribute needs to be added at the end.
-        setProperties.add(setProperty);
-
-      } else if (change instanceof TableChange.RemoveProperty) {
-        // Clickhouse does not support deleting table attributes, it can be replaced by Set Property
-        throw new UnsupportedOperationException(
-            "Remove property for ClickHouse is not supported yet");
+      } else if (change instanceof TableChange.SetProperty
+          || change instanceof TableChange.RemoveProperty) {
+        // Table setting changes were fully validated before any table metadata was loaded. They are
+        // rendered together after the other change branches, which are mutually exclusive with
+        // settings changes.
+        continue;
 
       } else if (change instanceof TableChange.AddColumn addColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1068,8 +1288,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       alterSql.add(" MODIFY COMMENT '%s'".formatted(escapeSingleQuotes(newComment)));
     }
 
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateAlterTableProperties(setProperties));
+    if (!setProperties.isEmpty() || !removeProperties.isEmpty()) {
+      alterSql.add(generateAlterTableProperties(setProperties, removeProperties));
     }
 
     // Remove all empty SQL statements
@@ -1101,7 +1321,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "ALTER TABLE %s \n%s;"
               .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
     }
-    LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    if (!setProperties.isEmpty() || !removeProperties.isEmpty()) {
+      LOG.info(
+          "Generated alter table settings for {}.{} with keys {}",
+          databaseName,
+          tableName,
+          tableSettingNames(setProperties, removeProperties));
+    } else {
+      LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    }
     return result;
   }
 
@@ -1119,28 +1347,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Map<String, String> properties = addIndex.getProperties();
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD "
-            + buildDataSkippingIndexDdl(
-                addIndex.getName(),
-                fieldStr,
-                DATA_SKIPPING_MINMAX_VALUE,
-                resolveGranularity(properties, 1));
-
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD "
-            + buildDataSkippingIndexDdl(
-                addIndex.getName(),
-                fieldStr,
-                DATA_SKIPPING_BLOOM_FILTER,
-                resolveGranularity(properties, 1));
-
       case DATA_SKIPPING_SET:
+      case DATA_SKIPPING_NGRAMBFV1:
+      case DATA_SKIPPING_TOKENBFV1:
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
         return "ADD "
             + buildDataSkippingIndexDdl(
-                addIndex.getName(),
-                fieldStr,
-                "set(" + resolveSetMaxValues(properties) + ")",
-                resolveGranularity(properties, 1));
+                addIndex.getName(), fieldStr, addIndex.getType(), properties);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -1235,13 +1449,142 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             appendColumnDefinition(updateColumn, new StringBuilder()));
   }
 
-  private String generateAlterTableProperties(List<TableChange.SetProperty> setProperties) {
-    if (CollectionUtils.isNotEmpty(setProperties)) {
-      throw new UnsupportedOperationException(
-          "Alter table properties in ClickHouse is not supported");
+  private static void collectAndValidateTableSettingChanges(
+      TableChange[] changes,
+      List<TableChange.SetProperty> setProperties,
+      List<TableChange.RemoveProperty> removeProperties) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty setProperty) {
+        tableSettingName(setProperty.getProperty());
+        validateTableSettingLiteral(setProperty.getValue());
+        setProperties.add(setProperty);
+      } else if (change instanceof TableChange.RemoveProperty removeProperty) {
+        tableSettingName(removeProperty.getProperty());
+        removeProperties.add(removeProperty);
+      }
     }
 
+    int settingChangeCount = setProperties.size() + removeProperties.size();
+    if (settingChangeCount == 0) {
+      return;
+    }
+
+    if (settingChangeCount != changes.length) {
+      throw new UnsupportedOperationException(
+          "ClickHouse table setting changes cannot be mixed with other table changes");
+    }
+    if (!setProperties.isEmpty() && !removeProperties.isEmpty()) {
+      throw new UnsupportedOperationException(
+          "ClickHouse MODIFY SETTING and RESET SETTING cannot be combined in one request");
+    }
+
+    validateNoDuplicateTableSettings(
+        setProperties.stream()
+            .map(change -> tableSettingName(change.getProperty()))
+            .collect(Collectors.toList()));
+    validateNoDuplicateTableSettings(
+        removeProperties.stream()
+            .map(change -> tableSettingName(change.getProperty()))
+            .collect(Collectors.toList()));
+
+    setProperties.sort(Comparator.comparing(change -> tableSettingName(change.getProperty())));
+    removeProperties.sort(Comparator.comparing(change -> tableSettingName(change.getProperty())));
+  }
+
+  private static void validateTableSettingChanges(TableChange[] changes) {
+    collectAndValidateTableSettingChanges(changes, new ArrayList<>(), new ArrayList<>());
+  }
+
+  private static void validateNoDuplicateTableSettings(List<String> settingNames) {
+    Set<String> uniqueNames = new HashSet<>();
+    for (String settingName : settingNames) {
+      Preconditions.checkArgument(
+          uniqueNames.add(settingName), "Duplicate ClickHouse table setting: %s", settingName);
+    }
+  }
+
+  private static String tableSettingName(String property) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(property), "ClickHouse table setting property is required");
+    if (!property.startsWith(TableConstants.SETTINGS_PREFIX)) {
+      throw new UnsupportedOperationException(
+          "Only ClickHouse table properties with the 'settings.' prefix can be altered");
+    }
+
+    String settingName = property.substring(TableConstants.SETTINGS_PREFIX.length());
+    Preconditions.checkArgument(
+        TABLE_SETTING_NAME_PATTERN.matcher(settingName).matches(),
+        "Invalid ClickHouse table setting name: %s",
+        settingName);
+    return settingName;
+  }
+
+  private static void validateTableSettingLiteral(String value) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value), "ClickHouse table setting value is required");
+    String literal = value.trim();
+    boolean valid =
+        NUMERIC_SETTING_LITERAL_PATTERN.matcher(literal).matches()
+            || "true".equalsIgnoreCase(literal)
+            || "false".equalsIgnoreCase(literal)
+            || isValidQuotedSettingLiteral(literal);
+    Preconditions.checkArgument(valid, "Invalid ClickHouse table setting literal");
+  }
+
+  private static boolean isValidQuotedSettingLiteral(String literal) {
+    if (literal.length() < 2
+        || literal.charAt(0) != '\''
+        || literal.charAt(literal.length() - 1) != '\'') {
+      return false;
+    }
+
+    for (int i = 1; i < literal.length() - 1; i++) {
+      char current = literal.charAt(i);
+      if (current == '\\') {
+        if (i + 1 >= literal.length() - 1) {
+          return false;
+        }
+        i++;
+      } else if (current == '\'') {
+        if (i + 1 >= literal.length() - 1 || literal.charAt(i + 1) != '\'') {
+          return false;
+        }
+        i++;
+      }
+    }
+    return true;
+  }
+
+  private static String generateAlterTableProperties(
+      List<TableChange.SetProperty> setProperties,
+      List<TableChange.RemoveProperty> removeProperties) {
+    if (!setProperties.isEmpty()) {
+      return setProperties.stream()
+          .map(
+              change ->
+                  "%s = %s"
+                      .formatted(tableSettingName(change.getProperty()), change.getValue().trim()))
+          .collect(Collectors.joining(", ", "MODIFY SETTING ", ""));
+    }
+    if (!removeProperties.isEmpty()) {
+      return removeProperties.stream()
+          .map(change -> tableSettingName(change.getProperty()))
+          .collect(Collectors.joining(", ", "RESET SETTING ", ""));
+    }
     return "";
+  }
+
+  private static List<String> tableSettingNames(
+      List<TableChange.SetProperty> setProperties,
+      List<TableChange.RemoveProperty> removeProperties) {
+    if (!setProperties.isEmpty()) {
+      return setProperties.stream()
+          .map(change -> tableSettingName(change.getProperty()))
+          .collect(Collectors.toList());
+    }
+    return removeProperties.stream()
+        .map(change -> tableSettingName(change.getProperty()))
+        .collect(Collectors.toList());
   }
 
   private String updateColumnCommentFieldDefinition(
@@ -1417,41 +1760,88 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @VisibleForTesting
-  Transform[] parsePartitioning(String partitionKey) {
+  Transform[] parsePartitioning(@Nullable String partitionKey) {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
-  private ShowCreateTableMetadata parseCreateStatement(String createSql) {
-    ShowCreateTableMetadata metadata = new ShowCreateTableMetadata();
-    if (StringUtils.isBlank(createSql)) {
-      return metadata;
-    }
-
-    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
-    if (partitionMatcher.find()) {
-      metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
-    }
-
-    return metadata;
-  }
-
-  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
-  // Keys are prefixed with "settings." to match the write path convention in
-  // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
-  // String, Enum) — arrays or nested structures are not valid SETTINGS values,
-  // so splitting by comma is safe.
+  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause. Keys are prefixed with
+  // "settings." to match the write path convention in appendTableProperties().
   private static Map<String, String> parseSettingsClause(String settingsStr) {
     Map<String, String> settings = new HashMap<>();
-    for (String pair : settingsStr.split(",")) {
-      String trimmed = pair.trim();
-      int eqIdx = trimmed.indexOf('=');
-      if (eqIdx > 0) {
-        String key = trimmed.substring(0, eqIdx).trim();
-        String value = trimmed.substring(eqIdx + 1).trim();
-        settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+    int fragmentStart = 0;
+    int equalsIndex = -1;
+    for (int i = 0; i < settingsStr.length(); i++) {
+      char current = settingsStr.charAt(i);
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(settingsStr, i);
+        Preconditions.checkArgument(quoteEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = quoteEnd;
+      } else if (current == '(') {
+        int parenthesisEnd = findMatchingParenthesis(settingsStr, i);
+        Preconditions.checkArgument(parenthesisEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = parenthesisEnd;
+      } else if (current == ')') {
+        throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
+      } else if (current == '=' && equalsIndex < 0) {
+        equalsIndex = i;
+      } else if (current == ',') {
+        addSetting(settings, settingsStr, fragmentStart, equalsIndex, i);
+        fragmentStart = i + 1;
+        equalsIndex = -1;
       }
     }
+
+    addSetting(settings, settingsStr, fragmentStart, equalsIndex, settingsStr.length());
     return settings;
+  }
+
+  private static void addSetting(
+      Map<String, String> settings,
+      String settingsStr,
+      int fragmentStart,
+      int equalsIndex,
+      int fragmentEnd) {
+    Preconditions.checkArgument(
+        equalsIndex >= fragmentStart && equalsIndex < fragmentEnd, INVALID_SETTINGS_METADATA_MSG);
+    String key = settingsStr.substring(fragmentStart, equalsIndex).trim();
+    String value = settingsStr.substring(equalsIndex + 1, fragmentEnd).trim();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(key) && StringUtils.isNotBlank(value),
+        INVALID_SETTINGS_METADATA_MSG);
+    settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+  }
+
+  private static int findLastTopLevelKeyword(String value, String keyword) {
+    int keywordIndex = -1;
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(value, i);
+        Preconditions.checkArgument(quoteEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = quoteEnd;
+      } else if (current == '(') {
+        int parenthesisEnd = findMatchingParenthesis(value, i);
+        Preconditions.checkArgument(parenthesisEnd >= 0, INVALID_SETTINGS_METADATA_MSG);
+        i = parenthesisEnd;
+      } else if (current == ')') {
+        throw new IllegalArgumentException(INVALID_SETTINGS_METADATA_MSG);
+      } else if (isKeywordAt(value, i, keyword)) {
+        keywordIndex = i;
+      }
+    }
+    return keywordIndex;
+  }
+
+  private static boolean isKeywordAt(String value, int index, String keyword) {
+    int keywordEnd = index + keyword.length();
+    return keywordEnd <= value.length()
+        && value.regionMatches(true, index, keyword, 0, keyword.length())
+        && (index == 0 || !isIdentifierCharacter(value.charAt(index - 1)))
+        && (keywordEnd == value.length() || !isIdentifierCharacter(value.charAt(keywordEnd)));
+  }
+
+  private static boolean isIdentifierCharacter(char value) {
+    return Character.isLetterOrDigit(value) || value == '_';
   }
 
   @VisibleForTesting
@@ -1460,29 +1850,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return Collections.emptyMap();
     }
 
-    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(engineFull);
-    if (settingsMatcher.find()) {
-      return parseSettingsClause(settingsMatcher.group(1));
+    // engine_full is formatted from ClickHouse's ASTStorage, where SETTINGS is the final storage
+    // clause. Use the last top-level match because ORDER BY may contain an unquoted identifier
+    // named "settings". Quoted values and engine parameters are skipped by the scanner.
+    int settingsStart = findLastTopLevelKeyword(engineFull, "SETTINGS");
+    if (settingsStart >= 0) {
+      return parseSettingsClause(engineFull.substring(settingsStart + "SETTINGS".length()).trim());
     }
     return Collections.emptyMap();
-  }
-
-  private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
-      throws SQLException {
-    String createSql = parseShowCreateTableSql(connection, tableName);
-    return parseCreateStatement(createSql);
-  }
-
-  private String parseShowCreateTableSql(Connection connection, String tableName)
-      throws SQLException {
-    String sql = "SHOW CREATE TABLE " + quoteIdentifier(tableName);
-    try (Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(sql)) {
-      if (resultSet.next()) {
-        return resultSet.getString(1);
-      }
-      throw new SQLException("SHOW CREATE TABLE returned no rows for " + tableName);
-    }
   }
 
   private String unquote(String value) {
@@ -1602,8 +1977,30 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
   }
 
-  private static final class ShowCreateTableMetadata {
-    private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+  private static final class TablePropertiesWithClusterMetadata {
+    private final Map<String, String> properties;
+    private final boolean hasClusterMetadata;
+    @Nullable private final String clusterName;
+
+    private TablePropertiesWithClusterMetadata(
+        Map<String, String> properties, boolean hasClusterMetadata, @Nullable String clusterName) {
+      this.properties = properties;
+      this.hasClusterMetadata = hasClusterMetadata;
+      this.clusterName = clusterName;
+    }
+
+    private Map<String, String> properties() {
+      return properties;
+    }
+
+    private boolean hasClusterMetadata() {
+      return hasClusterMetadata;
+    }
+
+    @Nullable
+    private String clusterName() {
+      return clusterName;
+    }
   }
 
   @VisibleForTesting
@@ -1613,41 +2010,150 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private List<Index> getSecondaryIndexes(
       Connection connection, String databaseName, String tableName) throws SQLException {
+    try {
+      return querySecondaryIndexes(
+          connection, databaseName, tableName, SECONDARY_INDEX_QUERY, true);
+    } catch (SQLException e) {
+      if (!isMissingTypeFullColumn(e)) {
+        throw e;
+      }
+      LOG.warn(
+          "ClickHouse server does not expose system.data_skipping_indices.type_full; "
+              + "falling back to the legacy secondary-index query for {}.{}",
+          databaseName,
+          tableName);
+      return querySecondaryIndexes(
+          connection, databaseName, tableName, LEGACY_SECONDARY_INDEX_QUERY, false);
+    }
+  }
+
+  private List<Index> querySecondaryIndexes(
+      Connection connection,
+      String databaseName,
+      String tableName,
+      String query,
+      boolean includesTypeFull)
+      throws SQLException {
     List<Index> secondaryIndexes = new ArrayList<>();
-    try (PreparedStatement preparedStatement =
-        connection.prepareStatement(
-            "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
-                + "WHERE database = ? AND table = ? ORDER BY name")) {
+    try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
       preparedStatement.setString(1, databaseName);
       preparedStatement.setString(2, tableName);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         while (resultSet.next()) {
           String name = resultSet.getString("name");
           String type = resultSet.getString("type");
+          String parameterSource = includesTypeFull ? resultSet.getString("type_full") : type;
+          String parameterSourceName = includesTypeFull ? "type_full" : "legacy type";
           String expression = resultSet.getString("expr");
           long granularity = resultSet.getLong("granularity");
+          Index.IndexType indexType;
           try {
-            String[][] fields = parseIndexFields(expression);
-            if (ArrayUtils.isEmpty(fields)) {
-              continue;
-            }
-            // Only include granularity in properties when it differs from the default,
-            // so that indexes created without explicit granularity have empty properties
-            // and match the original creation state (avoids false index-change diffs).
-            Map<String, String> properties =
-                granularity == DEFAULT_INDEX_GRANULARITY
-                    ? Map.of()
-                    : Map.of(GRANULARITY, String.valueOf(granularity));
-            secondaryIndexes.add(
-                Indexes.of(getClickHouseIndexType(type), name, fields, properties));
-          } catch (IllegalArgumentException e) {
+            indexType = getClickHouseIndexType(type);
+          } catch (IllegalArgumentException ignored) {
             LOG.warn(
-                "Skip unsupported data skipping index {} for {}.{} with expression {}",
+                "Skip unsupported data skipping index {} for {}.{} with unsupported type {}",
                 name,
                 databaseName,
                 tableName,
-                expression);
+                type);
+            continue;
           }
+
+          Map<String, String> parameterProperties = Collections.emptyMap();
+          String[][] fields;
+          try {
+            fields = parseIndexFields(expression);
+          } catch (IllegalArgumentException ignored) {
+            LOG.warn(
+                "Skip unsupported data skipping index {} for {}.{} with type {} because its "
+                    + "expression cannot be represented as index field names",
+                name,
+                databaseName,
+                tableName,
+                type);
+            continue;
+          }
+          if (ArrayUtils.isEmpty(fields)) {
+            continue;
+          }
+
+          if (indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+              && !includesTypeFull
+              && !StringUtils.contains(parameterSource, "(")) {
+            LOG.warn(
+                "Skip vector similarity index '{}' on {}.{} because the legacy metadata query "
+                    + "does not expose its required parameters",
+                name,
+                databaseName,
+                tableName);
+            continue;
+          }
+
+          if (indexType == Index.IndexType.DATA_SKIPPING_SET
+              || isParameterizedBloomFilterIndex(indexType)
+              || indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY) {
+            try {
+              parameterProperties =
+                  parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
+            } catch (UnsupportedVectorSimilarityIndexException e) {
+              LOG.warn(
+                  "Skip unsupported vector similarity index '{}' on {}.{} with {} '{}': {}",
+                  name,
+                  databaseName,
+                  tableName,
+                  parameterSourceName,
+                  parameterSource,
+                  e.getMessage());
+              continue;
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException(
+                  "Failed to load data skipping index '%s' from %s.%s with %s '%s': %s"
+                      .formatted(
+                          name,
+                          databaseName,
+                          tableName,
+                          parameterSourceName,
+                          parameterSource,
+                          e.getMessage()),
+                  e);
+            }
+          }
+
+          // Only include granularity in properties when it differs from the default,
+          // so that indexes created without explicit granularity have empty properties
+          // and match the original creation state (avoids false index-change diffs).
+          Map<String, String> properties = new HashMap<>();
+          long defaultGranularity =
+              indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+                  ? DEFAULT_VECTOR_SIMILARITY_GRANULARITY
+                  : DEFAULT_INDEX_GRANULARITY;
+          if (granularity != defaultGranularity) {
+            properties.put(GRANULARITY, String.valueOf(granularity));
+          }
+          if (!includesTypeFull
+              && isParameterizedBloomFilterIndex(indexType)
+              && parameterProperties.isEmpty()) {
+            LOG.warn(
+                "Legacy ClickHouse metadata does not expose bloom-filter parameters for "
+                    + "{} index '{}' on {}.{}; loaded Index.properties() is incomplete",
+                type,
+                name,
+                databaseName,
+                tableName);
+          }
+          if (!includesTypeFull
+              && indexType == Index.IndexType.DATA_SKIPPING_SET
+              && parameterProperties.isEmpty()
+              && !StringUtils.contains(parameterSource, "(")) {
+            LOG.warn(
+                "Legacy ClickHouse metadata does not expose SET max-values parameters for "
+                    + "SET index '{}' on {}.{}; loaded Index.properties() is incomplete",
+                name,
+                databaseName,
+                tableName);
+          }
+          properties.putAll(parameterProperties);
+          secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
         }
       }
     }
@@ -1655,14 +2161,402 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return secondaryIndexes;
   }
 
+  private static boolean isMissingTypeFullColumn(SQLException exception) {
+    for (SQLException current = exception; current != null; current = current.getNextException()) {
+      for (Throwable cause = current; cause != null; cause = cause.getCause()) {
+        String message = StringUtils.lowerCase(cause.getMessage());
+        if (message != null
+            && message.contains("type_full")
+            && (message.contains("unknown")
+                || message.contains("missing")
+                || message.contains("column"))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Parses the single positional parameter returned by ClickHouse for a SET data skipping index.
+   *
+   * @param indexType the mapped Gravitino index type
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the SET index properties, or an empty map for non-SET index types and {@code set(0)}
+   * @throws IllegalArgumentException if a SET index has malformed or out-of-range parameters
+   */
+  @VisibleForTesting
+  static Map<String, String> parseSetProperties(
+      Index.IndexType indexType, String typeFull, String indexName) {
+    if (indexType != Index.IndexType.DATA_SKIPPING_SET) {
+      return Collections.emptyMap();
+    }
+
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
+    Preconditions.checkArgument(
+        paramsStart > 0 && paramsEnd == normalizedTypeFull.length() - 1,
+        "Invalid SET metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            DATA_SKIPPING_SET, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "SET metadata '%s' does not match SET index '%s'",
+        typeFull,
+        indexName);
+
+    String[] params = normalizedTypeFull.substring(paramsStart + 1, paramsEnd).split(",", -1);
+    Preconditions.checkArgument(
+        params.length == 1,
+        "Invalid SET metadata '%s' for SET index '%s': expected one parameter but got %s",
+        typeFull,
+        indexName,
+        params.length);
+
+    String rawValue = params[0].trim();
+    Preconditions.checkArgument(
+        !rawValue.isEmpty(),
+        "Invalid SET metadata '%s' for SET index '%s': set_max_values is required",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        SET_MAX_VALUES_PATTERN.matcher(rawValue).matches(),
+        "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is not a valid decimal integer",
+        typeFull,
+        indexName,
+        rawValue);
+    BigInteger value;
+    try {
+      value = new BigInteger(rawValue);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is not a valid decimal integer"
+              .formatted(typeFull, indexName, rawValue),
+          e);
+    }
+
+    if (value.compareTo(MIN_SET_MAX_VALUES) < 0 || value.compareTo(MAX_SET_MAX_VALUES) > 0) {
+      throw new IllegalArgumentException(
+          "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is outside supported range %s"
+              .formatted(typeFull, indexName, rawValue, SET_MAX_VALUES_RANGE));
+    }
+    if (value.equals(MIN_SET_MAX_VALUES)) {
+      return Collections.emptyMap();
+    }
+    return Map.of(SET_MAX_VALUES, value.toString());
+  }
+
+  private static Map<String, String> parseIndexPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    switch (indexType) {
+      case DATA_SKIPPING_SET:
+        return parseSetPropertiesForQuery(
+            indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_NGRAMBFV1:
+      case DATA_SKIPPING_TOKENBFV1:
+        return parseBloomFilterPropertiesForQuery(
+            indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
+        if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+          return Collections.emptyMap();
+        }
+        return parseVectorSimilarityProperties(parameterSource, indexName);
+      default:
+        return Collections.emptyMap();
+    }
+  }
+
+  private static Map<String, String> parseSetPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+      return Collections.emptyMap();
+    }
+    return parseSetProperties(indexType, parameterSource, indexName);
+  }
+
+  /**
+   * Parses the positional parameters returned by ClickHouse in {@code type_full} for the two
+   * parameterized bloom-filter data skipping indexes.
+   *
+   * @param indexType the mapped Gravitino index type
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the index properties, or an empty map for non-parameterized index types
+   * @throws IllegalArgumentException if a supported index has malformed or invalid parameters
+   */
+  @VisibleForTesting
+  static Map<String, String> parseBloomFilterProperties(
+      Index.IndexType indexType, String typeFull, String indexName) {
+    if (!isParameterizedBloomFilterIndex(indexType)) {
+      return Collections.emptyMap();
+    }
+
+    String expectedType =
+        indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
+            ? DATA_SKIPPING_NGRAMBFV1
+            : DATA_SKIPPING_TOKENBFV1;
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
+    Preconditions.checkArgument(
+        paramsStart > 0 && paramsEnd == normalizedTypeFull.length() - 1,
+        "Invalid type_full '%s' for %s index '%s'",
+        typeFull,
+        expectedType,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            expectedType, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "type_full '%s' does not match %s index '%s'",
+        typeFull,
+        expectedType,
+        indexName);
+
+    String[] params = normalizedTypeFull.substring(paramsStart + 1, paramsEnd).split(",", -1);
+    int expectedParamCount = indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1 ? 4 : 3;
+    Preconditions.checkArgument(
+        params.length == expectedParamCount,
+        "Expected %s parameters for %s index '%s', but got %s in '%s'",
+        expectedParamCount,
+        expectedType,
+        indexName,
+        params.length,
+        typeFull);
+
+    Map<String, String> properties = new HashMap<>();
+    int paramIndex = 0;
+    if (indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1) {
+      properties.put(
+          NGRAM_SIZE,
+          requireIntWithMin(params[paramIndex++], NGRAM_SIZE, expectedType, indexName, 1));
+    }
+    properties.put(
+        BLOOM_FILTER_SIZE,
+        requireIntWithMin(params[paramIndex++], BLOOM_FILTER_SIZE, expectedType, indexName, 1));
+    properties.put(
+        HASH_FUNCTIONS,
+        requireIntWithMin(params[paramIndex++], HASH_FUNCTIONS, expectedType, indexName, 1));
+    properties.put(
+        RANDOM_SEED,
+        requireIntWithMin(params[paramIndex], RANDOM_SEED, expectedType, indexName, 0));
+    return Map.copyOf(properties);
+  }
+
+  private static Map<String, String> parseBloomFilterPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    if (!isParameterizedBloomFilterIndex(indexType)) {
+      return Collections.emptyMap();
+    }
+    if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+      return Collections.emptyMap();
+    }
+    return parseBloomFilterProperties(indexType, parameterSource, indexName);
+  }
+
+  /**
+   * Parses the positional parameters reported for a ClickHouse vector similarity index.
+   *
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the canonical Gravitino properties for the index
+   * @throws IllegalArgumentException if the type expression or any parameter is invalid
+   */
+  @VisibleForTesting
+  static Map<String, String> parseVectorSimilarityProperties(String typeFull, String indexName) {
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    Preconditions.checkArgument(
+        paramsStart > 0 && normalizedTypeFull.endsWith(")"),
+        "Invalid type_full '%s' for vector_similarity index '%s'",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            DATA_SKIPPING_VECTOR_SIMILARITY, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "type_full '%s' does not match vector_similarity index '%s'",
+        typeFull,
+        indexName);
+
+    String parameterText =
+        normalizedTypeFull.substring(paramsStart + 1, normalizedTypeFull.length() - 1);
+    List<String> parameters = splitVectorSimilarityParameters(parameterText, typeFull, indexName);
+    Preconditions.checkArgument(
+        parameters.size() >= 3 && parameters.size() <= 6,
+        "Expected 3 to 6 parameters for vector_similarity index '%s', but got %s in '%s'",
+        indexName,
+        parameters.size(),
+        typeFull);
+
+    String type =
+        parseVectorSimilarityStringParameter(parameters.get(0), VECTOR_SIMILARITY_TYPE, indexName);
+    if (!StringUtils.equalsIgnoreCase(DEFAULT_VECTOR_SIMILARITY_TYPE, type)) {
+      throw new UnsupportedVectorSimilarityIndexException(
+          "Unsupported %s '%s' for vector_similarity index '%s'"
+              .formatted(VECTOR_SIMILARITY_TYPE, type, indexName));
+    }
+    String distanceFunction =
+        parseVectorSimilarityStringParameter(
+            parameters.get(1), VECTOR_SIMILARITY_DISTANCE_FUNCTION, indexName);
+    if (!VECTOR_SIMILARITY_DISTANCE_FUNCTIONS.contains(distanceFunction)) {
+      throw new UnsupportedVectorSimilarityIndexException(
+          "Unsupported %s '%s' for vector_similarity index '%s'"
+              .formatted(VECTOR_SIMILARITY_DISTANCE_FUNCTION, distanceFunction, indexName));
+    }
+    String dimensions =
+        requireIntWithMin(
+            parameters.get(2),
+            VECTOR_SIMILARITY_DIMENSIONS,
+            DATA_SKIPPING_VECTOR_SIMILARITY,
+            indexName,
+            1);
+
+    String quantization = DEFAULT_VECTOR_SIMILARITY_QUANTIZATION;
+    if (parameters.size() >= 4) {
+      quantization =
+          parseVectorSimilarityStringParameter(
+              parameters.get(3), VECTOR_SIMILARITY_QUANTIZATION, indexName);
+      if (!VECTOR_SIMILARITY_QUANTIZATIONS.contains(quantization)) {
+        throw new UnsupportedVectorSimilarityIndexException(
+            "Unsupported %s '%s' for vector_similarity index '%s'"
+                .formatted(VECTOR_SIMILARITY_QUANTIZATION, quantization, indexName));
+      }
+    }
+
+    int maxConnections = DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER;
+    if (parameters.size() >= 5) {
+      maxConnections =
+          Integer.parseInt(
+              requireIntWithMin(
+                  parameters.get(4),
+                  HNSW_MAX_CONNECTIONS_PER_LAYER,
+                  DATA_SKIPPING_VECTOR_SIMILARITY,
+                  indexName,
+                  0));
+    }
+
+    int candidateListSize = DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION;
+    if (parameters.size() >= 6) {
+      candidateListSize =
+          Integer.parseInt(
+              requireIntWithMin(
+                  parameters.get(5),
+                  HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION,
+                  DATA_SKIPPING_VECTOR_SIMILARITY,
+                  indexName,
+                  0));
+    }
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(VECTOR_SIMILARITY_TYPE, DEFAULT_VECTOR_SIMILARITY_TYPE);
+    properties.put(VECTOR_SIMILARITY_DISTANCE_FUNCTION, distanceFunction);
+    properties.put(VECTOR_SIMILARITY_DIMENSIONS, dimensions);
+    if (!DEFAULT_VECTOR_SIMILARITY_QUANTIZATION.equals(quantization)) {
+      properties.put(VECTOR_SIMILARITY_QUANTIZATION, quantization);
+    }
+    if (maxConnections != 0 && maxConnections != DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER) {
+      properties.put(HNSW_MAX_CONNECTIONS_PER_LAYER, String.valueOf(maxConnections));
+    }
+    if (candidateListSize != 0
+        && candidateListSize != DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION) {
+      properties.put(HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION, String.valueOf(candidateListSize));
+    }
+    return Map.copyOf(properties);
+  }
+
+  private static List<String> splitVectorSimilarityParameters(
+      String parameterText, String typeFull, String indexName) {
+    List<String> parameters = new ArrayList<>();
+    StringBuilder parameter = new StringBuilder();
+    boolean inSingleQuotedString = false;
+    for (int i = 0; i < parameterText.length(); i++) {
+      char current = parameterText.charAt(i);
+      if (current == '\'') {
+        if (inSingleQuotedString
+            && i + 1 < parameterText.length()
+            && parameterText.charAt(i + 1) == '\'') {
+          parameter.append("''");
+          i++;
+        } else {
+          inSingleQuotedString = !inSingleQuotedString;
+          parameter.append(current);
+        }
+      } else if (!inSingleQuotedString && current == ',') {
+        parameters.add(parameter.toString().trim());
+        parameter.setLength(0);
+      } else if (!inSingleQuotedString && (current == '(' || current == ')')) {
+        throw new IllegalArgumentException(
+            "Invalid nested parentheses in type_full '%s' for vector_similarity index '%s'"
+                .formatted(typeFull, indexName));
+      } else {
+        parameter.append(current);
+      }
+    }
+    Preconditions.checkArgument(
+        !inSingleQuotedString,
+        "Invalid quoted parameter in type_full '%s' for vector_similarity index '%s'",
+        typeFull,
+        indexName);
+    parameters.add(parameter.toString().trim());
+    Preconditions.checkArgument(
+        parameters.stream().noneMatch(StringUtils::isBlank),
+        "Empty parameter in type_full '%s' for vector_similarity index '%s'",
+        typeFull,
+        indexName);
+    return List.copyOf(parameters);
+  }
+
+  private static String parseVectorSimilarityStringParameter(
+      String rawValue, String propertyName, String indexName) {
+    String value = StringUtils.trimToEmpty(rawValue);
+    if (value.startsWith("'") || value.endsWith("'")) {
+      Preconditions.checkArgument(
+          value.length() >= 2 && value.startsWith("'") && value.endsWith("'"),
+          "Malformed %s parameter '%s' for vector_similarity index '%s'",
+          propertyName,
+          rawValue,
+          indexName);
+      value = value.substring(1, value.length() - 1).replace("''", "'");
+    } else {
+      Preconditions.checkArgument(
+          !StringUtils.contains(value, "'"),
+          "Malformed %s parameter '%s' for vector_similarity index '%s'",
+          propertyName,
+          rawValue,
+          indexName);
+    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value),
+        "%s is required for vector_similarity index '%s'",
+        propertyName,
+        indexName);
+    return value;
+  }
+
+  private static boolean isParameterizedBloomFilterIndex(Index.IndexType indexType) {
+    return indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
+        || indexType == Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+  }
+
   /**
    * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
    * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
-   * default). Also handles the {@code set(N)} parameterized format that some ClickHouse versions
-   * may return from {@code system.data_skipping_indices}.
+   * default). Also handles parameterized formats that some ClickHouse versions may return from
+   * {@code system.data_skipping_indices}.
    *
    * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "bloom_filter",
-   *     "set", "set(0)")
+   *     "set", "set(0)", or "vector_similarity")
    * @return the corresponding Gravitino IndexType
    * @throws IllegalArgumentException if the type is not supported
    */
@@ -1679,14 +2573,290 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       case DATA_SKIPPING_SET:
         return Index.IndexType.DATA_SKIPPING_SET;
+      case DATA_SKIPPING_NGRAMBFV1:
+        return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
+      case DATA_SKIPPING_TOKENBFV1:
+        return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
+        return Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY;
       default:
-        // ClickHouse may return "set(N)" with parameter in some versions;
-        // match on prefix to handle both "set" and "set(N)" formats.
+        // ClickHouse may return type with parameters in some versions. Match on prefix to handle
+        // both bare and parameterized formats.
         if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
           return Index.IndexType.DATA_SKIPPING_SET;
         }
+        if (rawType.startsWith(DATA_SKIPPING_NGRAMBFV1 + "(")) {
+          return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
+        }
+        if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
+          return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+        }
+        if (rawType.startsWith(DATA_SKIPPING_VECTOR_SIMILARITY + "(")) {
+          return Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY;
+        }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
+  }
+
+  /**
+   * Validates that a property value is an integer with a given minimum bound, returning it as a
+   * string for DDL interpolation. Unlike {@link #resolveIntProperty(Map, String, int, int)}, this
+   * method treats the value as required — a missing or blank value throws {@link
+   * IllegalArgumentException} rather than returning a default. Used for bloom-filter parameters
+   * (e.g. {@code bloom_filter_size}, {@code ngram_size} require &ge; 1; {@code random_seed}
+   * requires &ge; 0).
+   *
+   * @param value the raw string value from the properties map
+   * @param paramName the parameter name for error messages
+   * @param indexType the index type name (e.g. "ngrambf_v1")
+   * @param indexName the index name for error messages
+   * @param minValue the minimum allowed value (inclusive)
+   * @return the validated value as a string
+   * @throws IllegalArgumentException if the value is null, blank, not an integer, or below minValue
+   */
+  private static String requireIntWithMin(
+      String value, String paramName, String indexType, String indexName, int minValue) {
+    Preconditions.checkArgument(
+        value != null && !value.isBlank(),
+        "%s is required for %s index '%s'",
+        paramName,
+        indexType,
+        indexName);
+    try {
+      int intVal = Integer.parseInt(value.strip());
+      Preconditions.checkArgument(
+          intVal >= minValue,
+          "%s must be >= %s for %s index '%s', but got '%s'",
+          paramName,
+          minValue,
+          indexType,
+          indexName,
+          value);
+      return String.valueOf(intVal);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s must be a valid integer for %s index '%s', but got '%s'",
+              paramName, indexType, indexName, value),
+          e);
+    }
+  }
+
+  /**
+   * Builds the full type clause for bloom-filter-based data skipping indexes, combining the type
+   * name (e.g. "ngrambf_v1") with the validated parameter clause. Extracted to eliminate
+   * duplication between the CREATE TABLE path ({@link #appendIndexesSql}) and the ALTER TABLE ADD
+   * INDEX path ({@link #addIndexDefinition}).
+   *
+   * @param props the index properties map
+   * @param indexType the index type name (one of the {@code DATA_SKIPPING_*} constants)
+   * @param indexName the index name, used in error messages
+   * @return the full type clause, e.g. "ngrambf_v1(3, 512, 3, 0)"
+   */
+  private static String buildBloomFilterTypeClause(
+      Map<String, String> props, String indexType, String indexName) {
+    return indexType + resolveBloomFilterParams(props, indexType, indexName);
+  }
+
+  /**
+   * Resolves bloom-filter-based data skipping index parameters from index properties for {@code
+   * ngrambf_v1} and {@code tokenbf_v1} index types. Used by both CREATE TABLE (via {@link
+   * Index#properties()}) and ALTER TABLE ADD INDEX (via {@link
+   * TableChange.AddIndex#getProperties()}).
+   *
+   * @param props the index properties map
+   * @param indexType "ngrambf_v1" or "tokenbf_v1" (determines whether ngram_size is required)
+   * @param indexName the index name, used in error messages
+   * @return the DDL parameter clause, e.g. "(3, 512, 3, 0)" for ngrambf_v1
+   * @throws IllegalArgumentException if any required parameter is missing or invalid
+   */
+  private static String resolveBloomFilterParams(
+      Map<String, String> props, String indexType, String indexName) {
+    String size =
+        requireIntWithMin(
+            props.get(BLOOM_FILTER_SIZE), "bloom_filter_size", indexType, indexName, 1);
+    String hashFuncs =
+        requireIntWithMin(props.get(HASH_FUNCTIONS), "hash_functions", indexType, indexName, 1);
+    String seed = requireIntWithMin(props.get(RANDOM_SEED), "random_seed", indexType, indexName, 0);
+
+    if (DATA_SKIPPING_NGRAMBFV1.equals(indexType)) {
+      String ngramSize =
+          requireIntWithMin(props.get(NGRAM_SIZE), "ngram_size", indexType, indexName, 1);
+      return String.format("(%s, %s, %s, %s)", ngramSize, size, hashFuncs, seed);
+    }
+    return String.format("(%s, %s, %s)", size, hashFuncs, seed);
+  }
+
+  private String buildDataSkippingIndexDdl(
+      String indexName,
+      String fieldStr,
+      Index.IndexType indexType,
+      Map<String, String> properties) {
+    Map<String, String> safeProperties = properties == null ? Collections.emptyMap() : properties;
+    int defaultGranularity =
+        indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+            ? DEFAULT_VECTOR_SIMILARITY_GRANULARITY
+            : (int) DEFAULT_INDEX_GRANULARITY;
+    int granularity =
+        indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+            ? resolveVectorSimilarityGranularity(safeProperties, indexName)
+            : resolveGranularity(safeProperties, defaultGranularity);
+    return buildDataSkippingIndexDdl(
+        indexName,
+        fieldStr,
+        resolveDataSkippingIndexTypeClause(indexType, safeProperties, indexName),
+        granularity);
+  }
+
+  private String resolveDataSkippingIndexTypeClause(
+      Index.IndexType indexType, Map<String, String> properties, String indexName) {
+    switch (indexType) {
+      case DATA_SKIPPING_MINMAX:
+        return DATA_SKIPPING_MINMAX_VALUE;
+      case DATA_SKIPPING_BLOOM_FILTER:
+        return DATA_SKIPPING_BLOOM_FILTER;
+      case DATA_SKIPPING_SET:
+        // SET index defaults to unlimited distinct values and supports an optional upper bound.
+        return "set(" + resolveSetMaxValues(properties) + ")";
+      case DATA_SKIPPING_NGRAMBFV1:
+        return buildBloomFilterTypeClause(properties, DATA_SKIPPING_NGRAMBFV1, indexName);
+      case DATA_SKIPPING_TOKENBFV1:
+        return buildBloomFilterTypeClause(properties, DATA_SKIPPING_TOKENBFV1, indexName);
+      case DATA_SKIPPING_VECTOR_SIMILARITY:
+        return buildVectorSimilarityTypeClause(properties, indexName);
+      default:
+        throw new IllegalArgumentException(
+            "Gravitino ClickHouse doesn't support index : " + indexType);
+    }
+  }
+
+  private static String buildVectorSimilarityTypeClause(
+      Map<String, String> properties, String indexName) {
+    Map<String, String> safeProperties = properties == null ? Collections.emptyMap() : properties;
+    for (String propertyName : safeProperties.keySet()) {
+      Preconditions.checkArgument(
+          VECTOR_SIMILARITY_PROPERTIES.contains(propertyName),
+          "Unsupported property '%s' for vector_similarity index '%s'",
+          propertyName,
+          indexName);
+    }
+
+    String type =
+        requireVectorSimilarityProperty(safeProperties, VECTOR_SIMILARITY_TYPE, indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(DEFAULT_VECTOR_SIMILARITY_TYPE, type),
+        "Unsupported %s '%s' for vector_similarity index '%s'",
+        VECTOR_SIMILARITY_TYPE,
+        type,
+        indexName);
+
+    String distanceFunction =
+        requireVectorSimilarityProperty(
+            safeProperties, VECTOR_SIMILARITY_DISTANCE_FUNCTION, indexName);
+    Preconditions.checkArgument(
+        VECTOR_SIMILARITY_DISTANCE_FUNCTIONS.contains(distanceFunction),
+        "Unsupported %s '%s' for vector_similarity index '%s'",
+        VECTOR_SIMILARITY_DISTANCE_FUNCTION,
+        distanceFunction,
+        indexName);
+
+    String dimensions =
+        requireIntWithMin(
+            safeProperties.get(VECTOR_SIMILARITY_DIMENSIONS),
+            VECTOR_SIMILARITY_DIMENSIONS,
+            DATA_SKIPPING_VECTOR_SIMILARITY,
+            indexName,
+            1);
+
+    String quantization = DEFAULT_VECTOR_SIMILARITY_QUANTIZATION;
+    if (safeProperties.containsKey(VECTOR_SIMILARITY_QUANTIZATION)) {
+      quantization =
+          requireVectorSimilarityProperty(
+              safeProperties, VECTOR_SIMILARITY_QUANTIZATION, indexName);
+      Preconditions.checkArgument(
+          VECTOR_SIMILARITY_QUANTIZATIONS.contains(quantization),
+          "Unsupported %s '%s' for vector_similarity index '%s'",
+          VECTOR_SIMILARITY_QUANTIZATION,
+          quantization,
+          indexName);
+    }
+
+    String maxConnections = null;
+    if (safeProperties.containsKey(HNSW_MAX_CONNECTIONS_PER_LAYER)) {
+      maxConnections =
+          requireIntWithMin(
+              safeProperties.get(HNSW_MAX_CONNECTIONS_PER_LAYER),
+              HNSW_MAX_CONNECTIONS_PER_LAYER,
+              DATA_SKIPPING_VECTOR_SIMILARITY,
+              indexName,
+              0);
+    }
+
+    String candidateListSize = null;
+    if (safeProperties.containsKey(HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION)) {
+      candidateListSize =
+          requireIntWithMin(
+              safeProperties.get(HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION),
+              HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION,
+              DATA_SKIPPING_VECTOR_SIMILARITY,
+              indexName,
+              0);
+    }
+
+    List<String> parameters =
+        new ArrayList<>(List.of("'hnsw'", "'" + distanceFunction + "'", dimensions));
+    boolean includeQuantization =
+        !DEFAULT_VECTOR_SIMILARITY_QUANTIZATION.equals(quantization)
+            || hasNonDefaultInteger(maxConnections, DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER)
+            || hasNonDefaultInteger(
+                candidateListSize, DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION);
+    if (includeQuantization) {
+      parameters.add("'" + quantization + "'");
+    }
+    boolean includeMaxConnections =
+        hasNonDefaultInteger(maxConnections, DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER)
+            || hasNonDefaultInteger(
+                candidateListSize, DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION);
+    if (includeMaxConnections) {
+      parameters.add(
+          hasNonDefaultInteger(maxConnections, DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER)
+              ? maxConnections
+              : String.valueOf(DEFAULT_HNSW_MAX_CONNECTIONS_PER_LAYER));
+    }
+    if (hasNonDefaultInteger(
+        candidateListSize, DEFAULT_HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION)) {
+      parameters.add(candidateListSize);
+    }
+    return DATA_SKIPPING_VECTOR_SIMILARITY + "(" + String.join(", ", parameters) + ")";
+  }
+
+  private static boolean hasNonDefaultInteger(String value, int defaultValue) {
+    return value != null && !value.equals("0") && !value.equals(String.valueOf(defaultValue));
+  }
+
+  private static String requireVectorSimilarityProperty(
+      Map<String, String> properties, String propertyName, String indexName) {
+    String value = properties.get(propertyName);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value),
+        "%s is required for vector_similarity index '%s'",
+        propertyName,
+        indexName);
+    return value.trim();
+  }
+
+  private static int resolveVectorSimilarityGranularity(
+      Map<String, String> properties, String indexName) {
+    if (!properties.containsKey(GRANULARITY)) {
+      return DEFAULT_VECTOR_SIMILARITY_GRANULARITY;
+    }
+    return Integer.parseInt(
+        requireIntWithMin(
+            properties.get(GRANULARITY),
+            GRANULARITY,
+            DATA_SKIPPING_VECTOR_SIMILARITY,
+            indexName,
+            1));
   }
 
   private String buildDataSkippingIndexDdl(
@@ -1781,48 +2951,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static boolean isSingleQuotedLiteral(@Nullable String value) {
     String literal = StringUtils.trim(value);
-    if (StringUtils.length(literal) < 2 || literal.charAt(0) != '\'') {
-      return false;
-    }
-
-    for (int i = 1; i < literal.length(); i++) {
-      char current = literal.charAt(i);
-      if (current == '\\') {
-        if (i + 1 >= literal.length()) {
-          return false;
-        }
-        i++;
-      } else if (current == '\'') {
-        if (i + 1 < literal.length() && literal.charAt(i + 1) == '\'') {
-          i++;
-        } else {
-          return i == literal.length() - 1;
-        }
-      }
-    }
-    return false;
+    return StringUtils.length(literal) >= 2
+        && literal.charAt(0) == '\''
+        && findClosingQuote(literal, 0) == literal.length() - 1;
   }
 
   private static int findMatchingParenthesis(String value, int openParenthesis) {
     int depth = 1;
-    char quote = 0;
     for (int i = openParenthesis + 1; i < value.length(); i++) {
       char current = value.charAt(i);
-      if (quote != 0) {
-        if (current == '\\' && i + 1 < value.length()) {
-          i++;
-        } else if (current == quote) {
-          if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
-            i++;
-          } else {
-            quote = 0;
-          }
+      if (isQuoteDelimiter(current)) {
+        int quoteEnd = findClosingQuote(value, i);
+        if (quoteEnd < 0) {
+          return -1;
         }
-        continue;
-      }
-
-      if (current == '\'' || current == '"' || current == '`') {
-        quote = current;
+        i = quoteEnd;
       } else if (current == '(') {
         depth++;
       } else if (current == ')') {
@@ -1833,6 +2976,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return -1;
+  }
+
+  private static int findClosingQuote(String value, int openQuote) {
+    char quote = value.charAt(openQuote);
+    for (int i = openQuote + 1; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (current == '\\' && i + 1 < value.length()) {
+        i++;
+      } else if (current == quote) {
+        if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
+          i++;
+        } else {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  private static boolean isQuoteDelimiter(char value) {
+    return value == '\'' || value == '"' || value == '`';
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
@@ -1858,5 +3022,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return sqlBuilder;
+  }
+
+  private static final class UnsupportedVectorSimilarityIndexException
+      extends IllegalArgumentException {
+    private static final long serialVersionUID = 1L;
+
+    private UnsupportedVectorSimilarityIndexException(String message) {
+      super(message);
+    }
   }
 }

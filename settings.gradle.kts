@@ -72,7 +72,6 @@ val skipTrinoConnector: Boolean =
 if (!skipTrinoConnector) {
   include(
     "trino-connector:trino-connector",
-    "trino-connector:trino-connector-435-439",
     "trino-connector:trino-connector-440-445",
     "trino-connector:trino-connector-446-451",
     "trino-connector:trino-connector-452-468",
@@ -83,21 +82,17 @@ if (!skipTrinoConnector) {
 } else {
   println("Skipping trino-connector modules since skipTrinoConnector is set to true")
 }
-include("spark-connector:spark-common")
+// flink-common's sources are also compiled directly into each flink-connector:flink-*
+// module's own sourceSet (not consumed as a jar dependency), so it is not gated by scalaVersion.
+include("flink-connector:flink-common")
 if (scalaVersion == "2.12") {
-  // flink only support scala 2.12
-  include("flink-connector:flink-common")
+  // flink 1.x only supports scala 2.12
   include(
-    "flink-connector:flink-1.18",
-    "flink-connector:flink-runtime-1.18",
     "flink-connector:flink-1.19",
     "flink-connector:flink-runtime-1.19",
     "flink-connector:flink-1.20",
     "flink-connector:flink-runtime-1.20"
   )
-  project(":flink-connector:flink-1.18").projectDir = file("flink-connector/v1.18/flink")
-  project(":flink-connector:flink-runtime-1.18").projectDir =
-    file("flink-connector/v1.18/flink-runtime")
   project(":flink-connector:flink-1.19").projectDir = file("flink-connector/v1.19/flink")
   project(":flink-connector:flink-runtime-1.19").projectDir =
     file("flink-connector/v1.19/flink-runtime")
@@ -105,14 +100,19 @@ if (scalaVersion == "2.12") {
   project(":flink-connector:flink-runtime-1.20").projectDir =
     file("flink-connector/v1.20/flink-runtime")
 }
-include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
-project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
-project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
-include("spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
-project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")
-project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
+// Flink 2.x removed the Scala APIs entirely, so the flink-2.1 modules are not gated by scalaVersion.
+include("flink-connector:flink-2.1", "flink-connector:flink-runtime-2.1")
+project(":flink-connector:flink-2.1").projectDir = file("flink-connector/v2.1/flink")
+project(":flink-connector:flink-runtime-2.1").projectDir =
+  file("flink-connector/v2.1/flink-runtime")
+include("spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
+// Spark 4.0 support (#8771). Spark 4 is Scala 2.13 only and needs JDK 17, so these modules pin
+// 2.13 rather than reading -PscalaVersion.
+include("spark-connector:spark-4.0", "spark-connector:spark-runtime-4.0")
+project(":spark-connector:spark-4.0").projectDir = file("spark-connector/v4.0/spark")
+project(":spark-connector:spark-runtime-4.0").projectDir = file("spark-connector/v4.0/spark-runtime")
 include("web:web", "web:integration-test")
 include("web-v2:web", "web-v2:integration-test")
 include("docs")

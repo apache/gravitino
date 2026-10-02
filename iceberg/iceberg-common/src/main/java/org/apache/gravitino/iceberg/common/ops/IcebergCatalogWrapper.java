@@ -27,6 +27,7 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
@@ -35,13 +36,16 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
@@ -248,6 +252,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   /**
+   * Loads table metadata directly from a metadata file location.
+   *
+   * @param metadataLocation metadata file location
+   * @return parsed table metadata
+   */
+  public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
+    try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
+      return TableMetadataParser.read(fileIO, metadataLocation);
+    }
+  }
+
+  /**
    * Returns the FileIO implementation configured for this catalog.
    *
    * @return the {@code io-impl} class, or the Iceberg default when unset
@@ -389,7 +405,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     } else {
       LOG.info("Closing IcebergCatalogWrapper before catalog is initialized");
     }
-    if (loadedCatalog instanceof AutoCloseable) {
+    boolean internedMemoryCatalog =
+        catalogBackend == IcebergCatalogBackend.MEMORY
+            && icebergConfig.getAllConfig().containsKey(IcebergConstants.CATALOG_UUID);
+    if (!internedMemoryCatalog && loadedCatalog instanceof AutoCloseable) {
       // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
       // cleanup
       ((AutoCloseable) loadedCatalog).close();

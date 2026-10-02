@@ -164,6 +164,54 @@ public class TestCredentialFactory {
   }
 
   @Test
+  void testCOSSecretKeyCredential() {
+    Map<String, String> cosSecretKeyCredentialInfo =
+        ImmutableMap.of(
+            COSSecretKeyCredential.GRAVITINO_COS_STATIC_ACCESS_KEY_ID,
+            "accessKeyId",
+            COSSecretKeyCredential.GRAVITINO_COS_STATIC_SECRET_ACCESS_KEY,
+            "secretAccessKey");
+    long expireTime = 0;
+    Credential cosSecretKeyCredential =
+        CredentialFactory.create(
+            COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE,
+            cosSecretKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE,
+        cosSecretKeyCredential.credentialType());
+    Assertions.assertInstanceOf(COSSecretKeyCredential.class, cosSecretKeyCredential);
+    COSSecretKeyCredential typed = (COSSecretKeyCredential) cosSecretKeyCredential;
+    Assertions.assertEquals("accessKeyId", typed.accessKeyId());
+    Assertions.assertEquals("secretAccessKey", typed.secretAccessKey());
+    Assertions.assertEquals(expireTime, typed.expireTimeInMs());
+  }
+
+  @Test
+  void testCOSTokenCredential() {
+    Map<String, String> cosTokenCredentialInfo =
+        ImmutableMap.of(
+            COSTokenCredential.GRAVITINO_COS_SESSION_ACCESS_KEY_ID,
+            "access-id",
+            COSTokenCredential.GRAVITINO_COS_SESSION_SECRET_ACCESS_KEY,
+            "secret-key",
+            COSTokenCredential.GRAVITINO_COS_SESSION_TOKEN,
+            "token");
+    long expireTime = 100;
+    Credential cosTokenCredential =
+        CredentialFactory.create(
+            COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE, cosTokenCredentialInfo, expireTime);
+    Assertions.assertEquals(
+        COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE, cosTokenCredential.credentialType());
+    Assertions.assertInstanceOf(COSTokenCredential.class, cosTokenCredential);
+    COSTokenCredential typed = (COSTokenCredential) cosTokenCredential;
+    Assertions.assertEquals("access-id", typed.accessKeyId());
+    Assertions.assertEquals("secret-key", typed.secretAccessKey());
+    Assertions.assertEquals("token", typed.securityToken());
+    Assertions.assertEquals(expireTime, typed.expireTimeInMs());
+  }
+
+  @Test
   void testADLSTokenCredential() {
     String storageAccountName = "storage-account-name";
     String sasToken = "sas-token";
@@ -235,6 +283,73 @@ public class TestCredentialFactory {
     Assertions.assertEquals(jdbcUser, jdbcCredential.jdbcUser());
     Assertions.assertEquals(jdbcPassword, jdbcCredential.jdbcPassword());
     Assertions.assertEquals(expireTime, jdbcCredential.expireTimeInMs());
+  }
+
+  @Test
+  void testAwsSecretKeyCredential() {
+    Map<String, String> awsSecretKeyCredentialInfo =
+        ImmutableMap.of(
+            AwsSecretKeyCredential.GRAVITINO_AWS_ACCESS_KEY_ID,
+            "accessKeyId",
+            AwsSecretKeyCredential.GRAVITINO_AWS_SECRET_ACCESS_KEY,
+            "secretAccessKey");
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE,
+            awsSecretKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(AwsSecretKeyCredential.class, credential);
+    AwsSecretKeyCredential aws = (AwsSecretKeyCredential) credential;
+    Assertions.assertEquals("accessKeyId", aws.accessKeyId());
+    Assertions.assertEquals("secretAccessKey", aws.secretAccessKey());
+    Assertions.assertEquals(expireTime, aws.expireTimeInMs());
+  }
+
+  @Test
+  void testDlfSecretKeyCredential() {
+    Map<String, String> dlfSecretKeyCredentialInfo =
+        ImmutableMap.of(
+            DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID,
+            "dlf-ak",
+            DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+            "dlf-sk",
+            DlfSecretKeyCredential.GRAVITINO_DLF_SECURITY_TOKEN,
+            "dlf-token");
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
+            dlfSecretKeyCredentialInfo,
+            expireTime);
+    Assertions.assertEquals(
+        DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(DlfSecretKeyCredential.class, credential);
+    DlfSecretKeyCredential dlf = (DlfSecretKeyCredential) credential;
+    Assertions.assertEquals("dlf-ak", dlf.accessKeyId());
+    Assertions.assertEquals("dlf-sk", dlf.accessKeySecret());
+    Assertions.assertEquals("dlf-token", dlf.securityToken());
+    Assertions.assertEquals(expireTime, dlf.expireTimeInMs());
+  }
+
+  @Test
+  void testDlfSecretKeyCredentialWithoutToken() {
+    Map<String, String> dlfSecretKeyCredentialInfo =
+        ImmutableMap.of(
+            DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_ID,
+            "dlf-ak",
+            DlfSecretKeyCredential.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+            "dlf-sk");
+    Credential credential =
+        CredentialFactory.create(
+            DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE, dlfSecretKeyCredentialInfo, 0);
+    Assertions.assertInstanceOf(DlfSecretKeyCredential.class, credential);
+    DlfSecretKeyCredential dlf = (DlfSecretKeyCredential) credential;
+    Assertions.assertEquals("dlf-ak", dlf.accessKeyId());
+    Assertions.assertEquals("dlf-sk", dlf.accessKeySecret());
+    Assertions.assertNull(dlf.securityToken());
   }
 
   @Test

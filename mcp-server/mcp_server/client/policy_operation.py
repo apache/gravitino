@@ -47,79 +47,56 @@ class PolicyOperation(ABC):
         pass
 
     @abstractmethod
-    async def associate_policy_with_metadata(
-        self,
-        metadata_full_name: str,
-        metadata_type: str,
-        policies_to_add: list,
-        policies_to_remove: list,
-    ) -> str:
-        """
-        Associate policies with metadata.
+    async def list_policies_for_tag(self, tag_name: str) -> str:
+        """List all policies directly associated with a tag.
 
         Args:
-            metadata_full_name: Full name of the metadata object to associate policies with.
-            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
-            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
-            is the same as for "catalog.schema.table".
-            metadata_type: Type of the metadata (e.g., "table", "column")
-            policies_to_add: List of policy names to associate with the metadata
-            policies_to_remove: List of policy names to disassociate from the metadata
+            tag_name: Name of the tag
 
         Returns:
-            str: JSON formatted string containing list of policy names that were
-            successfully associated with the metadata
+            str: JSON-formatted list of policy-tag associations, including selectors
         """
         pass
 
     @abstractmethod
-    async def get_policy_for_metadata(
-        self, metadata_full_name: str, metadata_type: str, policy_name: str
+    async def associate_policy_with_tag(
+        self, tag_name: str, policy_name: str, selector: dict
     ) -> str:
-        """
-        Get the policy associated with a specific metadata item.
+        """Associate one policy with a tag.
 
         Args:
-            metadata_full_name: Full name of the metadata object to associate policies with.
-            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
-            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
-            is the same as for "catalog.schema.table".
-            metadata_type: Type of the metadata (e.g., "table", "column")
+            tag_name: Name of the tag
+            policy_name: Name of the policy
+            selector: Selector controlling which tag assignments match the policy
+
+        Returns:
+            str: JSON-formatted policy-tag association
+        """
+        pass
+
+    @abstractmethod
+    async def disassociate_policy_from_tag(
+        self, tag_name: str, policy_name: str
+    ) -> str:
+        """Remove one policy association from a tag.
+
+        Args:
+            tag_name: Name of the tag
             policy_name: Name of the policy
 
         Returns:
-            str: JSON formatted string containing policy metadata
+            str: JSON-formatted removal confirmation
         """
         pass
 
     @abstractmethod
-    async def list_policies_for_metadata(
-        self, metadata_full_name: str, metadata_type: str
-    ) -> str:
-        """
-        List all policies associated with a specific metadata item.
+    async def list_tags_for_policy(self, policy_name: str) -> str:
+        """List all tags directly associated with a policy.
 
         Args:
-            metadata_full_name: Full name of the metadata object to associate policies with.
-            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
-            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
-            is the same as for "catalog.schema.table".
-            metadata_type: Type of the metadata (e.g., "table", "column")
+            policy_name: Name of the policy
 
         Returns:
-            str: JSON formatted string containing list of policy metadata associated with the metadata
-        """
-        pass
-
-    @abstractmethod
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        """
-        List all metadata items associated with a specific policy.
-
-        Args:
-            policy_name: Name of the policy to filter metadata by
-
-        Returns:
-            str: JSON formatted string containing list of metadata items associated with the policy
+            str: JSON-formatted list of policy-tag associations, including selectors
         """
         pass

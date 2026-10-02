@@ -149,6 +149,7 @@ Reviewing and triaging helps maintain the project. You can:
 * Add labels to categorize
 * Suggest improvements on PRs
 * Review code and give feedback
+* Please add Copilot before you review. That is recommended, not required. Do not wait on Copilot if you are ready to review.
 
 ## 🔃 Creating Pull Requests
 
@@ -156,6 +157,7 @@ Reviewing and triaging helps maintain the project. You can:
 * Write clear commit messages and PR descriptions
 * Link to issues (e.g., `Fixes #123`)
 * Respond to reviewer feedback
+* Please add Copilot on the PR. Automatic review runs once when the PR is marked ready; later pushes do not re-review, so add Copilot again after you push. Treat Copilot comments as hints: implement the suggestion, or reply with why you are not taking it. Human reviewers remain responsible for the merge decision. Project-specific Copilot guidance lives in [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
 ## 💻 Setting Up Development Environment
 

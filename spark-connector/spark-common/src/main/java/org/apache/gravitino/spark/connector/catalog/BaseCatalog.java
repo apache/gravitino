@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -33,10 +34,14 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
@@ -64,11 +69,14 @@ import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * BaseCatalog acts as the foundational class for Apache Spark CatalogManager registration, enabling
@@ -83,6 +91,8 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * initialization.
  */
 public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, FunctionCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
   // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
@@ -196,6 +206,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   @Override
+  // TableCatalog.createTable(Identifier, StructType, Transform[], Map) is deprecated from Spark 3.4
+  // in favor of the Column[] overload. Overriding the deprecated form keeps one implementation that
+  // every supported Spark version dispatches to.
+  @SuppressWarnings("deprecation")
   public Table createTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
@@ -281,6 +295,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         propertiesConverter,
         sparkTransformConverter,
         sparkTypeConverter);
+  }
+
+  @Override
+  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
+      throws NoSuchTableException {
+    return loadTableForWriting(ident);
   }
 
   @Override
@@ -713,7 +733,28 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   private static Map<String, String> propsWithSecrets(Catalog catalog) {
     Map<String, String> props =
         new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-    props.putAll(catalog.supportsSecrets().getSecrets());
+    try {
+      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
+      if (secrets != null) {
+        props.putAll(secrets);
+      }
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
+    }
+    try {
+      Credential[] credentials = catalog.supportsCredentials().getCredentials();
+      props.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      // Stubs may not implement SupportsCredentials; older servers lack /credentials.
+      LOG.debug(
+          "Skipping getCredentials while resolving Spark catalog properties: {}", e.toString());
+    } catch (RESTException e) {
+      LOG.warn(
+          "Failed to resolve getCredentials while building Spark catalog properties; continuing"
+              + " without static credential info: {}",
+          e.toString());
+    }
     return props;
   }
 

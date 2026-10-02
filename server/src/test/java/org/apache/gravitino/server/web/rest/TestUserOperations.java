@@ -92,7 +92,8 @@ public class TestUserOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", ownerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -116,6 +117,17 @@ public class TestUserOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  @Test
+  public void testAddUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test
@@ -208,40 +220,6 @@ public class TestUserOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
-  }
-
-  @Test
-  public void testAddUserWithExternalId() throws IOException {
-    UserAddRequest req = new UserAddRequest("user1", "ext-1", false);
-    User user =
-        UserEntity.builder()
-            .withId(1L)
-            .withName("user1")
-            .withExternalId("ext-1")
-            .withEnabled(false)
-            .withRoleNames(Collections.emptyList())
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-
-    when(manager.addUser(any(), any(), any(), any(Boolean.class))).thenReturn(user);
-
-    BaseMetalake metalake = mock(BaseMetalake.class);
-    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
-    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
-    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
-    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
-
-    Response resp =
-        target("/metalakes/metalake1/users")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    UserResponse userResponse = resp.readEntity(UserResponse.class);
-    Assertions.assertEquals("ext-1", userResponse.getUser().externalId());
-    Assertions.assertFalse(userResponse.getUser().enabled());
   }
 
   @Test

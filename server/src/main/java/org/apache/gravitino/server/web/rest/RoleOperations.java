@@ -140,6 +140,16 @@ public class RoleOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       RoleCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create role request with null request body");
+      return ExceptionHandlers.handleRoleException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String roleName = request.getName();
     try {
 
       return Utils.doAs(
@@ -197,8 +207,7 @@ public class RoleOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handleRoleException(OperationType.CREATE, roleName, metalake, e);
     }
   }
 

@@ -1118,6 +1118,40 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
+  public void testAssociateTagValuesForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity("null", "application/vnd.gravitino.v2+json"));
+
+    assertNullRequestBodyRejected(response);
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+  }
+
+  @Test
   public void testV2ErrorMediaType() {
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
     TagValuesAssociateRequest request = new TagValuesAssociateRequest(null, null);

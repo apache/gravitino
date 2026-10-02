@@ -20,7 +20,15 @@
         <gravitino_cluster>
             <shard>
                 <replica>
-                    <host>gravitino-ci-clickhouse-cluster</host>
+                    <host>gravitino-ci-clickhouse-cluster-1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>gravitino-ci-clickhouse-cluster-2</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>gravitino-ci-clickhouse-cluster-3</host>
                     <port>9000</port>
                 </replica>
             </shard>
