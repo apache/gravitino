@@ -32,6 +32,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.storage.relational.JDBCDatabase;
+import org.apache.gravitino.utils.PasswordEncryptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,17 @@ public class H2Database implements JDBCDatabase {
     String storagePath = getStoragePath(config);
     String originalJDBCUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     this.username = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER);
-    this.password = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+    String rawPassword = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+    this.password = PasswordEncryptor.decryptIfNeeded(rawPassword);
+
+    if (PasswordEncryptor.shouldWarnDefaultKey(rawPassword)) {
+      LOG.warn(
+          "Using default master encryption key \"{}\" for password decryption. Set a custom key"
+              + " via environment variable {} or system property {} for production use.",
+          PasswordEncryptor.DEFAULT_ENCRYPTION_KEY,
+          PasswordEncryptor.ENCRYPTION_KEY_ENV,
+          PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
+    }
 
     String connectionUrl = constructH2URI(originalJDBCUrl, storagePath);
 

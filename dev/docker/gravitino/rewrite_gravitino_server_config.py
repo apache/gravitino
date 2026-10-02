@@ -98,7 +98,8 @@ init_config = {
     "entity.store.relational.jdbcUrl": "jdbc:h2",
     "entity.store.relational.jdbcDriver": "org.h2.Driver",
     "entity.store.relational.jdbcUser": "gravitino",
-    "entity.store.relational.jdbcPassword": "gravitino",
+    # Encrypted form of "gravitino" with the default master key; keep in sync with Configs.java
+    "entity.store.relational.jdbcPassword": "ENC(KuC3/zFBSkbDUC8T/YyzQuAccmSBzB4jH14wC7ueIH0WoIiFOteLS3OgyP20ll3F3+81aSs=)",
     "catalog.cache.evictionIntervalMs": "3600000",
     "authorization.enable": "false",
     "authorization.serviceAdmins": "anonymous",

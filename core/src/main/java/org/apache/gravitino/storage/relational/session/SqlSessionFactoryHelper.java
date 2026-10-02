@@ -35,12 +35,15 @@ import org.apache.gravitino.storage.relational.mapper.OperateTypeHandler;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.JdbcUrlUtils;
+import org.apache.gravitino.utils.PasswordEncryptor;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.TransactionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SqlSessionFactoryHelper maintains the MyBatis's {@link SqlSessionFactory} object, which is used
@@ -51,6 +54,8 @@ public class SqlSessionFactoryHelper {
   private static final int JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 10;
   private static final int JDBC_BACKEND_MIN_IDLE_CONNECTIONS = 5;
   private static final Duration JDBC_BACKEND_MIN_EVICTABLE_IDLE_TIME = Duration.ofSeconds(30);
+
+  private static final Logger LOG = LoggerFactory.getLogger(SqlSessionFactoryHelper.class);
 
   private static volatile SqlSessionFactory sqlSessionFactory;
   private static final SqlSessionFactoryHelper INSTANCE = new SqlSessionFactoryHelper();
@@ -88,7 +93,17 @@ public class SqlSessionFactoryHelper {
       dataSource.setUrl(jdbcUrl);
       dataSource.setDriverClassName(driverClass);
       dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
-      dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
+      String rawPassword = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+      dataSource.setPassword(PasswordEncryptor.decryptIfNeeded(rawPassword));
+
+      if (PasswordEncryptor.shouldWarnDefaultKey(rawPassword)) {
+        LOG.warn(
+            "Using default master encryption key \"{}\" for password decryption. Set a custom key"
+                + " via environment variable {} or system property {} for production use.",
+            PasswordEncryptor.DEFAULT_ENCRYPTION_KEY,
+            PasswordEncryptor.ENCRYPTION_KEY_ENV,
+            PasswordEncryptor.ENCRYPTION_KEY_SYSTEM_PROPERTY);
+      }
       // Close the auto commit, so that we can control the transaction manual commit
       dataSource.setDefaultAutoCommit(false);
       dataSource.setMaxWaitMillis(

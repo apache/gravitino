@@ -92,7 +92,8 @@ public class Configs {
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_USERNAME = "gravitino";
 
-  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD =
+      "ENC(KuC3/zFBSkbDUC8T/YyzQuAccmSBzB4jH14wC7ueIH0WoIiFOteLS3OgyP20ll3F3+81aSs=)";
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
 
