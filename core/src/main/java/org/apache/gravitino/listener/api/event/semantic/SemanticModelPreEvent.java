@@ -27,6 +27,12 @@ import org.apache.gravitino.listener.api.event.PreEvent;
 @DeveloperApi
 public abstract class SemanticModelPreEvent extends PreEvent {
 
+  /**
+   * Constructs a pre-event for a Semantic Model operation.
+   *
+   * @param user The username of the individual who initiated the operation.
+   * @param identifier The identifier of the Semantic Model or namespace involved in the operation.
+   */
   protected SemanticModelPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }

@@ -27,6 +27,13 @@ import org.apache.gravitino.listener.api.event.FailureEvent;
 @DeveloperApi
 public abstract class SemanticModelFailureEvent extends FailureEvent {
 
+  /**
+   * Constructs a Semantic Model operation failure event.
+   *
+   * @param user The username of the individual who initiated the operation.
+   * @param identifier The identifier of the Semantic Model or namespace involved in the operation.
+   * @param exception The exception that caused the operation to fail.
+   */
   protected SemanticModelFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
