@@ -104,6 +104,27 @@ public class TestMysqlTypeConverter {
         () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
   }
 
+  @Test
+  public void testFromGravitinoExternalTypeValidation() {
+    // Full type declarations recovered by MysqlTableOperations must survive the validation.
+    checkGravitinoTypeToJdbcType("enum('a','b','c')", Types.ExternalType.of("enum('a','b','c')"));
+    checkGravitinoTypeToJdbcType("set('x','y','z')", Types.ExternalType.of("set('x','y','z')"));
+    checkGravitinoTypeToJdbcType("bit(8)", Types.ExternalType.of("bit(8)"));
+    checkGravitinoTypeToJdbcType("binary(16)", Types.ExternalType.of("binary(16)"));
+    checkGravitinoTypeToJdbcType("varbinary(100)", Types.ExternalType.of("varbinary(100)"));
+
+    // An external type cannot escape the column type position of the generated DDL.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("int, DROP COLUMN secret")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("json; DROP TABLE foo")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("int -- comment")));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, MYSQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

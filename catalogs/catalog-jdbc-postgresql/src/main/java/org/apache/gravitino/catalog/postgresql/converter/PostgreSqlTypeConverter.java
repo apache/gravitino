@@ -148,7 +148,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {
-      return ((Types.ExternalType) type).catalogString();
+      return validateExternalTypeString(((Types.ExternalType) type).catalogString());
     }
     throw new IllegalArgumentException(
         String.format(
