@@ -337,6 +337,66 @@ public class TestManagedTableOperations {
   }
 
   @Test
+  public void testAlterTableBundledColumnChanges() {
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "bundled");
+    Column[] columns =
+        new Column[] {
+          createColumn("col1", Types.StringType.get(), null),
+          createColumn("col2", Types.IntegerType.get(), Literals.integerLiteral(1)),
+          createColumn("col3", Types.StringType.get(), null)
+        };
+    tableOperations.createTable(
+        tableIdent,
+        columns,
+        "Test bundled alters",
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    // A delete of a lower-position column followed by an update of a
+    // higher-position one must neither crash nor reorder the remaining columns.
+    Table updated =
+        tableOperations.alterTable(
+            tableIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.updateColumnComment(new String[] {"col3"}, "updated"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2", "col3"},
+        Arrays.stream(updated.columns()).map(Column::name).toArray(String[]::new));
+    Assertions.assertEquals(
+        "updated",
+        Arrays.stream(updated.columns())
+            .filter(c -> c.name().equals("col3"))
+            .findFirst()
+            .orElseThrow()
+            .comment());
+
+    // An add at first() followed by an update of a later column must keep order.
+    Table updated2 =
+        tableOperations.alterTable(
+            tableIdent,
+            TableChange.addColumn(
+                new String[] {"colNew"},
+                Types.StringType.get(),
+                TableChange.ColumnPosition.first()),
+            TableChange.updateColumnComment(new String[] {"col3"}, "updated again"));
+    Assertions.assertArrayEquals(
+        new String[] {"colNew", "col2", "col3"},
+        Arrays.stream(updated2.columns()).map(Column::name).toArray(String[]::new));
+    Assertions.assertEquals(
+        "updated again",
+        Arrays.stream(updated2.columns())
+            .filter(c -> c.name().equals("col3"))
+            .findFirst()
+            .orElseThrow()
+            .comment());
+  }
+
+  @Test
   public void testAlterTable() {
     NameIdentifier table1Ident =
         NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table1");

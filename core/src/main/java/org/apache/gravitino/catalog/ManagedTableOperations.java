@@ -335,10 +335,10 @@ public abstract class ManagedTableOperations implements TableCatalog {
           || change instanceof TableChange.UpdateColumnPosition
           || change instanceof TableChange.UpdateColumnNullability
           || change instanceof TableChange.UpdateColumnAutoIncrement) {
-        int i;
+        int removedIndex;
         ColumnEntity oldColumn = null;
-        for (i = 0; i < newColumns.size(); i++) {
-          ColumnEntity col = newColumns.get(i);
+        for (removedIndex = 0; removedIndex < newColumns.size(); removedIndex++) {
+          ColumnEntity col = newColumns.get(removedIndex);
           if (col.name().equals(DOT.join(change.fieldName()))) {
             oldColumn = col;
             break;
@@ -407,7 +407,14 @@ public abstract class ManagedTableOperations implements TableCatalog {
                 newPosition,
                 newNullable,
                 newAutoIncrement);
-        newColumns.add(newColumn.position(), newColumn);
+        if (newPosition.isPresent()) {
+          newColumns.add(newColumn.position(), newColumn);
+        } else {
+          // Stored positions go stale as sibling changes in the same alter add or
+          // remove columns, so without an explicit position change the column goes
+          // back to the list index it was removed from.
+          newColumns.add(removedIndex, newColumn);
+        }
 
       } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
         boolean removed =
