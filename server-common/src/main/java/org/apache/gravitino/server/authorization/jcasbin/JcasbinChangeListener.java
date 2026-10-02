@@ -63,9 +63,9 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * Entity types that are cacheable in the entity store — and therefore emitted into {@code
    * entity_change_log} — but that live in a virtual namespace ({@code
    * <metalake>.system.<kind>.<name>}) instead of under a catalog. Their change-log identifier has
-   * more levels than {@link MetadataObjects#of} accepts for the matching type, and the JCasbin
-   * {@code metadataIdCache} never keys on them, so they are dropped before any mapping is
-   * attempted.
+   * more levels than {@link MetadataObjects#of} accepts for the matching type, so only the leaf
+   * name is mapped. Authorization resolves them by that name, so the JCasbin {@code
+   * metadataIdCache} does key on them and peers must drop the mapping after a delete or rename.
    */
   private static final Set<MetadataObject.Type> VIRTUAL_NAMESPACE_TYPES =
       ImmutableSet.of(
@@ -257,10 +257,6 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
         continue;
       }
 
-      if (VIRTUAL_NAMESPACE_TYPES.contains(mdType)) {
-        continue;
-      }
-
       String cacheKey;
       try {
         MetadataObject mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
@@ -303,6 +299,9 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   static MetadataObject metadataObjectFromChangeLog(
       String metalake, String fullName, MetadataObject.Type type) {
     NameIdentifier ident = EntityChangeLogNameIdentifierCodec.decode(fullName);
+    if (VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      return MetadataObjects.of(null, ident.name(), type);
+    }
     List<String> names = new ArrayList<>(Arrays.asList(ident.namespace().levels()));
     names.add(ident.name());
     if (type != MetadataObject.Type.METALAKE
