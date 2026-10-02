@@ -865,6 +865,130 @@ public class TestHologresTableOperations {
     assertTrue(sql.contains("NULL DEFAULT val * 2"));
   }
 
+  @Test
+  void testCreateTableRejectsNanosecondTimestampTypesBeforeSqlGeneration() {
+    Types.TimestampType[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Types.TimestampType type : nanosecondTypes) {
+      JdbcColumn column = JdbcColumn.builder().withName("nanosecond_col").withType(type).build();
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.createTableSql(
+                      "test_table",
+                      new JdbcColumn[] {column},
+                      null,
+                      Collections.emptyMap(),
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.NONE,
+                      Indexes.EMPTY_INDEXES));
+      assertTrue(exception.getMessage().contains("cannot preserve Gravitino type"));
+    }
+  }
+
+  @Test
+  void testCreateTableRejectsVariantBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder().withName("variant_col").withType(Types.VariantType.get()).build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
+
+  @Test
+  void testCreateTableRejectsUnknownBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unknown_col").withType(Types.NullType.get()).build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
+  @Test
+  void testCreateTableRejectsGeometryBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geometry_col")
+            .withType(Types.GeometryType.of("EPSG:3857"))
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics"));
+  }
+
+  @Test
+  void testCreateTableRejectsGeographyBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geography_col")
+            .withType(Types.GeographyType.of("EPSG:4326", "karney"))
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
+  }
+
   // ==================== generateAlterTableSql tests ====================
 
   @Test
