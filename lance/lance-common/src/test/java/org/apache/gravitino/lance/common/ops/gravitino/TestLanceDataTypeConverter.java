@@ -24,8 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.arrow.vector.complex.MapVector;
@@ -255,6 +258,303 @@ public class TestLanceDataTypeConverter {
     assertEquals(expectedNullable, arrowField.isNullable());
     assertInstanceOf(ArrowType.FixedSizeList.class, arrowField.getFieldType().getType());
     assertEquals(10, ((ArrowType.FixedSizeList) arrowField.getFieldType().getType()).getListSize());
+  }
+
+  @Test
+  void testBlobConvertsToReadableExternalTypeAndRoundTrips() {
+    // Storage thresholds and other non-layout metadata are not part of the Gravitino type.
+    Field blobField =
+        new Field(
+            "blob",
+            new FieldType(
+                true,
+                ArrowType.Struct.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name", "lance.blob.v2",
+                    "lance-encoding:blob-dedicated-size-threshold", "1048576")),
+            Arrays.asList(
+                new Field("data", new FieldType(true, ArrowType.LargeBinary.INSTANCE, null), null),
+                new Field("uri", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null)));
+
+    Type type = CONVERTER.toGravitino(blobField);
+
+    assertEquals(Types.ExternalType.of("lance.blob"), type);
+    assertEquals(
+        LanceBlobTypes.toArrowField("blob", true, LanceBlobTypes.BLOB),
+        CONVERTER.toArrowField("blob", type, true));
+  }
+
+  @Test
+  void testLegacyBlobConvertsToReadableExternalTypeAndRoundTrips() {
+    Field legacyField =
+        new Field(
+            "image",
+            new FieldType(
+                false, ArrowType.LargeBinary.INSTANCE, null, Map.of("lance-encoding:blob", "true")),
+            null);
+
+    Type type = CONVERTER.toGravitino(legacyField);
+
+    assertEquals(Types.ExternalType.of("lance.blob.legacy"), type);
+    assertEquals(legacyField, CONVERTER.toArrowField("image", type, false));
+  }
+
+  @Test
+  void testNonStandardBlobConvertsToJsonExternalTypeAndRoundTrips() {
+    // A legacy blob stored as Binary instead of LargeBinary.
+    assertJsonExternalTypeRoundTrips(
+        new Field(
+            "image",
+            new FieldType(
+                true, ArrowType.Binary.INSTANCE, null, Map.of("lance-encoding:blob", "true")),
+            null));
+
+    // A legacy blob marker whose value is not "true"; Lance still treats it as a blob.
+    assertJsonExternalTypeRoundTrips(
+        new Field(
+            "image",
+            new FieldType(
+                true, ArrowType.LargeBinary.INSTANCE, null, Map.of("lance-encoding:blob", "false")),
+            null));
+
+    // A blob v2 struct with the optional external range fields.
+    Field blob = LanceBlobTypes.toArrowField("blob", true, LanceBlobTypes.BLOB);
+    List<Field> fullChildren = new ArrayList<>(blob.getChildren());
+    fullChildren.add(
+        new Field("position", new FieldType(true, new ArrowType.Int(64, false), null), null));
+    fullChildren.add(
+        new Field("size", new FieldType(true, new ArrowType.Int(64, false), null), null));
+    assertJsonExternalTypeRoundTrips(new Field("blob", blob.getFieldType(), fullChildren));
+  }
+
+  @Test
+  void testNonBlobMetadataIsIgnored() {
+    Field field =
+        new Field(
+            "id",
+            new FieldType(
+                false,
+                new ArrowType.Int(64, true),
+                null,
+                Map.of("lance-schema:unenforced-primary-key", "true")),
+            null);
+    assertEquals(Types.LongType.get(), CONVERTER.toGravitino(field));
+
+    Field listField =
+        new Field(
+            "tags",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "element",
+                    new FieldType(
+                        true,
+                        ArrowType.Utf8.INSTANCE,
+                        null,
+                        Map.of("lance-encoding:compression", "zstd")),
+                    null)));
+    assertEquals(Types.ListType.of(Types.StringType.get(), true), CONVERTER.toGravitino(listField));
+  }
+
+  @Test
+  void testStructWithBlobChildRoundTrips() {
+    Field blobChild = LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.BLOB);
+    Field structField =
+        new Field(
+            "record",
+            new FieldType(true, ArrowType.Struct.INSTANCE, null),
+            Arrays.asList(
+                new Field("id", new FieldType(false, new ArrowType.Int(64, true), null), null),
+                blobChild));
+
+    Type type = CONVERTER.toGravitino(structField);
+
+    Types.StructType structType = assertInstanceOf(Types.StructType.class, type);
+    assertEquals(Types.LongType.get(), structType.fields()[0].type());
+    assertEquals(Types.ExternalType.of(LanceBlobTypes.BLOB), structType.fields()[1].type());
+    assertEquals(structField, CONVERTER.toArrowField("record", type, true));
+  }
+
+  @Test
+  void testListWithBlobChildConvertsToNativeList() {
+    String blobType = LanceBlobTypes.BLOB;
+    // Lance and pyarrow name list children "item"; Gravitino writes them back as "element".
+    Field listField =
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(LanceBlobTypes.toArrowField("item", true, blobType)));
+
+    Type type = CONVERTER.toGravitino(listField);
+
+    assertEquals(Types.ListType.of(Types.ExternalType.of(blobType), true), type);
+    assertEquals(
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(LanceBlobTypes.toArrowField("element", true, blobType))),
+        CONVERTER.toArrowField("images", type, true));
+  }
+
+  @Test
+  void testListWithNonCanonicalBlobChildKeepsBlobMetadata() {
+    Map<String, String> blobMetadata = Map.of("lance-encoding:blob", "true");
+    Field listField =
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "item",
+                    new FieldType(true, ArrowType.Binary.INSTANCE, null, blobMetadata),
+                    null)));
+
+    Type type = CONVERTER.toGravitino(listField);
+
+    Types.ListType listType = assertInstanceOf(Types.ListType.class, type);
+    Types.ExternalType elementType =
+        assertInstanceOf(Types.ExternalType.class, listType.elementType());
+    assertTrue(elementType.catalogString().startsWith("{"));
+    assertEquals(
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.List.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "element",
+                    new FieldType(true, ArrowType.Binary.INSTANCE, null, blobMetadata),
+                    null))),
+        CONVERTER.toArrowField("images", type, true));
+  }
+
+  @Test
+  void testLargeAndFixedSizeListWithBlobChildRoundTrip() {
+    Field blobChild = LanceBlobTypes.toArrowField("item", true, LanceBlobTypes.BLOB);
+    assertJsonExternalTypeRoundTrips(
+        new Field(
+            "images",
+            new FieldType(true, ArrowType.LargeList.INSTANCE, null),
+            Collections.singletonList(blobChild)));
+    assertJsonExternalTypeRoundTrips(
+        new Field(
+            "images",
+            new FieldType(true, new ArrowType.FixedSizeList(2), null),
+            Collections.singletonList(blobChild)));
+  }
+
+  @Test
+  void testStructWithBlobListConvertsToNativeTypes() {
+    Field structField =
+        new Field(
+            "record",
+            new FieldType(true, ArrowType.Struct.INSTANCE, null),
+            Collections.singletonList(
+                new Field(
+                    "images",
+                    new FieldType(true, ArrowType.List.INSTANCE, null),
+                    Collections.singletonList(
+                        LanceBlobTypes.toArrowField("element", true, LanceBlobTypes.BLOB)))));
+
+    Type type = CONVERTER.toGravitino(structField);
+
+    assertEquals(
+        Types.StructType.of(
+            Types.StructType.Field.of(
+                "images",
+                Types.ListType.of(Types.ExternalType.of(LanceBlobTypes.BLOB), true),
+                true,
+                null)),
+        type);
+    assertEquals(structField, CONVERTER.toArrowField("record", type, true));
+  }
+
+  @Test
+  void testMapWithBlobValueConvertsToNativeMap() {
+    Field mapField =
+        new Field(
+            "images",
+            new FieldType(true, new ArrowType.Map(false), null),
+            Collections.singletonList(
+                new Field(
+                    MapVector.DATA_VECTOR_NAME,
+                    new FieldType(false, ArrowType.Struct.INSTANCE, null),
+                    Arrays.asList(
+                        new Field(
+                            MapVector.KEY_NAME,
+                            new FieldType(false, ArrowType.Utf8.INSTANCE, null),
+                            null),
+                        LanceBlobTypes.toArrowField(
+                            MapVector.VALUE_NAME, true, LanceBlobTypes.LEGACY_BLOB)))));
+
+    Type type = CONVERTER.toGravitino(mapField);
+
+    assertEquals(
+        Types.MapType.of(
+            Types.StringType.get(), Types.ExternalType.of(LanceBlobTypes.LEGACY_BLOB), true),
+        type);
+    assertEquals(mapField, CONVERTER.toArrowField("images", type, true));
+  }
+
+  @Test
+  void testUnionWithBlobChildConvertsToNativeUnion() {
+    Field unionField =
+        new Field(
+            "value",
+            new FieldType(
+                true,
+                new ArrowType.Union(
+                    UnionMode.Sparse,
+                    new int[] {
+                      org.apache.arrow.vector.types.Types.MinorType.LARGEVARBINARY.ordinal(),
+                      org.apache.arrow.vector.types.Types.MinorType.INT.ordinal()
+                    }),
+                null),
+            Arrays.asList(
+                LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.LEGACY_BLOB),
+                new Field("number", new FieldType(true, new ArrowType.Int(32, true), null), null)));
+
+    Type type = CONVERTER.toGravitino(unionField);
+
+    assertEquals(
+        Types.UnionType.of(
+            Types.ExternalType.of(LanceBlobTypes.LEGACY_BLOB), Types.IntegerType.get()),
+        type);
+    Field blobChild = CONVERTER.toArrowField("value", type, true).getChildren().get(0);
+    assertEquals(ArrowType.LargeBinary.INSTANCE, blobChild.getType());
+    assertEquals(Map.of("lance-encoding:blob", "true"), blobChild.getMetadata());
+  }
+
+  @Test
+  void testJsonExternalTypeUsesColumnName() {
+    Field field =
+        new Field("old_name", new FieldType(true, ArrowType.LargeUtf8.INSTANCE, null), null);
+    Type type = CONVERTER.toGravitino(field);
+
+    Field renamed = CONVERTER.toArrowField("new_name", type, true);
+
+    assertEquals(
+        new Field("new_name", new FieldType(true, ArrowType.LargeUtf8.INSTANCE, null), null),
+        renamed);
+  }
+
+  @Test
+  void testLegacyJsonExternalTypeStillParses() {
+    String json =
+        "{\"name\":\"col\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}";
+
+    Field field = CONVERTER.toArrowField("col", Types.ExternalType.of(json), true);
+
+    assertEquals(
+        new Field("col", new FieldType(true, ArrowType.LargeUtf8.INSTANCE, null), null), field);
+  }
+
+  private static void assertJsonExternalTypeRoundTrips(Field field) {
+    Type type = CONVERTER.toGravitino(field);
+
+    Types.ExternalType externalType = assertInstanceOf(Types.ExternalType.class, type);
+    assertTrue(externalType.catalogString().startsWith("{"));
+    assertEquals(field, CONVERTER.toArrowField(field.getName(), type, field.isNullable()));
   }
 
   @ParameterizedTest(name = "[{index}] name={0}, type={1}, nullable={2}")
