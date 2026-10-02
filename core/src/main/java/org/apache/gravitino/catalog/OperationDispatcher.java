@@ -22,8 +22,13 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -45,6 +50,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +61,12 @@ import org.slf4j.LoggerFactory;
 public abstract class OperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(OperationDispatcher.class);
+
+  /**
+   * How many times a fenced delete is retried while the observed entity keeps being updated by
+   * concurrent store writes.
+   */
+  private static final int MAX_FENCED_DELETE_ATTEMPTS = 3;
 
   private final CatalogManager catalogManager;
 
@@ -245,6 +257,180 @@ public abstract class OperationDispatcher {
   }
 
   /**
+   * Wraps an updater so the store rejects the update, before writing anything, when the row under
+   * the name is not the entity the external catalog reported.
+   *
+   * <p>The updater runs inside the store's update, after the current row is read and before the
+   * version-checked write. Throwing here therefore aborts the transaction with nothing written,
+   * which is what a post-write id comparison cannot do.
+   *
+   * @param expectedId the expected id of the entity being updated
+   * @param updater the update to apply when the ids match
+   * @param <E> the entity type
+   * @return the guarded updater
+   */
+  protected static <E extends Entity & HasIdentifier> Function<E, E> requireEntityId(
+      long expectedId, Function<E, E> updater) {
+    return entity -> {
+      if (entity.id() != expectedId) {
+        throw new EntityIdMismatchException(entity.id(), expectedId);
+      }
+      return updater.apply(entity);
+    };
+  }
+
+  /**
+   * Reads the id of a registration before an external-catalog call, so a later store write can be
+   * fenced on it.
+   *
+   * @param ident the entity identifier
+   * @param type the entity type
+   * @return the observed id, or null when nothing is registered under the name
+   * @throws UnsupportedOperationException if the store lacks identity-fenced delete support
+   */
+  @Nullable
+  protected Long observeRegistration(NameIdentifier ident, Entity.EntityType type) {
+    try {
+      return SupportsIdentityFencedDelete.require(store).getEntityId(ident, type);
+    } catch (NoSuchEntityException e) {
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to read the registration of " + ident, e);
+    }
+  }
+
+  /**
+   * Deletes the registration observed before an external-catalog call, and only that one.
+   *
+   * <p>The external drop has already succeeded when this runs, so a conflict is not reported to the
+   * caller: a failed request would invite a retry, and by now the name may belong to a newly
+   * created object that the retry would drop. Instead:
+   *
+   * <ul>
+   *   <li>A registration with another id belongs to a newer incarnation. It is kept, and a
+   *       reconcile pass, not this drop, decides what happens to it.
+   *   <li>The same id with a newer version means a concurrent store write to the entity that was
+   *       just dropped. The fenced delete is retried, because giving up would leave a registration
+   *       whose external object is gone, and a retried drop would no longer reach the store.
+   * </ul>
+   *
+   * @param ident the entity identifier
+   * @param type the entity type
+   * @param cascade whether to delete the children as well
+   * @param observed the id read before the external call, or null when there was no registration to
+   *     delete
+   * @return true if the observed registration was deleted
+   * @throws UnsupportedOperationException if the store lacks identity-fenced delete support
+   */
+  protected boolean deleteObservedRegistration(
+      NameIdentifier ident, Entity.EntityType type, boolean cascade, @Nullable Long observed) {
+    if (observed == null) {
+      LOG.warn(
+          "No {} registration was found for {} before the external drop; leaving the store alone",
+          type.name().toLowerCase(Locale.ROOT),
+          ident);
+      return false;
+    }
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return SupportsIdentityFencedDelete.require(store)
+            .deleteIfIdMatches(ident, type, cascade, observed);
+      } catch (OptimisticLockException e) {
+        Long current = observeRegistration(ident, type);
+        if (current == null) {
+          LOG.warn(
+              "The {} registration of {} was removed concurrently while the external drop ran",
+              type.name().toLowerCase(Locale.ROOT),
+              ident);
+          return false;
+        }
+        if (current.longValue() != observed.longValue()) {
+          LOG.warn(
+              "The {} registration of {} changed while the external drop ran (expected {}, found"
+                  + " {}); it is kept instead of being deleted under the new incarnation",
+              type.name().toLowerCase(Locale.ROOT),
+              ident,
+              observed,
+              current);
+          return false;
+        }
+        if (attempt >= MAX_FENCED_DELETE_ATTEMPTS) {
+          LOG.warn(
+              "Leaving the {} registration of {} after {} concurrent delete conflicts; the external"
+                  + " drop has already succeeded",
+              type.name().toLowerCase(Locale.ROOT),
+              ident,
+              attempt);
+          return false;
+        }
+        LOG.info(
+            "The {} registration of {} was updated concurrently; retrying the delete (attempt {})",
+            type.name().toLowerCase(Locale.ROOT),
+            ident,
+            attempt + 1);
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The {} to be dropped does not exist in the store: {}", type, ident, e);
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  /**
+   * Stores the registration of an entity that the external catalog has just created or loaded.
+   *
+   * <p>A newly created or loaded external entity means a registration observed before the external
+   * call with another id is stale: its object was dropped out of band, or by a drop on another
+   * server that has not reached the store yet. A registration first observed after the call may
+   * belong to a newer object, so it must be kept. An upsert by name would keep that row's id and
+   * hand its owner, tags, and grants to the new object, and the pending drop's identity fence would
+   * then pass and delete the new registration. The stale row is replaced instead: deleted fenced on
+   * its own id, then the new registration is inserted. These are separate store calls; if insertion
+   * fails, a later load must import the external object again.
+   *
+   * @param entity the registration of the newly created or loaded object
+   * @param cascade whether a stale registration is deleted with its children
+   * @param observed the registration read before the external create or load, or null if none
+   *     existed
+   * @param <E> the entity type
+   * @throws IOException if a store operation fails
+   * @throws OptimisticLockException if the stale registration changed while it was replaced
+   */
+  protected <E extends Entity & HasIdentifier> void putCreatedEntity(
+      E entity, boolean cascade, @Nullable Long observed) throws IOException {
+    try {
+      store.put(entity, false /* overwrite */);
+      return;
+    } catch (EntityAlreadyExistsException e) {
+      // A registration already sits under the name; decide below whether it is stale.
+    }
+
+    NameIdentifier ident = entity.nameIdentifier();
+    Long existing = observeRegistration(ident, entity.type());
+    if (existing != null && existing.longValue() == entity.id()) {
+      // Another node already imported this object. Keep any updates it has made since then.
+      return;
+    }
+    if (existing != null) {
+      if (observed == null || existing.longValue() != observed.longValue()) {
+        throw new OptimisticLockException(
+            "The registration of %s changed during create; keeping the newer registration %s",
+            ident, existing);
+      }
+      LOG.warn(
+          "Replacing the stale {} registration {} of {} with the newly created object {}",
+          entity.type().name().toLowerCase(Locale.ROOT),
+          existing,
+          ident,
+          entity.id());
+      SupportsIdentityFencedDelete.require(store)
+          .deleteIfIdMatches(ident, entity.type(), cascade, observed);
+    }
+    store.put(entity, false /* overwrite */);
+  }
+
+  /**
    * Runs a store operation as a best-effort side effect of the request.
    *
    * <p>Every failure is logged and reported as a null result, because the external catalog is the
@@ -256,6 +442,10 @@ public abstract class OperationDispatcher {
     R ret = null;
     try {
       ret = fn.apply(ident);
+    } catch (EntityIdMismatchException e) {
+      // Case 4: the row under the name is not the entity the external catalog reported. The
+      // updater refused before anything was written.
+      LOG.error(FormattedErrorMessages.ENTITY_UNMATCHED, ident, e.actualId, e.expectedId);
     } catch (OptimisticLockException e) {
       // Only external entities reach this point, so swallowing the conflict is safe: alterTable,
       // alterSchema and alterView return before calling this helper when the entity is managed,
@@ -284,6 +474,18 @@ public abstract class OperationDispatcher {
     }
 
     return ret;
+  }
+
+  /** Thrown by {@link #requireEntityId} when the stored row is not the expected entity. */
+  private static final class EntityIdMismatchException extends RuntimeException {
+    private final long actualId;
+    private final long expectedId;
+
+    private EntityIdMismatchException(long actualId, long expectedId) {
+      super("Entity id " + actualId + " does not match the expected id " + expectedId);
+      this.actualId = actualId;
+      this.expectedId = expectedId;
+    }
   }
 
   boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {

@@ -111,6 +111,35 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    Namespace schemaNs = NamespaceUtil.ofSchema(metalakeName, catalogName);
+    SchemaMetaService service = SchemaMetaService.getInstance();
+
+    SchemaEntity first =
+        createSchemaEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNs, "s", AUDIT_INFO);
+    backend.insert(first, false);
+    Long observed = service.getSchemaId(first.nameIdentifier());
+    Assertions.assertEquals(first.id(), observed.longValue());
+
+    Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.SCHEMA, false));
+    SchemaEntity second =
+        createSchemaEntity(RandomIdGenerator.INSTANCE.nextId(), schemaNs, "s", AUDIT_INFO);
+    backend.insert(second, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteSchema(first.nameIdentifier(), true, observed));
+    Assertions.assertEquals(
+        second.id(), service.getSchemaByIdentifier(second.nameIdentifier()).id());
+
+    Long current = service.getSchemaId(second.nameIdentifier());
+    Assertions.assertTrue(service.deleteSchema(second.nameIdentifier(), true, current));
+    Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
   public void testInsertSchemaLocksCatalogWithoutChangingVersion() throws IOException {
     createAndInsertMakeLake(metalakeName);
     CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);

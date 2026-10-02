@@ -167,6 +167,11 @@ columns.
 Not every provider accepts every change. Where one does not, the request is rejected rather than
 silently ignored.
 
+Rename tables through Gravitino to preserve their registrations and column tag associations. For a
+Hive table renamed directly in Hive Metastore, its retained `gravitino.identifier` can conflict with
+the registration at the old path. Loading the new path then fails instead of moving the old
+registration and its governance metadata based only on the embedded identifier.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 

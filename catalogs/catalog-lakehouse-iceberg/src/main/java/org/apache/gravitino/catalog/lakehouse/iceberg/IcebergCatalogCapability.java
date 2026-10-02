@@ -25,6 +25,7 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 public class IcebergCatalogCapability implements Capability {
 
   private final String schemaSeparator;
+  private final boolean hiveBackend;
 
   /**
    * Creates a capability with the given external schema separator.
@@ -32,7 +33,28 @@ public class IcebergCatalogCapability implements Capability {
    * @param schemaSeparator the external separator used in logical schema names (e.g. {@code ":"})
    */
   public IcebergCatalogCapability(String schemaSeparator) {
+    this(schemaSeparator, false);
+  }
+
+  /**
+   * Creates a capability with the given schema separator and backend name semantics.
+   *
+   * @param schemaSeparator the external separator used in logical schema names
+   * @param hiveBackend whether the catalog uses Hive Metastore
+   */
+  public IcebergCatalogCapability(String schemaSeparator, boolean hiveBackend) {
     this.schemaSeparator = schemaSeparator;
+    this.hiveBackend = hiveBackend;
+  }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    if (hiveBackend && (scope == Scope.SCHEMA || scope == Scope.TABLE)) {
+      // Hive Metastore folds database and table names, while Iceberg preserves column names.
+      return CapabilityResult.unsupported(
+          "Hive Metastore schema and table names are case insensitive.");
+    }
+    return Capability.super.caseSensitiveOnName(scope);
   }
 
   @Override

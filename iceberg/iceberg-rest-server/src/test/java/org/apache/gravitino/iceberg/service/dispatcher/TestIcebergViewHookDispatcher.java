@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -43,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -89,10 +91,14 @@ public class TestIcebergViewHookDispatcher {
   private OwnerDispatcher previousInternalOwnerDispatcher;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws IOException {
     mockExecutor = mock(IcebergViewOperationDispatcher.class);
     mockNamespaceDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
-    mockEntityStore = mock(EntityStore.class);
+    mockEntityStore =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    when(SupportsIdentityFencedDelete.require(mockEntityStore)
+            .getEntityId(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA)))
+        .thenReturn(1L);
     mockViewDispatcher = mock(ViewDispatcher.class);
     mockInternalViewDispatcher = mock(ViewDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
@@ -323,7 +329,8 @@ public class TestIcebergViewHookDispatcher {
     hookDispatcher.dropView(mockContext, viewIdent);
 
     verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
-    verify(mockEntityStore, times(1)).delete(schemaIdent, Entity.EntityType.SCHEMA, true);
+    verify(SupportsIdentityFencedDelete.require(mockEntityStore), times(1))
+        .deleteIfIdMatches(schemaIdent, Entity.EntityType.SCHEMA, true, 1L);
   }
 
   @Test

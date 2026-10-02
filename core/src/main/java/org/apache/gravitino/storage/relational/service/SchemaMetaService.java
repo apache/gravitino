@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -268,13 +269,44 @@ public class SchemaMetaService {
     return newEntity;
   }
 
+  public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
+    return deleteSchema(identifier, cascade, null);
+  }
+
+  /**
+   * Reads the id of the schema under this name.
+   *
+   * @param identifier the schema identifier
+   * @return the id
+   * @throws NoSuchEntityException if the schema does not exist
+   */
+  public long getSchemaId(NameIdentifier identifier) {
+    SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+    return schemaPO.getSchemaId();
+  }
+
+  /**
+   * Deletes the schema under this name only if it is still the observed one.
+   *
+   * @param identifier the schema identifier
+   * @param cascade whether to delete the children as well
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no schema exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchema")
-  public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
+  public boolean deleteSchema(NameIdentifier identifier, boolean cascade, @Nullable Long expected) {
     NameIdentifierUtil.checkSchema(identifier);
 
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+    if (expected != null && schemaPO.getSchemaId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
+    }
     Long schemaId = schemaPO.getSchemaId();
 
     if (cascade) {

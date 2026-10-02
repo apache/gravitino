@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -277,9 +278,39 @@ public class TopicMetaService {
     return POConverters.fromTopicPO(topicPO, identifier.namespace());
   }
 
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
-  public boolean deleteTopic(NameIdentifier identifier) {
+  /**
+   * Reads the id of the topic under this name.
+   *
+   * @param identifier the topic identifier
+   * @return the id
+   * @throws NoSuchEntityException if the topic does not exist
+   */
+  public long getTopicId(NameIdentifier identifier) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
+    return topicPO.getTopicId();
+  }
+
+  public boolean deleteTopic(NameIdentifier identifier) {
+    return deleteTopic(identifier, null);
+  }
+
+  /**
+   * Deletes the topic under this name only if it is still the observed one.
+   *
+   * @param identifier the topic identifier
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no topic exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
+  public boolean deleteTopic(NameIdentifier identifier, @Nullable Long expected) {
+    TopicPO topicPO = getTopicPOByIdentifier(identifier);
+    if (expected != null && topicPO.getTopicId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.TOPIC, identifier);
+    }
     deleteTopicWithVersion(identifier, topicPO);
     return true;
   }

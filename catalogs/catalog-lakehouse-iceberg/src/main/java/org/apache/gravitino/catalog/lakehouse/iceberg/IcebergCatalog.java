@@ -86,7 +86,13 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
   @Override
   public Capability newCapability() {
-    return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());
+    Map<String, String> properties = entity().getProperties();
+    boolean hiveBackend =
+        properties != null
+            && IcebergCatalogBackend.HIVE
+                .name()
+                .equalsIgnoreCase(properties.get(IcebergConstants.CATALOG_BACKEND));
+    return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator(), hiveBackend);
   }
 
   @Override

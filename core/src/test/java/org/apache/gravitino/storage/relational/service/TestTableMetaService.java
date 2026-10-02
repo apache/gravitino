@@ -64,6 +64,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -317,6 +318,52 @@ public class TestTableMetaService extends TestJDBCBackend {
             .isEmpty());
     Assertions.assertEquals(0, countActiveTagRels(stale.id()));
     Assertions.assertEquals(0, countActiveTagRels(recreated.id()));
+  }
+
+  @TestTemplate
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    Namespace tableNs = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    TableMetaService service = TableMetaService.getInstance();
+
+    TableEntity first =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "t", AUDIT_INFO);
+    backend.insert(first, false);
+    Long observed = service.getTableId(first.nameIdentifier());
+    Assertions.assertEquals(first.id(), observed.longValue());
+
+    // The observed table is dropped and re-created under the same name by someone else.
+    Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.TABLE, false));
+    TableEntity second =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), tableNs, "t", AUDIT_INFO);
+    backend.insert(second, false);
+
+    // A delete fenced on the old observation must not touch the new incarnation.
+    assertThrows(
+        OptimisticLockException.class, () -> service.deleteTable(first.nameIdentifier(), observed));
+    Assertions.assertEquals(
+        second.id(), service.getTableByIdentifier(second.nameIdentifier()).id());
+
+    // An update to the same incarnation during the external call must not prevent deletion.
+    long current = service.getTableId(second.nameIdentifier());
+    long versionBeforeUpdate = getTablePO(second.id()).getCurrentVersion();
+    service.insertTable(second, true);
+    Assertions.assertEquals(
+        versionBeforeUpdate + 1, getTablePO(second.id()).getCurrentVersion().longValue());
+    long maxIdBeforeFencedDelete = maxEntityChangeId();
+    Assertions.assertTrue(
+        SupportsIdentityFencedDelete.require(backend)
+            .deleteIfIdMatches(second.nameIdentifier(), Entity.EntityType.TABLE, false, current));
+    Assertions.assertFalse(backend.exists(second.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertTrue(
+        listEntityChanges(maxIdBeforeFencedDelete).stream()
+            .anyMatch(
+                record ->
+                    record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record.getFullName().equals(second.nameIdentifier().toString())
+                        && record.getOperateType() == OperateType.DROP));
   }
 
   @TestTemplate

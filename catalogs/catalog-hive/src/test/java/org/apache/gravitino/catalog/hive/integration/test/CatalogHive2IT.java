@@ -58,6 +58,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.hive.HiveCatalogOperations;
@@ -1420,7 +1421,7 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   @Test
-  public void testOutOfBandRenameKeepsColumnTags() throws InterruptedException {
+  public void testOutOfBandRenameRejectsConflictingIdentifier() throws InterruptedException {
     // Hive stores names in lower case, and tag operations resolve a column by its stored name.
     String schema = schemaName.toLowerCase(Locale.ROOT);
     NameIdentifier ident =
@@ -1434,10 +1435,11 @@ public class CatalogHive2IT extends BaseIT {
     try {
       loadColumn(ident, HIVE_COL_NAME1).supportsTags().associateTags(new String[] {tagName}, null);
 
-      // Rename the table directly in the Hive Metastore. It keeps its Gravitino id in its table
-      // parameters, so loading it under the new name imports it again over the same id.
+      // Rename directly in HMS, retaining the marker already bound to the old path. The marker
+      // alone cannot distinguish an external rename from a copied table with the same ID.
       String newName = GravitinoITUtils.genRandomName("hive_oob_renamed_table");
       HiveTable hiveTable = loadHiveTable(schema, ident.name());
+      Assertions.assertNotNull(hiveTable.properties().get(StringIdentifier.ID_KEY));
       HiveTable.Builder renamed =
           HiveTable.builder()
               .withName(newName)
@@ -1458,10 +1460,54 @@ public class CatalogHive2IT extends BaseIT {
             return null;
           });
 
-      // The column keeps its id, so the tag follows the table to its new name.
+      Assertions.assertEquals(
+          hiveTable.properties().get(StringIdentifier.ID_KEY),
+          loadHiveTable(schema, newName).properties().get(StringIdentifier.ID_KEY));
       NameIdentifier newIdent = NameIdentifier.of(schema, newName);
-      Column column = loadColumn(newIdent, HIVE_COL_NAME1);
-      Assertions.assertArrayEquals(new String[] {tagName}, column.supportsTags().listTags());
+      // Loading or retrying must not move the original registration and its governance metadata.
+      for (int i = 0; i < 2; i++) {
+        UnsupportedOperationException error =
+            assertThrows(
+                UnsupportedOperationException.class,
+                () -> catalog.asTableCatalog().loadTable(newIdent));
+        Assertions.assertTrue(error.getMessage().contains("Table managed by multiple catalogs"));
+        MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
+        Assertions.assertEquals(1, objects.length);
+        Assertions.assertEquals(
+            String.join(".", catalogName, schema, ident.name(), HIVE_COL_NAME1)
+                .toLowerCase(Locale.ROOT),
+            objects[0].fullName().toLowerCase(Locale.ROOT));
+      }
+    } finally {
+      metalake.deleteTag(tagName);
+    }
+  }
+
+  @Test
+  public void testGravitinoRenameKeepsColumnTags() throws InterruptedException {
+    String schema = schemaName.toLowerCase(Locale.ROOT);
+    NameIdentifier ident =
+        NameIdentifier.of(schema, GravitinoITUtils.genRandomName("hive_rename_table"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, createColumns(), TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+    String identifier =
+        loadHiveTable(schema, ident.name()).properties().get(StringIdentifier.ID_KEY);
+    Assertions.assertNotNull(identifier);
+    String tagName = GravitinoITUtils.genRandomName("hive_rename_tag");
+    metalake.createTag(tagName, "comment", Collections.emptyMap());
+    try {
+      loadColumn(ident, HIVE_COL_NAME1).supportsTags().associateTags(new String[] {tagName}, null);
+
+      // Gravitino observes and updates the original registration as part of the rename.
+      String newName = GravitinoITUtils.genRandomName("hive_renamed_table");
+      catalog.asTableCatalog().alterTable(ident, TableChange.rename(newName));
+      NameIdentifier newIdent = NameIdentifier.of(schema, newName);
+      Assertions.assertEquals(
+          identifier, loadHiveTable(schema, newName).properties().get(StringIdentifier.ID_KEY));
+      Assertions.assertArrayEquals(
+          new String[] {tagName}, loadColumn(newIdent, HIVE_COL_NAME1).supportsTags().listTags());
       MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
       Assertions.assertEquals(1, objects.length);
       Assertions.assertEquals(

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -219,11 +220,41 @@ public class ViewMetaService {
     }
   }
 
+  public boolean deleteView(NameIdentifier ident) {
+    return deleteView(ident, null);
+  }
+
+  /**
+   * Reads the id of the view under this name.
+   *
+   * @param ident the view identifier
+   * @return the id
+   * @throws NoSuchEntityException if the view does not exist
+   */
+  public long getViewId(NameIdentifier ident) {
+    ViewPO viewPO = getViewPOByIdentifier(ident);
+    return viewPO.getViewId();
+  }
+
+  /**
+   * Deletes the view under this name only if it is still the observed one.
+   *
+   * @param ident the view identifier
+   * @param expected the id read before the operation started, or null to delete whatever row is
+   *     under the name now
+   * @return true once the row is deleted
+   * @throws NoSuchEntityException if no view exists under the name
+   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the row is not the expected
+   *     one
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteViewByIdentifier")
-  public boolean deleteView(NameIdentifier ident) {
+  public boolean deleteView(NameIdentifier ident, @Nullable Long expected) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
+    if (expected != null && viewPO.getViewId() != expected.longValue()) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.VIEW, ident);
+    }
 
     deleteViewWithVersion(ident, viewPO);
     return true;

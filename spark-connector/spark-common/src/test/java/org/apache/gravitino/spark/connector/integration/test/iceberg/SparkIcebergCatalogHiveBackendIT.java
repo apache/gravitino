@@ -20,15 +20,39 @@ package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 /** This class use Apache Iceberg HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
+
+  /** Verifies that Hive table aliases differing only in case read and write the same table. */
+  @Test
+  public void testCaseInsensitiveTableName() {
+    String tableName = "test_case_insensitive_table";
+    String uppercaseName = tableName.toUpperCase(Locale.ROOT);
+    dropTableIfExists(tableName);
+    try {
+      createSimpleTable(tableName);
+      sql(String.format("INSERT INTO %s VALUES(1, 'lowercase', 10)", tableName));
+      sql(String.format("INSERT INTO %s VALUES(2, 'uppercase', 20)", uppercaseName));
+
+      List<String> rows = getQueryData(String.format("SELECT * FROM %s ORDER BY id", tableName));
+      Assertions.assertEquals(List.of("1,lowercase,10", "2,uppercase,20"), rows);
+      Assertions.assertEquals(
+          rows, getQueryData(String.format("SELECT * FROM %s ORDER BY id", uppercaseName)));
+    } finally {
+      dropTableIfExists(tableName);
+    }
+  }
 
   @Override
   protected Map<String, String> getExtraSparkConfigs() {

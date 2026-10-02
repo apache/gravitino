@@ -27,6 +27,7 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -35,8 +36,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -58,9 +61,11 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
@@ -90,6 +95,9 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
+import org.apache.gravitino.storage.relational.RelationalBackend;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -99,6 +107,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
@@ -332,6 +341,413 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testDropTableLeavesRegistrationRecreatedDuringTheDropAlone() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropAba");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    TableEntity registered = entityStore.get(tableIdent, TABLE, TableEntity.class);
+
+    // Simulate the race: the drop observed an older incarnation of t before its external drop,
+    // and by the time it reaches the store another node has re-created t under a new id.
+    reset(entityStore);
+    doReturn(registered.id() - 1)
+        .doCallRealMethod()
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
+
+    // The external drop succeeded, so the drop reports success instead of a conflict that would
+    // invite a retry against the new incarnation, and it does not delete what is under the name.
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+
+    // The external table is gone, but the newer registration was not deleted under it.
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    Assertions.assertEquals(
+        registered.id(), entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+  }
+
+  /**
+   * Another node re-creates a table through Gravitino while this node's drop of the same name is
+   * between its external drop and its store delete. The relational store's overwrite (ON DUPLICATE
+   * KEY UPDATE on MySQL and H2) keeps the stored id when the name matches, so an overwrite would
+   * hand the new table the observed id and the drop's identity fence would delete it.
+   *
+   * @param imported whether the replacement is created externally and then imported
+   * @throws Exception if the catalog or store operation fails
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTableRecreatedDuringDropKeepsItsOwnRegistration(boolean imported)
+      throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRecreate" + imported);
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    long droppedId = entityStore.get(tableIdent, TABLE, TableEntity.class).id();
+
+    // Model the relational overwrite: a row already stored under the name keeps its id.
+    doAnswer(
+            invocation -> {
+              TableEntity incoming = invocation.getArgument(0);
+              NameIdentifier ident = incoming.nameIdentifier();
+              if (entityStore.exists(ident, TABLE)) {
+                long storedId = entityStore.get(ident, TABLE, TableEntity.class).id();
+                entityStore.delete(ident, TABLE, false);
+                incoming =
+                    TableEntity.builder()
+                        .withId(storedId)
+                        .withName(incoming.name())
+                        .withNamespace(incoming.namespace())
+                        .withColumns(incoming.columns())
+                        .withAuditInfo(incoming.auditInfo())
+                        .build();
+              }
+              entityStore.put(incoming, false);
+              return null;
+            })
+        .when(entityStore)
+        .put(any(TableEntity.class), eq(true));
+
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    TestCatalogOperations ops = spy(realOps);
+    doAnswer(
+            invocation -> {
+              Object dropped = invocation.callRealMethod();
+              // The other node re-creates t before this drop reaches the store.
+              if (imported) {
+                realOps.createTable(
+                    tableIdent,
+                    columns,
+                    "recreated",
+                    StringIdentifier.newPropertiesWithId(
+                        StringIdentifier.fromId(droppedId + 1), props),
+                    new Transform[0],
+                    null,
+                    null,
+                    null);
+                tableOperationDispatcher.loadTable(tableIdent);
+              } else {
+                tableOperationDispatcher.createTable(
+                    tableIdent, columns, "recreated", props, new Transform[0]);
+              }
+              return dropped;
+            })
+        .when(ops)
+        .dropTable(tableIdent);
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+
+      long recreatedId =
+          StringIdentifier.fromProperties(realOps.loadTable(tableIdent).properties()).id();
+      Assertions.assertNotEquals(droppedId, recreatedId);
+      Assertions.assertEquals(
+          recreatedId, entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  /**
+   * A delayed create must preserve a newer registration, whether or not a stale row existed before
+   * its external call.
+   *
+   * @param staleRegistration whether the name initially has a stale registration
+   * @throws Exception if the test setup or catalog operation fails
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDelayedCreateKeepsRegistrationOfNewerTable(boolean staleRegistration)
+      throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDelayedCreate" + staleRegistration);
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    if (staleRegistration) {
+      tableOperationDispatcher.createTable(
+          tableIdent, new Column[0], "stale", props, new Transform[0]);
+      Assertions.assertTrue(realOps.dropTable(tableIdent));
+    }
+    TestCatalogOperations ops = spy(realOps);
+    AtomicBoolean replaced = new AtomicBoolean();
+    doAnswer(
+            invocation -> {
+              Object created = invocation.callRealMethod();
+              if (replaced.compareAndSet(false, true)) {
+                // Another node drops and re-creates the external table before this create writes
+                // its registration. The older create must not replace the newer registration.
+                Assertions.assertTrue(realOps.dropTable(tableIdent));
+                tableOperationDispatcher.createTable(
+                    tableIdent, new Column[0], "newer", props, new Transform[0]);
+              }
+              return created;
+            })
+        .when(ops)
+        .createTable(eq(tableIdent), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      tableOperationDispatcher.createTable(
+          tableIdent, new Column[0], "older", props, new Transform[0]);
+
+      long currentId =
+          StringIdentifier.fromProperties(realOps.loadTable(tableIdent).properties()).id();
+      Assertions.assertEquals(
+          currentId, entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  /**
+   * A create whose object was already imported must preserve subsequent registration updates.
+   *
+   * @throws IOException if the store operation fails
+   */
+  @Test
+  public void testCreatedEntityKeepsUpdatesToAlreadyImportedRegistration() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCreateAlreadyImported");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    tableOperationDispatcher.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0]);
+    TableEntity imported = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    TableEntity updated =
+        entityStore.update(
+            tableIdent,
+            TableEntity.class,
+            TABLE,
+            current ->
+                TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withColumns(current.columns())
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator("newer")
+                            .withCreateTime(Instant.now())
+                            .build())
+                    .build());
+
+    tableOperationDispatcher.putCreatedEntity(imported, false, null);
+
+    Assertions.assertEquals(updated, entityStore.get(tableIdent, TABLE, TableEntity.class));
+    verify(entityStore, never()).put(any(TableEntity.class), eq(true));
+  }
+
+  /**
+   * An unsupported registration read must stop a create before the external table is created.
+   *
+   * @throws IOException if the test setup fails
+   */
+  @Test
+  public void testCreateTableFailsBeforeExternalCreateWhenVersionReadIsUnsupported()
+      throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaCreateUnsupportedVersion");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    doThrow(new UnsupportedOperationException("identity reads unsupported"))
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableOperationDispatcher.createTable(
+                tableIdent, new Column[0], "comment", props, new Transform[0]));
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    Assertions.assertFalse(((TestCatalogOperations) testCatalog.ops()).tableExists(tableIdent));
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  /**
+   * An imported table carries no identifier in its external properties, so the id the store update
+   * is fenced on must come from the registration read before the external alter, not after it.
+   */
+  @Test
+  public void testAlterImportedTableDoesNotUpdateRegistrationRecreatedDuringAlter()
+      throws Exception {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaAlterRecreate");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "imported");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations realOps = (TestCatalogOperations) testCatalog.ops();
+    realOps.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0], null, null, null);
+    tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertNull(
+        StringIdentifier.fromProperties(realOps.loadTable(tableIdent).properties()));
+    TableEntity imported = entityStore.get(tableIdent, TABLE, TableEntity.class);
+
+    // Another node replaces the registration while the external alter runs.
+    TableEntity recreated =
+        TableEntity.builder()
+            .withId(imported.id() + 1)
+            .withName(tableIdent.name())
+            .withNamespace(tableNs)
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("other").withCreateTime(Instant.now()).build())
+            .build();
+    TestCatalogOperations ops = spy(realOps);
+    doAnswer(
+            invocation -> {
+              Object altered = invocation.callRealMethod();
+              entityStore.delete(tableIdent, TABLE, false);
+              entityStore.put(recreated, false);
+              return altered;
+            })
+        .when(ops)
+        .alterTable(eq(tableIdent), any(TableChange[].class));
+    FieldUtils.writeField(testCatalog, "ops", ops, true);
+    try {
+      tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k2", "v2"));
+
+      TableEntity stored = entityStore.get(tableIdent, TABLE, TableEntity.class);
+      Assertions.assertEquals(recreated.id(), stored.id());
+      Assertions.assertNull(stored.auditInfo().lastModifier());
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", realOps, true);
+    }
+  }
+
+  /**
+   * A concurrent store write to the same table during its drop moves the row version. The external
+   * table is already gone, so the delete is retried instead of reporting a conflict that a retried
+   * drop could never resolve.
+   */
+  @Test
+  public void testDropTableRetriesDeleteAfterConcurrentUpdateOfTheSameTable() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRetry");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    tableOperationDispatcher.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0]);
+
+    reset(entityStore);
+    doThrow(new OptimisticLockException("concurrent update"))
+        .doCallRealMethod()
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .deleteIfIdMatches(eq(tableIdent), eq(TABLE), eq(false), anyLong());
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  @Test
+  public void testDropTableReportsExternalSuccessWhenFencedDeleteRetriesAreExhausted()
+      throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropRetryExhausted");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    tableOperationDispatcher.createTable(
+        tableIdent, new Column[0], "comment", props, new Transform[0]);
+    reset(entityStore);
+    doThrow(new OptimisticLockException("concurrent update"))
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .deleteIfIdMatches(eq(tableIdent), eq(TABLE), eq(false), anyLong());
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    verify(SupportsIdentityFencedDelete.require(entityStore), times(3))
+        .deleteIfIdMatches(eq(tableIdent), eq(TABLE), eq(false), anyLong());
+  }
+
+  @Test
+  public void testDropTableDeletesTheObservedRegistration() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaDropObserved");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  @Test
+  public void testAlterTableDoesNotUpdateARegistrationWithAnotherId() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schemaAlterMismatch");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "t");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    TableEntity registered = entityStore.get(tableIdent, TABLE, TableEntity.class);
+
+    // Replace the registration under the name with one that belongs to another incarnation.
+    TableEntity other =
+        TableEntity.builder()
+            .withId(registered.id() + 1)
+            .withName(registered.name())
+            .withNamespace(registered.namespace())
+            .withColumns(registered.columns())
+            .withAuditInfo(registered.auditInfo())
+            .build();
+    entityStore.delete(tableIdent, TABLE);
+    entityStore.put(other, false);
+
+    Table altered =
+        tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k2", "v2"));
+    Assertions.assertEquals("v2", altered.properties().get("k2"));
+
+    // The external alter went through, but the mismatched registration was left untouched.
+    TableEntity after = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(other.id(), after.id());
+    Assertions.assertEquals(
+        registered.auditInfo().lastModifier(), after.auditInfo().lastModifier());
+  }
+
+  @Test
   public void testConcurrentImportTableReusesExistingEntity() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema52");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -483,6 +899,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
     // thrown).
     reset(entityStore);
+    doThrow(new NoSuchEntityException("not observed"))
+        .doReturn(mismatchedTableEntity.id())
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedTableEntity)
@@ -873,12 +1293,79 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doThrow(new OptimisticLockException("mock conflict"))
         .when(entityStore)
         .delete(any(), any(), anyBoolean());
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
   }
 
   @Test
-  public void testPurgeTablePropagatesOptimisticLockConflict() throws IOException {
+  void testDropTableFailsBeforeExternalDropWhenStoreCannotReadIdentity() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_version");
+    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_version", "t");
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    createTable(tableIdent);
+
+    reset(entityStore);
+    doThrow(new UnsupportedOperationException("identity reads unsupported"))
+        .when(SupportsIdentityFencedDelete.require(entityStore))
+        .getEntityId(tableIdent, TABLE);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations operations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertDoesNotThrow(() -> operations.loadTable(tableIdent));
+          return null;
+        });
+  }
+
+  @Test
+  void testDropAndPurgeRejectStoresWithoutIdentityFenceBeforeExternalCall()
+      throws IOException, IllegalAccessException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_fence");
+    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema_drop_no_fence", "t");
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    createTable(tableIdent);
+    EntityStore legacyStore = mock(EntityStore.class);
+    doReturn(entityStore.get(tableIdent, TABLE, TableEntity.class))
+        .when(legacyStore)
+        .get(tableIdent, TABLE, TableEntity.class);
+    RelationalEntityStore relationalStore = new RelationalEntityStore();
+    RelationalBackend legacyBackend = mock(RelationalBackend.class);
+    FieldUtils.writeField(relationalStore, "backend", legacyBackend, true);
+
+    for (EntityStore unsupportedStore : List.of(legacyStore, relationalStore)) {
+      TableOperationDispatcher dispatcher =
+          new TableOperationDispatcher(
+              catalogManager,
+              unsupportedStore,
+              idGenerator,
+              () -> schemaOperationDispatcher,
+              secretManager);
+      Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> dispatcher.dropTable(tableIdent));
+      Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> dispatcher.purgeTable(tableIdent));
+      Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+      catalogManager.doWithCatalog(
+          NameIdentifier.of(metalake, catalog),
+          liveCatalog -> {
+            TestCatalogOperations operations = (TestCatalogOperations) liveCatalog.ops();
+            Assertions.assertDoesNotThrow(() -> operations.loadTable(tableIdent));
+            return null;
+          });
+    }
+    verify(legacyStore, never()).delete(any(), any(), anyBoolean());
+    verifyNoInteractions(legacyBackend);
+  }
+
+  @Test
+  public void testPurgeTableReportsExternalSuccessAfterOptimisticLockConflicts()
+      throws IOException {
     NameIdentifier tableIdent =
         NameIdentifier.of(metalake, catalog, "schema_purge_occ", "table_purge_occ");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -899,8 +1386,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .when(entityStore)
         .delete(any(), any(), anyBoolean());
 
-    Assertions.assertThrows(
-        OptimisticLockException.class, () -> tableOperationDispatcher.purgeTable(tableIdent));
+    Assertions.assertTrue(tableOperationDispatcher.purgeTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
   }
 
   @Test

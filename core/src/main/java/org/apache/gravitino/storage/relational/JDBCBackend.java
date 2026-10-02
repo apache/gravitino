@@ -70,6 +70,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -100,6 +101,7 @@ import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,7 +112,8 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
+public class JDBCBackend
+    implements RelationalBackend, SupportsOrphanedRelationCleanup, SupportsIdentityFencedDelete {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
@@ -387,8 +390,59 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
+    return deleteRecordingChange(ident, entityType, () -> deleteEntity(ident, entityType, cascade));
+  }
+
+  @Override
+  public long getEntityId(NameIdentifier ident, Entity.EntityType entityType) {
+    switch (entityType) {
+      case SCHEMA:
+        return SchemaMetaService.getInstance().getSchemaId(ident);
+      case TABLE:
+        return TableMetaService.getInstance().getTableId(ident);
+      case TOPIC:
+        return TopicMetaService.getInstance().getTopicId(ident);
+      case VIEW:
+        return ViewMetaService.getInstance().getViewId(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for identity read", entityType);
+    }
+  }
+
+  @Override
+  public boolean deleteIfIdMatches(
+      NameIdentifier ident, Entity.EntityType entityType, boolean cascade, long expectedId)
+      throws IOException {
+    return deleteRecordingChange(
+        ident,
+        entityType,
+        () -> {
+          switch (entityType) {
+            case SCHEMA:
+              return SchemaMetaService.getInstance().deleteSchema(ident, cascade, expectedId);
+            case TABLE:
+              return TableMetaService.getInstance().deleteTable(ident, expectedId);
+            case TOPIC:
+              return TopicMetaService.getInstance().deleteTopic(ident, expectedId);
+            case VIEW:
+              return ViewMetaService.getInstance().deleteView(ident, expectedId);
+            default:
+              throw new UnsupportedEntityTypeException(
+                  "Unsupported entity type: %s for identity-fenced delete", entityType);
+          }
+        });
+  }
+
+  /**
+   * Runs a delete and, when the entity type is replicated to other nodes, records the drop in the
+   * entity change log inside the same transaction.
+   */
+  private boolean deleteRecordingChange(
+      NameIdentifier ident, Entity.EntityType entityType, Executable<Boolean, IOException> delete)
+      throws IOException {
     if (!shouldRecordEntityDrop(entityType)) {
-      return deleteEntity(ident, entityType, cascade);
+      return delete.execute();
     }
 
     boolean transactionOwner = !SessionUtils.isInTransaction();
@@ -397,7 +451,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     }
     boolean committed = false;
     try {
-      boolean deleted = deleteEntity(ident, entityType, cascade);
+      boolean deleted = delete.execute();
       if (deleted) {
         insertEntityChange(ident, entityType, OperateType.DROP);
       }

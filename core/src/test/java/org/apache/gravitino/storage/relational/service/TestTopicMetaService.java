@@ -91,6 +91,29 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteWithObservedIdentityOnlyRemovesThatIncarnation() throws IOException {
+    Namespace topicNs = NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName);
+    TopicMetaService service = TopicMetaService.getInstance();
+
+    TopicEntity first =
+        createTopicEntity(RandomIdGenerator.INSTANCE.nextId(), topicNs, "t", AUDIT_INFO);
+    backend.insert(first, false);
+    Long observed = service.getTopicId(first.nameIdentifier());
+
+    Assertions.assertTrue(backend.delete(first.nameIdentifier(), Entity.EntityType.TOPIC, false));
+    TopicEntity second =
+        createTopicEntity(RandomIdGenerator.INSTANCE.nextId(), topicNs, "t", AUDIT_INFO);
+    backend.insert(second, false);
+
+    assertThrows(
+        OptimisticLockException.class, () -> service.deleteTopic(first.nameIdentifier(), observed));
+    Assertions.assertEquals(
+        second.id(), service.getTopicByIdentifier(second.nameIdentifier()).id());
+    Assertions.assertTrue(
+        service.deleteTopic(second.nameIdentifier(), service.getTopicId(second.nameIdentifier())));
+  }
+
+  @TestTemplate
   public void testInsertWaitsForConcurrentSchemaDelete() throws Exception {
     SchemaPO observedSchemaPO =
         SessionUtils.getWithoutCommit(

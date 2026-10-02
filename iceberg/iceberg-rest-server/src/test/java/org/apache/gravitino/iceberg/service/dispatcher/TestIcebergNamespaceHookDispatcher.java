@@ -27,6 +27,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -50,6 +51,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
@@ -96,7 +98,7 @@ public class TestIcebergNamespaceHookDispatcher {
   private LockManager previousLockManager;
 
   @BeforeEach
-  public void setUp() throws IllegalAccessException {
+  public void setUp() throws IllegalAccessException, IOException {
     mockDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockInternalOwnerDispatcher = mock(OwnerDispatcher.class);
@@ -147,7 +149,11 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalViewDispatcher", mockInternalViewDispatcher, true);
 
-    mockEntityStore = mock(EntityStore.class);
+    mockEntityStore =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    when(SupportsIdentityFencedDelete.require(mockEntityStore)
+            .getEntityId(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA)))
+        .thenReturn(1L);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
 
     mockLockManager = mock(LockManager.class);
@@ -514,8 +520,8 @@ public class TestIcebergNamespaceHookDispatcher {
     // The leaf and both phantom ancestors are stale, so a single cascade delete of the outermost
     // empty ancestor (A) removes the whole stale chain in one batched operation.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+    verify(SupportsIdentityFencedDelete.require(mockEntityStore), times(1))
+        .deleteIfIdMatches(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true), eq(1L));
     Assertions.assertEquals("A", captor.getValue().name());
   }
 
@@ -537,8 +543,8 @@ public class TestIcebergNamespaceHookDispatcher {
 
     // The parent still exists, so only the leaf is stale; it is cascade-deleted on its own.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+    verify(SupportsIdentityFencedDelete.require(mockEntityStore), times(1))
+        .deleteIfIdMatches(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true), eq(1L));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
   }
 }

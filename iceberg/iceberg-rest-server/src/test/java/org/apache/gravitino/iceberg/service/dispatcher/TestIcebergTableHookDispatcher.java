@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -48,6 +49,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
@@ -90,13 +92,17 @@ public class TestIcebergTableHookDispatcher {
   private OwnerDispatcher previousInternalOwnerDispatcher;
 
   @BeforeEach
-  public void setUp() throws IllegalAccessException {
+  public void setUp() throws IllegalAccessException, IOException {
     // Mock the underlying dispatcher
     mockDispatcher = mock(IcebergTableOperationDispatcher.class);
     mockNamespaceDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
 
     // Mock GravitinoEnv components
-    mockEntityStore = mock(EntityStore.class);
+    mockEntityStore =
+        mock(EntityStore.class, withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
+    when(SupportsIdentityFencedDelete.require(mockEntityStore)
+            .getEntityId(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA)))
+        .thenReturn(1L);
     mockTableDispatcher = mock(TableDispatcher.class);
     mockInternalTableDispatcher = mock(TableDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
@@ -258,7 +264,8 @@ public class TestIcebergTableHookDispatcher {
     hookDispatcher.dropTable(mockContext, tableId, false);
 
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
-    verify(mockEntityStore).delete(schemaIdent, Entity.EntityType.SCHEMA, true);
+    verify(SupportsIdentityFencedDelete.require(mockEntityStore))
+        .deleteIfIdMatches(schemaIdent, Entity.EntityType.SCHEMA, true, 1L);
   }
 
   @Test

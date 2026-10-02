@@ -37,6 +37,7 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.storage.SupportsIdentityFencedDelete;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.TestUtil;
@@ -63,7 +64,10 @@ public class TestRelationalEntityStoreBatchGetLateFill {
   @BeforeEach
   void setUp() throws IllegalAccessException {
     store = new RelationalEntityStore();
-    backend = Mockito.mock(RelationalBackend.class);
+    backend =
+        Mockito.mock(
+            RelationalBackend.class,
+            Mockito.withSettings().extraInterfaces(SupportsIdentityFencedDelete.class));
     cache = Mockito.spy(new CaffeineEntityCache(new Config() {}));
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", cache, true);
@@ -77,6 +81,21 @@ public class TestRelationalEntityStoreBatchGetLateFill {
         EntityChangeLogNameIdentifierCodec.encode(ident),
         OperateType.DROP,
         0L);
+  }
+
+  @Test
+  void testIdentityObservationBypassesStaleEntityCache() throws IOException {
+    TableEntity cached = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
+    cache.put(cached);
+    Mockito.when(
+            ((SupportsIdentityFencedDelete) backend)
+                .getEntityId(cached.nameIdentifier(), Entity.EntityType.TABLE))
+        .thenReturn(2L);
+
+    Assertions.assertEquals(
+        2L, store.getEntityId(cached.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertEquals(
+        cached, cache.getIfPresent(cached.nameIdentifier(), Entity.EntityType.TABLE).orElseThrow());
   }
 
   @Test
@@ -126,6 +145,26 @@ public class TestRelationalEntityStoreBatchGetLateFill {
     store.batchGet(List.of(ident), Entity.EntityType.TABLE, TableEntity.class);
 
     Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testBatchGetSkipsWriteBackWhenIdentityFencedDeleteInvalidatesDuringBackendRead()
+      throws IOException {
+    TableEntity table = TestUtil.getTestTableEntity(1L, "t1", SCHEMA_NS);
+    NameIdentifier ident = table.nameIdentifier();
+    Long expected = table.id();
+    Mockito.when(backend.batchGet(any(), eq(Entity.EntityType.TABLE)))
+        .thenAnswer(
+            invocation -> {
+              store.deleteIfIdMatches(ident, Entity.EntityType.TABLE, false, expected);
+              return List.of(table);
+            });
+
+    store.batchGet(List.of(ident), Entity.EntityType.TABLE, TableEntity.class);
+
+    Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
+    Mockito.verify((SupportsIdentityFencedDelete) backend)
+        .deleteIfIdMatches(ident, Entity.EntityType.TABLE, false, expected);
   }
 
   @Test

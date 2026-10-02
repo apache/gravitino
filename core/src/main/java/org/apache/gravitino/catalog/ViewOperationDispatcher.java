@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -237,8 +238,11 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
-          Optional<ViewEntity> viewEntityBeforeRename =
-              isRenameView && !isManagedView ? getViewEntityBeforeRename(ident) : Optional.empty();
+          // Read the registration before the external call. Its id is the one the store update
+          // below must still find; reading it after the call could pick up a view re-created
+          // under the same name in between.
+          Optional<ViewEntity> viewEntityBeforeAlter =
+              isManagedView ? Optional.empty() : getViewEntityBeforeAlter(ident);
           View alteredView =
               doWithCatalog(
                   catalogIdent,
@@ -259,19 +263,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
           StringIdentifier stringId = getStringIdFromProperties(alteredView.properties());
           // Case 1: The view is not created by Gravitino and this view is never imported.
-          ViewEntity existing = viewEntityBeforeRename.orElse(null);
-          if (stringId == null) {
-            if (existing == null) {
-              existing = getEntity(ident, VIEW, ViewEntity.class);
-            }
-            if (existing == null) {
-              return EntityCombinedView.of(alteredView)
-                  .withHiddenProperties(
-                      getMaskAndOmitKeys(
-                          catalogIdent,
-                          HasPropertyMetadata::tablePropertiesMetadata,
-                          alteredView.properties()));
-            }
+          ViewEntity existing = viewEntityBeforeAlter.orElse(null);
+          if (stringId == null && existing == null) {
+            return EntityCombinedView.of(alteredView)
+                .withHiddenProperties(
+                    getMaskAndOmitKeys(
+                        catalogIdent,
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredView.properties()));
           }
 
           long viewId = stringId != null ? stringId.id() : existing.id();
@@ -283,7 +282,10 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                           id,
                           ViewEntity.class,
                           VIEW,
-                          viewEntity -> applyChangesToEntity(viewEntity, alteredView, changes)),
+                          requireEntityId(
+                              viewId,
+                              viewEntity ->
+                                  applyChangesToEntity(viewEntity, alteredView, changes))),
                   "UPDATE",
                   viewId);
 
@@ -322,13 +324,16 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+          // Read the registration before the external call, so the store delete below can only
+          // remove the row this drop started with and never one re-created under the same name.
+          Long observed = isManagedView ? null : observeRegistration(ident, VIEW);
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
                   c -> c.doWithViewOps(v -> v.dropView(ident)),
                   RuntimeException.class);
 
-          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
           if (isManagedView) {
             return droppedFromCatalog;
           }
@@ -338,13 +343,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
           // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
           // registration that requires separate cleanup.
           if (droppedFromCatalog) {
-            try {
-              store.delete(ident, VIEW);
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
+            deleteObservedRegistration(ident, VIEW, false, observed);
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -381,6 +380,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, properties);
 
+    boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+    Long observed = isManagedView ? null : observeRegistration(ident, VIEW);
     View catalogView =
         doWithCatalog(
             catalogIdent,
@@ -399,7 +400,6 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             ViewAlreadyExistsException.class);
 
     // If the view is managed by Gravitino, we don't need to create ViewEntity and store it again.
-    boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
     if (isManagedView) {
       return EntityCombinedView.of(catalogView)
           .withHiddenProperties(
@@ -430,7 +430,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .build();
 
     try {
-      store.put(viewEntity, true /* overwrite */);
+      putCreatedEntity(viewEntity, false /* cascade */, observed);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedView.of(catalogView)
@@ -450,14 +450,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                 catalogView.properties()));
   }
 
-  private Optional<ViewEntity> getViewEntityBeforeRename(NameIdentifier ident) {
+  private Optional<ViewEntity> getViewEntityBeforeAlter(NameIdentifier ident) {
     try {
       return Optional.of(store.get(ident, VIEW, ViewEntity.class));
     } catch (NoSuchEntityException e) {
       return Optional.empty();
     } catch (Exception e) {
       throw new GravitinoRuntimeException(
-          e, "Failed to read the stored registration for view %s before renaming it", ident);
+          e, "Failed to read the stored registration for view %s before altering it", ident);
     }
   }
 
@@ -526,6 +526,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   }
 
   private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+    Long observed = observeRegistration(ident, VIEW);
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {
@@ -575,8 +576,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(viewEntity, true /* overwrite */);
-    } catch (EntityAlreadyExistsException e) {
+      putCreatedEntity(viewEntity, false, observed);
+    } catch (EntityAlreadyExistsException | OptimisticLockException e) {
       LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
       throw new UnsupportedOperationException(
           "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
