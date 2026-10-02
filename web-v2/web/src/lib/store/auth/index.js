@@ -78,7 +78,7 @@ export const refreshToken = createAsyncThunk('auth/refreshToken', async (data, {
     throw new Error(err)
   }
 
-  const { access_token, expires_in } = res.data
+  const { access_token, expires_in } = res // `expires_in ` is in seconds, default is 499
 
   return { token: access_token, expiredIn: expires_in }
 })
