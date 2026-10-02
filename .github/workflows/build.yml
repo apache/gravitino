@@ -93,7 +93,11 @@ jobs:
           fi
 
           echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
+      - name: List build shards
+        id: shards
+        run: echo "build_shards=$(dev/ci/test-shards.sh build --list)" >> "${GITHUB_OUTPUT}"
     outputs:
+      build_shards: ${{ steps.shards.outputs.build_shards }}
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
@@ -147,17 +151,18 @@ jobs:
             spark-connector/**/*.log
 
   build:
-    # The type of runner that the job will run on
+    name: build (${{ matrix.java-version }}, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         java-version: [ 17 ]
-    timeout-minutes: 120
+        # Shards are defined in dev/ci/test-shards.sh.
+        shard: ${{ fromJSON(needs.changes.outputs.build_shards) }}
+    timeout-minutes: 90
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-java-toolchains
@@ -165,6 +170,7 @@ jobs:
           java-version: ${{ matrix.java-version }}
 
       - name: Test publish to local
+        if: matrix.shard == 'others'
         run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
 
       - name: Free up disk space
@@ -179,6 +185,10 @@ jobs:
       - name: Build with Gradle
         run: |
           if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
+            if [ "${{ matrix.shard }}" != "others" ]; then
+              echo "Only maintenance modules changed; they are built by the 'others' shard."
+              exit 0
+            fi
             ./gradlew \
               :maintenance:optimizer-api:build \
               :maintenance:updaters:build \
@@ -190,8 +200,11 @@ jobs:
             exit 0
           fi
 
+          shard_args_text="$(dev/ci/test-shards.sh build "${{ matrix.shard }}")"
+          mapfile -t shard_args <<< "${shard_args_text}"
+
           gradle_args=(
-            build
+            "${shard_args[@]}"
             --max-workers=2
             -PskipWeb=true
             -PskipITs
@@ -217,13 +230,50 @@ jobs:
 
           ./gradlew "${gradle_args[@]}"
 
-      - name: Fetch base branch for coverage diff
+      - name: Upload coverage data
         if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-${{ matrix.shard }}
+          # build.gradle.kts anchors the artifact at the repository root, so the report paths keep
+          # their module prefix, which jacoco_report.py uses to name modules.
+          path: |
+            build.gradle.kts
+            **/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload unit tests report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: unit test report ${{ matrix.shard }}
+          path: |
+            build/reports
+            catalogs-contrib/**/*.log
+            catalogs-contrib/**/*.tar
+            catalogs/**/*.log
+            catalogs/**/*.tar
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build
+    if: github.event_name == 'pull_request' && needs.build.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch base branch for coverage diff
         run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Download coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jacoco-*
+          merge-multiple: true
 
       - name: Generate Coverage Report
         id: coverage
-        if: github.event_name == 'pull_request'
         run: |
           python3 dev/ci/jacoco_report.py \
             --base-ref "${{ github.base_ref }}" \
@@ -234,11 +284,11 @@ jobs:
             --output coverage-report.md
 
       - name: Save PR number
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        if: steps.coverage.outputs.has_reports == 'true'
         run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
 
       - name: Upload Coverage Report
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        if: steps.coverage.outputs.has_reports == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
@@ -247,19 +297,7 @@ jobs:
             pr-number.txt
 
       - name: Output Coverage Info
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        if: steps.coverage.outputs.has_reports == 'true'
         run: |
           echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
-
-      - name: Upload unit tests report
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: unit test report
-          path: |
-            build/reports
-            catalogs-contrib/**/*.log
-            catalogs-contrib/**/*.tar
-            catalogs/**/*.log
-            catalogs/**/*.tar
