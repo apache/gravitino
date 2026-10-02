@@ -286,6 +286,20 @@ const transform = {
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
     if (response?.status === 401 && !originConfig?._retry && response?.config?.url !== githubApis.GET) {
+      // If the 401 comes from the /configs endpoint, the server requires basic auth
+      // and we haven't set authType yet. Persist authType='basic' so the login page
+      // renders the BasicLogin component instead of an indefinite spinner.
+      if (originConfig?.url?.includes('/configs')) {
+        localStorage.setItem('authType', 'basic')
+
+        // If we are already on the login page, don't redirect again to avoid an
+        // infinite redirect loop. The Redux store will pick up authType from
+        // localStorage and the login page will render the BasicLogin component.
+        if (window.location.pathname.includes('/login')) {
+          return Promise.reject(error)
+        }
+      }
+
       // Clear OAuth + BasicAuth tokens
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
