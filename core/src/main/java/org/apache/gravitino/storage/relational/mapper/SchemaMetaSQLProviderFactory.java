@@ -116,6 +116,20 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().selectSchemaMetaByIdForUpdate(schemaId);
   }
 
+  /** Returns SQL that locks a schema row by ID, including a soft-deleted row. */
+  public static String selectSchemaMetaByIdIncludingDeletedForUpdate(
+      @Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdIncludingDeletedForUpdate(schemaId);
+  }
+
+  /** Returns SQL that restores the observed soft-deleted schema row. */
+  public static String restoreDeletedSchemaMeta(
+      @Param("schemaMeta") SchemaPO schemaPO,
+      @Param("oldVersion") Long oldVersion,
+      @Param("oldDeletedAt") Long oldDeletedAt) {
+    return getProvider().restoreDeletedSchemaMeta(schemaPO, oldVersion, oldDeletedAt);
+  }
+
   /** Returns SQL that selects and share-locks an active schema by ID. */
   public static String selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId) {
     return getProvider().selectSchemaMetaByIdForShare(schemaId);
