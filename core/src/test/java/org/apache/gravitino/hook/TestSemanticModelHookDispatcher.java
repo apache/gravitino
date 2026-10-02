@@ -19,6 +19,7 @@
 package org.apache.gravitino.hook;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +33,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -46,6 +48,7 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestSemanticModelHookDispatcher {
@@ -203,6 +206,7 @@ public class TestSemanticModelHookDispatcher {
     SemanticModelDispatcher dispatcher = Mockito.mock(SemanticModelDispatcher.class);
     SemanticModel loaded = Mockito.mock(SemanticModel.class);
     SemanticModel altered = Mockito.mock(SemanticModel.class);
+    Mockito.when(altered.name()).thenReturn("renamed_model");
     NameIdentifier[] listed = new NameIdentifier[] {IDENT};
     SemanticModelChange change = SemanticModelChange.rename("renamed_model");
 
@@ -228,6 +232,26 @@ public class TestSemanticModelHookDispatcher {
       Mockito.verifyNoInteractions(ownerDispatcher);
     } finally {
       FieldUtils.writeField(env, "ownerDispatcher", originalOwnerDispatcher, true);
+    }
+  }
+
+  @Test
+  public void testFailedMutationsAndNonRenameChangesDoNotInvalidateCache() {
+    SemanticModelDispatcher dispatcher = Mockito.mock(SemanticModelDispatcher.class);
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+    SemanticModelChange rename = SemanticModelChange.rename("renamed");
+    Mockito.when(dispatcher.alterSemanticModel(IDENT, rename))
+        .thenThrow(new IllegalArgumentException("rejected"));
+    try (MockedStatic<GravitinoEnv> mocked = Mockito.mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher, () -> null);
+      assertThrows(IllegalArgumentException.class, () -> hook.alterSemanticModel(IDENT, rename));
+      hook.alterSemanticModel(IDENT, SemanticModelChange.setProperty("key", "value"));
+      Mockito.when(dispatcher.dropSemanticModel(IDENT)).thenReturn(false);
+      assertFalse(hook.dropSemanticModel(IDENT));
+      Mockito.verifyNoInteractions(authorizer);
     }
   }
 

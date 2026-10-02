@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.requests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -91,13 +92,22 @@ public class TestSemanticModelCreateRequest {
             () -> new SemanticModelCreateRequest("sales_model", null, null, Map.of()).validate());
     assertEquals(
         "\"definition\" field is required and cannot be null", missingDefinition.getMessage());
+  }
 
-    IllegalArgumentException missingProperties =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> new SemanticModelCreateRequest("sales_model", null, definition, null).validate());
-    assertEquals(
-        "\"properties\" field is required and cannot be null", missingProperties.getMessage());
+  @Test
+  public void testOmittedPropertiesAreAccepted() throws JsonProcessingException {
+    String json =
+        "{"
+            + "\"name\":\"sales_model\","
+            + "\"definition\":{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\",\"mart\"],\"name\":\"orders\"}}]}"
+            + "}";
+
+    SemanticModelCreateRequest request =
+        JsonUtils.objectMapper().readValue(json, SemanticModelCreateRequest.class);
+    request.validate();
+
+    assertNull(request.getProperties());
   }
 
   @Test

@@ -186,7 +186,6 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
-              ( entityType == 'MODEL_VERSION' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s)) ||
               ( entityType == 'SEMANTIC_MODEL' && (%s))
               """
@@ -205,7 +204,6 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
-                LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                 LOAD_FUNCTION_AUTHORIZATION_EXPRESSION,
                 LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION));
   }
@@ -299,10 +297,16 @@ public class AuthorizationExpressionConverter {
                 + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_USE_SECRET",
-            "((ANY(USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL,"
-                + " MODEL_VERSION)) && !(ANY(DENY_USE_SECRET, METALAKE, CATALOG, SCHEMA, TABLE,"
-                + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))");
+            "ANY_USE_SECRETS",
+            "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL))"
+                + " && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL)))");
+    expression =
+        expression.replaceAll(
+            "ANY_INCLUDE_CREDENTIAL_SECRETS",
+            "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG,"
+                + " SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_LINK_MODEL_VERSION",

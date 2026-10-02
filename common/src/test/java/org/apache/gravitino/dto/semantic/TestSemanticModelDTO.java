@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.semantic;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -149,16 +150,15 @@ public class TestSemanticModelDTO {
 
     SemanticModelDefinitionDTO invalidDefinition =
         SemanticModelDefinitionDTO.builder().withDatasets(new DatasetDTO[] {null}).build();
-    IllegalArgumentException nullDataset =
-        assertThrows(
-            IllegalArgumentException.class,
+    SemanticModelDTO dto =
+        assertDoesNotThrow(
             () ->
                 SemanticModelDTO.builder()
                     .withName("sales_model")
                     .withDefinition(invalidDefinition)
                     .withAudit(audit())
                     .build());
-    assertEquals("datasets[0] must not be null", nullDataset.getMessage());
+    assertTrue(dto.hasDefinition());
   }
 
   private static SemanticModelDefinitionDTO definitionDTO(String datasetName) {

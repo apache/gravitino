@@ -43,7 +43,7 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(S3Properties.GRAVITINO_S3_REGION));
     assertTrue(metadata.containsKey(S3Properties.GRAVITINO_S3_ROLE_ARN));
     assertFalse(metadata.get(S3Properties.GRAVITINO_S3_ENDPOINT).isHidden());
-    assertFalse(metadata.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID).isHidden());
+    assertTrue(metadata.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID).isHidden());
     assertTrue(metadata.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY).isHidden());
   }
 
@@ -53,6 +53,8 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(OSSProperties.GRAVITINO_OSS_ENDPOINT));
     assertTrue(metadata.containsKey(OSSProperties.GRAVITINO_OSS_ROLE_ARN));
     assertFalse(metadata.get(OSSProperties.GRAVITINO_OSS_REGION).isHidden());
+    assertTrue(metadata.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID).isHidden());
+    assertTrue(metadata.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET).isHidden());
   }
 
   @Test
@@ -72,7 +74,7 @@ public class TestCloudPropertiesMetadata {
     assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_ROLE_ARN));
     assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_EXTERNAL_ID));
     assertTrue(metadata.containsKey(COSProperties.GRAVITINO_COS_APP_ID));
-    assertFalse(metadata.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID).isHidden());
+    assertTrue(metadata.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID).isHidden());
     assertTrue(metadata.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET).isHidden());
   }
 
@@ -114,7 +116,7 @@ public class TestCloudPropertiesMetadata {
     var metadata = AWSPropertiesMetadata.PROPERTY_ENTRIES;
     assertTrue(metadata.containsKey(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID));
     assertTrue(metadata.containsKey(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY));
-    assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isHidden());
+    assertTrue(metadata.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isHidden());
     assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID).isRequired());
     assertTrue(metadata.get(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY).isHidden());
     assertFalse(metadata.get(AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY).isRequired());

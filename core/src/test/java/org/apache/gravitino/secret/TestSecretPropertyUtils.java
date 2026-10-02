@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -209,51 +210,47 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testBuildSecretsExcludesDeclaredNonHiddenSensitiveKeys() {
+  void testBuildSecretsRecoversDeclaredHiddenWithoutKeywordGate() {
+    Config config = new Config(false) {};
+    // Drop "access" / "password" / "secret" so keyword fuzzy recovery cannot rescue these keys.
+    config.set(Configs.SENSITIVE_KEY_KEYWORDS, List.of("token"));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
     try (SecretManager sm = memorySecretManager()) {
       PropertiesMetadata metadata =
           new PropertiesMetadata() {
             @Override
             public Map<String, PropertyEntry<?>> propertyEntries() {
               return ImmutableMap.of(
-                  "credential-providers",
-                  PropertyEntry.stringOptionalPropertyEntry(
-                      "credential-providers", "providers", false, null, false),
-                  "azure-storage-account-name",
-                  PropertyEntry.stringOptionalPropertyEntry(
-                      "azure-storage-account-name", "account", false, null, false),
                   "s3-access-key-id",
                   PropertyEntry.stringOptionalPropertyEntry(
-                      "s3-access-key-id", "ak", false, null, false),
-                  "jdbc-password",
+                      "s3-access-key-id", "ak", false, null, true),
+                  "auth-file",
+                  PropertyEntry.stringOptionalPropertyEntry("auth-file", "path", false, null, true),
+                  "credential-providers",
                   PropertyEntry.stringOptionalPropertyEntry(
-                      "jdbc-password", "password", false, null, true),
-                  "s3-secret-access-key",
-                  PropertyEntry.stringOptionalPropertyEntry(
-                      "s3-secret-access-key", "sk", false, null, true));
+                      "credential-providers", "providers", false, null, false));
             }
           };
       Map<String, String> entityProps =
           Map.of(
-              "credential-providers",
-              "s3-token",
-              "azure-storage-account-name",
-              "abs-account",
               "s3-access-key-id",
               "AKIA",
-              "jdbc-password",
-              "inline-secret",
-              "s3-secret-access-key",
-              "super-secret",
+              "auth-file",
+              "/path/to/key",
+              "credential-providers",
+              "s3-token",
               "custom-token",
-              "tok");
+              "tok",
+              "undeclared-access-key",
+              "should-not-recover");
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
-      Assertions.assertFalse(secrets.containsKey("credential-providers"));
-      Assertions.assertFalse(secrets.containsKey("azure-storage-account-name"));
-      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
-      Assertions.assertEquals("inline-secret", secrets.get("jdbc-password"));
-      Assertions.assertEquals("super-secret", secrets.get("s3-secret-access-key"));
+      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
+      Assertions.assertEquals("/path/to/key", secrets.get("auth-file"));
       Assertions.assertEquals("tok", secrets.get("custom-token"));
+      Assertions.assertFalse(secrets.containsKey("credential-providers"));
+      Assertions.assertFalse(
+          secrets.containsKey("undeclared-access-key"),
+          "undeclared keys still require a sensitive keyword match");
     }
   }
 

@@ -40,12 +40,14 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.DlfSecretKeyCredential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -72,7 +74,9 @@ import org.junit.jupiter.api.Test;
  *   <li>{@code paimonCatalog.getTable()} is never called when Gravitino auth fails.
  * </ol>
  */
-public class TestGravitinoPaimonCatalog {
+public abstract class TestGravitinoPaimonCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
 
   private AbstractCatalog mockPaimonCatalog;
 
@@ -86,18 +90,25 @@ public class TestGravitinoPaimonCatalog {
    */
   private static class TestableBaseCatalog extends BaseCatalog {
 
+    private final CatalogCompat catalogCompat;
     private final AbstractCatalog realCatalog = mock(AbstractCatalog.class);
     private final Catalog gravitinoCatalog = mock(Catalog.class);
     private CatalogBaseTable toFlinkTableResult;
     private CatalogException toFlinkTableException;
 
-    TestableBaseCatalog() {
+    TestableBaseCatalog(CatalogCompat catalogCompat) {
       super(
           "test-catalog",
           Collections.emptyMap(),
           "default",
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
+      this.catalogCompat = catalogCompat;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return catalogCompat;
     }
 
     @Override
@@ -137,12 +148,14 @@ public class TestGravitinoPaimonCatalog {
 
     private final AbstractCatalog injectedPaimon;
     private final Catalog injectedCatalog;
+    private final CatalogCompat catalogCompat;
 
-    TestablePaimonCatalog(AbstractCatalog injectedPaimon) {
-      this(injectedPaimon, null);
+    TestablePaimonCatalog(CatalogCompat catalogCompat, AbstractCatalog injectedPaimon) {
+      this(catalogCompat, injectedPaimon, null);
     }
 
-    TestablePaimonCatalog(AbstractCatalog injectedPaimon, Catalog injectedCatalog) {
+    TestablePaimonCatalog(
+        CatalogCompat catalogCompat, AbstractCatalog injectedPaimon, Catalog injectedCatalog) {
       // We cannot call super(context, ...) without a real FlinkCatalogFactory, so we use a
       // package-private constructor shim that skips the factory call.  Because we override
       // realCatalog() the parent constructor's catalog reference is never used.
@@ -151,8 +164,14 @@ public class TestGravitinoPaimonCatalog {
           "default",
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
+      this.catalogCompat = catalogCompat;
       this.injectedPaimon = injectedPaimon;
       this.injectedCatalog = injectedCatalog;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return catalogCompat;
     }
 
     @Override
@@ -172,7 +191,7 @@ public class TestGravitinoPaimonCatalog {
     }
   }
 
-  private static class CapturingPaimonCatalog extends GravitinoPaimonCatalog {
+  private class CapturingPaimonCatalog extends GravitinoPaimonCatalog {
 
     private final AbstractCatalog innerCatalog = mock(AbstractCatalog.class);
     private final Catalog injectedCatalog;
@@ -186,6 +205,11 @@ public class TestGravitinoPaimonCatalog {
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
       this.injectedCatalog = injectedCatalog;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestGravitinoPaimonCatalog.this.catalogCompat();
     }
 
     @Override
@@ -217,7 +241,7 @@ public class TestGravitinoPaimonCatalog {
    */
   @Test
   public void testDefaultEnrichCatalogTableIsIdentity() {
-    TestableBaseCatalog base = new TestableBaseCatalog();
+    TestableBaseCatalog base = new TestableBaseCatalog(catalogCompat());
     CatalogTable input = mock(CatalogTable.class);
     ObjectPath path = new ObjectPath("db", "tbl");
 
@@ -250,7 +274,7 @@ public class TestGravitinoPaimonCatalog {
     when(mockPaimonCatalog.getTable(path)).thenReturn(paimonNativeTable);
 
     CatalogTable gravitinoBuiltTable = mock(CatalogTable.class);
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog);
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(catalogCompat(), mockPaimonCatalog);
     CatalogBaseTable result = cat.enrichCatalogTable(gravitinoBuiltTable, path);
 
     Assertions.assertSame(
@@ -278,7 +302,7 @@ public class TestGravitinoPaimonCatalog {
 
     CatalogTable gravitinoBuiltTable = mock(CatalogTable.class);
 
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog);
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(catalogCompat(), mockPaimonCatalog);
     CatalogException ex =
         Assertions.assertThrows(
             CatalogException.class, () -> cat.enrichCatalogTable(gravitinoBuiltTable, path));
@@ -315,7 +339,8 @@ public class TestGravitinoPaimonCatalog {
     when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
     when(mockTableCatalog.loadTable(any())).thenThrow(new RuntimeException("denied"));
 
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog, mockCatalog);
+    TestablePaimonCatalog cat =
+        new TestablePaimonCatalog(catalogCompat(), mockPaimonCatalog, mockCatalog);
 
     Assertions.assertThrows(RuntimeException.class, () -> cat.getTable(path));
     verify(mockPaimonCatalog, never()).getTable(any());
@@ -340,7 +365,7 @@ public class TestGravitinoPaimonCatalog {
     FlinkCatalog mockFlinkCatalog = mock(FlinkCatalog.class);
     when(mockFlinkCatalog.catalog()).thenReturn(mockInnerCatalog);
 
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog);
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(catalogCompat(), mockFlinkCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
     cat.invalidateNativeTableCache(path);
 
@@ -356,7 +381,7 @@ public class TestGravitinoPaimonCatalog {
   @Test
   public void testInvalidateNativeTableCacheIsNoOpForNonFlinkCatalog() {
     // mockPaimonCatalog is AbstractCatalog, not FlinkCatalog — must not throw
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog);
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(catalogCompat(), mockPaimonCatalog);
     Assertions.assertDoesNotThrow(
         () -> cat.invalidateNativeTableCache(new ObjectPath("db", "tbl")));
   }
@@ -366,7 +391,7 @@ public class TestGravitinoPaimonCatalog {
    */
   @Test
   public void testGetTablePreservesCatalogException() {
-    TestableBaseCatalog baseCatalog = new TestableBaseCatalog();
+    TestableBaseCatalog baseCatalog = new TestableBaseCatalog(catalogCompat());
     Catalog mockCatalog = baseCatalog.catalog();
     TableCatalog mockTableCatalog = mock(TableCatalog.class);
     when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
@@ -384,6 +409,7 @@ public class TestGravitinoPaimonCatalog {
 
   /** Verifies that successful Paimon alterTable invalidates the native cache. */
   @Test
+  @SuppressWarnings("deprecation")
   public void testAlterTableInvalidatesNativeCacheAfterSuccessfulAlter() throws Exception {
     org.apache.paimon.catalog.Catalog mockInnerCatalog =
         mock(org.apache.paimon.catalog.Catalog.class);
@@ -407,16 +433,21 @@ public class TestGravitinoPaimonCatalog {
     when(existingTable.comment()).thenReturn("existing comment");
     when(mockTableCatalog.loadTable(any())).thenReturn(existingTable);
 
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
+    TestablePaimonCatalog cat =
+        new TestablePaimonCatalog(catalogCompat(), mockFlinkCatalog, mockCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
     org.apache.flink.table.api.Schema schema =
         org.apache.flink.table.api.Schema.newBuilder().column("id", DataTypes.INT()).build();
     // The existing table carries an old comment so the alter produces a real TableChange
     // (comment update) rather than a no-op.
     CatalogTable existingFlinkTable =
-        CatalogTable.of(schema, "old comment", Collections.emptyList(), Collections.emptyMap());
+        catalogCompat()
+            .createCatalogTable(
+                schema, "old comment", Collections.emptyList(), Collections.emptyMap());
     CatalogTable newTable =
-        CatalogTable.of(schema, "new comment", Collections.emptyList(), Collections.emptyMap());
+        catalogCompat()
+            .createCatalogTable(
+                schema, "new comment", Collections.emptyList(), Collections.emptyMap());
     when(mockFlinkCatalog.getTable(path)).thenReturn(existingFlinkTable);
 
     cat.alterTable(path, newTable, false);
@@ -430,6 +461,7 @@ public class TestGravitinoPaimonCatalog {
    * the alter to Gravitino nor invalidates the native cache.
    */
   @Test
+  @SuppressWarnings("deprecation")
   public void testAlterTableNoOpDoesNotInvalidateNativeCache() throws Exception {
     org.apache.paimon.catalog.Catalog mockInnerCatalog =
         mock(org.apache.paimon.catalog.Catalog.class);
@@ -453,14 +485,17 @@ public class TestGravitinoPaimonCatalog {
     when(existingTable.comment()).thenReturn("same comment");
     when(mockTableCatalog.loadTable(any())).thenReturn(existingTable);
 
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
+    TestablePaimonCatalog cat =
+        new TestablePaimonCatalog(catalogCompat(), mockFlinkCatalog, mockCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
     org.apache.flink.table.api.Schema schema =
         org.apache.flink.table.api.Schema.newBuilder().column("id", DataTypes.INT()).build();
     // The existing table and the alter target share the same comment, so no TableChange is
     // produced and the alter must be skipped.
     CatalogTable sameTable =
-        CatalogTable.of(schema, "same comment", Collections.emptyList(), Collections.emptyMap());
+        catalogCompat()
+            .createCatalogTable(
+                schema, "same comment", Collections.emptyList(), Collections.emptyMap());
     when(mockFlinkCatalog.getTable(path)).thenReturn(sameTable);
 
     cat.alterTable(path, sameTable, false);
@@ -483,7 +518,8 @@ public class TestGravitinoPaimonCatalog {
     when(mockTableCatalog.purgeTable(any())).thenReturn(true);
     when(mockCatalog.asViewCatalog()).thenThrow(new UnsupportedOperationException("no views"));
 
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
+    TestablePaimonCatalog cat =
+        new TestablePaimonCatalog(catalogCompat(), mockFlinkCatalog, mockCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
     cat.dropTable(path, false);
 
@@ -591,6 +627,25 @@ public class TestGravitinoPaimonCatalog {
         "jdbc-user", catalog.capturedOptions.get(PaimonConstants.PAIMON_JDBC_USER));
     Assertions.assertEquals(
         "jdbc-password", catalog.capturedOptions.get(PaimonConstants.PAIMON_JDBC_PASSWORD));
+  }
+
+  /** Verifies that DLF backend credentials remain Paimon catalog options. */
+  @Test
+  public void testOpenKeepsDlfCredentialsInPaimonOptions() {
+    Catalog mockCatalog =
+        catalogWithCredentials(new DlfSecretKeyCredential("dlf-ak", "dlf-sk", "dlf-token"));
+    Map<String, String> options = new HashMap<>();
+    options.put("warehouse", "file:/tmp/test-paimon-warehouse");
+
+    CapturingPaimonCatalog catalog = new CapturingPaimonCatalog(options, mockCatalog);
+    catalog.open();
+
+    Assertions.assertEquals(
+        "dlf-ak", catalog.capturedOptions.get(PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "dlf-sk", catalog.capturedOptions.get(PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET));
+    Assertions.assertEquals(
+        "dlf-token", catalog.capturedOptions.get(PaimonConstants.PAIMON_DLF_SECURITY_TOKEN));
   }
 
   private static Catalog catalogWithCredentials(Credential... credentials) {

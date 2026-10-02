@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.responses;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,11 +86,17 @@ public class TestSemanticModelResponse {
         "semanticModel 'name' must not be null or empty",
         assertThrows(IllegalArgumentException.class, missingName::validate).getMessage());
     assertEquals(
-        "definition must not be null",
+        "semanticModel 'definition' must not be null",
         assertThrows(IllegalArgumentException.class, missingDefinition::validate).getMessage());
     assertEquals(
         "semanticModel 'audit' must not be null",
         assertThrows(IllegalArgumentException.class, missingAudit::validate).getMessage());
+
+    SemanticModelResponse invalidNestedDefinition =
+        readResponse(
+            "{\"code\":0,\"semanticModel\":{\"name\":\"sales_model\","
+                + "\"definition\":{\"datasets\":[null]},\"audit\":{}}}");
+    assertDoesNotThrow(invalidNestedDefinition::validate);
   }
 
   private static SemanticModelDTO semanticModelDTO() {

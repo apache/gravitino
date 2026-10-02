@@ -54,6 +54,7 @@ public class SemanticModelCreateRequest implements RESTRequest {
   @JsonProperty("definition")
   private final SemanticModelDefinitionDTO definition;
 
+  @Nullable
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
@@ -68,13 +69,13 @@ public class SemanticModelCreateRequest implements RESTRequest {
    * @param name The Semantic Model name.
    * @param comment The comment, or {@code null} if it is not set.
    * @param definition The required Semantic Model definition.
-   * @param properties The required Gravitino-specific properties.
+   * @param properties The Gravitino-specific properties, or {@code null} if none are set.
    */
   public SemanticModelCreateRequest(
       String name,
       @Nullable String comment,
       SemanticModelDefinitionDTO definition,
-      Map<String, String> properties) {
+      @Nullable Map<String, String> properties) {
     this.name = name;
     this.comment = comment;
     this.definition = definition;
@@ -87,10 +88,7 @@ public class SemanticModelCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(
         definition != null, "\"definition\" field is required and cannot be null");
-    Preconditions.checkArgument(
-        properties != null, "\"properties\" field is required and cannot be null");
-
-    toDefinition();
+    definition.validate();
   }
 
   /**

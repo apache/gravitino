@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
@@ -102,11 +103,24 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    return dispatcher.alterSemanticModel(ident, changes);
+    SemanticModel model = dispatcher.alterSemanticModel(ident, changes);
+    for (SemanticModelChange change : changes) {
+      if (change instanceof SemanticModelChange.RenameSemanticModel) {
+        AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.SEMANTIC_MODEL);
+        AuthorizationUtils.notifyEntityNameIdMappingChange(
+            NameIdentifier.of(ident.namespace(), model.name()), Entity.EntityType.SEMANTIC_MODEL);
+        break;
+      }
+    }
+    return model;
   }
 
   @Override
   public boolean dropSemanticModel(NameIdentifier ident) {
-    return dispatcher.dropSemanticModel(ident);
+    boolean dropped = dispatcher.dropSemanticModel(ident);
+    if (dropped) {
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.SEMANTIC_MODEL);
+    }
+    return dropped;
   }
 }
