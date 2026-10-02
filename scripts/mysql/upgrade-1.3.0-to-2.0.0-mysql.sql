@@ -21,7 +21,7 @@
 -- The 2.0 server no longer reads direct object-policy assignments from this table.
 
 ALTER TABLE `table_column_version_info`
-    MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
+    MODIFY COLUMN `column_comment` LONGTEXT COMMENT 'column comment';
 
 ALTER TABLE `tag_meta`
     ADD COLUMN `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;

@@ -25,7 +25,7 @@
 -- The 2.0 server no longer reads direct object-policy assignments from this table.
 
 ALTER TABLE table_column_version_info
-    ALTER COLUMN column_comment TYPE VARCHAR(4096);
+    ALTER COLUMN column_comment TYPE TEXT;
 
 ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS current_version INT NOT NULL DEFAULT 1;
 ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS last_version INT NOT NULL DEFAULT 1;
