@@ -47,7 +47,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName().toLowerCase();
     if (typeName.startsWith(JDBC_ARRAY_PREFIX)) {
-      return toGravitinoArrayType(typeName);
+      return toGravitinoArrayType(typeName, typeBean);
     }
     switch (typeName) {
       case BOOL:
@@ -173,9 +173,13 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     return elementTypeString + ARRAY_TOKEN;
   }
 
-  private ListType toGravitinoArrayType(String typeName) {
+  private ListType toGravitinoArrayType(String typeName, JdbcTypeBean arrayTypeBean) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
+    if (BPCHAR.equals(elementTypeName)) {
+      // JDBC reports the character length of a bpchar array in COLUMN_SIZE.
+      bean.setColumnSize(arrayTypeBean.getColumnSize());
+    }
     return ListType.nullable(toGravitino(bean));
   }
 }

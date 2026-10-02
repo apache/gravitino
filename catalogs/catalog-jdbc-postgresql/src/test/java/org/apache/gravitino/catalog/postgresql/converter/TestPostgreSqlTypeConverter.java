@@ -105,6 +105,14 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
+  public void testCharArrayPreservesLength() {
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.FixedCharType.of(5)), "_bpchar", 5, 0, 0);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.FixedCharType.of(1)), "_bpchar", 1, 0, 0);
+  }
+
+  @Test
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(INT_2, Types.ShortType.get());
