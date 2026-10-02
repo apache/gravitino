@@ -56,7 +56,6 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -495,10 +494,13 @@ public class IcebergCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
-      IcebergTableChange icebergTableChange =
-          icebergCatalogWrapperHelper.buildIcebergTableChanges(
-              NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
-      LoadTableResponse loadTableResponse = icebergCatalogWrapper.updateTable(icebergTableChange);
+      NameIdentifier schemaTableIdent =
+          NameIdentifier.of(levels[levels.length - 1], tableIdent.name());
+      LoadTableResponse loadTableResponse =
+          icebergCatalogWrapper.buildAndUpdateTable(
+              catalog ->
+                  icebergCatalogWrapperHelper.buildIcebergTableChanges(
+                      catalog, schemaTableIdent, changes));
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
