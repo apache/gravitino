@@ -95,6 +95,17 @@ public interface ModelCatalog {
    * model is registered, in the meantime, the model version (version 0) will also be created and
    * linked to the registered model.
    *
+   * <p>If linking the model version fails (with {@link ModelVersionAliasesAlreadyExistException} or
+   * any other exception), the just-registered model is removed again (best effort), so a failed
+   * call does not leave an orphan model with zero versions behind. The rollback only removes the
+   * model when it still has zero versions, because models are not owned by the caller: another
+   * actor may have linked a version to this model concurrently, and {@link
+   * #deleteModel(NameIdentifier)} cascades to all versions. When versions were linked concurrently
+   * (or the check itself fails), the model is left in place and only the original exception is
+   * propagated. The check and the delete are not atomic: a model version linked between them may
+   * still be removed by the cascade delete. If the rollback itself fails, its exception is attached
+   * to the original as a suppressed exception.
+   *
    * @param ident The name identifier of the model.
    * @param uris The names and URIs of the model version artifact.
    * @param aliases The aliases of the model version. The aliases should be unique in this model,
@@ -118,7 +129,23 @@ public interface ModelCatalog {
       throws NoSuchSchemaException, ModelAlreadyExistsException,
           ModelVersionAliasesAlreadyExistException {
     Model model = registerModel(ident, comment, properties);
-    linkModelVersion(ident, uris, aliases, comment, properties);
+    try {
+      linkModelVersion(ident, uris, aliases, comment, properties);
+    } catch (RuntimeException e) {
+      // Best-effort compensation: drop the just-registered model so a failed registration does
+      // not leave an orphan model with zero versions; propagate the original failure. Only roll
+      // back a model that still has no versions, since deleteModel cascades to all versions and
+      // another actor may have linked one concurrently.
+      try {
+        if (listModelVersions(ident).length == 0) {
+          deleteModel(ident);
+        }
+      } catch (RuntimeException compensationFailure) {
+        // Attach as suppressed so the original linking failure stays the primary exception.
+        e.addSuppressed(compensationFailure);
+      }
+      throw e;
+    }
     return model;
   }
 
