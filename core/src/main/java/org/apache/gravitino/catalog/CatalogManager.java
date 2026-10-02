@@ -81,6 +81,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -1414,7 +1415,40 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // the cache with stale data between invalidate and delete.
             Map<String, String> catalogProperties =
                 copyProperties(catalogWrapper.catalog().entity().getProperties());
-            boolean deleted = store.delete(ident, EntityType.CATALOG, true);
+            boolean deleted;
+            if (force) {
+              deleted = store.delete(ident, EntityType.CATALOG, true);
+            } else {
+              try {
+                if (schemaEntities.isEmpty()) {
+                  deleted = store.delete(ident, EntityType.CATALOG, false);
+                } else {
+                  // Managed-storage catalogs cannot reach this branch: any schema in one blocks
+                  // non-force drop before external schema deletion or secret cleanup starts.
+                  Set<Long> allowedSchemaIds =
+                      schemaEntities.stream().map(SchemaEntity::id).collect(Collectors.toSet());
+                  if (!(store instanceof SupportsConditionalCatalogDelete)) {
+                    // Fail closed: an unconditional cascade could delete a schema created after
+                    // the classification above.
+                    throw new UnsupportedOperationException(
+                        String.format(
+                            "Catalog %s still has built-in, imported, or externally removed "
+                                + "schemas, and entity store %s cannot delete it atomically with "
+                                + "them. Use the force option, or use an entity store that "
+                                + "implements %s",
+                            ident,
+                            store.getClass().getName(),
+                            SupportsConditionalCatalogDelete.class.getSimpleName()));
+                  }
+                  deleted =
+                      ((SupportsConditionalCatalogDelete) store)
+                          .deleteCatalogWithAllowedSchemas(ident, allowedSchemaIds);
+                }
+              } catch (NonEmptyEntityException e) {
+                throw new NonEmptyCatalogException(
+                    e, "Catalog %s has schemas, please drop them first or use force option", ident);
+              }
+            }
             if (deleted) {
               markLocalMutation(ident);
               try {
@@ -1448,7 +1482,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // reaches here: it maps a missing entity to false on its own.
             catalogCache.invalidate(ident);
             return false;
-          } catch (GravitinoRuntimeException e) {
+          } catch (GravitinoRuntimeException | UnsupportedOperationException e) {
+            // Keep UnsupportedOperationException unwrapped so REST reports an unsupported
+            // operation instead of an internal error.
             throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);

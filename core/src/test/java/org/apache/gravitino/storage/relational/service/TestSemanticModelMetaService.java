@@ -91,6 +91,32 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testMetalakeCascadeDeletesSemanticModelsAndVersions() throws IOException {
+    SemanticModelEntity semanticModel =
+        semanticModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            "cascade_model",
+            "orders",
+            "initial comment",
+            "initial");
+    SemanticModelMetaService service = SemanticModelMetaService.getInstance();
+    service.insertSemanticModel(semanticModel, false);
+
+    assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(metalakeName), true));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> service.getSemanticModelByIdentifier(semanticModel.nameIdentifier()));
+    assertNull(
+        SessionUtils.getWithoutCommit(
+            SemanticModelMetaMapper.class,
+            mapper -> mapper.selectSemanticModelMetaById(semanticModel.id())));
+    Map<Integer, VersionState> versions = listSemanticModelVersions(semanticModel.id());
+    assertEquals(1, versions.size());
+    assertTrue(versions.get(1).deletedAt > 0L);
+  }
+
+  @TestTemplate
   public void testInsertLoadListOverwriteAndIdLookup() throws IOException {
     String semanticModelName = GravitinoITUtils.genRandomName("sales_model");
     SemanticModelEntity original =

@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -41,11 +43,13 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -65,7 +69,7 @@ import org.mockito.Mockito;
 
 public class TestMemoryEntityStore {
 
-  public static class InMemoryEntityStore implements EntityStore {
+  public static class InMemoryEntityStore implements EntityStore, SupportsConditionalCatalogDelete {
 
     private final Map<NameIdentifier, Entity> entityMap;
     private final Lock lock;
@@ -172,6 +176,33 @@ public class TestMemoryEntityStore {
                         && key.name().startsWith(descendantPrefix));
       }
       return prev != null;
+    }
+
+    @Override
+    public boolean deleteCatalogWithAllowedSchemas(NameIdentifier ident, Set<Long> allowedSchemaIds)
+        throws IOException {
+      return executeInTransaction(
+          () -> {
+            List<SchemaEntity> schemas =
+                list(
+                    Namespace.of(ident.namespace().level(0), ident.name()),
+                    SchemaEntity.class,
+                    EntityType.SCHEMA);
+            Optional<SchemaEntity> unexpectedSchema =
+                schemas.stream()
+                    .filter(schema -> !allowedSchemaIds.contains(schema.id()))
+                    .findFirst();
+            if (unexpectedSchema.isPresent()) {
+              throw new NonEmptyEntityException(
+                  "Catalog %s has unexpected schema %s (ID %s)",
+                  ident, unexpectedSchema.get().name(), unexpectedSchema.get().id());
+            }
+            // Mirror the relational store, which removes the allowed schemas with the catalog.
+            for (SchemaEntity schema : schemas) {
+              delete(schema.nameIdentifier(), EntityType.SCHEMA, true);
+            }
+            return delete(ident, EntityType.CATALOG, true);
+          });
     }
 
     @Override

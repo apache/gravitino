@@ -34,4 +34,16 @@ public class NonEmptyCatalogException extends GravitinoRuntimeException {
   public NonEmptyCatalogException(@FormatString String message, Object... args) {
     super(message, args);
   }
+
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public NonEmptyCatalogException(Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
+  }
 }

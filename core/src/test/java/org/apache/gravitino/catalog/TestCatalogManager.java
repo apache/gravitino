@@ -28,6 +28,7 @@ import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY6_PREFIX;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 
 import com.google.common.collect.ImmutableMap;
@@ -74,6 +75,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -107,6 +110,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.AdditionalAnswers;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -1410,6 +1414,161 @@ public class TestCatalogManager {
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
     Mockito.verify((CatalogDropAware) operations).onCatalogDropped();
+  }
+
+  @Test
+  void testNonForceDropCatalogDeletesClassifiedSchemasAtomically() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(newMetalakeStore());
+    SecretManager secretManager = Mockito.spy(new SecretManager(config));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), secretManager)) {
+      NameIdentifier ident = NameIdentifier.of(metalake, "classified_schema_drop");
+      SchemaEntity removedExternally =
+          createDisabledCatalogWithStoreOnlySchema(manager, store, ident);
+
+      Assertions.assertTrue(manager.dropCatalog(ident));
+
+      Mockito.verify(store).deleteCatalogWithAllowedSchemas(ident, Set.of(removedExternally.id()));
+      Assertions.assertFalse(store.exists(ident, EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(removedExternally.nameIdentifier(), EntityType.SCHEMA));
+    } finally {
+      store.close();
+    }
+  }
+
+  @Test
+  void testNonForceDropCatalogWithoutSchemasUsesNonCascadeDelete() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(newMetalakeStore());
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+      NameIdentifier ident = NameIdentifier.of(metalake, "empty_non_force_drop");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          ImmutableMap.of(
+              "provider",
+              "test",
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3"));
+      manager.disableCatalog(ident);
+
+      Assertions.assertTrue(manager.dropCatalog(ident));
+
+      Mockito.verify(store).delete(ident, EntityType.CATALOG, false);
+      Mockito.verify(store, Mockito.never()).deleteCatalogWithAllowedSchemas(eq(ident), any());
+      Assertions.assertFalse(store.exists(ident, EntityType.CATALOG));
+    } finally {
+      store.close();
+    }
+  }
+
+  @Test
+  void testNonForceDropCatalogRejectsSchemaCreatedAfterClassification() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(newMetalakeStore());
+    SecretManager secretManager = Mockito.spy(new SecretManager(config));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), secretManager)) {
+      NameIdentifier ident = NameIdentifier.of(metalake, "late_schema_drop");
+      SchemaEntity removedExternally =
+          createDisabledCatalogWithStoreOnlySchema(manager, store, ident);
+      SchemaEntity lateSchema = schemaEntity(ident, "late_schema");
+      // Another server creates a schema after the manager classified the existing ones.
+      Mockito.doAnswer(
+              invocation -> {
+                store.put(lateSchema, false);
+                return invocation.callRealMethod();
+              })
+          .when(store)
+          .deleteCatalogWithAllowedSchemas(ident, Set.of(removedExternally.id()));
+
+      NonEmptyCatalogException rejection =
+          Assertions.assertThrows(NonEmptyCatalogException.class, () -> manager.dropCatalog(ident));
+      Assertions.assertTrue(rejection.getMessage().contains(ident.toString()));
+      Assertions.assertInstanceOf(NonEmptyEntityException.class, rejection.getCause());
+      Assertions.assertTrue(rejection.getCause().getMessage().contains(lateSchema.name()));
+
+      Assertions.assertTrue(store.exists(ident, EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(removedExternally.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(lateSchema.nameIdentifier(), EntityType.SCHEMA));
+      Mockito.verify(secretManager, Mockito.never()).deleteSecretsFromProperties(any());
+    } finally {
+      store.close();
+    }
+  }
+
+  @Test
+  void testNonForceDropCatalogFailsClosedWithoutConditionalDeleteStore() throws Exception {
+    InMemoryEntityStore backingStore = newMetalakeStore();
+    // A custom entity store that does not implement SupportsConditionalCatalogDelete.
+    EntityStore store =
+        Mockito.mock(EntityStore.class, AdditionalAnswers.delegatesTo(backingStore));
+    SecretManager secretManager = Mockito.spy(new SecretManager(config));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), secretManager)) {
+      NameIdentifier ident = NameIdentifier.of(metalake, "unsupported_store_drop");
+      SchemaEntity removedExternally =
+          createDisabledCatalogWithStoreOnlySchema(manager, backingStore, ident);
+
+      UnsupportedOperationException e =
+          Assertions.assertThrows(
+              UnsupportedOperationException.class, () -> manager.dropCatalog(ident));
+
+      Assertions.assertTrue(e.getMessage().contains("Use the force option"), e.getMessage());
+      Mockito.verify(store, Mockito.never())
+          .delete(eq(ident), eq(EntityType.CATALOG), anyBoolean());
+      Assertions.assertTrue(backingStore.exists(ident, EntityType.CATALOG));
+      Assertions.assertTrue(
+          backingStore.exists(removedExternally.nameIdentifier(), EntityType.SCHEMA));
+      Mockito.verify(secretManager, Mockito.never()).deleteSecretsFromProperties(any());
+    } finally {
+      backingStore.close();
+    }
+  }
+
+  private static InMemoryEntityStore newMetalakeStore() throws IOException {
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    return store;
+  }
+
+  /**
+   * Creates a disabled catalog with one schema that exists only in the entity store, so the manager
+   * classifies it as externally removed and lets a non-force drop discard it.
+   */
+  private static SchemaEntity createDisabledCatalogWithStoreOnlySchema(
+      CatalogManager manager, EntityStore store, NameIdentifier ident) throws IOException {
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    manager.disableCatalog(ident);
+    SchemaEntity schema = schemaEntity(ident, "removed_externally");
+    store.put(schema, false);
+    return schema;
+  }
+
+  private static SchemaEntity schemaEntity(NameIdentifier catalogIdent, String name) {
+    return SchemaEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(Namespace.of(metalake, catalogIdent.name()))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
   }
 
   @Test

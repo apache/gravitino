@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,6 +43,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsConditionalCatalogDelete;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -61,6 +63,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -417,6 +420,113 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     assertEquals(beforeDelete.getCurrentVersion(), afterDelete.getCurrentVersion());
     assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testAllowedSchemasDeleteRejectsNewSchema() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_with_new_schema",
+            auditInfo);
+    backend.insert(catalog, false);
+    SchemaEntity allowed =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "allowed",
+            auditInfo);
+    backend.insert(allowed, false);
+    Set<Long> allowedIds = Set.of(allowed.id());
+
+    // The manager classified the first schema before another server created this one.
+    SchemaEntity newSchema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "new_schema",
+            auditInfo);
+    backend.insert(newSchema, false);
+
+    NonEmptyEntityException rejection =
+        assertThrows(
+            NonEmptyEntityException.class,
+            () ->
+                ((SupportsConditionalCatalogDelete) backend)
+                    .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), allowedIds));
+    assertTrue(rejection.getMessage().contains(newSchema.name()));
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertTrue(backend.exists(allowed.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(newSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testAllowedSchemasDeleteRemovesClassifiedSchema() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_with_allowed_schema",
+            auditInfo);
+    backend.insert(catalog, false);
+    SchemaEntity allowed =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "allowed",
+            auditInfo);
+    backend.insert(allowed, false);
+
+    assertTrue(
+        ((SupportsConditionalCatalogDelete) backend)
+            .deleteCatalogWithAllowedSchemas(catalog.nameIdentifier(), Set.of(allowed.id())));
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertFalse(backend.exists(allowed.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testNonCascadeDeleteCleansOrphanedTableVersions() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_with_orphaned_table",
+            auditInfo);
+    backend.insert(catalog, false);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "deleted_schema",
+            auditInfo);
+    backend.insert(schema, false);
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(auditInfo)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("orphaned_table")
+            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withColumns(List.of(column))
+            .withAuditInfo(auditInfo)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    SessionUtils.doWithCommit(
+        SchemaMetaMapper.class,
+        mapper -> mapper.softDeleteSchemaMetasBySchemaIds(List.of(schema.id())));
+    assertTrue(countActiveTableVersionRows(table.id()) > 0);
+
+    assertTrue(CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false));
+    assertEquals(0, countActiveTableVersionRows(table.id()));
   }
 
   @TestTemplate
