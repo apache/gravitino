@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestFullName {
 
+  private static final String LONG_OPTION_PREFIX = "--";
   private Options options;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
@@ -270,6 +271,21 @@ public class TestFullName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
     assertEquals(4, fullName.getLevel());
+  }
+
+  @Test
+  void testGetLevelFromFunction() throws ParseException {
+    String[] args = {
+      CommandEntities.FUNCTION,
+      CommandActions.LIST,
+      LONG_OPTION_PREFIX + GravitinoOptions.IGNORE,
+      LONG_OPTION_PREFIX + GravitinoOptions.NAME,
+      "function_catalog.default.schema"
+    };
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+
+    assertEquals(3, fullName.getLevel());
   }
 
   @Test
