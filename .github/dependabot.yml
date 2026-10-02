@@ -1,5 +1,25 @@
 version: 2
 updates:
+  # Container manifests, including new Compose fixtures when they are added.
+  - package-ecosystem: "docker"
+    directories:
+      - "/dev/docker/*"
+      - "/dev/charts/*"
+      - "/dev/charts/*/templates/tests"
+    exclude-paths:
+      - "**/*compose*.yml"
+      - "**/*compose*.yaml"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker-compose"
+    directories:
+      - "**/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
