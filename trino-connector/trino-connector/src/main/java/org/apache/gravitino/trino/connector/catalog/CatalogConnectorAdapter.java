@@ -72,4 +72,11 @@ public interface CatalogConnectorAdapter {
   default List<PropertyMetadata<?>> getColumnProperties() {
     return emptyList();
   }
+
+  /**
+   * @return ViewProperties list that used to validate view properties.
+   */
+  default List<PropertyMetadata<?>> getViewProperties() {
+    return emptyList();
+  }
 }

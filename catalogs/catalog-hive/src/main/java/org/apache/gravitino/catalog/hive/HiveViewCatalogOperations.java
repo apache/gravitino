@@ -65,6 +65,14 @@ class HiveViewCatalogOperations implements ViewCatalog {
       String.join(", ", Dialects.HIVE, Dialects.TRINO, Dialects.FLINK, Dialects.SPARK);
 
   /**
+   * Reserved view property, namespaced by the Trino connector, used to round-trip a Trino native
+   * view's {@code SECURITY DEFINER} owner into the encoded {@code viewOriginalText} payload; its
+   * value must match {@code CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY} in the
+   * trino-connector module. Its absence means the view is {@code SECURITY INVOKER}.
+   */
+  static final String TRINO_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
+
+  /**
    * The HMS-level representation derived from a logical view definition: the columns, comment, and
    * {@code viewOriginalText} actually stored on the underlying HMS table. For a Trino dialect view
    * these differ from the caller-supplied values (see {@link #encodeHmsView}); for every other
@@ -209,10 +217,10 @@ class HiveViewCatalogOperations implements ViewCatalog {
       // here too, instead of being silently treated as a non-Trino view.
       boolean isTrinoView =
           Dialects.TRINO.equalsIgnoreCase(HiveView.detectDialect(currentHiveTable.properties()));
-      // Gravitino's view model has no owner/runAsInvoker/path concept, so replacing a native Trino
-      // view that carries a non-default value for any of them would silently discard it (e.g. a
-      // SECURITY DEFINER view with an owner would silently become an ownerless SECURITY INVOKER
-      // view). Reject the replace instead of doing that.
+      // Owner/runAsInvoker round-trip through the TRINO_VIEW_OWNER_PROPERTY reserved property (see
+      // toHmsViewOriginalText()/loadHiveView()), but Gravitino's view model still has no path
+      // concept, so replacing a native Trino view with a non-empty SQL path would silently discard
+      // it. Reject the replace instead of doing that.
       boolean currentTrinoViewHasUnrepresentableFields = false;
       if (isTrinoView) {
         TrinoNativeViewCodec.ViewDefinition currentDefinition;
@@ -226,10 +234,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   + "decoded",
               e);
         }
-        currentTrinoViewHasUnrepresentableFields =
-            currentDefinition.owner != null
-                || !currentDefinition.runAsInvoker
-                || !currentDefinition.path.isEmpty();
+        currentTrinoViewHasUnrepresentableFields = !currentDefinition.path.isEmpty();
       }
 
       String newViewName = currentHiveTable.name();
@@ -289,9 +294,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
             throw new UnsupportedOperationException(
                 "View "
                     + ident
-                    + " is a native Trino view with a non-default owner, runAsInvoker, or SQL "
-                    + "path; Gravitino cannot represent these fields, so replacing it would "
-                    + "silently discard them");
+                    + " is a native Trino view with a non-empty SQL path; Gravitino cannot "
+                    + "represent this field, so replacing it would silently discard it");
           }
           ViewChange.ReplaceView replace = (ViewChange.ReplaceView) change;
           SQLRepresentation sqlRepresentation =
@@ -500,6 +504,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
       resolvedComment = decoded.comment;
       restoredDefaultCatalog = decoded.catalog;
       restoredDefaultSchema = decoded.schema;
+      if (decoded.owner != null) {
+        params.put(TRINO_VIEW_OWNER_PROPERTY, decoded.owner);
+      }
       resolvedColumns =
           decoded.columns.stream()
               .map(
@@ -647,7 +654,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
     applyTrinoViewMarker(properties, sqlRepresentation.dialect());
     String viewOriginalText =
         toHmsViewOriginalText(
-            sqlRepresentation, columns, comment, defaultCatalog, defaultSchema, ident);
+            sqlRepresentation, columns, comment, defaultCatalog, defaultSchema, properties, ident);
     String hmsComment =
         Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())
             ? TrinoNativeViewCodec.PRESTO_VIEW_COMMENT
@@ -662,6 +669,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
       String comment,
       String defaultCatalog,
       String defaultSchema,
+      Map<String, String> properties,
       NameIdentifier ident) {
     switch (representation.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
@@ -678,6 +686,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
                             TrinoNativeViewCodec.toTrinoTypeString(c.dataType()),
                             c.comment()))
                 .collect(Collectors.toList());
+        String owner = properties == null ? null : properties.get(TRINO_VIEW_OWNER_PROPERTY);
         return TrinoNativeViewCodec.encode(
             new TrinoNativeViewCodec.ViewDefinition(
                 representation.sql(),
@@ -685,8 +694,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
                 defaultSchema,
                 viewColumns,
                 comment,
-                /* owner= */ null,
-                /* runAsInvoker= */ true,
+                /* owner= */ owner,
+                /* runAsInvoker= */ owner == null,
                 /* path= */ Collections.emptyList()));
       default:
         throw new UnsupportedOperationException(
