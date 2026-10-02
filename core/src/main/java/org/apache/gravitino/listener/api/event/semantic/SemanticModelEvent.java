@@ -28,6 +28,12 @@ import org.apache.gravitino.listener.api.event.OperationStatus;
 @DeveloperApi
 public abstract class SemanticModelEvent extends Event {
 
+  /**
+   * Constructs a successful Semantic Model operation event.
+   *
+   * @param user The username of the individual who initiated the operation.
+   * @param identifier The identifier of the Semantic Model or namespace involved in the operation.
+   */
   protected SemanticModelEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
