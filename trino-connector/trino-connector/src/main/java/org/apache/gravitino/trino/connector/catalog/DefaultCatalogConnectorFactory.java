@@ -149,7 +149,10 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
 
     CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
     if (builder == null) {
-      String message = String.format("Unsupported catalog provider %s.", catalogProvider);
+      String message =
+          String.format(
+              "Unsupported catalog provider %s. It may be served by a separate extension jar.",
+              catalogProvider);
       LOG.error(message);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_CATALOG_PROVIDER, message);
     }
