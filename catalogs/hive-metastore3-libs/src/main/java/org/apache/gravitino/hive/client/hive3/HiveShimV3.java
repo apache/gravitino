@@ -47,6 +47,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Catalog;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.DefaultConstraintsRequest;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SQLDefaultConstraint;
@@ -157,6 +158,13 @@ public class HiveShimV3 extends HiveShim {
             () -> client.getTable(catalogName, databaseName, tableName));
     if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(tb.getTableType())) {
       return HiveTableConverter.fromHiveTable(tb);
+    }
+    if (hasDerivedColumnTypes(tb)) {
+      List<FieldSchema> resolvedColumns =
+          invoke(
+              ExceptionTarget.table(tableName),
+              () -> client.getFields(catalogName, databaseName, tableName));
+      replaceDerivedColumns(tb, resolvedColumns);
     }
     ColumnConstraints constraints = loadColumnConstraints(catalogName, databaseName, tableName);
     return HiveTableConverter.fromHiveTable(
