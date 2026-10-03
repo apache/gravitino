@@ -149,5 +149,11 @@ public interface Index {
      * Vector similarity data skipping index for approximate nearest-neighbor search in ClickHouse.
      */
     DATA_SKIPPING_VECTOR_SIMILARITY,
+
+    /** Legacy Annoy data-skipping index metadata in ClickHouse. */
+    DATA_SKIPPING_ANNOY,
+
+    /** Legacy USearch data-skipping index metadata in ClickHouse. */
+    DATA_SKIPPING_USEARCH,
   }
 }

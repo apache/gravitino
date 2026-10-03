@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.ANNOY_TREES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 
@@ -110,6 +114,21 @@ public class TestClickHouseTableOperationsUnit {
           getSortOrders("id"));
     }
 
+    String callGenerateCreateTableSqlWithoutSort(JdbcColumn[] columns, Index[] indexes) {
+      return generateCreateTableSql(
+          "test_table",
+          columns,
+          "",
+          Map.of(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          indexes);
+    }
+
+    Index.IndexType callGetClickHouseIndexType(String rawType) {
+      return getClickHouseIndexType(rawType);
+    }
+
     void setTable(JdbcTable table) {
       this.table = table;
     }
@@ -145,6 +164,63 @@ public class TestClickHouseTableOperationsUnit {
             IllegalArgumentException.class,
             () -> newOps().callGenerateCreateTableSql(columns, Map.of()));
     Assertions.assertTrue(exception.getMessage().contains("ClickHouse does not support varchar"));
+  }
+
+  @Test
+  void testLegacyAnnUsearchTypesAreDistinctAndParameterizedFormsAreRecognized() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, ops.callGetClickHouseIndexType("annoy"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, ops.callGetClickHouseIndexType("annoy(100)"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH, ops.callGetClickHouseIndexType("usearch"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH,
+        ops.callGetClickHouseIndexType("usearch(cosineDistance)"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+        ops.callGetClickHouseIndexType("vector_similarity"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.callGetClickHouseIndexType("unknown_index"));
+  }
+
+  @Test
+  void testCreateAndAlterRejectLegacyAnnUsearchIndexesWithContext() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build()
+        };
+
+    for (Index.IndexType indexType :
+        List.of(Index.IndexType.DATA_SKIPPING_ANNOY, Index.IndexType.DATA_SKIPPING_USEARCH)) {
+      Index index = Indexes.of(indexType, "idx_legacy", new String[][] {{"id"}});
+      IllegalArgumentException createException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> newOps().callGenerateCreateTableSql(columns, Map.of(), new Index[] {index}));
+      assertLegacyWriteError(createException, indexType);
+
+      IllegalArgumentException createWithoutSortException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> newOps().callGenerateCreateTableSqlWithoutSort(columns, new Index[] {index}));
+      assertLegacyWriteError(createWithoutSortException, indexType);
+
+      IllegalArgumentException alterException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  newAlterOps(Map.of())
+                      .callGenerateAlterTableSql(
+                          TableChange.addIndex(indexType, "idx_legacy", new String[][] {{"id"}})));
+      assertLegacyWriteError(alterException, indexType);
+    }
   }
 
   @Test
@@ -1406,10 +1482,6 @@ public class TestClickHouseTableOperationsUnit {
     Assertions.assertEquals(
         Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
         ops.getClickHouseIndexType("vector_similarity('hnsw', 'L2Distance', 3)"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("annoy"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("usearch"));
   }
 
   @Test
@@ -1668,6 +1740,134 @@ public class TestClickHouseTableOperationsUnit {
             "hash_functions", "3",
             "random_seed", "0"),
         indexes.get(0).properties());
+  }
+
+  @Test
+  void testGetIndexesPreservesLegacyAnnUsearchMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn("idx_annoy", "idx_usearch", "idx_annoy_without_parameters");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("annoy", "usearch", "annoy");
+    // The native metadata DDL in ClickHouse issue #41729 uses annoy(100) with GRANULARITY 1.
+    // This is a parser fixture only; it does not validate a successful system-table read path.
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn("annoy(100)", "usearch('cosineDistance')", "annoy()");
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn("embedding", "tuple(embedding)", "embedding");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(3, indexes.size());
+    Index annoy = indexes.get(0);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, annoy.type());
+    Assertions.assertEquals("idx_annoy", annoy.name());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, annoy.fieldNames());
+    Assertions.assertEquals(
+        Map.of(ANNOY_TREES, "100", CLICKHOUSE_TYPE_FULL, "annoy(100)", GRANULARITY, "1"),
+        annoy.properties());
+
+    Index usearch = indexes.get(1);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_USEARCH, usearch.type());
+    Assertions.assertEquals("idx_usearch", usearch.name());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, usearch.fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            USEARCH_DISTANCE_FUNCTION,
+            "cosineDistance",
+            CLICKHOUSE_TYPE_FULL,
+            "usearch('cosineDistance')",
+            GRANULARITY,
+            "1"),
+        usearch.properties());
+
+    Index annoyWithoutParameters = indexes.get(2);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, annoyWithoutParameters.type());
+    Assertions.assertEquals("idx_annoy_without_parameters", annoyWithoutParameters.name());
+    Assertions.assertArrayEquals(
+        new String[][] {{"embedding"}}, annoyWithoutParameters.fieldNames());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "annoy()", GRANULARITY, "1"),
+        annoyWithoutParameters.properties());
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndPreservesLegacyAnnUsearchTypes() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_annoy", "idx_legacy_usearch", "idx_unknown");
+    Mockito.when(legacySecondaryRs.getString("type"))
+        .thenReturn("annoy", "usearch", "vector_similarity");
+    Mockito.when(legacySecondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding", "embedding");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "annoy", GRANULARITY, "1"), indexes.get(0).properties());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_USEARCH, indexes.get(1).type());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, indexes.get(1).fieldNames());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "usearch", GRANULARITY, "1"), indexes.get(1).properties());
+  }
+
+  @Test
+  void testGetIndexesReportsUnrepresentableLegacyExpressionByOmittingIt() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_annoy_expr");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("annoy");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn("annoy(100)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("lower(embedding)");
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    Assertions.assertTrue(ops.callGetIndexes(connection, "db", "tbl").isEmpty());
   }
 
   @Test
@@ -2381,5 +2581,13 @@ public class TestClickHouseTableOperationsUnit {
       String typeFull, String expression) throws Exception {
     return Assertions.assertThrows(
         IllegalArgumentException.class, () -> getIndexesForSetMetadata(typeFull, expression));
+  }
+
+  private static void assertLegacyWriteError(
+      IllegalArgumentException exception, Index.IndexType indexType) {
+    Assertions.assertTrue(exception.getMessage().contains("test_table"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_legacy"));
+    Assertions.assertTrue(exception.getMessage().contains(indexType.name()));
+    Assertions.assertTrue(exception.getMessage().contains("metadata-only"));
   }
 }
