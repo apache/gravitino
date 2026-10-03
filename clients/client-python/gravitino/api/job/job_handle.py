@@ -76,8 +76,8 @@ class JobHandle(ABC):
 
     def runtime_job_template(self) -> Optional[JobTemplate]:
         """Returns the resolved job template that was actually submitted for execution, with
-        placeholders replaced and referenced files downloaded, or ``None`` for jobs run before
-        this field was introduced.
+        placeholders replaced and its resources kept as the URIs from the template, or ``None``
+        for jobs run before this field was introduced.
         """
         raise NotImplementedError("runtime_job_template is not implemented")
 
