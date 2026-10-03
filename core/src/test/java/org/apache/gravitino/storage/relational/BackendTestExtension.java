@@ -37,6 +37,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -108,6 +109,14 @@ public class BackendTestExtension
   @Override
   public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
       ExtensionContext context) {
+    String testMethodName = context.getRequiredTestMethod().getName();
+    Optional<String> selectedBackend = BackendTestSelector.selectedBackend();
+    if (selectedBackend.isPresent()) {
+      LOG.info("Running tests with the selected {} backend.", selectedBackend.get());
+      return Stream.of(selectedBackend.get())
+          .map(backendType -> new BackendInvocationContext(testMethodName, backendType));
+    }
+
     List<String> backendsToTest = new ArrayList<>();
     backendsToTest.add("h2"); // Always test with H2
 
@@ -121,19 +130,25 @@ public class BackendTestExtension
           "Running tests with H2 backend only. Set env var 'dockerTest=true' to include all backends.");
     }
 
-    return backendsToTest.stream().map(BackendInvocationContext::new);
+    return backendsToTest.stream()
+        .map(backendType -> new BackendInvocationContext(testMethodName, backendType));
   }
 
   private static class BackendInvocationContext implements TestTemplateInvocationContext {
+    private final String testMethodName;
     private final String backendType;
 
-    public BackendInvocationContext(String backendType) {
+    public BackendInvocationContext(String testMethodName, String backendType) {
+      this.testMethodName = testMethodName;
       this.backendType = backendType;
     }
 
     @Override
     public String getDisplayName(int invocationIndex) {
-      return String.format("[%s Backend]", backendType.toUpperCase());
+      // No trailing "()" here: @TestTemplate methods can declare parameters (e.g. an injected
+      // DatabaseTestContext), and a hardcoded empty parameter list would misrepresent the
+      // method's actual signature in JUnit XML/HTML reports.
+      return String.format("%s[%s Backend]", testMethodName, backendType.toUpperCase());
     }
 
     @Override
