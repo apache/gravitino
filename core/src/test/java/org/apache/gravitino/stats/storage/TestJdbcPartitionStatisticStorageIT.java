@@ -58,6 +58,7 @@ import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.gravitino.storage.relational.CoreBackend;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -93,7 +94,8 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /**
    * Abstract base class containing all test logic. Each database-specific test class extends this
-   * and implements the database setup.
+   * and implements the database setup. Each subclass carries the tag of the one backend lane it
+   * runs in.
    */
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   abstract static class BaseJdbcPartitionStatisticStorageTest {
@@ -585,6 +587,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** MySQL-specific tests using Docker container. */
   @Nested
+  @CoreBackend.MySQL
   @Tag("gravitino-docker-test")
   static class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -655,6 +658,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** PostgreSQL-specific tests using Docker container. */
   @Nested
+  @CoreBackend.PostgreSQL
   @Tag("gravitino-docker-test")
   static class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
@@ -728,6 +732,7 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** H2-specific tests using embedded in-memory database. */
   @Nested
+  @CoreBackend.H2
   static class H2Test extends BaseJdbcPartitionStatisticStorageTest {
 
     private static final String H2_JDBC_URL =

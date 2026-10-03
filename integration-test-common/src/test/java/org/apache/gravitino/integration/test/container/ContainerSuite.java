@@ -386,10 +386,10 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLContainer(TestDatabaseName testDatabaseName) {
-    ITUtils.cleanDisk();
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
+          ITUtils.cleanDisk();
           initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
@@ -443,10 +443,10 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
-    ITUtils.cleanDisk();
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
+          ITUtils.cleanDisk();
           initIfNecessary();
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
@@ -972,7 +972,8 @@ public class ContainerSuite implements Closeable {
   @Override
   public void close() throws IOException {
     try {
-      closer.close();
+      closeResources(closer);
+    } finally {
       mySQLContainer = null;
       mySQLVersion5Container = null;
       hiveContainer = null;
@@ -986,8 +987,16 @@ public class ContainerSuite implements Closeable {
       kerberosHiveContainer = null;
       sqlBaseHiveContainer = null;
       pgContainerMap.clear();
+    }
+  }
+
+  static void closeResources(CloseableGroup resources) throws IOException {
+    try {
+      resources.close();
+    } catch (IOException e) {
+      throw e;
     } catch (Exception e) {
-      LOG.error("Failed to close ContainerEnvironment", e);
+      throw new IOException("Failed to close ContainerEnvironment", e);
     }
   }
 
