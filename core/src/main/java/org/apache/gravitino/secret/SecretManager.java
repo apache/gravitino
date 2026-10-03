@@ -350,20 +350,29 @@ public class SecretManager implements Closeable {
     }
     List<SecretUrn> writeThrough = new ArrayList<>();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      if (!SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
-        continue;
-      }
-      try {
-        SecretUrn urn = SecretUrn.parse(entry.getValue());
-        // Write-through URNs are entityType:entityId:propertyKey (3 segments).
-        if (urn.identifierSegments().size() == 3) {
-          writeThrough.add(urn);
-        }
-      } catch (IllegalArgumentException e) {
-        LOG.warn("Skipping invalid secret URN in properties for key {}", entry.getKey(), e);
+      // Only Gravitino-owned write-through URNs may be deleted; a provider's
+      // external-reference URN can legally have any identifier shape.
+      if (SecretPropertyUtils.isWriteThroughUrn(entry.getKey(), entry.getValue())) {
+        writeThrough.add(SecretUrn.parse(entry.getValue()));
+      } else if (SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
+        logSkippedSecretUrn(entry.getKey(), entry.getValue());
       }
     }
     deleteSecrets(writeThrough);
+  }
+
+  /**
+   * Logs a secret URN that drop-time cleanup left alone: a malformed value at warn, since it points
+   * at nothing we can clean up, and a well-formed non-write-through URN at debug, since leaving a
+   * provider's external reference in place is the intended behavior.
+   */
+  private static void logSkippedSecretUrn(String key, String value) {
+    try {
+      SecretUrn.parse(value);
+      LOG.debug("Skipping non-write-through secret URN in properties for key {}", key);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Skipping invalid secret URN in properties for key {}", key, e);
+    }
   }
 
   /**

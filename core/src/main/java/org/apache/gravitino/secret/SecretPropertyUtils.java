@@ -25,10 +25,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
@@ -40,6 +42,12 @@ import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
  * (build/write/rollback) and secret-key uniqueness checks rather than property assembly.
  */
 public final class SecretPropertyUtils {
+
+  private static final Set<String> WRITE_THROUGH_ENTITY_TYPES =
+      Set.of(
+          Entity.EntityType.CATALOG.name().toLowerCase(Locale.ROOT),
+          Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
+          Entity.EntityType.FILESET.name().toLowerCase(Locale.ROOT));
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
@@ -261,6 +269,45 @@ public final class SecretPropertyUtils {
           && String.valueOf(entityId).equals(segments.get(1))
           && propertyKey.equals(segments.get(2));
     } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Whether the URN stored under {@code propertyKey} is shaped like a write-through secret URN:
+   * three identifier segments {@code entityType:entityId:propertyKey} with a known Gravitino entity
+   * type, a numeric entity id, and the storing property key. Providers may emit external-reference
+   * URNs with any identifier shape, so entity-drop cleanup must only treat URNs of exactly this
+   * shape as Gravitino-owned write-through secrets.
+   *
+   * @param propertyKey the property key the URN is stored under
+   * @param value the stored URN string
+   * @return true when the URN is a write-through URN owned by Gravitino
+   */
+  public static boolean isWriteThroughUrn(String propertyKey, @Nullable String value) {
+    if (!isSecretProperty(propertyKey, value)) {
+      return false;
+    }
+    try {
+      SecretUrn urn = SecretUrn.parse(value);
+      List<String> segments = urn.identifierSegments();
+      return segments.size() == 3
+          && WRITE_THROUGH_ENTITY_TYPES.contains(segments.get(0))
+          && isWriteThroughEntityId(segments.get(1))
+          && propertyKey.equals(segments.get(2));
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  // A write-through URN carries the entity id as a long (SecretUrn.buildWriteThrough formats
+  // String.valueOf(long)), so accept the segment only when it parses as a long. A digits-only
+  // check would also accept out-of-range values a provider's external reference could carry.
+  private static boolean isWriteThroughEntityId(String segment) {
+    try {
+      Long.parseLong(segment);
+      return true;
+    } catch (NumberFormatException e) {
       return false;
     }
   }
