@@ -62,6 +62,8 @@ dependencies {
     // on request deserialization (e.g. dropping fields like `check_declared`).
     exclude(group = "org.lance", module = "lance-namespace-apache-client")
   }
+  implementation(libs.jedis)
+  implementation(libs.kryo)
   implementation(libs.mybatis)
 
   annotationProcessor(libs.lombok)
