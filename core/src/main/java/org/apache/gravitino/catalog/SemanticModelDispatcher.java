@@ -18,7 +18,42 @@
  */
 package org.apache.gravitino.catalog;
 
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.OssieSemanticModelDocumentConverter;
+import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 
 /** A dispatcher specialization for schema-scoped Semantic Model operations. */
-public interface SemanticModelDispatcher extends SemanticModelCatalog {}
+public interface SemanticModelDispatcher extends SemanticModelCatalog {
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Delegates to this dispatcher's native create operation so that the document follows the same
+   * normalization and validation chain as a structured create request.
+   */
+  @Override
+  default SemanticModel importOssieSemanticModel(Namespace namespace, OssieDocument document) {
+    SemanticModelCreateRequest request =
+        OssieSemanticModelDocumentConverter.importDocument(document);
+    return createSemanticModel(
+        NameIdentifier.of(namespace, request.getName()),
+        request.getComment(),
+        request.toDefinition(),
+        request.getProperties());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Loads the model through this dispatcher's native load operation before serializing it.
+   */
+  @Override
+  default OssieDocument exportOssieSemanticModel(NameIdentifier ident, OssieFormat format) {
+    return OssieSemanticModelDocumentConverter.exportDocument(loadSemanticModel(ident), format);
+  }
+}

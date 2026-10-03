@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -60,6 +61,8 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
+import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
+import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -81,6 +84,7 @@ import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
+import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -142,6 +146,113 @@ public class TestGravitinoInterceptionService {
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
       verify(malformedRequest, never()).getName();
       verify(invocation, never()).proceed();
+    }
+  }
+
+  @Test
+  public void testSemanticModelOperationsIsRegisteredForInterception() {
+    Descriptor descriptor = mock(Descriptor.class);
+    when(descriptor.getImplementation()).thenReturn(SemanticModelOperations.class.getName());
+    Assertions.assertTrue(
+        new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));
+  }
+
+  @Test
+  public void testSemanticModelEndpointAuthorization() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtils = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class)) {
+      principalUtils
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      GravitinoEnv env = mock(GravitinoEnv.class);
+      environments.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.eventBus()).thenReturn(mock(EventBus.class));
+      Method create =
+          SemanticModelOperations.class.getMethod(
+              "createSemanticModel",
+              String.class,
+              String.class,
+              String.class,
+              SemanticModelCreateRequest.class);
+      Method load =
+          SemanticModelOperations.class.getMethod(
+              "loadSemanticModel", String.class, String.class, String.class, String.class);
+      Method list =
+          SemanticModelOperations.class.getMethod(
+              "listSemanticModels", String.class, String.class, String.class);
+      Method alter =
+          SemanticModelOperations.class.getMethod(
+              "alterSemanticModel",
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              SemanticModelUpdatesRequest.class);
+      Method drop =
+          SemanticModelOperations.class.getMethod(
+              "dropSemanticModel", String.class, String.class, String.class, String.class);
+      Method importOssie =
+          SemanticModelOperations.class.getMethod(
+              "importOssieSemanticModel",
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              HttpHeaders.class);
+      Method exportOssie =
+          SemanticModelOperations.class.getMethod(
+              "exportOssieSemanticModel",
+              String.class,
+              String.class,
+              String.class,
+              String.class,
+              String.class);
+      for (Method method : List.of(create, load, list, alter, drop, importOssie, exportOssie)) {
+        MethodInvocation invocation = mock(MethodInvocation.class);
+        when(invocation.getMethod()).thenReturn(method);
+        Object[] args;
+        if (method.equals(list)) {
+          args = new Object[] {"metalake", "catalog", "schema"};
+        } else if (method.equals(importOssie)) {
+          args =
+              new Object[] {"metalake", "catalog", "schema", "document", mock(HttpHeaders.class)};
+        } else if (method.equals(exportOssie)) {
+          args = new Object[] {"metalake", "catalog", "schema", "sales", "yaml"};
+        } else if (method.equals(alter)) {
+          args =
+              new Object[] {
+                "metalake", "catalog", "schema", "sales", mock(SemanticModelUpdatesRequest.class)
+              };
+        } else {
+          args =
+              new Object[] {
+                "metalake",
+                "catalog",
+                "schema",
+                method.equals(create) ? mock(SemanticModelCreateRequest.class) : "sales"
+              };
+        }
+        when(invocation.getArguments()).thenReturn(args);
+        MethodInterceptor interceptor =
+            new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+        Response denied = (Response) interceptor.invoke(invocation);
+        assertEquals(403, denied.getStatus());
+        verify(invocation, never()).proceed();
+        when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+        when(invocation.proceed()).thenReturn(Response.ok().build());
+        Response allowed = (Response) interceptor.invoke(invocation);
+        assertEquals(200, allowed.getStatus());
+        verify(invocation).proceed();
+        when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(false);
+      }
     }
   }
 
