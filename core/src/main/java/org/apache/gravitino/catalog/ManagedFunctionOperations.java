@@ -147,8 +147,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
   public boolean dropFunction(NameIdentifier ident) {
     try {
       return store.delete(ident, Entity.EntityType.FUNCTION);
-    } catch (NoSuchEntityException e) {
-      return false;
     } catch (IOException e) {
       throw new RuntimeException("Failed to drop function " + ident, e);
     }

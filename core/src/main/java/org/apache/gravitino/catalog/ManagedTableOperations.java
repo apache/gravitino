@@ -200,8 +200,6 @@ public abstract class ManagedTableOperations implements TableCatalog {
   public boolean dropTable(NameIdentifier ident) {
     try {
       return store().delete(ident, Entity.EntityType.TABLE);
-    } catch (NoSuchEntityException e) {
-      return false;
     } catch (IOException e) {
       throw new RuntimeException("Failed to drop metadata for table " + ident, e);
     }

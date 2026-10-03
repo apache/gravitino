@@ -262,15 +262,14 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testDropTableIgnoresNoSuchEntityException() throws IOException {
+  public void testDropTableIgnoresMissingTableEntity() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
 
     NameIdentifier expectedIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
-    doThrow(new NoSuchEntityException("Table not found"))
-        .when(mockEntityStore)
-        .delete(expectedIdentifier, Entity.EntityType.TABLE);
+    // The store reports a missing entity by returning false, not by throwing.
+    when(mockEntityStore.delete(expectedIdentifier, Entity.EntityType.TABLE)).thenReturn(false);
 
     // Should not throw exception
     Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
