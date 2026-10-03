@@ -266,6 +266,10 @@ public interface AuditLog {
 
     PLAN_TABLE_SCAN,
 
+    FETCH_PLANNING_RESULT,
+
+    CANCEL_PLANNING,
+
     FETCH_SCAN_TASKS,
 
     PURGE_TABLE,
