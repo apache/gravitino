@@ -57,3 +57,8 @@ jobs:
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
+
+  RayIcebergIT:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    uses: ./.github/workflows/ray-iceberg-it-action.yml
