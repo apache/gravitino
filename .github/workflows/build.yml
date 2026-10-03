@@ -146,6 +146,38 @@ jobs:
             build/reports
             spark-connector/**/*.log
 
+  # Runs core tests against the Docker-backed MySQL and PostgreSQL entity stores. It is split from
+  # the build job because these tests take about 45 minutes and would otherwise serialize all other
+  # Docker test projects behind them.
+  core-docker-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.maintenance_module_only_changes != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      - name: Test core with Docker
+        timeout-minutes: 80
+        run: |
+          dev/ci/dump_test_threads_after.sh 75 &
+          watchdog_pid=$!
+          trap 'pkill -P "${watchdog_pid}" 2>/dev/null; kill "${watchdog_pid}" 2>/dev/null' EXIT
+          ./gradlew :core:test -PskipWeb=true -PskipITs -PskipDockerTests=false
+
+      - name: Upload core test report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: core docker test report
+          path: |
+            build/reports
+            core/build/*.log
+
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
@@ -177,7 +209,14 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
+        timeout-minutes: 95
         run: |
+          # Print the stacks of test JVMs that are still running shortly before the step timeout,
+          # so a hung test can be identified from the log.
+          dev/ci/dump_test_threads_after.sh 90 &
+          watchdog_pid=$!
+          trap 'pkill -P "${watchdog_pid}" 2>/dev/null; kill "${watchdog_pid}" 2>/dev/null' EXIT
+
           if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
             ./gradlew \
               :maintenance:optimizer-api:build \
@@ -196,6 +235,9 @@ jobs:
             -PskipWeb=true
             -PskipITs
             -PskipDockerTests=false
+            # Core runs its Docker-backed tests in the core-docker-test job. Here it runs with H2
+            # only, so it no longer holds the shared Docker test lock for its whole duration.
+            -PskipDockerTestsForProjects=:core
             -x :clients:client-python:build
             -x :catalogs-contrib:catalog-jdbc-clickhouse:test
             -x :catalogs-contrib:catalog-jdbc-hologres:test
