@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
@@ -101,6 +102,29 @@ public class PolicyContents {
         deleteFileNumberWeight,
         maxPartitionNum,
         rewriteOptions);
+  }
+
+  /**
+   * @return orphan cleanup policy content with the default retention and execution mode
+   */
+  public static PolicyContent icebergOrphanFileRemoval() {
+    return icebergOrphanFileRemoval(
+        IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
+        null,
+        IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN);
+  }
+
+  /**
+   * Creates orphan cleanup policy content.
+   *
+   * @param olderThanDays minimum file age in days, from 1 to 36500 inclusive
+   * @param location optional scan location within the table
+   * @param dryRun whether to list candidates without deleting them
+   * @return orphan cleanup policy content
+   */
+  public static PolicyContent icebergOrphanFileRemoval(
+      long olderThanDays, @Nullable String location, boolean dryRun) {
+    return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
   }
 
   private PolicyContents() {}
