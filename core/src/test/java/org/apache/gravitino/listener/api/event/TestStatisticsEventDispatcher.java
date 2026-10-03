@@ -166,6 +166,51 @@ public class TestStatisticsEventDispatcher {
   }
 
   @Test
+  public void testMergeStatisticsEvent() {
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put(
+        "custom-by-spec",
+        StatisticValues.objectValue(
+            Collections.singletonMap("1", StatisticValues.longValue(100L))));
+    dispatcher.mergeStatistics(
+        "metalake",
+        MetadataObjects.of(Lists.newArrayList("catalog", "db", "table"), MetadataObject.Type.TABLE),
+        stats);
+    UpdateStatisticsPreEvent preEvent = (UpdateStatisticsPreEvent) dummyEventListener.popPreEvent();
+    Assertions.assertEquals(stats, preEvent.statistics());
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, preEvent.operationType());
+    UpdateStatisticsEvent event = (UpdateStatisticsEvent) dummyEventListener.popPostEvent();
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, event.operationType());
+    Assertions.assertEquals(stats, event.statistics());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+  }
+
+  @Test
+  public void testMergeStatisticsFailureEvent() {
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put(
+        "custom-by-spec",
+        StatisticValues.objectValue(
+            Collections.singletonMap("1", StatisticValues.longValue(100L))));
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.mergeStatistics(
+                "metalake",
+                MetadataObjects.of(
+                    Lists.newArrayList("catalog", "db", "table"), MetadataObject.Type.TABLE),
+                stats));
+    UpdateStatisticsPreEvent preEvent = (UpdateStatisticsPreEvent) dummyEventListener.popPreEvent();
+    Assertions.assertEquals(stats, preEvent.statistics());
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, preEvent.operationType());
+    UpdateStatisticsFailureEvent event =
+        (UpdateStatisticsFailureEvent) dummyEventListener.popPostEvent();
+    Assertions.assertEquals(OperationType.UPDATE_STATISTICS, event.operationType());
+    Assertions.assertEquals(stats, event.statistics());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
   public void testUpdateStatisticsEvent() {
     Map<String, StatisticValue<?>> stats = Maps.newHashMap();
     stats.put("stat1", StatisticValues.longValue(100L));

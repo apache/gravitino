@@ -21,10 +21,11 @@ from typing import Any
 
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class SupportsStatistics(ABC):
-    """SupportsStatistics provides methods to list and update statistics.
+    """SupportsStatistics provides methods to manage statistics.
 
     A table, a partition or a fileset can implement this interface to manage its statistics.
     """
@@ -53,6 +54,26 @@ class SupportsStatistics(ABC):
             IllegalStatisticNameException: If the statistic name is illegal
             UnmodifiableStatisticException: If the statistic is unmodifiable
         """
+
+    def merge_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
+        """Atomically shallow-merge object-valued statistics.
+
+        Supplied object keys replace existing keys; omitted keys are preserved.
+        Missing statistics are created. All supplied and existing values must be
+        objects, and the whole batch is published together to statistics readers.
+
+        Args:
+            statistics: a map of statistic names to objects containing the keys to merge
+
+        Raises:
+            UnsupportedOperationException: If atomic merging is unsupported
+            IllegalArgumentException: If a value is not an object
+            IllegalStatisticNameException: If a statistic name is illegal
+            UnmodifiableStatisticException: If a statistic is unmodifiable
+        """
+        raise UnsupportedOperationException(
+            "Atomic statistics merging is not supported"
+        )
 
     @abstractmethod
     def drop_statistics(self, statistics: list[str]) -> bool:
