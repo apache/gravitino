@@ -49,6 +49,7 @@ public class TestCompatibilityUtils {
       {OperationType.LIST_CATALOG, Operation.LIST_CATALOG},
       {OperationType.ENABLE_CATALOG, Operation.ENABLE_CATALOG},
       {OperationType.DISABLE_CATALOG, Operation.DISABLE_CATALOG},
+      {OperationType.TEST_CONNECTION_CATALOG, Operation.TEST_CONNECTION_CATALOG},
       {OperationType.CREATE_SCHEMA, Operation.CREATE_SCHEMA},
       {OperationType.ALTER_SCHEMA, Operation.ALTER_SCHEMA},
       {OperationType.DROP_SCHEMA, Operation.DROP_SCHEMA},

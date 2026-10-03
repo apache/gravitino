@@ -43,6 +43,7 @@ public class CompatibilityUtils {
           .put(OperationType.LIST_CATALOG, Operation.LIST_CATALOG)
           .put(OperationType.ENABLE_CATALOG, Operation.ENABLE_CATALOG)
           .put(OperationType.DISABLE_CATALOG, Operation.DISABLE_CATALOG)
+          .put(OperationType.TEST_CONNECTION_CATALOG, Operation.TEST_CONNECTION_CATALOG)
           .put(OperationType.CREATE_SCHEMA, Operation.CREATE_SCHEMA)
           .put(OperationType.DROP_SCHEMA, Operation.DROP_SCHEMA)
           .put(OperationType.ALTER_SCHEMA, Operation.ALTER_SCHEMA)
