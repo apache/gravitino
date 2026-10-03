@@ -166,3 +166,20 @@ def mock_authentication_with_jwt():
             status_code=HTTPStatus.OK.value,
         ),
     ]
+def mock_authentication_with_basic_jwt():
+    _, new_access_token = mock_old_new_jwt()
+
+    return TestResponse(
+        body=json.dumps(
+            {
+                "code": 0,
+                "access_token": new_access_token,
+                "issued_token_type": "2",
+                "token_type": "bearer",
+                "expires_in": 3600,
+                "scope": "test",
+                "refresh_token": None,
+            }
+        ),
+        status_code=HTTPStatus.OK.value,
+    )
