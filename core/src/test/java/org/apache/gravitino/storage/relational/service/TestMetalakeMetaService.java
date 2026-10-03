@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -38,16 +39,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -67,6 +73,79 @@ import org.mockito.Mockito;
 public class TestMetalakeMetaService extends TestJDBCBackend {
 
   private static final String METALAKE_NAME = "metalake_for_metalake_test";
+
+  @TestTemplate
+  public void testCascadeDeleteCleansSecurableObjectsAndTagRels() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    long metalakeId = metalake.id();
+
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "cascade_cat");
+
+    // A role with a securable object under this metalake.
+    backend.insert(
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("cascade_role")
+            .withNamespace(Namespace.of(METALAKE_NAME, "system", "role"))
+            .withAuditInfo(AUDIT_INFO)
+            .withSecurableObjects(
+                Lists.newArrayList(
+                    SecurableObjects.ofCatalog(
+                        "cascade_cat", Lists.newArrayList(Privileges.UseCatalog.allow()))))
+            .build(),
+        false);
+
+    // A tag assigned to a metadata object under this metalake.
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("cascade_tag")
+            .withNamespace(Namespace.of(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(tag, false);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            new NameIdentifier[] {NameIdentifier.of(METALAKE_NAME, "cascade_tag")},
+            new NameIdentifier[0]);
+
+    // Both relations exist and are live before the drop, so the assertions after the drop prove
+    // the cascade actually exercised both cleanup statements.
+    Assertions.assertEquals(
+        1, liveRows("role_meta_securable_object", "role_id IN (SELECT role_id FROM role_meta)"));
+    Assertions.assertEquals(
+        1,
+        liveRows(
+            "tag_relation_meta",
+            "tag_id IN (SELECT tag_id FROM tag_meta WHERE metalake_id = " + metalakeId + ")"));
+
+    // The metalake cascade tombstones roles and tags BEFORE the relation cleanups in
+    // one transaction; the relation cleanups must not filter on the parents' live rows.
+    Assertions.assertTrue(
+        backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true));
+
+    Assertions.assertEquals(
+        0, liveRows("role_meta_securable_object", "role_id IN (SELECT role_id FROM role_meta)"));
+    Assertions.assertEquals(
+        0,
+        liveRows(
+            "tag_relation_meta",
+            "tag_id IN (SELECT tag_id FROM tag_meta WHERE metalake_id = " + metalakeId + ")"));
+  }
+
+  private long liveRows(String table, String scope) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement st = session.getConnection().createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT COUNT(*) FROM " + table + " WHERE deleted_at = 0 AND " + scope)) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
+    }
+  }
 
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {

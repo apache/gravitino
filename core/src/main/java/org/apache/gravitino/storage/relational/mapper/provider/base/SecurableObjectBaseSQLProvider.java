@@ -85,10 +85,13 @@ public class SecurableObjectBaseSQLProvider {
         + SECURABLE_OBJECT_TABLE_NAME
         + " ob SET ob.deleted_at = "
         + DatabaseTimeSQL.MYSQL
+        // No ro.deleted_at filter: the metalake cascade tombstones the role rows BEFORE
+        // this statement runs in the same transaction, so filtering on live roles would
+        // match nothing and leak the securable-object rows (own writes are visible).
         + " WHERE exists (SELECT * FROM "
         + ROLE_TABLE_NAME
-        + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
-        + " AND ro.deleted_at = 0) AND ob.deleted_at = 0";
+        + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id)"
+        + " AND ob.deleted_at = 0";
   }
 
   public String softDeleteObjectRelsByMetadataObject(
