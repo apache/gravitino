@@ -33,10 +33,11 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoClient;
@@ -135,7 +136,11 @@ public class TestGravitinoCatalogManager {
   @Test
   void testCloseClosesEveryCachedClient() {
     SparkConf sparkConf = tokenConf();
-    GravitinoCatalogManager manager = createManager(sparkConf);
+    // Run the client cache's removal listener on the calling thread. close() first drains and
+    // closes every cached client, then invalidateAll() fires the removal listener for each of the
+    // same entries; with a same-thread executor both happen before close() returns, so the
+    // close-once contract is observable with no wait. A broken CAS would close a client twice here.
+    GravitinoCatalogManager manager = createManager(sparkConf, Runnable::run);
 
     for (String user : new String[] {"alice", "bob", "carol"}) {
       sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt(user));
@@ -145,7 +150,11 @@ public class TestGravitinoCatalogManager {
 
     manager.close();
 
-    assertEquals(3, clientFactory.closedCount());
+    assertEquals(
+        List.of(1, 1, 1),
+        clientFactory.closeCounts(),
+        "close() must close each cached client exactly once, though the drain and the removal"
+            + " listener both try");
   }
 
   @Test
@@ -255,6 +264,11 @@ public class TestGravitinoCatalogManager {
     return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory);
   }
 
+  private GravitinoCatalogManager createManager(SparkConf sparkConf, Executor cacheExecutor) {
+    clientFactory = new ClientFactory();
+    return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory, cacheExecutor);
+  }
+
   private static SparkConf tokenConf() {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE);
@@ -297,7 +311,7 @@ public class TestGravitinoCatalogManager {
   /** Hands out a distinct mock client per identity and counts what the manager asks of it. */
   private static class ClientFactory implements Function<GravitinoIdentity, GravitinoClient> {
 
-    private final List<AtomicBoolean> closedFlags = new ArrayList<>();
+    private final List<AtomicInteger> closeCounts = new ArrayList<>();
     private final AtomicInteger clients = new AtomicInteger();
     private final AtomicInteger loads = new AtomicInteger();
 
@@ -314,15 +328,13 @@ public class TestGravitinoCatalogManager {
                 when(catalog.name()).thenReturn(invocation.getArgument(0));
                 return catalog;
               });
-      // Closing twice must not be counted twice: the shutdown path closes explicitly and the
-      // removal listener may then fire for the same client.
-      AtomicBoolean closed = new AtomicBoolean(false);
-      synchronized (closedFlags) {
-        closedFlags.add(closed);
+      AtomicInteger closes = new AtomicInteger();
+      synchronized (closeCounts) {
+        closeCounts.add(closes);
       }
       doAnswer(
               invocation -> {
-                closed.set(true);
+                closes.incrementAndGet();
                 return null;
               })
           .when(client)
@@ -339,8 +351,14 @@ public class TestGravitinoCatalogManager {
     }
 
     int closedCount() {
-      synchronized (closedFlags) {
-        return (int) closedFlags.stream().filter(AtomicBoolean::get).count();
+      synchronized (closeCounts) {
+        return (int) closeCounts.stream().filter(closes -> closes.get() > 0).count();
+      }
+    }
+
+    List<Integer> closeCounts() {
+      synchronized (closeCounts) {
+        return closeCounts.stream().map(AtomicInteger::get).collect(Collectors.toList());
       }
     }
   }
