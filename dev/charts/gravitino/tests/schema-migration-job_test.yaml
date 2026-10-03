@@ -1,0 +1,129 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino schema migration job
+templates:
+  - schema-migration-job.yaml
+tests:
+  - it: renders the schema migration Job for external MySQL
+    release:
+      name: gravitino
+      namespace: gravitino-system
+    set:
+      entity:
+        jdbcUrl: jdbc:mysql://db.example.com:3306/gravitino
+        jdbcUser: admin
+        jdbcPassword: secret
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: gravitino-gravitino-helm-schema-migration
+      - equal:
+          path: metadata.namespace
+          value: gravitino-system
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "1"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - equal:
+          path: spec.backoffLimit
+          value: 4
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: sqlfile
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].image
+          pattern: "apache/gravitino:"
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "bitnamilegacy/mysql:"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JDBC_URL
+            value: jdbc:mysql://db.example.com:3306/gravitino
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JDBC_USER
+            value: admin
+          any: true
+
+  - it: renders the schema migration Job for external PostgreSQL
+    release:
+      name: gravitino
+      namespace: gravitino-system
+    set:
+      entity:
+        jdbcUrl: jdbc:postgresql://db.example.com:5432/gravitino
+        jdbcUser: admin
+        jdbcPassword: secret
+    asserts:
+      - isKind:
+          of: Job
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "bitnamilegacy/postgresql:"
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+
+  - it: does not render the Job when a bundled MySQL database is enabled
+    release:
+      name: gravitino
+    set:
+      mysql:
+        enabled: true
+      entity:
+        jdbcUrl: jdbc:mysql://db.example.com:3306/gravitino
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render the Job for the default embedded H2 configuration
+    release:
+      name: gravitino
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render the Job when schemaMigration is disabled
+    release:
+      name: gravitino
+    set:
+      schemaMigration:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:mysql://db.example.com:3306/gravitino
+    asserts:
+      - hasDocuments:
+          count: 0
