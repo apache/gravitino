@@ -26,6 +26,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -164,6 +166,68 @@ public class TestDorisUtils {
         "CREATE TABLE `testTable` (\n`testColumn` STRING NOT NULL COMMENT 'test comment'\n) ENGINE=OLAP\nCOMMENT \"test comment\"";
     transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
     assertFalse(transform.isPresent());
+  }
+
+  @Test
+  public void testExtractAutoRangePartitionInfoFromSql() {
+    String quotedDt = String.valueOf((char) 96) + "dt" + (char) 96;
+    Transform expected =
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month")});
+
+    String createTableSql =
+        "CREATE TABLE testTable (\n"
+            + quotedDt
+            + " datetime NOT NULL\n) ENGINE=OLAP\n"
+            + "AUTO PARTITION BY RANGE (date_trunc("
+            + quotedDt
+            + ", 'month'))\n"
+            + "(PARTITION p_seed VALUES [('2024-01-01 00:00:00'), "
+            + "('2024-02-01 00:00:00')])\n"
+            + "DISTRIBUTED BY HASH("
+            + quotedDt
+            + ") BUCKETS 1";
+    Optional<Transform> transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertEquals(Optional.of(expected), transform);
+    assertTrue(DorisUtils.isAutoRangeTransform(transform.get()));
+
+    // Doris 4.x also documents the AUTO keyword as optional for AUTO RANGE.
+    createTableSql =
+        "CREATE TABLE testTable (\ndt date NOT NULL\n) ENGINE=OLAP\n"
+            + "PARTITION BY RANGE (date_trunc(dt, 'month,quarter'))\n()";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(
+        Transforms.apply(
+            "date_trunc",
+            new Expression[] {NamedReference.field("dt"), Literals.stringLiteral("month,quarter")}),
+        transform.get());
+
+    // The bounded parser must handle a multiline expression without consuming the origin list.
+    createTableSql =
+        "CREATE TABLE testTable (\ndt date NOT NULL\n) ENGINE=OLAP\n"
+            + "AUTO PARTITION BY RANGE (\n  date_trunc(\n    "
+            + quotedDt
+            + ",\n    'month'\n  )\n)\n"
+            + "(PARTITION p_seed VALUES [('2024-01-01'), ('2024-02-01')])";
+    assertEquals(Optional.of(expected), DorisUtils.extractPartitionInfoFromSql(createTableSql));
+
+    String malformed =
+        "CREATE TABLE testTable (dt date NOT NULL)\n"
+            + "AUTO PARTITION BY RANGE (date_trunc(dt, month))\n()";
+    assertFalse(DorisUtils.extractPartitionInfoFromSql(malformed).isPresent());
+
+    String nested =
+        "CREATE TABLE testTable (dt date NOT NULL)\n"
+            + "AUTO PARTITION BY RANGE (date_trunc(year(dt), 'month'))\n()";
+    assertFalse(DorisUtils.extractPartitionInfoFromSql(nested).isPresent());
+
+    String unsupported =
+        "CREATE TABLE testTable (dt date NOT NULL)\n" + "AUTO PARTITION BY RANGE (to_date(dt))\n()";
+    assertFalse(DorisUtils.extractPartitionInfoFromSql(unsupported).isPresent());
+
+    assertFalse(DorisUtils.isAutoRangeTransform(Transforms.apply("other", new Expression[0])));
   }
 
   @Test

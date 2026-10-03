@@ -22,14 +22,17 @@ import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeS
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.unescapeSqlLiteral;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -49,6 +52,14 @@ public final class DorisUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DorisUtils.class);
   private static final Pattern PARTITION_INFO_PATTERN =
       Pattern.compile("PARTITION BY \\b(LIST|RANGE)\\b\\s*\\((.+)\\)");
+  private static final Pattern RANGE_PARTITION_START_PATTERN =
+      Pattern.compile("(?im)^\\s*(AUTO\\s+)?PARTITION\\s+BY\\s+RANGE\\s*\\(");
+  private static final Pattern FUNCTION_EXPRESSION_PATTERN =
+      Pattern.compile("(?is)^[\\p{L}_][\\p{L}\\p{N}_$]*\\s*\\(");
+  private static final Pattern SIMPLE_IDENTIFIER_PATTERN =
+      Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_$]*");
+  private static final String DATE_TRUNC_FUNCTION = "date_trunc";
+  private static final char BACK_TICK = '`';
 
   private static final Pattern DISTRIBUTION_INFO_PATTERN =
       Pattern.compile(
@@ -109,6 +120,22 @@ public final class DorisUtils {
 
   public static Optional<Transform> extractPartitionInfoFromSql(String createTableSql) {
     try {
+      Matcher rangeStartMatcher = RANGE_PARTITION_START_PATTERN.matcher(createTableSql);
+      if (rangeStartMatcher.find()) {
+        boolean autoPartition = rangeStartMatcher.group(1) != null;
+        int openingParenthesis = rangeStartMatcher.end() - 1;
+        int closingParenthesis = findMatchingParenthesis(createTableSql, openingParenthesis);
+        String rangeExpression =
+            closingParenthesis < 0
+                ? createTableSql.substring(rangeStartMatcher.end()).trim()
+                : createTableSql.substring(openingParenthesis + 1, closingParenthesis).trim();
+        if (autoPartition || FUNCTION_EXPRESSION_PATTERN.matcher(rangeExpression).find()) {
+          return closingParenthesis < 0
+              ? Optional.empty()
+              : extractDateTruncTransform(rangeExpression);
+        }
+      }
+
       String[] lines = createTableSql.split("\n");
       for (String line : lines) {
         Matcher matcher = PARTITION_INFO_PATTERN.matcher(line.trim());
@@ -133,6 +160,166 @@ public final class DorisUtils {
       LOGGER.warn("Failed to extract partition info", e);
       return Optional.empty();
     }
+  }
+
+  /**
+   * Returns whether the transform has the exact shape supported by Doris AUTO RANGE partitioning.
+   *
+   * @param transform The transform to check.
+   * @return {@code true} if the transform is a single-column {@code date_trunc} transform with a
+   *     string literal interval.
+   */
+  public static boolean isAutoRangeTransform(Transform transform) {
+    if (!(transform instanceof Transforms.ApplyTransform)) {
+      return false;
+    }
+
+    Transforms.ApplyTransform applyTransform = (Transforms.ApplyTransform) transform;
+    if (!DATE_TRUNC_FUNCTION.equalsIgnoreCase(applyTransform.name())) {
+      return false;
+    }
+
+    Expression[] arguments = applyTransform.arguments();
+    if (arguments == null
+        || arguments.length != 2
+        || !(arguments[0] instanceof NamedReference.FieldReference)) {
+      return false;
+    }
+
+    String[] fieldNames = ((NamedReference.FieldReference) arguments[0]).fieldName();
+    return fieldNames != null
+        && fieldNames.length == 1
+        && fieldNames[0] != null
+        && !fieldNames[0].isEmpty()
+        && arguments[1] instanceof Literal
+        && ((Literal<?>) arguments[1]).value() instanceof String;
+  }
+
+  private static Optional<Transform> extractDateTruncTransform(String expression) {
+    int openingParenthesis = expression.indexOf('(');
+    if (openingParenthesis < 0
+        || !DATE_TRUNC_FUNCTION.equalsIgnoreCase(
+            expression.substring(0, openingParenthesis).trim())) {
+      return Optional.empty();
+    }
+
+    int closingParenthesis = findMatchingParenthesis(expression, openingParenthesis);
+    if (closingParenthesis != expression.length() - 1) {
+      return Optional.empty();
+    }
+
+    List<String> arguments =
+        splitFunctionArguments(expression, openingParenthesis + 1, closingParenthesis);
+    if (arguments.size() != 2) {
+      return Optional.empty();
+    }
+
+    String columnName = parseColumnReference(arguments.get(0));
+    String interval = parseStringLiteral(arguments.get(1));
+    if (columnName == null || interval == null) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        Transforms.apply(
+            DATE_TRUNC_FUNCTION,
+            new Expression[] {NamedReference.field(columnName), Literals.stringLiteral(interval)}));
+  }
+
+  private static String parseColumnReference(String columnReference) {
+    String trimmed = columnReference.trim();
+    if (trimmed.length() > 1
+        && trimmed.charAt(0) == BACK_TICK
+        && trimmed.charAt(trimmed.length() - 1) == BACK_TICK) {
+      StringBuilder columnName = new StringBuilder();
+      for (int i = 1; i < trimmed.length() - 1; i++) {
+        char current = trimmed.charAt(i);
+        if (current == BACK_TICK) {
+          if (i + 1 >= trimmed.length() - 1 || trimmed.charAt(i + 1) != BACK_TICK) {
+            return null;
+          }
+          columnName.append(current);
+          i++;
+        } else {
+          columnName.append(current);
+        }
+      }
+      return columnName.length() == 0 ? null : columnName.toString();
+    }
+    return SIMPLE_IDENTIFIER_PATTERN.matcher(trimmed).matches() ? trimmed : null;
+  }
+
+  private static String parseStringLiteral(String value) {
+    String trimmed = value.trim();
+    if (trimmed.length() < 2
+        || trimmed.charAt(0) != '\''
+        || trimmed.charAt(trimmed.length() - 1) != '\'') {
+      return null;
+    }
+    return unescapeSqlLiteral(trimmed.substring(1, trimmed.length() - 1), '\'');
+  }
+
+  private static List<String> splitFunctionArguments(String expression, int start, int end) {
+    List<String> arguments = new ArrayList<>();
+    char quote = 0;
+    int nestedParentheses = 0;
+    int argumentStart = start;
+    for (int i = start; i < end; i++) {
+      char current = expression.charAt(i);
+      if (quote != 0) {
+        if (current == '\\' && quote != BACK_TICK && i + 1 < end) {
+          i++;
+        } else if (current == quote) {
+          if (i + 1 < end && expression.charAt(i + 1) == quote) {
+            i++;
+          } else {
+            quote = 0;
+          }
+        }
+      } else if (current == '\'' || current == '"' || current == BACK_TICK) {
+        quote = current;
+      } else if (current == '(') {
+        nestedParentheses++;
+      } else if (current == ')') {
+        if (--nestedParentheses < 0) {
+          return List.of();
+        }
+      } else if (current == ',' && nestedParentheses == 0) {
+        arguments.add(expression.substring(argumentStart, i).trim());
+        argumentStart = i + 1;
+      }
+    }
+    if (quote != 0 || nestedParentheses != 0) {
+      return List.of();
+    }
+    arguments.add(expression.substring(argumentStart, end).trim());
+    return arguments;
+  }
+
+  private static int findMatchingParenthesis(String value, int openingParenthesis) {
+    char quote = 0;
+    int parentheses = 0;
+    for (int i = openingParenthesis; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (quote != 0) {
+        if (current == '\\' && quote != BACK_TICK && i + 1 < value.length()) {
+          i++;
+        } else if (current == quote) {
+          if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
+            i++;
+          } else {
+            quote = 0;
+          }
+        }
+      } else if (current == '\'' || current == '"' || current == BACK_TICK) {
+        quote = current;
+      } else if (current == '(') {
+        parentheses++;
+      } else if (current == ')' && --parentheses == 0) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   /**
