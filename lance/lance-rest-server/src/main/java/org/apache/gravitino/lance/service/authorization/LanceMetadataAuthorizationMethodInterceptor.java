@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.service.authorization;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -49,6 +50,7 @@ import org.lance.namespace.errors.LanceNamespaceException;
 import org.lance.namespace.errors.PermissionDeniedException;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.RegisterTableRequest;
+import org.lance.namespace.model.RenameTableRequest;
 
 /** Resolves Lance namespace IDs and maps shared authorization failures to Lance REST responses. */
 public class LanceMetadataAuthorizationMethodInterceptor
@@ -149,24 +151,86 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Returns the handler that authorizes an overwrite of an existing object. The mode of a Lance
-   * create request travels in the request body or in a query parameter rather than in the request
-   * path, so which privileges a create needs cannot be expressed by the method annotation alone.
+   * Creates request-specific authorization handlers for cross-schema rename and create overwrite.
    *
    * @param method invoked protocol method
    * @param parameters invoked method parameters
    * @param args invoked method arguments
-   * @return the overwrite handler for a create request, empty for every other operation
+   * @return a request-specific authorization handler when one is required
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
       Method method, Parameter[] parameters, Object[] args) {
+    Optional<AuthorizationHandler> renameHandler =
+        crossSchemaRenameAuthorizationHandler(method, parameters, args);
+    if (renameHandler.isPresent()) {
+      return renameHandler;
+    }
     String overwriteExpression =
         isTableOperation(method)
             ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
             : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
     return createMode(parameters, args)
         .map(mode -> new OverwriteAuthzHandler(mode, overwriteExpression));
+  }
+
+  private Optional<AuthorizationHandler> crossSchemaRenameAuthorizationHandler(
+      Method method, Parameter[] parameters, Object[] args) {
+    if (!isTableOperation(method) || !"renameTable".equals(method.getName())) {
+      return Optional.empty();
+    }
+
+    Optional<String> sourceId = pathArgument(parameters, args, "id");
+    String delimiter =
+        queryArgument(parameters, args, "delimiter")
+            .orElse(NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT);
+    if (sourceId.isEmpty() || delimiter.isBlank()) {
+      return Optional.empty();
+    }
+    ObjectIdentifier source = ObjectIdentifier.of(sourceId.get(), Pattern.quote(delimiter));
+    if (source.levels() != TABLE_IDENTIFIER_LEVELS) {
+      return Optional.empty();
+    }
+
+    for (Object arg : args) {
+      if (!(arg instanceof RenameTableRequest)) {
+        continue;
+      }
+      RenameTableRequest request = (RenameTableRequest) arg;
+      List<String> newNamespaceId = request.getNewNamespaceId();
+      String newTableName = request.getNewTableName();
+      if (newNamespaceId == null
+          || newNamespaceId.size() != 2
+          || newNamespaceId.get(0) == null
+          || newNamespaceId.get(0).isBlank()
+          || newNamespaceId.get(0).contains(delimiter)
+          || newNamespaceId.get(1) == null
+          || newNamespaceId.get(1).isBlank()
+          || newNamespaceId.get(1).contains(delimiter)
+          || newTableName == null
+          || newTableName.isBlank()
+          || newTableName.contains(delimiter)) {
+        return Optional.empty();
+      }
+      if (!source.levelAtListPos(0).equals(newNamespaceId.get(0))
+          || source.levelAtListPos(1).equals(newNamespaceId.get(1))) {
+        return Optional.empty();
+      }
+
+      Map<Entity.EntityType, NameIdentifier> destinationIdentifiers = baseIdentifiers();
+      String catalogName = source.levelAtListPos(0);
+      String schemaName = newNamespaceId.get(1);
+      destinationIdentifiers.put(
+          Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
+      destinationIdentifiers.put(
+          Entity.EntityType.SCHEMA,
+          NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName));
+      destinationIdentifiers.put(
+          Entity.EntityType.TABLE,
+          NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, newTableName));
+      return Optional.of(new RenameTargetAuthorizationHandler(destinationIdentifiers));
+    }
+    return Optional.empty();
   }
 
   @Override
@@ -260,6 +324,53 @@ public class LanceMetadataAuthorizationMethodInterceptor
       return nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
           ? Entity.EntityType.SCHEMA
           : Entity.EntityType.CATALOG;
+    }
+  }
+
+  private static final class RenameTargetAuthorizationHandler implements AuthorizationHandler {
+    private final Map<Entity.EntityType, NameIdentifier> destinationIdentifiers;
+
+    private RenameTargetAuthorizationHandler(
+        Map<Entity.EntityType, NameIdentifier> destinationIdentifiers) {
+      this.destinationIdentifiers = destinationIdentifiers;
+    }
+
+    @Override
+    public void process(Map<Entity.EntityType, NameIdentifier> sourceIdentifiers) {
+      AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+      if (!isAuthorized(
+          LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
+          sourceIdentifiers,
+          requestContext)) {
+        throw new ForbiddenException(
+            "User '%s' is not authorized to modify the source table",
+            PrincipalUtils.getCurrentUserName());
+      }
+      if (!isAuthorized(
+          LanceAuthorizationExpressions.CREATE_TABLE_AUTHORIZATION_EXPRESSION,
+          destinationIdentifiers,
+          requestContext)) {
+        throw new ForbiddenException(
+            "User '%s' is not authorized to rename a table into another schema",
+            PrincipalUtils.getCurrentUserName());
+      }
+    }
+
+    @Override
+    public boolean authorizationCompleted() {
+      return true;
+    }
+
+    private static boolean isAuthorized(
+        String expression,
+        Map<Entity.EntityType, NameIdentifier> identifiers,
+        AuthorizationRequestContext requestContext) {
+      return new AuthorizationExpressionEvaluator(expression)
+          .evaluate(
+              identifiers,
+              new HashMap<>(),
+              requestContext,
+              Optional.of(Entity.EntityType.TABLE.name()));
     }
   }
 

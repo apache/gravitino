@@ -72,6 +72,8 @@ import org.lance.namespace.model.DropTableRequest;
 import org.lance.namespace.model.DropTableResponse;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.RenameTableRequest;
+import org.lance.namespace.model.RenameTableResponse;
 import org.lance.namespace.model.TableExistsRequest;
 
 @Path("/v1/table/{id}")
@@ -322,6 +324,29 @@ public class LanceTableOperations {
               lanceNamespace
                   .asTableOps()
                   .alterTable(tableId, delimiter, alterTableAlterColumnsRequest);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/rename")
+  @Timed(name = "rename-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "rename-table", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
+  public Response renameTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
+      RenameTableRequest renameTableRequest) {
+    try {
+      Preconditions.checkArgument(
+          renameTableRequest != null, "Rename table request cannot be null.");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(renameTableRequest.getNewTableName()),
+          "New table name cannot be blank.");
+      RenameTableResponse response =
+          lanceNamespace.asTableOps().renameTable(tableId, delimiter, renameTableRequest);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
