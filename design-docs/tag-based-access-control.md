@@ -701,11 +701,11 @@ allow-only, and Databricks states that GRANT policies cannot revoke access grant
 restriction in [Allow and deny](#allow-and-deny) is the majority position rather than an unusual
 one.
 
-Unity Catalog does raise an error where policies conflict, but only when two row filters apply to
-the same table for a user, or two masks apply to the same column — transformations of the same
-kind, with no principled order between them. Its privilege composition is additive. It is not
-precedent for a conflict error in a design that makes whole-object decisions and excludes
-masking — see [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
+Unity Catalog does raise an error where policies conflict, but only when two distinct row filters
+apply to the same table for a user, or two distinct masks apply to the same column — transformations
+of the same kind, with no principled order between them. Its privilege composition is additive. This
+design has no masking, and allow against deny has a principled order: deny wins. So the error is not
+precedent here — see [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
 
 Ranger is also the only one of the three that documents an answer to [Freshness](#freshness): the
 plugin caches tags locally, polls the tag store for changes, and falls back to the cache file when
