@@ -52,7 +52,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    applyJdbcCredential(gravitinoCatalogClient, all);
+    applyJdbcCredential(catalog(), all);
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return jdbcTableCatalog;
   }

@@ -172,6 +172,35 @@ public class TestGravitinoCatalogManager {
   }
 
   @Test
+  void testClientEvictionInvalidatesCatalogCache() {
+    SparkConf sparkConf = tokenConf();
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_MAX_SIZE, "1");
+    GravitinoCatalogManager manager = createManager(sparkConf);
+
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt("alice"));
+    Catalog aliceCatalog1 = manager.getGravitinoCatalogInfo(CATALOG_NAME);
+    assertEquals(1, clientFactory.clientCount());
+    assertEquals(1, clientFactory.loadCount());
+
+    // Accessing Bob causes Alice's client to be evicted and closed
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt("bob"));
+    Catalog bobCatalog = manager.getGravitinoCatalogInfo(CATALOG_NAME);
+    assertEquals(2, clientFactory.clientCount());
+    assertEquals(2, clientFactory.loadCount());
+
+    assertTrue(
+        await(() -> clientFactory.closedCount() >= 1),
+        "Evicted client should be closed");
+
+    // Accessing Alice again should reload the catalog with a new client rather than returning the stale catalog
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt("alice"));
+    Catalog aliceCatalog2 = manager.getGravitinoCatalogInfo(CATALOG_NAME);
+    assertEquals(3, clientFactory.clientCount());
+    assertEquals(3, clientFactory.loadCount());
+    assertNotSame(aliceCatalog1, aliceCatalog2);
+  }
+
+  @Test
   void testCatalogCacheEntryExpires() throws InterruptedException {
     SparkConf sparkConf = tokenConf();
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_CATALOG_CACHE_TTL_SEC, "1");

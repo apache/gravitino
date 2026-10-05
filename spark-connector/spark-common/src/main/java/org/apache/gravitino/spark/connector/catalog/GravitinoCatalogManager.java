@@ -95,7 +95,7 @@ public class GravitinoCatalogManager {
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT)))
             // An evicted client still owns an HTTP connection pool, so it must be closed.
             .<GravitinoIdentity, GravitinoClient>removalListener(
-                (identity, client, cause) -> closeClient(identity, client))
+                (identity, client, cause) -> evictClient(identity, client))
             .build();
     this.gravitinoCatalogs =
         Caffeine.newBuilder()
@@ -247,6 +247,14 @@ public class GravitinoCatalogManager {
 
   private static String cacheKey(GravitinoIdentity identity, String catalogName) {
     return identity.key() + ":" + catalogName;
+  }
+
+  private void evictClient(GravitinoIdentity identity, GravitinoClient client) {
+    if (identity != null) {
+      String prefix = identity.key() + ":";
+      gravitinoCatalogs.asMap().keySet().removeIf(k -> k.startsWith(prefix));
+    }
+    closeClient(identity, client);
   }
 
   private static void closeClient(GravitinoIdentity identity, GravitinoClient client) {

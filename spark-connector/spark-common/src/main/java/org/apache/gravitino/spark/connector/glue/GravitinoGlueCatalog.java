@@ -107,7 +107,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     TableCatalog hiveCatalog = createHiveTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    this.vendedAwsCredentials = applyS3Credential(gravitinoCatalogClient, all);
+    this.vendedAwsCredentials = applyS3Credential(catalog(), all);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return hiveCatalog;
   }
