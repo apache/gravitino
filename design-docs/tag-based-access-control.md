@@ -162,7 +162,6 @@ a fixed allowlist:
 | Object   | Permitted                                          |
 | -------- | -------------------------------------------------- |
 | Table    | `SELECT_TABLE`, `MODIFY_TABLE`, `PROBE_TABLE_LIKE` |
-
 | View     | `SELECT_VIEW`                                      |
 | Fileset  | `READ_FILESET`, `WRITE_FILESET`                    |
 | Topic    | `CONSUME_TOPIC`, `PRODUCE_TOPIC`                   |
@@ -554,7 +553,7 @@ Four write paths can change who has access. Their current authority requirements
 | ------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Create a policy          | `METALAKE::OWNER \|\| METALAKE::CREATE_POLICY`                                  | metalake only                                                    |
 | Create a tag             | `METALAKE::OWNER \|\| METALAKE::CREATE_TAG`                                     | metalake only                                                    |
-| Bind a policy to a tag   | tag-scoped                                                                      | metalake, or the specific tag                                    |
+| Bind a policy to a tag   | `METALAKE::OWNER \|\| ((TAG::OWNER \|\| ANY_APPLY_TAG) && (POLICY::OWNER \|\| ANY_APPLY_POLICY))` | metalake, the specific tag, or the specific policy               |
 | Apply a tag to an object | `METALAKE::OWNER \|\| ((TAG::OWNER \|\| ANY_APPLY_TAG) && CAN_ACCESS_METADATA)` | the specific tag, and only objects the caller can already access |
 
 Creating a policy and creating a tag are both metalake-wide, with no way to scope either to a
@@ -581,12 +580,15 @@ the object itself. That bounds which objects they can tag, not what the tag may 
 Binding an access policy to a tag is a deliberate delegation: it says that whoever can apply this
 tag may confer this access on the named role. That is the feature, not a defect.
 
-Two properties of that delegation are worth recording:
+Three properties of that delegation are worth recording:
 
 - `CAN_ACCESS_METADATA` establishes that the applier can *access* the object. It does not establish
   that they may *confer* access on a role they do not control. These are different authorities.
 - `ApplyTag.canBindTo` accepts only `METALAKE` and `TAG`, so the delegation cannot be scoped to a
   subtree — "may apply `certified` within `lakehouse.finance`" is not expressible.
+- The policy half of the bind expression is satisfied by `POLICY::OWNER` or a policy-scoped
+  `APPLY_POLICY`. Whoever owns the policy can therefore bind it to a tag that is already applied
+  anywhere, holding no authority over the objects that tag reaches.
 
 See [OQ-4](#oq-4--authority-to-confer-access-through-a-tag).
 
@@ -596,8 +598,9 @@ One server-level configuration turns tag-based access on or off. It defaults to 
 audit-only mode is in scope for v1.
 
 **Off.** Policies and tags behave as they do today: they can be created, bound to each other and
-applied to objects, each still requiring the authority in the table above. The authorizer never
-reads them, so no tag grants anyone anything.
+applied to objects, each still requiring the authority in
+[OQ-4](#oq-4--authority-to-confer-access-through-a-tag). The authorizer never reads them, so no tag
+grants anyone anything.
 
 **On.** The authorizer consults tags — both when deciding access to a single object and when
 filtering a list. It is both or neither: enforcing only one would either grant a caller access to
@@ -623,7 +626,8 @@ are how every privilege in Gravitino already behaves. M4 tests the first row acr
 
 **Off to on grants everything authored while it was off.** The authority checks ran when each
 policy was bound, so that access was authorized. The flag decides when it takes effect, not
-whether it was allowed.
+whether it was allowed. That holds from M2 onwards; binds made during M1 predate those checks,
+so M2 validates what already exists.
 
 The flag is server-wide, so turning it off affects every metalake.
 
@@ -724,7 +728,7 @@ Each is settled below. The alternatives are kept with the reason they were not t
 | OQ-1 | Where tags are evaluated                                | [Evaluation](#evaluation)                                     | Inside `authorize`, at the privilege leaf                |
 | OQ-2 | Composition when a tag allows and RBAC denies           | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins                                                |
 | OQ-3 | What happens when a referenced role is deleted          | [below](#oq-3--deleting-a-referenced-role)                    | Refuse the deletion                                      |
-| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag)      | Grant authority on the object, and an explicit tag grant |
+| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag)      | Grant authority on the object and an explicit tag grant to apply; metalake-level policy authority to bind or widen |
 
 ### OQ-1 — where tags are evaluated
 
@@ -799,26 +803,28 @@ access on an object becomes authority over who else can reach it.
 |              | Option                                                                  | Behaviour                                                                                                                                                                                                                                                                                                           |
 | ------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Decided** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
-| **Decided** | Require policy authority to bind or widen an access policy               | Covers the other two paths. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once.                                                                                                                                                          |
+| **Decided** | Require metalake-level policy authority to bind or widen an access policy | Covers the other two paths: `METALAKE::OWNER` or `METALAKE::CREATE_POLICY`. A policy-scoped `APPLY_POLICY` or `POLICY::OWNER` is not enough, because a policy carries no scope of its own and binding it reaches every object the tag already touches. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once. |
 |              | Leave as is                                                             | Reading an object is enough to change who else can reach it.                                                                                                                                                                                                                                                        |
 |              | Require the applier to hold the privilege the tag confers               | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles.                                                                                                                        |
+|              | Require authority over every object the tag currently reaches           | A bind that is legal today becomes illegal tomorrow because someone applied the tag elsewhere, and the check costs an enumeration that grows with the tag's reach.                                                                                                                                                  |
 
-Justification: the two requirements cover different halves — one governs who may change access
-on an object, the other who may wield a tag that confers it. Neither adds a new privilege, and
-scoping needs no new mechanism, because grant authority can already be given on a catalog or a
-schema.
+Justification: the two requirements cover different halves. Object authority scopes where a tag
+reaches; policy authority scopes what it confers, and for an access-carrying policy it is
+metalake-wide by construction. Because the halves are independent, no scope has to be derived from
+the tag's current reach. Neither requirement adds a new privilege.
 
 Widening takes the same requirement as binding: the policy is already attached, so adding a
 privilege or a role to `content` confers access across everything the tag reaches with no further
-act by anyone. Neither is scoped to the tag's current reach — authority comes from where it was
-granted, on a catalog or a schema. M2 covers all three paths.
+act by anyone. M2 covers all three paths.
 
-The earlier alternative of extending `ApplyTag.canBindTo` to `CATALOG` and `SCHEMA` is deferred
-beyond v1. It is not a prerequisite for M2: the explicit tag grant answers *which tag*, while
-existing `MANAGE_GRANTS` or ownership on the object or an ancestor answers *where*. A later
-extension would need to define how tag-scoped and object-scoped `APPLY_TAG` grants compose, and
-how existing grants retain their meaning, before scheduling its implementation. No new IAM role
-or privilege is introduced by the current proposal.
+The cost is that an access policy cannot be delegated: a team owning a catalog cannot own the
+policies that confer access within it. Scoped tags are the delegation path — an access-carrying tag
+would carry a scope, could only be applied inside it, and policy authority at that scope would then
+suffice. That needs `ApplyTag.canBindTo` extended to `CATALOG` and `SCHEMA`, and rules for how
+tag-scoped and object-scoped `APPLY_TAG` grants compose while existing grants retain their meaning.
+Both are deferred beyond v1, and neither is a prerequisite for M2: the explicit tag grant answers
+*which tag*, while existing `MANAGE_GRANTS` or ownership on the object or an ancestor answers
+*where*. No new IAM role or privilege is introduced by the current proposal.
 
 ---
 
@@ -829,7 +835,7 @@ Each milestone names the decision it rests on.
 | Milestone                         | What lands                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Rests on                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1 — model and storage            | `AccessControlContent` and its `validate()`, registered in `PolicyContents` and the content DTO, and the derived policy-to-role record written on policy create and update. Policies can be created, validated and bound to tags; nothing evaluates them yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [OQ-3](#oq-3--deleting-a-referenced-role), for whether `validate()` rejects a reference to a role that does not exist.                                                                                                                                                                      |
-| M2 — authority on the write paths | The authority checks on the three write paths in OQ-4: applying an access-carrying tag, binding a policy to a tag already applied, and widening a bound policy's `content`. Lands before M3 is switched on, or all three confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
+| M2 — authority on the write paths | The authority checks on the three write paths in OQ-4: applying an access-carrying tag, binding a policy to a tag already applied, and widening a bound policy's `content`, including binds and tag applications made during M1, before these checks existed. Lands before M3 is switched on, or all three confer access unchecked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [OQ-4](#oq-4--authority-to-confer-access-through-a-tag). Independent of where tags are evaluated.                                                                                                                                                                                           |
 | M3 — enforcement, single node     | The check at the privilege leaf described in [Evaluation](#evaluation), with per-request caching, behind the configuration in [Enabling the feature](#enabling-the-feature) — which lands here, or there is no way to back the feature out. Tags now grant access, correctly on one node: an edit to a tag or a policy takes effect on the next request, as [Freshness](#freshness) defines it; the per-request cache does not outlive the request that built it. Because list endpoints filter through the same authorizer, filtering starts consulting tags here too, at the unbatched cost in [Cost](#cost). The component boundaries and test acceptance criteria in [Independently testable evaluation](#independently-testable-evaluation) land here too. Two smaller pieces land with it: the diagnostic naming the tag and policy whose allow an RBAC deny suppressed, and the test asserting that no tag-conferrable privilege appears in bare `TYPE::PRIVILEGE` form in an authorization expression. | [OQ-1](#oq-1--where-tags-are-evaluated) — expanding rows at load time would make this a write-path milestone instead. [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies) needs no combining rule under the proposed placement, only those two pieces; the other option needs one. |
 | M4 — multi-node tests             | Tests that a tag application, a policy bind, an edit to a policy's `content` and a policy disable are each visible on the next request on another node, and that the feature flag is per node. No new transport: [Freshness](#freshness) shows tag state is read per request, so there is nothing to propagate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Nothing. It asserts the behaviour the leaf check already has.                                                                                                                                                                                                                               |
 | M5 — affordable list filtering    | The batch preload in [List filtering](#list-filtering). Filtering already consults tags from M3; this is what stops it costing an ancestor walk per candidate, so enabling the feature on a large metalake before M5 is correct but expensive.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [OQ-1](#oq-1--where-tags-are-evaluated), for the same reason as M3.                                                                                                                                                                                                                         |
