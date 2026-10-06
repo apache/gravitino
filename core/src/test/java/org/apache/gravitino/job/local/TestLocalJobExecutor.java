@@ -644,7 +644,9 @@ public class TestLocalJobExecutor {
     // A process that ignores SIGTERM must still terminate (and free its worker
     // thread) after the cancel grace period.
     LocalJobExecutor executor = new LocalJobExecutor();
-    executor.initialize(ImmutableMap.of("cancelForceKillDelayInMs", "1000"));
+    executor.initialize(
+        withStagingDir(
+            ImmutableMap.of(LocalJobExecutorConfigs.CANCEL_FORCE_KILL_DELAY_MS, "1000")));
     try {
       JobTemplateEntity.TemplateContent trapContent =
           JobTemplateEntity.TemplateContent.builder()
@@ -665,7 +667,7 @@ public class TestLocalJobExecutor {
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
       JobTemplate template =
-          JobManager.createRuntimeJobTemplate(trapTemplate, ImmutableMap.of(), workingDir);
+          new JobTemplateResolver(trapTemplate).resolve(ImmutableMap.of(), workingDir);
 
       String jobId = executor.submitJob(template);
       Thread.sleep(1000);
@@ -709,7 +711,7 @@ public class TestLocalJobExecutor {
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
       JobTemplate template =
-          JobManager.createRuntimeJobTemplate(templateEntity, ImmutableMap.of(), workingDir);
+          new JobTemplateResolver(templateEntity).resolve(ImmutableMap.of(), workingDir);
 
       String jobId = executor.submitJob(template);
       Thread.sleep(1000);
