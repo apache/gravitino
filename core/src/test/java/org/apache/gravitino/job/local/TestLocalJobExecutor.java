@@ -651,7 +651,7 @@ public class TestLocalJobExecutor {
       JobTemplateEntity.TemplateContent trapContent =
           JobTemplateEntity.TemplateContent.builder()
               .withExecutable("/bin/sh")
-              .withArguments(Lists.newArrayList("-c", "trap '' TERM; sleep 300"))
+              .withArguments(Lists.newArrayList("-c", "trap '' TERM; echo ready; exec sleep 300"))
               .withEnvironments(ImmutableMap.of())
               .withJobType(JobTemplate.JobType.SHELL)
               .withScripts(Lists.newArrayList())
@@ -670,7 +670,7 @@ public class TestLocalJobExecutor {
           new JobTemplateResolver(trapTemplate).resolve(ImmutableMap.of(), workingDir);
 
       String jobId = executor.submitJob(template);
-      Thread.sleep(1000);
+      awaitReadyMarker();
       Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
 
       executor.cancelJob(jobId);
@@ -695,7 +695,8 @@ public class TestLocalJobExecutor {
           JobTemplateEntity.TemplateContent.builder()
               .withExecutable("/bin/sh")
               .withArguments(
-                  Lists.newArrayList("-c", "trap 'exit 0' TERM; while :; do sleep 1; done"))
+                  Lists.newArrayList(
+                      "-c", "trap 'exit 0' TERM; echo ready; while :; do sleep 1; done"))
               .withEnvironments(ImmutableMap.of())
               .withJobType(JobTemplate.JobType.SHELL)
               .withScripts(Lists.newArrayList())
@@ -714,7 +715,7 @@ public class TestLocalJobExecutor {
           new JobTemplateResolver(templateEntity).resolve(ImmutableMap.of(), workingDir);
 
       String jobId = executor.submitJob(template);
-      Thread.sleep(1000);
+      awaitReadyMarker();
       Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
 
       executor.cancelJob(jobId);
@@ -1222,6 +1223,19 @@ public class TestLocalJobExecutor {
     String jobId = runSucceededJob(workingDir);
     Assertions.assertTrue(outputIndexFile(jobId).exists());
     Assertions.assertEquals(6, jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES).size());
+  }
+
+  // The job script prints "ready" only after installing its TERM trap, so a cancel sent once this
+  // returns cannot reach the shell before the trap is in place.
+  private static void awaitReadyMarker() {
+    File output = new File(workingDir, "output.log");
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .until(
+            () ->
+                output.exists()
+                    && FileUtils.readFileToString(output, StandardCharsets.UTF_8)
+                        .contains("ready"));
   }
 
   private static Map<String, String> withStagingDir(Map<String, String> configs) {

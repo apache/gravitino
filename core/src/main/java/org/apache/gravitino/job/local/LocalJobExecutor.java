@@ -473,7 +473,9 @@ public class LocalJobExecutor implements JobExecutor {
 
       int exitCode = process.waitFor();
       synchronized (lock) {
-        JobHandle.Status oldStatus = jobInfos.get(jobId).status();
+        // The job may be missing if the executor is closed concurrently.
+        JobExecutionInfo current = jobInfos.get(jobId);
+        JobHandle.Status oldStatus = current == null ? null : current.status();
         if (oldStatus == JobHandle.Status.CANCELLING) {
           // A cancelled job whose process traps SIGTERM and still exits 0 was cancelled, not
           // successful; consult the cancel state before the exit code.
@@ -482,7 +484,7 @@ public class LocalJobExecutor implements JobExecutor {
         } else if (exitCode == 0) {
           LOG.info("Job {} completed successfully", jobId);
           finishJob(jobId, JobHandle.Status.SUCCEEDED);
-        } else if (oldStatus == JobHandle.Status.STARTED) {
+        } else if (oldStatus == null || oldStatus == JobHandle.Status.STARTED) {
           LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
           finishJob(jobId, JobHandle.Status.FAILED);
         }

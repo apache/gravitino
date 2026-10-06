@@ -389,6 +389,7 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
 | `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
+| `gravitino.jobExecutor.local.cancelForceKillDelayInMs` | How long in milliseconds a cancelled job's process may keep running after it is asked to stop before the executor kills it forcibly            | `30000` (30 seconds)                   | No       |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
 
 The local job executor always uses `gravitino.job.stagingDir` as its staging directory, the same one
