@@ -115,6 +115,7 @@ import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -367,6 +368,19 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
     restoreDefaultPrincipal();
+    // View and function cache keys read the catalog's case rules; default to a case-sensitive
+    // catalog. Tests that need other rules install their own catalog manager.
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
     // Reset role-user relation mock to return empty list (no roles) by default; individual tests
     // can override as needed.
     NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
@@ -2336,6 +2350,60 @@ public class TestJcasbinAuthorizer {
       assertEquals(
           Optional.of(100L),
           lookups.resolveMetadataId(lower, METALAKE, new AuthorizationRequestContext()));
+    } finally {
+      when(gravitinoEnv.catalogManager()).thenReturn(null);
+    }
+  }
+
+  @Test
+  public void testViewAndFunctionCacheKeysUseNormalizedSchema() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    // Hive-shaped: schema names are case-insensitive, view and function names are not.
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return scope == Scope.SCHEMA
+                    ? CapabilityResult.unsupported("case insensitive")
+                    : CapabilityResult.SUPPORTED;
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(
+            getMetadataIdCache(jcasbinAuthorizer), getOwnerRelCache(jcasbinAuthorizer));
+    try {
+      for (MetadataObject.Type type :
+          ImmutableList.of(MetadataObject.Type.VIEW, MetadataObject.Type.FUNCTION)) {
+        MetadataObject upper = MetadataObjects.parse("catalog.SCHEMA.Sales", type);
+        metadataIdConverterMockedStatic
+            .when(() -> MetadataIdConverter.getID(upper, METALAKE))
+            .thenReturn(Optional.of(100L));
+        assertEquals(
+            Optional.of(100L),
+            lookups.resolveMetadataId(upper, METALAKE, new AuthorizationRequestContext()));
+        // Hooks invalidate by the stored name; the entry warmed by the upper-case spelling must go.
+        jcasbinAuthorizer.handleEntityNameIdMappingChange(
+            METALAKE,
+            NameIdentifier.of(METALAKE, "catalog", "schema", "Sales"),
+            MetadataObjectUtil.toEntityType(type));
+        metadataIdConverterMockedStatic
+            .when(() -> MetadataIdConverter.getID(upper, METALAKE))
+            .thenReturn(Optional.of(200L));
+        assertEquals(
+            Optional.of(200L),
+            lookups.resolveMetadataId(upper, METALAKE, new AuthorizationRequestContext()),
+            type.name());
+      }
     } finally {
       when(gravitinoEnv.catalogManager()).thenReturn(null);
     }

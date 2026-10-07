@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Optional;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -79,22 +78,9 @@ public class JcasbinAuthorizationLookups {
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
     try {
-      MetadataObject cacheObject = metadataObject;
-      // Hooks and change-log records use normalized parents. Cache the same key for every
-      // equivalent request spelling, while preserving the Gravitino-owned model leaf.
-      if (metadataObject.type() == MetadataObject.Type.SEMANTIC_MODEL) {
-        NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-        Capability capability =
-            CapabilityHelpers.getCapability(ident, GravitinoEnv.getInstance().catalogManager());
-        NameIdentifier normalized =
-            NameIdentifier.of(
-                CapabilityHelpers.applyCaseSensitive(
-                    ident.namespace(), Capability.Scope.SEMANTIC_MODEL, capability),
-                ident.name());
-        cacheObject =
-            NameIdentifierUtil.toMetadataObject(normalized, Entity.EntityType.SEMANTIC_MODEL);
-      }
-      String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);
+      String cacheKey =
+          JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+              metalake, cacheKeyObject(metadataObject, metalake));
       // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
       // by throwing through the loaders and translated back to Optional.empty() here. This caches
       // only positive results, never a negative one.
@@ -105,6 +91,39 @@ public class JcasbinAuthorizationLookups {
     } catch (NotFoundException e) {
       return Optional.empty();
     }
+  }
+
+  /**
+   * Hooks and change-log records use stored (case-normalized) names, so key semantic models, views
+   * and functions by the normalized name to give every equivalent request spelling one cache entry
+   * that those invalidations reach. The Gravitino-owned semantic model leaf is kept as is.
+   */
+  private static MetadataObject cacheKeyObject(MetadataObject metadataObject, String metalake) {
+    Capability.Scope scope;
+    switch (metadataObject.type()) {
+      case SEMANTIC_MODEL:
+        scope = Capability.Scope.SEMANTIC_MODEL;
+        break;
+      case VIEW:
+        scope = Capability.Scope.VIEW;
+        break;
+      case FUNCTION:
+        scope = Capability.Scope.FUNCTION;
+        break;
+      default:
+        return metadataObject;
+    }
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Capability capability =
+        CapabilityHelpers.getCapability(ident, GravitinoEnv.getInstance().catalogManager());
+    NameIdentifier normalized =
+        scope == Capability.Scope.SEMANTIC_MODEL
+            ? NameIdentifier.of(
+                CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability),
+                ident.name())
+            : CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+    return NameIdentifierUtil.toMetadataObject(
+        normalized, MetadataObjectUtil.toEntityType(metadataObject.type()));
   }
 
   private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {
