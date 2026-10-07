@@ -50,6 +50,8 @@ public class MetadataIdConverter {
           MetadataObject.Type.MODEL, Capability.Scope.MODEL,
           MetadataObject.Type.FILESET, Capability.Scope.FILESET,
           MetadataObject.Type.TOPIC, Capability.Scope.TOPIC,
+          MetadataObject.Type.VIEW, Capability.Scope.VIEW,
+          MetadataObject.Type.FUNCTION, Capability.Scope.FUNCTION,
           MetadataObject.Type.COLUMN, Capability.Scope.COLUMN,
           MetadataObject.Type.SEMANTIC_MODEL, Capability.Scope.SEMANTIC_MODEL);
 

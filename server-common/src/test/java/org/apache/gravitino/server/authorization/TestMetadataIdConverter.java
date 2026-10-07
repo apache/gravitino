@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
@@ -51,6 +52,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -58,7 +60,10 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.EntityClassMapper;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -134,6 +139,90 @@ public class TestMetadataIdConverter {
               MetadataObjects.parse(
                   "catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL),
               "metalake"));
+    }
+  }
+
+  @Test
+  void testViewAndFunctionLookupNormalizesCase() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return CapabilityResult.unsupported("lowercase");
+          }
+        };
+    when(catalog.capability()).thenReturn(capability);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    ViewEntity view = mock(ViewEntity.class);
+    when(view.id()).thenReturn(81L);
+    when(store.get(
+            NameIdentifier.of("metalake", "catalog", "schema", "sales_view"),
+            Entity.EntityType.VIEW,
+            ViewEntity.class))
+        .thenReturn(view);
+    FunctionEntity function = mock(FunctionEntity.class);
+    when(function.id()).thenReturn(82L);
+    when(store.get(
+            NameIdentifier.of("metalake", "catalog", "schema", "sales_fun"),
+            Entity.EntityType.FUNCTION,
+            FunctionEntity.class))
+        .thenReturn(function);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(81L),
+          MetadataIdConverter.getID(
+              MetadataObjects.parse("catalog.SCHEMA.SALES_VIEW", MetadataObject.Type.VIEW),
+              "metalake"));
+      Assertions.assertEquals(
+          Optional.of(82L),
+          MetadataIdConverter.getID(
+              MetadataObjects.parse("catalog.SCHEMA.Sales_Fun", MetadataObject.Type.FUNCTION),
+              "metalake"));
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testCatalogScopedTypesAreAllCaseNormalized() throws Exception {
+    // Every metadata type living under a catalog must have both a capability scope and an
+    // entity class registered; a missing entry skips case normalization and breaks id
+    // resolution on case-insensitive catalogs. Metalake-scoped and principal types are
+    // deliberately unmapped, so derive the checked set from the enum minus an ignore set -
+    // a newly added catalog-scoped type then fails here instead of silently misbehaving.
+    ImmutableSet<MetadataObject.Type> unmappedTypes =
+        ImmutableSet.of(
+            MetadataObject.Type.METALAKE,
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.ROLE,
+            MetadataObject.Type.TAG,
+            MetadataObject.Type.POLICY,
+            MetadataObject.Type.JOB,
+            MetadataObject.Type.JOB_TEMPLATE);
+    ImmutableMap<MetadataObject.Type, Capability.Scope> mapping =
+        (ImmutableMap<MetadataObject.Type, Capability.Scope>)
+            FieldUtils.readStaticField(MetadataIdConverter.class, "METADATA_SCOPE_MAPPING", true);
+    for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      if (unmappedTypes.contains(type)) {
+        continue;
+      }
+      Assertions.assertNotNull(
+          mapping.get(type), String.format("MetadataObject.Type.%s has no capability scope", type));
+      Assertions.assertNotNull(
+          EntityClassMapper.getEntityClass(MetadataObjectUtil.toEntityType(type)),
+          String.format("MetadataObject.Type.%s has no entity class", type));
     }
   }
 
