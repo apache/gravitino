@@ -73,6 +73,35 @@ class TestGravitinoLanceModeParsing {
   }
 
   @Test
+  void testParseEnumTokenAcceptsPascalCaseAndSnakeCase() {
+    // The Lance namespace specification spells a mode either way, so both have to resolve to the
+    // same constant. ExistOk is the only multi-word value in the mode and behavior vocabulary,
+    // which is why it is the only spelling the two forms differ on.
+    for (String mode :
+        new String[] {"ExistOk", " ExistOk ", "existOk", "EXISTOK", "existok", "exist_ok"}) {
+      Assertions.assertEquals(
+          TestMode.EXIST_OK,
+          CommonUtil.parseEnumToken(TestMode.class, mode, "Unknown mode: ", "table"),
+          "mode '" + mode + "' must resolve to EXIST_OK");
+    }
+  }
+
+  @Test
+  void testParseEnumTokenRejectsSpellingsThatAreNotTheConstant() {
+    // An underscore inserted into a single-word constant must not resolve: the mode is also read
+    // by LanceMetadataAuthorizationMethodInterceptor through CommonUtil.normalizeToken, which
+    // compares it against the literal OVERWRITE, so a token resolved here but not recognized
+    // there would be authorized as a plain create and a create privilege could replace an object
+    // owned by somebody else.
+    for (String mode : new String[] {"CRE_ATE", "cre_ate", "Exist-Ok", "ExistsOk", "ExistOkay"}) {
+      Assertions.assertThrows(
+          InvalidInputException.class,
+          () -> CommonUtil.parseEnumToken(TestMode.class, mode, "Unknown mode: ", "table"),
+          "mode '" + mode + "' must be rejected");
+    }
+  }
+
+  @Test
   void testNamespaceModeRejectsMalformedValues() {
     GravitinoLanceNameSpaceOperations operations =
         new GravitinoLanceNameSpaceOperations(Mockito.mock(GravitinoLanceNamespaceWrapper.class));
@@ -111,12 +140,18 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
 
     operations.createTable("catalog.schema.table", " exist_ok ", ".", null, Map.of(), null);
+    // The catalog reads lance.creation-mode with CreationMode.valueOf, so whichever spelling the
+    // client sends has to be stored as the canonical constant name.
+    operations.createTable("catalog.schema.table", " ExistOk ", ".", null, Map.of(), null);
 
     ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
-    Mockito.verify(tableCatalog)
+    Mockito.verify(tableCatalog, Mockito.times(2))
         .createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
-    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
+    propertiesCaptor
+        .getAllValues()
+        .forEach(
+            properties -> Assertions.assertEquals("EXIST_OK", properties.get(LANCE_CREATION_MODE)));
   }
 
   @Test

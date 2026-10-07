@@ -295,6 +295,11 @@ public class LanceRESTServiceIT extends BaseIT {
     createNamespaceResp = ns.createNamespace(createNamespaceReq);
     Assertions.assertEquals(catalog.properties(), createNamespaceResp.getProperties());
 
+    // the spec spells the same mode in PascalCase, which has to be accepted as well
+    createNamespaceReq.setMode("ExistOk");
+    createNamespaceResp = ns.createNamespace(createNamespaceReq);
+    Assertions.assertEquals(catalog.properties(), createNamespaceResp.getProperties());
+
     // create catalog again with overwrite mode should succeed and update properties
     Map<String, String> newProps =
         new HashMap<>(catalogProps) {
@@ -334,6 +339,11 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // create schema again with exist_ok mode should succeed
     createSchemaReq.setMode("exist_ok");
+    createNamespaceResp = ns.createNamespace(createSchemaReq);
+    Assertions.assertEquals(schema.properties(), createNamespaceResp.getProperties());
+
+    // the spec spells the same mode in PascalCase, which has to be accepted as well
+    createSchemaReq.setMode("ExistOk");
     createNamespaceResp = ns.createNamespace(createSchemaReq);
     Assertions.assertEquals(schema.properties(), createNamespaceResp.getProperties());
 
@@ -577,16 +587,18 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(new File(newLocation).exists());
     Assertions.assertFalse(new File(location).exists());
 
-    // Check exist_ok mode
-    response =
-        Assertions.assertDoesNotThrow(
-            () -> createTable(ids, newLocation, overwriteTableProperties, body, "exist_ok"));
+    // Check exist_ok mode, in the snake_case and the PascalCase spelling the spec allows
+    for (String existOkMode : List.of("exist_ok", "ExistOk")) {
+      response =
+          Assertions.assertDoesNotThrow(
+              () -> createTable(ids, newLocation, overwriteTableProperties, body, existOkMode));
 
-    Assertions.assertNotNull(response);
-    Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
-    Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
-    Assertions.assertEquals(newLocation, response.getLocation());
-    Assertions.assertTrue(new File(newLocation).exists());
+      Assertions.assertNotNull(response);
+      Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
+      Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
+      Assertions.assertEquals(newLocation, response.getLocation());
+      Assertions.assertTrue(new File(newLocation).exists());
+    }
 
     // Create table again without overwrite or exist_ok should fail
     LanceNamespaceException exception =

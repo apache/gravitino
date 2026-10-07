@@ -46,13 +46,36 @@ public class CommonUtil {
     return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
   }
 
+  /**
+   * Resolves a request token to a constant of {@code enumClass}, accepting the two spellings the
+   * Lance namespace specification uses for the same value: snake_case ({@code exist_ok}) and
+   * PascalCase ({@code ExistOk}).
+   *
+   * <p>A token matches a constant when it equals the constant name or that name with its
+   * underscores removed, and nothing looser. The same token is also read as a mode by {@code
+   * LanceMetadataAuthorizationMethodInterceptor} through {@link #normalizeToken}, which compares it
+   * against the literal {@code OVERWRITE}; a spelling resolved to {@code OVERWRITE} here but not
+   * recognized there would be authorized as a plain create, letting a caller holding only a create
+   * privilege replace an object somebody else owns.
+   *
+   * @param <E> the enum type being resolved
+   * @param enumClass the enum whose constants the token is resolved against
+   * @param value the raw token sent by the client
+   * @param errorMessagePrefix the prefix of the message reported when no constant matches
+   * @param instance the identifier the error is reported for
+   * @return the matching constant
+   * @throws InvalidInputException when no constant matches the token
+   */
   static <E extends Enum<E>> E parseEnumToken(
       Class<E> enumClass, String value, String errorMessagePrefix, String instance) {
-    try {
-      return Enum.valueOf(enumClass, normalizeToken(value));
-    } catch (IllegalArgumentException e) {
-      throw new InvalidInputException(
-          errorMessagePrefix + value, formatCurrentStackTrace(), instance);
+    String token = normalizeToken(value);
+    for (E constant : enumClass.getEnumConstants()) {
+      String name = constant.name();
+      if (name.equals(token) || name.replace("_", "").equals(token)) {
+        return constant;
+      }
     }
+    throw new InvalidInputException(
+        errorMessagePrefix + value, formatCurrentStackTrace(), instance);
   }
 }
