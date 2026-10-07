@@ -171,7 +171,13 @@ public interface Privilege {
      * credential secrets in the {@code getSecrets} result. Alone it does not authorize {@code
      * getSecrets}. Does not authorize {@code getCredentials}.
      */
-    INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38);
+    INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38),
+    /** The privilege to create a semantic model. */
+    CREATE_SEMANTIC_MODEL(0L, 1L << 39),
+    /** The privilege to discover a semantic model and load its definition. */
+    SELECT_SEMANTIC_MODEL(0L, 1L << 40),
+    /** The privilege to rename a semantic model or alter its definition and metadata. */
+    MODIFY_SEMANTIC_MODEL(0L, 1L << 41);
 
     private final long highBits;
     private final long lowBits;
