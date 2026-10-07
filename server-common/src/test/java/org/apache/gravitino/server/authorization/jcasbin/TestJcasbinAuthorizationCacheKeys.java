@@ -66,6 +66,16 @@ public class TestJcasbinAuthorizationCacheKeys {
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "VIEW", "tbl1"), viewKey);
 
+    MetadataObject semanticModel =
+        MetadataObjects.of(
+            Arrays.asList("cat1", "sch1", "sales_model"), MetadataObject.Type.SEMANTIC_MODEL);
+    String semanticModelKey =
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", semanticModel);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "SEMANTIC_MODEL", "sales_model"),
+        semanticModelKey);
+    Assertions.assertTrue(semanticModelKey.startsWith(schemaKey));
+
     Assertions.assertTrue(schemaKey.startsWith(catalogKey));
     Assertions.assertTrue(tableKey.startsWith(schemaKey));
     Assertions.assertTrue(columnKey.startsWith(tableKey));
@@ -91,6 +101,8 @@ public class TestJcasbinAuthorizationCacheKeys {
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.TOPIC));
     Assertions.assertFalse(
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.SEMANTIC_MODEL));
   }
 
   @Test
