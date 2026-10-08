@@ -22,6 +22,7 @@ package org.apache.gravitino.server.authorization;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ObjectArrays;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +32,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
@@ -38,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** It is used to convert MetadataObject to MetadataId */
 public class MetadataIdConverter {
@@ -95,14 +98,55 @@ public class MetadataIdConverter {
     return Optional.of(extractIdFromEntity(entity));
   }
 
+  /**
+   * Normalizes a metadata object's name using the same catalog rules as ID resolution.
+   *
+   * <p>Types without a catalog capability scope retain their names. Semantic model leaves remain
+   * case sensitive, while column names and their table/schema parents follow their own scopes.
+   *
+   * @param metadataObject the object whose name will be normalized
+   * @param metalake the metalake name
+   * @return the normalized object, suitable for name-to-ID cache keys
+   * @throws NotFoundException if the containing catalog does not exist
+   */
+  public static MetadataObject normalizeMetadataObject(
+      MetadataObject metadataObject, String metalake) {
+    Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
+    Capability.Scope scope = METADATA_SCOPE_MAPPING.get(metadataObject.type());
+    if (scope == null) {
+      return metadataObject;
+    }
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier normalized =
+        normalizeIdentifier(ident, scope, GravitinoEnv.getInstance().catalogManager());
+    if (normalized.equals(ident)) {
+      return metadataObject;
+    }
+    return NameIdentifierUtil.toMetadataObject(
+        normalized, MetadataObjectUtil.toEntityType(metadataObject));
+  }
+
   @VisibleForTesting
   static NameIdentifier normalizeCaseSensitive(
+      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
+    return normalizeIdentifier(ident, scope, catalogManager);
+  }
+
+  private static NameIdentifier normalizeIdentifier(
       NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
     if (scope == null) {
       return ident;
     }
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
+    if (scope == Capability.Scope.COLUMN) {
+      NameIdentifier table =
+          CapabilityHelpers.applyCaseSensitive(
+              NameIdentifier.of(ident.namespace().levels()), Capability.Scope.TABLE, capability);
+      return NameIdentifier.of(
+          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())),
+          CapabilityHelpers.applyCaseSensitiveOnName(scope, ident.name(), capability));
+    }
     if (scope == Capability.Scope.SEMANTIC_MODEL) {
       return NameIdentifier.of(
           CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());

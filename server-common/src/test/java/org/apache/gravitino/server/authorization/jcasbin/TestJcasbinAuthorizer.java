@@ -310,7 +310,17 @@ public class TestJcasbinAuthorizer {
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
     when(gravitinoEnv.config()).thenReturn(new ServerConfig());
     principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
-    metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
+    metadataIdConverterMockedStatic =
+        mockStatic(
+            MetadataIdConverter.class,
+            invocation -> {
+              // Keep ID-loading fixtures, but execute all normalization helpers (including nested
+              // static calls) so capability rules are tested rather than stubbed away.
+              if (invocation.getMethod().getName().equals("getID")) {
+                return Optional.empty();
+              }
+              return invocation.callRealMethod();
+            });
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
@@ -364,6 +374,17 @@ public class TestJcasbinAuthorizer {
   public void createAuthorizer() throws Exception {
     // Build a fresh authorizer per test so enforcer g-rows and version-validated cache state can
     // never bleed across cases regardless of the JUnit execution order.
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
     restoreDefaultPrincipal();
@@ -2238,10 +2259,16 @@ public class TestJcasbinAuthorizer {
     MetadataObject newObject =
         MetadataObjects.parse("catalog.ScHeMa.RenamedModel", MetadataObject.Type.SEMANTIC_MODEL);
     metadataIdConverterMockedStatic
-        .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+        .when(
+            () ->
+                MetadataIdConverter.getID(
+                    MetadataIdConverter.normalizeMetadataObject(oldObject, METALAKE), METALAKE))
         .thenReturn(Optional.of(100L));
     metadataIdConverterMockedStatic
-        .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+        .when(
+            () ->
+                MetadataIdConverter.getID(
+                    MetadataIdConverter.normalizeMetadataObject(newObject, METALAKE), METALAKE))
         .thenReturn(Optional.of(200L));
     assertEquals(
         Optional.of(100L),
@@ -2260,10 +2287,16 @@ public class TestJcasbinAuthorizer {
     try {
       hook.alterSemanticModel(oldIdent, rename);
       metadataIdConverterMockedStatic
-          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .when(
+              () ->
+                  MetadataIdConverter.getID(
+                      MetadataIdConverter.normalizeMetadataObject(oldObject, METALAKE), METALAKE))
           .thenReturn(Optional.empty());
       metadataIdConverterMockedStatic
-          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .when(
+              () ->
+                  MetadataIdConverter.getID(
+                      MetadataIdConverter.normalizeMetadataObject(newObject, METALAKE), METALAKE))
           .thenReturn(Optional.of(100L));
       assertEquals(
           Optional.empty(),
@@ -2273,13 +2306,19 @@ public class TestJcasbinAuthorizer {
           lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
       hook.dropSemanticModel(newIdent);
       metadataIdConverterMockedStatic
-          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .when(
+              () ->
+                  MetadataIdConverter.getID(
+                      MetadataIdConverter.normalizeMetadataObject(newObject, METALAKE), METALAKE))
           .thenReturn(Optional.of(300L));
       assertEquals(
           Optional.of(300L),
           lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
       metadataIdConverterMockedStatic
-          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .when(
+              () ->
+                  MetadataIdConverter.getID(
+                      MetadataIdConverter.normalizeMetadataObject(oldObject, METALAKE), METALAKE))
           .thenReturn(Optional.of(400L));
       assertEquals(
           Optional.of(400L),

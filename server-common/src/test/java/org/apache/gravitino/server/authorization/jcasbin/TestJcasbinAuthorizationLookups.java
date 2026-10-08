@@ -45,8 +45,7 @@ public class TestJcasbinAuthorizationLookups {
 
   @Test
   void testResolveMetadataIdUsesAtomicSharedCacheAndRequestDedup() {
-    MetadataObject table =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
+    MetadataObject catalog = MetadataObjects.of(Arrays.asList("cat1"), MetadataObject.Type.CATALOG);
     CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
     CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>();
     JcasbinAuthorizationLookups lookups =
@@ -54,9 +53,9 @@ public class TestJcasbinAuthorizationLookups {
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
 
     Assertions.assertEquals(
-        Optional.of(100L), lookups.resolveMetadataId(table, "ml1", requestContext));
+        Optional.of(100L), lookups.resolveMetadataId(catalog, "ml1", requestContext));
     Assertions.assertEquals(
-        Optional.of(100L), lookups.resolveMetadataId(table, "ml1", requestContext));
+        Optional.of(100L), lookups.resolveMetadataId(catalog, "ml1", requestContext));
 
     Assertions.assertEquals(1, metadataIdCache.getCount);
     Assertions.assertEquals(0, metadataIdCache.getIfPresentCount);

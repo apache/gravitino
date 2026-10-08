@@ -19,22 +19,15 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Optional;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.catalog.CapabilityHelpers;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Two-tier metadata-id and owner resolution for {@link JcasbinAuthorizer}.
@@ -74,34 +67,25 @@ public class JcasbinAuthorizationLookups {
    * Optional#empty()} when the metadata object does not exist so callers can deny authorization.
    * Missing metadata objects are never cached as negative results: a later create for the same name
    * can be observed without waiting for cache eviction. Existing objects are invalidated by local
-   * name-id mapping hooks and by the change-log poller on peer nodes.
+   * name-id mapping hooks and by the change-log poller on peer nodes. Both cache tiers use names
+   * normalized by catalog capability; capability lookup therefore also occurs on cache hits.
    */
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
     try {
-      MetadataObject cacheObject = metadataObject;
-      // Hooks and change-log records use normalized parents. Cache the same key for every
-      // equivalent request spelling, while preserving the Gravitino-owned model leaf.
-      if (metadataObject.type() == MetadataObject.Type.SEMANTIC_MODEL) {
-        NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-        Capability capability =
-            CapabilityHelpers.getCapability(ident, GravitinoEnv.getInstance().catalogManager());
-        NameIdentifier normalized =
-            NameIdentifier.of(
-                CapabilityHelpers.applyCaseSensitive(
-                    ident.namespace(), Capability.Scope.SEMANTIC_MODEL, capability),
-                ident.name());
-        cacheObject =
-            NameIdentifierUtil.toMetadataObject(normalized, Entity.EntityType.SEMANTIC_MODEL);
-      }
+      // Use the same capability rules as ID resolution so hooks and peer change-log replay
+      // evict every equivalent spelling from both cache tiers.
+      MetadataObject cacheObject =
+          MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake);
       String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);
       // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
       // by throwing through the loaders and translated back to Optional.empty() here. This caches
-      // only positive results, never a negative one.
+      // only positive results, never a negative one. Load the same canonical name as the key,
+      // rather than applying the request spelling again in the loader.
       return Optional.of(
           requestContext.computeMetadataIdIfAbsent(
               cacheKey,
-              k -> metadataIdCache.get(k, ignored -> loadMetadataId(metadataObject, metalake))));
+              k -> metadataIdCache.get(k, ignored -> loadMetadataId(cacheObject, metalake))));
     } catch (NotFoundException e) {
       return Optional.empty();
     }
