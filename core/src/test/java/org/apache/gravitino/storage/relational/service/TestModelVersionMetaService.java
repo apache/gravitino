@@ -987,7 +987,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   @TestTemplate
   public void testDeleteModelVersionsInDeletion() throws IOException, SQLException {
     for (String param : new String[] {"model", "schema", "catalog", "metalake"}) {
-      init();
+      resetDatabase();
       performDeletionTestLogic(param);
     }
   }

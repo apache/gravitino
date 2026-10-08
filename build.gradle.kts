@@ -28,6 +28,8 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.apache.gravitino.testing.CoreDatabaseConcurrency
+import org.apache.gravitino.testing.SharedDbContainerService
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
@@ -80,6 +82,18 @@ val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
 ) {
   maxParallelUsages.set(1)
 }
+
+// Owns one shared MySQL container and one shared PostgreSQL container for the whole build (see
+// org.apache.gravitino.testing.SharedDbContainerService in buildSrc), so the Core database test
+// tasks no longer have to start a fresh container per test-worker fork. Registered here, at the
+// root, so a single instance is shared by every project that opts in via `usesService`. Stored on
+// rootProject.extra so subproject build scripts (for example core/build.gradle.kts) can look up
+// the same registration by name.
+val sharedDbContainerService = gradle.sharedServices.registerIfAbsent(
+  "sharedDbContainerService",
+  SharedDbContainerService::class
+) {}
+rootProject.extra["sharedDbContainerService"] = sharedDbContainerService
 
 /** Packages the legal documents for one Maven artifact, retaining dependency provenance. */
 @CacheableTask
@@ -458,12 +472,11 @@ allprojects {
       // Ryuk need privileged mode, if we want to rootless or run non-privileged mode, we need to disable it.
       param.environment("TESTCONTAINERS_RYUK_DISABLED", "true")
 
-      val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
-      val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
-      if (OperatingSystem.current().isMacOsX() &&
-        dockerRunning &&
-        macDockerConnector
-      ) {
+      val macDockerConnectorFixedNetwork =
+        project.rootProject.extra[
+          CoreDatabaseConcurrency.MAC_DOCKER_CONNECTOR_FIXED_NETWORK_EXTRA
+        ] as? Boolean ?: false
+      if (macDockerConnectorFixedNetwork) {
         param.environment("NEED_CREATE_DOCKER_NETWORK", "true")
       }
 
@@ -514,9 +527,12 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      val includeDockerTaggedTests =
+        param.extensions.extraProperties.properties["includeDockerTaggedTests"] as? Boolean
+          ?: dockerTest
       val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
-        if (!dockerTest) {
+        if (!includeDockerTaggedTests) {
           excludeTags("gravitino-docker-test")
         }
         if (!dorisMultiVersion) {
@@ -1017,9 +1033,19 @@ subprojects {
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       val extraArgs = project.property("extraJvmArgs") as List<String>
-      jvmArgs = listOf("-Xmx4G") + extraArgs
+      jvmArgs = listOf(CoreDatabaseConcurrency.TEST_WORKER_MAX_HEAP_ARGUMENT) + extraArgs
       useJUnitPlatform()
-      finalizedBy(tasks.getByName("jacocoTestReport"))
+      val isCoreSuiteTask =
+        project.path == ":core" &&
+          name in setOf(
+          "coreUnitTest",
+          "coreH2Test",
+          "coreMySQLTest",
+          "corePostgreSQLTest"
+        )
+      if (!isCoreSuiteTask) {
+        finalizedBy(tasks.getByName("jacocoTestReport"))
+      }
     }
   }
 
@@ -1629,12 +1655,20 @@ project.extra["dockerTest"] = false
 project.extra["dockerRunning"] = false
 project.extra["macDockerConnector"] = false
 project.extra["isOrbStack"] = false
+project.extra[CoreDatabaseConcurrency.MAC_DOCKER_CONNECTOR_FIXED_NETWORK_EXTRA] = false
 
 // The following is to check the docker status and print the tip message
 fun printDockerCheckInfo() {
   checkMacDockerConnector()
   checkDockerStatus()
   checkOrbStackStatus()
+
+  val macDockerConnectorFixedNetwork =
+    OperatingSystem.current().isMacOsX() &&
+      (project.extra["dockerRunning"] as? Boolean ?: false) &&
+      (project.extra["macDockerConnector"] as? Boolean ?: false)
+  project.extra[CoreDatabaseConcurrency.MAC_DOCKER_CONNECTOR_FIXED_NETWORK_EXTRA] =
+    macDockerConnectorFixedNetwork
 
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode != "deploy" && testMode != "embedded") {

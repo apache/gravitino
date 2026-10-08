@@ -1,0 +1,52 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Extra mysqld command-line flags for the shared MySQL test container
+# (SharedDbContainerService). One token per line; blank lines and lines
+# starting with # are ignored.
+#
+# Why these are safe HERE (and would NOT be safe in production): this
+# container is disposable and is torn down at the end of every test run,
+# so there is no need for crash durability, replication, or monitoring.
+#
+# Measured effect (apache/gravitino#13553, 8vCPU/31GB gcp-arc-runners-large
+# class, -PcoreDatabaseForks=2), core:coreMySQLTest wall clock:
+#   26m25s  per-fork containers (old design)
+#   27m53s  shared container, untuned
+#    7m05s  shared container + tmpfs data dir (flags NOT yet loading)
+#    6m40s  shared container + tmpfs data dir + the flags below, verified
+#           as actually applied inside the running container
+# The staged numbers above predate the fix for a classpath bug that stopped
+# this file from ever being read, so the large win is attributable to the tmpfs
+# data dir; these flags add roughly a further 6%. See README.md next to this
+# file for the full attribution table.
+# All runs: 520 tests, 0 failures, 0 deadlocks / lock-wait timeouts.
+# core:coreH2Test is unchanged across all runs (1m27s -> 1m21s), the control
+# confirming the speedup is database I/O and not the host.
+#
+# NOTE: --performance-schema is deliberately NOT disabled here, even though
+# turning it off would shave a little more overhead. TestRoleMembershipWrites
+# and TestOwnerAssignmentWrites assert on real row-lock contention by polling
+# performance_schema.data_lock_waits; with the performance schema off that
+# table is silently always empty, so those assertions would stop verifying
+# anything without ever failing.
+--innodb-flush-log-at-trx-commit=0
+--sync-binlog=0
+--innodb-buffer-pool-size=2G
+--innodb-log-buffer-size=64M
+--skip-log-bin
+--innodb-doublewrite=0
