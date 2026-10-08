@@ -138,7 +138,7 @@ public class PolicyContents {
   }
 
   /**
-   * Creates a column-mask policy for tagged columns.
+   * Creates a column-mask policy for tagged tables or columns.
    *
    * @param expression column-mask expression
    * @return validated read-restriction policy content

@@ -26,11 +26,11 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
-/** Built-in policy content for masking tagged columns. */
+/** Built-in policy content for masking columns of tagged tables or tagged columns. */
 public final class ColumnMaskContent extends ReadRestrictionContent {
 
   private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
-      ImmutableSet.of(MetadataObject.Type.COLUMN);
+      ImmutableSet.of(MetadataObject.Type.TABLE, MetadataObject.Type.COLUMN);
 
   @Nullable private final String expression;
 

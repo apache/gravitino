@@ -50,7 +50,7 @@ public interface Policy extends Auditable {
     /** Built-in policy type for filtering rows of tagged tables. */
     ROW_FILTER(BUILT_IN_TYPE_PREFIX + "row_filter", RowFilterContent.class),
 
-    /** Built-in policy type for masking tagged columns. */
+    /** Built-in policy type for masking columns of tagged tables or tagged columns. */
     COLUMN_MASK(BUILT_IN_TYPE_PREFIX + "column_mask", ColumnMaskContent.class),
 
     /** Non-built-in policies use the fixed wire value {@code custom}. */

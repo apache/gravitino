@@ -44,7 +44,8 @@ public class TestReadRestrictionContent {
     Assertions.assertEquals(
         ImmutableSet.of(MetadataObject.Type.TABLE), rowFilter.supportedObjectTypes());
     Assertions.assertEquals(
-        ImmutableSet.of(MetadataObject.Type.COLUMN), columnMask.supportedObjectTypes());
+        ImmutableSet.of(MetadataObject.Type.TABLE, MetadataObject.Type.COLUMN),
+        columnMask.supportedObjectTypes());
     Assertions.assertTrue(rowFilter.properties().isEmpty());
     Assertions.assertTrue(columnMask.properties().isEmpty());
     Assertions.assertDoesNotThrow(rowFilter::validate);
