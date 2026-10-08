@@ -77,7 +77,8 @@ gravitino_catalog_datasource_max_connections{provider="jdbc",metalake="test_meta
 The `entity-change-log` source exposes each server's change-log processing state through JMX and
 `/prometheus/metrics`. For example, `entity-change-log.record-lag` in the metrics registry becomes
 `entity_change_log_record_lag` in Prometheus. Gauges read only in-memory values; the poller samples
-the database tail once per cycle. If only the tail sample fails, delivery continues and the tail
+the database tail on partial and empty polls, and at most once per `pollIntervalSecs` during
+a full-batch drain (including failed sample attempts). If only the tail sample fails, delivery continues and the tail
 value remains at its last successful sample.
 
 | Metric suffix                                                | Type and unit            | Meaning                                                                                                                                                     |

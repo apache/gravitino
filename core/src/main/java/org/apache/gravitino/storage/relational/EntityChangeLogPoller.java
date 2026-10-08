@@ -87,6 +87,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private ScheduledExecutorService scheduler;
   private volatile boolean closed = false;
   private volatile long entityPollHighWaterId = 0;
+  private boolean tailSampleAttempted;
+  private long lastTailSampleNanos;
 
   /**
    * Creates an {@link EntityChangeLogPoller} with an unregistered metrics source for callers that
@@ -173,6 +175,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
     metrics.setDbTailId(entityPollHighWaterId);
+    tailSampleAttempted = true;
+    lastTailSampleNanos = nanoTime();
     metrics.setCursorId(entityPollHighWaterId);
     LOG.info(
         "Starting entity change log poller at high-water id {} with a {} second interval and a "
@@ -217,10 +221,16 @@ public class EntityChangeLogPoller implements AutoCloseable {
               t.setDaemon(true);
               return t;
             });
-    // Each poll is a one-shot delayed task. By default such tasks still run after shutdown(), so
-    // close() would wait for the pending poll and run it against a store that is shutting down.
+    // Drop polls whose delay has not elapsed so close() does not wait for an idle poll. Already-due
+    // tasks, including zero-delay drain hops, can still run after shutdown(); runPollCycle's closed
+    // guard prevents those tasks from accessing the closing store.
     executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     return executor;
+  }
+
+  @VisibleForTesting
+  long nanoTime() {
+    return System.nanoTime();
   }
 
   /**
@@ -235,6 +245,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
     long nextDelayMillis = TimeUnit.SECONDS.toMillis(pollIntervalSecs);
     try {
       if (pollChanges()) {
+        // Continuous draining is intentional: every cycle advances the cursor and is bounded by
+        // batchSize. Tail sampling is rate-limited separately so diagnostics do not double the
+        // database query rate while a sustained backlog is being consumed.
         nextDelayMillis = 0;
       }
     } finally {
@@ -300,18 +313,27 @@ public class EntityChangeLogPoller implements AutoCloseable {
     // The tail is for observability only. A failed sample must not suppress delivery of rows
     // already fetched successfully or hold the cursor back.
     @Nullable Long dbTailId = null;
-    try {
-      dbTailId =
-          getOrDefault(
-              SessionUtils.getWithoutCommit(
-                  EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
-      metrics.setDbTailId(dbTailId);
-    } catch (RuntimeException e) {
-      if (handleInterruptIfAny(e, "Entity change log tail sample")) {
-        throw e;
+    long nowNanos = nanoTime();
+    if (changes.size() < batchSize
+        || !tailSampleAttempted
+        || nowNanos - lastTailSampleNanos >= TimeUnit.SECONDS.toNanos(pollIntervalSecs)) {
+      // A full batch already signals backlog. Sample at most once per interval during a drain,
+      // including failed attempts, while partial/empty polls refresh the caught-up state.
+      tailSampleAttempted = true;
+      lastTailSampleNanos = nowNanos;
+      try {
+        dbTailId =
+            getOrDefault(
+                SessionUtils.getWithoutCommit(
+                    EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+        metrics.setDbTailId(dbTailId);
+      } catch (RuntimeException e) {
+        if (handleInterruptIfAny(e, "Entity change log tail sample")) {
+          throw e;
+        }
+        metrics.tailSampleFailed();
+        LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
       }
-      metrics.tailSampleFailed();
-      LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
     }
     metrics.pollSucceeded(changes.size());
     long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - fetchStartNanos);

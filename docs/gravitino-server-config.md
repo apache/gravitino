@@ -332,7 +332,11 @@ server can read and apply batches rather than at a fixed `pollBatchSize / pollIn
 records per second. Once a poll returns fewer records than the batch size, or fails, the server
 waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
 on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
-it. Each poll holds its whole batch in memory, so raise `pollBatchSize` in moderate steps.
+it. Continuous draining deliberately has no minimum delay between batches; a sustained backlog
+can therefore keep the data query running at the rate the database and listeners support. The
+observability-only database-tail query is sampled at most once per `pollIntervalSecs` during a
+full-batch drain; partial and empty polls still sample the tail. Each poll holds its whole batch
+in memory, so raise `pollBatchSize` in moderate steps.
 
 | Configuration Item                              | Description                                                                                                                                         | Default Value       |
 |-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
