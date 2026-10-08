@@ -32,8 +32,10 @@ import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFa
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +68,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_QUEUE_CAPACITY = 100;
   private static final int CACHE_MONITOR_PERIOD_MINUTES = 5;
   private static final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
+
+  /**
+   * Runs Caffeine's maintenance work and removal notifications. When its queue is full, {@link
+   * ThreadPoolExecutor.CallerRunsPolicy} runs the task on the submitting thread, and Caffeine also
+   * runs a rejected task inline; either way the removal listener can run while Caffeine holds its
+   * eviction lock, so the listener must never block on an entity segment lock.
+   */
   private static final ExecutorService CLEANUP_EXECUTOR =
       new ThreadPoolExecutor(
           CACHE_CLEANUP_CORE_THREADS,
@@ -79,6 +88,20 @@ public class CaffeineEntityCache extends BaseEntityCache {
             return t;
           },
           new ThreadPoolExecutor.CallerRunsPolicy());
+
+  /**
+   * Removes evicted and expired keys from the prefix index. The removal listener only hands keys to
+   * this executor; the cleanup itself takes the key's segment lock, which is safe here because this
+   * thread never holds a Caffeine lock. The queue is unbounded, so handing off a key never runs the
+   * cleanup inline on Caffeine's thread.
+   */
+  private static final ExecutorService INDEX_CLEANUP_EXECUTOR =
+      Executors.newSingleThreadExecutor(
+          r -> {
+            Thread t = new Thread(r, "CaffeineEntityCache-IndexCleanup");
+            t.setDaemon(true);
+            return t;
+          });
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
@@ -103,6 +126,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private volatile RadixTree<EntityCacheKey> cacheIndex;
 
+  private final Executor indexCleanupExecutor;
+
   private ScheduledExecutorService scheduler;
 
   /**
@@ -111,7 +136,22 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param cacheConfig the cache configuration
    */
   public CaffeineEntityCache(Config cacheConfig) {
+    this(cacheConfig, CLEANUP_EXECUTOR, INDEX_CLEANUP_EXECUTOR);
+  }
+
+  /**
+   * Constructs a new {@link CaffeineEntityCache} with the given executors.
+   *
+   * @param cacheConfig the cache configuration
+   * @param maintenanceExecutor the executor Caffeine uses for maintenance and removal notifications
+   * @param indexCleanupExecutor the executor that removes evicted and expired keys from the prefix
+   *     index; it must not run tasks on the submitting thread
+   */
+  @VisibleForTesting
+  CaffeineEntityCache(
+      Config cacheConfig, Executor maintenanceExecutor, Executor indexCleanupExecutor) {
     super(cacheConfig);
+    this.indexCleanupExecutor = indexCleanupExecutor;
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     // Initialize segmented lock
@@ -121,22 +161,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
     Caffeine<EntityCacheKey, Entity> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
     cacheDataBuilder
-        .executor(CLEANUP_EXECUTOR)
+        .executor(maintenanceExecutor)
         .removalListener(
             (key, value, cause) -> {
               LOG.debug("Removed entity cache entry, key={}, cause={}", key, cause);
               if (cause == RemovalCause.EXPLICIT || cause == RemovalCause.REPLACED) {
                 return;
               }
-              try {
-                invalidateExpiredItem(key);
-              } catch (Throwable t) {
-                LOG.error(
-                    "Failed to remove entity key={} from cache asynchronously, cause={}",
-                    key,
-                    cause,
-                    t);
-              }
+              // This listener can run while Caffeine holds its eviction lock, and a writer can hold
+              // a segment lock while waiting for that eviction lock in cacheData.put. Taking the
+              // segment lock here would close that cycle, so only hand the key off.
+              scheduleIndexCleanup(key, cause);
             });
 
     this.cacheData = cacheDataBuilder.build();
@@ -189,7 +224,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * <p>Read from the prefix index without holding a segment lock, so the result is a point-in-time
    * estimate: entries concurrently added or cascaded away may or may not be counted. It may also
    * briefly exceed the number of live entries, because entries evicted by Caffeine are removed from
-   * the index asynchronously by the removal listener.
+   * the index asynchronously by the index cleanup executor.
    */
   @Override
   public long size() {
@@ -252,18 +287,48 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
-   * entry expires, it will call this method.
+   * Removes a key that Caffeine evicted or expired from the prefix index. Runs on the index cleanup
+   * executor, never on a thread that holds a Caffeine lock.
    *
-   * @param key The key of the expired entity
+   * <p>A put can add the key back between Caffeine removing it and this cleanup running. That put
+   * indexes the key under the same segment lock, so the index entry is removed only when the key is
+   * still absent from the cache; otherwise it belongs to the live entry.
+   *
+   * @param key The key of the evicted or expired entity
    */
   @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
     segmentedLock.withLock(
         key,
         () -> {
-          cacheIndex.remove(key.toString());
+          if (cacheData.policy().getIfPresentQuietly(key) == null) {
+            cacheIndex.remove(key.toString());
+          }
         });
+  }
+
+  /**
+   * Hands an evicted or expired key to the index cleanup executor without blocking.
+   *
+   * @param key The key Caffeine removed
+   * @param cause Why Caffeine removed it
+   */
+  private void scheduleIndexCleanup(EntityCacheKey key, RemovalCause cause) {
+    try {
+      indexCleanupExecutor.execute(
+          () -> {
+            try {
+              invalidateExpiredItem(key);
+            } catch (Throwable t) {
+              LOG.error(
+                  "Failed to remove entity key={} from the cache index, cause={}", key, cause, t);
+            }
+          });
+    } catch (RejectedExecutionException e) {
+      // Never fall back to running the cleanup here: this thread may hold Caffeine's eviction lock.
+      // A key left in the index only costs memory; a later invalidation of an ancestor removes it.
+      LOG.error("Failed to schedule cache index cleanup for key={}, cause={}", key, cause, e);
+    }
   }
 
   /**
