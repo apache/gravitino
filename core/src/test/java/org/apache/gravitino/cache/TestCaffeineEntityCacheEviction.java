@@ -28,6 +28,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -52,13 +54,11 @@ public class TestCaffeineEntityCacheEviction {
 
   @Test
   void testEvictionCompletesWhileSegmentLocksAreHeld() throws Exception {
-    ExecutorService indexCleanup = Executors.newSingleThreadExecutor();
     ExecutorService evictor = Executors.newSingleThreadExecutor();
     try {
       // A direct executor reproduces the rejected-task path: Caffeine performs eviction and calls
       // the removal listener inline, under its eviction lock.
-      CaffeineEntityCache cache =
-          new CaffeineEntityCache(countBoundedConfig(1), Runnable::run, indexCleanup);
+      CaffeineEntityCache cache = new CaffeineEntityCache(countBoundedConfig(1), Runnable::run);
       BaseMetalake first = TestUtil.getTestMetalake(1L, "metalake1", "first");
       BaseMetalake second = TestUtil.getTestMetalake(2L, "metalake2", "second");
       EntityCacheKey firstKey = metalakeKey(first);
@@ -98,17 +98,15 @@ public class TestCaffeineEntityCacheEviction {
                       cache.size()));
     } finally {
       evictor.shutdownNow();
-      indexCleanup.shutdownNow();
     }
   }
 
   @Test
   void testStaleEvictionDoesNotUnindexReinsertedEntry() {
-    // Defer Caffeine's removal notifications so one can arrive after the key was put back. They run
-    // later on this thread, which then holds no Caffeine lock, so a direct index cleanup is safe.
+    // Defer Caffeine's removal notifications so one can arrive after the key was put back.
     Queue<Runnable> deferredNotifications = new ArrayDeque<>();
     CaffeineEntityCache cache =
-        new CaffeineEntityCache(countBoundedConfig(10), deferredNotifications::add, Runnable::run);
+        new CaffeineEntityCache(countBoundedConfig(10), deferredNotifications::add);
     BaseMetalake metalake = TestUtil.getTestMetalake(1L, "metalake1", "metalake");
     CatalogEntity catalog =
         TestUtil.getTestCatalogEntity(2L, "catalog1", Namespace.of("metalake1"), "hive", "child");
@@ -119,6 +117,7 @@ public class TestCaffeineEntityCacheEviction {
 
     // Evict everything; the notification for the catalog stays queued.
     cache.getCacheData().policy().eviction().get().setMaximum(0);
+    cache.getCacheData().cleanUp();
     Assertions.assertNull(cache.getCacheData().policy().getIfPresentQuietly(catalogKey));
     cache.getCacheData().policy().eviction().get().setMaximum(10);
 
@@ -133,6 +132,58 @@ public class TestCaffeineEntityCacheEviction {
     Assertions.assertNull(
         cache.getCacheData().policy().getIfPresentQuietly(catalogKey),
         "invalidating the metalake must also drop its cached catalog");
+  }
+
+  @Test
+  void testHeldSegmentDoesNotAccumulateEvictedKeys() throws Exception {
+    CaffeineEntityCache cache = new CaffeineEntityCache(countBoundedConfig(64), Runnable::run);
+    BaseMetalake held = TestUtil.getTestMetalake(1L, "held", "slow read");
+    EntityCacheKey heldKey = metalakeKey(held);
+    SegmentedLock locks = (SegmentedLock) FieldUtils.readField(cache, "segmentedLock", true);
+    Lock heldSegment = locks.getSegmentLock(heldKey);
+    cache.put(held);
+
+    cache.withCacheLock(
+        heldKey,
+        () -> {
+          // A slow backend read holds this segment after its entry is evicted. Cleanup must not
+          // wait for it, otherwise evictions of unrelated keys accumulate behind this one.
+          cache.getCacheData().policy().eviction().get().setMaximum(0);
+          cache.getCacheData().cleanUp();
+          cache.getCacheData().policy().eviction().get().setMaximum(64);
+          for (int i = 0; i < 2_000; i++) {
+            BaseMetalake entity = TestUtil.getTestMetalake(100L + i, "entry" + i, "eviction");
+            if (locks.getSegmentLock(metalakeKey(entity)) == heldSegment) {
+              continue;
+            }
+            cache.put(entity);
+            cache.getCacheData().cleanUp();
+            Assertions.assertEquals(cache.getCacheData().asMap().size(), cache.size());
+            Assertions.assertTrue(cache.size() <= 64, "evicted keys must not accumulate");
+          }
+        });
+  }
+
+  @Test
+  void testClearBeforeStaleRemovalPreservesReinsertedEntry() {
+    Queue<Runnable> deferredNotifications = new ArrayDeque<>();
+    CaffeineEntityCache cache =
+        new CaffeineEntityCache(countBoundedConfig(1), deferredNotifications::add);
+    BaseMetalake entity = TestUtil.getTestMetalake(1L, "metalake", "reinserted");
+    EntityCacheKey key = metalakeKey(entity);
+    cache.put(entity);
+    runAll(deferredNotifications);
+    cache.getCacheData().policy().eviction().get().setMaximum(0);
+    cache.getCacheData().cleanUp();
+    cache.clear();
+    cache.getCacheData().policy().eviction().get().setMaximum(1);
+    cache.put(entity);
+    runAll(deferredNotifications);
+
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertNotNull(cache.getCacheData().policy().getIfPresentQuietly(key));
+    cache.invalidate(entity.nameIdentifier(), entity.type());
+    Assertions.assertEquals(0, cache.size());
   }
 
   @Test

@@ -183,8 +183,9 @@ public abstract class BaseEntityCache implements EntityCache {
 
   /**
    * Removes a key that the underlying cache evicted or expired from the implementation's own
-   * bookkeeping, such as a key index. Implementations must not call this while holding a lock of
-   * the underlying cache, and must tolerate the key having been added back before the call.
+   * bookkeeping, such as a key index. This may be called while the underlying cache holds an
+   * internal lock. Implementations must not acquire locks held across underlying cache operations,
+   * and must tolerate the key having been added back before the call.
    *
    * @param key The evicted or expired entity key.
    */
