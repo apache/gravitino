@@ -145,7 +145,7 @@ entity:
   ##
   maxConnections: ""
   ## Maximum idle JDBC connections the relational backend pool keeps on each server, capped by
-  ## maxConnections. Leave unset to use the server default (32). Budget for this value on every
+  ## maxConnections. Leave unset to use the server default (10). Budget for this value on every
   ## replica, because idle connections are released slowly.
   ##
   maxIdleConnections: ""

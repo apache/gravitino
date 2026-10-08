@@ -79,7 +79,7 @@ public class TestSqlSession {
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
-    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(32);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
   }
 
@@ -126,7 +126,7 @@ public class TestSqlSession {
                 .getDataSource();
     assertEquals("org.h2.Driver", dataSource.getDriverClassName());
     assertEquals(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL), dataSource.getUrl());
-    assertEquals(32, dataSource.getMaxIdle());
+    assertEquals(10, dataSource.getMaxIdle());
     assertEquals(5, dataSource.getMinIdle());
     assertEquals(Duration.ofSeconds(30).toMillis(), dataSource.getMinEvictableIdleTimeMillis());
   }
@@ -148,7 +148,7 @@ public class TestSqlSession {
       assertEquals(40, dataSource.getMaxTotal());
       assertEquals(40, dataSource.getMaxIdle());
     } finally {
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(32);
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     }
   }
@@ -167,7 +167,7 @@ public class TestSqlSession {
                   .getEnvironment()
                   .getDataSource();
       assertEquals(-1, dataSource.getMaxTotal());
-      assertEquals(32, dataSource.getMaxIdle());
+      assertEquals(10, dataSource.getMaxIdle());
     } finally {
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     }

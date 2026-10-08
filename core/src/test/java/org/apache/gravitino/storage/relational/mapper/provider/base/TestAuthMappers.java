@@ -93,7 +93,7 @@ public class TestAuthMappers {
         .thenReturn("org.h2.Driver");
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(20);
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS))
-        .thenReturn(32);
+        .thenReturn(10);
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
         .thenReturn(1000L);
 

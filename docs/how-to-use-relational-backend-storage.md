@@ -32,7 +32,7 @@ gravitino.entity.store.relational.jdbcPassword = {password}
 and `JDBCBackend`. Leave them alone.
 
 For concurrent metadata reads, tune `gravitino.entity.store.relational.maxIdleConnections`
-alongside `maxConnections`. The default retains up to 32 idle connections per server; the
+alongside `maxConnections`. The default retains up to 10 idle connections per server; the
 effective limit never exceeds `maxConnections`. Count this limit once per server when calculating
 the database connection budget, and also count the pools of any JDBC catalogs that point at the
 same database instance.
@@ -42,12 +42,15 @@ returns a connection while the pool already holds `maxIdleConnections` idle conn
 closes it at once, and a later request has to open a new one. When the number of connections in
 use keeps swinging by more than this limit, physical connections keep being closed and reopened,
 which adds latency. Setting it at or above the number of connections in use at steady peak
-concurrency avoids that.
+concurrency avoids that. For example, with 64 concurrent clients listing metalakes against MySQL,
+a limit of `10` reopened about 1,400 to 2,700 connections every 15 seconds, `32` about 300 to 400,
+and `64` almost none. Raise it only as far as the database connection budget of all servers allows.
 
 Idle connections are released slowly. The pool's evictor runs every ten minutes and checks at most
 three idle connections per run, closing those idle for more than 30 seconds. After a burst, a server
-can therefore keep close to `maxIdleConnections` open for more than an hour. Budget for the full
-value on every server rather than treating it as a short-lived peak.
+can therefore keep close to `maxIdleConnections` open for a long time; with a limit of `64`, it
+takes more than three hours to shrink back to the minimum of five. Budget for the full value on
+every server rather than treating it as a short-lived peak.
 
 The values to use, and the driver each one needs:
 

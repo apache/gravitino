@@ -72,7 +72,7 @@ gravitino.entity.store.relational.jdbcUser = gravitino
 gravitino.entity.store.relational.jdbcPassword = gravitino
 # Maximum idle entity-store connections retained by this server (capped by maxConnections).
 # Budget for it on every server, plus any JDBC catalog pools that use the same database instance.
-# gravitino.entity.store.relational.maxIdleConnections = 32
+# gravitino.entity.store.relational.maxIdleConnections = 10
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache

@@ -178,7 +178,7 @@ public class TestConfig {
   public void testEntityStoreMaxIdleConnections() {
     Config config = new Config(false) {};
     Assertions.assertEquals(
-        32, config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS));
+        10, config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,

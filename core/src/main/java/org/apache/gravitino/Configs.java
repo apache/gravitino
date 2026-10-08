@@ -101,7 +101,7 @@ public class Configs {
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
 
   /** Default maximum idle connections retained by the entity-store pool on each server. */
-  public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 32;
+  public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 10;
 
   public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
 
