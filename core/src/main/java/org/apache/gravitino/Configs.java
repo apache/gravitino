@@ -191,6 +191,7 @@ public class Configs {
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
   /** Default maximum number of entity change log records read in one polling cycle. */
   public static final int DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE = 2000;
+
   public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
   public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
