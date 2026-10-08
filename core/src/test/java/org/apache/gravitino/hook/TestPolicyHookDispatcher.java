@@ -138,4 +138,16 @@ public class TestPolicyHookDispatcher {
     hookDispatcher.alterPolicy("test_metalake", "test_policy", changes);
     verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
   }
+
+  @Test
+  public void testFailedRenamePolicyDoesNotInvalidateNameIdMapping() {
+    PolicyChange[] changes = {PolicyChange.rename("new_policy")};
+    when(mockDispatcher.alterPolicy("test_metalake", "test_policy", changes))
+        .thenThrow(new RuntimeException("Alter failed"));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> hookDispatcher.alterPolicy("test_metalake", "test_policy", changes));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
 }

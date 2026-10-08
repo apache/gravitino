@@ -35,9 +35,13 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -161,7 +165,14 @@ public class JobTemplateMetaService {
                           JobTemplateMetaMapper.class,
                           mapper ->
                               mapper.updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO)),
-                  () -> writeFailure(jobTemplateIdent, oldJobTemplatePO)));
+                  () -> writeFailure(jobTemplateIdent, oldJobTemplatePO)),
+          () -> {
+            // Job templates are not entity-cacheable, so JDBCBackend does not log their changes.
+            // Peers still cache the old name's id for authorization, so log a rename here.
+            if (!Objects.equals(oldJobTemplateEntity.name(), newJobTemplateEntity.name())) {
+              insertJobTemplateChange(jobTemplateIdent, OperateType.ALTER);
+            }
+          });
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB_TEMPLATE, jobTemplateIdent.name());
       throw e;
@@ -248,7 +259,20 @@ public class JobTemplateMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 JobMetaMapper.class,
-                mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())));
+                mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())),
+        () -> insertJobTemplateChange(ident, OperateType.DROP));
+  }
+
+  private static void insertJobTemplateChange(NameIdentifier ident, OperateType operateType) {
+    String metalakeName = ident.namespace().level(0);
+    String fullName = EntityChangeLogNameIdentifierCodec.encode(ident);
+    SessionUtils.doWithoutCommit(
+        EntityChangeLogMapper.class,
+        mapper ->
+            mapper.insertEntityChange(
+                metalakeName, Entity.EntityType.JOB_TEMPLATE.name(), fullName, operateType));
+    EntityChangeLogDiagnostics.logAppended(
+        metalakeName, Entity.EntityType.JOB_TEMPLATE.name(), operateType, fullName);
   }
 
   /** Locks the observed template while a job is inserted in the same transaction. */

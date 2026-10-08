@@ -224,6 +224,18 @@ public class TestModelHookDispatcher {
     verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
   }
 
+  @Test
+  public void testFailedRenameModelDoesNotInvalidateNameIdMapping() {
+    NameIdentifier ident =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_model");
+    when(mockDispatcher.alterModel(eq(ident), any(ModelChange[].class)))
+        .thenThrow(new RuntimeException("Alter failed"));
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> hookDispatcher.alterModel(ident, ModelChange.rename("new")));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
   private static class CaseInsensitiveCapability implements Capability {
     @Override
     public CapabilityResult caseSensitiveOnName(Scope scope) {

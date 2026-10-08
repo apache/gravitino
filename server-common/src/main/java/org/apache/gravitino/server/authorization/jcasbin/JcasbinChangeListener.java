@@ -60,11 +60,10 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangeListener.class);
 
   /**
-   * Entity types that are cacheable in the entity store — and therefore emitted into {@code
-   * entity_change_log} — but that live in a virtual namespace ({@code
-   * <metalake>.system.<kind>.<name>}) instead of under a catalog. Their change-log identifier has
-   * more levels than {@link MetadataObjects#of} accepts for the matching type, so only the leaf
-   * name is mapped. Authorization resolves them by that name, so the JCasbin {@code
+   * Entity types that are emitted into {@code entity_change_log} but live in a virtual namespace
+   * ({@code <metalake>.system.<kind>.<name>}) instead of under a catalog. Their change-log
+   * identifier has more levels than {@link MetadataObjects#of} accepts for the matching type, so
+   * only the leaf name is mapped. Authorization resolves them by that name, so the JCasbin {@code
    * metadataIdCache} does key on them and peers must drop the mapping after a delete or rename.
    */
   private static final Set<MetadataObject.Type> VIRTUAL_NAMESPACE_TYPES =
