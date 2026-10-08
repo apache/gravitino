@@ -89,8 +89,9 @@ public class TestBuiltInJobTemplateProvider {
   @Test
   public void testTemplatesOnlyRequireTheParametersTheyHaveTo() {
     // A built-in template must let a caller run it with the catalog and the table alone, so every
-    // other parameter needs a default value. The catalog connection has no default that fits every
-    // catalog, and an empty where clause rewrites a whole table, so those stay required.
+    // other parameter needs a default value. Catalog and updater connections have no defaults that
+    // fit every deployment, and an empty where clause rewrites a whole table, so those stay
+    // required.
     Map<String, Set<String>> expected = new HashMap<>();
     Set<String> icebergCatalog =
         ImmutableSet.of(
@@ -101,6 +102,9 @@ public class TestBuiltInJobTemplateProvider {
             "warehouse_location");
     expected.put("builtin-sparkpi", ImmutableSet.of());
     expected.put("builtin-iceberg-update-stats", icebergCatalog);
+    expected.put(
+        "builtin-iceberg-update-manifest-stats",
+        ImmutableSet.<String>builder().addAll(icebergCatalog).add("updater_options").build());
     expected.put("builtin-iceberg-expire-snapshots", icebergCatalog);
     expected.put("builtin-iceberg-remove-orphan-files", icebergCatalog);
     expected.put("builtin-iceberg-rewrite-manifests", icebergCatalog);
