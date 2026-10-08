@@ -142,7 +142,10 @@ public interface PolicyUpdateRequest extends RESTRequest {
       // "system_data_compaction")
       @JsonSubTypes.Type(
           value = PolicyContentDTO.IcebergCompactionContentDTO.class,
-          name = "system_iceberg_compaction")
+          name = "system_iceberg_compaction"),
+      @JsonSubTypes.Type(
+          value = PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.class,
+          name = "system_iceberg_orphan_file_removal")
     })
     private final PolicyContentDTO newContent;
 
