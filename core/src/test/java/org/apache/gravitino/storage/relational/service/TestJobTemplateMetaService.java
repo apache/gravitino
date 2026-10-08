@@ -210,7 +210,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         () ->
             jobTemplateMetaService.deleteJobTemplate(
                 NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs")));
-    // The rejected delete rolls back with its change-log record, so peers keep a valid mapping.
+    // A delete rejected for active jobs logs no change, so peers keep a valid mapping.
     Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
     Assertions.assertEquals(
         2,
@@ -300,7 +300,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         () ->
             jobTemplateMetaService.updateJobTemplate(
                 updatedJobTemplateEntity.nameIdentifier(), e -> duplicateNameJobTemplateEntity));
-    // The rejected rename rolls back with its change-log record.
+    // A rename rejected for a duplicate name logs no change.
     Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
   }
 
