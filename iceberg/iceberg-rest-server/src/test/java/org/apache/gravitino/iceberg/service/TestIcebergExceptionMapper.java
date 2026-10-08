@@ -82,6 +82,19 @@ public class TestIcebergExceptionMapper {
   }
 
   @Test
+  public void testNotAllowedPreservesAllowHeader() {
+    try (Response response = icebergExceptionMapper.toResponse(new NotAllowedException("GET"))) {
+      Assertions.assertEquals(405, response.getStatus());
+      Assertions.assertTrue(
+          response.getHeaderString("Allow") != null
+              && response.getHeaderString("Allow").contains("GET"));
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(405, entity.code());
+      Assertions.assertEquals("NotAllowedException", entity.type());
+    }
+  }
+
+  @Test
   public void testConvertToIcebergExceptionKeepsWebApplicationException() {
     NotAcceptableException original = new NotAcceptableException();
     Exception converted = IcebergExceptionMapper.convertToIcebergException(original);

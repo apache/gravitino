@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
@@ -150,10 +151,37 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
+
+    // JAX-RS framework errors already have status (+ headers such as Allow on 405).
+    // Keep those headers and only replace the body with Iceberg ErrorResponse JSON.
+    if (ex instanceof WebApplicationException) {
+      return toJaxRsErrorResponse((WebApplicationException) ex);
+    }
+
     int status =
         ex instanceof Exception
             ? getErrorCode((Exception) ex)
             : Status.INTERNAL_SERVER_ERROR.getStatusCode();
+    logFailure(ex, status);
+    return IcebergRESTUtils.errorResponse(ex, status);
+  }
+
+  /**
+   * Builds an Iceberg JSON error from a JAX-RS {@link WebApplicationException}, preserving
+   * framework headers from the original response.
+   */
+  private static Response toJaxRsErrorResponse(WebApplicationException ex) {
+    int status = getErrorCode(ex);
+    logFailure(ex, status);
+    Response icebergBody = IcebergRESTUtils.errorResponse(ex, status);
+    return Response.fromResponse(ex.getResponse())
+        .status(status)
+        .entity(icebergBody.getEntity())
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  private static void logFailure(Throwable ex, int status) {
     if (status == Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
       LOG.error("Iceberg REST server unexpected failure:", ex);
     } else {
@@ -163,7 +191,6 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getClass(),
           ex.getMessage());
     }
-    return IcebergRESTUtils.errorResponse(ex, status);
   }
 
   /** Whether the exception already has a known HTTP status and should not be wrapped. */
