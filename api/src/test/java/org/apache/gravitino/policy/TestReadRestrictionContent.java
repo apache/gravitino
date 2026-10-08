@@ -42,9 +42,9 @@ public class TestReadRestrictionContent {
     Assertions.assertEquals(Map.of("expression", rowFilterExpression), rowFilter.rules());
     Assertions.assertEquals(Map.of("expression", columnMaskExpression), columnMask.rules());
     Assertions.assertEquals(
-        ImmutableSet.of(MetadataObject.Type.TAG), rowFilter.supportedObjectTypes());
+        ImmutableSet.of(MetadataObject.Type.TABLE), rowFilter.supportedObjectTypes());
     Assertions.assertEquals(
-        ImmutableSet.of(MetadataObject.Type.TAG), columnMask.supportedObjectTypes());
+        ImmutableSet.of(MetadataObject.Type.COLUMN), columnMask.supportedObjectTypes());
     Assertions.assertTrue(rowFilter.properties().isEmpty());
     Assertions.assertTrue(columnMask.properties().isEmpty());
     Assertions.assertDoesNotThrow(rowFilter::validate);

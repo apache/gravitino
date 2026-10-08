@@ -20,27 +20,16 @@ package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.MetadataObject;
 
 /** Shared behavior for built-in policies that restrict data reads. */
 public abstract class ReadRestrictionContent implements PolicyContent {
 
   /** Maximum UTF-8 size of an authored expression. */
   public static final int MAX_SOURCE_LENGTH_BYTES = 16 * 1024;
-
-  private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
-      ImmutableSet.of(MetadataObject.Type.TAG);
-
-  @Override
-  public Set<MetadataObject.Type> supportedObjectTypes() {
-    return SUPPORTED_OBJECT_TYPES;
-  }
 
   @Override
   public Map<String, String> properties() {

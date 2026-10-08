@@ -459,6 +459,31 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testCreateUpdateAndGetRowFilterPolicy() {
+    String policyName = "row_filter_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent originalContent = PolicyContents.rowFilter("filter := col(\"region\") == \"US\"");
+
+    PolicyEntity created =
+        policyManager.createPolicy(
+            METALAKE, policyName, Policy.BuiltInType.ROW_FILTER, null, true, originalContent);
+
+    Assertions.assertEquals(originalContent, created.content());
+    Assertions.assertEquals(
+        ImmutableSet.of(MetadataObject.Type.TABLE), created.content().supportedObjectTypes());
+    Assertions.assertEquals(
+        originalContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    PolicyContent updatedContent = PolicyContents.rowFilter("filter := col(\"region\") == \"EU\"");
+    PolicyEntity updated =
+        policyManager.alterPolicy(
+            METALAKE, policyName, PolicyChange.updateContent("system_row_filter", updatedContent));
+
+    Assertions.assertEquals(updatedContent, updated.content());
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+  }
+
+  @Test
   public void testDeletePolicy() {
     String policyName = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");

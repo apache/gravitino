@@ -18,13 +18,19 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.MetadataObject;
 
 /** Built-in policy content for filtering rows of tagged tables. */
 public final class RowFilterContent extends ReadRestrictionContent {
+
+  private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
+      ImmutableSet.of(MetadataObject.Type.TABLE);
 
   @Nullable private final String expression;
 
@@ -45,6 +51,12 @@ public final class RowFilterContent extends ReadRestrictionContent {
    */
   public String expression() {
     return expression;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Set<MetadataObject.Type> supportedObjectTypes() {
+    return SUPPORTED_OBJECT_TYPES;
   }
 
   @Override

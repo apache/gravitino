@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -166,12 +167,8 @@ public class TestReadRestrictionPolicyDTO {
             + "\"content\":{\"rules\":[{\"action\":\"show-first-4\"}]}"
             + "}";
 
-    Assertions.assertThrows(
-        JsonProcessingException.class,
-        () -> JsonUtils.objectMapper().readValue(rowFilterWithRules, PolicyCreateRequest.class));
-    Assertions.assertThrows(
-        JsonProcessingException.class,
-        () -> JsonUtils.objectMapper().readValue(columnMaskWithRules, PolicyCreateRequest.class));
+    assertLegacyRuleShapeRejected(rowFilterWithRules);
+    assertLegacyRuleShapeRejected(columnMaskWithRules);
   }
 
   @Test
@@ -204,5 +201,14 @@ public class TestReadRestrictionPolicyDTO {
     Assertions.assertEquals(request, restored);
     Assertions.assertEquals(policyType, restored.getPolicyType());
     Assertions.assertEquals(content, DTOConverters.fromDTO(restored.getNewContent()));
+  }
+
+  private static void assertLegacyRuleShapeRejected(String json) {
+    UnrecognizedPropertyException exception =
+        Assertions.assertThrows(
+            UnrecognizedPropertyException.class,
+            () -> JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class));
+    Assertions.assertEquals("rules", exception.getPropertyName());
+    Assertions.assertTrue(exception.getMessage().contains("rules"));
   }
 }
