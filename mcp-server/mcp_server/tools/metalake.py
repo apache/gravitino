@@ -48,6 +48,10 @@ def load_metalake_tools(mcp: FastMCP):
                 "audit": {
                   "creator": "anonymous",
                   "createTime": "2025-08-20T07:33:41.233089Z"
+                },
+                "owner": {
+                  "name": "alice",
+                  "type": "user"
                 }
               }
             ]
@@ -57,6 +61,8 @@ def load_metalake_tools(mcp: FastMCP):
             comment: A human-readable description of the metalake.
             properties: Metalake properties.
             audit: Metadata about the metalake's creation and modification.
+            owner: The user or group owning the metalake, or null when
+                authorization is disabled or no owner is assigned.
         """
         # require_metalake=False: this is the tool an agent calls when it does
         # not know a metalake yet, so it must work with none configured.
