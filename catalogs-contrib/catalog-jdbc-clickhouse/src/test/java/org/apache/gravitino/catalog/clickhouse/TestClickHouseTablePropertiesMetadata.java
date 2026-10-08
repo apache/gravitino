@@ -43,6 +43,10 @@ public class TestClickHouseTablePropertiesMetadata {
     properties.put(TableConstants.PARTITION_KEY, "cityHash64(x) % 7");
     properties.put(TableConstants.ENGINE, "MergeTree");
     properties.put(TableConstants.SETTINGS_PREFIX + "index_granularity", "8192");
+    properties.put(
+        ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY,
+        "[{\"name\":\"by_name\",\"type\":\"Normal\","
+            + "\"query\":\"SELECT name ORDER BY name\",\"settings\":{}}]");
 
     Map<String, String> jdbcProperties = metadata.transformToJdbcProperties(properties);
 
@@ -55,6 +59,9 @@ public class TestClickHouseTablePropertiesMetadata {
     // Other properties pass through unchanged.
     Assertions.assertEquals(
         "8192", jdbcProperties.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        properties.get(ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY),
+        jdbcProperties.get(ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY));
   }
 
   @Test
@@ -79,5 +86,17 @@ public class TestClickHouseTablePropertiesMetadata {
     Assertions.assertTrue(entry.isImmutable());
     Assertions.assertFalse(entry.isHidden());
     Assertions.assertEquals("", entry.getDefaultValue());
+  }
+
+  @Test
+  void testClickHouseProjectionsPropertyEntry() {
+    PropertyEntry<?> entry =
+        ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY;
+    Assertions.assertEquals(
+        ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY, entry.getName());
+    Assertions.assertTrue(entry.isImmutable());
+    Assertions.assertFalse(entry.isReserved());
+    Assertions.assertFalse(entry.isHidden());
+    Assertions.assertNull(entry.getDefaultValue());
   }
 }

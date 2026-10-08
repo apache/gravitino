@@ -67,8 +67,10 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -135,12 +137,16 @@ public class TestTagManager {
 
   private static final String FUNCTION = "function_for_tag_test";
 
+  private static final String SEMANTIC_MODEL = "semantic_model_for_tag_test";
+
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
   private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
   private static final ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
   private static final FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
+  private static final SemanticModelDispatcher semanticModelDispatcher =
+      mock(SemanticModelDispatcher.class);
 
   private static EntityStore entityStore;
 
@@ -286,6 +292,11 @@ public class TestTagManager {
         GravitinoEnv.getInstance(), "internalViewDispatcher", viewDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalFunctionDispatcher", functionDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalSemanticModelDispatcher",
+        semanticModelDispatcher,
+        true);
 
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
@@ -1140,6 +1151,44 @@ public class TestTagManager {
             () -> tagManager.getTagForMetadataObject(METALAKE, nonExistentObject, tag1.name()));
     Assertions.assertTrue(
         e3.getMessage().contains("Failed to get tag for metadata object " + nonExistentObject));
+  }
+
+  @Test
+  public void testSemanticModelIsSupportedForTags() {
+    Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);
+
+    MetadataObject semanticModelObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofSemanticModel(METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL),
+            Entity.EntityType.SEMANTIC_MODEL);
+    Assertions.assertEquals(MetadataObject.Type.SEMANTIC_MODEL, semanticModelObject.type());
+    Assertions.assertEquals(
+        CATALOG + "." + SCHEMA + "." + SEMANTIC_MODEL, semanticModelObject.fullName());
+
+    // A Semantic Model is an accepted tag target, so an absent one must fail existence validation
+    // rather than be rejected as an unsupported metadata object type.
+    when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(false);
+
+    Throwable e =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                tagManager.associateTagsForMetadataObject(
+                    METALAKE, semanticModelObject, new String[] {tag1.name()}, null));
+    Assertions.assertTrue(
+        e.getMessage()
+            .contains(
+                "Metadata object "
+                    + semanticModelObject.fullName()
+                    + " type SEMANTIC_MODEL doesn't exist"),
+        e.getMessage());
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> tagManager.listTagsForMetadataObject(METALAKE, semanticModelObject));
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
   }
 
   @Test
