@@ -205,7 +205,11 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
-    dependsOn(tasks.jar)
+    dependsOn(
+      tasks.jar,
+      ":catalogs:catalog-lakehouse-iceberg:jar",
+      ":iceberg:iceberg-rest-experimental-server:copyLibAndConfigs"
+    )
   }
 }
 
