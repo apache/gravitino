@@ -89,6 +89,47 @@ from effective tags. Row-filter resolution consumes effective policies for a tab
 resolution consumes effective policies for each top-level column. Direct policy
 associations are not used.
 
+### Target scope and tag inheritance
+
+The policy type determines the evaluation target, but it does not restrict where its selecting tag
+can be assigned. Effective tags include direct assignments and assignments inherited from metadata
+ancestors. A tag assigned to a schema can therefore select a row-filter policy for every descendant
+table and a column-mask policy for every descendant column. The policy content does not contain a
+second list of table or column targets; tag assignment and policy-on-tag selectors are the only
+selection mechanism.
+
+For example, assume schema `sales` contains these tables:
+
+```text
+sales.orders(region field-id=4)
+sales.customers(region field-id=9)
+```
+
+If a tag selecting this policy is assigned only to `sales.orders`, only that table receives the
+filter:
+
+```text
+filter := col("region") == "US"
+```
+
+The resolver binds `region` to field ID 4 when loading `orders`. If the same tag is assigned to the
+`sales` schema, both tables inherit it. The same authored expression is then bound independently to
+field ID 4 for `orders` and field ID 9 for `customers`. A descendant table without exactly one
+compatible `region` field fails its governed load; the resolver never skips an inherited policy or
+returns an unrestricted response because schema binding failed.
+
+For a column mask, assigning a tag directly to `sales.customers.phone` selects the mask only for
+that field. Assigning the same tag to `sales` makes it effective for every descendant column. This
+is supported, but it is intentionally broad: every selected column must support the resolved mask
+action or the table load fails. Administrators should normally assign mask-selecting tags directly
+to the affected columns.
+
+Tag-value selectors can narrow an inherited assignment. For example, a schema assignment of
+`data_access=restricted` can select a policy through `TAG_VALUE("restricted")`, while a nearer
+`data_access=public` assignment on one table overrides the inherited value and does not match that
+selector. This exclusion pattern does not work with `ALL_VALUES`, because the nearer assignment
+still makes the tag present.
+
 First-version policy content stores one expression. It does not store parser names,
 action-vocabulary names, resolved subjects, group membership snapshots, table schemas, field IDs,
 or serialized load-table responses. The built-in policy type determines how the expression is
@@ -253,6 +294,35 @@ is valid only as the row-filter rule head, and `mask` is valid only as the colum
 Column names, group names, and string values appear only as JSON string literals. A name equal to a
 keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
 single quotes, SQL delimited identifiers, and backslash escaping outside a JSON string are invalid.
+
+For example, this expression is valid and unambiguous:
+
+```text
+filter := col("filter") == "mask"
+```
+
+The first `filter` is the rule head, `"filter"` is a column name, and `"mask"` is a string value.
+Similarly, `col("action")` references a column named `action`; it is unrelated to the
+`action(...)` mask constructor. A group name can also equal a keyword:
+
+```text
+mask := action("show-last-4") if is_group_member("mask")
+else := action("replace-with-null")
+```
+
+User-provided names cannot appear as bare identifiers. The following forms are invalid:
+
+```text
+filter := region == "US"
+filter := col(mask) == "US"
+filter := filter == true
+"filter" := col("region") == "US"
+```
+
+Keywords, numbers, and built-in function names must end at the end of input or before a valid token
+delimiter. The lexer never splits an alphanumeric or underscore sequence into adjacent tokens. It
+therefore rejects prefix forms such as `notcol("active")`, `notebook`, `truefalse`, and `1and`
+rather than interpreting them as combinations of valid tokens.
 
 There are two syntactic JSON layers in an API request. The HTTP JSON parser decodes the outer
 `expression` field once, and the expression parser decodes each inner JSON string literal once. For
@@ -450,19 +520,80 @@ governed response must include at least:
 - authenticated subject and identity revision;
 - effective policy and tag revisions;
 - schema revision; and
-- canonical read-restriction signature.
+- canonical read-restriction signature;
+- read-restriction capability version; and
+- trusted-reader identity or channel revision.
 
 The existing metadata-location-only conditional-GET fast path must not return `304 Not Modified`
 before restriction resolution. A response resolved for one subject must never be reused for another
-subject.
+subject, capability version, or trusted-reader identity.
 
 ## Delivery
 
 The implementation ships through the normal Gravitino Iceberg REST build and distribution.
 
-An operator enables the feature with normal server configuration, and a client declares the
-`read-restrictions` capability. Both are required while reader support is maturing. The client
-declaration is capability negotiation, not authorization.
+### Client capability declaration
+
+The feature is disabled by default. A compatible client declares support with this request header:
+
+```http
+X-Gravitino-Client-Capabilities: read-restrictions.v1
+```
+
+`X-Gravitino-Client-Capabilities` follows the generic client-capability pattern proposed for the
+Iceberg REST protocol, but uses the Gravitino namespace because that Iceberg proposal is not part of
+the published REST specification. The value is a comma-separated list of independent, versioned
+capability tokens. For example:
+
+```http
+X-Gravitino-Client-Capabilities: read-restrictions.v1,future-capability.v2
+```
+
+Capability tokens are lowercase and case-sensitive. A token starts with an ASCII lowercase letter
+or digit and then contains only ASCII lowercase letters, digits, `-`, or `.`, so
+`read-restrictions.v1` is valid while `Read-Restrictions.v1`, `read_restrictions.v1`, and an empty
+token are malformed. Parsing trims optional HTTP whitespace around each comma-separated token and
+deduplicates repeated tokens. Unknown well-formed tokens are ignored for forward compatibility. A
+malformed header does not declare any capability. A client SDK may send the static header on every
+Iceberg REST request; the first implementation consumes `read-restrictions.v1` only for operations
+that can return governed table metadata.
+
+Generic Iceberg REST clients can configure the header through their normal custom-header property:
+
+```properties
+header.X-Gravitino-Client-Capabilities=read-restrictions.v1
+```
+
+For Spark, the corresponding catalog property is:
+
+```properties
+spark.sql.catalog.<catalog-name>.header.X-Gravitino-Client-Capabilities=read-restrictions.v1
+```
+
+A Gravitino-provided reader integration should set the capability automatically after its complete
+enforcement path passes the read-restriction conformance suite. Manual header configuration is a
+compatibility declaration only.
+
+### Trust and failure behavior
+
+The capability header is a forward-compatibility signal, not authorization or evidence that a
+reader enforces restrictions. A caller can copy it. The deployment must separately bind an
+authenticated reader identity or mutually authenticated channel to an operator-reviewed reader
+implementation, and it must carry the effective end user through an authorized delegation
+mechanism. Governed data credentials must not be issued when that trust check fails.
+
+The server applies these outcomes:
+
+| Active restriction | `read-restrictions.v1` | Trusted reader | Result |
+| --- | --- | --- | --- |
+| No | Missing or present | Any | Return the normal response without read restrictions. |
+| Yes | Missing | Any | Return `406 Not Acceptable`; do not return unrestricted metadata. |
+| Yes | Unsupported version | Any | Return `406 Not Acceptable`; do not return unrestricted metadata. |
+| Yes | Present | No | Return `403 Forbidden`; the header does not establish trust. |
+| Yes | Present | Yes | Return `200 OK` with the resolved read restrictions. |
+
+An applicable restriction that cannot be loaded, parsed, bound, canonicalized, serialized, or
+enforced also fails the request. No error path falls back to an unrestricted response.
 
 When an active restriction applies:
 
@@ -473,6 +604,10 @@ When an active restriction applies:
 Compatibility tests pin the Iceberg implementation revision. When official Iceberg runtime support
 is available, Gravitino replaces its compatibility DTOs and reader integration with official types
 and runs the same conformance fixtures against both implementations.
+
+If Iceberg standardizes `X-Iceberg-Client-Capabilities`, Gravitino can temporarily accept the union
+of recognized capabilities from the Iceberg and Gravitino headers, deprecate the Gravitino header,
+and remove it in a later major release.
 
 ## Persistence and Administration
 
@@ -502,6 +637,9 @@ request ID; policy details remain subject to policy-view authorization.
 6. An old client that may ignore `read-restrictions` is not a trusted enforcement target.
 7. A `function` definition remains invalid until its complete contract and enforcement capability
    are enabled.
+8. A capability declaration does not establish reader trust, end-user identity, or authorization.
+9. Governed data credentials and storage authorization prevent reads that bypass the trusted
+   restriction-enforcement path.
 
 ## Testing
 
@@ -534,8 +672,13 @@ Coverage includes:
 - all nine mask actions and unsupported action/type pairs;
 - table and column effective-tag selection;
 - renamed, missing, required, and unsupported fields;
-- subject, policy, tag, schema, and metadata cache changes;
-- old-client rejection and capability negotiation; and
+- direct table and column tags, inherited schema tags, tag-value overrides, and broad inherited
+  column-mask failures;
+- subject, policy, tag, schema, capability version, trusted-reader identity, and metadata cache
+  changes;
+- missing, malformed, duplicate, unknown, and versioned client capability tokens;
+- old-client rejection, spoofed-header rejection, trusted-reader binding, and capability
+  negotiation; and
 - row filtering before masking in an end-to-end reader test.
 
 ## Implementation Plan
@@ -546,13 +689,16 @@ Coverage includes:
 3. Implement policy-on-tag selection, subject binding, schema binding, canonicalization, and conflict
    detection.
 4. Integrate restriction resolution with load-table responses and restriction-aware ETags.
-5. Build the pinned compatible reader and add end-to-end conformance tests.
-6. Replace compatibility protocol and reader classes with official Iceberg types when available.
+5. Add the false-by-default server setting, trusted-reader binding, and versioned
+   `X-Gravitino-Client-Capabilities` handling.
+6. Build the pinned compatible reader and add end-to-end conformance tests.
+7. Replace compatibility protocol and reader classes with official Iceberg types when available.
 
 ## References
 
 - [Policy-on-tag design](policy-on-tag.md)
 - [Apache Iceberg read-restrictions specification](https://github.com/apache/iceberg/pull/13879)
+- [Iceberg client-capabilities proposal](https://github.com/apache/iceberg/pull/16394)
 - [Pinned Iceberg REST schema](https://github.com/apache/iceberg/blob/6dec25e430b33a8b4f623b14940110d459581826/open-api/rest-catalog-open-api.yaml)
 - [Iceberg read-restriction actions implementation](https://github.com/apache/iceberg/pull/16198)
 - [Iceberg generic reader implementation](https://github.com/apache/iceberg/pull/16131)
