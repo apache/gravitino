@@ -132,7 +132,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
         || e instanceof ValidationException) {
       return new BadRequestException("%s", message);
     }
-    if (keepsOriginalException(e)) {
+    if (EXCEPTION_ERROR_CODES.containsKey(e.getClass()) || e instanceof WebApplicationException) {
       return e;
     }
     return new ServiceFailureException("%s", message);
@@ -151,37 +151,10 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
-
-    // JAX-RS framework errors already have status (+ headers such as Allow on 405).
-    // Keep those headers and only replace the body with Iceberg ErrorResponse JSON.
-    if (ex instanceof WebApplicationException) {
-      return toJaxRsErrorResponse((WebApplicationException) ex);
-    }
-
     int status =
         ex instanceof Exception
             ? getErrorCode((Exception) ex)
             : Status.INTERNAL_SERVER_ERROR.getStatusCode();
-    logFailure(ex, status);
-    return IcebergRESTUtils.errorResponse(ex, status);
-  }
-
-  /**
-   * Builds an Iceberg JSON error from a JAX-RS {@link WebApplicationException}, preserving
-   * framework headers from the original response.
-   */
-  private static Response toJaxRsErrorResponse(WebApplicationException ex) {
-    int status = getErrorCode(ex);
-    logFailure(ex, status);
-    Response icebergBody = IcebergRESTUtils.errorResponse(ex, status);
-    return Response.fromResponse(ex.getResponse())
-        .status(status)
-        .entity(icebergBody.getEntity())
-        .type(MediaType.APPLICATION_JSON)
-        .build();
-  }
-
-  private static void logFailure(Throwable ex, int status) {
     if (status == Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
       LOG.error("Iceberg REST server unexpected failure:", ex);
     } else {
@@ -191,10 +164,16 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getClass(),
           ex.getMessage());
     }
-  }
 
-  /** Whether the exception already has a known HTTP status and should not be wrapped. */
-  private static boolean keepsOriginalException(Exception e) {
-    return EXCEPTION_ERROR_CODES.containsKey(e.getClass()) || e instanceof WebApplicationException;
+    Response response = IcebergRESTUtils.errorResponse(ex, status);
+    // Preserve JAX-RS headers (e.g. Allow on 405); only the body becomes Iceberg JSON.
+    if (ex instanceof WebApplicationException) {
+      return Response.fromResponse(((WebApplicationException) ex).getResponse())
+          .status(status)
+          .entity(response.getEntity())
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+    return response;
   }
 }
