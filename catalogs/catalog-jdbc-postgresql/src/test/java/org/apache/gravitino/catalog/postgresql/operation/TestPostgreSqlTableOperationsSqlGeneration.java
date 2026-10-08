@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import java.sql.Connection;
 import java.util.Collections;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -58,12 +59,15 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
     }
 
     public String alterTableSql(String tableName, TableChange... changes) {
-      return generateAlterTableSql("database", tableName, changes);
+      return generateAlterTableSql(null, "database", tableName, changes);
     }
 
     @Override
     protected JdbcTable getOrCreateTable(
-        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+        Connection connection,
+        String databaseName,
+        String tableName,
+        JdbcTable lazyLoadCreateTable) {
       return JdbcTable.builder()
           .withName(tableName)
           .withColumns(

@@ -103,13 +103,13 @@ public class SqliteTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateAlterTableSql(
-      String databaseName, String tableName, TableChange... changes) {
+      Connection connection, String databaseName, String tableName, TableChange... changes) {
     throw new UnsupportedOperationException("Alter table is not supported in sqlite.");
   }
 
   @Override
   protected JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      Connection connection, String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
     throw new UnsupportedOperationException("Sqlite does not support lazy load create table.");
   }
 

@@ -313,7 +313,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateAlterTableSql(
-      String databaseName, String tableName, TableChange... changes) {
+      Connection connection, String databaseName, String tableName, TableChange... changes) {
     // Not all operations require the original table information, so lazy loading is used here
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
@@ -331,51 +331,51 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(addColumnFieldDefinition(addColumn));
       } else if (change instanceof TableChange.RenameColumn) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
             (TableChange.UpdateColumnDefaultValue) change;
         alterSql.add(
             updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnComment) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnComment updateColumnComment =
             (TableChange.UpdateColumnComment) change;
         alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnPosition) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnPosition updateColumnPosition =
             (TableChange.UpdateColumnPosition) change;
         alterSql.add(updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadTable));
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
         if (StringUtils.isNotEmpty(deleteColSql)) {
           alterSql.add(deleteColSql);
         }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnAutoIncrementDefinition(
                 lazyLoadTable, (TableChange.UpdateColumnAutoIncrement) change));
@@ -390,7 +390,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       String newComment = updateComment.getNewComment();
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
-        JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        JdbcTable jdbcTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
         if (null != identifier) {
           newComment = StringIdentifier.addToComment(identifier, newComment);

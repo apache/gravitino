@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.sql.Connection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,7 +65,10 @@ public class TestHologresTableOperations {
 
     @Override
     protected JdbcTable getOrCreateTable(
-        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+        Connection connection,
+        String databaseName,
+        String tableName,
+        JdbcTable lazyLoadCreateTable) {
       if (mockTable != null) {
         return mockTable;
       }
@@ -96,7 +100,7 @@ public class TestHologresTableOperations {
     }
 
     public String alterTableSql(String schemaName, String tableName, TableChange... changes) {
-      return generateAlterTableSql(schemaName, tableName, changes);
+      return generateAlterTableSql(null, schemaName, tableName, changes);
     }
 
     public JdbcTable buildFakeTable(String tableName, JdbcColumn... columns) {

@@ -2555,12 +2555,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     @Override
     protected JdbcTable getOrCreateTable(
-        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+        Connection connection,
+        String databaseName,
+        String tableName,
+        JdbcTable lazyLoadCreateTable) {
       return table;
     }
 
     String buildAlterSql(String db, String tableName, TableChange[] changes) {
-      return generateAlterTableSql(db, tableName, changes);
+      return generateAlterTableSql(null, db, tableName, changes);
     }
   }
 }

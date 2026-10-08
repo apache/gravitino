@@ -116,12 +116,15 @@ public class TestClickHouseTableOperationsUnit {
 
     @Override
     protected JdbcTable getOrCreateTable(
-        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+        Connection connection,
+        String databaseName,
+        String tableName,
+        JdbcTable lazyLoadCreateTable) {
       return table;
     }
 
     String callGenerateAlterTableSql(TableChange... changes) {
-      return generateAlterTableSql("db", "test_table", changes);
+      return generateAlterTableSql(null, "db", "test_table", changes);
     }
   }
 

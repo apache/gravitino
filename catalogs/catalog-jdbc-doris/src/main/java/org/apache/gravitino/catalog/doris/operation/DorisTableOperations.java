@@ -826,7 +826,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateAlterTableSql(
-      String databaseName, String tableName, TableChange... changes) {
+      Connection connection, String databaseName, String tableName, TableChange... changes) {
     /*
      * NOTICE:
      * As described in the Doris documentation, the creation of Schema Change is an asynchronous process.
@@ -861,12 +861,12 @@ public class DorisTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(addColumnFieldDefinition(addColumn, alterColumnDorisVersion));
       } else if (change instanceof TableChange.RenameColumn) {
         throw new IllegalArgumentException("Rename column is not supported yet");
       } else if (change instanceof TableChange.UpdateColumnType) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
         if (alterColumnDorisVersion.isEmpty() && updateColumnType.fieldName().length == 1) {
           JdbcColumn currentColumn =
@@ -884,26 +884,26 @@ public class DorisTableOperations extends JdbcTableOperations {
             (TableChange.UpdateColumnComment) change;
         alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment));
       } else if (change instanceof TableChange.UpdateColumnPosition) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnPosition updateColumnPosition =
             (TableChange.UpdateColumnPosition) change;
         alterSql.add(updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadTable));
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
         if (StringUtils.isNotEmpty(deleteColSql)) {
           alterSql.add(deleteColSql);
         }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
       } else {
         throw new IllegalArgumentException(
@@ -919,7 +919,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       String newComment = updateComment.getNewComment();
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
-        JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        JdbcTable jdbcTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
         if (null != identifier) {
           newComment = StringIdentifier.addToComment(identifier, newComment);

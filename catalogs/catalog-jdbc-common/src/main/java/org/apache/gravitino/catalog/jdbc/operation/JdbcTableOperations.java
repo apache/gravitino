@@ -241,13 +241,32 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    try (Connection connection = getConnection(databaseName)) {
+      return load(connection, databaseName, tableName);
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  /**
+   * Loads a table using the given connection instead of borrowing a new one from the pool. Callers
+   * that already hold a connection MUST use this method to avoid nested borrows.
+   *
+   * @param connection The connection to use for reading table metadata.
+   * @param databaseName The name of the database
+   * @param tableName The name of the table
+   * @return The loaded table
+   * @throws NoSuchTableException if the table does not exist
+   */
+  protected JdbcTable load(Connection connection, String databaseName, String tableName)
+      throws NoSuchTableException {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
     // tables, for example.
     // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
     // like utf8mb4.
     // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
     // by any character, and ending with 'b'.
-    try (Connection connection = getConnection(databaseName)) {
+    try {
       // 1. Get table information, The result of tables may be more than one due to the reason
       // above, so we need to check the result.
       ResultSet tables = getTable(connection, databaseName, tableName);
@@ -354,7 +373,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      String sql = generateAlterTableSql(databaseName, tableName, changes);
+      String sql = generateAlterTableSql(connection, databaseName, tableName, changes);
       if (StringUtils.isEmpty(sql)) {
         LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
         return;
@@ -567,21 +586,39 @@ public abstract class JdbcTableOperations implements TableOperation {
     return generatePurgeTableSql(tableName);
   }
 
+  /**
+   * Generates the SQL statement to alter a table.
+   *
+   * <p>Implementations that need the original table definition MUST reuse the caller's {@code
+   * connection} (for example through {@link #getOrCreateTable(Connection, String, String,
+   * JdbcTable)}) instead of letting the table be loaded with a newly borrowed connection, since
+   * nested borrows can exhaust the pool under concurrency.
+   *
+   * @param connection The connection obtained by the caller, used to read table metadata
+   * @param databaseName The name of the database
+   * @param tableName The name of the table
+   * @param changes The changes to apply to the table
+   * @return The generated SQL statement, or an empty string if there is nothing to alter
+   */
   protected abstract String generateAlterTableSql(
-      String databaseName, String tableName, TableChange... changes);
+      Connection connection, String databaseName, String tableName, TableChange... changes);
 
   /**
-   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
-   * support MySQL syntax, this method needs to be rewritten.
+   * Returns the given table, or loads it using the caller's connection when it has not been loaded
+   * yet. The provided connection is required so that loading does not borrow a second connection
+   * from the pool.
    *
+   * @param connection The connection obtained by the caller, reused for loading the table
    * @param databaseName The name of the database
    * @param tableName The name of the table
    * @param lazyLoadCreateTable The pre-loaded table object, if available
    * @return The resulting JdbcTable object
    */
   protected JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-    return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
+      Connection connection, String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+    return null != lazyLoadCreateTable
+        ? lazyLoadCreateTable
+        : load(connection, databaseName, tableName);
   }
 
   protected void validateUpdateColumnNullable(

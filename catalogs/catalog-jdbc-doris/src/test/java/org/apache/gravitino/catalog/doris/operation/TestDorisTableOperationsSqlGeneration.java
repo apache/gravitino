@@ -106,7 +106,7 @@ public class TestDorisTableOperationsSqlGeneration {
     }
 
     public String alterTableSql(String tableName, TableChange... changes) {
-      return generateAlterTableSql("database", tableName, changes);
+      return generateAlterTableSql(null, "database", tableName, changes);
     }
 
     /**
@@ -132,7 +132,10 @@ public class TestDorisTableOperationsSqlGeneration {
 
     @Override
     protected JdbcTable getOrCreateTable(
-        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+        Connection connection,
+        String databaseName,
+        String tableName,
+        JdbcTable lazyLoadCreateTable) {
       return tableForAlter;
     }
 

@@ -763,7 +763,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     validateTableSettingChanges(changes);
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      String sql = generateAlterTableSql(databaseName, tableName, changes);
+      String sql = generateAlterTableSql(connection, databaseName, tableName, changes);
       if (StringUtils.isEmpty(sql)) {
         LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
         return;
@@ -892,6 +892,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     try (Connection connection = getConnection(databaseName)) {
+      return load(connection, databaseName, tableName);
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  @Override
+  protected JdbcTable load(Connection connection, String databaseName, String tableName)
+      throws NoSuchTableException {
+    try {
       ResultSet tables = getTable(connection, databaseName, tableName);
       JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
 
@@ -1187,7 +1197,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateAlterTableSql(
-      String databaseName, String tableName, TableChange... changes) {
+      Connection connection, String databaseName, String tableName, TableChange... changes) {
     // Not all operations require the original table information, so lazy loading is used here
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
@@ -1209,32 +1219,32 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         continue;
 
       } else if (change instanceof TableChange.AddColumn addColumn) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(addColumnFieldDefinition(addColumn));
 
       } else if (change instanceof TableChange.RenameColumn renameColumn) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(renameColumnFieldDefinition(renameColumn));
 
       } else if (change instanceof TableChange.UpdateColumnDefaultValue updateColumnDefaultValue) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
 
       } else if (change instanceof TableChange.UpdateColumnType updateColumnType) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
 
       } else if (change instanceof TableChange.UpdateColumnComment updateColumnComment) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment, lazyLoadTable));
 
       } else if (change instanceof TableChange.UpdateColumnPosition updateColumnPosition) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadTable));
 
       } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
 
         if (StringUtils.isNotEmpty(deleteColSql)) {
@@ -1242,17 +1252,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         }
 
       } else if (change instanceof TableChange.UpdateColumnNullability) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
 
       } else if (change instanceof TableChange.AddIndex addIndex) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(addIndexDefinition(lazyLoadTable, addIndex));
 
       } else if (change instanceof TableChange.DeleteIndex) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
 
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
@@ -1274,7 +1284,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       //      still identify the table after the comment is changed.
       //   2. Re-embed the cluster name so it is not lost. ClickHouse does not persist ON CLUSTER
       //      in SHOW CREATE TABLE, so the cluster name lives only in the stored comment.
-      lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+      lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
       if (null == StringIdentifier.fromComment(newComment)) {
         StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
         if (null != identifier) {
@@ -1300,7 +1310,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // Check if the table is on a cluster, so that ALTER TABLE includes ON CLUSTER
-    lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+    lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
     Map<String, String> props = lazyLoadTable.properties();
     String clusterName = props == null ? null : props.get(ClusterConstants.CLUSTER_NAME);
     boolean onCluster =

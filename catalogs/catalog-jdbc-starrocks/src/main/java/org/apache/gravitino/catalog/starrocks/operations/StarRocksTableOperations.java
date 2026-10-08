@@ -135,7 +135,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateAlterTableSql(
-      String databaseName, String tableName, TableChange... changes) {
+      Connection connection, String databaseName, String tableName, TableChange... changes) {
     JdbcTable lazyLoadTable = null;
     List<String> alterSql = new ArrayList<>();
     boolean hasSetPropertyChange = false;
@@ -143,36 +143,36 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       TableChange change = changes[i];
       if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(addColumnFieldDefinition(addColumn));
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadTable));
       } else if (change instanceof TableChange.RemoveProperty) {
         throw new IllegalArgumentException("Remove property is not supported yet.");
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(renameColumnDefinition(renameColumn, lazyLoadTable));
       } else if (change instanceof TableChange.RenameTable) {
         TableChange.RenameTable renameTable = (TableChange.RenameTable) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(renameTableDefinition(renameTable, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         TableChange.UpdateColumnPosition updateColumnPosition =
             (TableChange.UpdateColumnPosition) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
         String newComment = updateComment.getNewComment();
         if (StringIdentifier.fromComment(newComment) == null) {
-          lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+          lazyLoadTable = getOrCreateTable(connection, databaseName, tableName, lazyLoadTable);
           StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
           if (identifier != null) {
             newComment = StringIdentifier.addToComment(identifier, newComment);
