@@ -182,9 +182,11 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Removes an expired entity from the data cache.
+   * Removes a key that the underlying cache evicted or expired from the implementation's own
+   * bookkeeping, such as a key index. Implementations must not call this while holding a lock of
+   * the underlying cache, and must tolerate the key having been added back before the call.
    *
-   * @param key The expired entity key to remove.
+   * @param key The evicted or expired entity key.
    */
   protected abstract void invalidateExpiredItem(EntityCacheKey key);
 }

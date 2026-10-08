@@ -70,10 +70,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
 
   /**
-   * Runs Caffeine's maintenance work and removal notifications. When its queue is full, {@link
-   * ThreadPoolExecutor.CallerRunsPolicy} runs the task on the submitting thread, and Caffeine also
-   * runs a rejected task inline; either way the removal listener can run while Caffeine holds its
-   * eviction lock, so the listener must never block on an entity segment lock.
+   * Runs Caffeine's maintenance work and removal notifications.
+   *
+   * <p>The removal listener can still run while Caffeine holds its eviction lock: when this queue
+   * is full, {@link ThreadPoolExecutor.CallerRunsPolicy} runs the task on the submitting thread,
+   * which may be the one performing eviction; Caffeine also runs a task inline if an executor
+   * throws on submission. Meanwhile a writer that holds a segment lock can block on the eviction
+   * lock in {@code cacheData.put}, because Caffeine cleans up synchronously when its write buffer
+   * is full. The removal listener must therefore never wait for a segment lock.
    */
   private static final ExecutorService CLEANUP_EXECUTOR =
       new ThreadPoolExecutor(
@@ -92,8 +96,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /**
    * Removes evicted and expired keys from the prefix index. The removal listener only hands keys to
    * this executor; the cleanup itself takes the key's segment lock, which is safe here because this
-   * thread never holds a Caffeine lock. The queue is unbounded, so handing off a key never runs the
-   * cleanup inline on Caffeine's thread.
+   * thread never holds a Caffeine lock.
+   *
+   * <p>The queue is unbounded and the executor is never shut down, so handing off a key never fails
+   * or runs the cleanup on Caffeine's thread. Each task holds only a key, so the backlog is bounded
+   * by the number of pending evictions. A segment held across a slow store read delays the cleanup
+   * behind it, which only lets {@link #size()} over-count and the stale keys use memory for longer.
    */
   private static final ExecutorService INDEX_CLEANUP_EXECUTOR =
       Executors.newSingleThreadExecutor(
@@ -145,7 +153,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param cacheConfig the cache configuration
    * @param maintenanceExecutor the executor Caffeine uses for maintenance and removal notifications
    * @param indexCleanupExecutor the executor that removes evicted and expired keys from the prefix
-   *     index; it must not run tasks on the submitting thread
+   *     index; it must not run a task on the submitting thread while that thread may hold a
+   *     Caffeine lock
    */
   @VisibleForTesting
   CaffeineEntityCache(
@@ -325,8 +334,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
             }
           });
     } catch (RejectedExecutionException e) {
-      // Never fall back to running the cleanup here: this thread may hold Caffeine's eviction lock.
-      // A key left in the index only costs memory; a later invalidation of an ancestor removes it.
+      // Unreachable with the production executor, which is unbounded and never shut down. Never
+      // fall
+      // back to running the cleanup here: this thread may hold Caffeine's eviction lock. A key left
+      // in the index only costs memory; a later invalidation of it or an ancestor removes it.
       LOG.error("Failed to schedule cache index cleanup for key={}, cause={}", key, cause, e);
     }
   }

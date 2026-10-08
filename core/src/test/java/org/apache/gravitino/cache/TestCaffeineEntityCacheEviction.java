@@ -104,7 +104,8 @@ public class TestCaffeineEntityCacheEviction {
 
   @Test
   void testStaleEvictionDoesNotUnindexReinsertedEntry() {
-    // Defer Caffeine's removal notifications so one can arrive after the key was put back.
+    // Defer Caffeine's removal notifications so one can arrive after the key was put back. They run
+    // later on this thread, which then holds no Caffeine lock, so a direct index cleanup is safe.
     Queue<Runnable> deferredNotifications = new ArrayDeque<>();
     CaffeineEntityCache cache =
         new CaffeineEntityCache(countBoundedConfig(10), deferredNotifications::add, Runnable::run);
@@ -138,7 +139,10 @@ public class TestCaffeineEntityCacheEviction {
   void testConcurrentEvictionUnderCountBoundCompletesAndKeepsIndexConsistent() throws Exception {
     int writers = 8;
     int putsPerWriter = 5_000;
-    // The production executors: Caffeine's bounded cleanup pool runs rejected work inline.
+    // The production executors: Caffeine's bounded cleanup pool runs rejected work inline. These
+    // are
+    // static, so if this deadlock regresses the shared cleanup thread stays stuck for this JVM and
+    // later cache tests in the same fork can time out too; the timeout below reports it first.
     CaffeineEntityCache cache = new CaffeineEntityCache(countBoundedConfig(64));
     CountDownLatch start = new CountDownLatch(1);
     ExecutorService pool = Executors.newFixedThreadPool(writers);
