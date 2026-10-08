@@ -25,7 +25,9 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.iceberg.rest.responses.ConfigResponse;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -104,6 +106,23 @@ public class TestIcebergConfig extends IcebergTestBase {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, IcebergRestTestUtil.PREFIX);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
     Assertions.assertEquals(404, response.getStatus());
+  }
+
+  @Test
+  public void testConfigUnacceptableAcceptReturns406() {
+    // Gravitino media types are for /api/*, not Iceberg REST. Content negotiation must return
+    // 406 (and the Iceberg error body code must match), not a misleading 500.
+    try (Response resp =
+        target(IcebergRestTestUtil.CONFIG_PATH)
+            .register(IcebergObjectMapperProvider.class)
+            .request()
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.NOT_ACCEPTABLE.getStatusCode(), resp.getStatus());
+      ErrorResponse error = resp.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(406, error.code());
+      Assertions.assertEquals("NotAcceptableException", error.type());
+    }
   }
 
   @Test
