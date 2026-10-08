@@ -39,6 +39,7 @@ import com.google.common.collect.ImmutableSet;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -635,6 +636,52 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testCatalogsAreLoadedWithOneDetailedListing() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog first = mockCatalog("a", "memory", Catalog.Type.RELATIONAL);
+    Catalog second = mockCatalog("b", "memory", Catalog.Type.RELATIONAL);
+    Mockito.doReturn(new Catalog[] {first, second}).when(fixture.metalake).listCatalogsInfo();
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    manager.loadMetalakeSync();
+    manager.loadMetalakeSync();
+
+    // Every refresh reads all catalogs with one request instead of one request per catalog.
+    verify(fixture.metalake, times(2)).listCatalogsInfo();
+    verify(fixture.metalake, never()).listCatalogs();
+    verify(fixture.metalake, never()).loadCatalog(any());
+    List<CatalogRegistrationState> states = manager.getCatalogRegistrationStates();
+    assertEquals(2, states.size());
+    for (CatalogRegistrationState state : states) {
+      assertEquals(CatalogRegistrationState.Status.REGISTERED, state.getStatus());
+    }
+  }
+
+  @Test
+  public void testDetailedListingFailureFallsBackToPerCatalogLoad() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(
+        mockCatalog("good", "memory", Catalog.Type.RELATIONAL),
+        mockCatalog("bad", "memory", Catalog.Type.RELATIONAL));
+    // One catalog the client cannot convert fails the whole detailed listing.
+    Mockito.doThrow(new UnsupportedOperationException("Unsupported catalog type: UNKNOWN"))
+        .when(fixture.metalake)
+        .loadCatalog("bad");
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    manager.loadMetalakeSync();
+
+    // The failure stays confined to the catalog that caused it.
+    assertTrue(manager.getMetalakeErrors().isEmpty());
+    Map<String, CatalogRegistrationState.Status> statuses = new HashMap<>();
+    for (CatalogRegistrationState state : manager.getCatalogRegistrationStates()) {
+      statuses.put(state.getCatalogName(), state.getStatus());
+    }
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, statuses.get("good"));
+    assertEquals(CatalogRegistrationState.Status.UNSUPPORTED, statuses.get("bad"));
+  }
+
+  @Test
   public void testDeletedCatalogWithConnectorIsRemoved() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
@@ -880,6 +927,7 @@ public class TestCatalogConnectorManager {
     Catalog devCatalog = mockCatalog("sandbox", "memory", Catalog.Type.RELATIONAL);
     Mockito.doReturn(new String[] {"sandbox"}).when(devMetalake).listCatalogs();
     Mockito.doReturn(devCatalog).when(devMetalake).loadCatalog("sandbox");
+    listCatalogsInfoFromLoads(devMetalake);
     Mockito.doReturn(new GravitinoMetalake[] {fixture.metalake, devMetalake})
         .when(fixture.client)
         .listMetalakes();
@@ -1659,6 +1707,21 @@ public class TestCatalogConnectorManager {
     return catalog;
   }
 
+  /**
+   * Answers the detailed listing from the {@code listCatalogs()} and {@code loadCatalog()} stubs,
+   * so that it fails as a whole when any of them fails, like the server does, and a test that stubs
+   * a failure on either one drives the manager onto its per-catalog path.
+   */
+  private static void listCatalogsInfoFromLoads(GravitinoMetalake metalake) {
+    Mockito.doAnswer(
+            invocation ->
+                Arrays.stream(metalake.listCatalogs())
+                    .map(metalake::loadCatalog)
+                    .toArray(Catalog[]::new))
+        .when(metalake)
+        .listCatalogsInfo();
+  }
+
   /** Wires up a manager whose load loop can be driven with {@code loadMetalakeSync()}. */
   private static class LoadFixture {
     private final CatalogRegister catalogRegister = mock(CatalogRegister.class);
@@ -1671,6 +1734,7 @@ public class TestCatalogConnectorManager {
       when(catalogRegister.isTrinoReachable()).thenReturn(true);
       when(metalake.name()).thenReturn("test");
       when(client.loadMetalake(any())).thenReturn(metalake);
+      listCatalogsInfoFromLoads(metalake);
       Mockito.doReturn(new GravitinoMetalake[] {metalake}).when(client).listMetalakes();
       when(catalogFactory.getSupportedCatalogProviders()).thenReturn(ImmutableSet.of("memory"));
       CatalogConnectorContext.Builder builder = mock(CatalogConnectorContext.Builder.class);
@@ -1729,6 +1793,7 @@ public class TestCatalogConnectorManager {
         Mockito.doReturn(catalogs[i]).when(second).loadCatalog(names[i]);
       }
       Mockito.doReturn(names).when(second).listCatalogs();
+      listCatalogsInfoFromLoads(second);
       Mockito.doReturn(second).when(client).loadMetalake(name);
       Mockito.doReturn(new GravitinoMetalake[] {metalake, second}).when(client).listMetalakes();
       return second;

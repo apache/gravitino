@@ -27,6 +27,7 @@ import io.trino.spi.connector.ConnectorContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +91,10 @@ public class CatalogConnectorManager {
 
   // The last error reported by each metalake, keyed by the metalake name.
   private final ConcurrentHashMap<String, String> metalakeErrors = new ConcurrentHashMap<>();
+
+  // The metalakes whose detailed catalog listing is currently failing, so that falling back to
+  // loading their catalogs one by one is logged only when it starts and when it ends.
+  private final Set<String> perCatalogLoadMetalakes = ConcurrentHashMap.newKeySet();
 
   private volatile boolean trinoReachable = false;
   private volatile long lastLoadAttemptTimeMs = 0L;
@@ -328,6 +333,7 @@ public class CatalogConnectorManager {
         .removeIf(
             state -> !usedMetalakes.contains(state.getMetalake()) && !hasLiveConnector(state));
     metalakeErrors.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
+    perCatalogLoadMetalakes.removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
     metalakes.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
   }
 
@@ -454,9 +460,14 @@ public class CatalogConnectorManager {
 
   private void loadCatalogs(GravitinoMetalake metalake) {
     String metalakeName = metalake.name();
+    // Null when the detailed listing failed, in which case each catalog is loaded on its own.
+    Map<String, Catalog> catalogInfos = listCatalogInfos(metalake);
     String[] allCatalogNames;
     try {
-      allCatalogNames = metalake.listCatalogs();
+      allCatalogNames =
+          catalogInfos != null
+              ? catalogInfos.keySet().toArray(new String[0])
+              : metalake.listCatalogs();
     } catch (Exception e) {
       // Keep the existing catalog states untouched, a transient listing failure must not turn
       // healthy catalogs into failed ones. The load status system table reports the cause.
@@ -562,7 +573,10 @@ public class CatalogConnectorManager {
       // Tracked outside the try so that a failure can still report the provider it knows about.
       String provider = null;
       try {
-        Catalog catalog = metalake.loadCatalog(catalogName);
+        Catalog catalog =
+            catalogInfos != null
+                ? catalogInfos.get(catalogName)
+                : metalake.loadCatalog(catalogName);
         // Registration deliberately carries only the visible properties. The resolved secrets are
         // added by each node in createCatalogConnectorContext(), so that they never reach the
         // CREATE CATALOG statement, the catalog properties file Trino persists from it, or
@@ -631,6 +645,46 @@ public class CatalogConnectorManager {
         }
       }
     }
+  }
+
+  /**
+   * Lists the catalogs of a metalake together with their details in a single request, so that a
+   * refresh cycle costs the server one call (and one audit record) instead of one per catalog.
+   *
+   * @return the catalogs keyed by name in listing order, or null if the listing failed and the
+   *     caller should load the catalogs one by one
+   */
+  @Nullable
+  private Map<String, Catalog> listCatalogInfos(GravitinoMetalake metalake) {
+    Catalog[] catalogs;
+    try {
+      catalogs = metalake.listCatalogsInfo();
+    } catch (Exception e) {
+      // The detailed listing fails as a whole when any single catalog cannot be resolved by the
+      // server or converted by the client, e.g. a catalog type this client does not know. Loading
+      // the catalogs one by one keeps such a failure confined to the catalog that caused it.
+      if (perCatalogLoadMetalakes.add(metalake.name())) {
+        LOG.warn(
+            e,
+            "Failed to list catalog details of metalake %s, loading its catalogs one by one "
+                + "until the listing recovers. Every refresh then sends one request per catalog.",
+            metalake.name());
+      } else {
+        LOG.debug(
+            e,
+            "Failed to list catalog details of metalake %s, loading catalogs one by one",
+            metalake.name());
+      }
+      return null;
+    }
+    if (perCatalogLoadMetalakes.remove(metalake.name())) {
+      LOG.info("Catalog details listing of metalake %s recovered.", metalake.name());
+    }
+    Map<String, Catalog> catalogInfos = new LinkedHashMap<>();
+    for (Catalog catalog : catalogs) {
+      catalogInfos.put(catalog.name(), catalog);
+    }
+    return catalogInfos;
   }
 
   private void recordCatalogState(CatalogRegistrationState newState, Throwable cause) {
