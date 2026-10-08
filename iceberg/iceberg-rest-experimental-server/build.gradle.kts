@@ -32,7 +32,7 @@ configurations.configureEach {
       requested.name.startsWith("iceberg-") &&
       (requested.group == "org.apache.iceberg" || requested.group == "com.datastrato")
     ) {
-      useTarget("com.datastrato:${requested.name}:$datastratoIcebergVersion")
+      useTarget("com.datastrato:experimental-${requested.name}:$datastratoIcebergVersion")
       because("Use the Datastrato Iceberg distribution in the experimental auxiliary service")
     }
   }
