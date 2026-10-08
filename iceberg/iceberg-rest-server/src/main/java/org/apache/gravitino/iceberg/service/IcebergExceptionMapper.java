@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.ws.rs.NotFoundException;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
@@ -88,10 +89,17 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
   /**
    * Returns the HTTP status code for the given exception based on the Iceberg REST spec.
    *
+   * <p>JAX-RS {@link WebApplicationException} subclasses already carry the negotiated HTTP status
+   * (for example {@code NotAcceptableException} → 406). Preserve that status instead of falling
+   * through to the unmapped-exception default of 500.
+   *
    * @param ex the exception
    * @return the HTTP status code, defaulting to 500 for unmapped exceptions
    */
   public static int getErrorCode(Exception ex) {
+    if (ex instanceof WebApplicationException) {
+      return ((WebApplicationException) ex).getResponse().getStatus();
+    }
     return EXCEPTION_ERROR_CODES.getOrDefault(
         ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
   }
@@ -118,7 +126,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
         || e instanceof ValidationException) {
       return new BadRequestException("%s", message);
     }
-    if (EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {
+    if (e instanceof WebApplicationException || EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {
       return e;
     }
     return new ServiceFailureException("%s", message);
@@ -138,8 +146,9 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
   public static Response toRESTResponse(Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
     int status =
-        EXCEPTION_ERROR_CODES.getOrDefault(
-            ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
+        ex instanceof Exception
+            ? getErrorCode((Exception) ex)
+            : Status.INTERNAL_SERVER_ERROR.getStatusCode();
     if (status == Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
       LOG.error("Iceberg REST server unexpected failure:", ex);
     } else {
