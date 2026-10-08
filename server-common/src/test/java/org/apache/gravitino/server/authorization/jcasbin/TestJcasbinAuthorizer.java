@@ -835,6 +835,209 @@ public class TestJcasbinAuthorizer {
     assertFalse(
         getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
         "the completed load's policies must survive a late partial result");
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a late partial result must not mark a completely loaded role as incomplete");
+  }
+
+  @Test
+  public void testCompleteResultAfterPartialLoadClearsIncompleteMarker() throws Exception {
+    // Mirror of testPartialResultCannotOverwriteCompletedConcurrentLoad with the opposite ordering:
+    // the partial result wins first, then a complete result for the same version replaces it.
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+    String[] policyRow =
+        new String[] {
+          roleIdStr,
+          MetadataObject.Type.CATALOG.name(),
+          String.valueOf(CATALOG_ID),
+          USE_CATALOG.name(),
+          AuthConstants.ALLOW
+        };
+    ResolvedRolePolicies complete =
+        new ResolvedRolePolicies(
+            ImmutableList.<String[]>of(policyRow),
+            Collections.emptyList(),
+            Collections.emptyList());
+    ResolvedRolePolicies partial =
+        new ResolvedRolePolicies(
+            Collections.emptyList(),
+            Collections.emptyList(),
+            ImmutableList.of("CATALOG:testCatalog"));
+    long roleVersion = 43L;
+
+    assertTrue(invokeReplaceRolePolicies(jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion, partial));
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a partial load must mark the role's policies as incomplete");
+    assertFalse(
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "a partial load must stay out of loadedRoles");
+
+    // The complete result replaces the partial rows, so nothing can be missing any longer.
+    assertTrue(invokeReplaceRolePolicies(jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion, complete));
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a complete load must clear the incomplete marker");
+    assertFalse(
+        getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "the complete load's policies must be installed");
+
+    // An explicit invalidation drops the rows, so the marker must not outlive them.
+    jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "clearing a role's policies must also clear its incomplete marker");
+  }
+
+  @Test
+  public void testHasDenyPolicyReportsMissingDenyOfIncompleteRoleLoad() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // The user holds a role that DENIES USE_CATALOG on a parent scope, but the role's securable
+    // object cannot be resolved, so no deny row is installed. hasDenyPolicy answers an existence
+    // question ("can a DENY hide one of the listed objects?"), and a row that was never installed
+    // cannot prove there is none: reporting "no deny" lets list authorization take the parent-scope
+    // short-circuit and skip the per-object checks that would have caught it.
+    mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(DENY_ROLE_ID, "denyRole")));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
+
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    try {
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              currentPrincipal,
+              METALAKE,
+              ImmutableSet.of(USE_CATALOG),
+              new AuthorizationRequestContext()),
+          "an incomplete role load must be reported as possibly holding a DENY");
+      assertTrue(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredNamedPolicy("p", 0, String.valueOf(DENY_ROLE_ID))
+              .isEmpty(),
+          "the deny row must really be absent, so the answer cannot come from the policy scan");
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+
+    // The retry throttle lapses independently of the partial policies. Even when the retry cannot
+    // read the role at all (so it neither reloads nor re-arms the throttle), the role still holds
+    // the partial row set and must keep reporting the possible deny.
+    getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(DENY_ROLE_ID);
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, "denyRole")),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(null);
+
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()),
+        "the deny must still be reported after the retry throttle expired");
+    assertFalse(
+        getPartialRoleLoadBackoffCache(jcasbinAuthorizer).getIfPresent(DENY_ROLE_ID).isPresent(),
+        "the unreadable role must not have re-armed the throttle, proving the marker carries"
+            + " the answer");
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(DENY_ROLE_ID)),
+        "the incomplete marker must survive the retry throttle");
+  }
+
+  @Test
+  public void testHasDenyPolicyRecoversAfterCompleteRoleLoad() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // An ALLOW-only role so that the deny enforcer never holds a row: every hasDenyPolicy answer
+    // below is driven solely by policy completeness, which makes the recovery observable.
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()),
+        "no policy could be installed, so the DENY enforcer cannot be trusted yet");
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(ALLOW_ROLE_ID)));
+
+    // 1. Recovery: once every object resolves the role loads completely, the marker goes away and
+    //    the deny enforcer is authoritative again.
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.of(CATALOG_ID));
+    getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()),
+        "a completely loaded ALLOW-only role holds no deny");
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(ALLOW_ROLE_ID)));
+    assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+
+    // 2. Partial reloads: a newer version of an already complete role that fails to resolve one
+    //    securable object must re-arm the marker.
+    RoleEntity partiallyResolvable =
+        getRoleEntity(
+            ALLOW_ROLE_ID,
+            "allowRole",
+            ImmutableList.of(
+                getAllowSecurableObject(),
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "unresolvableCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, "allowRole")),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(partiallyResolvable);
+    mockedRoleVersions.put(
+        ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", nextRoleVersion()));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(0);
+              return object.fullName().contains("unresolvableCatalog")
+                  ? Optional.empty()
+                  : Optional.of(CATALOG_ID);
+            });
+    getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()),
+        "a partial reload must re-arm the marker even though the previous load was complete");
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(ALLOW_ROLE_ID)));
+    assertFalse(
+        getAllowEnforcer(jcasbinAuthorizer)
+            .getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID))
+            .isEmpty(),
+        "the resolvable securable object must still install its row");
   }
 
   @Test
@@ -2949,6 +3152,14 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("partialRoleLoadBackoff");
     field.setAccessible(true);
     return (GravitinoCache<Long, Boolean>) field.get(authorizer);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Set<String> getIncompleteRolePolicyIds(JcasbinAuthorizer authorizer)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("incompleteRolePolicyIds");
+    field.setAccessible(true);
+    return (Set<String>) field.get(authorizer);
   }
 
   @SuppressWarnings("unchecked")
