@@ -36,6 +36,15 @@ public class LocalJobExecutorConfigs {
   public static final String JOB_STATUS_KEEP_TIME_MS = "jobStatusKeepTimeInMs";
   public static final long DEFAULT_JOB_STATUS_KEEP_TIME_MS = 60 * 60 * 1000; // 1 hour
 
+  /**
+   * How long in milliseconds a cancelled job's process may keep running after it is asked to stop
+   * before the executor kills it forcibly. Must be greater than 0.
+   */
+  public static final String CANCEL_FORCE_KILL_DELAY_MS = "cancelForceKillDelayInMs";
+
+  /** The default value of {@link #CANCEL_FORCE_KILL_DELAY_MS}. */
+  public static final long DEFAULT_CANCEL_FORCE_KILL_DELAY_MS = 30 * 1000L; // 30 seconds
+
   public static final String SPARK_HOME = "sparkHome";
 
   /**

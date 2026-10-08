@@ -640,6 +640,96 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testCancelJobEscalatesToForcibleKill() throws Exception {
+    // A process that ignores SIGTERM must still terminate (and free its worker
+    // thread) after the cancel grace period.
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(
+        withStagingDir(
+            ImmutableMap.of(LocalJobExecutorConfigs.CANCEL_FORCE_KILL_DELAY_MS, "1000")));
+    try {
+      JobTemplateEntity.TemplateContent trapContent =
+          JobTemplateEntity.TemplateContent.builder()
+              .withExecutable("/bin/sh")
+              .withArguments(Lists.newArrayList("-c", "trap '' TERM; echo ready; exec sleep 300"))
+              .withEnvironments(ImmutableMap.of())
+              .withJobType(JobTemplate.JobType.SHELL)
+              .withScripts(Lists.newArrayList())
+              .withCustomFields(ImmutableMap.of())
+              .build();
+      JobTemplateEntity trapTemplate =
+          JobTemplateEntity.builder()
+              .withId(2L)
+              .withName("trap-term-job-template")
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withComment("test")
+              .withTemplateContent(trapContent)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      JobTemplate template =
+          new JobTemplateResolver(trapTemplate).resolve(ImmutableMap.of(), workingDir);
+
+      String jobId = executor.submitJob(template);
+      awaitReadyMarker();
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
+
+      executor.cancelJob(jobId);
+
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
+  public void testCancelledJobExitingZeroReportsCancelled() throws Exception {
+    // A cancelled job whose TERM handler exits 0 must report CANCELLED, not SUCCEEDED: the user
+    // asked for it to stop, so a clean exit taken in response to the cancel is still a
+    // cancellation.
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(withStagingDir(Collections.emptyMap()));
+    try {
+      JobTemplateEntity.TemplateContent content =
+          JobTemplateEntity.TemplateContent.builder()
+              .withExecutable("/bin/sh")
+              .withArguments(
+                  Lists.newArrayList(
+                      "-c", "trap 'exit 0' TERM; echo ready; while :; do sleep 1; done"))
+              .withEnvironments(ImmutableMap.of())
+              .withJobType(JobTemplate.JobType.SHELL)
+              .withScripts(Lists.newArrayList())
+              .withCustomFields(ImmutableMap.of())
+              .build();
+      JobTemplateEntity templateEntity =
+          JobTemplateEntity.builder()
+              .withId(3L)
+              .withName("term-exit-zero-template")
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withComment("test")
+              .withTemplateContent(content)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      JobTemplate template =
+          new JobTemplateResolver(templateEntity).resolve(ImmutableMap.of(), workingDir);
+
+      String jobId = executor.submitJob(template);
+      awaitReadyMarker();
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
+
+      executor.cancelJob(jobId);
+
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, executor.getJobStatus(jobId));
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
   public void testCancelSucceededJob() {
     // Cancelling a job that is already succeeded.
     Map<String, String> successJobConf =
@@ -1133,6 +1223,19 @@ public class TestLocalJobExecutor {
     String jobId = runSucceededJob(workingDir);
     Assertions.assertTrue(outputIndexFile(jobId).exists());
     Assertions.assertEquals(6, jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES).size());
+  }
+
+  // The job script prints "ready" only after installing its TERM trap, so a cancel sent once this
+  // returns cannot reach the shell before the trap is in place.
+  private static void awaitReadyMarker() {
+    File output = new File(workingDir, "output.log");
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .until(
+            () ->
+                output.exists()
+                    && FileUtils.readFileToString(output, StandardCharsets.UTF_8)
+                        .contains("ready"));
   }
 
   private static Map<String, String> withStagingDir(Map<String, String> configs) {
