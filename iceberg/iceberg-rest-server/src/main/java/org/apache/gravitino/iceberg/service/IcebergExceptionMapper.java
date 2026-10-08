@@ -87,21 +87,26 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .build();
 
   /**
-   * Returns the HTTP status code for the given exception based on the Iceberg REST spec.
+   * Returns the HTTP status code for the given exception.
    *
-   * <p>JAX-RS {@link WebApplicationException} subclasses already carry the negotiated HTTP status
-   * (for example {@code NotAcceptableException} → 406). Preserve that status instead of falling
-   * through to the unmapped-exception default of 500.
+   * <ol>
+   *   <li>Iceberg / Gravitino business exceptions from {@link #EXCEPTION_ERROR_CODES}
+   *   <li>JAX-RS {@link WebApplicationException} that already carries an HTTP status (406/405/415)
+   *   <li>Unexpected failures default to 500
+   * </ol>
    *
    * @param ex the exception
-   * @return the HTTP status code, defaulting to 500 for unmapped exceptions
+   * @return the HTTP status code
    */
   public static int getErrorCode(Exception ex) {
+    Integer code = EXCEPTION_ERROR_CODES.get(ex.getClass());
+    if (code != null) {
+      return code;
+    }
     if (ex instanceof WebApplicationException) {
       return ((WebApplicationException) ex).getResponse().getStatus();
     }
-    return EXCEPTION_ERROR_CODES.getOrDefault(
-        ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
+    return Status.INTERNAL_SERVER_ERROR.getStatusCode();
   }
 
   /**
@@ -126,7 +131,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
         || e instanceof ValidationException) {
       return new BadRequestException("%s", message);
     }
-    if (e instanceof WebApplicationException || EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {
+    if (keepsOriginalException(e)) {
       return e;
     }
     return new ServiceFailureException("%s", message);
@@ -159,5 +164,10 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getMessage());
     }
     return IcebergRESTUtils.errorResponse(ex, status);
+  }
+
+  /** Whether the exception already has a known HTTP status and should not be wrapped. */
+  private static boolean keepsOriginalException(Exception e) {
+    return EXCEPTION_ERROR_CODES.containsKey(e.getClass()) || e instanceof WebApplicationException;
   }
 }
