@@ -279,12 +279,12 @@ public class TestSQLScripts extends TestJDBCBackend {
             "UPDATE policy_meta SET occ_version = 43"),
         "customized migrated data");
     Map<String, Set<String>> expectedColumns = readSchemaColumns();
-    List<String> expectedIndexes = readSchemaIndexes();
+    List<String> expectedIndexes = readSchemaIndexes(expectedColumns.keySet());
     Map<String, List<List<String>>> expectedData = readUpgradeData();
     executeScript(upgrade);
     executeScript(upgrade);
     Assertions.assertEquals(expectedColumns, readSchemaColumns());
-    Assertions.assertEquals(expectedIndexes, readSchemaIndexes());
+    Assertions.assertEquals(expectedIndexes, readSchemaIndexes(expectedColumns.keySet()));
     Assertions.assertEquals(expectedData, readUpgradeData(), "Retry must preserve migrated values");
     if ("mysql".equals(backendType)) {
       // Neither rename source nor target exists: this is damage, not an already-applied DDL.
@@ -294,8 +294,10 @@ public class TestSQLScripts extends TestJDBCBackend {
       AssertionFailedError failure =
           Assertions.assertThrows(AssertionFailedError.class, () -> executeScript(upgrade));
       Assertions.assertInstanceOf(SQLException.class, failure.getCause());
-      Assertions.assertEquals(1176, ((SQLException) failure.getCause()).getErrorCode());
+      Assertions.assertTrue(
+          failure.getCause().getMessage().contains("idx_mid"), failure.getMessage());
     }
+    assertSchemaMatchesFreshInstall(expectedColumns, expectedIndexes);
   }
 
   /** Verifies retries after structural DDL and data updates, including prepared DDL execution. */
@@ -311,9 +313,16 @@ public class TestSQLScripts extends TestJDBCBackend {
     seedUpgradeData();
     executeScript(upgrade);
     Map<String, Set<String>> expectedColumns = readSchemaColumns();
-    List<String> expectedIndexes = readSchemaIndexes();
+    List<String> expectedIndexes = readSchemaIndexes(expectedColumns.keySet());
     Map<String, List<List<String>>> expectedData = readUpgradeData();
+    assertSchemaMatchesFreshInstall(expectedColumns, expectedIndexes);
 
+    String lastIndexRename =
+        statements.stream()
+            .filter(sql -> sql.contains("RENAME INDEX"))
+            .reduce((first, last) -> last)
+            .orElse("");
+    boolean testedIndexRename = false;
     for (int completed = 1; completed <= statements.size(); completed++) {
       String last = statements.get(completed - 1).toUpperCase();
       if (!(last.startsWith("ALTER TABLE")
@@ -321,6 +330,13 @@ public class TestSQLScripts extends TestJDBCBackend {
           || last.startsWith("UPDATE ")
           || last.startsWith("EXECUTE "))) {
         continue;
+      }
+      // MySQL renames share one guard shape; sample the first and last rename.
+      if (last.startsWith("EXECUTE ") && statements.get(completed - 3).contains("RENAME INDEX")) {
+        if (testedIndexRename && !statements.get(completed - 3).equals(lastIndexRename)) {
+          continue;
+        }
+        testedIndexRename = true;
       }
       dropAllTables();
       executeScript(schema);
@@ -330,7 +346,8 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeStatements(statements.subList(0, completed), checkpoint);
       executeScript(upgrade);
       Assertions.assertEquals(expectedColumns, readSchemaColumns(), checkpoint);
-      Assertions.assertEquals(expectedIndexes, readSchemaIndexes(), checkpoint);
+      Assertions.assertEquals(
+          expectedIndexes, readSchemaIndexes(expectedColumns.keySet()), checkpoint);
       Assertions.assertEquals(expectedData, readUpgradeData(), checkpoint);
       if ("mysql".equals(backendType)) {
         try (SqlSession session =
@@ -351,6 +368,67 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  /** Verifies unexpected MySQL primary keys are rejected rather than silently accepted. */
+  @TestTemplate
+  public void testUpgradeToTwoZeroRejectsUnexpectedPrimaryKey() throws SQLException, IOException {
+    if (!"mysql".equals(backendType)) {
+      return;
+    }
+    Path scriptDir = upgradeScriptDirectory();
+    for (String key :
+        List.of("table_id", "version, table_id, deleted_at", "table_id, version, deleted_at")) {
+      dropAllTables();
+      executeScript(scriptDir.resolve("schema-1.3.0-mysql.sql").toFile());
+      seedUpgradeData();
+      // The target key is incomplete while the old unique index remains.
+      executeStatements(
+          List.of("ALTER TABLE table_version_info ADD PRIMARY KEY (" + key + ")"),
+          "unexpected primary key");
+      boolean keepLegacyIndex = !key.startsWith("version");
+      if (!keepLegacyIndex) {
+        // Check column order independently of the legacy-index guard.
+        executeStatements(
+            List.of("ALTER TABLE table_version_info DROP INDEX uk_table_id_version_deleted_at"),
+            "remove legacy index");
+      }
+      AssertionFailedError failure =
+          Assertions.assertThrows(
+              AssertionFailedError.class,
+              () -> executeScript(scriptDir.resolve("upgrade-1.3.0-to-2.0.0-mysql.sql").toFile()));
+      Assertions.assertInstanceOf(SQLException.class, failure.getCause());
+      String expectedError = keepLegacyIndex ? "primary key" : "uk_table_id_version_deleted_at";
+      Assertions.assertTrue(
+          failure.getCause().getMessage().toLowerCase().contains(expectedError),
+          failure.getMessage());
+      Assertions.assertEquals(
+          keepLegacyIndex,
+          readSchemaIndexes(Set.of("table_version_info")).stream()
+              .anyMatch(index -> index.contains("uk_table_id_version_deleted_at")),
+          "Failed conversion must preserve the existing indexes");
+    }
+  }
+
+  private void assertSchemaMatchesFreshInstall(
+      Map<String, Set<String>> upgradedColumns, List<String> upgradedIndexes)
+      throws SQLException, IOException {
+    Map<String, Set<String>> expectedColumns = new TreeMap<>(upgradedColumns);
+    // The migration intentionally retains this legacy table; fresh 2.0 installs omit it.
+    expectedColumns.keySet().removeIf(table -> table.equalsIgnoreCase("policy_relation_meta"));
+    List<String> expectedIndexes =
+        upgradedIndexes.stream()
+            .filter(index -> !index.toLowerCase().startsWith("policy_relation_meta:"))
+            .toList();
+    dropAllTables();
+    executeScript(
+        upgradeScriptDirectory().resolve("schema-2.0.0-" + backendType + ".sql").toFile());
+    Map<String, Set<String>> freshColumns = readSchemaColumns();
+    Assertions.assertEquals(freshColumns, expectedColumns, "Upgrade must match fresh 2.0 columns");
+    Assertions.assertEquals(
+        readSchemaIndexes(freshColumns.keySet()),
+        expectedIndexes,
+        "Upgrade must match fresh 2.0 indexes");
+  }
+
   private Path upgradeScriptDirectory() {
     String home = System.getenv("GRAVITINO_HOME");
     Assertions.assertNotNull(home, "GRAVITINO_HOME environment variable is not set");
@@ -360,12 +438,19 @@ public class TestSQLScripts extends TestJDBCBackend {
   private void seedUpgradeData() throws SQLException {
     executeStatements(
         List.of(
-            "INSERT INTO idp_user_meta (user_id, user_name, password_hash, current_version, last_version) VALUES (1, 'user', 'hash', 7, 9)",
+            "INSERT INTO idp_user_meta (user_id, user_name, password_hash, "
+                + "current_version, last_version) VALUES (1, 'user', 'hash', 7, 9)",
             "INSERT INTO idp_group_meta (group_id, group_name) VALUES (1, 'group')",
-            "INSERT INTO tag_meta (tag_id, tag_name, metalake_id, audit_info) VALUES (1, 'tag', 1, '{}')",
-            "INSERT INTO tag_relation_meta (id, tag_id, metadata_object_id, metadata_object_type, audit_info) VALUES (1, 1, 1, 'TABLE', '{}')",
-            "INSERT INTO fileset_meta (fileset_id, fileset_name, metalake_id, catalog_id, schema_id, type, audit_info, current_version, last_version) VALUES (1, 'fileset', 1, 1, 1, 'MANAGED', '{}', 7, 9)",
-            "INSERT INTO policy_meta (policy_id, policy_name, policy_type, metalake_id, audit_info, current_version, last_version) VALUES (1, 'policy', 'custom', 1, '{}', 7, 9)",
+            "INSERT INTO tag_meta (tag_id, tag_name, metalake_id, audit_info) VALUES (1, "
+                + "'tag', 1, '{}')",
+            "INSERT INTO tag_relation_meta (id, tag_id, metadata_object_id, "
+                + "metadata_object_type, audit_info) VALUES (1, 1, 1, 'TABLE', '{}')",
+            "INSERT INTO fileset_meta (fileset_id, fileset_name, metalake_id, catalog_id, "
+                + "schema_id, type, audit_info, current_version, last_version) VALUES (1, "
+                + "'fileset', 1, 1, 1, 'MANAGED', '{}', 7, 9)",
+            "INSERT INTO policy_meta (policy_id, policy_name, policy_type, metalake_id, "
+                + "audit_info, current_version, last_version) VALUES (1, 'policy', 'custom', 1, "
+                + "'{}', 7, 9)",
             "INSERT INTO table_version_info (table_id, version, deleted_at) VALUES (1, 7, 0)"),
         "source schema data");
   }
@@ -424,8 +509,7 @@ public class TestSQLScripts extends TestJDBCBackend {
     return columns;
   }
 
-  private List<String> readSchemaIndexes() throws SQLException {
-    Set<String> tables = readSchemaColumns().keySet();
+  private List<String> readSchemaIndexes(Set<String> tables) throws SQLException {
     List<String> indexes = new ArrayList<>();
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);

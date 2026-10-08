@@ -468,8 +468,15 @@ DEALLOCATE PREPARE stmt;
 --   SELECT COUNT(*) FROM `table_version_info`
 --    WHERE `version` IS NULL OR `deleted_at` IS NULL;
 -- The statement below fails rather than silently coercing NULL to 0.
-SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
-    WHERE table_schema = DATABASE() AND table_name = 'table_version_info' AND index_name = 'PRIMARY'),
+-- Skip only the exact completed conversion; unexpected keys must fail the ALTER.
+SET @ddl = IF((SELECT COUNT(*) = 3 AND SUM(
+        (seq_in_index = 1 AND column_name = 'table_id') OR
+        (seq_in_index = 2 AND column_name = 'version') OR
+        (seq_in_index = 3 AND column_name = 'deleted_at')) = 3
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_version_info' AND index_name = 'PRIMARY')
+    AND NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_version_info' AND index_name = 'uk_table_id_version_deleted_at'),
     'SELECT 1',
     'ALTER TABLE `table_version_info` MODIFY COLUMN `version` BIGINT(20) UNSIGNED NOT NULL COMMENT ''table current version'', MODIFY COLUMN `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''table deletion timestamp, 0 means not deleted'', DROP INDEX `uk_table_id_version_deleted_at`, ADD PRIMARY KEY (`table_id`, `version`, `deleted_at`)');
 PREPARE stmt FROM @ddl;
