@@ -136,6 +136,36 @@ public class TestJobExecutorFactory {
   }
 
   @Test
+  public void testK8sJobExecutorWithoutItsJar() {
+    // The k8s job executor is registered by class name, and its jar isn't on the classpath of core.
+    config.set(Configs.JOB_EXECUTOR, JobExecutorFactory.K8S_JOB_EXECUTOR_NAME);
+
+    RuntimeException e =
+        Assertions.assertThrows(RuntimeException.class, () -> JobExecutorFactory.create(config));
+    Assertions.assertInstanceOf(ClassNotFoundException.class, e.getCause());
+    Assertions.assertTrue(
+        e.getMessage().contains(JobExecutorFactory.K8S_JOB_EXECUTOR_CLASS_NAME), e.getMessage());
+    Assertions.assertTrue(e.getMessage().contains("gravitino-k8s-job-executor"), e.getMessage());
+    Assertions.assertTrue(e.getMessage().contains("libs"), e.getMessage());
+  }
+
+  @Test
+  public void testCustomJobExecutorClassNotFound() {
+    config.set(Configs.JOB_EXECUTOR, "missing");
+    config.loadFromMap(
+        ImmutableMap.of("gravitino.jobExecutor.missing.class", "com.example.MissingJobExecutor"),
+        key -> true);
+
+    RuntimeException e =
+        Assertions.assertThrows(RuntimeException.class, () -> JobExecutorFactory.create(config));
+    Assertions.assertInstanceOf(ClassNotFoundException.class, e.getCause());
+    Assertions.assertTrue(
+        e.getMessage().contains("com.example.MissingJobExecutor"), e.getMessage());
+    Assertions.assertTrue(
+        e.getMessage().contains("gravitino.jobExecutor.missing.class"), e.getMessage());
+  }
+
+  @Test
   public void testRejectJobExecutorBuiltAgainstOldSpi() throws Exception {
     // A job executor plugin built before getJobExecutionInfo was added to the SPI only
     // implements getJobStatus. Loaded against the current SPI, it would throw AbstractMethodError

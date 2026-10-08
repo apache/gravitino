@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.exceptions.NoSuchJobException;
+import org.apache.gravitino.job.JobExecutorFactory;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -129,6 +130,15 @@ public class TestK8sJobExecutor {
   public void tearDown() {
     executor.close();
     server.destroy();
+  }
+
+  @Test
+  public void testRegisteredInJobExecutorFactory() {
+    // The factory in core can only refer to the job executor by name, so check the names here.
+    Assertions.assertEquals(
+        JobExecutorFactory.K8S_JOB_EXECUTOR_CLASS_NAME, K8sJobExecutor.class.getName());
+    Assertions.assertEquals(
+        JobExecutorFactory.K8S_JOB_EXECUTOR_NAME, K8sJobExecutorConfigs.K8S_JOB_EXECUTOR_NAME);
   }
 
   @Test
