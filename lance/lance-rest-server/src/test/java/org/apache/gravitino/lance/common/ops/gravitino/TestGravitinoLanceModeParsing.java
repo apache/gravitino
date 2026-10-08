@@ -40,6 +40,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DescribeTableResponse;
 import org.mockito.ArgumentCaptor;
@@ -55,8 +56,20 @@ class TestGravitinoLanceModeParsing {
   @Test
   void testNormalizeTokenPreservesSpecialCharacters() {
     Assertions.assertEquals("CREATE", CommonUtil.normalizeToken(" create "));
-    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("exist_ok"));
     Assertions.assertEquals("#CREATE$", CommonUtil.normalizeToken("#create$"));
+  }
+
+  @Test
+  void testParseEnumTokenAcceptsBothSpellingsOfMultiWordValues() {
+    // The spec declares these fields case insensitive and accepts the PascalCase spelling it
+    // documents, so a client following it must not have to discover the snake_case one by trial.
+    for (String mode : new String[] {"ExistOk", "exist_ok", "EXIST_OK", "existok", " existOk "}) {
+      Assertions.assertEquals(
+          TestMode.EXIST_OK,
+          CommonUtil.parseEnumToken(TestMode.class, mode, "Unknown mode: ", "table"),
+          "mode '" + mode + "' must parse as EXIST_OK");
+    }
+    Assertions.assertEquals("EXISTOK", CommonUtil.normalizeToken("ExistOk"));
   }
 
   @Test
@@ -101,6 +114,25 @@ class TestGravitinoLanceModeParsing {
   }
 
   @Test
+  void testCreateNamespaceModeAcceptsPascalCaseExistOk() {
+    GravitinoLanceNamespaceWrapper namespaceWrapper =
+        Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+    Catalog catalog = Mockito.mock(Catalog.class);
+    when(namespaceWrapper.loadCatalog("catalog")).thenReturn(catalog);
+    when(namespaceWrapper.isLakehouseCatalog(catalog)).thenReturn(true);
+    when(catalog.properties()).thenReturn(Map.of("key", "value"));
+    GravitinoLanceNameSpaceOperations operations =
+        new GravitinoLanceNameSpaceOperations(namespaceWrapper);
+
+    CreateNamespaceResponse response =
+        operations.createNamespace("catalog", Pattern.quote("."), "ExistOk", Map.of());
+
+    // EXIST_OK answers with the existing namespace's properties; had the mode been read as CREATE,
+    // the operation would have raised NamespaceAlreadyExistsException instead.
+    Assertions.assertEquals(Map.of("key", "value"), response.getProperties());
+  }
+
+  @Test
   void testCreateTableModeNormalizesCase() {
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Table table = Mockito.mock(Table.class);
@@ -111,6 +143,25 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
 
     operations.createTable("catalog.schema.table", " exist_ok ", ".", null, Map.of(), null);
+
+    ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
+    Mockito.verify(tableCatalog)
+        .createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
+    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
+  }
+
+  @Test
+  void testCreateTableModeAcceptsPascalCaseExistOk() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Table table = Mockito.mock(Table.class);
+    when(table.properties()).thenReturn(Map.of());
+    when(tableCatalog.createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), anyMap()))
+        .thenReturn(table);
+    GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
+
+    operations.createTable("catalog.schema.table", "ExistOk", ".", null, Map.of(), null);
 
     ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
     Mockito.verify(tableCatalog)

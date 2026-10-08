@@ -88,8 +88,9 @@ More details, refer to the [Lance REST API specification](https://lance.org/form
 
 Some operations have specific behaviors and modes. Below are important details to consider:
 
-Mode values are parsed case-insensitively. The examples below use lowercase values as the
-REST-style canonical form.
+Mode values are parsed case-insensitively, and an underscore in a multi-word value is optional:
+`exist_ok`, `EXIST_OK`, `ExistOk` and `existok` all name the same mode. The examples below use
+lowercase values as the REST-style canonical form.
 
 #### Namespace Operations
 

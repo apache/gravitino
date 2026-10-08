@@ -35,24 +35,32 @@ public class CommonUtil {
    * Normalizes a request token the way every mode and behavior parameter is read, so that callers
    * deciding something from a token compare it exactly as the operation that acts on it will.
    *
+   * <p>The spec declares the mode and behavior fields case insensitive and accepts both the
+   * PascalCase and the snake_case spelling of a value, so {@code EXIST_OK}, {@code ExistOk}, {@code
+   * exist_ok} and {@code existok} all normalize to {@code EXISTOK}: a token is compared as its
+   * upper-cased letters, with separating underscores carrying no meaning.
+   *
    * <p>Authorization relies on this: a mode that reaches the operation as {@code OVERWRITE} has to
-   * be recognized as an overwrite while the request is being authorized, whatever spacing or case
-   * the client sent.
+   * be recognized as an overwrite while the request is being authorized, whatever spacing,
+   * separators or case the client sent.
    *
    * @param value the raw token, may be null
-   * @return the trimmed, upper-cased token, or an empty string when the value is null
+   * @return the trimmed, upper-cased token without underscores, or an empty string when the value
+   *     is null
    */
   public static String normalizeToken(String value) {
-    return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    return value == null ? "" : value.trim().replace("_", "").toUpperCase(Locale.ROOT);
   }
 
   static <E extends Enum<E>> E parseEnumToken(
       Class<E> enumClass, String value, String errorMessagePrefix, String instance) {
-    try {
-      return Enum.valueOf(enumClass, normalizeToken(value));
-    } catch (IllegalArgumentException e) {
-      throw new InvalidInputException(
-          errorMessagePrefix + value, formatCurrentStackTrace(), instance);
+    String token = normalizeToken(value);
+    for (E candidate : enumClass.getEnumConstants()) {
+      if (normalizeToken(candidate.name()).equals(token)) {
+        return candidate;
+      }
     }
+    throw new InvalidInputException(
+        errorMessagePrefix + value, formatCurrentStackTrace(), instance);
   }
 }

@@ -295,6 +295,11 @@ public class LanceRESTServiceIT extends BaseIT {
     createNamespaceResp = ns.createNamespace(createNamespaceReq);
     Assertions.assertEquals(catalog.properties(), createNamespaceResp.getProperties());
 
+    // the spec's PascalCase spelling names the same mode
+    createNamespaceReq.setMode("ExistOk");
+    createNamespaceResp = ns.createNamespace(createNamespaceReq);
+    Assertions.assertEquals(catalog.properties(), createNamespaceResp.getProperties());
+
     // create catalog again with overwrite mode should succeed and update properties
     Map<String, String> newProps =
         new HashMap<>(catalogProps) {
@@ -334,6 +339,11 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // create schema again with exist_ok mode should succeed
     createSchemaReq.setMode("exist_ok");
+    createNamespaceResp = ns.createNamespace(createSchemaReq);
+    Assertions.assertEquals(schema.properties(), createNamespaceResp.getProperties());
+
+    // the spec's PascalCase spelling names the same mode
+    createSchemaReq.setMode("ExistOk");
     createNamespaceResp = ns.createNamespace(createSchemaReq);
     Assertions.assertEquals(schema.properties(), createNamespaceResp.getProperties());
 
@@ -581,6 +591,17 @@ public class LanceRESTServiceIT extends BaseIT {
     response =
         Assertions.assertDoesNotThrow(
             () -> createTable(ids, newLocation, overwriteTableProperties, body, "exist_ok"));
+
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
+    Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
+    Assertions.assertEquals(newLocation, response.getLocation());
+    Assertions.assertTrue(new File(newLocation).exists());
+
+    // the spec's PascalCase spelling names the same mode
+    response =
+        Assertions.assertDoesNotThrow(
+            () -> createTable(ids, newLocation, overwriteTableProperties, body, "ExistOk"));
 
     Assertions.assertNotNull(response);
     Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));

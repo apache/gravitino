@@ -221,12 +221,13 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   void testOverwriteIsRecognizedWhateverSpacingTheClientSends() throws Throwable {
     allow(Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
 
-    // The create operation reads the mode through CommonUtil.normalizeToken, which trims and
-    // upper-cases, so all of these reach it as OVERWRITE. Authorization has to read the mode the
-    // same way: a token this interceptor fails to recognize is authorized as a plain create, and
-    // the create privileges above would then be enough to replace a namespace owned by somebody
-    // else.
-    for (String mode : new String[] {" overwrite", "overwrite ", " OverWrite ", "\toverwrite\n"}) {
+    // The create operation reads the mode through CommonUtil.normalizeToken, which trims, drops
+    // underscores and upper-cases, so all of these reach it as OVERWRITE. Authorization has to read
+    // the mode the same way: a token this interceptor fails to recognize is authorized as a plain
+    // create, and the create privileges above would then be enough to replace a namespace owned by
+    // somebody else.
+    for (String mode :
+        new String[] {" overwrite", "overwrite ", " OverWrite ", "\toverwrite\n", "over_write"}) {
       assertErrorResponse(
           interceptor.invoke(createInvocation(CATALOG, "$", mode)),
           Response.Status.FORBIDDEN,
