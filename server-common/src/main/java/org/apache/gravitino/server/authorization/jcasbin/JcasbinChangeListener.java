@@ -218,11 +218,12 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * Invalidates the affected {@code metadataIdCache} keys from an entity-change batch.
    *
    * <p><b>Contract with the writer side:</b> {@code entity_change_log.full_name} must be the
-   * <i>pre-mutation</i> name (the name that consumers currently have cached). {@code JDBCBackend}
-   * emits the pre-mutation identifier on update and the current name on drop, so the cacheKey we
-   * build here resolves to the entry a peer node would have populated under that name. If a future
-   * change starts emitting the new post-rename name, this invalidation will silently miss and stale
-   * entries will only clear via LRU eviction.
+   * <i>pre-mutation</i> name (the name that consumers currently have cached). Every writer ({@code
+   * JDBCBackend}, and the services that log types it skips, such as {@code ModelMetaService} and
+   * {@code JobTemplateMetaService}) emits the pre-mutation identifier on update and the current
+   * name on drop, so the cacheKey we build here resolves to the entry a peer node would have
+   * populated under that name. If a future change starts emitting the new post-rename name, this
+   * invalidation will silently miss and stale entries will only clear via LRU eviction.
    *
    * <p><b>Bad rows:</b> a record this listener cannot understand is logged and skipped instead of
    * being thrown up. Such a row does not point at any cache key, so skipping it leaves nothing

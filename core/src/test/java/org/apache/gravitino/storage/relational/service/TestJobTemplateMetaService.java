@@ -204,11 +204,14 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         newJobEntity("job_template_with_jobs", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
     backend.insert(jobEntity2, false);
 
+    long lastChangeId = maxEntityChangeId();
     Assertions.assertThrows(
         NonEmptyEntityException.class,
         () ->
             jobTemplateMetaService.deleteJobTemplate(
                 NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs")));
+    // The rejected delete rolls back with its change-log record, so peers keep a valid mapping.
+    Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
     Assertions.assertEquals(
         2,
         JobMetaService.getInstance()
@@ -291,11 +294,14 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
             .withAuditInfo(updatedJobTemplateEntity.auditInfo())
             .build();
 
+    long lastChangeId = maxEntityChangeId();
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
         () ->
             jobTemplateMetaService.updateJobTemplate(
                 updatedJobTemplateEntity.nameIdentifier(), e -> duplicateNameJobTemplateEntity));
+    // The rejected rename rolls back with its change-log record.
+    Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
   }
 
   @TestTemplate
