@@ -78,8 +78,8 @@ The `entity-change-log` source exposes each server's change-log processing state
 `/prometheus/metrics`. For example, `entity-change-log.record-lag` in the metrics registry becomes
 `entity_change_log_record_lag` in Prometheus. Gauges read only in-memory values; the poller samples
 the database tail on partial and empty polls, and at most once per `pollIntervalSecs` during
-a full-batch drain (including failed sample attempts). If only the tail sample fails, delivery continues and the tail
-value remains at its last successful sample.
+a full-batch drain (including failed sample attempts). If only the tail sample fails, delivery
+continues and the tail value remains at its last successful sample.
 
 | Metric suffix                                                | Type and unit            | Meaning                                                                                                                                                     |
 | ------------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -103,9 +103,11 @@ recover locally; its failure counter and log identify the affected listener. The
 row was added to the current transaction, not that the transaction committed.
 
 For an incident, check `seconds-since-last-successful-tail-sample` before comparing `db-tail-id`
-with `cursor-id` on the affected server. If it exceeds the poll interval, the tail sample itself is
-failing: the retained tail can fall below an advancing cursor and `record-lag` can read zero despite
-an unknown database tail. `tail-sample-failures-total` counts those failures for alerting. With a
+with `cursor-id` on the affected server. If it substantially exceeds the normal sampling interval,
+investigate slow or failed polling and tail sampling; `tail-sample-failures-total` counts actual
+sample failures. Between samples, an advancing cursor can pass the retained tail, so `record-lag`
+can read zero even while full batches remain. Use `batch-size-records` at `pollBatchSize` as the
+backlog signal rather than treating zero sampled lag as proof that the poller has caught up. With a
 fresh tail sample, a growing `record-lag` together with an increasing poll age or
 `poll-failures-total` points to polling trouble.
 If the cursor advances but data remains stale, inspect `listener-failures-total`, `records-delivered.<class>-total`,
