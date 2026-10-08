@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -16,62 +16,39 @@
 # under the License.
 
 from gravitino.constants.error import ErrorConstants
-from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.base import (
     CatalogNotInUseException,
     ForbiddenException,
-    IllegalArgumentException,
     IllegalStatisticNameException,
     MetalakeNotInUseException,
     NoSuchMetadataObjectException,
     NoSuchSchemaException,
     NoSuchTableException,
-    NotFoundException,
-    NotInUseException,
     UnmodifiableStatisticException,
-    UnsupportedOperationException,
 )
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class StatisticsErrorHandler(RestErrorHandler):
-    def handle(
-        self, error_response: ErrorResponse
-    ):  # pylint: disable=too-many-branches
-        error_message = error_response.format_error_message()
-        # Keep unknown server codes intact so the common handler can report them.
-        code = error_response.code()
-        exception_type = error_response.type()
-
-        match code:
-            case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-                if exception_type == IllegalStatisticNameException.__name__:
-                    raise IllegalStatisticNameException(error_message)
-                raise IllegalArgumentException(error_message)
-            case ErrorConstants.NOT_FOUND_CODE:
-                if exception_type == NoSuchSchemaException.__name__:
-                    raise NoSuchSchemaException(error_message)
-                if exception_type == NoSuchTableException.__name__:
-                    raise NoSuchTableException(error_message)
-                if exception_type == NoSuchMetadataObjectException.__name__:
-                    raise NoSuchMetadataObjectException(error_message)
-                raise NotFoundException(error_message)
-            case ErrorConstants.INTERNAL_ERROR_CODE:
-                raise RuntimeError(error_message)
-            case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
-                if exception_type == UnmodifiableStatisticException.__name__:
-                    raise UnmodifiableStatisticException(error_message)
-                raise UnsupportedOperationException(error_message)
-            case ErrorConstants.FORBIDDEN_CODE:
-                raise ForbiddenException(error_message)
-            case ErrorConstants.NOT_IN_USE_CODE:
-                if exception_type == CatalogNotInUseException.__name__:
-                    raise CatalogNotInUseException(error_message)
-                if exception_type == MetalakeNotInUseException.__name__:
-                    raise MetalakeNotInUseException(error_message)
-                raise NotInUseException(error_message)
-            case _:
-                super().handle(error_response)
+class StatisticsErrorHandler(CodeMappingErrorHandler):
+    _code_exception_map = {
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: {
+            IllegalStatisticNameException.__name__: IllegalStatisticNameException
+        },
+        ErrorConstants.NOT_FOUND_CODE: {
+            NoSuchSchemaException.__name__: NoSuchSchemaException,
+            NoSuchTableException.__name__: NoSuchTableException,
+            NoSuchMetadataObjectException.__name__: NoSuchMetadataObjectException,
+        },
+        ErrorConstants.INTERNAL_ERROR_CODE: RuntimeError,
+        ErrorConstants.UNSUPPORTED_OPERATION_CODE: {
+            UnmodifiableStatisticException.__name__: UnmodifiableStatisticException
+        },
+        ErrorConstants.FORBIDDEN_CODE: ForbiddenException,
+        ErrorConstants.NOT_IN_USE_CODE: {
+            CatalogNotInUseException.__name__: CatalogNotInUseException,
+            MetalakeNotInUseException.__name__: MetalakeNotInUseException,
+        },
+    }
 
 
 STATISTICS_ERROR_HANDLER = StatisticsErrorHandler()
