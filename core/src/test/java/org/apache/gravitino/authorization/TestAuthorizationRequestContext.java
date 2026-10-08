@@ -25,8 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -345,6 +347,48 @@ public class TestAuthorizationRequestContext {
     ActiveRoles seen =
         PrincipalUtils.doAs(principal, () -> new AuthorizationRequestContext().getActiveRoles());
     assertEquals(named, seen);
+  }
+
+  @Test
+  public void testRolePolicyGenerationDoesNotMoveBackwardsAcrossWorkers() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    CountDownLatch newerRecorded = new CountDownLatch(1);
+    Thread olderWorker =
+        new Thread(
+            () -> {
+              try {
+                if (newerRecorded.await(5, TimeUnit.SECONDS)) {
+                  context.setRolePolicyGeneration(100L);
+                }
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            });
+    Thread newerWorker =
+        new Thread(
+            () -> {
+              context.setRolePolicyGeneration(105L);
+              newerRecorded.countDown();
+            });
+    olderWorker.start();
+    newerWorker.start();
+    olderWorker.join(5000);
+    newerWorker.join(5000);
+    assertFalse(olderWorker.isAlive());
+    assertFalse(newerWorker.isAlive());
+    assertEquals(105L, context.getRolePolicyGeneration());
+  }
+
+  @Test
+  public void testUnreadableRoleIdsAreCopied() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertTrue(context.getUnreadableRoleIds().isEmpty());
+    Set<Long> roleIds = new HashSet<>(Arrays.asList(1L, 2L));
+    context.setUnreadableRoleIds(roleIds);
+    roleIds.add(3L);
+    assertEquals(new HashSet<>(Arrays.asList(1L, 2L)), context.getUnreadableRoleIds());
+    assertThrows(UnsupportedOperationException.class, () -> context.getUnreadableRoleIds().add(4L));
+    assertThrows(NullPointerException.class, () -> context.setUnreadableRoleIds(null));
   }
 
   @Test

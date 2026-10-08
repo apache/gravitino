@@ -1041,6 +1041,79 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testInitialRoleReadFailureMustNotLoseDeny() throws Exception {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    String roleName = "unavailableInitialDenyRole";
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity denyRole =
+        mockRoleInStore(DENY_ROLE_ID, roleName, ImmutableList.of(getDenySecurableObject()));
+    mockDirectUserRoles(allowRole, denyRole);
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, roleName)),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenThrow(new IllegalStateException("Role store temporarily unavailable"));
+
+    // Each entry point must preserve the failure from its own initial load, including when
+    // another readable role grants the privilege. Subsequent checks of that request stay closed.
+    AuthorizationRequestContext allowContext = new AuthorizationRequestContext();
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            principal, METALAKE, catalogObject(), USE_CATALOG, allowContext));
+    assertTrue(
+        jcasbinAuthorizer.deny(principal, METALAKE, catalogObject(), USE_CATALOG, allowContext));
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            principal, METALAKE, ImmutableSet.of(USE_CATALOG), allowContext));
+    assertTrue(
+        jcasbinAuthorizer.deny(
+            principal, METALAKE, catalogObject(), USE_CATALOG, new AuthorizationRequestContext()));
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            principal, METALAKE, ImmutableSet.of(USE_CATALOG), new AuthorizationRequestContext()));
+
+    Mockito.doReturn(denyRole)
+        .when(entityStore)
+        .get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, roleName)),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class));
+    AuthorizationRequestContext recoveredContext = new AuthorizationRequestContext();
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicy(
+            principal, METALAKE, ImmutableSet.of(USE_SCHEMA), recoveredContext));
+    assertTrue(recoveredContext.getUnreadableRoleIds().isEmpty());
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            principal, METALAKE, ImmutableSet.of(USE_SCHEMA), allowContext),
+        "the failed request stays closed even after another request successfully loads the role");
+  }
+
+  @Test
+  public void testReloadExceptionFailsClosed() throws Exception {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity role =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(role);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertFalse(
+        jcasbinAuthorizer.authorize(principal, METALAKE, metalakeObject(), USE_CATALOG, context));
+    getLoadedRolesCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+    // Force the reload to probe versions rather than use the request's fat-JOIN snapshot.
+    context.setPrefetchedRoleVersions(Collections.emptyMap());
+    when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
+        .thenThrow(new IllegalStateException("Role version probe unavailable"));
+
+    assertFalse(
+        jcasbinAuthorizer.authorize(principal, METALAKE, catalogObject(), USE_CATALOG, context));
+    assertTrue(jcasbinAuthorizer.deny(principal, METALAKE, catalogObject(), USE_CATALOG, context));
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            principal, METALAKE, ImmutableSet.of(USE_CATALOG), context));
+  }
+
+  @Test
   public void testNewDenyOnInitiallyEmptyRoleIsSeenMidRequest() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     Long roleId = 32L;
@@ -1276,6 +1349,17 @@ public class TestJcasbinAuthorizer {
         jcasbinAuthorizer.deny(
             currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, denyContext),
         "a deny check must fail closed when the request's policies never stabilize");
+    armed.set(false);
+    AuthorizationRequestContext scanContext = new AuthorizationRequestContext();
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal, METALAKE, ImmutableSet.of(USE_CATALOG), scanContext));
+    armed.set(true);
+    loadedRoles.invalidate(ALLOW_ROLE_ID);
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal, METALAKE, ImmutableSet.of(USE_CATALOG), scanContext),
+        "a deny scan must fail closed when the request's policies never stabilize");
     armed.set(false);
   }
 

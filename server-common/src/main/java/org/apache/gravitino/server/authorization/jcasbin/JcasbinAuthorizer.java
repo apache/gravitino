@@ -183,8 +183,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private final Map<Long, Long> roleClearGenerations = new ConcurrentHashMap<>();
 
   /**
-   * Upper bound on {@link #roleClearGenerations} entries, set to the role cache size. Guarded by
-   * the write lock of {@link #rolePolicyLock}.
+   * Upper bound on {@link #roleClearGenerations} entries, set once to the role cache size in {@link
+   * #initialize()} before use, and read under the write lock of {@link #rolePolicyLock}.
    */
   private long maxRoleClearGenerations;
 
@@ -1315,7 +1315,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           List<Long> allRoleIds = new ArrayList<>(userDirectRoleIds);
           allRoleIds.addAll(groupInheritedRoleIds);
           if (!allRoleIds.isEmpty()) {
-            versionCheckAndLoadRoles(metalake, allRoleIds, requestContext);
+            requestContext.setUnreadableRoleIds(
+                versionCheckAndLoadRoles(metalake, allRoleIds, requestContext));
           }
           requestContext.setBoundRoleIds(allRoleIds);
           requestContext.setRolePolicyGeneration(rolePolicyGeneration);
@@ -1725,6 +1726,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Optional<Boolean> evaluateWithLoadedRolePolicies(
       String metalake, AuthorizationRequestContext requestContext, BooleanSupplier evaluation) {
+    if (!requestContext.getUnreadableRoleIds().isEmpty()) {
+      LOG.warn(
+          "Failed to read roles {} during the initial role load; failing closed",
+          requestContext.getUnreadableRoleIds());
+      return Optional.empty();
+    }
     for (int reloads = 0; ; reloads++) {
       rolePolicyLock.readLock().lock();
       try {
@@ -1749,8 +1756,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Set<Long> unreadableRoleIds;
       try {
         unreadableRoleIds =
-            versionCheckAndLoadRoles(
-                metalake, new ArrayList<>(requestContext.getBoundRoleIds()), requestContext);
+            versionCheckAndLoadRoles(metalake, requestContext.getBoundRoleIds(), requestContext);
       } catch (RuntimeException e) {
         LOG.warn(
             "Failed to reload cleared role policies for roles {}; failing closed",

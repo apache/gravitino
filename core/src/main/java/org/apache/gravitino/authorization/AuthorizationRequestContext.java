@@ -22,12 +22,15 @@ package org.apache.gravitino.authorization;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -103,7 +106,10 @@ public class AuthorizationRequestContext {
    * bound roles against. A role cleared after this generation must be reloaded before the request
    * evaluates it again.
    */
-  private volatile long rolePolicyGeneration;
+  private final AtomicLong rolePolicyGeneration = new AtomicLong();
+
+  /** Roles whose entities could not be read during this request's initial role load. */
+  private volatile Set<Long> unreadableRoleIds = Collections.emptySet();
 
   /**
    * The roles the caller has declared active for this request (role assumption). Read from the
@@ -274,16 +280,38 @@ public class AuthorizationRequestContext {
    * @return the role policy generation
    */
   public long getRolePolicyGeneration() {
-    return rolePolicyGeneration;
+    return rolePolicyGeneration.get();
   }
 
   /**
-   * Records the role policy generation this request validated its bound roles against.
+   * Advances the role policy generation this request validated its bound roles against. Concurrent
+   * workers cannot move the recorded generation backwards.
    *
    * @param rolePolicyGeneration the role policy generation
    */
   public void setRolePolicyGeneration(long rolePolicyGeneration) {
-    this.rolePolicyGeneration = rolePolicyGeneration;
+    this.rolePolicyGeneration.accumulateAndGet(rolePolicyGeneration, Math::max);
+  }
+
+  /**
+   * Returns the roles whose entities could not be read during the initial role load.
+   *
+   * @return the unreadable role ids; empty when all role entities were readable
+   */
+  public Set<Long> getUnreadableRoleIds() {
+    return unreadableRoleIds;
+  }
+
+  /**
+   * Records unreadable roles during the initial load so every check of this request fails closed.
+   *
+   * @param unreadableRoleIds the unreadable role ids; must not be {@code null}
+   */
+  public void setUnreadableRoleIds(Set<Long> unreadableRoleIds) {
+    this.unreadableRoleIds =
+        Collections.unmodifiableSet(
+            new HashSet<>(
+                Objects.requireNonNull(unreadableRoleIds, "unreadableRoleIds must not be null")));
   }
 
   /**
