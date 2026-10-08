@@ -32,8 +32,17 @@ configurations.all {
   }
 }
 
+// Everything packaged into the shaded runtime jar. Declaring these as `implementation` would make
+// Gradle publish them as `runtime` scoped POM dependencies and list them in the Gradle module
+// metadata, so resolving the coordinate would download the modules and third-party libraries the
+// jar already contains. See https://github.com/apache/gravitino/issues/13171
+val shadedDependencies by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
 dependencies {
-  implementation(project(":clients:client-java"))
+  shadedDependencies(project(":clients:client-java"))
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -41,7 +50,7 @@ dependencies {
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
+  configurations = listOf(shadedDependencies)
   archiveClassifier.set("")
 
   // Exclude server-side JDBC pooling utilities. These classes reference commons-dbcp2 which is
@@ -73,12 +82,12 @@ tasks.test {
   dependsOn(runtimeJar)
   inputs.file(runtimeJar.flatMap { it.archiveFile })
   inputs.dir(rootProject.file("dev/release/maven"))
-  inputs.files(configurations.runtimeClasspath)
+  inputs.files(shadedDependencies)
   doFirst {
     systemProperty("artifactPath", runtimeJar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("legalTemplates", rootProject.file("dev/release/maven").absolutePath)
-    systemProperty("dependencyJars", configurations.runtimeClasspath.get().asPath)
-    configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
+    systemProperty("dependencyJars", shadedDependencies.asPath)
+    shadedDependencies.resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
       val id = artifact.moduleVersion.id
       val classifier = artifact.classifier?.let { "/$it" } ?: ""
       systemProperty("dependencyPrefix.${artifact.file.name}", "META-INF/licenses/${id.group}/${id.name}/${id.version}$classifier/")
