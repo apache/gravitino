@@ -725,10 +725,9 @@ public class TestLocalJobExecutor {
               .withTemplateContent(trapContent)
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
-      JobTemplate template =
-          new JobTemplateResolver(trapTemplate).resolve(ImmutableMap.of(), workingDir);
+      JobTemplate template = new JobTemplateResolver(trapTemplate).resolve(ImmutableMap.of());
 
-      String jobId = executor.submitJob(template);
+      String jobId = submit(executor, template, workingDir);
       awaitReadyMarker();
       Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
 
@@ -770,10 +769,9 @@ public class TestLocalJobExecutor {
               .withTemplateContent(content)
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
-      JobTemplate template =
-          new JobTemplateResolver(templateEntity).resolve(ImmutableMap.of(), workingDir);
+      JobTemplate template = new JobTemplateResolver(templateEntity).resolve(ImmutableMap.of());
 
-      String jobId = executor.submitJob(template);
+      String jobId = submit(executor, template, workingDir);
       awaitReadyMarker();
       Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
 
