@@ -27,6 +27,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.NotAllowedException;
+import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.ADLSTokenCredential;
@@ -468,6 +470,19 @@ public class TestIcebergRESTUtils {
       Assertions.assertEquals("failure", withoutStack.message());
     } finally {
       IcebergRESTUtils.setIncludeErrorStackTrace(true);
+    }
+  }
+
+  @Test
+  void testErrorResponsePreservesWebApplicationExceptionHeaders() {
+    try (Response response = IcebergRESTUtils.errorResponse(new NotAllowedException("GET"), 405)) {
+      Assertions.assertEquals(405, response.getStatus());
+      Assertions.assertTrue(
+          response.getHeaderString("Allow") != null
+              && response.getHeaderString("Allow").contains("GET"));
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(405, entity.code());
+      Assertions.assertEquals("NotAllowedException", entity.type());
     }
   }
 }

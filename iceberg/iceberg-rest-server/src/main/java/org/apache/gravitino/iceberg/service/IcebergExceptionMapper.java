@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
@@ -164,16 +163,6 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getClass(),
           ex.getMessage());
     }
-
-    Response response = IcebergRESTUtils.errorResponse(ex, status);
-    // Preserve JAX-RS headers (e.g. Allow on 405); only the body becomes Iceberg JSON.
-    if (ex instanceof WebApplicationException) {
-      return Response.fromResponse(((WebApplicationException) ex).getResponse())
-          .status(status)
-          .entity(response.getEntity())
-          .type(MediaType.APPLICATION_JSON)
-          .build();
-    }
-    return response;
+    return IcebergRESTUtils.errorResponse(ex, status);
   }
 }
