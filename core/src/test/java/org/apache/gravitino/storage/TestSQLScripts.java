@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -295,7 +296,22 @@ public class TestSQLScripts extends TestJDBCBackend {
           Assertions.assertThrows(AssertionFailedError.class, () -> executeScript(upgrade));
       Assertions.assertInstanceOf(SQLException.class, failure.getCause());
       Assertions.assertTrue(
-          failure.getCause().getMessage().contains("idx_mid"), failure.getMessage());
+          failure.getCause().getMessage().contains("'idx_mid'"), failure.getMessage());
+    }
+    if ("h2".equals(backendType)) {
+      executeStatements(
+          List.of("ALTER INDEX idx_tid_value RENAME TO wrong_idx_tid_value"),
+          "rename explicitly named H2 index");
+      try {
+        Assertions.assertNotEquals(
+            expectedIndexes,
+            readSchemaIndexes(expectedColumns.keySet()),
+            "An explicitly named H2 index must retain its name in schema comparisons");
+      } finally {
+        executeStatements(
+            List.of("ALTER INDEX wrong_idx_tid_value RENAME TO idx_tid_value"),
+            "restore explicitly named H2 index");
+      }
     }
     assertSchemaMatchesFreshInstall(expectedColumns, expectedIndexes);
   }
@@ -332,7 +348,9 @@ public class TestSQLScripts extends TestJDBCBackend {
         continue;
       }
       // MySQL renames share one guard shape; sample the first and last rename.
-      if (last.startsWith("EXECUTE ") && statements.get(completed - 3).contains("RENAME INDEX")) {
+      if (last.startsWith("EXECUTE ")
+          && completed >= 3
+          && statements.get(completed - 3).contains("RENAME INDEX")) {
         if (testedIndexRename && !statements.get(completed - 3).equals(lastIndexRename)) {
           continue;
         }
@@ -514,6 +532,20 @@ public class TestSQLScripts extends TestJDBCBackend {
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = session.getConnection()) {
+      Set<String> generatedIndexes = new TreeSet<>();
+      if ("h2".equals(backendType)) {
+        try (PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES "
+                    + "WHERE TABLE_SCHEMA = ? AND IS_GENERATED = TRUE")) {
+          statement.setString(1, connection.getSchema());
+          try (ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+              generatedIndexes.add(result.getString("INDEX_NAME"));
+            }
+          }
+        }
+      }
       for (String table : tables) {
         try (ResultSet result =
             connection
@@ -524,9 +556,15 @@ public class TestSQLScripts extends TestJDBCBackend {
             if (result.getShort("ORDINAL_POSITION") == 0) {
               continue;
             }
-            // H2 generates constraint index names from a database-wide counter. Compare their
-            // definitions and multiplicity, while keeping index names for MySQL rename checks.
-            String name = "h2".equals(backendType) ? "" : result.getString("INDEX_NAME");
+            // H2 appends counters to generated constraint indexes. Keep the constraint name so
+            // a named unique index and its fresh-install constraint compare equally; explicit
+            // index names are never normalized.
+            String name = result.getString("INDEX_NAME");
+            if (generatedIndexes.contains(name)) {
+              name =
+                  name.replaceFirst("_INDEX_[0-9A-F]+$", "")
+                      .replaceFirst("^PRIMARY_KEY_[0-9A-F]+$", "");
+            }
             indexes.add(
                 table
                     + ":"
