@@ -87,7 +87,7 @@ public class StatisticBaseSQLProvider {
         + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}";
   }
 
-  /** Selects the requested live statistics without loading unrelated values or audit fields. */
+  /** Selects full rows of only the requested live statistics of one metadata object. */
   public String listStatisticPOsByNames(
       @Param("metalakeId") Long metalakeId,
       @Param("entityId") Long entityId,
