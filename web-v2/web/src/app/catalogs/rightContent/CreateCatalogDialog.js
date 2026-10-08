@@ -44,6 +44,7 @@ import {
   sensitiveCatalogPropertyKeys
 } from '@/config/catalog'
 import { nameRegex } from '@/lib/utils/regex'
+import { buildCatalogProperties, isCatalogPropertyHidden, isCatalogRequiredField } from '@/lib/utils/catalogProperties'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
@@ -78,12 +79,7 @@ export default function CreateCatalogDialog({ ...props }) {
   const dispatch = useAppDispatch()
   const isShowTestConnect = ['fileset', 'model'].includes(catalogType) || currentProvider === 'lakehouse-generic'
 
-  const isRequiredField = prop => {
-    return (
-      prop.required ||
-      (prop.key === 'warehouse' && currentProvider === 'lakehouse-iceberg' && ['hive', 'jdbc'].includes(catalogBackend))
-    )
-  }
+  const isRequiredField = prop => isCatalogRequiredField(prop, { currentProvider, catalogBackend })
 
   const defaultValues = {
     name: '',
@@ -113,22 +109,14 @@ export default function CreateCatalogDialog({ ...props }) {
     setCurrentStep
   )
 
-  const isHidden = prop => {
-    const { parentField, hide, key } = prop
-
-    // In edit mode, hide props not present in the loaded catalog response
-    if (editCatalog && cacheData?.properties && !(key in cacheData.properties)) {
-      return true
-    }
-    switch (parentField) {
-      case 'catalog-backend':
-        return catalogBackend && hide && hide.includes(catalogBackend)
-      case 'authentication.type':
-        return !authType || (hide && hide.includes(authType))
-      default:
-        return !(!editCatalog || ['region', 'location'].includes(key) || isRequiredField(prop))
-    }
-  }
+  const isHidden = prop =>
+    isCatalogPropertyHidden(prop, {
+      editCatalog,
+      catalogProperties: cacheData?.properties,
+      catalogBackend,
+      authType,
+      currentProvider
+    })
 
   const handScroll = () => {
     if (scrollRef.current) {
@@ -252,17 +240,12 @@ export default function CreateCatalogDialog({ ...props }) {
       type: catalogType,
       provider: values.provider,
       comment: values.comment,
-      properties: [...values.properties, ...defaultProps].reduce((acc, item) => {
-        if (item.key === 'location' || item.key.startsWith('location-')) {
-          if (item.value) {
-            acc[item.key] = item.prefix ? item.prefix + item.value : item.value
-          }
-        } else {
-          acc[item.key] = values[item.key] || (item.value instanceof Array ? item.value.join(',') : item.value)
-        }
-
-        return acc
-      }, {})
+      properties: buildCatalogProperties({
+        values,
+        defaultProps,
+        editCatalog: Boolean(editCatalog),
+        catalogProperties: cacheData?.properties || {}
+      })
     }
   }
 
@@ -543,7 +526,7 @@ export default function CreateCatalogDialog({ ...props }) {
                             {prop.select ? (
                               <Select
                                 data-refer={`catalog-props-${prop.key}`}
-                                disabled={editCatalog && prop.required}
+                                disabled={editCatalog && (prop.required || prop.immutable)}
                                 placeholder={prop.description ? prop.description : ''}
                               >
                                 {prop.select?.map(item => (
@@ -556,7 +539,7 @@ export default function CreateCatalogDialog({ ...props }) {
                               <Input
                                 data-refer={`catalog-props-${prop.key}`}
                                 placeholder={prop.description ? prop.description : ''}
-                                disabled={prop.disabled}
+                                disabled={prop.disabled || (editCatalog && prop.immutable)}
                                 type={sensitiveCatalogPropertyKeys.includes(prop.key) ? 'password' : 'text'}
                               />
                             )}
