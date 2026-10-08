@@ -24,16 +24,16 @@ plugins {
   id("idea")
 }
 
-val icebergExperimentalVersion: String =
-  providers.gradleProperty("icebergExperimentalVersion")
-    .orElse(libs.versions.iceberg)
-    .get()
+val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
 
 configurations.configureEach {
   resolutionStrategy.eachDependency {
-    if (requested.group == "org.apache.iceberg") {
-      useVersion(icebergExperimentalVersion)
-      because("Use one Iceberg version in the experimental auxiliary service")
+    if (
+      requested.name.startsWith("iceberg-") &&
+      (requested.group == "org.apache.iceberg" || requested.group == "com.datastrato")
+    ) {
+      useTarget("com.datastrato:${requested.name}:$datastratoIcebergVersion")
+      because("Use the Datastrato Iceberg distribution in the experimental auxiliary service")
     }
   }
 }

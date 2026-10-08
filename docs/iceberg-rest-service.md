@@ -121,16 +121,9 @@ gravitino.iceberg-rest-experimental.classpath = iceberg-rest-experimental-server
 ```
 
 The stable and experimental services use separate isolated classloaders and library directories.
-Build the experimental directory against an Iceberg snapshot published to a configured Maven
-repository by setting the `icebergExperimentalVersion` Gradle property:
-
-```shell
-./gradlew compileDistribution -PicebergExperimentalVersion=<snapshot-version>
-```
-
-If the property is omitted, the experimental module falls back to the repository's regular Iceberg
-version so that normal development and CI builds remain reproducible before the snapshot is
-available.
+The experimental directory uses the Datastrato Iceberg distribution published under the
+`com.datastrato` Maven group. Its version is pinned by `datastrato-iceberg` in
+`gradle/libs.versions.toml`, independently of the regular Iceberg version.
 
 #### HTTP Server
 
