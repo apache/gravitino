@@ -516,6 +516,14 @@ Not every operation defines all three. The full set of classes lives in the
 [`org.apache.gravitino.listener.api.event`](https://github.com/apache/gravitino/tree/main/core/src/main/java/org/apache/gravitino/listener/api/event)
 package.
 
+Statistics replacement (`PUT`) and atomic merge (`PATCH`) both emit
+`UpdateStatisticsPreEvent`, `UpdateStatisticsEvent`, and `UpdateStatisticsFailureEvent`, with
+operation type `UPDATE_STATISTICS`. Their `statistics()` payload contains the submitted values.
+For a merge, these are partial object entries, including after success; they are not the complete
+persisted values. Listeners cannot distinguish merge from replacement using these events and
+must not treat the payload as a stored-statistics snapshot. A separate statistics read returns
+current values, which may already include later concurrent writes.
+
 Throwing a `ForbiddenException` from a pre-event handler stops the operation before it runs, which
 makes pre-events a veto point rather than a notification.
 

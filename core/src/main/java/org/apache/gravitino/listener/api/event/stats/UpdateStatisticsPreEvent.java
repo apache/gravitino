@@ -24,7 +24,14 @@ import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.stats.StatisticValue;
 
-/** Event fired before updating statistics. */
+/**
+ * Event fired before replacing or merging statistics.
+ *
+ * <p>Replacement and atomic merge operations both use {@code UPDATE_STATISTICS}. The statistics
+ * payload is the caller's request: for a merge it contains only the supplied object entries, not
+ * the complete stored values. Listeners cannot distinguish the two operations from this event and
+ * must not treat its payload as a snapshot of the persisted statistics.
+ */
 @DeveloperApi
 public class UpdateStatisticsPreEvent extends StatisticsPreEvent {
   private Map<String, StatisticValue<?>> statistics;
