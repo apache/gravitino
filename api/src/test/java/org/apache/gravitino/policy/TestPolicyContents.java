@@ -20,9 +20,16 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -117,6 +124,160 @@ public class TestPolicyContents {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     Assertions.assertTrue(exception.getMessage().contains("maxPartitionNum"));
+  }
+
+  @Test
+  void testAccessControlContent() {
+    AccessControlContent content =
+        (AccessControlContent)
+            PolicyContents.accessControl(
+                Arrays.asList(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
+                Arrays.asList("analyst", "data_engineer"));
+
+    Assertions.assertDoesNotThrow(content::validate);
+    Assertions.assertEquals(
+        Arrays.asList(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
+        content.privileges());
+    Assertions.assertEquals(Arrays.asList("analyst", "data_engineer"), content.applicableRoles());
+    Assertions.assertEquals(
+        Arrays.asList("SELECT_TABLE", "MODIFY_TABLE"),
+        content.rules().get(AccessControlContent.PRIVILEGES_KEY));
+    Assertions.assertEquals(
+        Arrays.asList("analyst", "data_engineer"),
+        content.rules().get(AccessControlContent.APPLICABLE_ROLES_KEY));
+    Assertions.assertTrue(content.properties().isEmpty());
+  }
+
+  @Test
+  void testAccessControlContentSupportedObjectTypes() {
+    Assertions.assertEquals(
+        ImmutableSet.of(
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.SCHEMA,
+            MetadataObject.Type.TABLE,
+            MetadataObject.Type.VIEW,
+            MetadataObject.Type.FILESET,
+            MetadataObject.Type.TOPIC,
+            MetadataObject.Type.MODEL,
+            MetadataObject.Type.FUNCTION),
+        PolicyContents.accessControl(
+                Collections.singletonList(Privilege.Name.SELECT_TABLE),
+                Collections.singletonList("analyst"))
+            .supportedObjectTypes());
+  }
+
+  @Test
+  void testAccessControlContentSupportedObjectTypesTrackPermittedPrivileges() {
+    Set<MetadataObject.Type> union =
+        Arrays.stream(MetadataObject.Type.values())
+            .filter(type -> type != MetadataObject.Type.METALAKE)
+            .filter(
+                type ->
+                    AccessControlContent.PERMITTED_PRIVILEGES.stream()
+                        .anyMatch(name -> Privileges.allow(name).canBindTo(type)))
+            .collect(Collectors.toSet());
+
+    Assertions.assertEquals(
+        union,
+        PolicyContents.accessControl(
+                Collections.singletonList(Privilege.Name.SELECT_TABLE),
+                Collections.singletonList("analyst"))
+            .supportedObjectTypes(),
+        "supportedObjectTypes must stay the union of canBindTo over PERMITTED_PRIVILEGES, "
+            + "minus METALAKE, which a tag cannot be applied to");
+  }
+
+  @Test
+  void testAccessControlContentAcceptsEveryPermittedPrivilege() {
+    for (Privilege.Name privilege : AccessControlContent.PERMITTED_PRIVILEGES) {
+      PolicyContent content =
+          PolicyContents.accessControl(
+              Collections.singletonList(privilege), Collections.singletonList("analyst"));
+      Assertions.assertDoesNotThrow(content::validate, privilege + " should be permitted");
+    }
+  }
+
+  @Test
+  void testAccessControlContentRejectsPrivilegesOutsideAllowlist() {
+    for (Privilege.Name privilege : Privilege.Name.values()) {
+      if (AccessControlContent.PERMITTED_PRIVILEGES.contains(privilege)) {
+        continue;
+      }
+
+      PolicyContent content =
+          PolicyContents.accessControl(
+              Collections.singletonList(privilege), Collections.singletonList("analyst"));
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              content::validate,
+              privilege + " should not be conferrable by a tag");
+      Assertions.assertTrue(exception.getMessage().contains(privilege.name()));
+    }
+  }
+
+  @Test
+  void testAccessControlContentRejectsEmptyPrivileges() {
+    List<String> roles = Collections.singletonList("analyst");
+    Assertions.assertTrue(
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> PolicyContents.accessControl(null, roles).validate())
+            .getMessage()
+            .contains("privileges cannot be empty"));
+    Assertions.assertTrue(
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> PolicyContents.accessControl(Collections.emptyList(), roles).validate())
+            .getMessage()
+            .contains("privileges cannot be empty"));
+  }
+
+  @Test
+  void testAccessControlContentRejectsInvalidApplicableRoles() {
+    List<Privilege.Name> privileges = Collections.singletonList(Privilege.Name.SELECT_TABLE);
+    Assertions.assertTrue(
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> PolicyContents.accessControl(privileges, Collections.emptyList()).validate())
+            .getMessage()
+            .contains("applicableRoles cannot be empty"));
+    Assertions.assertTrue(
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> PolicyContents.accessControl(privileges, null).validate())
+            .getMessage()
+            .contains("applicableRoles cannot be empty"));
+
+    for (List<String> roles :
+        Arrays.asList(
+            Arrays.asList("analyst", " "),
+            Arrays.asList("analyst", ""),
+            Arrays.asList("analyst", (String) null))) {
+      Assertions.assertTrue(
+          Assertions.assertThrows(
+                  IllegalArgumentException.class,
+                  () -> PolicyContents.accessControl(privileges, roles).validate())
+              .getMessage()
+              .contains("applicable role name cannot be blank"),
+          roles + " should be rejected");
+    }
+  }
+
+  @Test
+  void testAccessControlContentEquality() {
+    List<Privilege.Name> privileges = Collections.singletonList(Privilege.Name.SELECT_TABLE);
+    PolicyContent content =
+        PolicyContents.accessControl(privileges, Collections.singletonList("analyst"));
+
+    Assertions.assertEquals(
+        content, PolicyContents.accessControl(privileges, Collections.singletonList("analyst")));
+    Assertions.assertEquals(
+        content.hashCode(),
+        PolicyContents.accessControl(privileges, Collections.singletonList("analyst")).hashCode());
+    Assertions.assertNotEquals(
+        content,
+        PolicyContents.accessControl(privileges, Collections.singletonList("data_engineer")));
   }
 
   private static Map<String, String> mapOf(String key, String value) {

@@ -19,10 +19,12 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -101,6 +103,19 @@ public class PolicyContents {
         deleteFileNumberWeight,
         maxPartitionNum,
         rewriteOptions);
+  }
+
+  /**
+   * Creates an access control policy content.
+   *
+   * @param privileges the privileges the rule confers on the tagged object, each of which must be
+   *     in {@link AccessControlContent#PERMITTED_PRIVILEGES}
+   * @param applicableRoles the roles that satisfy the rule's condition
+   * @return access control policy content
+   */
+  public static PolicyContent accessControl(
+      List<Privilege.Name> privileges, List<String> applicableRoles) {
+    return new AccessControlContent(privileges, applicableRoles);
   }
 
   private PolicyContents() {}
