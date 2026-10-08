@@ -208,7 +208,8 @@ tasks.test {
     dependsOn(
       tasks.jar,
       ":catalogs:catalog-lakehouse-iceberg:jar",
-      ":iceberg:iceberg-rest-experimental-server:copyLibAndConfigs"
+      ":iceberg:iceberg-rest-experimental-server:copyDepends",
+      ":iceberg:iceberg-rest-experimental-server:jar"
     )
   }
 }
