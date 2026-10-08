@@ -40,7 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -442,11 +441,6 @@ public class IcebergRESTUtils {
     includeErrorStackTrace = include;
   }
 
-  /**
-   * Builds an Iceberg JSON error response. If {@code ex} is a JAX-RS {@link
-   * WebApplicationException}, framework headers from its response (e.g. {@code Allow} on 405) are
-   * preserved.
-   */
   public static Response errorResponse(Throwable ex, int httpStatus) {
     ErrorResponse.Builder builder =
         ErrorResponse.builder()
@@ -457,11 +451,10 @@ public class IcebergRESTUtils {
       builder.withStackTrace(ex);
     }
     ErrorResponse errorResponse = builder.build();
-    Response.ResponseBuilder responseBuilder =
-        ex instanceof WebApplicationException
-            ? Response.fromResponse(((WebApplicationException) ex).getResponse()).status(httpStatus)
-            : Response.status(httpStatus);
-    return responseBuilder.entity(errorResponse).type(MediaType.APPLICATION_JSON).build();
+    return Response.status(httpStatus)
+        .entity(errorResponse)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   /**

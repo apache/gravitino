@@ -91,7 +91,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
    *
    * <ol>
    *   <li>Iceberg / Gravitino business exceptions from {@link #EXCEPTION_ERROR_CODES}
-   *   <li>JAX-RS {@link WebApplicationException} that already carries an HTTP status (406/405/415)
+   *   <li>JAX-RS {@link WebApplicationException} that already carries an HTTP status
    *   <li>Unexpected failures default to 500
    * </ol>
    *
