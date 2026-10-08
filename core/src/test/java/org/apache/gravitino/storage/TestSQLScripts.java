@@ -32,6 +32,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -39,6 +42,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.opentest4j.AssertionFailedError;
 
 public class TestSQLScripts extends TestJDBCBackend {
 
@@ -251,6 +255,219 @@ public class TestSQLScripts extends TestJDBCBackend {
           Assertions.assertEquals(100, rows.getLong("deleted_at"));
           Assertions.assertFalse(rows.next());
         }
+      }
+    }
+  }
+
+  /** Verifies a completed upgrade can be repeated without resetting migrated data. */
+  @TestTemplate
+  public void testUpgradeToTwoZeroIsIdempotent() throws SQLException, IOException {
+    Path scriptDir = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    File upgrade = scriptDir.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.3.0" + suffix).toFile());
+    seedUpgradeData();
+    executeScript(upgrade);
+    executeStatements(
+        List.of(
+            "UPDATE idp_user_meta SET enabled = FALSE, audit_info = 'preserved audit'",
+            "UPDATE idp_group_meta SET group_comment = 'preserved comment'",
+            "UPDATE tag_meta SET allowed_values = '[\"blue\"]'",
+            "UPDATE tag_relation_meta SET tag_value = 'blue'",
+            "UPDATE fileset_meta SET occ_version = 42",
+            "UPDATE policy_meta SET occ_version = 43"),
+        "customized migrated data");
+    Map<String, Set<String>> expectedColumns = readSchemaColumns();
+    List<String> expectedIndexes = readSchemaIndexes();
+    Map<String, List<List<String>>> expectedData = readUpgradeData();
+    executeScript(upgrade);
+    executeScript(upgrade);
+    Assertions.assertEquals(expectedColumns, readSchemaColumns());
+    Assertions.assertEquals(expectedIndexes, readSchemaIndexes());
+    Assertions.assertEquals(expectedData, readUpgradeData(), "Retry must preserve migrated values");
+    if ("mysql".equals(backendType)) {
+      // Neither rename source nor target exists: this is damage, not an already-applied DDL.
+      executeStatements(
+          List.of("ALTER TABLE schema_meta DROP INDEX schema_meta_idx_mid"),
+          "missing target index");
+      AssertionFailedError failure =
+          Assertions.assertThrows(AssertionFailedError.class, () -> executeScript(upgrade));
+      Assertions.assertInstanceOf(SQLException.class, failure.getCause());
+      Assertions.assertEquals(1176, ((SQLException) failure.getCause()).getErrorCode());
+    }
+  }
+
+  /** Verifies retries after structural DDL and data updates, including prepared DDL execution. */
+  @TestTemplate
+  public void testUpgradeToTwoZeroRetriesPartialExecution() throws SQLException, IOException {
+    Path scriptDir = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    File schema = scriptDir.resolve("schema-1.3.0" + suffix).toFile();
+    File upgrade = scriptDir.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    List<String> statements = extractStatements(upgrade.toPath());
+    dropAllTables();
+    executeScript(schema);
+    seedUpgradeData();
+    executeScript(upgrade);
+    Map<String, Set<String>> expectedColumns = readSchemaColumns();
+    List<String> expectedIndexes = readSchemaIndexes();
+    Map<String, List<List<String>>> expectedData = readUpgradeData();
+
+    for (int completed = 1; completed <= statements.size(); completed++) {
+      String last = statements.get(completed - 1).toUpperCase();
+      if (!(last.startsWith("ALTER TABLE")
+          || last.startsWith("CREATE ")
+          || last.startsWith("UPDATE ")
+          || last.startsWith("EXECUTE "))) {
+        continue;
+      }
+      dropAllTables();
+      executeScript(schema);
+      seedUpgradeData();
+      // Close the connection after the prefix, as if the migration process stopped here.
+      String checkpoint = "Interrupted after statement " + completed + ": " + last;
+      executeStatements(statements.subList(0, completed), checkpoint);
+      executeScript(upgrade);
+      Assertions.assertEquals(expectedColumns, readSchemaColumns(), checkpoint);
+      Assertions.assertEquals(expectedIndexes, readSchemaIndexes(), checkpoint);
+      Assertions.assertEquals(expectedData, readUpgradeData(), checkpoint);
+      if ("mysql".equals(backendType)) {
+        try (SqlSession session =
+                SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+            Connection connection = session.getConnection();
+            ResultSet keys =
+                connection
+                    .getMetaData()
+                    .getPrimaryKeys(connection.getCatalog(), null, "table_version_info")) {
+          List<String> columns = new ArrayList<>();
+          while (keys.next()) {
+            columns.add(keys.getString("COLUMN_NAME"));
+          }
+          Assertions.assertEquals(
+              Set.of("table_id", "version", "deleted_at"), Set.copyOf(columns), checkpoint);
+        }
+      }
+    }
+  }
+
+  private Path upgradeScriptDirectory() {
+    String home = System.getenv("GRAVITINO_HOME");
+    Assertions.assertNotNull(home, "GRAVITINO_HOME environment variable is not set");
+    return Path.of(home, "scripts", backendType.toLowerCase());
+  }
+
+  private void seedUpgradeData() throws SQLException {
+    executeStatements(
+        List.of(
+            "INSERT INTO idp_user_meta (user_id, user_name, password_hash, current_version, last_version) VALUES (1, 'user', 'hash', 7, 9)",
+            "INSERT INTO idp_group_meta (group_id, group_name) VALUES (1, 'group')",
+            "INSERT INTO tag_meta (tag_id, tag_name, metalake_id, audit_info) VALUES (1, 'tag', 1, '{}')",
+            "INSERT INTO tag_relation_meta (id, tag_id, metadata_object_id, metadata_object_type, audit_info) VALUES (1, 1, 1, 'TABLE', '{}')",
+            "INSERT INTO fileset_meta (fileset_id, fileset_name, metalake_id, catalog_id, schema_id, type, audit_info, current_version, last_version) VALUES (1, 'fileset', 1, 1, 1, 'MANAGED', '{}', 7, 9)",
+            "INSERT INTO policy_meta (policy_id, policy_name, policy_type, metalake_id, audit_info, current_version, last_version) VALUES (1, 'policy', 'custom', 1, '{}', 7, 9)",
+            "INSERT INTO table_version_info (table_id, version, deleted_at) VALUES (1, 7, 0)"),
+        "source schema data");
+  }
+
+  private Map<String, List<List<String>>> readUpgradeData() throws SQLException {
+    Map<String, List<List<String>>> data = new TreeMap<>();
+    Map<String, String> selections =
+        Map.of(
+            "idp_user_meta",
+                "user_id, user_name, password_hash, current_version, last_version, enabled, audit_info",
+            "idp_group_meta", "group_id, group_name, group_comment, audit_info",
+            "tag_meta", "tag_id, tag_name, allowed_values",
+            "tag_relation_meta", "id, tag_id, metadata_object_id, tag_value",
+            "fileset_meta", "fileset_id, current_version, last_version, occ_version",
+            "policy_meta", "policy_id, current_version, last_version, occ_version",
+            "table_version_info", "table_id, version, deleted_at");
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (Map.Entry<String, String> entry : selections.entrySet()) {
+        List<List<String>> rows = new ArrayList<>();
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT " + entry.getValue() + " FROM " + entry.getKey() + " ORDER BY 1")) {
+          while (result.next()) {
+            List<String> row = new ArrayList<>();
+            for (int column = 1; column <= result.getMetaData().getColumnCount(); column++) {
+              row.add(result.getString(column));
+            }
+            rows.add(row);
+          }
+        }
+        data.put(entry.getKey(), rows);
+      }
+    }
+    return data;
+  }
+
+  private Map<String, Set<String>> readSchemaColumns() throws SQLException {
+    Map<String, Set<String>> columns = new TreeMap<>();
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        ResultSet result =
+            connection
+                .getMetaData()
+                .getColumns(connection.getCatalog(), connection.getSchema(), "%", "%")) {
+      while (result.next()) {
+        columns
+            .computeIfAbsent(result.getString("TABLE_NAME"), key -> new TreeSet<>())
+            .add(result.getString("COLUMN_NAME"));
+      }
+    }
+    Assertions.assertFalse(columns.isEmpty(), "Schema metadata must contain columns");
+    return columns;
+  }
+
+  private List<String> readSchemaIndexes() throws SQLException {
+    Set<String> tables = readSchemaColumns().keySet();
+    List<String> indexes = new ArrayList<>();
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection()) {
+      for (String table : tables) {
+        try (ResultSet result =
+            connection
+                .getMetaData()
+                .getIndexInfo(
+                    connection.getCatalog(), connection.getSchema(), table, false, false)) {
+          while (result.next()) {
+            if (result.getShort("ORDINAL_POSITION") == 0) {
+              continue;
+            }
+            // H2 generates constraint index names from a database-wide counter. Compare their
+            // definitions and multiplicity, while keeping index names for MySQL rename checks.
+            String name = "h2".equals(backendType) ? "" : result.getString("INDEX_NAME");
+            indexes.add(
+                table
+                    + ":"
+                    + name
+                    + ":"
+                    + result.getShort("ORDINAL_POSITION")
+                    + ":"
+                    + result.getString("COLUMN_NAME")
+                    + ":"
+                    + result.getBoolean("NON_UNIQUE"));
+          }
+        }
+      }
+    }
+    indexes.sort(Comparator.naturalOrder());
+    return indexes;
+  }
+
+  private void executeStatements(List<String> statements, String context) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String sql : statements) {
+        Assertions.assertDoesNotThrow(() -> statement.execute(sql), context + ", sql: " + sql);
       }
     }
   }
