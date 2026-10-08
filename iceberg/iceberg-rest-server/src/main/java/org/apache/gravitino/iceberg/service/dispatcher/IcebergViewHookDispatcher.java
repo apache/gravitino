@@ -262,14 +262,6 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
             viewIdentifier.namespace(),
             viewIdentifier.name());
       }
-    } catch (NoSuchEntityException ignore) {
-      // Ignore if the view entity does not exist in the store
-      LOG.debug(
-          "View entity does not exist in store: {}.{}.{}.{}",
-          metalake,
-          catalogName,
-          viewIdentifier.namespace(),
-          viewIdentifier.name());
     } catch (IOException ioe) {
       LOG.error(
           "Failed to delete view entity from store: {}.{}.{}.{}",

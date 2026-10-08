@@ -45,8 +45,12 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -285,6 +289,28 @@ public class TestEntityStoreContract extends TestJDBCBackend {
 
     assertTrue(store.delete(schema.nameIdentifier(), Entity.EntityType.SCHEMA, true));
     assertFalse(store.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testJobTemplateWithUnfinishedJobCannotBeDeletedEvenWithCascade() throws IOException {
+    JobTemplateEntity template =
+        createAndInsertShellJobTemplateEntity("busy_template", "comment", METALAKE);
+    store.put(
+        JobEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withJobExecutionId(String.valueOf(RandomIdGenerator.INSTANCE.nextId()))
+            .withNamespace(NamespaceUtil.ofJob(METALAKE))
+            .withJobTemplateName(template.name())
+            .withStatus(JobHandle.Status.STARTED)
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(System.currentTimeMillis())
+            .withFinishedAt(0L)
+            .build());
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> store.delete(template.nameIdentifier(), Entity.EntityType.JOB_TEMPLATE, true));
+    assertTrue(store.exists(template.nameIdentifier(), Entity.EntityType.JOB_TEMPLATE));
   }
 
   @TestTemplate

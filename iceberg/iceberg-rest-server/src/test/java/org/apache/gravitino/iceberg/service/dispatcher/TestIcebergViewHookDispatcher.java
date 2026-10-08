@@ -330,12 +330,10 @@ public class TestIcebergViewHookDispatcher {
   public void testDropViewHandlesMissingEntity() throws Exception {
     TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
 
-    // Simulate entity not found in store
+    // The store reports a missing entity by returning false, not by throwing.
     NameIdentifier expectedIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
-    doThrow(new NoSuchEntityException("Entity not found"))
-        .when(mockEntityStore)
-        .delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
+    when(mockEntityStore.delete(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
 
     // Should not throw - missing entity is ignored
     hookDispatcher.dropView(mockContext, viewIdent);
