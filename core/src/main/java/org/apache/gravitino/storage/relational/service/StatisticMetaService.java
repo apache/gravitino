@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -75,6 +76,20 @@ public class StatisticMetaService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Creates or replaces statistics of a metadata object by name.
+   *
+   * <p>The name keeps the historical upsert name and metric, but the write is no longer a blind
+   * upsert. Existing statistics are replaced only if their version is unchanged since this call
+   * read them, and missing statistics are inserted only if nobody created them meanwhile; both
+   * cases otherwise fail the whole batch with {@link OptimisticLockException}. The target is fenced
+   * in the same transaction, so a target dropped or replaced after its ID was resolved fails with
+   * {@link org.apache.gravitino.exceptions.NoSuchEntityException}.
+   *
+   * @param statisticEntities the statistics to write; names must be unique in the batch
+   * @param entity the metadata object that owns the statistics
+   * @param type the metadata object type
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
@@ -123,19 +138,29 @@ public class StatisticMetaService {
               // A writer can create the same statistic after the snapshot above. A duplicate
               // insert is a stale snapshot, not an internal server error.
               if (old == null && isDuplicateKey(e)) {
-                throw new OptimisticLockException(
-                    "Statistic %s for %s changed during update", po.getStatisticName(), entity);
+                throw statisticConflict(e, po.getStatisticName(), entity);
               }
               throw e;
             }
             if (updated != 1) {
-              throw new OptimisticLockException(
-                  "Statistic %s for %s changed during update", po.getStatisticName(), entity);
+              throw statisticConflict(null, po.getStatisticName(), entity);
             }
           }
         });
   }
 
+  /**
+   * Soft-deletes the named statistics of a metadata object.
+   *
+   * <p>Each statistic is deleted only at the version this call read. A statistic that was changed
+   * meanwhile fails the whole batch with {@link OptimisticLockException}; one that a concurrent
+   * drop already removed is not counted, like a name that does not exist.
+   *
+   * @param identifier the metadata object that owns the statistics
+   * @param type the metadata object type
+   * @param statisticNames the statistic names to delete
+   * @return the number of statistics this call deleted
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchDeleteStatisticPOs")
@@ -173,8 +198,7 @@ public class StatisticMetaService {
             if (updated == 1) {
               deleted[0]++;
             } else if (hasLiveStatistic(observed, name)) {
-              throw new OptimisticLockException(
-                  "Statistic %s for %s changed during deletion", name, identifier);
+              throw statisticConflict(null, name, identifier);
             }
             // Otherwise a concurrent drop already removed it. Like a drop of a missing name, that
             // is not a conflict and is simply not counted.
@@ -189,6 +213,15 @@ public class StatisticMetaService {
         StatisticMetaMapper.class,
         mapper ->
             mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
+  }
+
+  private static OptimisticLockException statisticConflict(
+      @Nullable Throwable cause, String name, NameIdentifier target) {
+    return new OptimisticLockException(
+        cause,
+        "The statistic %s of %s was modified concurrently; retry the operation",
+        name,
+        target);
   }
 
   private static boolean hasLiveStatistic(NamespacedEntityId endpoint, String name) {

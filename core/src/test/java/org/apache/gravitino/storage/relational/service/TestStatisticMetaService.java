@@ -132,8 +132,10 @@ public class TestStatisticMetaService extends TestJDBCBackend {
       Throwable firstFailure = first.get(30, TimeUnit.SECONDS);
       Throwable secondFailure = second.get(30, TimeUnit.SECONDS);
       Assertions.assertTrue((firstFailure == null) != (secondFailure == null));
-      Assertions.assertInstanceOf(
-          OptimisticLockException.class, firstFailure == null ? secondFailure : firstFailure);
+      Throwable conflict = firstFailure == null ? secondFailure : firstFailure;
+      Assertions.assertInstanceOf(OptimisticLockException.class, conflict);
+      // The duplicate-key failure stays attached for diagnosis.
+      Assertions.assertNotNull(conflict.getCause());
       Assertions.assertEquals(
           1,
           statisticMetaService
@@ -291,6 +293,66 @@ public class TestStatisticMetaService extends TestJDBCBackend {
         statisticMetaService
             .listStatisticsByEntity(table.nameIdentifier(), Entity.EntityType.TABLE)
             .isEmpty());
+  }
+
+  /** Verifies a write or delete based on a stale version fails without touching the newer value. */
+  @TestTemplate
+  public void testStaleStatisticWriteAndDeleteReportConflict() throws Exception {
+    String metalake = "statistic_stale_service_metalake";
+    String catalog = "statistic_stale_service_catalog";
+    String schema = "statistic_stale_service_schema";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalake, catalog, schema, auditInfo);
+    TableEntity table =
+        createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "stale_service");
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(createStatisticEntity(auditInfo, 1L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    OptimisticLockException staleWrite =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                updateAfterSnapshot(table, auditInfo, 2L)
+                    .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                        List.of(createStatisticEntity(auditInfo, 3L)),
+                        table.nameIdentifier(),
+                        Entity.EntityType.TABLE));
+    Assertions.assertTrue(staleWrite.getMessage().contains("retry the operation"));
+    Assertions.assertEquals(2L, singleStatisticValue(table));
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            updateAfterSnapshot(table, auditInfo, 4L)
+                .batchDeleteStatisticPOs(
+                    table.nameIdentifier(), Entity.EntityType.TABLE, List.of("test")));
+    Assertions.assertEquals(4L, singleStatisticValue(table));
+  }
+
+  private StatisticMetaService updateAfterSnapshot(
+      TableEntity table, AuditInfo auditInfo, long value) {
+    return new StatisticMetaService() {
+      @Override
+      List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+        List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
+        statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+            List.of(createStatisticEntity(auditInfo, value)),
+            table.nameIdentifier(),
+            Entity.EntityType.TABLE);
+        return rows;
+      }
+    };
+  }
+
+  private Object singleStatisticValue(TableEntity table) {
+    List<StatisticEntity> statistics =
+        statisticMetaService.listStatisticsByEntity(
+            table.nameIdentifier(), Entity.EntityType.TABLE);
+    Assertions.assertEquals(1, statistics.size());
+    return statistics.get(0).value().value();
   }
 
   private StatisticMetaService dropTableAfterSnapshot(TableEntity table) {
