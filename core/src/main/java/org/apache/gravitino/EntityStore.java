@@ -62,12 +62,15 @@ import org.apache.gravitino.utils.Executable;
  *       <td>{@link #get} and {@link #update} throw {@link NoSuchEntityException}; {@link #delete}
  *       returns {@code false}; {@link #deleteAndGet} returns an empty result; {@link #exists}
  *       returns {@code false}; {@link #batchGet} leaves it out of the result.</td></tr>
+ *   <tr><td>The parent of a new entity does not exist</td>
+ *       <td>{@link #put} throws {@link NoSuchEntityException}.</td></tr>
  *   <tr><td>The name is already taken</td>
  *       <td>{@link #put} without overwrite and a renaming {@link #update} throw {@link
  *       EntityAlreadyExistsException}.</td></tr>
  *   <tr><td>A concurrent write to the entity won</td>
  *       <td>{@link #update}, {@link #delete} and {@link #deleteAndGet} throw {@link
- *       OptimisticLockException}.</td></tr>
+ *       OptimisticLockException}. If that write deleted or renamed the entity, the result is the
+ *       one for an entity that does not exist instead.</td></tr>
  *   <tr><td>A non-cascade delete finds children</td>
  *       <td>{@link #delete} throws {@link NonEmptyEntityException}.</td></tr>
  *   <tr><td>The store cannot hold the entity type</td>
@@ -165,6 +168,7 @@ public interface EntityStore extends Closeable {
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if an entity with the same name already exists
+   * @throws NoSuchEntityException if the parent of the entity does not exist
    */
   default <E extends Entity & HasIdentifier> void put(E e) throws IOException {
     put(e, false);
@@ -185,6 +189,7 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     set to false
+   * @throws NoSuchEntityException if the parent of the entity does not exist
    */
   <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
@@ -196,7 +201,8 @@ public interface EntityStore extends Closeable {
    * exactly once with it. The updater returns the new state of the entity; throwing from it aborts
    * the update with nothing written. The updater runs before the write is known to succeed, so it
    * must not have effects outside the returned entity. If another write to the entity commits
-   * between the read and this write, the update fails with {@link OptimisticLockException}.
+   * between the read and this write, the update fails with {@link OptimisticLockException}, or with
+   * {@link NoSuchEntityException} if that write deleted or renamed the entity.
    *
    * <p>The updater may change the name, which renames the entity; the new name must be free. It
    * must not change the id, and an implementation rejects such an update with {@link
@@ -210,7 +216,8 @@ public interface EntityStore extends Closeable {
    * @param entityType the general type of the entity
    * @return E the updated entity
    * @throws IOException if the store operation fails
-   * @throws NoSuchEntityException if the entity does not exist
+   * @throws NoSuchEntityException if the entity does not exist, or a concurrent write deleted or
+   *     renamed it
    * @throws EntityAlreadyExistsException if the entity is renamed to a name that is already taken
    * @throws OptimisticLockException if a concurrent write to the entity committed first
    */
@@ -236,7 +243,8 @@ public interface EntityStore extends Closeable {
       throws NoSuchEntityException, IOException;
 
   /**
-   * Batch get the entities from the underlying storage.
+   * Batch get the entities from the underlying storage. All identifiers must be in the same
+   * namespace.
    *
    * <p>An identifier with no entity is left out of the result instead of failing the call, so the
    * result may be shorter than {@code idents}; a failure to read the storage is thrown. The order
@@ -248,12 +256,14 @@ public interface EntityStore extends Closeable {
    * @param <E> the class of entity
    * @return the entities that exist, in unspecified order
    * @throws UnsupportedEntityTypeException if the store cannot batch get this entity type
+   * @throws IllegalArgumentException if the identifiers are not all in the same namespace
    */
   <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> idents, EntityType entityType, Class<E> clazz);
 
   /**
-   * Batch get the entities from the underlying storage.
+   * Batch get the entities from the underlying storage. All identifiers must be in the same
+   * namespace.
    *
    * <p>An identifier with no entity is left out of the result instead of failing the call, so the
    * result may be shorter than {@code idents}; a failure to read the storage is thrown. The order
@@ -265,6 +275,7 @@ public interface EntityStore extends Closeable {
    * @param <E> the class of entity
    * @return the entities that exist, in unspecified order
    * @throws UnsupportedEntityTypeException if the store cannot batch get this entity type
+   * @throws IllegalArgumentException if the identifiers are not all in the same namespace
    */
   default <E extends Entity & HasIdentifier> E[] batchGet(
       NameIdentifier[] idents, EntityType entityType, Class<E> clazz) {

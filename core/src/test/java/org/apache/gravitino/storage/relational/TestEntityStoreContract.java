@@ -80,6 +80,18 @@ public class TestEntityStoreContract extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testPutUnderMissingParentThrowsNoSuchEntity() {
+    SchemaEntity orphan =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE, "missing_catalog"),
+            "orphan",
+            AUDIT_INFO);
+
+    assertThrows(NoSuchEntityException.class, () -> store.put(orphan));
+  }
+
+  @TestTemplate
   public void testUpdateCallsUpdaterOnceWithStoredEntity() throws IOException {
     SchemaEntity schema = newSchema("updated_once");
     store.put(schema);
@@ -214,6 +226,42 @@ public class TestEntityStoreContract extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateLosingToConcurrentDeleteThrowsNoSuchEntity() throws Exception {
+    SchemaEntity schema = newSchema("concurrent_delete");
+    store.put(schema);
+    NameIdentifier ident = schema.nameIdentifier();
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            store.update(
+                ident,
+                SchemaEntity.class,
+                Entity.EntityType.SCHEMA,
+                current -> {
+                  // Another writer, on its own connection, deletes the entity between this
+                  // update's read and its write.
+                  try {
+                    assertTrue(
+                        CompletableFuture.supplyAsync(
+                                () -> {
+                                  try {
+                                    return store.delete(ident, Entity.EntityType.SCHEMA);
+                                  } catch (IOException e) {
+                                    throw new UncheckedIOException(e);
+                                  }
+                                })
+                            .get(30, TimeUnit.SECONDS));
+                  } catch (Exception e) {
+                    throw new IllegalStateException("The concurrent delete did not commit", e);
+                  }
+                  return withComment(current, "loser");
+                }));
+
+    assertFalse(store.exists(ident, Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
   public void testDeleteOfMissingEntityReturnsFalse() throws IOException {
     assertFalse(
         store.delete(NameIdentifier.of(schemaNamespace, "missing"), Entity.EntityType.SCHEMA));
@@ -259,6 +307,19 @@ public class TestEntityStoreContract extends TestJDBCBackend {
         Set.of(first.id(), second.id()),
         found.stream().map(SchemaEntity::id).collect(Collectors.toSet()));
     assertEquals(2, found.size());
+  }
+
+  @TestTemplate
+  public void testBatchGetRejectsMixedNamespaces() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            store.batchGet(
+                ImmutableList.of(
+                    NameIdentifier.of(schemaNamespace, "first"),
+                    NameIdentifier.of(Namespace.of(METALAKE, "other_catalog"), "second")),
+                Entity.EntityType.SCHEMA,
+                SchemaEntity.class));
   }
 
   @TestTemplate
