@@ -73,6 +73,8 @@ public class TestReadRestrictionContent {
 
   @Test
   void testValidatesUtf8ExpressionLength() {
+    Assertions.assertEquals(16 * 1024, ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES);
+
     String maximumLength = "é".repeat(ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES / 2);
     String tooLong = maximumLength + "a";
 

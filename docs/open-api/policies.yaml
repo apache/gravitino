@@ -439,6 +439,78 @@ components:
             content:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
 
+    RowFilterContent:
+      type: object
+      description: Expression content for a built-in row-filter policy.
+      required:
+        - expression
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          pattern: '[\s\S]*\S[\s\S]*'
+          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+
+    ColumnMaskContent:
+      type: object
+      description: Expression content for a built-in column-mask policy.
+      required:
+        - expression
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          pattern: '[\s\S]*\S[\s\S]*'
+          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+
+    RowFilterPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            content:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    RowFilterPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            content:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    ColumnMaskPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            content:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
+    ColumnMaskPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            content:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
     PolicyContentBase:
       type: object
       description: A base content structure for policies
@@ -514,6 +586,10 @@ components:
           required:
             - content
           properties:
+            policyType:
+              type: string
+              not:
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -524,12 +600,16 @@ components:
         - $ref: '#/components/schemas/CustomPolicy'
         - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
         - $ref: '#/components/schemas/IcebergCompactionPolicy'
+        - $ref: '#/components/schemas/RowFilterPolicy'
+        - $ref: '#/components/schemas/ColumnMaskPolicy'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicy'
           system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
           system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicy'
+          system_row_filter: '#/components/schemas/RowFilterPolicy'
+          system_column_mask: '#/components/schemas/ColumnMaskPolicy'
 
     PolicyListResponse:
       type: object
@@ -597,6 +677,10 @@ components:
           required:
             - content
           properties:
+            policyType:
+              type: string
+              not:
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -607,12 +691,16 @@ components:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
         - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
         - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+        - $ref: '#/components/schemas/RowFilterPolicyCreateRequest'
+        - $ref: '#/components/schemas/ColumnMaskPolicyCreateRequest'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
           system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
           system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+          system_row_filter: '#/components/schemas/RowFilterPolicyCreateRequest'
+          system_column_mask: '#/components/schemas/ColumnMaskPolicyCreateRequest'
 
 
     PolicyUpdatesRequest:
@@ -702,7 +790,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
             newContent:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -728,18 +816,44 @@ components:
             newContent:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
 
+    UpdateRowFilterPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            newContent:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    UpdateColumnMaskPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            newContent:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
     UpdatePolicyContentRequest:
       description: Selects typed content using the sibling policyType field, matching REST deserialization.
       oneOf:
         - $ref: '#/components/schemas/UpdateCustomPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/UpdateCustomPolicyContentRequest'
           system_iceberg_compaction: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
           system_iceberg_orphan_file_removal: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+          system_row_filter: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
+          system_column_mask: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
       example: {
         "@type": "updateContent",
         "policyType": "custom",
