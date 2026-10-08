@@ -457,17 +457,11 @@ public class IcebergRESTUtils {
       builder.withStackTrace(ex);
     }
     ErrorResponse errorResponse = builder.build();
-    if (ex instanceof WebApplicationException) {
-      return Response.fromResponse(((WebApplicationException) ex).getResponse())
-          .status(httpStatus)
-          .entity(errorResponse)
-          .type(MediaType.APPLICATION_JSON)
-          .build();
-    }
-    return Response.status(httpStatus)
-        .entity(errorResponse)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    Response.ResponseBuilder responseBuilder =
+        ex instanceof WebApplicationException
+            ? Response.fromResponse(((WebApplicationException) ex).getResponse()).status(httpStatus)
+            : Response.status(httpStatus);
+    return responseBuilder.entity(errorResponse).type(MediaType.APPLICATION_JSON).build();
   }
 
   /**
