@@ -92,10 +92,6 @@ public class CatalogConnectorManager {
   // The last error reported by each metalake, keyed by the metalake name.
   private final ConcurrentHashMap<String, String> metalakeErrors = new ConcurrentHashMap<>();
 
-  // The metalakes whose detailed catalog listing is currently failing, so that falling back to
-  // loading their catalogs one by one is logged only when it starts and when it ends.
-  private final Set<String> perCatalogLoadMetalakes = ConcurrentHashMap.newKeySet();
-
   private volatile boolean trinoReachable = false;
   private volatile long lastLoadAttemptTimeMs = 0L;
   // The outcome of the last completed load attempt: its success time, error and consecutive
@@ -333,7 +329,6 @@ public class CatalogConnectorManager {
         .removeIf(
             state -> !usedMetalakes.contains(state.getMetalake()) && !hasLiveConnector(state));
     metalakeErrors.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
-    perCatalogLoadMetalakes.removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
     metalakes.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
   }
 
@@ -460,14 +455,13 @@ public class CatalogConnectorManager {
 
   private void loadCatalogs(GravitinoMetalake metalake) {
     String metalakeName = metalake.name();
-    // Null when the detailed listing failed, in which case each catalog is loaded on its own.
-    Map<String, Catalog> catalogInfos = listCatalogInfos(metalake);
-    String[] allCatalogNames;
+    // Keyed by name in listing order. Read with their details in a single request, so that a
+    // refresh costs the server one call instead of one per catalog.
+    Map<String, Catalog> allCatalogs = new LinkedHashMap<>();
     try {
-      allCatalogNames =
-          catalogInfos != null
-              ? catalogInfos.keySet().toArray(new String[0])
-              : metalake.listCatalogs();
+      for (Catalog catalog : metalake.listCatalogsInfo()) {
+        allCatalogs.put(catalog.name(), catalog);
+      }
     } catch (Exception e) {
       // Keep the existing catalog states untouched, a transient listing failure must not turn
       // healthy catalogs into failed ones. The load status system table reports the cause.
@@ -480,7 +474,7 @@ public class CatalogConnectorManager {
     // catalogs that are intentionally not registered.
     Set<String> presentTrinoNames = new HashSet<>();
     List<String> catalogNames = new ArrayList<>();
-    for (String catalogName : allCatalogNames) {
+    for (String catalogName : allCatalogs.keySet()) {
       String trinoCatalogName = getTrinoCatalogName(metalakeName, catalogName);
       presentTrinoNames.add(trinoCatalogName);
       if (skipCatalog(trinoCatalogName)) {
@@ -573,10 +567,7 @@ public class CatalogConnectorManager {
       // Tracked outside the try so that a failure can still report the provider it knows about.
       String provider = null;
       try {
-        Catalog catalog =
-            catalogInfos != null
-                ? catalogInfos.get(catalogName)
-                : metalake.loadCatalog(catalogName);
+        Catalog catalog = allCatalogs.get(catalogName);
         // Registration deliberately carries only the visible properties. The resolved secrets are
         // added by each node in createCatalogConnectorContext(), so that they never reach the
         // CREATE CATALOG statement, the catalog properties file Trino persists from it, or
@@ -616,14 +607,6 @@ public class CatalogConnectorManager {
           recordCatalogState(
               CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName), null);
         }
-      } catch (UnsupportedOperationException e) {
-        // The client library does not recognize this catalog's type, e.g. DTOConverters.toCatalog
-        // throws for a type it cannot map. This is the same "we know about it, we just don't
-        // support it" case as the type/provider checks above, not a registration failure.
-        recordCatalogState(
-            CatalogRegistrationState.unsupported(
-                metalakeName, catalogName, trinoCatalogName, provider, toErrorMessage(e)),
-            e);
       } catch (Exception e) {
         // reloadCatalog() unregisters the old connector before re-registering; if the
         // re-register then fails, the catalog is no longer in catalogConnectors even though
@@ -645,46 +628,6 @@ public class CatalogConnectorManager {
         }
       }
     }
-  }
-
-  /**
-   * Lists the catalogs of a metalake together with their details in a single request, so that a
-   * refresh cycle costs the server one call (and one audit record) instead of one per catalog.
-   *
-   * @return the catalogs keyed by name in listing order, or null if the listing failed and the
-   *     caller should load the catalogs one by one
-   */
-  @Nullable
-  private Map<String, Catalog> listCatalogInfos(GravitinoMetalake metalake) {
-    Catalog[] catalogs;
-    try {
-      catalogs = metalake.listCatalogsInfo();
-    } catch (Exception e) {
-      // The detailed listing fails as a whole when any single catalog cannot be resolved by the
-      // server or converted by the client, e.g. a catalog type this client does not know. Loading
-      // the catalogs one by one keeps such a failure confined to the catalog that caused it.
-      if (perCatalogLoadMetalakes.add(metalake.name())) {
-        LOG.warn(
-            e,
-            "Failed to list catalog details of metalake %s, loading its catalogs one by one "
-                + "until the listing recovers. Every refresh then sends one request per catalog.",
-            metalake.name());
-      } else {
-        LOG.debug(
-            e,
-            "Failed to list catalog details of metalake %s, loading catalogs one by one",
-            metalake.name());
-      }
-      return null;
-    }
-    if (perCatalogLoadMetalakes.remove(metalake.name())) {
-      LOG.info("Catalog details listing of metalake %s recovered.", metalake.name());
-    }
-    Map<String, Catalog> catalogInfos = new LinkedHashMap<>();
-    for (Catalog catalog : catalogs) {
-      catalogInfos.put(catalog.name(), catalog);
-    }
-    return catalogInfos;
   }
 
   private void recordCatalogState(CatalogRegistrationState newState, Throwable cause) {
