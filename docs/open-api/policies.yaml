@@ -334,6 +334,111 @@ components:
           items:
             $ref: "#/components/schemas/TagForPolicyAssociation"
 
+    IcebergCompactionContent:
+      type: object
+      description: Built-in Iceberg compaction thresholds, scoring weights, and job options.
+      properties:
+        minDataFileMse:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 405323966463344
+        minDeleteFileNumber:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 1
+        dataFileMseWeight:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 1
+        deleteFileNumberWeight:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 100
+        maxPartitionNum:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 50
+        rewriteOptions:
+          type: object
+          default: {}
+          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
+          additionalProperties:
+            type: string
+            minLength: 1
+
+    IcebergCompactionPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    IcebergCompactionPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    IcebergOrphanFileRemovalContent:
+      type: object
+      description: Table-level orphan cleanup options. Scheduling is configured separately.
+      properties:
+        olderThanDays:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 36500
+          default: 3
+          description: Minimum age of orphan files in days, including for dry runs.
+        location:
+          type: string
+          nullable: true
+          description: Optional scan location within the target table's storage root.
+        dryRun:
+          type: boolean
+          default: false
+          description: List candidates without deleting them.
+
+    IcebergOrphanFileRemovalPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            content:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    IcebergOrphanFileRemovalPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            content:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
     PolicyContentBase:
       type: object
       description: A base content structure for policies
@@ -417,10 +522,14 @@ components:
       description: A basic policy without content
       oneOf:
         - $ref: '#/components/schemas/CustomPolicy'
+        - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
+        - $ref: '#/components/schemas/IcebergCompactionPolicy'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicy'
+          system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
+          system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicy'
 
     PolicyListResponse:
       type: object
@@ -496,10 +605,14 @@ components:
       type: object
       oneOf:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
+          system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+          system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
 
 
     PolicyUpdatesRequest:
@@ -567,7 +680,7 @@ components:
         "newComment": "This is my new policy comment"
       }
 
-    UpdatePolicyContentRequest:
+    UpdatePolicyContentRequestBase:
       type: object
       required:
         - "@type"
@@ -576,20 +689,57 @@ components:
       properties:
         "@type":
           type: string
-          enum:
-            - updateContent
+          enum: [updateContent]
         policyType:
           type: string
-          description: The type of the policy
-        newContent:
-          type: object
-          description: The new content of the policy, its structure depends on the 'policyType'.
-          oneOf:
-              - $ref: '#/components/schemas/CustomPolicyContent'
-          discriminator:
-            propertyName: policyType
-            mapping:
-              custom: '#/components/schemas/CustomPolicyContent'
+          description: The type of the policy.
+
+    UpdateCustomPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              not:
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal]
+            newContent:
+              $ref: '#/components/schemas/CustomPolicyContent'
+
+    UpdateIcebergCompactionPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            newContent:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    UpdateIcebergOrphanFileRemovalPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            newContent:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    UpdatePolicyContentRequest:
+      description: Selects typed content using the sibling policyType field, matching REST deserialization.
+      oneOf:
+        - $ref: '#/components/schemas/UpdateCustomPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+      discriminator:
+        propertyName: policyType
+        mapping:
+          custom: '#/components/schemas/UpdateCustomPolicyContentRequest'
+          system_iceberg_compaction: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
+          system_iceberg_orphan_file_removal: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
       example: {
         "@type": "updateContent",
         "policyType": "custom",

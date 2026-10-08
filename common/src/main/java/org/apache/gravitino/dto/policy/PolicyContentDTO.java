@@ -23,12 +23,14 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 
@@ -202,6 +204,73 @@ public interface PolicyContentDTO extends PolicyContent {
           deleteFileNumberWeight(),
           maxPartitionNum(),
           rewriteOptions());
+    }
+  }
+
+  /** Typed orphan cleanup policy content for REST requests and responses. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO {
+    @JsonProperty("olderThanDays")
+    private Long olderThanDays;
+
+    @JsonProperty("location")
+    private String location;
+
+    @JsonProperty("dryRun")
+    private Boolean dryRun;
+
+    private IcebergOrphanFileRemovalContentDTO() {}
+
+    /**
+     * @return minimum age in days, defaulting to three
+     */
+    public long olderThanDays() {
+      return olderThanDays == null
+          ? IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS
+          : olderThanDays;
+    }
+
+    /**
+     * @return optional scan location
+     */
+    @Nullable
+    public String location() {
+      return location;
+    }
+
+    /**
+     * @return whether to list candidates without deleting them
+     */
+    public boolean dryRun() {
+      return dryRun == null ? IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN : dryRun;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergOrphanFileRemoval(olderThanDays(), location(), dryRun());
     }
   }
 }
