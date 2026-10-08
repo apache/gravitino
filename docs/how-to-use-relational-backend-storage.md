@@ -39,9 +39,10 @@ same database instance.
 
 This limit, not idle-time eviction, is what decides whether connections are reused. When a request
 returns a connection while the pool already holds `maxIdleConnections` idle connections, the pool
-closes it at once, and a later request has to open a new one. If more than this many connections
-are in use at peak, physical connections keep being closed and reopened, which adds latency. Set it
-at or above the number of connections in use at steady peak concurrency.
+closes it at once, and a later request has to open a new one. When the number of connections in
+use keeps swinging by more than this limit, physical connections keep being closed and reopened,
+which adds latency. Setting it at or above the number of connections in use at steady peak
+concurrency avoids that.
 
 Idle connections are released slowly. The pool's evictor runs every ten minutes and checks at most
 three idle connections per run, closing those idle for more than 30 seconds. After a burst, a server
