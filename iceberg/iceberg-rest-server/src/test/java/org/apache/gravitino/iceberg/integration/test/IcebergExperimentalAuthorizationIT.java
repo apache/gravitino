@@ -44,14 +44,15 @@ public class IcebergExperimentalAuthorizationIT extends IcebergAuthorizationIT {
   public void startIntegrationTest() throws Exception {
     String rootDirectory = System.getenv("GRAVITINO_ROOT_DIR");
     String experimentalServerHome =
-        Paths.get(rootDirectory, "distribution", "package", EXPERIMENTAL_SERVER_DIRECTORY)
-            .toString();
+        Paths.get(rootDirectory, "iceberg", EXPERIMENTAL_SERVER_DIRECTORY).toString();
     customConfigs.put(
         "gravitino." + EXPERIMENTAL_SERVICE_NAME + ".classpath",
         String.join(
             ",",
-            Paths.get(experimentalServerHome, "libs").toString(),
-            Paths.get(experimentalServerHome, "conf").toString()));
+            Paths.get(experimentalServerHome, "build", "libs").toString(),
+            Paths.get(experimentalServerHome, "build", "dependencies").toString(),
+            Paths.get(rootDirectory, "iceberg", "iceberg-rest-server", "src", "main", "resources")
+                .toString()));
     super.startIntegrationTest();
   }
 
