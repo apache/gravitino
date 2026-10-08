@@ -19,7 +19,7 @@
 package org.apache.gravitino.semantic;
 
 import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,7 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /** Tests standalone Apache Ossie document import, export, and conversion diagnostics. */
-public class TestOssieSemanticModelDocumentConverter {
+public class TestOssieDocumentConverter {
 
   private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
@@ -85,11 +85,11 @@ public class TestOssieSemanticModelDocumentConverter {
         """;
 
     SemanticModelCreateRequest yamlRequest =
-        OssieSemanticModelDocumentConverter.importDocument(OssieDocument.yaml(yaml));
+        OssieDocumentConverter.importDocument(OssieDocument.yaml(yaml));
     assertEquals("sales", yamlRequest.getName());
     assertEquals("Governed sales definitions", yamlRequest.getComment());
     assertEquals(
-        Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION),
+        Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION),
         yamlRequest.getProperties());
     SemanticModelDefinition yamlDefinition = yamlRequest.toDefinition();
     assertEquals(
@@ -113,7 +113,7 @@ public class TestOssieSemanticModelDocumentConverter {
         }
         """;
     SemanticModelCreateRequest jsonRequest =
-        OssieSemanticModelDocumentConverter.importDocument(OssieDocument.json(json));
+        OssieDocumentConverter.importDocument(OssieDocument.json(json));
     assertEquals("inventory", jsonRequest.getName());
     assertEquals("future-version", jsonRequest.getProperties().get(PROPERTY_OSSIE_VERSION));
     assertEquals(
@@ -128,7 +128,7 @@ public class TestOssieSemanticModelDocumentConverter {
             definition(), Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, "future-version"));
 
     OssieDocument jsonDocument =
-        OssieSemanticModelDocumentConverter.exportDocument(semanticModel, OssieFormat.JSON);
+        OssieDocumentConverter.exportDocument(semanticModel, OssieFormat.JSON);
     assertEquals(OssieFormat.JSON, jsonDocument.format());
     JsonNode json = JSON_MAPPER.readTree(jsonDocument.content());
     assertEquals("future-version", json.path("version").textValue());
@@ -153,20 +153,18 @@ public class TestOssieSemanticModelDocumentConverter {
     assertEquals(JSON_MAPPER.readTree("{\"domain\":\"sales\"}"), properties);
     assertFalse(properties.has(PROPERTY_OSSIE_VERSION));
 
-    SemanticModelCreateRequest jsonRoundTrip =
-        OssieSemanticModelDocumentConverter.importDocument(jsonDocument);
+    SemanticModelCreateRequest jsonRoundTrip = OssieDocumentConverter.importDocument(jsonDocument);
     assertEquals(semanticModel.name(), jsonRoundTrip.getName());
     assertEquals(semanticModel.comment(), jsonRoundTrip.getComment());
     assertEquals(semanticModel.definition(), jsonRoundTrip.toDefinition());
     assertEquals(semanticModel.properties(), jsonRoundTrip.getProperties());
 
     OssieDocument yamlDocument =
-        OssieSemanticModelDocumentConverter.exportDocument(semanticModel, OssieFormat.YAML);
+        OssieDocumentConverter.exportDocument(semanticModel, OssieFormat.YAML);
     assertEquals(OssieFormat.YAML, yamlDocument.format());
     assertTrue(yamlDocument.content().contains("version:"));
     assertFalse(yamlDocument.content().contains("semantic_model:"));
-    SemanticModelCreateRequest yamlRoundTrip =
-        OssieSemanticModelDocumentConverter.importDocument(yamlDocument);
+    SemanticModelCreateRequest yamlRoundTrip = OssieDocumentConverter.importDocument(yamlDocument);
     assertEquals(semanticModel.definition(), yamlRoundTrip.toDefinition());
     assertEquals(semanticModel.properties(), yamlRoundTrip.getProperties());
   }
@@ -179,13 +177,12 @@ public class TestOssieSemanticModelDocumentConverter {
         SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build();
 
     OssieDocument document =
-        OssieSemanticModelDocumentConverter.exportDocument(
+        OssieDocumentConverter.exportDocument(
             semanticModel(definition, Map.of()), OssieFormat.JSON);
     JsonNode json = JSON_MAPPER.readTree(document.content());
     assertEquals("`sales.eu`.`ma``rt`.`ord.ers`", json.at("/datasets/0/source").textValue());
 
-    SemanticModelCreateRequest roundTrip =
-        OssieSemanticModelDocumentConverter.importDocument(document);
+    SemanticModelCreateRequest roundTrip = OssieDocumentConverter.importDocument(document);
     assertEquals(source, roundTrip.toDefinition().datasets()[0].source());
   }
 
@@ -193,19 +190,16 @@ public class TestOssieSemanticModelDocumentConverter {
   public void testExportDefaultsMissingOssieVersion() throws Exception {
     SemanticModel semanticModel = semanticModel(definition(), Map.of());
 
-    OssieDocument document =
-        OssieSemanticModelDocumentConverter.exportDocument(semanticModel, OssieFormat.JSON);
+    OssieDocument document = OssieDocumentConverter.exportDocument(semanticModel, OssieFormat.JSON);
     JsonNode json = JSON_MAPPER.readTree(document.content());
 
-    assertEquals(DEFAULT_OSSIE_VERSION, json.path("version").textValue());
-    SemanticModelCreateRequest roundTrip =
-        OssieSemanticModelDocumentConverter.importDocument(document);
-    assertEquals(DEFAULT_OSSIE_VERSION, roundTrip.getProperties().get(PROPERTY_OSSIE_VERSION));
+    assertEquals(DEFAULT_VERSION, json.path("version").textValue());
+    SemanticModelCreateRequest roundTrip = OssieDocumentConverter.importDocument(document);
+    assertEquals(DEFAULT_VERSION, roundTrip.getProperties().get(PROPERTY_OSSIE_VERSION));
   }
 
   @Test
   public void testRejectsMalformedAndUnsupportedDocuments() {
-    assertInvalid("", "must not be empty");
     assertInvalid("[]", "root must be an object");
     assertInvalid("name: sales\ndatasets: []\n", "$.version: must be a non-empty string");
     assertInvalid("version: ' '\nname: sales\ndatasets: []\n", "must be a non-empty string");
@@ -294,8 +288,7 @@ public class TestOssieSemanticModelDocumentConverter {
         "version: 0.2.0.dev0\nname: sales\ndatasets:\n"
             + "  - name: orders\n    source: sales.mart.orders\n";
     assertEquals(
-        "sales",
-        OssieSemanticModelDocumentConverter.importDocument(OssieDocument.yaml(yaml)).getName());
+        "sales", OssieDocumentConverter.importDocument(OssieDocument.yaml(yaml)).getName());
     assertInvalid(OssieDocument.json(yaml), "Cannot parse Apache Ossie JSON");
     assertInvalid(
         OssieDocument.json("{version: '0.2.0.dev0', name: sales, datasets: []}"),
@@ -304,7 +297,6 @@ public class TestOssieSemanticModelDocumentConverter {
 
   @Test
   public void testRejectsMalformedJsonDocuments() {
-    assertInvalid(OssieDocument.json(" "), "must not be empty");
     assertInvalid(OssieDocument.json("[]"), "root must be an object");
     assertInvalid(
         OssieDocument.json("{\"name\":\"first\",\"name\":\"second\"}"), "Duplicate field 'name'");
@@ -384,9 +376,9 @@ public class TestOssieSemanticModelDocumentConverter {
   @EnumSource(OssieFormat.class)
   public void testConsumesEmptyPropertiesExtension(OssieFormat format) throws Exception {
     SemanticModelCreateRequest request =
-        OssieSemanticModelDocumentConverter.importDocument(
+        OssieDocumentConverter.importDocument(
             ossieDocument(documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, "{}"), format));
-    assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION), request.getProperties());
+    assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION), request.getProperties());
     assertNull(request.toDefinition().customExtensions());
   }
 
@@ -403,18 +395,18 @@ public class TestOssieSemanticModelDocumentConverter {
     };
     for (String payload : payloads) {
       SemanticModelCreateRequest request =
-          OssieSemanticModelDocumentConverter.importDocument(
+          OssieDocumentConverter.importDocument(
               ossieDocument(documentWithExtension("GRAVITINO", payload), format));
-      assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION), request.getProperties());
+      assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION), request.getProperties());
       assertEquals(payload, request.toDefinition().customExtensions()[0].data());
 
       SemanticModel model =
           semanticModel(
               request.toDefinition(),
-              Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION));
+              Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION));
       SemanticModelCreateRequest roundTrip =
-          OssieSemanticModelDocumentConverter.importDocument(
-              OssieSemanticModelDocumentConverter.exportDocument(model, format));
+          OssieDocumentConverter.importDocument(
+              OssieDocumentConverter.exportDocument(model, format));
       assertEquals(model.definition(), roundTrip.toDefinition());
       assertEquals(model.properties(), roundTrip.getProperties());
     }
@@ -437,11 +429,10 @@ public class TestOssieSemanticModelDocumentConverter {
     SemanticModel model =
         semanticModel(
             SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build(),
-            Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION));
+            Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION));
 
     SemanticModelCreateRequest roundTrip =
-        OssieSemanticModelDocumentConverter.importDocument(
-            OssieSemanticModelDocumentConverter.exportDocument(model, format));
+        OssieDocumentConverter.importDocument(OssieDocumentConverter.exportDocument(model, format));
     assertEquals(model.definition(), roundTrip.toDefinition());
     assertEquals(model.properties(), roundTrip.getProperties());
   }
@@ -449,10 +440,10 @@ public class TestOssieSemanticModelDocumentConverter {
   @Test
   public void testDoesNotExportPropertiesExtensionForVersionOnly() throws Exception {
     SemanticModel model =
-        semanticModel(definition(), Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION));
+        semanticModel(definition(), Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION));
     JsonNode document =
         JSON_MAPPER.readTree(
-            OssieSemanticModelDocumentConverter.exportDocument(model, OssieFormat.JSON).content());
+            OssieDocumentConverter.exportDocument(model, OssieFormat.JSON).content());
     assertEquals(1, document.path("custom_extensions").size());
     assertEquals("EXAMPLE", document.at("/custom_extensions/0/vendor_name").textValue());
   }
@@ -463,7 +454,7 @@ public class TestOssieSemanticModelDocumentConverter {
         assertThrows(
             IllegalSemanticModelException.class,
             () ->
-                OssieSemanticModelDocumentConverter.exportDocument(
+                OssieDocumentConverter.exportDocument(
                     semanticModel(definition(), Map.of(PROPERTY_OSSIE_VERSION, " ")),
                     OssieFormat.JSON));
 
@@ -487,7 +478,7 @@ public class TestOssieSemanticModelDocumentConverter {
         assertThrows(
             IllegalSemanticModelException.class,
             () ->
-                OssieSemanticModelDocumentConverter.exportDocument(
+                OssieDocumentConverter.exportDocument(
                     semanticModel(definition, Map.of()), OssieFormat.JSON));
     assertTrue(exception.getMessage().contains("reserved for Gravitino properties"));
   }
@@ -506,7 +497,7 @@ public class TestOssieSemanticModelDocumentConverter {
             .build();
 
     OssieDocument document =
-        OssieSemanticModelDocumentConverter.exportDocument(
+        OssieDocumentConverter.exportDocument(
             semanticModel(definition, Map.of()), OssieFormat.JSON);
     JsonNode json = JSON_MAPPER.readTree(document.content());
     assertEquals(
@@ -519,15 +510,14 @@ public class TestOssieSemanticModelDocumentConverter {
             .path("dialect")
             .textValue());
 
-    SemanticModelCreateRequest roundTrip =
-        OssieSemanticModelDocumentConverter.importDocument(document);
+    SemanticModelCreateRequest roundTrip = OssieDocumentConverter.importDocument(document);
     assertEquals(
         "TRINO", roundTrip.toDefinition().metrics()[0].expression().dialects()[0].dialect());
   }
 
   private static ObjectNode documentWithExtension(String vendorName, String payload) {
     ObjectNode root = JSON_MAPPER.createObjectNode();
-    root.put("version", DEFAULT_OSSIE_VERSION);
+    root.put("version", DEFAULT_VERSION);
     root.put("name", "sales");
     ObjectNode dataset = root.putArray("datasets").addObject();
     dataset.put("name", "orders");
@@ -644,7 +634,7 @@ public class TestOssieSemanticModelDocumentConverter {
     IllegalSemanticModelException exception =
         assertThrows(
             IllegalSemanticModelException.class,
-            () -> OssieSemanticModelDocumentConverter.importDocument(document));
+            () -> OssieDocumentConverter.importDocument(document));
     assertTrue(
         exception.getMessage().contains(expectedMessage),
         () -> "Expected '" + expectedMessage + "' in: " + exception.getMessage());

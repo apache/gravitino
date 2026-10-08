@@ -20,13 +20,14 @@ package org.apache.gravitino.semantic;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
  * An immutable standalone Apache Ossie document containing serialized content and its format.
  *
- * <p>The content is the document text, not a file path or URL. Constructing this value does not
- * parse or validate its content; validation takes place when the document is imported.
+ * <p>The content is the document text, not a file path or URL, and must not be blank. Constructing
+ * this value does not parse the content; document syntax and structure are validated when imported.
  */
 @Evolving
 public final class OssieDocument {
@@ -35,7 +36,7 @@ public final class OssieDocument {
   private final OssieFormat format;
 
   private OssieDocument(String content, OssieFormat format) {
-    Preconditions.checkArgument(content != null, "content must not be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(content), "content must not be blank");
     this.content = content;
     this.format = format;
   }
@@ -45,7 +46,7 @@ public final class OssieDocument {
    *
    * @param content The document text.
    * @return The YAML document.
-   * @throws IllegalArgumentException If the content is null.
+   * @throws IllegalArgumentException If the content is null, empty, or whitespace-only.
    */
   public static OssieDocument yaml(String content) {
     return new OssieDocument(content, OssieFormat.YAML);
@@ -56,7 +57,7 @@ public final class OssieDocument {
    *
    * @param content The document text.
    * @return The JSON document.
-   * @throws IllegalArgumentException If the content is null.
+   * @throws IllegalArgumentException If the content is null, empty, or whitespace-only.
    */
   public static OssieDocument json(String content) {
     return new OssieDocument(content, OssieFormat.JSON);

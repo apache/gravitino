@@ -19,7 +19,7 @@
 package org.apache.gravitino.semantic;
 
 import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -49,7 +49,7 @@ import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 
 /** Converts between standalone Apache Ossie documents and Gravitino Semantic Models. */
-public final class OssieSemanticModelDocumentConverter {
+public final class OssieDocumentConverter {
 
   private static final Set<String> ROOT_PROPERTIES =
       Set.of(
@@ -93,7 +93,7 @@ public final class OssieSemanticModelDocumentConverter {
   private static final ObjectMapper JSON_MAPPER = createJsonMapper();
   private static final ObjectMapper YAML_MAPPER = createYamlMapper();
 
-  private OssieSemanticModelDocumentConverter() {}
+  private OssieDocumentConverter() {}
 
   /**
    * Converts one standalone Apache Ossie YAML or JSON document into a create request.
@@ -245,7 +245,7 @@ public final class OssieSemanticModelDocumentConverter {
   }
 
   private static String ossieVersion(Map<String, String> properties) {
-    String version = properties.getOrDefault(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION);
+    String version = properties.getOrDefault(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
     if (StringUtils.isBlank(version)) {
       throw invalid(
           "$.version",
@@ -259,15 +259,13 @@ public final class OssieSemanticModelDocumentConverter {
     transformObjectArray(
         definition.get("datasets"),
         path + ".datasets",
-        OssieSemanticModelDocumentConverter::transformOssieDataset);
+        OssieDocumentConverter::transformOssieDataset);
     transformObjectArray(
         definition.get("relationships"),
         path + ".relationships",
-        OssieSemanticModelDocumentConverter::transformOssieRelationship);
+        OssieDocumentConverter::transformOssieRelationship);
     transformObjectArray(
-        definition.get("metrics"),
-        path + ".metrics",
-        OssieSemanticModelDocumentConverter::transformOssieMetric);
+        definition.get("metrics"), path + ".metrics", OssieDocumentConverter::transformOssieMetric);
     transformOssieCustomExtensions(
         definition.get("custom_extensions"), path + ".custom_extensions");
     rename(definition, "ai_context", "aiContext");
@@ -295,9 +293,7 @@ public final class OssieSemanticModelDocumentConverter {
 
     validateAIContext(dataset.get("ai_context"), path + ".ai_context");
     transformObjectArray(
-        dataset.get("fields"),
-        path + ".fields",
-        OssieSemanticModelDocumentConverter::transformOssieField);
+        dataset.get("fields"), path + ".fields", OssieDocumentConverter::transformOssieField);
     transformOssieCustomExtensions(dataset.get("custom_extensions"), path + ".custom_extensions");
     rename(dataset, "primary_key", "primaryKey");
     rename(dataset, "unique_keys", "uniqueKeys");
@@ -465,17 +461,13 @@ public final class OssieSemanticModelDocumentConverter {
 
   private static void transformNativeDefinition(ObjectNode definition) {
     transformObjectArray(
-        definition.get("datasets"),
-        "$.datasets",
-        OssieSemanticModelDocumentConverter::transformNativeDataset);
+        definition.get("datasets"), "$.datasets", OssieDocumentConverter::transformNativeDataset);
     transformObjectArray(
         definition.get("relationships"),
         "$.relationships",
-        OssieSemanticModelDocumentConverter::transformNativeRelationship);
+        OssieDocumentConverter::transformNativeRelationship);
     transformObjectArray(
-        definition.get("metrics"),
-        "$.metrics",
-        OssieSemanticModelDocumentConverter::transformNativeMetric);
+        definition.get("metrics"), "$.metrics", OssieDocumentConverter::transformNativeMetric);
     transformNativeCustomExtensions(definition.get("customExtensions"), "$.custom_extensions");
     rename(definition, "aiContext", "ai_context");
     rename(definition, "customExtensions", "custom_extensions");
@@ -505,9 +497,7 @@ public final class OssieSemanticModelDocumentConverter {
             + formatOssieSourceSegment(name.textValue()));
 
     transformObjectArray(
-        dataset.get("fields"),
-        path + ".fields",
-        OssieSemanticModelDocumentConverter::transformNativeField);
+        dataset.get("fields"), path + ".fields", OssieDocumentConverter::transformNativeField);
     transformNativeCustomExtensions(dataset.get("customExtensions"), path + ".custom_extensions");
     rename(dataset, "primaryKey", "primary_key");
     rename(dataset, "uniqueKeys", "unique_keys");

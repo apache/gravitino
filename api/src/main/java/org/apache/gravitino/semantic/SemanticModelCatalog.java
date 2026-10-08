@@ -109,7 +109,7 @@ public interface SemanticModelCatalog {
    * @throws IllegalSemanticModelException If the document or Semantic Model definition is invalid.
    * @throws UnsupportedOperationException If Ossie import is not supported.
    */
-  default SemanticModel importOssieSemanticModel(Namespace namespace, OssieDocument document)
+  default SemanticModel importOssieDocument(Namespace namespace, OssieDocument document)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     throw new UnsupportedOperationException("Ossie import is not supported");
@@ -129,7 +129,7 @@ public interface SemanticModelCatalog {
    * @throws IllegalSemanticModelException If the model cannot be represented as an Ossie document.
    * @throws UnsupportedOperationException If Ossie export is not supported.
    */
-  default OssieDocument exportOssieSemanticModel(NameIdentifier ident, OssieFormat format)
+  default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format)
       throws NoSuchSemanticModelException, IllegalSemanticModelException {
     throw new UnsupportedOperationException("Ossie export is not supported");
   }

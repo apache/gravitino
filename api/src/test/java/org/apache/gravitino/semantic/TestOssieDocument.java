@@ -41,14 +41,16 @@ public class TestOssieDocument {
 
   @Test
   public void testConstructionDoesNotParseContent() {
-    assertEquals("", OssieDocument.yaml("").content());
+    assertEquals("name: [", OssieDocument.yaml("name: [").content());
     assertEquals("not json", OssieDocument.json("not json").content());
   }
 
   @Test
-  public void testNullContentIsRejected() {
-    assertThrows(IllegalArgumentException.class, () -> OssieDocument.yaml(null));
-    assertThrows(IllegalArgumentException.class, () -> OssieDocument.json(null));
+  public void testBlankContentIsRejected() {
+    for (String content : new String[] {null, "", " ", "\t\r\n"}) {
+      assertThrows(IllegalArgumentException.class, () -> OssieDocument.yaml(content));
+      assertThrows(IllegalArgumentException.class, () -> OssieDocument.json(content));
+    }
   }
 
   @Test

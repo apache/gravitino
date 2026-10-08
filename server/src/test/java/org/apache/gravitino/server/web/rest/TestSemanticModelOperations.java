@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -137,8 +137,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @BeforeEach
   void resetDispatcher() {
     reset(dispatcher);
-    doCallRealMethod().when(dispatcher).importOssieSemanticModel(any(), any());
-    doCallRealMethod().when(dispatcher).exportOssieSemanticModel(any(), any());
+    doCallRealMethod().when(dispatcher).importOssieDocument(any(), any());
+    doCallRealMethod().when(dispatcher).exportOssieDocument(any(), any());
   }
 
   @Test
@@ -552,7 +552,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(salesIdent),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION))))
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
         .thenReturn(semanticModel("sales", "Sales definitions"));
     when(dispatcher.createSemanticModel(
             eq(inventoryIdent),
@@ -609,8 +609,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     jsonBody.validate();
     Assertions.assertEquals("inventory", jsonBody.getSemanticModel().name());
 
-    verify(dispatcher).importOssieSemanticModel(namespace, OssieDocument.yaml(yaml));
-    verify(dispatcher).importOssieSemanticModel(namespace, OssieDocument.json(json));
+    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
+    verify(dispatcher).importOssieDocument(namespace, OssieDocument.json(json));
     ArgumentCaptor<SemanticModelDefinition> definitionCaptor =
         ArgumentCaptor.forClass(SemanticModelDefinition.class);
     verify(dispatcher)
@@ -618,7 +618,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(salesIdent),
             eq("Sales definitions"),
             definitionCaptor.capture(),
-            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION)));
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
     Assertions.assertEquals(
         NameIdentifier.of(catalog, schema, "orders"),
         definitionCaptor.getValue().datasets()[0].source());
@@ -642,7 +642,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION))))
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
         .thenReturn(semanticModel("marketing", null));
 
     String yaml =
@@ -660,13 +660,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     SemanticModelResponse body = response.readEntity(SemanticModelResponse.class);
     body.validate();
     Assertions.assertEquals("marketing", body.getSemanticModel().name());
-    verify(dispatcher).importOssieSemanticModel(namespace, OssieDocument.yaml(yaml));
+    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
     verify(dispatcher)
         .createSemanticModel(
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION)));
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -708,8 +708,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         json.at("/datasets/0/source").textValue());
     Assertions.assertFalse(json.has("semantic_model"));
     Assertions.assertFalse(json.has("definition"));
-    verify(dispatcher).exportOssieSemanticModel(ident, OssieFormat.YAML);
-    verify(dispatcher).exportOssieSemanticModel(ident, OssieFormat.JSON);
+    verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
+    verify(dispatcher).exportOssieDocument(ident, OssieFormat.JSON);
     verify(dispatcher, times(2)).loadSemanticModel(ident);
     verifyNoMoreInteractions(dispatcher);
   }
@@ -730,7 +730,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalSemanticModelException.class.getSimpleName(),
         "query sources are not supported");
-    verify(dispatcher).importOssieSemanticModel(namespace, OssieDocument.yaml(querySource));
+    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(querySource));
 
     assertError(
         target(semanticModelPath() + "/sales/ossie").queryParam("format", "csv").request().get(),
@@ -738,6 +738,23 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalArgumentException.class.getSimpleName(),
         "expected yaml or json");
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testOssieImportRejectsBlankContentBeforeDispatch() {
+    for (String mediaType : new String[] {"application/yaml", MediaType.APPLICATION_JSON}) {
+      for (String content : new String[] {"", " \t\r\n"}) {
+        try (Response response = postDocument(semanticModelPath() + "/ossie", content, mediaType)) {
+          assertError(
+              response,
+              Response.Status.BAD_REQUEST,
+              ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+              IllegalArgumentException.class.getSimpleName(),
+              "content must not be blank");
+        }
+      }
+    }
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -750,7 +767,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalSemanticModelException.class.getSimpleName(),
         "Cannot parse Apache Ossie JSON");
-    verify(dispatcher).importOssieSemanticModel(namespace, OssieDocument.json(yaml));
+    verify(dispatcher).importOssieDocument(namespace, OssieDocument.json(yaml));
     verifyNoMoreInteractions(dispatcher);
   }
 

@@ -22,7 +22,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -118,7 +118,7 @@ public class TestSemanticModelOperationDispatcher {
 
     assertEquals("sales_model", created.name());
     assertEquals(2, created.definition().datasets().length);
-    assertEquals(DEFAULT_OSSIE_VERSION, created.properties().get(PROPERTY_OSSIE_VERSION));
+    assertEquals(DEFAULT_VERSION, created.properties().get(PROPERTY_OSSIE_VERSION));
     assertSame(created, dispatcher.loadSemanticModel(MODEL_IDENT));
   }
 
@@ -237,7 +237,7 @@ public class TestSemanticModelOperationDispatcher {
             SemanticModelChange.updateComment("Updated"));
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, renamed.name());
     assertEquals(
-        Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION),
+        Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION),
         propertyUpdated.properties());
     assertEquals("Updated", renamed.comment());
 
@@ -343,15 +343,15 @@ public class TestSemanticModelOperationDispatcher {
             definition,
             Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, "future-version"));
 
-    OssieDocument document = dispatcher.exportOssieSemanticModel(MODEL_IDENT, format);
+    OssieDocument document = dispatcher.exportOssieDocument(MODEL_IDENT, format);
     assertEquals(format, document.format());
     assertThrows(
         SemanticModelAlreadyExistsException.class,
-        () -> dispatcher.importOssieSemanticModel(NAMESPACE, document));
+        () -> dispatcher.importOssieDocument(NAMESPACE, document));
     assertSame(original, dispatcher.loadSemanticModel(MODEL_IDENT));
 
     assertTrue(dispatcher.dropSemanticModel(MODEL_IDENT));
-    SemanticModel imported = dispatcher.importOssieSemanticModel(NAMESPACE, document);
+    SemanticModel imported = dispatcher.importOssieDocument(NAMESPACE, document);
     assertEquals(original.name(), imported.name());
     assertEquals(original.comment(), imported.comment());
     assertEquals(original.definition(), imported.definition());
@@ -379,7 +379,7 @@ public class TestSemanticModelOperationDispatcher {
 
     assertThrows(
         IllegalSemanticModelException.class,
-        () -> dispatcher.importOssieSemanticModel(NAMESPACE, invalid));
+        () -> dispatcher.importOssieDocument(NAMESPACE, invalid));
     assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
   }
 
@@ -388,7 +388,7 @@ public class TestSemanticModelOperationDispatcher {
     assertThrows(
         IllegalSemanticModelException.class,
         () ->
-            dispatcher.importOssieSemanticModel(
+            dispatcher.importOssieDocument(
                 NAMESPACE, OssieDocument.json(ossieDocument().content())));
     verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
   }
@@ -397,12 +397,12 @@ public class TestSemanticModelOperationDispatcher {
   public void testOssieOperationsPreserveMissingObjectErrors() {
     assertThrows(
         NoSuchSemanticModelException.class,
-        () -> dispatcher.exportOssieSemanticModel(MODEL_IDENT, OssieFormat.YAML));
+        () -> dispatcher.exportOssieDocument(MODEL_IDENT, OssieFormat.YAML));
     when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
         .thenThrow(new NoSuchSchemaException("Schema does not exist"));
     assertThrows(
         NoSuchSchemaException.class,
-        () -> dispatcher.importOssieSemanticModel(NAMESPACE, ossieDocument()));
+        () -> dispatcher.importOssieDocument(NAMESPACE, ossieDocument()));
   }
 
   private static OssieDocument ossieDocument() {

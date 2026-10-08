@@ -189,7 +189,7 @@ public class SemanticModelOperations {
   @Produces(VND_GRAVITINO_V1_JSON)
   @Timed(name = "import-ossie-semantic-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "import-ossie-semantic-model", absolute = true)
-  public Response importOssieSemanticModel(
+  public Response importOssieDocument(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
@@ -209,7 +209,7 @@ public class SemanticModelOperations {
                     ? OssieDocument.json(document)
                     : OssieDocument.yaml(document);
             SemanticModel semanticModel =
-                dispatcher.importOssieSemanticModel(
+                dispatcher.importOssieDocument(
                     NamespaceUtil.ofSemanticModel(metalake, catalog, schema), ossieDocument);
             LOG.info(
                 "Apache Ossie Semantic Model imported: {}.{}.{}.{}",
@@ -380,7 +380,7 @@ public class SemanticModelOperations {
   @Path("{semanticModel}/ossie")
   @Timed(name = "export-ossie-semantic-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "export-ossie-semantic-model", absolute = true)
-  public Response exportOssieSemanticModel(
+  public Response exportOssieDocument(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
@@ -400,7 +400,7 @@ public class SemanticModelOperations {
             OssieFormat outputFormat = parseOssieFormat(format);
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
-            OssieDocument document = dispatcher.exportOssieSemanticModel(ident, outputFormat);
+            OssieDocument document = dispatcher.exportOssieDocument(ident, outputFormat);
             String mediaType =
                 document.format() == OssieFormat.JSON
                     ? MediaType.APPLICATION_JSON
