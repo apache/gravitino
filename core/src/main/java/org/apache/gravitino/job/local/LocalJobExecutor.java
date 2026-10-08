@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.job.local;
 
+import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.CANCEL_FORCE_KILL_DELAY_MS;
+import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_CANCEL_FORCE_KILL_DELAY_MS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_JOB_STATUS_KEEP_TIME_MS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_MAX_RUNNING_JOBS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_WAITING_QUEUE_SIZE;
@@ -143,6 +145,8 @@ public class LocalJobExecutor implements JobExecutor {
   private Map<String, JobExecutionInfo> jobInfos;
   private final Object lock = new Object();
 
+  private long cancelForceKillDelayMs;
+
   private long jobStatusKeepTimeInMs;
   private ScheduledExecutorService jobStatusCleanupExecutor;
 
@@ -169,6 +173,14 @@ public class LocalJobExecutor implements JobExecutor {
   @Override
   public void initialize(Map<String, String> configs) {
     this.configs = configs;
+    this.cancelForceKillDelayMs =
+        configs.containsKey(CANCEL_FORCE_KILL_DELAY_MS)
+            ? Long.parseLong(configs.get(CANCEL_FORCE_KILL_DELAY_MS))
+            : DEFAULT_CANCEL_FORCE_KILL_DELAY_MS;
+    Preconditions.checkArgument(
+        cancelForceKillDelayMs > 0,
+        "Cancel force-kill delay must be greater than 0, but got: %s",
+        cancelForceKillDelayMs);
     this.executorId = String.format("%08x", ThreadLocalRandom.current().nextInt());
     this.ownedJobIdPrefix = LOCAL_JOB_PREFIX + executorId + "-";
     LOG.info("Initializing local job executor with executor id {}", executorId);
@@ -366,6 +378,20 @@ public class LocalJobExecutor implements JobExecutor {
         Process process = runningProcesses.get(jobId);
         if (process != null) {
           process.destroy();
+          // A process that traps or ignores SIGTERM would otherwise stay in
+          // CANCELLING forever and permanently occupy one of the fixed worker
+          // threads; escalate to a hard kill after a grace period.
+          long delayMs = cancelForceKillDelayMs;
+          jobStatusCleanupExecutor.schedule(
+              () -> {
+                if (process.isAlive()) {
+                  LOG.warn(
+                      "Job {} still alive {} ms after cancel, destroying forcibly", jobId, delayMs);
+                  process.destroyForcibly();
+                }
+              },
+              delayMs,
+              TimeUnit.MILLISECONDS);
         }
         LOG.info("Job {} is cancelling while running", jobId);
         jobInfos.put(jobId, info.toBuilder().withStatus(JobHandle.Status.CANCELLING).build());
@@ -446,21 +472,21 @@ public class LocalJobExecutor implements JobExecutor {
       LOG.info("Starting job: {}", jobId);
 
       int exitCode = process.waitFor();
-      if (exitCode == 0) {
-        LOG.info("Job {} completed successfully", jobId);
-        synchronized (lock) {
+      synchronized (lock) {
+        // The job may be missing if the executor is closed concurrently.
+        JobExecutionInfo current = jobInfos.get(jobId);
+        JobHandle.Status oldStatus = current == null ? null : current.status();
+        if (oldStatus == JobHandle.Status.CANCELLING) {
+          // A cancelled job whose process traps SIGTERM and still exits 0 was cancelled, not
+          // successful; consult the cancel state before the exit code.
+          LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
+          finishJob(jobId, JobHandle.Status.CANCELLED);
+        } else if (exitCode == 0) {
+          LOG.info("Job {} completed successfully", jobId);
           finishJob(jobId, JobHandle.Status.SUCCEEDED);
-        }
-      } else {
-        synchronized (lock) {
-          JobHandle.Status oldStatus = jobInfos.get(jobId).status();
-          if (oldStatus == JobHandle.Status.CANCELLING) {
-            LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
-            finishJob(jobId, JobHandle.Status.CANCELLED);
-          } else if (oldStatus == JobHandle.Status.STARTED) {
-            LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
-            finishJob(jobId, JobHandle.Status.FAILED);
-          }
+        } else if (oldStatus == null || oldStatus == JobHandle.Status.STARTED) {
+          LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
+          finishJob(jobId, JobHandle.Status.FAILED);
         }
       }
 
