@@ -123,31 +123,16 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
 
     operations.createTable("catalog.schema.table", " exist_ok ", ".", null, Map.of(), null);
-
-    ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
-    Mockito.verify(tableCatalog)
-        .createTable(
-            any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
-    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
-  }
-
-  @Test
-  void testCreateTableModeAcceptsPascalCase() {
-    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
-    Table table = Mockito.mock(Table.class);
-    when(table.properties()).thenReturn(Map.of());
-    when(tableCatalog.createTable(
-            any(NameIdentifier.class), any(Column[].class), isNull(), anyMap()))
-        .thenReturn(table);
-    GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
-
     operations.createTable("catalog.schema.table", "ExistOk", ".", null, Map.of(), null);
 
     ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
-    Mockito.verify(tableCatalog)
+    Mockito.verify(tableCatalog, Mockito.times(2))
         .createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
-    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "EXIST_OK", propertiesCaptor.getAllValues().get(0).get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "EXIST_OK", propertiesCaptor.getAllValues().get(1).get(LANCE_CREATION_MODE));
   }
 
   @Test
