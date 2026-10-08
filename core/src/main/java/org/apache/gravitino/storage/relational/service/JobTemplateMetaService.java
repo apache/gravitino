@@ -35,9 +35,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
-import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
@@ -170,7 +168,8 @@ public class JobTemplateMetaService {
             // Job templates are not entity-cacheable, so JDBCBackend does not log their changes.
             // Peers still cache the old name's id for authorization, so log a rename here.
             if (!Objects.equals(oldJobTemplateEntity.name(), newJobTemplateEntity.name())) {
-              insertJobTemplateChange(jobTemplateIdent, OperateType.ALTER);
+              EntityChangeLogWriter.append(
+                  jobTemplateIdent, Entity.EntityType.JOB_TEMPLATE, OperateType.ALTER);
             }
           });
     } catch (RuntimeException e) {
@@ -260,19 +259,8 @@ public class JobTemplateMetaService {
             SessionUtils.doWithoutCommit(
                 JobMetaMapper.class,
                 mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())),
-        () -> insertJobTemplateChange(ident, OperateType.DROP));
-  }
-
-  private static void insertJobTemplateChange(NameIdentifier ident, OperateType operateType) {
-    String metalakeName = ident.namespace().level(0);
-    String fullName = EntityChangeLogNameIdentifierCodec.encode(ident);
-    SessionUtils.doWithoutCommit(
-        EntityChangeLogMapper.class,
-        mapper ->
-            mapper.insertEntityChange(
-                metalakeName, Entity.EntityType.JOB_TEMPLATE.name(), fullName, operateType));
-    EntityChangeLogDiagnostics.logAppended(
-        metalakeName, Entity.EntityType.JOB_TEMPLATE.name(), operateType, fullName);
+        () ->
+            EntityChangeLogWriter.append(ident, Entity.EntityType.JOB_TEMPLATE, OperateType.DROP));
   }
 
   /** Locks the observed template while a job is inserted in the same transaction. */
