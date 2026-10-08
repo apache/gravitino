@@ -80,7 +80,8 @@ public final class CloudStorageCredentialPropertyKeys {
           AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
           AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
           PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
-          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET);
+          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+          PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN);
 
   private CloudStorageCredentialPropertyKeys() {}
 

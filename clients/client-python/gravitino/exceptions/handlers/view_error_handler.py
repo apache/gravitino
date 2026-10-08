@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -16,7 +16,6 @@
 # under the License.
 
 from gravitino.constants.error import ErrorConstants
-from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.base import (
     CatalogNotInUseException,
     ForbiddenException,
@@ -25,54 +24,31 @@ from gravitino.exceptions.base import (
     NoSuchCatalogException,
     NoSuchSchemaException,
     NoSuchViewException,
-    NotFoundException,
-    NotInUseException,
     UnsupportedOperationException,
     ViewAlreadyExistsException,
 )
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class ViewErrorHandler(RestErrorHandler):
+class ViewErrorHandler(CodeMappingErrorHandler):
     """Error handler for view operations."""
 
-    def handle(self, error_response: ErrorResponse):
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-        exception_type = error_response.type()
-
-        if code == ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-            raise IllegalArgumentException(error_message)
-
-        if code == ErrorConstants.NOT_FOUND_CODE:
-            if exception_type == NoSuchCatalogException.__name__:
-                raise NoSuchCatalogException(error_message)
-            if exception_type == NoSuchSchemaException.__name__:
-                raise NoSuchSchemaException(error_message)
-            if exception_type == NoSuchViewException.__name__:
-                raise NoSuchViewException(error_message)
-            raise NotFoundException(error_message)
-
-        if code == ErrorConstants.ALREADY_EXISTS_CODE:
-            raise ViewAlreadyExistsException(error_message)
-
-        if code == ErrorConstants.INTERNAL_ERROR_CODE:
-            raise RuntimeError(error_message)
-
-        if code == ErrorConstants.UNSUPPORTED_OPERATION_CODE:
-            raise UnsupportedOperationException(error_message)
-
-        if code == ErrorConstants.FORBIDDEN_CODE:
-            raise ForbiddenException(error_message)
-
-        if code == ErrorConstants.NOT_IN_USE_CODE:
-            if exception_type == CatalogNotInUseException.__name__:
-                raise CatalogNotInUseException(error_message)
-            if exception_type == MetalakeNotInUseException.__name__:
-                raise MetalakeNotInUseException(error_message)
-            raise NotInUseException(error_message)
-
-        super().handle(error_response)
+    _code_exception_map = {
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: IllegalArgumentException,
+        ErrorConstants.NOT_FOUND_CODE: {
+            NoSuchCatalogException.__name__: NoSuchCatalogException,
+            NoSuchSchemaException.__name__: NoSuchSchemaException,
+            NoSuchViewException.__name__: NoSuchViewException,
+        },
+        ErrorConstants.ALREADY_EXISTS_CODE: ViewAlreadyExistsException,
+        ErrorConstants.INTERNAL_ERROR_CODE: RuntimeError,
+        ErrorConstants.UNSUPPORTED_OPERATION_CODE: UnsupportedOperationException,
+        ErrorConstants.FORBIDDEN_CODE: ForbiddenException,
+        ErrorConstants.NOT_IN_USE_CODE: {
+            CatalogNotInUseException.__name__: CatalogNotInUseException,
+            MetalakeNotInUseException.__name__: MetalakeNotInUseException,
+        },
+    }
 
 
 VIEW_ERROR_HANDLER = ViewErrorHandler()

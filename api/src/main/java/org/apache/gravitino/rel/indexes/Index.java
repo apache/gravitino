@@ -54,8 +54,8 @@ public interface Index {
   }
 
   /**
-   * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
-   * supported.
+   * The index type. Catalogs may support generic key types as well as connector-specific index
+   * types.
    */
   enum IndexType {
     /**
@@ -144,5 +144,10 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /**
+     * Vector similarity data skipping index for approximate nearest-neighbor search in ClickHouse.
+     */
+    DATA_SKIPPING_VECTOR_SIMILARITY,
   }
 }

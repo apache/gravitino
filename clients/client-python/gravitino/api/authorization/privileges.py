@@ -1821,7 +1821,6 @@ class Privileges:
         MetadataObject.Type.TOPIC,
         MetadataObject.Type.FILESET,
         MetadataObject.Type.MODEL,
-        MetadataObject.Type.MODEL_VERSION,
     }
     MANAGE_GRANTS_SUPPORTED_TYPES = {
         MetadataObject.Type.METALAKE,
