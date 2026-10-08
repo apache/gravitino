@@ -61,6 +61,7 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +81,13 @@ public class IcebergRESTUtils {
   public static final String SNAPSHOT_ALL = "all";
 
   public static final String SNAPSHOT_REFS = "refs";
+
+  /**
+   * Salt mixed into view ETags so they stay distinct from the ETag a table would get for the same
+   * metadata file location. Views have no {@code snapshots} query parameter, so they cannot reuse
+   * the table salt.
+   */
+  private static final String VIEW_ETAG_SALT = "view";
 
   /**
    * Iceberg refresh-endpoint keys that may appear in {@link LoadTableResponse#config()}. Kept in
@@ -367,8 +375,36 @@ public class IcebergRESTUtils {
    */
   public static Response buildResponseWithETag(
       LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
-    Response.ResponseBuilder responseBuilder =
-        Response.ok(loadTableResponse, MediaType.APPLICATION_JSON_TYPE);
+    return okWithETag(loadTableResponse, etag);
+  }
+
+  /**
+   * Builds an OK response for a loaded view with the ETag header derived from the view metadata
+   * file location. The ETag changes whenever the view metadata is rewritten, so clients can reuse
+   * it as the {@code If-None-Match} value of a subsequent loadView request.
+   *
+   * @param loadViewResponse the view response to include in the body
+   * @return a Response with ETag header set, or without one if no metadata location is available
+   */
+  public static Response buildResponseWithETag(LoadViewResponse loadViewResponse) {
+    return buildResponseWithETag(
+        loadViewResponse, generateViewETag(loadViewResponse.metadata().metadataFileLocation()));
+  }
+
+  /**
+   * Builds an OK response for a loaded view with the given ETag header.
+   *
+   * @param loadViewResponse the view response to include in the body
+   * @param etag the pre-computed ETag
+   * @return a Response with ETag header set if etag is present
+   */
+  public static Response buildResponseWithETag(
+      LoadViewResponse loadViewResponse, Optional<EntityTag> etag) {
+    return okWithETag(loadViewResponse, etag);
+  }
+
+  private static Response okWithETag(Object entity, Optional<EntityTag> etag) {
+    Response.ResponseBuilder responseBuilder = Response.ok(entity, MediaType.APPLICATION_JSON_TYPE);
     etag.ifPresent(responseBuilder::tag);
     return responseBuilder.build();
   }
@@ -417,6 +453,39 @@ public class IcebergRESTUtils {
       LOG.warn("Failed to generate ETag for metadata location: {}", metadataLocation, e);
       return Optional.empty();
     }
+  }
+
+  /**
+   * Generates an ETag for an Iceberg view based on its metadata file location. The ETag is a
+   * SHA-256 hash that changes whenever the view metadata is rewritten (for example after a
+   * replaceView or renameView), so it can be compared against the client's {@code If-None-Match}
+   * header.
+   *
+   * @param metadataLocation the view metadata file location
+   * @return the generated ETag
+   */
+  public static Optional<EntityTag> generateViewETag(String metadataLocation) {
+    return generateETag(metadataLocation, VIEW_ETAG_SALT);
+  }
+
+  /**
+   * Checks whether the client's {@code If-None-Match} header matches the current ETag of a
+   * resource.
+   *
+   * @param ifNoneMatch the If-None-Match header value from the client
+   * @param etag the current ETag
+   * @return true if the ETag matches (the resource is unchanged), false otherwise
+   */
+  public static boolean etagMatches(String ifNoneMatch, EntityTag etag) {
+    if (StringUtils.isBlank(ifNoneMatch)) {
+      return false;
+    }
+    // Strip quotes if present to compare the raw value
+    String clientEtag = ifNoneMatch.trim();
+    if (clientEtag.startsWith("\"") && clientEtag.endsWith("\"")) {
+      clientEtag = clientEtag.substring(1, clientEtag.length() - 1);
+    }
+    return etag.getValue().equals(clientEtag);
   }
 
   public static Response okWithoutContent() {
