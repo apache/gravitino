@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.jdbc.utils;
+package org.apache.gravitino.catalog.postgresql;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,7 +37,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 /** Exercises default validation against a real PostgreSQL server. */
 @Tag("gravitino-docker-test")
-public class TestPostgresqlDataSource {
+public class TestPostgreSqlDataSource {
   private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:13");
 
   /** Starts PostgreSQL and creates a schema for connection state changes. */

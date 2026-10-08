@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.jdbc.utils;
+package org.apache.gravitino.catalog.mysql;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -28,6 +28,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
