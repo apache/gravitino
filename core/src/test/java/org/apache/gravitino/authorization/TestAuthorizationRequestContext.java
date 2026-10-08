@@ -25,9 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
@@ -227,6 +233,53 @@ public class TestAuthorizationRequestContext {
     assertFalse(absentFirst.isPresent());
     assertFalse(absentSecond.isPresent(), "Absent group result must also be cached");
     assertEquals(2, loaderCalls.get(), "Loader must fire once per distinct group key");
+  }
+
+  @Test
+  public void testNormalizationDeduplicatesConcurrentLoaders() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    MetadataObject object = MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE);
+    AtomicInteger calls = new AtomicInteger();
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Callable<MetadataObject> lookup =
+          () -> {
+            assertTrue(start.await(5, TimeUnit.SECONDS));
+            return context.computeNormalizedMetadataObjectIfAbsent(
+                "ml::table",
+                key -> {
+                  calls.incrementAndGet();
+                  return object;
+                });
+          };
+      Future<MetadataObject> first = workers.submit(lookup);
+      Future<MetadataObject> second = workers.submit(lookup);
+      start.countDown();
+      assertEquals(object, first.get(5, TimeUnit.SECONDS));
+      assertEquals(object, second.get(5, TimeUnit.SECONDS));
+      assertEquals(1, calls.get());
+    } finally {
+      workers.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testNormalizationDoesNotCacheFailuresOrNull() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            context.computeNormalizedMetadataObjectIfAbsent(
+                "key",
+                key -> {
+                  throw new IllegalStateException("Unavailable");
+                }));
+    assertThrows(
+        NullPointerException.class,
+        () -> context.computeNormalizedMetadataObjectIfAbsent("key", key -> null));
+    MetadataObject object = MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE);
+    assertEquals(object, context.computeNormalizedMetadataObjectIfAbsent("key", key -> object));
   }
 
   @Test

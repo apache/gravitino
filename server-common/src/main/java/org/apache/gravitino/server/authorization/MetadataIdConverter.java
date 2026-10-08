@@ -26,6 +26,7 @@ import com.google.common.collect.ObjectArrays;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -126,6 +127,16 @@ public class MetadataIdConverter {
         normalized, MetadataObjectUtil.toEntityType(metadataObject));
   }
 
+  /**
+   * Returns the immutable set of metadata types with catalog-scoped normalization rules.
+   *
+   * @return the types covered by the production capability mapping
+   */
+  @VisibleForTesting
+  public static Set<MetadataObject.Type> catalogScopedTypes() {
+    return METADATA_SCOPE_MAPPING.keySet();
+  }
+
   @VisibleForTesting
   static NameIdentifier normalizeCaseSensitive(
       NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
@@ -140,6 +151,7 @@ public class MetadataIdConverter {
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
     if (scope == Capability.Scope.COLUMN) {
+      // The NameIdentifier overload applies SCHEMA to the namespace and TABLE to the leaf.
       NameIdentifier table =
           CapabilityHelpers.applyCaseSensitive(
               NameIdentifier.of(ident.namespace().levels()), Capability.Scope.TABLE, capability);

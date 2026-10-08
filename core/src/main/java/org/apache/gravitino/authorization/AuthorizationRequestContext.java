@@ -74,6 +74,9 @@ public class AuthorizationRequestContext {
   /** Per-request group identity cache. Key: {@code metalake::groupName}. */
   private final Map<String, Optional<GroupUpdatedAt>> groupInfoCache = new ConcurrentHashMap<>();
 
+  /** Per-request raw-name → canonical metadata object cache. */
+  private final Map<String, MetadataObject> normalizedMetadataObjects = new ConcurrentHashMap<>();
+
   /** Per-request name→id cache. Deduplicates resolveMetadataId within a single request. */
   private final Map<String, Long> metadataIdCache = new ConcurrentHashMap<>();
 
@@ -184,6 +187,24 @@ public class AuthorizationRequestContext {
     return groupInfoCache.computeIfAbsent(
         key,
         k -> Objects.requireNonNull(loader.apply(k), "Group info loader must not return null"));
+  }
+
+  /**
+   * Normalizes each raw metadata name at most once per request.
+   *
+   * <p>The key must include the metalake, object type and raw name. Successful results are a
+   * request-local snapshot; failures are not cached, so a later lookup may retry. A fresh request
+   * must resolve current catalog rules again. This map must not be shared across mutations.
+   *
+   * @param key the raw metadata object's cache key
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, Function<String, MetadataObject> loader) {
+    return normalizedMetadataObjects.computeIfAbsent(
+        key,
+        k -> Objects.requireNonNull(loader.apply(k), "Normalization loader must not return null"));
   }
 
   /** Per-request name→id dedup. Loader must return a non-null id or throw. */

@@ -68,7 +68,8 @@ public class JcasbinAuthorizationLookups {
    * Missing metadata objects are never cached as negative results: a later create for the same name
    * can be observed without waiting for cache eviction. Existing objects are invalidated by local
    * name-id mapping hooks and by the change-log poller on peer nodes. Both cache tiers use names
-   * normalized by catalog capability; capability lookup therefore also occurs on cache hits.
+   * normalized by catalog capability. Normalization is deduplicated per raw name within a request;
+   * a fresh request still resolves current catalog rules before consulting the shared cache.
    */
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
@@ -76,7 +77,9 @@ public class JcasbinAuthorizationLookups {
       // Use the same capability rules as ID resolution so hooks and peer change-log replay
       // evict every equivalent spelling from both cache tiers.
       MetadataObject cacheObject =
-          MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake);
+          requestContext.computeNormalizedMetadataObjectIfAbsent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject),
+              ignored -> MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake));
       String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);
       // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
       // by throwing through the loaders and translated back to Optional.empty() here. This caches

@@ -311,6 +311,60 @@ public class TestJcasbinMetadataIdCacheNormalization {
   }
 
   @Test
+  void testColumnNormalizationPreservesSchemaAndColumnCaseIndependently() {
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return scope == Scope.TABLE
+                    ? CapabilityResult.unsupported("case insensitive")
+                    : CapabilityResult.SUPPORTED;
+              }
+            });
+    assertEquals(
+        MetadataObjects.parse("CAT.SCHEMA.table.CoL", MetadataObject.Type.COLUMN),
+        MetadataIdConverter.normalizeMetadataObject(
+            MetadataObjects.parse("CAT.SCHEMA.Table.CoL", MetadataObject.Type.COLUMN), "Metalake"));
+  }
+
+  @Test
+  void testNormalizationIsReusedWithinRequestAndRefreshedOnNextRequest() throws IOException {
+    MetadataObject table = object(MetadataObject.Type.TABLE, false);
+    put(table, 100L);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+    // One capability lookup for key normalization and one for ID loading on the shared miss.
+    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    assertEquals(Optional.of(100L), resolve(table));
+    verify(catalogs, times(3)).doWithCatalog(any(), any());
+    verify(store, times(1)).get(any(), any(), any());
+    doThrow(new NoSuchCatalogException("Missing catalog"))
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    assertEquals(Optional.empty(), resolve(table));
+  }
+
+  @Test
+  void testFailedNormalizationCanRetryInSameRequest() {
+    MetadataObject table = object(MetadataObject.Type.TABLE, false);
+    put(table, 100L);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    doThrow(new NoSuchCatalogException("Missing catalog"))
+        .doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    assertEquals(Optional.empty(), lookups.resolveMetadataId(table, METALAKE, context));
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+  }
+
+  @Test
   void testLoaderUsesTheCanonicalNameOfItsCacheKey() {
     MetadataObject alias = object(MetadataObject.Type.TABLE, true);
     MetadataObject normalized = object(MetadataObject.Type.TABLE, false);
@@ -442,13 +496,8 @@ public class TestJcasbinMetadataIdCacheNormalization {
                     EntityClassMapper.getEntityClass(entityType(type))));
   }
 
-  @SuppressWarnings("unchecked")
-  private static Stream<MetadataObject.Type> catalogScopedTypes() throws IllegalAccessException {
+  private static Stream<MetadataObject.Type> catalogScopedTypes() {
     // Derive coverage from the production registry: a newly mapped type cannot silently be missed.
-    Map<MetadataObject.Type, Capability.Scope> scopes =
-        (Map<MetadataObject.Type, Capability.Scope>)
-            FieldUtils.readDeclaredStaticField(
-                MetadataIdConverter.class, "METADATA_SCOPE_MAPPING", true);
-    return scopes.keySet().stream();
+    return MetadataIdConverter.catalogScopedTypes().stream();
   }
 }
