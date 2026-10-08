@@ -43,9 +43,18 @@ configurations.all {
   }
 }
 
+// Everything packaged into the shaded runtime jar. Declaring these as `implementation` would make
+// Gradle publish them as `runtime` scoped POM dependencies and list them in the Gradle module
+// metadata, so resolving the connector coordinate would download the modules and third-party
+// libraries the jar already contains. See https://github.com/apache/gravitino/issues/13171
+val shadedDependencies by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
 dependencies {
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(project(":flink-connector:flink-1.20"))
+  shadedDependencies(project(":clients:client-java-runtime", configuration = "shadow"))
+  shadedDependencies(project(":flink-connector:flink-1.20"))
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -55,7 +64,7 @@ val shadowJarTask = tasks.named<ShadowJar>("shadowJar")
 
 shadowJarTask.configure {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
+  configurations = listOf(shadedDependencies)
   archiveFileName.set("$baseName-$version.jar")
   archiveClassifier.set("")
   mergeServiceFiles()

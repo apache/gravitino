@@ -29,13 +29,22 @@ val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val baseName = "${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion"
 
+// Everything packaged into the shaded runtime jar. Declaring these as `implementation` would make
+// Gradle publish them as `runtime` scoped POM dependencies and list them in the Gradle module
+// metadata, so resolving the connector coordinate would download the modules and third-party
+// libraries the jar already contains. See https://github.com/apache/gravitino/issues/13171
+val shadedDependencies by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
 dependencies {
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  shadedDependencies(project(":clients:client-java-runtime", configuration = "shadow"))
   when (sparkMajorVersion) {
     "3.5" -> {
       val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
-      implementation(project(":spark-connector:spark-3.5"))
-      implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+      shadedDependencies(project(":spark-connector:spark-3.5"))
+      shadedDependencies("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
     }
     else -> throw IllegalArgumentException("Unsupported Spark version: $sparkMajorVersion")
   }
@@ -43,7 +52,7 @@ dependencies {
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
+  configurations = listOf(shadedDependencies)
   archiveFileName.set("$baseName-$version.jar")
   archiveClassifier.set("")
 
