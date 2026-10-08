@@ -20,12 +20,14 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -53,6 +55,7 @@ public class StatisticMetaService {
     return INSTANCE;
   }
 
+  @VisibleForTesting
   StatisticMetaService() {}
 
   @Monitored(
@@ -142,15 +145,19 @@ public class StatisticMetaService {
       return 0;
     }
     NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, type);
-    Set<String> orderedNames = new TreeSet<>(Comparator.nullsFirst(Comparator.naturalOrder()));
-    orderedNames.addAll(statisticNames);
-    orderedNames.remove(null);
+    Set<String> orderedNames =
+        statisticNames.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(TreeSet::new));
     if (orderedNames.isEmpty()) {
       return 0;
     }
     Map<String, StatisticPO> previous =
         listStatisticPOs(observed, new ArrayList<>(orderedNames)).stream()
             .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    if (previous.isEmpty()) {
+      return 0;
+    }
     int[] deleted = new int[] {0};
     SessionUtils.doMultipleWithCommit(
         () -> {
@@ -163,16 +170,20 @@ public class StatisticMetaService {
             int updated =
                 SessionUtils.getWithoutCommit(
                     StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(old));
-            if (updated != 1) {
+            if (updated == 1) {
+              deleted[0]++;
+            } else if (hasLiveStatistic(observed, name)) {
               throw new OptimisticLockException(
                   "Statistic %s for %s changed during deletion", name, identifier);
             }
-            deleted[0]++;
+            // Otherwise a concurrent drop already removed it. Like a drop of a missing name, that
+            // is not a conflict and is simply not counted.
           }
         });
     return deleted[0];
   }
 
+  @VisibleForTesting
   List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
     return SessionUtils.getWithoutCommit(
         StatisticMetaMapper.class,
@@ -180,6 +191,19 @@ public class StatisticMetaService {
             mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
   }
 
+  private static boolean hasLiveStatistic(NamespacedEntityId endpoint, String name) {
+    return !SessionUtils.getWithoutCommit(
+            StatisticMetaMapper.class,
+            mapper ->
+                mapper.listStatisticPOsByNames(
+                    endpoint.namespaceIds()[0], endpoint.entityId(), List.of(name)))
+        .isEmpty();
+  }
+
+  /**
+   * Returns whether a failure is a unique-key violation. PostgreSQL and H2 report SQLState 23505,
+   * and MySQL reports error code 1062, the same codes the backend exception converters match.
+   */
   private static boolean isDuplicateKey(Throwable failure) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
       if (cause instanceof SQLException) {

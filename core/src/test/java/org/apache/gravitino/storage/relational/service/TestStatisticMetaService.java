@@ -202,6 +202,10 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             StatisticMetaMapper.class,
             mapper -> mapper.updateStatisticPOWithVersion(staleValue, stale));
     Assertions.assertEquals(0, staleUpdated);
+    int staleDeleted =
+        SessionUtils.getWithoutCommit(
+            StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(stale));
+    Assertions.assertEquals(0, staleDeleted);
     Assertions.assertEquals(
         20L,
         statisticMetaService
@@ -209,6 +213,95 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             .get(0)
             .value()
             .value());
+  }
+
+  /** Verifies a write or delete fails when its target is dropped after the version snapshot. */
+  @TestTemplate
+  public void testStatisticWritesFailWhenTargetDroppedAfterSnapshot() throws Exception {
+    String metalake = "statistic_dropped_target_metalake";
+    String catalog = "statistic_dropped_target_catalog";
+    String schema = "statistic_dropped_target_schema";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalake, catalog, schema, auditInfo);
+    Long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+
+    TableEntity writeTarget =
+        createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "dropped_write");
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            dropTableAfterSnapshot(writeTarget)
+                .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                    List.of(createStatisticEntity(auditInfo, 1L)),
+                    writeTarget.nameIdentifier(),
+                    Entity.EntityType.TABLE));
+    Assertions.assertEquals(0, countActiveStats(metalakeId));
+
+    TableEntity deleteTarget =
+        createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "dropped_delete");
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(createStatisticEntity(auditInfo, 1L)),
+        deleteTarget.nameIdentifier(),
+        Entity.EntityType.TABLE);
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            dropTableAfterSnapshot(deleteTarget)
+                .batchDeleteStatisticPOs(
+                    deleteTarget.nameIdentifier(), Entity.EntityType.TABLE, List.of("test")));
+    Assertions.assertEquals(0, countActiveStats(metalakeId));
+  }
+
+  /** Verifies a drop that loses to a concurrent drop of the same name is not a conflict. */
+  @TestTemplate
+  public void testConcurrentDropOfSameStatisticIsNotConflict() throws Exception {
+    String metalake = "statistic_double_drop_metalake";
+    String catalog = "statistic_double_drop_catalog";
+    String schema = "statistic_double_drop_schema";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createParentEntities(metalake, catalog, schema, auditInfo);
+    TableEntity table =
+        createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "double_drop");
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(createStatisticEntity(auditInfo, 1L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    StatisticMetaService losingDrop =
+        new StatisticMetaService() {
+          @Override
+          List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+            List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
+            Assertions.assertEquals(
+                1,
+                statisticMetaService.batchDeleteStatisticPOs(
+                    table.nameIdentifier(), Entity.EntityType.TABLE, names));
+            return rows;
+          }
+        };
+
+    Assertions.assertEquals(
+        0,
+        losingDrop.batchDeleteStatisticPOs(
+            table.nameIdentifier(), Entity.EntityType.TABLE, List.of("test")));
+    Assertions.assertTrue(
+        statisticMetaService
+            .listStatisticsByEntity(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .isEmpty());
+  }
+
+  private StatisticMetaService dropTableAfterSnapshot(TableEntity table) {
+    return new StatisticMetaService() {
+      @Override
+      List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+        List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
+        Assertions.assertTrue(TableMetaService.getInstance().deleteTable(table.nameIdentifier()));
+        return rows;
+      }
+    };
   }
 
   @TestTemplate
