@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -428,7 +429,7 @@ public class TestJcasbinMetadataIdCacheNormalization {
   }
 
   @Test
-  void testTransientCapabilityFailureCanRetryInSameRequest() throws IOException {
+  void testCapabilityFailureRetriesOnlyInNextRequest() throws IOException {
     MetadataObject table = object(MetadataObject.Type.TABLE, true);
     put(object(MetadataObject.Type.TABLE, false), 100L);
     AuthorizationRequestContext context = new AuthorizationRequestContext();
@@ -441,10 +442,40 @@ public class TestJcasbinMetadataIdCacheNormalization {
         .when(catalogs)
         .doWithCatalog(any(), any());
     assertEquals(Optional.empty(), lookups.resolveMetadataId(table, METALAKE, context));
-    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
-    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+    assertEquals(Optional.empty(), lookups.resolveMetadataId(table, METALAKE, context));
+    MetadataObject schema = MetadataObjects.parse("cat.SCHEMA", MetadataObject.Type.SCHEMA);
+    assertEquals(Optional.empty(), lookups.resolveMetadataId(schema, METALAKE, context));
+    verify(catalogs, times(1)).doWithCatalog(any(), any());
+    verifyNoInteractions(store);
+    assertEquals(
+        Optional.of(100L),
+        lookups.resolveMetadataId(table, METALAKE, new AuthorizationRequestContext()));
     verify(catalogs, times(2)).doWithCatalog(any(), any());
     verify(store, times(1)).get(any(), any(), any());
+  }
+
+  @Test
+  void testPersistentCapabilityFailureIsIsolatedToItsCatalog() {
+    MetadataObject broken = object(MetadataObject.Type.TABLE, true);
+    MetadataObject healthy =
+        MetadataObjects.parse("healthy.SCHEMA.TABLE", MetadataObject.Type.TABLE);
+    MetadataObject catalogObject = MetadataObjects.of(null, "cat", MetadataObject.Type.CATALOG);
+    put(MetadataObjects.parse("healthy.schema.table", MetadataObject.Type.TABLE), 200L);
+    put(catalogObject, 300L);
+    doThrow(new IllegalStateException("Connector initialization failed"))
+        .when(catalogs)
+        .doWithCatalog(eq(NameIdentifier.of(METALAKE, "cat")), any());
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    for (int i = 0; i < 5; i++) {
+      assertTrue(lookups.resolveMetadataIdResult(broken, METALAKE, context).normalizationFailed());
+      MetadataObject other =
+          MetadataObjects.parse("cat.SCHEMA.OTHER" + i, MetadataObject.Type.TABLE);
+      assertTrue(lookups.resolveMetadataIdResult(other, METALAKE, context).normalizationFailed());
+    }
+    assertEquals(Optional.of(200L), lookups.resolveMetadataId(healthy, METALAKE, context));
+    assertEquals(Optional.of(300L), lookups.resolveMetadataId(catalogObject, METALAKE, context));
+    verify(catalogs, times(1)).doWithCatalog(eq(NameIdentifier.of(METALAKE, "cat")), any());
+    verify(catalogs, times(1)).doWithCatalog(eq(NameIdentifier.of(METALAKE, "healthy")), any());
   }
 
   @Test

@@ -19,7 +19,9 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Optional;
+import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -28,6 +30,8 @@ import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +78,8 @@ public class JcasbinAuthorizationLookups {
    * objects are invalidated by local name-id mapping hooks and by the change-log poller on peer
    * nodes. Both cache tiers use names normalized by catalog capability. Normalization is
    * deduplicated per raw name within a request; a fresh request still resolves current catalog
-   * rules before consulting the shared cache.
+   * rules before consulting the shared cache. Capability failures are remembered per catalog within
+   * this request, so a failing connector is attempted and logged only once.
    */
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
@@ -104,25 +109,39 @@ public class JcasbinAuthorizationLookups {
     try {
       // Use the same capability rules as ID resolution so hooks and peer change-log replay
       // evict every equivalent spelling from both cache tiers.
-      cacheObject =
-          requestContext.computeNormalizedMetadataObjectIfAbsent(
-              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject),
-              ignored -> MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake));
+      String rawKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject);
+      Function<String, MetadataObject> normalizer =
+          ignored -> {
+            try {
+              return MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake);
+            } catch (NotFoundException e) {
+              throw e;
+            } catch (RuntimeException e) {
+              LOG.warn(
+                  "Cannot normalize metadata object {}:{} in metalake {}; authorization lookup is unresolved",
+                  metadataObject.type(),
+                  metadataObject.fullName(),
+                  metalake,
+                  e);
+              throw e;
+            }
+          };
+      if (MetadataIdConverter.catalogScopedTypes().contains(metadataObject.type())) {
+        NameIdentifier catalogIdentifier =
+            NameIdentifierUtil.getCatalogIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+        cacheObject =
+            requestContext.computeNormalizedMetadataObjectIfAbsent(
+                rawKey, catalogIdentifier, normalizer);
+      } else {
+        // Catalog ID resolution must remain available to install conservative DENY guards.
+        cacheObject = requestContext.computeNormalizedMetadataObjectIfAbsent(rawKey, normalizer);
+      }
     } catch (NotFoundException e) {
       return new MetadataIdResolution(Optional.empty(), false);
     } catch (RuntimeException e) {
-      // Never fall back to the raw key: it can retain an ID after canonical-name invalidation.
-      // Catch only normalization failures; entity-store and cache-loader failures still propagate.
-      // Failures are not memoized, so a transient one can succeed on retry in the same request.
-      // The cost: while a catalog cannot initialize, every object of that catalog looked up in a
-      // request reloads it (connector initialization included) and logs this warning again. A
-      // per-request, per-catalog failure memo or a once-per-request warning would bound that.
-      LOG.warn(
-          "Cannot normalize metadata object {}:{} in metalake {}; authorization lookup is unresolved",
-          metadataObject.type(),
-          metadataObject.fullName(),
-          metalake,
-          e);
+      // Never use a raw key after normalization fails. Only this request remembers the failure;
+      // entity-store and cache-loader failures below still propagate.
       return new MetadataIdResolution(Optional.empty(), true);
     }
     String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);

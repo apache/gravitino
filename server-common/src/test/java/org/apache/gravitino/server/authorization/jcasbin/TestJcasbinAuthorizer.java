@@ -966,18 +966,21 @@ public class TestJcasbinAuthorizer {
         .when(() -> MetadataIdConverter.getID(catalogObject, METALAKE))
         .thenReturn(Optional.empty());
     try {
-      RuntimeException failure =
-          Assertions.assertThrows(
-              RuntimeException.class,
-              () ->
-                  jcasbinAuthorizer.authorize(
-                      PrincipalUtils.getCurrentPrincipal(),
-                      METALAKE,
-                      MetadataObjects.of(null, "healthy", MetadataObject.Type.CATALOG),
-                      Privilege.Name.SELECT_TABLE,
-                      new AuthorizationRequestContext()));
-      assertTrue(failure.getCause() instanceof IllegalStateException);
-      assertTrue(failure.getCause().getMessage().contains("broken.schema.table"));
+      AuthorizationRequestContext context = new AuthorizationRequestContext();
+      assertFalse(
+          jcasbinAuthorizer.authorize(
+              PrincipalUtils.getCurrentPrincipal(),
+              METALAKE,
+              MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+              Privilege.Name.SELECT_TABLE,
+              context));
+      assertEquals(Set.of(ALLOW_ROLE_ID), context.getUnreadableRoleIds());
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              PrincipalUtils.getCurrentPrincipal(),
+              METALAKE,
+              Set.of(Privilege.Name.SELECT_TABLE),
+              context));
       assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
       assertTrue(
           getAllowEnforcer(jcasbinAuthorizer)
@@ -987,6 +990,16 @@ public class TestJcasbinAuthorizer {
           getDenyEnforcer(jcasbinAuthorizer)
               .getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID))
               .isEmpty());
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(catalogObject, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              PrincipalUtils.getCurrentPrincipal(),
+              METALAKE,
+              MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+              Privilege.Name.SELECT_TABLE,
+              new AuthorizationRequestContext()));
     } finally {
       metadataIdConverterMockedStatic
           .when(() -> MetadataIdConverter.getID(catalogObject, METALAKE))

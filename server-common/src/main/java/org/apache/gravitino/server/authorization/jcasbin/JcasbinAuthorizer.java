@@ -1540,7 +1540,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
       // Resolve every securable object to a metadata id before touching the enforcers, so the
       // critical section below stays free of DB round-trips.
-      ResolvedRolePolicies resolved = resolveRolePolicies(roleEntity, requestContext);
+      Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(roleEntity, requestContext);
+      if (!resolution.isPresent()) {
+        unreadableRoleIds.add(roleId);
+        continue;
+      }
+      ResolvedRolePolicies resolved = resolution.get();
 
       if (!replaceRolePolicies(roleId, dbUpdatedAt, resolved)) {
         // Another request completed this version (or a newer one) while this request was resolving
@@ -1856,9 +1861,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * ResolvedRolePolicies#getUnresolvedObjects()} rather than silently dropped. That normally means
    * the object has been dropped while the role still references it. Transient normalization
    * failures also leave the role incomplete, but require a conservative catalog-scoped guard for
-   * DENY privileges. The caller records a loaded marker only when all objects were resolved.
+   * DENY privileges. If that guard cannot be installed, returns empty so the caller marks the role
+   * unreadable without publishing any of its policies. The caller records a loaded marker only when
+   * all objects were resolved.
    */
-  private ResolvedRolePolicies resolveRolePolicies(
+  private Optional<ResolvedRolePolicies> resolveRolePolicies(
       RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     String roleIdStr = String.valueOf(roleEntity.id());
@@ -1874,9 +1881,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Optional<Long> metadataId = resolution.metadataId();
       if (!metadataId.isPresent()) {
         unresolvedObjects.add(securableObject.type().name() + ":" + securableObject.fullName());
-        if (resolution.normalizationFailed()) {
-          addUnresolvedDenyPolicies(
-              securableObject, metalake, roleIdStr, requestContext, allowRows, denyRows);
+        if (resolution.normalizationFailed()
+            && !addUnresolvedDenyPolicies(
+                securableObject, metalake, roleIdStr, requestContext, allowRows, denyRows)) {
+          return Optional.empty();
         }
         continue;
       }
@@ -1888,10 +1896,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           allowRows,
           denyRows);
     }
-    return new ResolvedRolePolicies(allowRows, denyRows, unresolvedObjects);
+    return Optional.of(new ResolvedRolePolicies(allowRows, denyRows, unresolvedObjects));
   }
 
-  private void addUnresolvedDenyPolicies(
+  private boolean addUnresolvedDenyPolicies(
       SecurableObject object,
       String metalake,
       String roleId,
@@ -1903,7 +1911,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .filter(privilege -> privilege.condition() == Privilege.Condition.DENY)
             .collect(Collectors.toList());
     if (denies.isEmpty()) {
-      return;
+      return true;
     }
     // An unresolved child DENY must not disappear while an ancestor or another role grants
     // ALLOW. Conservatively deny the same privileges throughout its catalog until the existing
@@ -1919,12 +1927,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // Without a catalog ID even a catalog-scoped guard cannot be installed safely. A missing
       // catalog makes normalization report a missing object instead, so this is only reachable
       // when the catalog is dropped between the two lookups. Skipping the DENY could drop it for
-      // a catalog recreated under the same name, so fail this load; the next request retries.
-      throw new IllegalStateException(
-          "Cannot resolve catalog for unresolved deny policy on " + object.fullName());
+      // a catalog recreated under the same name. Mark the role unreadable and publish none of
+      // its policies; the next request retries.
+      LOG.warn("Cannot resolve catalog for unresolved deny policy on {}", object.fullName());
+      return false;
     }
     addPolicyRows(
         roleId, MetadataObject.Type.CATALOG, catalogId.get(), denies, allowRows, denyRows);
+    return true;
   }
 
   private static void addPolicyRows(
