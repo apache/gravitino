@@ -31,6 +31,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -65,6 +66,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestAccessControlManagerForPermissions {
@@ -180,6 +182,7 @@ public class TestAccessControlManagerForPermissions {
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.name()).thenReturn(CATALOG);
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     Mockito.when(catalogManager.listCatalogs(Mockito.any()))
         .thenReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "catalog")});
@@ -449,6 +452,73 @@ public class TestAccessControlManagerForPermissions {
         () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, notExist));
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"METALAKE", "CATALOG", "SCHEMA"})
+  void testSemanticModelPrivilegeUpdatesStayLocal(String scope) throws IOException {
+    MetadataObject.Type type = MetadataObject.Type.valueOf(scope);
+    String fullName =
+        type == MetadataObject.Type.METALAKE
+            ? METALAKE
+            : type == MetadataObject.Type.CATALOG ? CATALOG : CATALOG + "." + SCHEMA;
+    MetadataObject object = MetadataObjects.parse(fullName, type);
+    String name = "semantic_updates_" + scope;
+    entityStore.put(
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(List.of())
+            .build(),
+        false);
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    Privilege semantic = Privileges.SelectSemanticModel.allow();
+    Privilege table = Privileges.SelectTable.allow();
+    SecurableObject tableObject = SecurableObjects.parse(fullName, type, List.of(table));
+    SecurableObject semanticObject = SecurableObjects.parse(fullName, type, List.of(semantic));
+    SecurableObject mixed = SecurableObjects.parse(fullName, type, List.of(semantic, table));
+    reset(authorizationPlugin);
+    Role semanticRole =
+        manager.grantPrivilegesToRole(
+            METALAKE, name, object, Set.of(semantic, Privileges.CreateSemanticModel.allow()));
+    Assertions.assertEquals(
+        Set.of(semantic, Privileges.CreateSemanticModel.allow()),
+        Set.copyOf(semanticRole.securableObjects().get(0).privileges()));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(table));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    manager.grantPrivilegesToRole(
+        METALAKE, name, object, Set.of(Privileges.ModifySemanticModel.allow()));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(table));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(mixed));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    SecurableObject modifiedTable =
+        SecurableObjects.parse(fullName, type, List.of(Privileges.ModifyTable.allow()));
+    manager.overridePrivilegesInRole(
+        METALAKE,
+        name,
+        List.of(
+            SecurableObjects.parse(
+                fullName, type, List.of(semantic, Privileges.ModifyTable.allow()))));
+    assertConnectorChange(RoleChange.updateSecurableObject(name, tableObject, modifiedTable));
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(semanticObject));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, modifiedTable));
+    manager.overridePrivilegesInRole(METALAKE, name, List.of());
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(semanticObject));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(semantic, table));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic, table));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
+  }
+
   @Test
   public void testGrantPrivilegeToRole() {
     reset(authorizationPlugin);
@@ -640,5 +710,23 @@ public class TestAccessControlManagerForPermissions {
     } else {
       manager.revokeRolesFromUser(METALAKE, roles, USER);
     }
+  }
+
+  private void assertConnectorChange(RoleChange expected) {
+    ArgumentCaptor<Role> role = ArgumentCaptor.forClass(Role.class);
+    ArgumentCaptor<RoleChange> change = ArgumentCaptor.forClass(RoleChange.class);
+    verify(authorizationPlugin).onRoleUpdated(role.capture(), change.capture());
+    Assertions.assertEquals(expected, change.getValue());
+    role.getValue()
+        .securableObjects()
+        .forEach(
+            object ->
+                object
+                    .privileges()
+                    .forEach(
+                        privilege ->
+                            Assertions.assertFalse(
+                                privilege.name().name().endsWith("SEMANTIC_MODEL"))));
+    reset(authorizationPlugin);
   }
 }

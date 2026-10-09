@@ -63,7 +63,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
@@ -122,8 +122,18 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 An unconstrained `Numeric` column, that is one declared without precision and scale, accepts values of up to
 131072 digits before and 16383 digits after the decimal point, and its precision and scale vary per row.
 Gravitino `Decimal` caps precision at 38 and is fixed per column, so such a column is mapped to the External
-Type `numeric` instead. A `Numeric(p, s)` column is mapped to `Decimal(p, s)` and a `Numeric(p)` column to
-`Decimal(p, 0)` as usual.
+Type `numeric` instead. A `Numeric(p, s)` column maps to `Decimal(p, s)` when `p` is at most 38
+and `s` is between 0 and `p`. Other constrained declarations, such as `numeric(39,0)`,
+`numeric(2,-3)`, and `numeric(3,5)`, map to External Types preserving their precision and scale.
+A `Numeric(p)` column follows the same rules with scale 0.
+
+The Spark JDBC, Trino PostgreSQL, and Flink connectors map these External Types to strings
+(`StringType`, unbounded `VARCHAR`, and `STRING`, respectively), using the fallback added in
+[PR #13042](https://github.com/apache/gravitino/pull/13042). This keeps schema type conversion
+from failing, but does not expose native decimal semantics in those engines. Consumers needing
+numeric operations must choose an explicit conversion compatible with their data and engine;
+Gravitino does not clamp precision or round scale to fit `Decimal`. Supported `Numeric(p, s)`
+columns continue to map to native decimal types.
 
 PostgreSQL array elements always accept NULL and cannot be declared otherwise, so an `Array` column is always
 mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and

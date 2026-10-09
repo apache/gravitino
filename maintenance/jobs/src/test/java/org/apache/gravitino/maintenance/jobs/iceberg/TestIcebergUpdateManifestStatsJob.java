@@ -51,7 +51,7 @@ class TestIcebergUpdateManifestStatsJob {
     assertTrue(
         template
             .arguments()
-            .containsAll(Arrays.asList("--spec-id", "{{spec_id}}", "--updater-options")));
+            .containsAll(Arrays.asList("--spec-id", "{{spec_id:-}}", "--updater-options")));
     assertFalse(template.arguments().contains("--update-mode"));
     assertEquals("v1", template.customFields().get("version"));
     assertTrue(template.configs().containsKey("spark.sql.extensions"));

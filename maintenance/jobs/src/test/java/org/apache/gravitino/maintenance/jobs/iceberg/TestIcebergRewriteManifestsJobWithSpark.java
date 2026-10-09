@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.maintenance.jobs.TemplateArguments;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler;
@@ -258,18 +259,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     if (caching != null) {
       jobConf.put("use_caching", caching);
     }
-    // Model JobManager's template substitution, including unresolved optional values.
-    return new IcebergRewriteManifestsJob()
-        .jobTemplate().arguments().stream()
-            .map(
-                value -> {
-                  String resolved = value;
-                  for (Map.Entry<String, String> entry : jobConf.entrySet()) {
-                    resolved = resolved.replace("{{" + entry.getKey() + "}}", entry.getValue());
-                  }
-                  return resolved;
-                })
-            .toArray(String[]::new);
+    return TemplateArguments.resolve(new IcebergRewriteManifestsJob().jobTemplate(), jobConf);
   }
 
   private void startSpark() {

@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.jobs.TemplateArguments;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
@@ -182,17 +183,7 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
       conf.put("spark_conf", "{}");
     }
     String[] arguments =
-        new IcebergUpdateManifestStatsJob()
-            .jobTemplate().arguments().stream()
-                .map(
-                    argument -> {
-                      String value = argument;
-                      for (Map.Entry<String, String> entry : conf.entrySet()) {
-                        value = value.replace("{{" + entry.getKey() + "}}", entry.getValue());
-                      }
-                      return value;
-                    })
-                .toArray(String[]::new);
+        TemplateArguments.resolve(new IcebergUpdateManifestStatsJob().jobTemplate(), conf);
     IcebergUpdateManifestStatsJob.main(arguments);
     RecordingStatisticsUpdater updater = RecordingStatisticsUpdater.lastCreated;
     assertEquals(1, updater.mergeCalls);

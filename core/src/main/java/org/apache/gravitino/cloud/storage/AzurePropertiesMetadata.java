@@ -32,6 +32,7 @@ public class AzurePropertiesMetadata {
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
               AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+              // Intentionally non-hidden: the account name already appears in abfss:// URIs.
               stringOptionalPropertyEntry(
                   AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
                   "Azure storage account name",

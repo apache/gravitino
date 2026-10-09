@@ -64,11 +64,11 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
                 "--table",
                 "{{table_identifier}}",
                 "--spec-id",
-                "{{spec_id}}",
+                "{{spec_id:-}}",
                 "--updater-options",
                 "{{updater_options}}",
                 "--spark-conf",
-                "{{spark_conf}}"))
+                "{{spark_conf:-}}"))
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v1"))
         .build();

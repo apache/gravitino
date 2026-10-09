@@ -56,6 +56,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -70,6 +72,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -579,7 +582,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
+      // Overwrite only with the id stored in the catalog: it identifies the table, so a row under
+      // the same name with another id is stale and gets replaced. A generated id identifies
+      // nothing, so a row that appeared meanwhile, e.g. from a concurrent import on another node,
+      // must win. The plain insert then conflicts, and loadTable reloads that row.
+      store.put(tableEntity, stringId != null);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
@@ -766,7 +773,32 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         && Objects.equal(left.comment(), right.comment())
         && left.nullable() == right.nullable()
         && left.autoIncrement() == right.autoIncrement()
-        && Objects.equal(left.defaultValue(), right.defaultValue());
+        && isSameDefaultValue(left.defaultValue(), right.defaultValue());
+  }
+
+  @VisibleForTesting
+  static boolean isSameDefaultValue(@Nullable Expression left, @Nullable Expression right) {
+    if (Objects.equal(left, right)) {
+      return true;
+    }
+
+    // Connector snapshots use DTOs, while relational storage restores API expressions. Compare
+    // their persisted representation rather than implementation-specific equals methods.
+    try {
+      return Objects.equal(toDefaultValueArg(left), toDefaultValueArg(right));
+    } catch (IllegalArgumentException e) {
+      // A default value that cannot be converted is treated as changed instead of failing the
+      // comparison.
+      LOG.debug("Failed to compare column default values {} and {}", left, right, e);
+      return false;
+    }
+  }
+
+  @Nullable
+  private static FunctionArg toDefaultValueArg(@Nullable Expression expression) {
+    return expression == null || expression.equals(Column.DEFAULT_VALUE_NOT_SET)
+        ? null
+        : DTOConverters.toFunctionArg(expression);
   }
 
   private String columnDifferenceContent(
@@ -802,7 +834,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               "autoIncrement[catalog=%s, store=%s]",
               catalogColumn.autoIncrement(), entityColumn.autoIncrement()));
     }
-    if (!Objects.equal(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
+    if (!isSameDefaultValue(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
       differences.add(
           String.format(
               "defaultValue[catalog=%s, store=%s]",

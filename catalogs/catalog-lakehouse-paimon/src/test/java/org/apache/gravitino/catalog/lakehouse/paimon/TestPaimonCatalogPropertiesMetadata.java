@@ -35,16 +35,16 @@ public class TestPaimonCatalogPropertiesMetadata {
   @Test
   void testSensitivePropertiesAreHidden() {
     assertTrue(metadata.isHiddenProperty(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD));
-    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    assertFalse(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
     assertTrue(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
-    assertFalse(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
-    // REST bearer token and DLF secrets are hidden; DLF access-key-id matches OSS/S3 (visible).
+    // REST bearer token and DLF credential keys (including access-key-id) are hidden.
     assertTrue(metadata.isHiddenProperty(PaimonConstants.TOKEN));
-    assertFalse(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
     assertTrue(metadata.isHiddenProperty(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
   }

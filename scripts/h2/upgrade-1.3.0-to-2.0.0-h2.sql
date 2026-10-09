@@ -26,29 +26,29 @@
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
 
-ALTER TABLE `model_meta` ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`;
-ALTER TABLE `model_meta` ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
+ALTER TABLE `model_meta` ADD COLUMN IF NOT EXISTS `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`;
+ALTER TABLE `model_meta` ADD COLUMN IF NOT EXISTS `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
 
-ALTER TABLE `tag_meta` ADD COLUMN `allowed_values` CLOB DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
+ALTER TABLE `tag_meta` ADD COLUMN IF NOT EXISTS `allowed_values` CLOB DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
 
-ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_del`;
+ALTER TABLE `tag_relation_meta` DROP CONSTRAINT IF EXISTS `uk_ti_mi_del`;
 
-ALTER TABLE `tag_relation_meta` ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
+ALTER TABLE `tag_relation_meta` ADD COLUMN IF NOT EXISTS `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
 
-ALTER TABLE `idp_user_meta` ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
+ALTER TABLE `idp_user_meta` ADD COLUMN IF NOT EXISTS `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
 
-ALTER TABLE `idp_group_meta` ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
+ALTER TABLE `idp_group_meta` ADD COLUMN IF NOT EXISTS `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
 
-ALTER TABLE `idp_user_meta` ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp user audit info' AFTER `enabled`;
+ALTER TABLE `idp_user_meta` ADD COLUMN IF NOT EXISTS `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp user audit info' AFTER `enabled`;
 
-ALTER TABLE `idp_group_meta` ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp group audit info' AFTER `group_comment`;
+ALTER TABLE `idp_group_meta` ADD COLUMN IF NOT EXISTS `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp group audit info' AFTER `group_comment`;
 
-ALTER TABLE `idp_user_group_rel` ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp user group relation audit info' AFTER `group_id`;
+ALTER TABLE `idp_user_group_rel` ADD COLUMN IF NOT EXISTS `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'idp user group relation audit info' AFTER `group_id`;
 
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
 
-ALTER TABLE `job_run_meta` ADD COLUMN `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at' AFTER `job_run_status`;
+ALTER TABLE `job_run_meta` ADD COLUMN IF NOT EXISTS `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at' AFTER `job_run_status`;
 
 CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB;
 
-ALTER TABLE `job_run_meta` ADD COLUMN `runtime_job_template` CLOB DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
+ALTER TABLE `job_run_meta` ADD COLUMN IF NOT EXISTS `runtime_job_template` CLOB DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
 
 CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
@@ -114,3 +114,15 @@ UPDATE `owner_meta`
           AND d.`metadata_object_id` = `owner_meta`.`metadata_object_id`
           AND d.`metadata_object_type` = `owner_meta`.`metadata_object_type`
       );
+
+-- Separate the optimistic-concurrency token from the history version for fileset and policy.
+-- Until now `current_version` served as both: it is the join key into `*_version_info` and the
+-- value the CAS compares, so every alter had to advance it and write a snapshot even when nothing
+-- in that snapshot changed. `occ_version` takes over the CAS; `current_version` again advances
+-- only when the stored snapshot changes. The default is the whole backfill, because `occ_version`
+-- is only ever compared against itself on the same row.
+ALTER TABLE `fileset_meta`
+    ADD COLUMN IF NOT EXISTS `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset optimistic concurrency version' AFTER `last_version`;
+
+ALTER TABLE `policy_meta`
+    ADD COLUMN IF NOT EXISTS `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version' AFTER `last_version`;
