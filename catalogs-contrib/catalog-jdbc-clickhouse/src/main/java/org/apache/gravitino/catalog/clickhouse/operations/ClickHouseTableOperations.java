@@ -761,18 +761,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
     validateTableSettingChanges(changes);
-    LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
-    try (Connection connection = getConnection(databaseName)) {
-      String sql = generateAlterTableSql(databaseName, tableName, changes);
-      if (StringUtils.isEmpty(sql)) {
-        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-        return;
-      }
-      JdbcConnectorUtils.executeUpdate(connection, sql);
-      LOG.info("Alter table {} from database {}", tableName, databaseName);
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
-    }
+    super.alterTable(databaseName, tableName, changes);
   }
 
   @Override
