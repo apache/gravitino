@@ -152,7 +152,17 @@ public class DataSourceUtils {
     String password = jdbcConfig.getPassword();
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
-    basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
+    // Preserve maxIdle supplied through the existing DBCP bypass unless the canonical setting is
+    // explicitly configured. The canonical default applies to catalogs without either setting.
+    if (jdbcConfig.getAllConfig().containsKey(JdbcConfig.POOL_MAX_IDLE.getKey())
+        || !jdbcConfig.getAllConfig().containsKey("maxIdle")) {
+      basicDataSource.setMaxIdle(jdbcConfig.getPoolMaxIdle());
+    }
+    int maxIdle = basicDataSource.getMaxIdle();
+    basicDataSource.setMinIdle(
+        maxIdle >= 0
+            ? Math.min(jdbcConfig.getPoolMinSize(), maxIdle)
+            : jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be
     // executed to confirm whether the connection is valid.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());

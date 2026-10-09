@@ -41,15 +41,16 @@ more details.
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Doris catalog has the following properties:
 
-| Configuration item      | Description                                                                                       | Default value | Required |
-|-------------------------|---------------------------------------------------------------------------------------------------|---------------|----------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`               | (none)        | Yes      |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                          | (none)        | Yes      |
-| `jdbc-user`             | The JDBC user name.                                                                               | (none)        | Yes      |
-| `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                      | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                 | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No       |
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
