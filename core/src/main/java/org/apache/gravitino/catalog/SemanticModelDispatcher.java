@@ -20,9 +20,9 @@ package org.apache.gravitino.catalog;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieDocumentConverter;
+import org.apache.gravitino.semantic.OssieDocumentConverter.ImportedSemanticModel;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
@@ -38,12 +38,12 @@ public interface SemanticModelDispatcher extends SemanticModelCatalog {
    */
   @Override
   default SemanticModel importOssieDocument(Namespace namespace, OssieDocument document) {
-    SemanticModelCreateRequest request = OssieDocumentConverter.importDocument(document);
+    ImportedSemanticModel model = OssieDocumentConverter.importDocument(document);
     return createSemanticModel(
-        NameIdentifier.of(namespace, request.getName()),
-        request.getComment(),
-        request.toDefinition(),
-        request.getProperties());
+        NameIdentifier.of(namespace, model.name()),
+        model.comment(),
+        model.definition(),
+        model.properties());
   }
 
   /**

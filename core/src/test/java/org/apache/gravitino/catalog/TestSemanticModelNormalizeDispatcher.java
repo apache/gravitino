@@ -161,7 +161,7 @@ public class TestSemanticModelNormalizeDispatcher {
     OssieDocument document = dispatcher.exportOssieDocument(INPUT_IDENT, OssieFormat.JSON);
 
     assertEquals(OssieFormat.JSON, document.format());
-    assertEquals("SalesModel", OssieDocumentConverter.importDocument(document).getName());
+    assertEquals("SalesModel", OssieDocumentConverter.importDocument(document).name());
     verify(delegate).loadSemanticModel(NORMALIZED_IDENT);
     verifyNoMoreInteractions(delegate);
   }
