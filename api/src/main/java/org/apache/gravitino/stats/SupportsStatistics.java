@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 
 /**
@@ -44,7 +45,13 @@ public interface SupportsStatistics {
    * unmodifiable, it will throw an UnmodifiableStatisticException. If the statistic name is
    * illegal, it will throw an IllegalStatisticNameException.
    *
+   * <p>For Gravitino-managed table statistics, a concurrent creation or modification can fail the
+   * entire update with {@link OptimisticLockException}. No part of that update is committed; retry
+   * the operation against the current state.
+   *
    * @param statistics a map of statistic names to their values
+   * @throws OptimisticLockException if a Gravitino-managed table statistic was concurrently created
+   *     or modified
    */
   void updateStatistics(Map<String, StatisticValue<?>> statistics)
       throws UnmodifiableStatisticException, IllegalStatisticNameException;
@@ -53,9 +60,16 @@ public interface SupportsStatistics {
    * Drop statistics by their names. If the statistic is unmodifiable, it will throw an
    * UnmodifiableStatisticException.
    *
+   * <p>For Gravitino-managed table statistics, a concurrent modification or same-name replacement
+   * can fail the entire drop with {@link OptimisticLockException}. No part of that drop is
+   * committed; retry the operation against the current state. A statistic already removed by
+   * another drop is not a conflict and is not counted as dropped by this call.
+   *
    * @param statistics a list of statistic names to be dropped
    * @return true if the statistics were successfully dropped, false if no statistics were dropped
    * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
+   * @throws OptimisticLockException if a Gravitino-managed table statistic was concurrently
+   *     modified or replaced
    */
   boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException;
 }
