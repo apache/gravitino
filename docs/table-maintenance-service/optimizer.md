@@ -84,7 +84,7 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 ### Prerequisites
 
 - A running Gravitino server with a metalake. The examples use `test`.
-- Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- Spark available to the job executor. The [local job executor](../local-job-executor.md) needs either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`, and the [Kubernetes job executor](../k8s-job-executor.md) needs a Spark image.
 - An Iceberg Spark runtime on that Spark classpath. Built-in Iceberg templates configure
   `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
   Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
