@@ -102,26 +102,24 @@ The server-level `gravitino.fetchFile.blockUnsafeRemoteUri` configuration contro
 
 #### Auxiliary Service
 
-| Configuration item                              | Description                                                                                                                                                                                                                                           | Default value | Required    |
-|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------|
-| `gravitino.auxService.names`                    | The auxiliary services to start. Select either `iceberg-rest` or `iceberg-rest-experimental`, but not both.                                                                                                                                           | (none)        | Yes         |
-| `gravitino.iceberg-rest.classpath`              | The stable Iceberg REST service classpath. It supports absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf`.                                                                                                | (none)        | Conditional |
-| `gravitino.iceberg-rest-experimental.classpath` | The experimental Iceberg REST service classpath. It supports absolute and relative paths, for example, `iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf`.                                                                | (none)        | Conditional |
+| Configuration item                 | Description                                                                                                                                                                                                                                                                                                                                 | Default value | Required |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                                                                                                                           | (none)        | Yes      |
+| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service. Use `iceberg-rest-server/libs, iceberg-rest-server/conf` for the regular Iceberg dependencies or `iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf` for the experimental dependencies. It supports both absolute and relative paths. | (none)        | Yes      |
 
 These settings apply only to `gravitino.conf`.
 Do not add them to the standalone server configuration.
 
-The experimental service inherits the regular `gravitino.iceberg-rest.*` settings. A setting under
-`gravitino.iceberg-rest-experimental.*` overrides the corresponding regular setting. Usually only
-the auxiliary service name and classpath need to change:
+The auxiliary service name and all Iceberg REST configuration keys remain the same when using the
+experimental dependencies. Only select the experimental classpath:
 
 ```properties
-gravitino.auxService.names = iceberg-rest-experimental
-gravitino.iceberg-rest-experimental.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
+gravitino.auxService.names = iceberg-rest
+gravitino.iceberg-rest.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
 ```
 
-The stable and experimental services use separate isolated classloaders and library directories.
-The experimental directory uses the Datastrato Iceberg distribution published under the
+The selected directory is loaded by the Iceberg REST auxiliary service's isolated classloader. The
+experimental directory uses the Datastrato Iceberg distribution published under the
 `com.datastrato` Maven group. Its version is pinned by `datastrato-iceberg` in
 `gradle/libs.versions.toml`, independently of the regular Iceberg version.
 
