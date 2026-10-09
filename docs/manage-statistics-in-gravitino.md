@@ -24,6 +24,10 @@ may reserve later.
 Updating creates a statistic that does not exist and overwrites one that does. Reserved statistics
 maintained by the system are not modifiable and the request is rejected.
 
+Concurrent creation or modification of the same statistic can return HTTP 409. The entire update
+batch is rolled back on a conflict; retry the operation against the current state. If the target
+table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
@@ -73,6 +77,11 @@ List<Statistic> statistics = orders.supportsStatistics().listStatistics();
 </Tabs>
 
 ### Drop Statistics
+
+Dropping a statistic that another request has already removed is not a conflict. If a statistic
+was updated or deleted and recreated after the drop read it, the request can return HTTP 409 and
+the entire drop batch is rolled back. Retry against the current state. If the target table was
+deleted or replaced while dropping existing statistics, the request fails with HTTP 404.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

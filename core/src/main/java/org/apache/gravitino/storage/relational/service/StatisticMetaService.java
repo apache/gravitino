@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -84,7 +85,7 @@ public class StatisticMetaService {
    * read them, and missing statistics are inserted only if nobody created them meanwhile; both
    * cases otherwise fail the whole batch with {@link OptimisticLockException}. The target is fenced
    * in the same transaction, so a target dropped or replaced after its ID was resolved fails with
-   * {@link org.apache.gravitino.exceptions.NoSuchEntityException}.
+   * {@link NoSuchEntityException}.
    *
    * @param statisticEntities the statistics to write; names must be unique in the batch
    * @param entity the metadata object that owns the statistics
@@ -123,6 +124,8 @@ public class StatisticMetaService {
     SessionUtils.doMultipleWithCommit(
         () -> {
           LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
+          // Execute each CAS separately: a batch executor may report SUCCESS_NO_INFO rather than
+          // the per-row counts needed to detect conflicts (for example, MySQL batch rewriting).
           for (StatisticPO po : pos) {
             StatisticPO old = previous.get(po.getStatisticName());
             int updated;
@@ -154,7 +157,9 @@ public class StatisticMetaService {
    *
    * <p>Each statistic is deleted only at the version this call read. A statistic that was changed
    * meanwhile fails the whole batch with {@link OptimisticLockException}; one that a concurrent
-   * drop already removed is not counted, like a name that does not exist.
+   * drop already removed is not counted, like a name that does not exist. A same-name replacement
+   * is a conflict even if its version matches the deleted row. A target dropped or replaced after
+   * its ID was resolved fails with {@link NoSuchEntityException} when there are rows to delete.
    *
    * @param identifier the metadata object that owns the statistics
    * @param type the metadata object type

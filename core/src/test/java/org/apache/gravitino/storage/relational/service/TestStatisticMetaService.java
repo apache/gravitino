@@ -25,6 +25,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -159,6 +161,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     }
   }
 
+  /** Verifies stale mapper updates and deletes cannot change a newer statistic version. */
   @TestTemplate
   public void testStatisticVersionCompareAndSet() throws Exception {
     String metalake = "statistic_cas_metalake";
@@ -330,6 +333,136 @@ public class TestStatisticMetaService extends TestJDBCBackend {
                 .batchDeleteStatisticPOs(
                     table.nameIdentifier(), Entity.EntityType.TABLE, List.of("test")));
     Assertions.assertEquals(4L, singleStatisticValue(table));
+  }
+
+  /** Verifies a late write conflict rolls back earlier updates and inserts in the batch. */
+  @TestTemplate
+  public void testStatisticWriteConflictRollsBackWholeBatch() throws Exception {
+    TableEntity table = createBatchConflictTable("write");
+    StatisticEntity unchanged = createNamedStatistic("a_existing", 10L);
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(unchanged, createStatisticEntity(AUDIT_INFO, 1L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    OptimisticLockException conflict =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                updateAfterSnapshot(table, AUDIT_INFO, 2L)
+                    .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                        // Deliberately unsorted: the conflicting name must execute last.
+                        List.of(
+                            createStatisticEntity(AUDIT_INFO, 3L),
+                            createNamedStatistic("b_new", 30L),
+                            createNamedStatistic("a_existing", 20L)),
+                        table.nameIdentifier(),
+                        Entity.EntityType.TABLE));
+    assertStatisticConflict(conflict, table);
+    Map<String, StatisticEntity> remaining = statisticsByName(table);
+    Assertions.assertEquals(2, remaining.size());
+    Assertions.assertEquals(unchanged.fields(), remaining.get("a_existing").fields());
+    Assertions.assertEquals(2L, remaining.get("test").value().value());
+  }
+
+  /** Verifies a late delete conflict restores statistics deleted earlier in the batch. */
+  @TestTemplate
+  public void testStatisticDeleteConflictRollsBackWholeBatch() throws Exception {
+    TableEntity table = createBatchConflictTable("delete");
+    StatisticEntity unchanged = createNamedStatistic("a_existing", 10L);
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(unchanged, createStatisticEntity(AUDIT_INFO, 1L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    OptimisticLockException conflict =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                updateAfterSnapshot(table, AUDIT_INFO, 2L)
+                    .batchDeleteStatisticPOs(
+                        table.nameIdentifier(),
+                        Entity.EntityType.TABLE,
+                        List.of("test", "a_existing")));
+    assertStatisticConflict(conflict, table);
+    Map<String, StatisticEntity> remaining = statisticsByName(table);
+    Assertions.assertEquals(2, remaining.size());
+    Assertions.assertEquals(unchanged.fields(), remaining.get("a_existing").fields());
+    Assertions.assertEquals(2L, remaining.get("test").value().value());
+  }
+
+  /** Verifies a stale write or delete cannot affect a same-name replacement at version one. */
+  @TestTemplate
+  public void testRecreatedStatisticIsNotChangedByStaleWriteOrDelete() throws Exception {
+    TableEntity table = createBatchConflictTable("recreated");
+    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        List.of(createStatisticEntity(AUDIT_INFO, 1L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+    for (boolean delete : List.of(false, true)) {
+      StatisticEntity replacement = createStatisticEntity(AUDIT_INFO, 2L);
+      StatisticMetaService staleService =
+          new StatisticMetaService() {
+            @Override
+            List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+              List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
+              Assertions.assertEquals(1L, rows.get(0).getCurrentVersion());
+              Assertions.assertEquals(
+                  1,
+                  statisticMetaService.batchDeleteStatisticPOs(
+                      table.nameIdentifier(), Entity.EntityType.TABLE, names));
+              statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                  List.of(replacement), table.nameIdentifier(), Entity.EntityType.TABLE);
+              return rows;
+            }
+          };
+      OptimisticLockException conflict =
+          Assertions.assertThrows(
+              OptimisticLockException.class,
+              () -> {
+                if (delete) {
+                  staleService.batchDeleteStatisticPOs(
+                      table.nameIdentifier(), Entity.EntityType.TABLE, List.of("test"));
+                } else {
+                  staleService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                      List.of(createStatisticEntity(AUDIT_INFO, 3L)),
+                      table.nameIdentifier(),
+                      Entity.EntityType.TABLE);
+                }
+              });
+      assertStatisticConflict(conflict, table);
+      Assertions.assertEquals(replacement.fields(), statisticsByName(table).get("test").fields());
+    }
+  }
+
+  private TableEntity createBatchConflictTable(String suffix) throws Exception {
+    String metalake = "batch_conflict_metalake_" + suffix;
+    String catalog = "batch_conflict_catalog";
+    String schema = "batch_conflict_schema";
+    createParentEntities(metalake, catalog, schema, AUDIT_INFO);
+    return createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "batch_conflict");
+  }
+
+  private StatisticEntity createNamedStatistic(String name, long value) {
+    return TableStatisticEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withValue(StatisticValues.longValue(value))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private Map<String, StatisticEntity> statisticsByName(TableEntity table) {
+    return statisticMetaService
+        .listStatisticsByEntity(table.nameIdentifier(), Entity.EntityType.TABLE)
+        .stream()
+        .collect(Collectors.toMap(StatisticEntity::name, statistic -> statistic));
+  }
+
+  private void assertStatisticConflict(OptimisticLockException conflict, TableEntity table) {
+    Assertions.assertTrue(conflict.getMessage().contains("test"));
+    Assertions.assertTrue(conflict.getMessage().contains(table.nameIdentifier().toString()));
+    Assertions.assertTrue(conflict.getMessage().contains("retry the operation"));
   }
 
   private StatisticMetaService updateAfterSnapshot(
