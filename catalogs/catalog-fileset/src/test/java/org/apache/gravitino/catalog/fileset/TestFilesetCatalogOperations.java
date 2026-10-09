@@ -56,6 +56,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
@@ -150,9 +151,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -166,6 +170,9 @@ public class TestFilesetCatalogOperations {
       "/tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
 
   private static final String TEST_ROOT_PATH = "file:" + UNFORMALIZED_TEST_ROOT_PATH;
+
+  private static final NameIdentifier PATH_VALIDATION_FILESET =
+      NameIdentifier.of("metalake", "catalog", "schema", "fileset");
 
   private static final HasPropertyMetadata FILESET_PROPERTIES_METADATA =
       new HasPropertyMetadata() {
@@ -1925,6 +1932,172 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "..",
+        "../outside",
+        "/../outside",
+        "/dir/../../outside",
+        "dir/../file",
+        " /../outside ",
+        "/..\\outside",
+        "\\..\\outside",
+        "/dir\\..\\outside",
+        "/file\u0000name",
+        "\u0000file",
+        "/file\u0000"
+      })
+  void testRejectUnsafeSubPaths(String subPath) throws IOException {
+    try (FilesetCatalogOperations operations =
+        pathValidationOperations(mockFilesetForPathValidation())) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.getFileLocation(PATH_VALIDATION_FILESET, subPath, null));
+      Mockito.verify(operations, Mockito.never()).getFileSystemWithCache(any(), any());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("validLocations")
+  void testPreserveValidLocations(String storageLocation, String subPath, String expected)
+      throws IOException {
+    Fileset fileset = mockFilesetForPathValidation();
+    when(fileset.storageLocations()).thenReturn(ImmutableMap.of("primary", storageLocation));
+    try (FilesetCatalogOperations operations = pathValidationOperations(fileset)) {
+      Assertions.assertEquals(
+          expected, operations.getFileLocation(PATH_VALIDATION_FILESET, subPath, null));
+      Mockito.verify(operations, Mockito.never()).getFileSystemWithCache(any(), any());
+    }
+  }
+
+  @Test
+  void testSelectedLocationDefinesBoundary() throws IOException {
+    Fileset fileset = mockFilesetForPathValidation();
+    when(fileset.storageLocations())
+        .thenReturn(
+            ImmutableMap.of(
+                "primary", "s3a://bucket/primary", "archive", "hdfs://namenode:8020/archive"));
+    try (FilesetCatalogOperations operations = pathValidationOperations(fileset)) {
+      Assertions.assertEquals(
+          "s3a://bucket/primary/data",
+          operations.getFileLocation(PATH_VALIDATION_FILESET, "/data", null));
+      Assertions.assertEquals(
+          "hdfs://namenode:8020/archive/data",
+          operations.getFileLocation(PATH_VALIDATION_FILESET, "/data", "archive"));
+      for (String location : fileset.storageLocations().keySet()) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> operations.getFileLocation(PATH_VALIDATION_FILESET, "/../outside", location));
+      }
+    }
+  }
+
+  @Test
+  void testRejectAuthorityChangeAtFilesystemRoot() throws IOException {
+    Fileset fileset = mockFilesetForPathValidation();
+    when(fileset.storageLocations()).thenReturn(ImmutableMap.of("primary", "/"));
+    try (FilesetCatalogOperations operations = pathValidationOperations(fileset)) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.getFileLocation(PATH_VALIDATION_FILESET, "//other-host/outside", null));
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(FilesetDataOperation.class)
+  void testOperationHeadersCannotBypassValidation(FilesetDataOperation operation)
+      throws IOException {
+    try (FilesetCatalogOperations operations =
+        pathValidationOperations(mockFilesetForPathValidation())) {
+      CallerContext.CallerContextHolder.set(
+          CallerContext.builder()
+              .withContext(
+                  ImmutableMap.of(
+                      FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION, operation.name()))
+              .build());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.getFileLocation(PATH_VALIDATION_FILESET, "/../outside", null));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "/", "/.", "/./", "//", "///"})
+  void testRenameCannotTargetRootAliases(String subPath) throws IOException {
+    try (FilesetCatalogOperations operations =
+        pathValidationOperations(mockFilesetForPathValidation())) {
+      CallerContext.CallerContextHolder.set(
+          CallerContext.builder()
+              .withContext(
+                  ImmutableMap.of(
+                      FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+                      FilesetDataOperation.RENAME.name()))
+              .build());
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class,
+          () -> operations.getFileLocation(PATH_VALIDATION_FILESET, subPath, null));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+  }
+
+  @Test
+  void testListFilesCannotReachSiblingSentinel(@TempDir File tempDir) throws IOException {
+    File root = new File(tempDir, "root");
+    File outside = new File(tempDir, "root-sibling");
+    Files.createDirectories(root.toPath());
+    Files.createDirectories(outside.toPath());
+    Files.writeString(new File(outside, "sentinel.txt").toPath(), "outside the fileset");
+    Fileset fileset = mockFilesetForPathValidation();
+    when(fileset.storageLocations())
+        .thenReturn(ImmutableMap.of("primary", root.toURI().toString()));
+
+    try (FilesetCatalogOperations operations = pathValidationOperations(fileset);
+        FileSystem fs = FileSystem.newInstanceLocal(new Configuration(false))) {
+      doReturn(Collections.emptyMap())
+          .when(operations)
+          .mergeUpLevelConfigurations(any(), any(), any());
+      doReturn(fs).when(operations).getFileSystemWithCache(any(), any());
+      Assertions.assertEquals(1, fs.listStatus(new Path(outside.toURI())).length);
+      Assertions.assertEquals(0, operations.listFiles(PATH_VALIDATION_FILESET, null, "/").length);
+      Mockito.clearInvocations(operations);
+
+      for (String subPath :
+          new String[] {"/../root-sibling", "/../root-sibling/sentinel.txt", "/../missing"}) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> operations.listFiles(PATH_VALIDATION_FILESET, null, subPath));
+      }
+      Mockito.verify(operations, Mockito.never()).mergeUpLevelConfigurations(any(), any(), any());
+      Mockito.verify(operations, Mockito.never()).getFileSystemWithCache(any(), any());
+    }
+  }
+
+  @Test
+  void testListFilesPreservesLiteralEncodedNames(@TempDir File tempDir) throws IOException {
+    File root = new File(tempDir, "root");
+    File child = new File(root, "%2e%2e");
+    Files.createDirectories(child.toPath());
+    Files.writeString(new File(child, "a..b + caf\u00e9.txt").toPath(), "inside the fileset");
+    Fileset fileset = mockFilesetForPathValidation();
+    when(fileset.storageLocations())
+        .thenReturn(ImmutableMap.of("primary", root.toURI().toString()));
+
+    try (FilesetCatalogOperations operations = pathValidationOperations(fileset);
+        FileSystem fs = FileSystem.newInstanceLocal(new Configuration(false))) {
+      doReturn(Collections.emptyMap())
+          .when(operations)
+          .mergeUpLevelConfigurations(any(), any(), any());
+      doReturn(fs).when(operations).getFileSystemWithCache(any(), any());
+      FileInfo[] files = operations.listFiles(PATH_VALIDATION_FILESET, null, "/%2e%2e");
+      Assertions.assertEquals(1, files.length);
+      Assertions.assertEquals("a..b + caf\u00e9.txt", files[0].name());
+    }
+  }
+
   @Test
   public void testGetFileLocation() throws IOException {
     final long testId = generateTestId();
@@ -2025,6 +2198,8 @@ public class TestFilesetCatalogOperations {
       CallerContext.CallerContextHolder.set(callerContext);
       Assertions.assertThrows(
           GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, ""));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
     }
 
     // test storage location end with "/"
@@ -3998,6 +4173,51 @@ public class TestFilesetCatalogOperations {
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secretManager.readSecret(filesetUrn));
     }
+  }
+
+  private static Stream<Arguments> validLocations() {
+    return Stream.of(
+        Arguments.of("file:///storage/fileset", "", "file:///storage/fileset"),
+        Arguments.of("file:///storage/fileset", "/", "file:///storage/fileset/"),
+        Arguments.of("file:///storage/fileset/", "dir/file", "file:///storage/fileset/dir/file"),
+        Arguments.of("file:///storage/fileset/.", "/child", "file:///storage/fileset/./child"),
+        Arguments.of("file:///storage/fileset", "/dir/file", "file:///storage/fileset/dir/file"),
+        Arguments.of("file:///storage/fileset", "/a..b", "file:///storage/fileset/a..b"),
+        Arguments.of(
+            "file:///storage/fileset", "/dir/./file", "file:///storage/fileset/dir/./file"),
+        Arguments.of("file:///storage/fileset", "/%2e%2e", "file:///storage/fileset/%2e%2e"),
+        Arguments.of("file:///storage/fileset", "/a + b", "file:///storage/fileset/a + b"),
+        Arguments.of("file:///", "/child", "file:///child"),
+        Arguments.of("/", "/child", "/child"),
+        Arguments.of("/storage/fileset", "child", "/storage/fileset/child"),
+        Arguments.of(
+            "hdfs://namenode:8020/fileset", "/child", "hdfs://namenode:8020/fileset/child"),
+        Arguments.of("s3a://bucket/prefix", "/child", "s3a://bucket/prefix/child"),
+        Arguments.of("s3a://bucket", "/child", "s3a://bucket/child"),
+        Arguments.of("s3a://bucket", "", "s3a://bucket"),
+        Arguments.of(
+            "abfs://container@account.dfs.core.windows.net/prefix",
+            "/child",
+            "abfs://container@account.dfs.core.windows.net/prefix/child"));
+  }
+
+  private Fileset mockFilesetForPathValidation() {
+    Fileset fileset = Mockito.mock(Fileset.class);
+    when(fileset.name()).thenReturn(PATH_VALIDATION_FILESET.name());
+    when(fileset.properties())
+        .thenReturn(ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "primary"));
+    when(fileset.storageLocations())
+        .thenReturn(ImmutableMap.of("primary", "file:///storage/fileset"));
+    return fileset;
+  }
+
+  private FilesetCatalogOperations pathValidationOperations(Fileset fileset) {
+    FilesetCatalogOperations operations =
+        Mockito.spy(
+            new FilesetCatalogOperations(
+                Mockito.mock(EntityStore.class), Mockito.mock(SecretManager.class)));
+    doReturn(fileset).when(operations).loadFileset(PATH_VALIDATION_FILESET);
+    return operations;
   }
 
   private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
