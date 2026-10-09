@@ -50,8 +50,8 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      // When the precision is unknown (the MySQL catalog reports it only with MySQL Connector/J
-      // 8.0.16 or later) fall back to the MySQL default fractional seconds precision of 0.
+      // Fall back to the MySQL default fractional seconds precision of 0 when the catalog does
+      // not report one.
       int precision =
           timestampType.hasPrecisionSet()
               ? toMySQLFractionalSecondsPrecision(timestampType.precision())
