@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -80,7 +81,11 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
    * @throws Exception if collection, persistence, or resource cleanup fails
    */
   public static void main(String[] args) throws Exception {
-    Map<String, String> arguments = IcebergJobUtils.parseArguments(args);
+    Map<String, String> arguments =
+        IcebergJobUtils.parseArguments(
+            args,
+            ImmutableSet.of("catalog", "table", "spec-id", "updater-options", "spark-conf"),
+            ImmutableSet.of("catalog", "table", "updater-options"));
     String catalog = arguments.get("catalog");
     String table = arguments.get("table");
     tableIdentifier(catalog, table);
@@ -100,6 +105,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       sparkConfigs.forEach(builder::config);
       SparkSession spark = builder.getOrCreate();
       try {
+        IcebergJobUtils.requireIcebergSparkRuntime();
         updateStatistics(spark, updater, catalog, table, specId);
       } finally {
         spark.stop();

@@ -89,7 +89,8 @@ class TestManifestRewriteStrategyHandler {
         context(
             PolicyContents.icebergRewriteManifests(null, null, null, null, false),
             statistics(100, 1));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> handler.initialize(context));
+    handler.initialize(context);
+    Assertions.assertFalse(handler.shouldTrigger());
     handler.initialize(context, 1);
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()

@@ -77,8 +77,9 @@ An explicitly configured policy spec must match the collection target.
 
 The adapter always submits the resolved ID, even if the table's default changes after collection.
 It never infers the default from map keys or resolves it again during evaluation. The standalone
-CLI rejects a policy without `spec_id`, because persisted per-spec maps do not identify the
-default from an earlier collection cycle.
+CLI skips a policy without `spec_id` and logs a warning, because persisted per-spec maps do not
+identify the default from an earlier collection cycle. Empty policy content is valid for the
+collection-cycle API but produces no standalone CLI recommendation until `spec_id` is set.
 
 Rewriting reorganizes manifests within the selected spec and does not migrate data files
 between specs. This policy introduces no scheduling, cooldown, or last-success statistic.

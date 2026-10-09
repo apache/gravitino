@@ -93,6 +93,10 @@ class TestManifestRewriteRecommendation {
       Assertions.assertTrue(
           recommender.submitForStrategyName(List.of(identifier), "rewrite").isEmpty());
       Mockito.verifyNoMoreInteractions(submitter);
+      Mockito.when(policy.content()).thenReturn(PolicyContents.icebergRewriteManifests());
+      Assertions.assertTrue(
+          recommender.submitForStrategyName(List.of(identifier), "rewrite").isEmpty());
+      Mockito.verifyNoMoreInteractions(submitter);
     }
   }
 }

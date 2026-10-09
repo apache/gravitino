@@ -56,10 +56,14 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
   public void initialize(StrategyHandlerContext context) {
     evaluation = StrategyEvaluation.NO_EXECUTION;
     Integer requestedSpec = requestedSpec(context.strategy().rules());
-    Preconditions.checkArgument(
-        requestedSpec != null,
-        "Manifest rewrite requires spec_id when evaluating persisted statistics; "
-            + "for a collection cycle pass the collector's resolved spec ID to initialize");
+    if (requestedSpec == null) {
+      LOG.warn(
+          "Skipping manifest rewrite policy {} for {}: set spec_id for persisted statistics "
+              + "or pass the collector's resolved spec ID when initializing a collection cycle",
+          context.strategy().name(),
+          context.nameIdentifier());
+      return;
+    }
     initialize(context, requestedSpec);
   }
 

@@ -37,18 +37,19 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class TestIcebergUpdateManifestStatsJobWithSpark {
+/** Exercises manifest collection through Spark and resolved job-template arguments. */
+public class TestIcebergUpdateManifestStatsJobWithSpark {
   private static final String CATALOG_NAME = "manifest_catalog";
-  @TempDir static File tempDir;
-  private static SparkSession spark;
+  @TempDir File tempDir;
+  private SparkSession spark;
 
-  @BeforeAll
-  static void setUp() {
+  @BeforeEach
+  void setUp() {
     spark =
         SparkSession.builder()
             .master("local[2]")
@@ -65,8 +66,8 @@ class TestIcebergUpdateManifestStatsJobWithSpark {
     spark.sql("CREATE NAMESPACE " + CATALOG_NAME + ".db");
   }
 
-  @AfterAll
-  static void tearDown() {
+  @AfterEach
+  void tearDown() {
     if (spark != null) {
       spark.stop();
     }
@@ -147,10 +148,74 @@ class TestIcebergUpdateManifestStatsJobWithSpark {
     }
   }
 
-  private static final class RecordingStatisticsUpdater implements StatisticsUpdater {
+  @Test
+  void testTemplateWithOmittedOptionalValues() throws Exception {
+    runTemplateWithOmittedSpec(false);
+  }
+
+  @Test
+  void testTemplateWithOmittedSpecAndExplicitSparkConfig() throws Exception {
+    runTemplateWithOmittedSpec(true);
+  }
+
+  private void runTemplateWithOmittedSpec(boolean explicitSparkConfig) throws Exception {
+    spark.sql(
+        "CREATE TABLE "
+            + CATALOG_NAME
+            + ".db.template_defaults (id INT, ds STRING) "
+            + "USING iceberg PARTITIONED BY (ds)");
+    spark.sql(
+        "ALTER TABLE " + CATALOG_NAME + ".db.template_defaults ADD PARTITION FIELD bucket(2, id)");
+    int resolved =
+        IcebergUpdateManifestStatsJob.collectManifestStatistics(
+                spark, CATALOG_NAME, "db.template_defaults", null)
+            .specId();
+    assertTrue(resolved > 0);
+    Map<String, String> conf = new HashMap<>();
+    conf.put("catalog_name", CATALOG_NAME);
+    conf.put("table_identifier", "db.template_defaults");
+    conf.put(
+        "updater_options",
+        "{\"statistics_updater\":\"recording-updater\","
+            + "\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}");
+    if (explicitSparkConfig) {
+      conf.put("spark_conf", "{}");
+    }
+    String[] arguments =
+        new IcebergUpdateManifestStatsJob()
+            .jobTemplate().arguments().stream()
+                .map(
+                    argument -> {
+                      String value = argument;
+                      for (Map.Entry<String, String> entry : conf.entrySet()) {
+                        value = value.replace("{{" + entry.getKey() + "}}", entry.getValue());
+                      }
+                      return value;
+                    })
+                .toArray(String[]::new);
+    IcebergUpdateManifestStatsJob.main(arguments);
+    RecordingStatisticsUpdater updater = RecordingStatisticsUpdater.lastCreated;
+    assertEquals(1, updater.mergeCalls);
+    Map<String, StatisticValue<?>> values = new HashMap<>();
+    updater.manifestStatistics.forEach(stat -> values.put(stat.name(), stat.value()));
+    assertTrue(IcebergManifestStatistics.fromStatistics(values, resolved).isPresent());
+    assertTrue(updater.closed);
+    assertTrue(spark.sparkContext().isStopped());
+  }
+
+  /** Service-loaded updater that records the real job entry point's published measurement. */
+  public static final class RecordingStatisticsUpdater implements StatisticsUpdater {
+    private static RecordingStatisticsUpdater lastCreated;
+    private boolean closed;
     private NameIdentifier identifier;
+
     private int mergeCalls;
     private List<StatisticEntry<?>> manifestStatistics = Collections.emptyList();
+
+    /** Records the instance created by the job's provider loader. */
+    public RecordingStatisticsUpdater() {
+      lastCreated = this;
+    }
 
     @Override
     public String name() {
@@ -181,6 +246,8 @@ class TestIcebergUpdateManifestStatsJobWithSpark {
     }
 
     @Override
-    public void close() {}
+    public void close() {
+      closed = true;
+    }
   }
 }
