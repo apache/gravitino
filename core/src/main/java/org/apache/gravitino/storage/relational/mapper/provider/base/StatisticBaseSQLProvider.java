@@ -33,42 +33,63 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
-  /** Inserts a new live statistic without upsert fallback. */
-  public String insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO) {
-    return "INSERT INTO "
+  /** Inserts new live statistics in one statement without upsert fallback. */
+  public String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>INSERT INTO "
         + STATISTIC_META_TABLE_NAME
         + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
         + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES"
-        + " (#{statisticPO.statisticId}, #{statisticPO.statisticName},"
-        + " #{statisticPO.statisticValue}, #{statisticPO.metalakeId},"
-        + " #{statisticPO.metadataObjectId}, #{statisticPO.metadataObjectType},"
-        + " #{statisticPO.auditInfo}, 1, 1, 0)";
+        + "<foreach collection='statisticPOs' item='item' separator=','>"
+        + " (#{item.statisticId}, #{item.statisticName}, #{item.statisticValue},"
+        + " #{item.metalakeId}, #{item.metadataObjectId}, #{item.metadataObjectType},"
+        + " #{item.auditInfo}, #{item.currentVersion}, #{item.lastVersion}, #{item.deletedAt})"
+        + "</foreach></script>";
   }
 
-  /** Updates the value and advances the version when the observed row still matches. */
-  public String updateStatisticPOWithVersion(
-      @Param("statisticPO") StatisticPO statisticPO, @Param("previous") StatisticPO previous) {
-    return "UPDATE "
+  /**
+   * Replaces the values of the observed statistics in one statement and advances their versions.
+   * Each PO identifies an observed row by ID, target, name and current version, and carries the new
+   * value and audit info.
+   */
+  public String batchUpdateStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>UPDATE "
         + STATISTIC_META_TABLE_NAME
-        + " SET statistic_value = #{statisticPO.statisticValue},"
-        + " audit_info = #{statisticPO.auditInfo},"
+        + " SET statistic_value = CASE statistic_id"
+        + "<foreach collection='statisticPOs' item='item'>"
+        + " WHEN #{item.statisticId} THEN #{item.statisticValue}"
+        + "</foreach> END,"
+        + " audit_info = CASE statistic_id"
+        + "<foreach collection='statisticPOs' item='item'>"
+        + " WHEN #{item.statisticId} THEN #{item.auditInfo}"
+        + "</foreach> END,"
         + " last_version = current_version, current_version = current_version + 1"
-        + " WHERE statistic_id = #{previous.statisticId}"
-        + " AND metadata_object_id = #{previous.metadataObjectId}"
-        + " AND statistic_name = #{previous.statisticName}"
-        + " AND current_version = #{previous.currentVersion} AND deleted_at = 0";
+        + observedRowsPredicate()
+        + "</script>";
   }
 
-  /** Soft-deletes the observed statistic and advances its version. */
-  public String deleteStatisticPOWithVersion(@Param("previous") StatisticPO previous) {
-    return "UPDATE "
+  /**
+   * Soft-deletes the observed statistics in one statement and advances their versions. Each PO
+   * identifies an observed row by ID, target, name and current version.
+   */
+  public String batchDeleteStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
         + ", last_version = current_version, current_version = current_version + 1"
-        + " WHERE statistic_id = #{previous.statisticId}"
-        + " AND metadata_object_id = #{previous.metadataObjectId}"
-        + " AND statistic_name = #{previous.statisticName}"
-        + " AND current_version = #{previous.currentVersion} AND deleted_at = 0";
+        + observedRowsPredicate()
+        + "</script>";
+  }
+
+  private static String observedRowsPredicate() {
+    return " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='statisticPOs' item='item' separator=' OR '>"
+        + "(statistic_id = #{item.statisticId}"
+        + " AND metadata_object_id = #{item.metadataObjectId}"
+        + " AND statistic_name = #{item.statisticName}"
+        + " AND current_version = #{item.currentVersion})"
+        + "</foreach>)";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {

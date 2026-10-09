@@ -200,7 +200,8 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             .build();
     int wrongNameDeleted =
         SessionUtils.getWithoutCommit(
-            StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(wrongName));
+            StatisticMetaMapper.class,
+            mapper -> mapper.batchDeleteStatisticPOsWithVersion(List.of(wrongName)));
     Assertions.assertEquals(0, wrongNameDeleted);
 
     StatisticEntity replacement = createStatisticEntity(auditInfo, 20L);
@@ -214,21 +215,36 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertEquals(stale.getStatisticId(), current.getStatisticId());
     Assertions.assertEquals(2L, current.getCurrentVersion());
     Assertions.assertEquals(1L, current.getLastVersion());
-    StatisticPO staleValue =
+    String staleValue =
         StatisticPO.initializeStatisticPOs(
                 List.of(createStatisticEntity(auditInfo, 30L)),
                 metalakeId,
                 table.id(),
                 MetadataObject.Type.TABLE)
-            .get(0);
+            .get(0)
+            .getStatisticValue();
+    StatisticPO staleReplacement =
+        StatisticPO.builder()
+            .withMetalakeId(stale.getMetalakeId())
+            .withStatisticId(stale.getStatisticId())
+            .withMetadataObjectId(stale.getMetadataObjectId())
+            .withMetadataObjectType(stale.getMetadataObjectType())
+            .withStatisticName(stale.getStatisticName())
+            .withStatisticValue(staleValue)
+            .withAuditInfo(stale.getAuditInfo())
+            .withCurrentVersion(stale.getCurrentVersion())
+            .withLastVersion(stale.getLastVersion())
+            .withDeletedAt(stale.getDeletedAt())
+            .build();
     int staleUpdated =
         SessionUtils.getWithoutCommit(
             StatisticMetaMapper.class,
-            mapper -> mapper.updateStatisticPOWithVersion(staleValue, stale));
+            mapper -> mapper.batchUpdateStatisticPOsWithVersion(List.of(staleReplacement)));
     Assertions.assertEquals(0, staleUpdated);
     int staleDeleted =
         SessionUtils.getWithoutCommit(
-            StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(stale));
+            StatisticMetaMapper.class,
+            mapper -> mapper.batchDeleteStatisticPOsWithVersion(List.of(stale)));
     Assertions.assertEquals(0, staleDeleted);
     Assertions.assertEquals(
         20L,
@@ -317,6 +333,63 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             .isEmpty());
   }
 
+  /** Verifies one batch statement replaces each statistic with its own value. */
+  @TestTemplate
+  public void testBatchReplacementKeepsValuesPerStatistic() throws Exception {
+    TableEntity table = createBatchConflictTable("replace");
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(
+            createNamedStatistic("a", 1L),
+            createNamedStatistic("b", 2L),
+            createNamedStatistic("c", 3L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(
+            createNamedStatistic("c", 30L),
+            createNamedStatistic("d", 40L),
+            createNamedStatistic("a", 10L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    Map<String, StatisticEntity> current = statisticsByName(table);
+    Assertions.assertEquals(4, current.size());
+    Assertions.assertEquals(10L, current.get("a").value().value());
+    Assertions.assertEquals(2L, current.get("b").value().value());
+    Assertions.assertEquals(30L, current.get("c").value().value());
+    Assertions.assertEquals(40L, current.get("d").value().value());
+  }
+
+  /** Verifies a batch drop counts only its own deletes when a concurrent drop removed one name. */
+  @TestTemplate
+  public void testBatchDropCountsOnlyItsOwnDeletes() throws Exception {
+    TableEntity table = createBatchConflictTable("partial_drop");
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(createNamedStatistic("a", 1L), createNamedStatistic("b", 2L)),
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE);
+
+    StatisticMetaService losingDrop =
+        new StatisticMetaService() {
+          @Override
+          List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+            List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
+            Assertions.assertEquals(
+                1,
+                statisticMetaService.batchDeleteStatisticPOs(
+                    table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a")));
+            return rows;
+          }
+        };
+
+    Assertions.assertEquals(
+        1,
+        losingDrop.batchDeleteStatisticPOs(
+            table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a", "b")));
+    Assertions.assertTrue(statisticsByName(table).isEmpty());
+  }
+
   /** Verifies a write or delete based on a stale version fails without touching the newer value. */
   @TestTemplate
   public void testStaleStatisticWriteAndDeleteReportConflict() throws Exception {
@@ -370,7 +443,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             () ->
                 updateAfterSnapshot(table, AUDIT_INFO, 2L)
                     .writeStatisticsWithVersion(
-                        // Deliberately unsorted: the conflicting name must execute last.
+                        // A stale update in the batch must also roll back the insert of b_new.
                         List.of(
                             createStatisticEntity(AUDIT_INFO, 3L),
                             createNamedStatistic("b_new", 30L),

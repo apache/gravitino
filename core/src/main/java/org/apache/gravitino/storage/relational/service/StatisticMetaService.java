@@ -121,32 +121,46 @@ public class StatisticMetaService {
                 pos.stream().map(StatisticPO::getStatisticName).collect(Collectors.toList()))
             .stream()
             .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    List<StatisticPO> inserts = new ArrayList<>();
+    List<StatisticPO> updates = new ArrayList<>();
+    for (StatisticPO po : pos) {
+      StatisticPO old = previous.get(po.getStatisticName());
+      if (old == null) {
+        inserts.add(po);
+      } else {
+        updates.add(replacementOf(old, po));
+      }
+    }
+    // Each kind of write is one statement. Any mismatch fails the whole transaction, so the batch
+    // either applies completely or not at all.
     SessionUtils.doMultipleWithCommit(
         () -> {
           LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
-          // Execute each CAS separately: a batch executor may report SUCCESS_NO_INFO rather than
-          // the per-row counts needed to detect conflicts (for example, MySQL batch rewriting).
-          for (StatisticPO po : pos) {
-            StatisticPO old = previous.get(po.getStatisticName());
-            int updated;
+          if (!inserts.isEmpty()) {
+            int inserted;
             try {
-              updated =
+              inserted =
                   SessionUtils.getWithoutCommit(
-                      StatisticMetaMapper.class,
-                      mapper ->
-                          old == null
-                              ? mapper.insertStatisticPO(po)
-                              : mapper.updateStatisticPOWithVersion(po, old));
+                      StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(inserts));
             } catch (RuntimeException e) {
               // A writer can create the same statistic after the snapshot above. A duplicate
               // insert is a stale snapshot, not an internal server error.
-              if (old == null && isDuplicateKey(e)) {
-                throw statisticConflict(e, po.getStatisticName(), entity);
+              if (isDuplicateKey(e)) {
+                throw statisticConflict(e, names(inserts), entity);
               }
               throw e;
             }
-            if (updated != 1) {
-              throw statisticConflict(null, po.getStatisticName(), entity);
+            if (inserted != inserts.size()) {
+              throw statisticConflict(null, names(inserts), entity);
+            }
+          }
+          if (!updates.isEmpty()) {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates));
+            if (updated != updates.size()) {
+              throw statisticConflict(null, names(updates), entity);
             }
           }
         });
@@ -188,25 +202,24 @@ public class StatisticMetaService {
     if (previous.isEmpty()) {
       return 0;
     }
+    List<StatisticPO> observedRows = new ArrayList<>(previous.values());
     int[] deleted = new int[] {0};
     SessionUtils.doMultipleWithCommit(
         () -> {
           LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
-          for (String name : orderedNames) {
-            StatisticPO old = previous.get(name);
-            if (old == null) {
-              continue;
-            }
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(old));
-            if (updated == 1) {
-              deleted[0]++;
-            } else if (hasLiveStatistic(observed, name)) {
-              throw statisticConflict(null, name, identifier);
-            }
-            // Otherwise a concurrent drop already removed it. Like a drop of a missing name, that
-            // is not a conflict and is simply not counted.
+          deleted[0] =
+              SessionUtils.getWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.batchDeleteStatisticPOsWithVersion(observedRows));
+          if (deleted[0] == observedRows.size()) {
+            return;
+          }
+          // Some observed rows were not deleted. A name that is still live was changed or
+          // replaced meanwhile, which is a conflict. Otherwise a concurrent drop already removed
+          // it; like a drop of a missing name, that is not a conflict and is simply not counted.
+          List<StatisticPO> live = liveStatistics(observed, names(observedRows));
+          if (!live.isEmpty()) {
+            throw statisticConflict(null, names(live), identifier);
           }
         });
     return deleted[0];
@@ -221,21 +234,39 @@ public class StatisticMetaService {
   }
 
   private static OptimisticLockException statisticConflict(
-      @Nullable Throwable cause, String name, NameIdentifier target) {
+      @Nullable Throwable cause, List<String> names, NameIdentifier target) {
     return new OptimisticLockException(
         cause,
-        "The statistic %s of %s was modified concurrently; retry the operation",
-        name,
+        "The statistics %s of %s were modified concurrently; retry the operation",
+        names,
         target);
   }
 
-  private static boolean hasLiveStatistic(NamespacedEntityId endpoint, String name) {
-    return !SessionUtils.getWithoutCommit(
-            StatisticMetaMapper.class,
-            mapper ->
-                mapper.listStatisticPOsByNames(
-                    endpoint.namespaceIds()[0], endpoint.entityId(), List.of(name)))
-        .isEmpty();
+  private static List<StatisticPO> liveStatistics(NamespacedEntityId endpoint, List<String> names) {
+    return SessionUtils.getWithoutCommit(
+        StatisticMetaMapper.class,
+        mapper ->
+            mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
+  }
+
+  private static List<String> names(List<StatisticPO> pos) {
+    return pos.stream().map(StatisticPO::getStatisticName).sorted().collect(Collectors.toList());
+  }
+
+  /** Returns a PO that identifies the observed row and carries the replacement value. */
+  private static StatisticPO replacementOf(StatisticPO observed, StatisticPO replacement) {
+    return StatisticPO.builder()
+        .withStatisticId(observed.getStatisticId())
+        .withStatisticName(observed.getStatisticName())
+        .withMetalakeId(observed.getMetalakeId())
+        .withMetadataObjectId(observed.getMetadataObjectId())
+        .withMetadataObjectType(observed.getMetadataObjectType())
+        .withCurrentVersion(observed.getCurrentVersion())
+        .withLastVersion(observed.getLastVersion())
+        .withDeletedAt(observed.getDeletedAt())
+        .withStatisticValue(replacement.getStatisticValue())
+        .withAuditInfo(replacement.getAuditInfo())
+        .build();
   }
 
   /**

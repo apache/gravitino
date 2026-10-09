@@ -56,20 +56,22 @@ public class StatisticSQLProviderFactory {
     return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
   }
 
-  /** Returns SQL for a strict statistic insert. */
-  public static String insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO) {
-    return getProvider().insertStatisticPO(statisticPO);
+  /** Returns SQL for a strict multi-row statistic insert. */
+  public static String batchInsertStatisticPOs(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchInsertStatisticPOs(statisticPOs);
   }
 
-  /** Returns SQL for a version-checked statistic update. */
-  public static String updateStatisticPOWithVersion(
-      @Param("statisticPO") StatisticPO statisticPO, @Param("previous") StatisticPO previous) {
-    return getProvider().updateStatisticPOWithVersion(statisticPO, previous);
+  /** Returns SQL for a version-checked batch statistic update. */
+  public static String batchUpdateStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchUpdateStatisticPOsWithVersion(statisticPOs);
   }
 
-  /** Returns SQL for a version-checked statistic soft delete. */
-  public static String deleteStatisticPOWithVersion(@Param("previous") StatisticPO previous) {
-    return getProvider().deleteStatisticPOWithVersion(previous);
+  /** Returns SQL for a version-checked batch statistic soft delete. */
+  public static String batchDeleteStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchDeleteStatisticPOsWithVersion(statisticPOs);
   }
 
   public static String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
