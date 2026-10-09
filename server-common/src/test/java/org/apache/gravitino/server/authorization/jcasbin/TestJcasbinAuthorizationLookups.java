@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
@@ -28,14 +29,20 @@ import static org.mockito.Mockito.when;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -57,6 +64,50 @@ public class TestJcasbinAuthorizationLookups {
     Assertions.assertEquals(
         Optional.of(100L), lookups.resolveMetadataId(catalog, "ml1", requestContext));
 
+    Assertions.assertEquals(1, metadataIdCache.getCount);
+    Assertions.assertEquals(0, metadataIdCache.getIfPresentCount);
+    Assertions.assertEquals(0, metadataIdCache.putCount);
+  }
+
+  @Test
+  void testNormalizedTableUsesAtomicSharedCacheAndRequestDedup() {
+    MetadataObject alias = MetadataObjects.parse("cat1.SCH1.TBL1", MetadataObject.Type.TABLE);
+    MetadataObject canonical = MetadataObjects.parse("cat1.sch1.tbl1", MetadataObject.Type.TABLE);
+    CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
+    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>();
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return CapabilityResult.unsupported("case insensitive");
+          }
+        };
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(capability);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    try (MockedStatic<GravitinoEnv> envMock = mockStatic(GravitinoEnv.class)) {
+      envMock.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(Optional.of(100L), lookups.resolveMetadataId(alias, "ml1", context));
+      Assertions.assertEquals(Optional.of(100L), lookups.resolveMetadataId(alias, "ml1", context));
+      Assertions.assertEquals(
+          Optional.of(100L), lookups.resolveMetadataId(canonical, "ml1", context));
+    }
+    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    Assertions.assertEquals(
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", canonical),
+        metadataIdCache.lastKey);
     Assertions.assertEquals(1, metadataIdCache.getCount);
     Assertions.assertEquals(0, metadataIdCache.getIfPresentCount);
     Assertions.assertEquals(0, metadataIdCache.putCount);
@@ -159,6 +210,7 @@ public class TestJcasbinAuthorizationLookups {
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {
     private final V value;
     private Optional<V> cachedValue = Optional.empty();
+    private K lastKey;
     private int getCount;
     private int getIfPresentCount;
     private int putCount;
@@ -180,6 +232,7 @@ public class TestJcasbinAuthorizationLookups {
     @Override
     public V get(K key, Function<K, V> loader) {
       getCount++;
+      lastKey = key;
       if (cachedValue.isPresent()) {
         return cachedValue.get();
       }

@@ -28,6 +28,8 @@ import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Two-tier metadata-id and owner resolution for {@link JcasbinAuthorizer}.
@@ -42,6 +44,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * (local mutations).
  */
 public class JcasbinAuthorizationLookups {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizationLookups.class);
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -63,43 +67,18 @@ public class JcasbinAuthorizationLookups {
   /**
    * Two-tier name→id lookup: the per-request map in {@code requestContext} dedups calls within the
    * same HTTP request; on a miss, the long-lived {@code metadataIdCache} is consulted, and finally
-   * we fall back to a DB query via {@link MetadataIdConverter#getID}. Returns {@link
-   * Optional#empty()} when the metadata object does not exist so callers can deny authorization.
-   * Missing metadata objects are never cached as negative results: a later create for the same name
-   * can be observed without waiting for cache eviction. Existing objects are invalidated by local
-   * name-id mapping hooks and by the change-log poller on peer nodes. Both cache tiers use names
-   * normalized by catalog capability. Normalization is deduplicated per raw name within a request;
-   * a fresh request still resolves current catalog rules before consulting the shared cache.
+   * we fall back to a DB query via {@link MetadataIdConverter#getIdForNormalizedObject}. Returns
+   * {@link Optional#empty()} when the metadata object does not exist or normalization fails so
+   * callers can deny authorization. Missing metadata objects are never cached as negative results:
+   * a later create for the same name can be observed without waiting for cache eviction. Existing
+   * objects are invalidated by local name-id mapping hooks and by the change-log poller on peer
+   * nodes. Both cache tiers use names normalized by catalog capability. Normalization is
+   * deduplicated per raw name within a request; a fresh request still resolves current catalog
+   * rules before consulting the shared cache.
    */
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
-    try {
-      // Use the same capability rules as ID resolution so hooks and peer change-log replay
-      // evict every equivalent spelling from both cache tiers.
-      MetadataObject cacheObject =
-          requestContext.computeNormalizedMetadataObjectIfAbsent(
-              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject),
-              ignored -> MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake));
-      String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);
-      // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
-      // by throwing through the loaders and translated back to Optional.empty() here. This caches
-      // only positive results, never a negative one. Load the same canonical name as the key,
-      // rather than applying the request spelling again in the loader.
-      return Optional.of(
-          requestContext.computeMetadataIdIfAbsent(
-              cacheKey,
-              k -> metadataIdCache.get(k, ignored -> loadMetadataId(cacheObject, metalake))));
-    } catch (NotFoundException e) {
-      return Optional.empty();
-    }
-  }
-
-  private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {
-    return MetadataIdConverter.getID(metadataObject, metalake)
-        .orElseThrow(
-            () ->
-                new NoSuchMetadataObjectException(
-                    "Metadata object %s does not exist", metadataObject.fullName()));
+    return resolveMetadataIdResult(metadataObject, metalake, requestContext).metadataId();
   }
 
   /**
@@ -118,11 +97,81 @@ public class JcasbinAuthorizationLookups {
         id -> ownerRelCache.get(id, k -> loadOwner(k, metadataType)));
   }
 
+  // Preserve normalization failures as distinct from missing objects for DENY-policy consumers.
+  MetadataIdResolution resolveMetadataIdResult(
+      MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
+    MetadataObject cacheObject;
+    try {
+      // Use the same capability rules as ID resolution so hooks and peer change-log replay
+      // evict every equivalent spelling from both cache tiers.
+      cacheObject =
+          requestContext.computeNormalizedMetadataObjectIfAbsent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject),
+              ignored -> MetadataIdConverter.normalizeMetadataObject(metadataObject, metalake));
+    } catch (NotFoundException e) {
+      return new MetadataIdResolution(Optional.empty(), false);
+    } catch (RuntimeException e) {
+      // Never fall back to the raw key: it can retain an ID after canonical-name invalidation.
+      // Catch only normalization failures; entity-store and cache-loader failures still propagate.
+      LOG.warn(
+          "Cannot normalize metadata object {}:{} in metalake {}; authorization lookup is unresolved",
+          metadataObject.type(),
+          metadataObject.fullName(),
+          metalake,
+          e);
+      return new MetadataIdResolution(Optional.empty(), true);
+    }
+    String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, cacheObject);
+    try {
+      // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
+      // by throwing through the loaders and translated back to Optional.empty() here. This caches
+      // only positive results, never a negative one. Load the same canonical name as the key,
+      // rather than applying the request spelling again in the loader.
+      return new MetadataIdResolution(
+          Optional.of(
+              requestContext.computeMetadataIdIfAbsent(
+                  cacheKey,
+                  k -> metadataIdCache.get(k, ignored -> loadMetadataId(cacheObject, metalake)))),
+          false);
+    } catch (NotFoundException e) {
+      return new MetadataIdResolution(Optional.empty(), false);
+    }
+  }
+
+  private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {
+    return MetadataIdConverter.getIdForNormalizedObject(metadataObject, metalake)
+        .orElseThrow(
+            () ->
+                new NoSuchMetadataObjectException(
+                    "Metadata object %s does not exist", metadataObject.fullName()));
+  }
+
   private static Optional<OwnerInfo> loadOwner(Long id, MetadataObject.Type metadataType) {
     OwnerInfo ownerInfo =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
             m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
     return Optional.ofNullable(ownerInfo);
+  }
+
+  /** An ID lookup outcome, retaining capability failures for conservative DENY evaluation. */
+  static final class MetadataIdResolution {
+    private final Optional<Long> metadataId;
+    private final boolean normalizationFailed;
+
+    MetadataIdResolution(Optional<Long> metadataId, boolean normalizationFailed) {
+      this.metadataId = metadataId;
+      this.normalizationFailed = normalizationFailed;
+    }
+
+    /** Returns the metadata ID, or empty if the object is missing or could not be normalized. */
+    Optional<Long> metadataId() {
+      return metadataId;
+    }
+
+    /** Returns whether the catalog rules needed to normalize the object could not be resolved. */
+    boolean normalizationFailed() {
+      return normalizationFailed;
+    }
   }
 }

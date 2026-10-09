@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -334,12 +335,12 @@ public class TestJcasbinMetadataIdCacheNormalization {
     put(table, 100L);
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
-    // One capability lookup for key normalization and one for ID loading on the shared miss.
-    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    // The loader reuses the normalized name, so even a shared miss resolves capabilities once.
+    verify(catalogs, times(1)).doWithCatalog(any(), any());
     assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
-    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    verify(catalogs, times(1)).doWithCatalog(any(), any());
     assertEquals(Optional.of(100L), resolve(table));
-    verify(catalogs, times(3)).doWithCatalog(any(), any());
+    verify(catalogs, times(2)).doWithCatalog(any(), any());
     verify(store, times(1)).get(any(), any(), any());
     doThrow(new NoSuchCatalogException("Missing catalog"))
         .when(catalogs)
@@ -370,7 +371,7 @@ public class TestJcasbinMetadataIdCacheNormalization {
     MetadataObject normalized = object(MetadataObject.Type.TABLE, false);
     put(normalized, 100L);
     put(alias, 200L);
-    // A catalog can be replaced between key normalization and the loader's catalog lookup.
+    // A later request can observe different rules; the loader still uses its own canonical key.
     when(catalog.capability()).thenReturn(CASE_INSENSITIVE, Capability.DEFAULT);
     assertEquals(Optional.of(100L), resolve(alias));
     assertEquals(Optional.of(100L), resolve(normalized));
@@ -397,6 +398,77 @@ public class TestJcasbinMetadataIdCacheNormalization {
         .when(catalogs)
         .doWithCatalog(any(), any());
     assertEquals(Optional.empty(), resolve(table));
+  }
+
+  @Test
+  void testCapabilityFailureDoesNotReturnSharedOrRequestCachedId() {
+    MetadataObject alias = object(MetadataObject.Type.TABLE, true);
+    MetadataObject normalized = object(MetadataObject.Type.TABLE, false);
+    put(normalized, 100L);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(normalized, METALAKE, context));
+    doThrow(new IllegalStateException("Connector initialization failed"))
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    // This spelling is new to the request, but its canonical ID is present in both cache tiers.
+    assertEquals(Optional.empty(), lookups.resolveMetadataId(alias, METALAKE, context));
+    assertEquals(Optional.empty(), resolve(alias));
+    assertEquals(1L, metadataCache.size());
+  }
+
+  @Test
+  void testCapabilityFailureOnCacheMissDoesNotLoadOrCacheId() {
+    MetadataObject table = object(MetadataObject.Type.TABLE, true);
+    doThrow(new IllegalStateException("Connector initialization failed"))
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    assertEquals(Optional.empty(), resolve(table));
+    assertEquals(0L, metadataCache.size());
+    verifyNoInteractions(store);
+  }
+
+  @Test
+  void testTransientCapabilityFailureCanRetryInSameRequest() throws IOException {
+    MetadataObject table = object(MetadataObject.Type.TABLE, true);
+    put(object(MetadataObject.Type.TABLE, false), 100L);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    doThrow(new IllegalStateException("Connector initialization failed"))
+        .doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    assertEquals(Optional.empty(), lookups.resolveMetadataId(table, METALAKE, context));
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    verify(store, times(1)).get(any(), any(), any());
+  }
+
+  @Test
+  void testEntityStoreFailureStillPropagatesWithCause() throws IOException {
+    MetadataObject table = object(MetadataObject.Type.TABLE, true);
+    IOException failure = new IOException("Entity store unavailable");
+    doThrow(failure).when(store).get(any(), any(), any());
+    RuntimeException exception = assertThrows(RuntimeException.class, () -> resolve(table));
+    assertSame(failure, exception.getCause());
+    assertTrue(exception.getMessage().contains("cat.schema.object"));
+    assertEquals(0L, metadataCache.size());
+  }
+
+  @Test
+  void testViewsAndFunctionsRetainExistingRawNameBehavior() throws IOException {
+    for (MetadataObject.Type type :
+        List.of(MetadataObject.Type.VIEW, MetadataObject.Type.FUNCTION)) {
+      MetadataObject raw = MetadataObjects.parse("cat.SCHEMA.OBJECT", type);
+      assertSame(raw, MetadataIdConverter.normalizeMetadataObject(raw, METALAKE));
+      assertEquals(Optional.empty(), resolve(raw));
+      verify(store)
+          .get(ident(raw), entityType(type), EntityClassMapper.getEntityClass(entityType(type)));
+    }
+    verifyNoInteractions(catalogs);
   }
 
   @Test

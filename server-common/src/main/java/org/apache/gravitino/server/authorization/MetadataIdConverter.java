@@ -68,7 +68,6 @@ public class MetadataIdConverter {
    */
   public static Optional<Long> getID(MetadataObject metadataObject, String metalake) {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
 
     MetadataObject.Type metadataType = metadataObject.type();
@@ -82,33 +81,38 @@ public class MetadataIdConverter {
       return Optional.empty();
     }
 
-    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataType);
+    return loadId(metadataObject, normalizedIdent);
+  }
 
-    Entity entity;
-    try {
-      entity =
-          entityStore.get(
-              normalizedIdent, entityType, EntityClassMapper.getEntityClass(entityType));
-    } catch (NoSuchEntityException nse) {
-      return Optional.empty();
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "failed to load entity from entity store: " + metadataObject.fullName(), e);
-    }
-
-    return Optional.of(extractIdFromEntity(entity));
+  /**
+   * Loads an ID using an object already normalized by {@link #normalizeMetadataObject}.
+   *
+   * <p>The caller must use the same normalized object for the cache key and this lookup. This
+   * method does not resolve catalog capabilities or normalize the name again.
+   *
+   * @param metadataObject the previously normalized metadata object
+   * @param metalake the metalake name
+   * @return the metadata ID, or empty if the entity does not exist
+   * @throws RuntimeException if the entity store cannot load the entity
+   */
+  public static Optional<Long> getIdForNormalizedObject(
+      MetadataObject metadataObject, String metalake) {
+    Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
+    return loadId(metadataObject, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
   }
 
   /**
    * Normalizes a metadata object's name using the same catalog rules as ID resolution.
    *
-   * <p>Types without a catalog capability scope retain their names. Semantic model leaves remain
-   * case sensitive, while column names and their table/schema parents follow their own scopes.
+   * <p>Types without a catalog capability scope, including VIEW and FUNCTION, retain their names.
+   * Semantic model leaves remain case sensitive, while column names and their table/schema parents
+   * follow their own scopes.
    *
    * @param metadataObject the object whose name will be normalized
    * @param metalake the metalake name
    * @return the normalized object, suitable for name-to-ID cache keys
    * @throws NotFoundException if the containing catalog does not exist
+   * @throws RuntimeException if catalog capabilities cannot be resolved
    */
   public static MetadataObject normalizeMetadataObject(
       MetadataObject metadataObject, String metalake) {
@@ -164,6 +168,21 @@ public class MetadataIdConverter {
           CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
     }
     return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+  }
+
+  private static Optional<Long> loadId(MetadataObject metadataObject, NameIdentifier ident) {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject.type());
+    Entity entity;
+    try {
+      entity = entityStore.get(ident, entityType, EntityClassMapper.getEntityClass(entityType));
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "failed to load entity from entity store: " + metadataObject.fullName(), e);
+    }
+    return Optional.of(extractIdFromEntity(entity));
   }
 
   private static Long extractIdFromEntity(Entity entity) {

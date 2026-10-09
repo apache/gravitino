@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -104,6 +105,7 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -320,6 +322,10 @@ public class TestJcasbinAuthorizer {
             invocation -> {
               // Keep ID-loading fixtures, but execute all normalization helpers (including nested
               // static calls) so capability rules are tested rather than stubbed away.
+              if (invocation.getMethod().getName().equals("getIdForNormalizedObject")) {
+                return MetadataIdConverter.getID(
+                    invocation.getArgument(0), invocation.getArgument(1));
+              }
               if (invocation.getMethod().getName().equals("getID")) {
                 return Optional.empty();
               }
@@ -669,6 +675,316 @@ public class TestJcasbinAuthorizer {
     Assertions.assertFalse(
         getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
         "loadedRoles entry for the deleted role must be evicted");
+  }
+
+  /** Verifies that a connector failure does not suppress healthy catalog grants. */
+  @Test
+  public void testCapabilityFailureDoesNotAbortHealthyCatalogPolicyLoading() throws Exception {
+    CatalogManager catalogs = gravitinoEnv.catalogManager();
+    Mockito.doThrow(new IllegalStateException("Connector initialization failed"))
+        .when(catalogs)
+        .doWithCatalog(eq(NameIdentifier.of(METALAKE, "broken")), any());
+    RoleEntity role =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "mixedCatalogRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.TABLE,
+                    "broken.schema.table",
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW"),
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.TABLE,
+                    "healthy.schema.table",
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW")));
+    mockDirectUserRoles(role);
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            principal,
+            METALAKE,
+            MetadataObjects.parse("healthy.schema.table", MetadataObject.Type.TABLE),
+            Privilege.Name.SELECT_TABLE,
+            new AuthorizationRequestContext()));
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            principal,
+            METALAKE,
+            MetadataObjects.parse("broken.schema.table", MetadataObject.Type.TABLE),
+            Privilege.Name.SELECT_TABLE,
+            new AuthorizationRequestContext()));
+    assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+    assertTrue(
+        getPartialRoleLoadBackoffCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+  }
+
+  /** Verifies conservative DENY scope, backoff, role narrowing and recovery. */
+  @Test
+  public void testUnresolvedDenyGuardsCatalogAndRestoresPreciseScopeAfterRetry() throws Exception {
+    MetadataObject denied =
+        MetadataObjects.parse("broken.schema.denied", MetadataObject.Type.TABLE);
+    MetadataObject sibling =
+        MetadataObjects.parse("broken.schema.sibling", MetadataObject.Type.TABLE);
+    MetadataObject healthy = MetadataObjects.of(null, "healthy", MetadataObject.Type.CATALOG);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(denied, METALAKE))
+        .thenReturn(Optional.of(10L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(sibling, METALAKE))
+        .thenReturn(Optional.of(11L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(healthy, METALAKE))
+        .thenReturn(Optional.of(20L));
+    RoleEntity allowRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "ancestorAllowRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW")));
+    RoleEntity denyRole =
+        mockRoleInStore(
+            DENY_ROLE_ID,
+            "childDenyRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    DENY_ROLE_ID,
+                    MetadataObject.Type.TABLE,
+                    denied.fullName(),
+                    Privilege.Name.SELECT_TABLE,
+                    "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+    CatalogManager catalogs = gravitinoEnv.catalogManager();
+    Mockito.doThrow(new IllegalStateException("Connector initialization failed"))
+        .when(catalogs)
+        .doWithCatalog(eq(NameIdentifier.of(METALAKE, "broken")), any());
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator("ANY_SELECT_TABLE", jcasbinAuthorizer);
+    try {
+      assertFalse(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "denied"), new AuthorizationRequestContext()));
+      // The guard must persist through the partial-role retry backoff and role narrowing.
+      AuthorizationRequestContext narrowed = new AuthorizationRequestContext();
+      narrowed.setActiveRoles(ActiveRoles.of(Set.of("ancestorAllowRole")));
+      assertFalse(evaluator.evaluate(tableMetadataNames("broken", "sibling"), narrowed));
+      assertTrue(
+          evaluator.evaluate(
+              tableMetadataNames("healthy", "table"), new AuthorizationRequestContext()));
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              PrincipalUtils.getCurrentPrincipal(),
+              METALAKE,
+              Set.of(Privilege.Name.SELECT_TABLE),
+              new AuthorizationRequestContext()));
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(DENY_ROLE_ID).isPresent());
+
+      BaseCatalog<?> catalog = mock(BaseCatalog.class);
+      when(catalog.capability()).thenReturn(Capability.DEFAULT);
+      doAnswer(
+              invocation -> {
+                ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+                return operation.apply(catalog);
+              })
+          .when(catalogs)
+          .doWithCatalog(eq(NameIdentifier.of(METALAKE, "broken")), any());
+      getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(DENY_ROLE_ID);
+      assertFalse(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "denied"), new AuthorizationRequestContext()));
+      assertTrue(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "sibling"), new AuthorizationRequestContext()));
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(DENY_ROLE_ID).isPresent());
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .hasPolicy(
+                  String.valueOf(DENY_ROLE_ID),
+                  "CATALOG",
+                  String.valueOf(CATALOG_ID),
+                  "SELECT_TABLE",
+                  "allow"));
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(denied, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(sibling, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(healthy, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  /** Verifies that normalization failure cannot bypass a cached DENY policy. */
+  @Test
+  public void testNormalizationFailureCannotBypassAlreadyLoadedDeny() throws Exception {
+    MetadataObject denied =
+        MetadataObjects.parse("broken.schema.denied", MetadataObject.Type.TABLE);
+    MetadataObject sibling =
+        MetadataObjects.parse("broken.schema.sibling", MetadataObject.Type.TABLE);
+    MetadataObject healthy = MetadataObjects.of(null, "healthy", MetadataObject.Type.CATALOG);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(denied, METALAKE))
+        .thenReturn(Optional.of(10L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(sibling, METALAKE))
+        .thenReturn(Optional.of(11L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(healthy, METALAKE))
+        .thenReturn(Optional.of(20L));
+    RoleEntity role =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "completeRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW"),
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.TABLE,
+                    denied.fullName(),
+                    Privilege.Name.SELECT_TABLE,
+                    "DENY")));
+    mockDirectUserRoles(role);
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator("ANY_SELECT_TABLE", jcasbinAuthorizer);
+    try {
+      assertFalse(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "denied"), new AuthorizationRequestContext()));
+      assertTrue(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "sibling"), new AuthorizationRequestContext()));
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+      CatalogManager catalogs = gravitinoEnv.catalogManager();
+      Mockito.doThrow(new IllegalStateException("Connector initialization failed"))
+          .when(catalogs)
+          .doWithCatalog(eq(NameIdentifier.of(METALAKE, "broken")), any());
+      assertFalse(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "denied"), new AuthorizationRequestContext()));
+      assertFalse(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "sibling"), new AuthorizationRequestContext()));
+      assertTrue(
+          evaluator.evaluate(
+              tableMetadataNames("healthy", "table"), new AuthorizationRequestContext()));
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(denied, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(sibling, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(healthy, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  /** Verifies that a missing entity does not block inherited creation privileges. */
+  @Test
+  public void testMissingEntityStillAllowsInheritedCreatePrivilege() throws Exception {
+    MetadataObject missing =
+        MetadataObjects.parse("catalog.schema.newTable", MetadataObject.Type.TABLE);
+    RoleEntity role =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "createRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.CREATE_TABLE,
+                    "ALLOW")));
+    mockDirectUserRoles(role);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(missing, METALAKE))
+        .thenReturn(Optional.empty());
+    try {
+      assertTrue(
+          new AuthorizationExpressionEvaluator("ANY_CREATE_TABLE", jcasbinAuthorizer)
+              .evaluate(
+                  tableMetadataNames("catalog", "newTable"), new AuthorizationRequestContext()));
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(missing, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  /** Verifies that a failed DENY guard installation cannot publish a partial role. */
+  @Test
+  public void testUnresolvedDenyWithoutCatalogIdFailsBeforePoliciesAreApplied() throws Exception {
+    MetadataObject catalogObject = MetadataObjects.of(null, "broken", MetadataObject.Type.CATALOG);
+    CatalogManager catalogs = gravitinoEnv.catalogManager();
+    Mockito.doThrow(new IllegalStateException("Connector initialization failed"))
+        .when(catalogs)
+        .doWithCatalog(eq(NameIdentifier.of(METALAKE, "broken")), any());
+    RoleEntity role =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "unguardedRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW"),
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.TABLE,
+                    "broken.schema.table",
+                    Privilege.Name.SELECT_TABLE,
+                    "DENY")));
+    mockDirectUserRoles(role);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(catalogObject, METALAKE))
+        .thenReturn(Optional.empty());
+    try {
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  jcasbinAuthorizer.authorize(
+                      PrincipalUtils.getCurrentPrincipal(),
+                      METALAKE,
+                      MetadataObjects.of(null, "healthy", MetadataObject.Type.CATALOG),
+                      Privilege.Name.SELECT_TABLE,
+                      new AuthorizationRequestContext()));
+      assertTrue(failure.getCause() instanceof IllegalStateException);
+      assertTrue(failure.getCause().getMessage().contains("broken.schema.table"));
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+      assertTrue(
+          getAllowEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID))
+              .isEmpty());
+      assertTrue(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID))
+              .isEmpty());
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(catalogObject, METALAKE))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
   }
 
   @Test
@@ -2713,6 +3029,15 @@ public class TestJcasbinAuthorizer {
     }
     when(roleMetaMapper.listRolesByGroupId(eq(groupId))).thenReturn(rolePOs);
     return group;
+  }
+
+  private static Map<Entity.EntityType, NameIdentifier> tableMetadataNames(
+      String catalog, String table) {
+    return ImmutableMap.of(
+        Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(METALAKE),
+        Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(METALAKE, catalog),
+        Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(METALAKE, catalog, "schema"),
+        Entity.EntityType.TABLE, NameIdentifier.of(METALAKE, catalog, "schema", table));
   }
 
   private Boolean doAuthorize(Principal currentPrincipal) {
