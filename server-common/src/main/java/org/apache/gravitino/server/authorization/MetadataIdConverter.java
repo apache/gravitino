@@ -51,11 +51,13 @@ public class MetadataIdConverter {
       ImmutableMap.of(
           MetadataObject.Type.SCHEMA, Capability.Scope.SCHEMA,
           MetadataObject.Type.TABLE, Capability.Scope.TABLE,
+          MetadataObject.Type.VIEW, Capability.Scope.VIEW,
           MetadataObject.Type.MODEL, Capability.Scope.MODEL,
           MetadataObject.Type.FILESET, Capability.Scope.FILESET,
           MetadataObject.Type.TOPIC, Capability.Scope.TOPIC,
           MetadataObject.Type.COLUMN, Capability.Scope.COLUMN,
-          MetadataObject.Type.SEMANTIC_MODEL, Capability.Scope.SEMANTIC_MODEL);
+          MetadataObject.Type.SEMANTIC_MODEL, Capability.Scope.SEMANTIC_MODEL,
+          MetadataObject.Type.FUNCTION, Capability.Scope.FUNCTION);
 
   private MetadataIdConverter() {}
 
@@ -104,9 +106,8 @@ public class MetadataIdConverter {
   /**
    * Normalizes a metadata object's name using the same catalog rules as ID resolution.
    *
-   * <p>Types without a catalog capability scope, including VIEW and FUNCTION, retain their names.
-   * Semantic model leaves remain case sensitive, while column names and their table/schema parents
-   * follow their own scopes.
+   * <p>Types without a catalog capability scope retain their names. Semantic model leaves remain
+   * case sensitive, while column names and their table/schema parents follow their own scopes.
    *
    * @param metadataObject the object whose name will be normalized
    * @param metalake the metalake name

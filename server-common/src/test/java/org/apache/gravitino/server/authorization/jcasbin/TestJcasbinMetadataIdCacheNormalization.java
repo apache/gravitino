@@ -459,16 +459,16 @@ public class TestJcasbinMetadataIdCacheNormalization {
   }
 
   @Test
-  void testViewsAndFunctionsRetainExistingRawNameBehavior() throws IOException {
+  void testViewsAndFunctionsNormalizeNamesLikeTheirDispatchers() {
+    // Listed explicitly: the parameterized cases derive from the mapping and would vanish with it.
     for (MetadataObject.Type type :
         List.of(MetadataObject.Type.VIEW, MetadataObject.Type.FUNCTION)) {
-      MetadataObject raw = MetadataObjects.parse("cat.SCHEMA.OBJECT", type);
-      assertSame(raw, MetadataIdConverter.normalizeMetadataObject(raw, METALAKE));
-      assertEquals(Optional.empty(), resolve(raw));
-      verify(store)
-          .get(ident(raw), entityType(type), EntityClassMapper.getEntityClass(entityType(type)));
+      put(object(type, false), 100L);
+      assertEquals(
+          object(type, false),
+          MetadataIdConverter.normalizeMetadataObject(object(type, true), METALAKE));
+      assertEquals(Optional.of(100L), resolve(object(type, true)));
     }
-    verifyNoInteractions(catalogs);
   }
 
   @Test
@@ -547,6 +547,8 @@ public class TestJcasbinMetadataIdCacheNormalization {
         name = alias ? "cat.SCHEMA.Model" : "cat.schema.Model";
         break;
       case TABLE:
+      case VIEW:
+      case FUNCTION:
       case MODEL:
       case FILESET:
       case TOPIC:
