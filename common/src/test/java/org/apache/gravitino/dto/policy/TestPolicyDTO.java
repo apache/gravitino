@@ -119,10 +119,10 @@ public class TestPolicyDTO {
             .withDataFileMseWeight(2L)
             .withDeleteFileNumberWeight(150L)
             .withMaxPartitionNum(99L)
-            .withRewriteOptions(
-                ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
             .withRewriteStrategy("sort")
             .withSortOrder("zorder(c1,c2)")
+            .withRewriteOptions(
+                ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
             .build();
 
     PolicyDTO policyDTO =

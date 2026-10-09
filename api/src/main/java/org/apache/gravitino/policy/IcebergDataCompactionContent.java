@@ -124,9 +124,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
   private final Long dataFileMseWeight;
   private final Long deleteFileNumberWeight;
   private final Long maxPartitionNum;
-  private final Map<String, String> rewriteOptions;
   private final String rewriteStrategy;
   private final String sortOrder;
+  private final Map<String, String> rewriteOptions;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
@@ -139,9 +139,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
       Long dataFileMseWeight,
       Long deleteFileNumberWeight,
       Long maxPartitionNum,
-      Map<String, String> rewriteOptions,
       String rewriteStrategy,
-      String sortOrder) {
+      String sortOrder,
+      Map<String, String> rewriteOptions) {
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -151,15 +151,15 @@ public class IcebergDataCompactionContent implements PolicyContent {
     this.deleteFileNumberWeight =
         deleteFileNumberWeight == null ? DEFAULT_DELETE_FILE_NUMBER_WEIGHT : deleteFileNumberWeight;
     this.maxPartitionNum = maxPartitionNum == null ? DEFAULT_MAX_PARTITION_NUM : maxPartitionNum;
-    this.rewriteOptions =
-        rewriteOptions == null
-            ? DEFAULT_REWRITE_OPTIONS
-            : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     this.rewriteStrategy =
         rewriteStrategy == null
             ? DEFAULT_REWRITE_STRATEGY
             : rewriteStrategy.trim().toLowerCase(Locale.ROOT);
     this.sortOrder = sortOrder == null ? DEFAULT_SORT_ORDER : sortOrder.trim();
+    this.rewriteOptions =
+        rewriteOptions == null
+            ? DEFAULT_REWRITE_OPTIONS
+            : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
   }
 
   /**
@@ -208,15 +208,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
   }
 
   /**
-   * Returns rewrite options that are expanded to {@code job.options.*} rule entries.
-   *
-   * @return rewrite options
-   */
-  public Map<String, String> rewriteOptions() {
-    return rewriteOptions;
-  }
-
-  /**
    * Returns the Iceberg {@code rewrite_data_files} top-level {@code strategy} argument.
    *
    * @return rewrite strategy, one of {@value REWRITE_STRATEGY_BINPACK} or {@value
@@ -233,6 +224,15 @@ public class IcebergDataCompactionContent implements PolicyContent {
    */
   public String sortOrder() {
     return sortOrder;
+  }
+
+  /**
+   * Returns rewrite options that are expanded to {@code job.options.*} rule entries.
+   *
+   * @return rewrite options
+   */
+  public Map<String, String> rewriteOptions() {
+    return rewriteOptions;
   }
 
   @Override
@@ -312,9 +312,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
         && Objects.equals(deleteFileNumberWeight, that.deleteFileNumberWeight)
         && Objects.equals(maxPartitionNum, that.maxPartitionNum)
-        && Objects.equals(rewriteOptions, that.rewriteOptions)
         && Objects.equals(rewriteStrategy, that.rewriteStrategy)
-        && Objects.equals(sortOrder, that.sortOrder);
+        && Objects.equals(sortOrder, that.sortOrder)
+        && Objects.equals(rewriteOptions, that.rewriteOptions);
   }
 
   @Override
@@ -325,9 +325,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
         dataFileMseWeight,
         deleteFileNumberWeight,
         maxPartitionNum,
-        rewriteOptions,
         rewriteStrategy,
-        sortOrder);
+        sortOrder,
+        rewriteOptions);
   }
 
   @Override
@@ -343,14 +343,14 @@ public class IcebergDataCompactionContent implements PolicyContent {
         + deleteFileNumberWeight
         + ", maxPartitionNum="
         + maxPartitionNum
-        + ", rewriteOptions="
-        + rewriteOptions
         + ", rewriteStrategy='"
         + rewriteStrategy
         + '\''
         + ", sortOrder='"
         + sortOrder
         + '\''
+        + ", rewriteOptions="
+        + rewriteOptions
         + '}';
   }
 }

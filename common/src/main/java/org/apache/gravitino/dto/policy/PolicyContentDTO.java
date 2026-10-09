@@ -105,14 +105,14 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("maxPartitionNum")
     private Long maxPartitionNum;
 
-    @JsonProperty("rewriteOptions")
-    private Map<String, String> rewriteOptions;
-
     @JsonProperty("rewriteStrategy")
     private String rewriteStrategy;
 
     @JsonProperty("sortOrder")
     private String sortOrder;
+
+    @JsonProperty("rewriteOptions")
+    private Map<String, String> rewriteOptions;
 
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
@@ -173,17 +173,6 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
-     * Returns rewrite options expanded to job.options.* during rule generation.
-     *
-     * @return rewrite options map
-     */
-    public Map<String, String> rewriteOptions() {
-      return rewriteOptions == null
-          ? IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS
-          : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
-    }
-
-    /**
      * Returns the Iceberg rewrite_data_files top-level strategy.
      *
      * @return rewrite strategy
@@ -201,6 +190,17 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public String sortOrder() {
       return sortOrder == null ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER : sortOrder;
+    }
+
+    /**
+     * Returns rewrite options expanded to job.options.* during rule generation.
+     *
+     * @return rewrite options map
+     */
+    public Map<String, String> rewriteOptions() {
+      return rewriteOptions == null
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS
+          : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
     @Override
@@ -231,9 +231,9 @@ public interface PolicyContentDTO extends PolicyContent {
           dataFileMseWeight(),
           deleteFileNumberWeight(),
           maxPartitionNum(),
-          rewriteOptions(),
           rewriteStrategy(),
-          sortOrder());
+          sortOrder(),
+          rewriteOptions());
     }
   }
 

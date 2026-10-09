@@ -26,9 +26,9 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `dataFileMseWeight` | No | `1` | Score weight of `custom-data-file-mse`. Must be `>= 0`. |
 | `deleteFileNumberWeight` | No | `100` | Score weight of `custom-delete-file-number`. Must be `>= 0`. |
 | `maxPartitionNum` | No | `50` | Maximum number of partitions selected by optimizer. Must be `> 0`. |
-| `rewriteOptions` | No | `{}` | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules. |
 | `rewriteStrategy` | No | `binpack` | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`. |
 | `sortOrder` | No | `""` | Iceberg `rewrite_data_files` top-level `sort_order`. Required when `rewriteStrategy` is `sort`. |
+| `rewriteOptions` | No | `{}` | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules. |
 
 `rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
 parameters separate from the `options` map.

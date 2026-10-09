@@ -695,9 +695,9 @@ public class DTOConverters {
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
-          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
           .withSortOrder(icebergCompactionContent.sortOrder())
+          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
 
@@ -1574,9 +1574,9 @@ public class DTOConverters {
           icebergCompactionContentDTO.dataFileMseWeight(),
           icebergCompactionContentDTO.deleteFileNumberWeight(),
           icebergCompactionContentDTO.maxPartitionNum(),
-          icebergCompactionContentDTO.rewriteOptions(),
           icebergCompactionContentDTO.rewriteStrategy(),
-          icebergCompactionContentDTO.sortOrder());
+          icebergCompactionContentDTO.sortOrder(),
+          icebergCompactionContentDTO.rewriteOptions());
     }
 
     if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {

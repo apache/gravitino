@@ -104,9 +104,9 @@ class TestGravitinoPolicyCompactionStrategy {
             2L,
             10L,
             20L,
-            Map.of("target-file-size-bytes", "1048576"),
             "sort",
-            "id DESC NULLS LAST");
+            "id DESC NULLS LAST",
+            Map.of("target-file-size-bytes", "1048576"));
     Policy policy = Mockito.mock(Policy.class);
     Mockito.when(policy.name()).thenReturn("iceberg-compaction-sort-policy");
     Mockito.when(policy.content()).thenReturn(content);

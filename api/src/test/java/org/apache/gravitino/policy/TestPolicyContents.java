@@ -104,7 +104,7 @@ public class TestPolicyContents {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)
             PolicyContents.icebergDataCompaction(
-                1000L, 1L, 1L, 100L, 50L, mapOf("min-input-files", "5"), "sort", "zorder(c1,c2)");
+                1000L, 1L, 1L, 100L, 50L, "sort", "zorder(c1,c2)", mapOf("min-input-files", "5"));
 
     Assertions.assertEquals("sort", content.rewriteStrategy());
     Assertions.assertEquals("zorder(c1,c2)", content.sortOrder());
@@ -118,7 +118,7 @@ public class TestPolicyContents {
   void testIcebergCompactionContentRejectsSortWithoutSortOrder() {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)
-            PolicyContents.icebergDataCompaction(1000L, 1L, 1L, 100L, 50L, Map.of(), "sort", "");
+            PolicyContents.icebergDataCompaction(1000L, 1L, 1L, 100L, 50L, "sort", "", Map.of());
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
@@ -129,7 +129,7 @@ public class TestPolicyContents {
   void testIcebergCompactionContentRejectsUnsupportedStrategy() {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)
-            PolicyContents.icebergDataCompaction(1000L, 1L, 1L, 100L, 50L, Map.of(), "unknown", "");
+            PolicyContents.icebergDataCompaction(1000L, 1L, 1L, 100L, 50L, "unknown", "", Map.of());
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
