@@ -171,6 +171,89 @@ public class TestJobResourceUtils {
   }
 
   @Test
+  public void testLocalizeRejectsResourcesWithSameFileName() throws IOException {
+    File dirA = Files.createTempDirectory(tempDir.toPath(), "a").toFile();
+    File dirB = Files.createTempDirectory(tempDir.toPath(), "b").toFile();
+    File executable = new File(dirA, "run.sh");
+    File script = new File(dirB, "run.sh");
+    Assertions.assertTrue(executable.createNewFile());
+    Assertions.assertTrue(script.createNewFile());
+
+    // Different resources with the same file name would overwrite each other.
+    ShellJobTemplate shellTemplate =
+        ShellJobTemplate.builder()
+            .withName("shell_job")
+            .withExecutable(executable.getAbsolutePath())
+            .withScripts(Lists.newArrayList(script.getAbsolutePath()))
+            .build();
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobResourceUtils.localizeJobTemplate(shellTemplate, tempStagingDir));
+    Assertions.assertTrue(e.getMessage().contains("same file name run.sh"), e.getMessage());
+
+    SparkJobTemplate sparkTemplate =
+        SparkJobTemplate.builder()
+            .withName("spark_job")
+            .withExecutable("https://a.example.com/jobs/app.jar")
+            .withClassName("org.example.App")
+            .withFiles(Lists.newArrayList("https://b.example.com/conf/app.jar"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobResourceUtils.localizeJobTemplate(sparkTemplate, tempStagingDir));
+
+    // Nothing is fetched when the job template is rejected.
+    Assertions.assertArrayEquals(new String[0], tempStagingDir.list());
+
+    // The same resource listed twice is not a conflict.
+    ShellJobTemplate repeated =
+        ShellJobTemplate.builder()
+            .withName("shell_job")
+            .withExecutable(executable.getAbsolutePath())
+            .withScripts(Lists.newArrayList(executable.getAbsolutePath()))
+            .build();
+    Assertions.assertDoesNotThrow(
+        () -> JobResourceUtils.localizeJobTemplate(repeated, tempStagingDir));
+  }
+
+  @Test
+  public void testLocalizeRejectsScriptNamedLikeCommandNameExecutable() throws IOException {
+    File script = new File(Files.createTempDirectory(tempDir.toPath(), "src").toFile(), "run.sh");
+    Assertions.assertTrue(script.createNewFile());
+    // "run.sh" is a command name, so the fetched run.sh would not be the one that runs.
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("shell_job")
+            .withExecutable("run.sh")
+            .withScripts(Lists.newArrayList(script.toURI().toString()))
+            .build();
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobResourceUtils.localizeJobTemplate(template, tempStagingDir));
+    Assertions.assertTrue(e.getMessage().contains("command name"), e.getMessage());
+    Assertions.assertArrayEquals(new String[0], tempStagingDir.list());
+  }
+
+  @Test
+  public void testFetchFileRejectsUriWithoutFileName() {
+    for (String uri :
+        Arrays.asList("http://repo.example.com", "http://repo.example.com/", "file:relative")) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> JobResourceUtils.fetchFile(uri, tempStagingDir, 1000),
+              uri);
+      Assertions.assertTrue(e.getMessage().contains("no file name"), e.getMessage());
+    }
+    // The staging directory itself is never the fetch destination.
+    Assertions.assertTrue(tempStagingDir.isDirectory());
+    Assertions.assertArrayEquals(new String[0], tempStagingDir.list());
+  }
+
+  @Test
   public void testLocalizeSparkJobTemplate() throws IOException {
     File executable = Files.createTempFile(tempDir.toPath(), "app", ".jar").toFile();
     File jar = Files.createTempFile(tempDir.toPath(), "lib", ".jar").toFile();
@@ -266,14 +349,14 @@ public class TestJobResourceUtils {
     RuntimeException e3 =
         Assertions.assertThrows(
             RuntimeException.class,
-            () -> JobResourceUtils.fetchFile("http://192.168.1.1/", stagingDir, 1000));
+            () -> JobResourceUtils.fetchFile("http://192.168.1.1/run.sh", stagingDir, 1000));
     assertRemoteUriBlockedMessage(e3);
 
     // Alibaba Cloud / Oracle Cloud metadata endpoint
     RuntimeException e4 =
         Assertions.assertThrows(
             RuntimeException.class,
-            () -> JobResourceUtils.fetchFile("http://100.100.100.200/", stagingDir, 1000));
+            () -> JobResourceUtils.fetchFile("http://100.100.100.200/run.sh", stagingDir, 1000));
     assertRemoteUriBlockedMessage(e4);
   }
 
