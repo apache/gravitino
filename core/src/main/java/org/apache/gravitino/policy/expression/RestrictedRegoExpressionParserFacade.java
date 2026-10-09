@@ -22,14 +22,15 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Comparison;
 import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Literal;
 import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralArray;
 import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Operation;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Logical;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
 import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
@@ -114,6 +115,13 @@ public final class RestrictedRegoExpressionParserFacade {
         nodeCount <= MAX_AST_NODES,
         "restricted-rego-v1 AST must not exceed %s nodes",
         MAX_AST_NODES);
+    if (program instanceof RowFilter) {
+      CanonicalExpression lowered = ((RowFilter) program).lower();
+      Preconditions.checkArgument(
+          lowered.depth() <= MAX_SOURCE_DEPTH,
+          "lowered row-filter depth must not exceed %s",
+          MAX_SOURCE_DEPTH);
+    }
   }
 
   private static List<CanonicalExpression> expressions(RestrictedRegoProgram program) {
@@ -135,27 +143,21 @@ public final class RestrictedRegoExpressionParserFacade {
   }
 
   private static int countNodes(CanonicalExpression expression) {
-    if (!(expression instanceof Operation)) {
-      return 1;
+    if (expression instanceof Comparison) {
+      Comparison comparison = (Comparison) expression;
+      return 1 + countNodes(comparison.left()) + countNodes(comparison.right());
     }
-
-    Operation operation = (Operation) expression;
-    int count = 1;
-    if (operation.left() != null) {
-      count += countNodes(operation.left());
+    if (expression instanceof Not) {
+      return 1 + countNodes(((Not) expression).operand());
     }
-    if (operation.right() != null) {
-      count += countNodes(operation.right());
-    }
-    if (operation.operand() != null) {
-      count += countNodes(operation.operand());
-    }
-    if (operation.operands() != null) {
-      for (CanonicalExpression child : operation.operands()) {
+    if (expression instanceof Logical) {
+      int count = 1;
+      for (CanonicalExpression child : ((Logical) expression).operands()) {
         count += countNodes(child);
       }
+      return count;
     }
-    return count;
+    return 1;
   }
 
   private static final class SourceParser {
@@ -228,9 +230,14 @@ public final class RestrictedRegoExpressionParserFacade {
     private MaskAction parseMaskAction() {
       expect(TokenType.ACTION, "expected action");
       expect(TokenType.LPAREN, "expected ( after action");
-      String action = decodeString(expect(TokenType.STRING, "expected mask action string").text);
+      Token actionToken = expect(TokenType.STRING, "expected mask action string");
+      String action = decodeString(actionToken);
       expect(TokenType.RPAREN, "expected ) after mask action");
-      return MaskAction.fromValue(action);
+      try {
+        return MaskAction.fromValue(action);
+      } catch (IllegalArgumentException exception) {
+        throw error(actionToken, exception.getMessage());
+      }
     }
 
     private CanonicalExpression parseExpression() {
@@ -238,29 +245,21 @@ public final class RestrictedRegoExpressionParserFacade {
     }
 
     private CanonicalExpression parseOrExpression() {
-      CanonicalExpression result = parseAndExpression();
+      List<CanonicalExpression> operands = new ArrayList<>();
+      operands.add(parseAndExpression());
       while (match(TokenType.OR)) {
-        Preconditions.checkArgument(
-            ExpressionValidation.isPredicate(result), "or operands must be boolean predicates");
-        CanonicalExpression operand = parseAndExpression();
-        Preconditions.checkArgument(
-            ExpressionValidation.isPredicate(operand), "or operands must be boolean predicates");
-        result = new Operation(Operator.OR, null, null, null, Arrays.asList(result, operand));
+        operands.add(parseAndExpression());
       }
-      return result;
+      return operands.size() == 1 ? operands.get(0) : new Logical(Operator.OR, operands);
     }
 
     private CanonicalExpression parseAndExpression() {
-      CanonicalExpression result = parseNotExpression();
+      List<CanonicalExpression> operands = new ArrayList<>();
+      operands.add(parseNotExpression());
       while (match(TokenType.AND)) {
-        Preconditions.checkArgument(
-            ExpressionValidation.isPredicate(result), "and operands must be boolean predicates");
-        CanonicalExpression operand = parseNotExpression();
-        Preconditions.checkArgument(
-            ExpressionValidation.isPredicate(operand), "and operands must be boolean predicates");
-        result = new Operation(Operator.AND, null, null, null, Arrays.asList(result, operand));
+        operands.add(parseNotExpression());
       }
-      return result;
+      return operands.size() == 1 ? operands.get(0) : new Logical(Operator.AND, operands);
     }
 
     private CanonicalExpression parseNotExpression() {
@@ -271,9 +270,7 @@ public final class RestrictedRegoExpressionParserFacade {
 
       CanonicalExpression result = parseComparisonExpression();
       for (int index = 0; index < notCount; index++) {
-        Preconditions.checkArgument(
-            ExpressionValidation.isPredicate(result), "not operand must be a boolean predicate");
-        result = new Operation(Operator.NOT, null, null, result, null);
+        result = new Not(result);
       }
       return result;
     }
@@ -284,14 +281,18 @@ public final class RestrictedRegoExpressionParserFacade {
         return left;
       }
 
-      Operator operator = Operator.fromValue(advance().text);
-      return new Operation(operator, left, parsePrimary(), null, null);
+      Operator operator = Operator.fromSourceToken(advance().text);
+      CanonicalExpression right = parsePrimary();
+      if (isComparisonOperator(current.type)) {
+        throw error("chained comparisons are not supported");
+      }
+      return new Comparison(operator, left, right);
     }
 
     private CanonicalExpression parsePrimary() {
       if (match(TokenType.COL)) {
         expect(TokenType.LPAREN, "expected ( after col");
-        String column = decodeString(expect(TokenType.STRING, "expected column name string").text);
+        String column = decodeString(expect(TokenType.STRING, "expected column name string"));
         expect(TokenType.RPAREN, "expected ) after column name");
         return new CanonicalExpression.Column(column);
       }
@@ -302,7 +303,7 @@ public final class RestrictedRegoExpressionParserFacade {
       }
       if (match(TokenType.IS_GROUP_MEMBER)) {
         expect(TokenType.LPAREN, "expected ( after is_group_member");
-        String group = decodeString(expect(TokenType.STRING, "expected group name string").text);
+        String group = decodeString(expect(TokenType.STRING, "expected group name string"));
         expect(TokenType.RPAREN, "expected ) after group name");
         return new GroupMembership(group);
       }
@@ -314,10 +315,9 @@ public final class RestrictedRegoExpressionParserFacade {
       }
       if (match(TokenType.LPAREN)) {
         parenthesisNesting++;
-        Preconditions.checkArgument(
-            parenthesisNesting <= MAX_PARENTHESIS_NESTING,
-            "restricted-rego-v1 parenthesis nesting must not exceed %s",
-            MAX_PARENTHESIS_NESTING);
+        if (parenthesisNesting > MAX_PARENTHESIS_NESTING) {
+          throw error("parenthesis nesting must not exceed " + MAX_PARENTHESIS_NESTING);
+        }
         CanonicalExpression expression = parseExpression();
         expect(TokenType.RPAREN, "expected ) after expression");
         parenthesisNesting--;
@@ -330,7 +330,7 @@ public final class RestrictedRegoExpressionParserFacade {
       Token token = advance();
       switch (token.type) {
         case STRING:
-          return new Literal(LiteralType.STRING, decodeString(token.text));
+          return new Literal(LiteralType.STRING, decodeString(token));
         case NUMBER:
           BigDecimal value = new BigDecimal(token.text);
           return new Literal(
@@ -350,18 +350,16 @@ public final class RestrictedRegoExpressionParserFacade {
       List<Literal> values = new ArrayList<>();
       LiteralType elementType = null;
       do {
-        Preconditions.checkArgument(
-            values.size() < MAX_ARRAY_ELEMENTS,
-            "array literal must not exceed %s elements",
-            MAX_ARRAY_ELEMENTS);
-        Preconditions.checkArgument(isLiteral(current.type), "array literal cannot be empty");
+        if (values.size() >= MAX_ARRAY_ELEMENTS) {
+          throw error("array literal must not exceed " + MAX_ARRAY_ELEMENTS + " elements");
+        }
+        if (!isLiteral(current.type)) {
+          throw error("expected a literal array element");
+        }
         Literal literal = parseLiteral();
-        Preconditions.checkArgument(
-            literal.literalType() != LiteralType.NULL, "array literals cannot contain null");
-        Preconditions.checkArgument(
-            elementType == null || elementType == literal.literalType(),
-            "array literals must have one homogeneous source type");
-        elementType = literal.literalType();
+        if (elementType == null) {
+          elementType = literal.literalType();
+        }
         values.add(literal);
       } while (match(TokenType.COMMA));
       expect(TokenType.RBRACKET, "expected ] after array literal");
@@ -421,6 +419,53 @@ public final class RestrictedRegoExpressionParserFacade {
           || type == TokenType.FALSE
           || type == TokenType.NULL;
     }
+
+    private static String decodeString(Token token) {
+      StringBuilder result = new StringBuilder();
+      for (int index = 1; index < token.text.length() - 1; index++) {
+        char current = token.text.charAt(index);
+        if (current != '\\') {
+          result.append(current);
+          continue;
+        }
+
+        char escaped = token.text.charAt(++index);
+        switch (escaped) {
+          case '"':
+          case '\\':
+          case '/':
+            result.append(escaped);
+            break;
+          case 'b':
+            result.append('\b');
+            break;
+          case 'f':
+            result.append('\f');
+            break;
+          case 'n':
+            result.append('\n');
+            break;
+          case 'r':
+            result.append('\r');
+            break;
+          case 't':
+            result.append('\t');
+            break;
+          case 'u':
+            result.append((char) Integer.parseInt(token.text.substring(index + 1, index + 5), 16));
+            index += 4;
+            break;
+          default:
+            throw error(token, "unsupported string escape: \\" + escaped);
+        }
+      }
+      String decoded = result.toString();
+      if (decoded.getBytes(StandardCharsets.UTF_8).length > MAX_STRING_BYTES) {
+        throw error(
+            token, "decoded string literal must not exceed " + MAX_STRING_BYTES + " UTF-8 bytes");
+      }
+      return decoded;
+    }
   }
 
   private enum TokenType {
@@ -474,7 +519,7 @@ public final class RestrictedRegoExpressionParserFacade {
     private final String source;
     private int offset;
     private int line = 1;
-    private int column;
+    private int column = 1;
 
     private Lexer(String source) {
       this.source = source;
@@ -499,10 +544,10 @@ public final class RestrictedRegoExpressionParserFacade {
           advance();
         } while (!atEnd() && isIdentifierPart(peek()));
         String text = source.substring(tokenOffset, offset);
-        return new Token(keywordType(text), text, tokenLine, tokenColumn);
+        return new Token(keywordType(text, tokenLine, tokenColumn), text, tokenLine, tokenColumn);
       }
       if (isDigit(current) || (current == '-' && isDigit(peekNext()))) {
-        scanNumber();
+        scanNumber(tokenLine, tokenColumn);
         if (!atEnd() && isIdentifierStart(peek())) {
           throw lexicalError(
               tokenLine, tokenColumn, "numeric literal must be separated from identifiers");
@@ -567,12 +612,16 @@ public final class RestrictedRegoExpressionParserFacade {
       throw lexicalError(tokenLine, tokenColumn, "unterminated string");
     }
 
-    private void scanNumber() {
+    private void scanNumber(int tokenLine, int tokenColumn) {
       if (peek() == '-') {
         advance();
       }
       if (peek() == '0') {
         advance();
+        if (!atEnd() && isDigit(peek())) {
+          throw lexicalError(
+              tokenLine, tokenColumn, "numeric literals cannot contain leading zeros");
+        }
       } else {
         while (!atEnd() && isDigit(peek())) {
           advance();
@@ -623,7 +672,7 @@ public final class RestrictedRegoExpressionParserFacade {
       char current = source.charAt(offset++);
       if (current == '\n') {
         line++;
-        column = 0;
+        column = 1;
       } else {
         column++;
       }
@@ -642,7 +691,7 @@ public final class RestrictedRegoExpressionParserFacade {
       return offset >= source.length();
     }
 
-    private static TokenType keywordType(String text) {
+    private static TokenType keywordType(String text, int line, int column) {
       switch (text) {
         case "filter":
           return TokenType.FILTER;
@@ -675,8 +724,7 @@ public final class RestrictedRegoExpressionParserFacade {
         case "null":
           return TokenType.NULL;
         default:
-          throw new IllegalArgumentException(
-              "Unsupported identifier in restricted-rego-v1: " + text);
+          throw lexicalError(line, column, "unsupported identifier " + text);
       }
     }
 
@@ -698,52 +746,5 @@ public final class RestrictedRegoExpressionParserFacade {
               "Invalid restricted-rego-v1 program at line %s, column %s: %s",
               line, column, message));
     }
-  }
-
-  private static String decodeString(String token) {
-    StringBuilder result = new StringBuilder();
-    for (int index = 1; index < token.length() - 1; index++) {
-      char current = token.charAt(index);
-      if (current != '\\') {
-        result.append(current);
-        continue;
-      }
-
-      char escaped = token.charAt(++index);
-      switch (escaped) {
-        case '"':
-        case '\\':
-        case '/':
-          result.append(escaped);
-          break;
-        case 'b':
-          result.append('\b');
-          break;
-        case 'f':
-          result.append('\f');
-          break;
-        case 'n':
-          result.append('\n');
-          break;
-        case 'r':
-          result.append('\r');
-          break;
-        case 't':
-          result.append('\t');
-          break;
-        case 'u':
-          result.append((char) Integer.parseInt(token.substring(index + 1, index + 5), 16));
-          index += 4;
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported string escape: \\" + escaped);
-      }
-    }
-    String decoded = result.toString();
-    Preconditions.checkArgument(
-        decoded.getBytes(StandardCharsets.UTF_8).length <= MAX_STRING_BYTES,
-        "decoded string literal must not exceed %s UTF-8 bytes",
-        MAX_STRING_BYTES);
-    return decoded;
   }
 }

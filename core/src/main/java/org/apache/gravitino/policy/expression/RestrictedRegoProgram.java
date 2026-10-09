@@ -20,11 +20,11 @@ package org.apache.gravitino.policy.expression;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Operation;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Logical;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 
 /** A parsed, unresolved program in the {@code restricted-rego-v1} source dialect. */
@@ -223,22 +223,24 @@ public interface RestrictedRegoProgram {
      */
     public CanonicalExpression lower() {
       validate();
-      CanonicalExpression lowered = fallback;
-      for (int index = branches.size() - 1; index >= 0; index--) {
-        FilterBranch branch = branches.get(index);
-        CanonicalExpression selected =
-            new Operation(
-                Operator.AND, null, null, null, Arrays.asList(branch.condition(), branch.result()));
-        CanonicalExpression remaining =
-            new Operation(
-                Operator.AND,
-                null,
-                null,
-                null,
-                Arrays.asList(
-                    new Operation(Operator.NOT, null, null, branch.condition(), null), lowered));
-        lowered = new Operation(Operator.OR, null, null, null, Arrays.asList(selected, remaining));
+      if (branches.isEmpty()) {
+        return fallback;
       }
+
+      List<CanonicalExpression> disjuncts = new ArrayList<>();
+      List<CanonicalExpression> precedingBranchMisses = new ArrayList<>();
+      for (FilterBranch branch : branches) {
+        List<CanonicalExpression> selected = new ArrayList<>(precedingBranchMisses);
+        selected.add(branch.condition());
+        selected.add(branch.result());
+        disjuncts.add(new Logical(Operator.AND, selected));
+        precedingBranchMisses.add(new Not(branch.condition()));
+      }
+
+      List<CanonicalExpression> fallbackOperands = new ArrayList<>(precedingBranchMisses);
+      fallbackOperands.add(fallback);
+      disjuncts.add(new Logical(Operator.AND, fallbackOperands));
+      CanonicalExpression lowered = new Logical(Operator.OR, disjuncts);
       lowered.validate();
       return lowered;
     }

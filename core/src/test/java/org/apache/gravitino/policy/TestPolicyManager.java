@@ -483,6 +483,73 @@ public class TestPolicyManager {
     Assertions.assertEquals(updatedContent, updated.content());
     Assertions.assertEquals(
         updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.createPolicy(
+                METALAKE,
+                "invalid_" + policyName,
+                Policy.BuiltInType.ROW_FILTER,
+                null,
+                true,
+                PolicyContents.rowFilter("filter := col(\"region\")")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                policyName,
+                PolicyChange.updateContent(
+                    "system_row_filter",
+                    PolicyContents.rowFilter("mask := action(\"replace-with-null\")"))));
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+  }
+
+  @Test
+  public void testCreateUpdateAndGetColumnMaskPolicy() {
+    String policyName = "column_mask_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent originalContent = PolicyContents.columnMask("mask := action(\"show-last-4\")");
+
+    PolicyEntity created =
+        policyManager.createPolicy(
+            METALAKE, policyName, Policy.BuiltInType.COLUMN_MASK, null, true, originalContent);
+
+    Assertions.assertEquals(originalContent, created.content());
+    Assertions.assertEquals(
+        originalContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    PolicyContent updatedContent =
+        PolicyContents.columnMask("mask := action(\"replace-with-null\")");
+    PolicyEntity updated =
+        policyManager.alterPolicy(
+            METALAKE, policyName, PolicyChange.updateContent("system_column_mask", updatedContent));
+
+    Assertions.assertEquals(updatedContent, updated.content());
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.createPolicy(
+                METALAKE,
+                "invalid_" + policyName,
+                Policy.BuiltInType.COLUMN_MASK,
+                null,
+                true,
+                PolicyContents.columnMask("mask := action(\"unknown\")")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                policyName,
+                PolicyChange.updateContent(
+                    "system_column_mask", PolicyContents.columnMask("filter := true"))));
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
   }
 
   @Test

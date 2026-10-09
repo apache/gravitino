@@ -22,11 +22,13 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Column;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Comparison;
 import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Literal;
 import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralArray;
 import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Operation;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Logical;
+import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
 import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
@@ -48,7 +50,7 @@ public class TestRestrictedRegoExpressionParserFacade {
             "filter := col(\"owner\") == session_user()");
     Assertions.assertEquals(RuleType.FILTER, filter.ruleType());
     Assertions.assertFalse(filter.isConditional());
-    Assertions.assertInstanceOf(Operation.class, filter.fallback());
+    Assertions.assertInstanceOf(Comparison.class, filter.fallback());
 
     ColumnMask mask =
         RestrictedRegoExpressionParserFacade.parseColumnMask("mask := action(\"show-last-4\")");
@@ -72,9 +74,9 @@ public class TestRestrictedRegoExpressionParserFacade {
 
   @Test
   void testParsesContextReferences() {
-    Operation comparison = (Operation) parseFilterExpression("col(\"owner\") == session_user()");
+    Comparison comparison = (Comparison) parseFilterExpression("col(\"owner\") == session_user()");
 
-    Assertions.assertEquals(Operator.EQ, comparison.op());
+    Assertions.assertEquals(Operator.EQ, comparison.operator());
     Assertions.assertEquals("owner", ((Column) comparison.left()).name());
     Assertions.assertInstanceOf(SessionUser.class, comparison.right());
 
@@ -85,29 +87,28 @@ public class TestRestrictedRegoExpressionParserFacade {
 
   @Test
   void testParsesPrecedenceAndLiteralArray() {
-    Operation or =
-        (Operation)
+    Logical or =
+        (Logical)
             parseFilterExpression(
                 "col(\"region\") in [\"US\", \"CA\"] or "
                     + "col(\"level\") >= 3 and not col(\"deleted\") == true");
 
-    Assertions.assertEquals(Operator.OR, or.op());
+    Assertions.assertEquals(Operator.OR, or.operator());
     Assertions.assertEquals(2, or.operands().size());
 
-    Operation membership = (Operation) or.operands().get(0);
-    Assertions.assertEquals(Operator.IN, membership.op());
+    Comparison membership = (Comparison) or.operands().get(0);
+    Assertions.assertEquals(Operator.IN, membership.operator());
     LiteralArray values = (LiteralArray) membership.right();
     Assertions.assertEquals(LiteralType.STRING, values.elementType());
     Assertions.assertEquals(
         List.of("US", "CA"),
         List.of(values.values().get(0).value(), values.values().get(1).value()));
 
-    Operation and = (Operation) or.operands().get(1);
-    Assertions.assertEquals(Operator.AND, and.op());
-    Assertions.assertEquals(Operator.GTE, ((Operation) and.operands().get(0)).op());
-    Operation not = (Operation) and.operands().get(1);
-    Assertions.assertEquals(Operator.NOT, not.op());
-    Assertions.assertEquals(Operator.EQ, ((Operation) not.operand()).op());
+    Logical and = (Logical) or.operands().get(1);
+    Assertions.assertEquals(Operator.AND, and.operator());
+    Assertions.assertEquals(Operator.GTE, ((Comparison) and.operands().get(0)).operator());
+    Not not = (Not) and.operands().get(1);
+    Assertions.assertEquals(Operator.EQ, ((Comparison) not.operand()).operator());
   }
 
   @Test
@@ -121,17 +122,23 @@ public class TestRestrictedRegoExpressionParserFacade {
     Assertions.assertTrue(filter.isConditional());
     Assertions.assertEquals(2, filter.branches().size());
     Assertions.assertInstanceOf(GroupMembership.class, filter.branches().get(0).condition());
-    Assertions.assertEquals(Operator.EQ, ((Operation) filter.branches().get(1).condition()).op());
+    Assertions.assertEquals(
+        Operator.EQ, ((Comparison) filter.branches().get(1).condition()).operator());
     Assertions.assertEquals(false, ((Literal) filter.fallback()).value());
     Assertions.assertThrows(UnsupportedOperationException.class, () -> filter.branches().add(null));
 
-    Operation lowered = (Operation) filter.lower();
-    Assertions.assertEquals(Operator.OR, lowered.op());
-    Assertions.assertEquals(Operator.AND, ((Operation) lowered.operands().get(0)).op());
-    Operation remaining = (Operation) lowered.operands().get(1);
-    Assertions.assertEquals(Operator.AND, remaining.op());
-    Assertions.assertEquals(Operator.NOT, ((Operation) remaining.operands().get(0)).op());
-    Assertions.assertEquals(Operator.OR, ((Operation) remaining.operands().get(1)).op());
+    Logical lowered = (Logical) filter.lower();
+    Assertions.assertEquals(Operator.OR, lowered.operator());
+    Assertions.assertEquals(3, lowered.operands().size());
+    Assertions.assertEquals(Operator.AND, ((Logical) lowered.operands().get(0)).operator());
+    Logical secondBranch = (Logical) lowered.operands().get(1);
+    Assertions.assertEquals(Operator.AND, secondBranch.operator());
+    Assertions.assertInstanceOf(Not.class, secondBranch.operands().get(0));
+    Logical fallback = (Logical) lowered.operands().get(2);
+    Assertions.assertEquals(Operator.AND, fallback.operator());
+    Assertions.assertInstanceOf(Not.class, fallback.operands().get(0));
+    Assertions.assertInstanceOf(Not.class, fallback.operands().get(1));
+    Assertions.assertEquals(4, lowered.depth());
   }
 
   @Test
@@ -171,30 +178,30 @@ public class TestRestrictedRegoExpressionParserFacade {
 
   @Test
   void testRetainsExactNumbersAndNegativeZero() {
-    Operation comparison = (Operation) parseFilterExpression("col(\"ratio\") == -0.00");
+    Comparison comparison = (Comparison) parseFilterExpression("col(\"ratio\") == -0.00");
     Literal literal = (Literal) comparison.right();
 
     Assertions.assertEquals(new BigDecimal("0.00"), literal.value());
     Assertions.assertTrue(literal.negativeZero());
 
-    Operation positiveZero = (Operation) parseFilterExpression("col(\"ratio\") == 0.00");
+    Comparison positiveZero = (Comparison) parseFilterExpression("col(\"ratio\") == 0.00");
     Assertions.assertNotEquals(literal, positiveZero.right());
 
-    Operation one = (Operation) parseFilterExpression("col(\"x\") == 1");
-    Operation onePointZero = (Operation) parseFilterExpression("col(\"x\") == 1.00");
+    Comparison one = (Comparison) parseFilterExpression("col(\"x\") == 1");
+    Comparison onePointZero = (Comparison) parseFilterExpression("col(\"x\") == 1.00");
     Assertions.assertEquals(one.right(), onePointZero.right());
   }
 
   @Test
   void testDecodesJsonStringsWithoutNormalizing() {
-    Operation comparison = (Operation) parseFilterExpression("col(\"a\\\"b.c\") == \"a'b\\n\"");
+    Comparison comparison = (Comparison) parseFilterExpression("col(\"a\\\"b.c\") == \"a'b\\n\"");
 
     Assertions.assertEquals("a\"b.c", ((Column) comparison.left()).name());
     Assertions.assertEquals("a'b\n", ((Literal) comparison.right()).value());
 
     String escapedPair = "\\" + "uD83D" + "\\" + "uDE00";
-    Operation unicode =
-        (Operation) parseFilterExpression("col(\"emoji\") == \"" + escapedPair + "\"");
+    Comparison unicode =
+        (Comparison) parseFilterExpression("col(\"emoji\") == \"" + escapedPair + "\"");
     Assertions.assertEquals("😀", ((Literal) unicode.right()).value());
   }
 
@@ -210,17 +217,31 @@ public class TestRestrictedRegoExpressionParserFacade {
   }
 
   @Test
-  void testChecksSourceDepthBeforeBooleanFlattening() {
-    CanonicalExpression depthEight =
-        parseFilterExpression(
-            "true and true and true and true and true and true and true and true");
-    Assertions.assertEquals(8, depthEight.depth());
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
+  void testFlattensAssociativeBooleanChains() {
+    Logical and =
+        (Logical)
             parseFilterExpression(
-                "true and true and true and true and true and true and true and true and true"));
+                "true and true and true and true and true and true and true and true and true");
+    Assertions.assertEquals(Operator.AND, and.operator());
+    Assertions.assertEquals(9, and.operands().size());
+    Assertions.assertEquals(2, and.depth());
+  }
+
+  @Test
+  void testChecksLoweredRowFilterDepthAtSaveTime() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            RestrictedRegoExpressionParserFacade.parseRowFilter(
+                "filter := true if not not not not col(\"active\") == true else := false"));
+
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                RestrictedRegoExpressionParserFacade.parseRowFilter(
+                    "filter := true if not not not not not col(\"active\") == true "
+                        + "else := false"));
+    Assertions.assertTrue(error.getMessage().contains("lowered row-filter depth"));
   }
 
   @Test
@@ -278,18 +299,18 @@ public class TestRestrictedRegoExpressionParserFacade {
         () ->
             RestrictedRegoExpressionParserFacade.parseRowFilter(
                 "filter := "
-                    + balancedAndExpression(0, 32)
+                    + balancedAndExpression(0, 16)
                     + " if "
-                    + balancedAndExpression(32, 64)
+                    + balancedAndExpression(16, 32)
                     + " else := true"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RestrictedRegoExpressionParserFacade.parseRowFilter(
                 "filter := "
-                    + balancedAndExpression(0, 33)
+                    + balancedAndExpression(0, 17)
                     + " if "
-                    + balancedAndExpression(33, 66)
+                    + balancedAndExpression(17, 34)
                     + " else := true"));
   }
 
@@ -383,6 +404,39 @@ public class TestRestrictedRegoExpressionParserFacade {
   void testRejectsUnsupportedOrMalformedPrograms(String source) {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> RestrictedRegoExpressionParserFacade.parse(source));
+  }
+
+  @Test
+  void testReportsSpecificOneBasedSyntaxLocations() {
+    IllegalArgumentException identifierError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                RestrictedRegoExpressionParserFacade.parseRowFilter("filter := region == \"US\""));
+    Assertions.assertTrue(identifierError.getMessage().contains("line 1, column 11"));
+    Assertions.assertTrue(identifierError.getMessage().contains("unsupported identifier region"));
+
+    IllegalArgumentException characterError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> RestrictedRegoExpressionParserFacade.parseRowFilter("filter := @"));
+    Assertions.assertTrue(characterError.getMessage().contains("line 1, column 11"));
+
+    IllegalArgumentException leadingZeroError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                RestrictedRegoExpressionParserFacade.parseRowFilter("filter := col(\"x\") == 01"));
+    Assertions.assertTrue(leadingZeroError.getMessage().contains("leading zeros"));
+
+    IllegalArgumentException chainedComparisonError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                RestrictedRegoExpressionParserFacade.parseRowFilter(
+                    "filter := col(\"x\") == 1 == true"));
+    Assertions.assertTrue(
+        chainedComparisonError.getMessage().contains("chained comparisons are not supported"));
   }
 
   private static CanonicalExpression parseFilterExpression(String expression) {

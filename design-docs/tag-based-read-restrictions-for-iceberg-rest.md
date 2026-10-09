@@ -366,6 +366,10 @@ Save-time validation applies these limits before canonicalization:
 The resolved predicate also has maximum operation depth 8. Canonicalization cannot make an
 oversized expression valid.
 
+Operation depth counts AST operation nodes. A consecutive associative `and` or `or` chain is one
+n-ary logical node, and parentheses do not add depth. Conditional row filters are also lowered and
+checked against the resolved-predicate depth limit at save time.
+
 ## Context and Schema Binding
 
 The expression subset provides two request-stable context functions:

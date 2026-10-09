@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -73,21 +72,21 @@ public interface CanonicalExpression {
     /** Boolean negation. */
     NOT("not");
 
-    private final String value;
+    private final String canonicalName;
 
-    Operator(String value) {
-      this.value = value;
+    Operator(String canonicalName) {
+      this.canonicalName = canonicalName;
     }
 
     /**
-     * Parses a source or canonical operator value.
+     * Parses an operator token from restricted Rego source.
      *
-     * @param value operator value
+     * @param token source operator token
      * @return parsed operator
      */
-    public static Operator fromValue(String value) {
-      Preconditions.checkArgument(value != null && !value.isEmpty(), "operator cannot be empty");
-      switch (value) {
+    public static Operator fromSourceToken(String token) {
+      Preconditions.checkArgument(token != null && !token.isEmpty(), "operator cannot be empty");
+      switch (token) {
         case "==":
           return EQ;
         case "!=":
@@ -100,135 +99,183 @@ public interface CanonicalExpression {
           return GT;
         case ">=":
           return GTE;
+        case "in":
+          return IN;
         default:
-          for (Operator operator : values()) {
-            if (operator.value.equals(value)) {
-              return operator;
-            }
-          }
-          throw new IllegalArgumentException("Unsupported restricted-rego-v1 operator: " + value);
+          throw new IllegalArgumentException("Unsupported restricted-rego-v1 operator: " + token);
       }
     }
 
     /**
-     * Returns the canonical operator value.
+     * Returns the canonical operator name used by the resolved model.
      *
-     * @return canonical operator value
+     * @return canonical operator name
      */
-    public String value() {
-      return value;
+    public String canonicalName() {
+      return canonicalName;
     }
   }
 
   /** Source literal types supported by {@code restricted-rego-v1}. */
   enum LiteralType {
     /** String literal. */
-    STRING("string"),
+    STRING,
     /** Exact base-10 numeric literal. */
-    NUMBER("number"),
+    NUMBER,
     /** Boolean literal. */
-    BOOLEAN("boolean"),
+    BOOLEAN,
     /** Null literal. */
-    NULL("null");
-
-    private final String value;
-
-    LiteralType(String value) {
-      this.value = value;
-    }
-
-    /**
-     * Parses a literal type value.
-     *
-     * @param value literal type value
-     * @return parsed literal type
-     */
-    public static LiteralType fromValue(String value) {
-      Preconditions.checkArgument(
-          value != null && !value.isEmpty(), "literal type cannot be empty");
-      return LiteralType.valueOf(value.toUpperCase(Locale.ROOT));
-    }
-
-    /**
-     * Returns the literal type value.
-     *
-     * @return literal type value
-     */
-    public String value() {
-      return value;
-    }
+    NULL
   }
 
-  /** An allowlisted operation node. */
-  final class Operation implements CanonicalExpression {
-    private final Operator op;
-
+  /** A binary comparison operation. */
+  final class Comparison implements CanonicalExpression {
+    private final Operator operator;
     private final CanonicalExpression left;
-
     private final CanonicalExpression right;
 
-    private final CanonicalExpression operand;
-
-    private final List<CanonicalExpression> operands;
-
-    private Operation() {
-      this(null, null, null, null, null);
-    }
-
-    Operation(
-        Operator op,
-        CanonicalExpression left,
-        CanonicalExpression right,
-        CanonicalExpression operand,
-        List<CanonicalExpression> operands) {
-      this.op = op;
+    Comparison(Operator operator, CanonicalExpression left, CanonicalExpression right) {
+      this.operator = operator;
       this.left = left;
       this.right = right;
-      this.operand = operand;
-      this.operands =
-          operands == null ? null : Collections.unmodifiableList(new ArrayList<>(operands));
     }
 
     /**
-     * Returns the operation.
+     * Returns the comparison operator.
      *
-     * @return operation
+     * @return comparison operator
      */
-    public Operator op() {
-      return op;
+    public Operator operator() {
+      return operator;
     }
 
     /**
-     * Returns the left comparison operand.
+     * Returns the left operand.
      *
-     * @return left operand, or {@code null} for non-comparison operations
+     * @return left operand
      */
     public CanonicalExpression left() {
       return left;
     }
 
     /**
-     * Returns the right comparison operand.
+     * Returns the right operand.
      *
-     * @return right operand, or {@code null} for non-comparison operations
+     * @return right operand
      */
     public CanonicalExpression right() {
       return right;
     }
 
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          ExpressionValidation.isComparisonOperator(operator),
+          "comparison requires a comparison operator");
+      Preconditions.checkArgument(
+          left != null && right != null, "comparison operands cannot be null");
+      left.validate();
+      right.validate();
+      ExpressionValidation.validateComparison(operator, left, right);
+    }
+
+    @Override
+    public int depth() {
+      return 1;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (!(other instanceof Comparison)) {
+        return false;
+      }
+      Comparison that = (Comparison) other;
+      return operator == that.operator
+          && Objects.equals(left, that.left)
+          && Objects.equals(right, that.right);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(operator, left, right);
+    }
+
+    @Override
+    public String toString() {
+      return "Comparison{" + "operator=" + operator + ", left=" + left + ", right=" + right + '}';
+    }
+  }
+
+  /** A Boolean negation operation. */
+  final class Not implements CanonicalExpression {
+    private final CanonicalExpression operand;
+
+    Not(CanonicalExpression operand) {
+      this.operand = operand;
+    }
+
     /**
-     * Returns the unary operand.
+     * Returns the negated predicate.
      *
-     * @return unary operand, or {@code null} for other operations
+     * @return negated predicate
      */
     public CanonicalExpression operand() {
       return operand;
     }
 
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(operand != null, "not requires an operand");
+      operand.validate();
+      Preconditions.checkArgument(
+          ExpressionValidation.isPredicate(operand), "not operand must be a boolean predicate");
+    }
+
+    @Override
+    public int depth() {
+      return 1 + (operand == null ? 0 : operand.depth());
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof Not && Objects.equals(operand, ((Not) other).operand);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(operand);
+    }
+
+    @Override
+    public String toString() {
+      return "Not{" + "operand=" + operand + '}';
+    }
+  }
+
+  /** An n-ary Boolean conjunction or disjunction. */
+  final class Logical implements CanonicalExpression {
+    private final Operator operator;
+    private final List<CanonicalExpression> operands;
+
+    Logical(Operator operator, List<CanonicalExpression> operands) {
+      this.operator = operator;
+      this.operands =
+          operands == null ? null : Collections.unmodifiableList(new ArrayList<>(operands));
+    }
+
     /**
-     * Returns the conjunction or disjunction operands.
+     * Returns the logical operator.
      *
-     * @return immutable operands, or {@code null} for other operations
+     * @return {@link Operator#AND} or {@link Operator#OR}
+     */
+    public Operator operator() {
+      return operator;
+    }
+
+    /**
+     * Returns the logical operands.
+     *
+     * @return immutable operands
      */
     public List<CanonicalExpression> operands() {
       return operands;
@@ -236,134 +283,63 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(op != null, "operation cannot be null");
-      switch (op) {
-        case EQ:
-        case NEQ:
-        case LT:
-        case LTE:
-        case GT:
-        case GTE:
-        case IN:
-          Preconditions.checkArgument(
-              left != null && right != null, "%s requires left and right operands", op.value());
-          Preconditions.checkArgument(
-              operand == null && operands == null,
-              "%s cannot contain logical operands",
-              op.value());
-          left.validate();
-          right.validate();
-          ExpressionValidation.validateComparison(op, left, right);
-          break;
-        case NOT:
-          Preconditions.checkArgument(operand != null, "not requires an operand");
-          Preconditions.checkArgument(
-              left == null && right == null && operands == null,
-              "not cannot contain comparison or boolean operands");
-          operand.validate();
-          Preconditions.checkArgument(
-              ExpressionValidation.isPredicate(operand), "not operand must be a boolean predicate");
-          break;
-        case AND:
-        case OR:
-          Preconditions.checkArgument(
-              operands != null && operands.size() >= 2,
-              "%s requires at least two operands",
-              op.value());
-          Preconditions.checkArgument(
-              left == null && right == null && operand == null,
-              "%s cannot contain comparison or unary operands",
-              op.value());
-          for (CanonicalExpression child : operands) {
-            Preconditions.checkArgument(child != null, "%s operand cannot be null", op.value());
-            child.validate();
-            Preconditions.checkArgument(
-                ExpressionValidation.isPredicate(child),
-                "%s operands must be boolean predicates",
-                op.value());
-          }
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported restricted-rego-v1 operator: " + op);
+      Preconditions.checkArgument(
+          operator == Operator.AND || operator == Operator.OR,
+          "logical expression requires AND or OR");
+      Preconditions.checkArgument(
+          operands != null && operands.size() >= 2,
+          "%s requires at least two operands",
+          operator.canonicalName());
+      for (CanonicalExpression child : operands) {
+        Preconditions.checkArgument(
+            child != null, "%s operand cannot be null", operator.canonicalName());
+        child.validate();
+        Preconditions.checkArgument(
+            ExpressionValidation.isPredicate(child),
+            "%s operands must be boolean predicates",
+            operator.canonicalName());
       }
     }
 
     @Override
     public int depth() {
-      if (op == Operator.NOT) {
-        return operand == null ? 1 : 1 + operand.depth();
-      }
-      if (op == Operator.AND || op == Operator.OR) {
-        int childDepth = 0;
-        if (operands != null) {
-          for (CanonicalExpression child : operands) {
-            if (child != null) {
-              childDepth = Math.max(childDepth, child.depth());
-            }
+      int childDepth = 0;
+      if (operands != null) {
+        for (CanonicalExpression child : operands) {
+          if (child != null) {
+            childDepth = Math.max(childDepth, child.depth());
           }
         }
-        return 1 + childDepth;
       }
-      return 1;
+      return 1 + childDepth;
     }
 
     @Override
     public boolean equals(Object other) {
-      if (!(other instanceof Operation)) {
+      if (!(other instanceof Logical)) {
         return false;
       }
-      Operation that = (Operation) other;
-      return op == that.op
-          && Objects.equals(left, that.left)
-          && Objects.equals(right, that.right)
-          && Objects.equals(operand, that.operand)
-          && Objects.equals(operands, that.operands);
+      Logical that = (Logical) other;
+      return operator == that.operator && Objects.equals(operands, that.operands);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(op, left, right, operand, operands);
+      return Objects.hash(operator, operands);
     }
 
     @Override
     public String toString() {
-      return "Operation{"
-          + "op="
-          + op
-          + ", left="
-          + left
-          + ", right="
-          + right
-          + ", operand="
-          + operand
-          + ", operands="
-          + operands
-          + '}';
+      return "Logical{" + "operator=" + operator + ", operands=" + operands + '}';
     }
   }
 
   /** A symbolic top-level column reference. */
   final class Column implements CanonicalExpression {
-    private final String type;
-
     private final String name;
 
-    private Column() {
-      this(null);
-    }
-
     Column(String name) {
-      this.type = "column";
       this.name = name;
-    }
-
-    /**
-     * Returns the node type.
-     *
-     * @return {@code column}
-     */
-    public String type() {
-      return type;
     }
 
     /**
@@ -377,7 +353,6 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument("column".equals(type), "column node type must be 'column'");
       Preconditions.checkArgument(name != null && !name.isEmpty(), "column name cannot be empty");
       Preconditions.checkArgument(name.indexOf('\0') < 0, "column name cannot contain NUL");
       ExpressionValidation.validateUnicodeScalars(name, "column name");
@@ -394,12 +369,12 @@ public interface CanonicalExpression {
         return false;
       }
       Column that = (Column) other;
-      return Objects.equals(type, that.type) && Objects.equals(name, that.name);
+      return Objects.equals(name, that.name);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(type, name);
+      return Objects.hash(name);
     }
 
     @Override
@@ -410,27 +385,11 @@ public interface CanonicalExpression {
 
   /** A symbolic reference to the trusted effective session user. */
   final class SessionUser implements CanonicalExpression {
-    private final String type;
-
     /** Creates a session-user reference. */
-    SessionUser() {
-      this.type = "session-user";
-    }
-
-    /**
-     * Returns the node type.
-     *
-     * @return {@code session-user}
-     */
-    public String type() {
-      return type;
-    }
+    SessionUser() {}
 
     @Override
-    public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          "session-user".equals(type), "session user node type must be 'session-user'");
-    }
+    public void validate() throws IllegalArgumentException {}
 
     @Override
     public int depth() {
@@ -455,26 +414,10 @@ public interface CanonicalExpression {
 
   /** A request-context group-membership predicate. */
   final class GroupMembership implements CanonicalExpression {
-    private final String type;
-
     private final String group;
 
-    private GroupMembership() {
-      this(null);
-    }
-
     GroupMembership(String group) {
-      this.type = "group-membership";
       this.group = group;
-    }
-
-    /**
-     * Returns the node type.
-     *
-     * @return {@code group-membership}
-     */
-    public String type() {
-      return type;
     }
 
     /**
@@ -488,8 +431,6 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          "group-membership".equals(type), "group membership node type must be 'group-membership'");
       Preconditions.checkArgument(group != null && !group.isEmpty(), "group name cannot be empty");
       ExpressionValidation.validateUnicodeScalars(group, "group name");
     }
@@ -505,12 +446,12 @@ public interface CanonicalExpression {
         return false;
       }
       GroupMembership that = (GroupMembership) other;
-      return Objects.equals(type, that.type) && Objects.equals(group, that.group);
+      return Objects.equals(group, that.group);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(type, group);
+      return Objects.hash(group);
     }
 
     @Override
@@ -521,36 +462,20 @@ public interface CanonicalExpression {
 
   /** A decoded source literal. */
   final class Literal implements CanonicalExpression {
-    private final String type;
-
     private final LiteralType literalType;
 
     private final Object value;
 
     private final boolean negativeZero;
 
-    private Literal() {
-      this(null, null, false);
-    }
-
     Literal(LiteralType literalType, Object value) {
       this(literalType, value, false);
     }
 
     Literal(LiteralType literalType, Object value, boolean negativeZero) {
-      this.type = "literal";
       this.literalType = literalType;
       this.value = value;
       this.negativeZero = negativeZero;
-    }
-
-    /**
-     * Returns the node type.
-     *
-     * @return {@code literal}
-     */
-    public String type() {
-      return type;
     }
 
     /**
@@ -583,7 +508,6 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument("literal".equals(type), "literal node type must be 'literal'");
       Preconditions.checkArgument(literalType != null, "literalType cannot be null");
       switch (literalType) {
         case STRING:
@@ -622,9 +546,7 @@ public interface CanonicalExpression {
         return false;
       }
       Literal that = (Literal) other;
-      if (!Objects.equals(type, that.type)
-          || literalType != that.literalType
-          || negativeZero != that.negativeZero) {
+      if (literalType != that.literalType || negativeZero != that.negativeZero) {
         return false;
       }
       if (literalType == LiteralType.NUMBER) {
@@ -637,7 +559,7 @@ public interface CanonicalExpression {
     public int hashCode() {
       Object normalizedValue =
           literalType == LiteralType.NUMBER ? ((BigDecimal) value).stripTrailingZeros() : value;
-      return Objects.hash(type, literalType, normalizedValue, negativeZero);
+      return Objects.hash(literalType, normalizedValue, negativeZero);
     }
 
     @Override
@@ -655,29 +577,13 @@ public interface CanonicalExpression {
 
   /** A non-empty homogeneous array of non-null source literals. */
   final class LiteralArray implements CanonicalExpression {
-    private final String type;
-
     private final LiteralType elementType;
 
     private final List<Literal> values;
 
-    private LiteralArray() {
-      this(null, null);
-    }
-
     LiteralArray(LiteralType elementType, List<Literal> values) {
-      this.type = "array";
       this.elementType = elementType;
       this.values = values == null ? null : Collections.unmodifiableList(new ArrayList<>(values));
-    }
-
-    /**
-     * Returns the node type.
-     *
-     * @return {@code array}
-     */
-    public String type() {
-      return type;
     }
 
     /**
@@ -700,7 +606,6 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument("array".equals(type), "array node type must be 'array'");
       Preconditions.checkArgument(
           elementType != null && elementType != LiteralType.NULL,
           "array element type must be non-null");
@@ -725,14 +630,12 @@ public interface CanonicalExpression {
         return false;
       }
       LiteralArray that = (LiteralArray) other;
-      return Objects.equals(type, that.type)
-          && elementType == that.elementType
-          && Objects.equals(values, that.values);
+      return elementType == that.elementType && Objects.equals(values, that.values);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(type, elementType, values);
+      return Objects.hash(elementType, values);
     }
 
     @Override
@@ -746,7 +649,9 @@ final class ExpressionValidation {
   private ExpressionValidation() {}
 
   static boolean isPredicate(CanonicalExpression expression) {
-    if (expression instanceof CanonicalExpression.Operation
+    if (expression instanceof CanonicalExpression.Comparison
+        || expression instanceof CanonicalExpression.Not
+        || expression instanceof CanonicalExpression.Logical
         || expression instanceof CanonicalExpression.GroupMembership) {
       return true;
     }
@@ -759,28 +664,31 @@ final class ExpressionValidation {
     if (expression instanceof CanonicalExpression.Column) {
       return false;
     }
-    if (!(expression instanceof CanonicalExpression.Operation)) {
-      return true;
+    if (expression instanceof CanonicalExpression.Comparison) {
+      CanonicalExpression.Comparison comparison = (CanonicalExpression.Comparison) expression;
+      return isContextOnly(comparison.left()) && isContextOnly(comparison.right());
     }
-
-    CanonicalExpression.Operation operation = (CanonicalExpression.Operation) expression;
-    if (operation.left() != null && !isContextOnly(operation.left())) {
-      return false;
+    if (expression instanceof CanonicalExpression.Not) {
+      return isContextOnly(((CanonicalExpression.Not) expression).operand());
     }
-    if (operation.right() != null && !isContextOnly(operation.right())) {
-      return false;
-    }
-    if (operation.operand() != null && !isContextOnly(operation.operand())) {
-      return false;
-    }
-    if (operation.operands() != null) {
-      for (CanonicalExpression child : operation.operands()) {
+    if (expression instanceof CanonicalExpression.Logical) {
+      for (CanonicalExpression child : ((CanonicalExpression.Logical) expression).operands()) {
         if (!isContextOnly(child)) {
           return false;
         }
       }
     }
     return true;
+  }
+
+  static boolean isComparisonOperator(CanonicalExpression.Operator operator) {
+    return operator == CanonicalExpression.Operator.EQ
+        || operator == CanonicalExpression.Operator.NEQ
+        || operator == CanonicalExpression.Operator.LT
+        || operator == CanonicalExpression.Operator.LTE
+        || operator == CanonicalExpression.Operator.GT
+        || operator == CanonicalExpression.Operator.GTE
+        || operator == CanonicalExpression.Operator.IN;
   }
 
   static void validateComparison(
@@ -806,7 +714,7 @@ final class ExpressionValidation {
         !(left instanceof CanonicalExpression.LiteralArray)
             && !(right instanceof CanonicalExpression.LiteralArray),
         "%s does not support array operands",
-        operator.value());
+        operator.canonicalName());
 
     boolean equality =
         operator == CanonicalExpression.Operator.EQ || operator == CanonicalExpression.Operator.NEQ;
@@ -835,7 +743,8 @@ final class ExpressionValidation {
     }
 
     throw new IllegalArgumentException(
-        String.format("Unsupported operands for %s in restricted-rego-v1", operator.value()));
+        String.format(
+            "Unsupported operands for %s in restricted-rego-v1", operator.canonicalName()));
   }
 
   static void validateUnicodeScalars(String value, String description) {
