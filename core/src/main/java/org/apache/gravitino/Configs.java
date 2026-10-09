@@ -205,6 +205,9 @@ public class Configs {
           .createWithDefault(60 * 60 * 1000L);
 
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
+  /** Default maximum number of entity change log records read in one polling cycle. */
+  public static final int DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE = 2000;
+
   public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
   public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
@@ -215,6 +218,20 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
+
+  /**
+   * Maximum records read per entity change log poll. A full batch triggers an immediate next poll;
+   * empty or partial batches wait for the configured poll interval.
+   */
+  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_POLL_BATCH_SIZE =
+      new ConfigBuilder("gravitino.entityChangeLog.pollBatchSize")
+          .doc(
+              "The maximum number of entity change log records read per poll. A full batch is"
+                  + " followed by another poll right away instead of after the poll interval")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
