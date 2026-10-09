@@ -38,9 +38,6 @@ import org.apache.gravitino.utils.JdbcUrlUtils;
  */
 public class DataSourceUtils {
 
-  /** SQL statements for database connection pool testing. */
-  private static final String POOL_TEST_QUERY = "SELECT 1";
-
   // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
   // config map is handed to BasicDataSourceFactory, so allowing these would either run arbitrary
   // code or let a raw property override the validated canonical connection fields:
@@ -153,10 +150,18 @@ public class DataSourceUtils {
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
-    // Set each time a connection is taken out from the connection pool, a test statement will be
-    // executed to confirm whether the connection is valid.
+    // Each time a connection is taken out of the pool it is validated. No validation query is
+    // configured on purpose: DBCP2 prepares the validation statement once per physical connection
+    // and reuses it, while MySQL Connector/J binds a statement to the database that was current
+    // when the statement was created and, on execution, switches the connection back to that
+    // database. For a JDBC URL without a default database the connection is catalog-less when the
+    // first validation statement is prepared, so every later validation on a connection whose
+    // catalog was changed by the catalog code (connection.setCatalog(...)) fails with
+    // "No database selected" (SQLState 3D000, error 1046). DBCP2 then destroys the connection and
+    // opens a new physical connection on every borrow. Without a validation query DBCP2 validates
+    // through the JDBC4 Connection.isValid(int) call, which is evaluated against the connection's
+    // current catalog instead of a statement bound to a stale one.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
-    basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
   }
