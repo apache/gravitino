@@ -36,6 +36,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.TestUtil;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
@@ -88,7 +89,7 @@ public class TestCaffeineEntityCacheEviction {
                   }));
 
       Assertions.assertEquals(1, cache.getCacheData().estimatedSize());
-      // The evicted entry leaves the prefix index once its segment is free again.
+      // Inline removal cleans up the index even while the segment locks remain held.
       Awaitility.await()
           .atMost(5, TimeUnit.SECONDS)
           .untilAsserted(
@@ -143,25 +144,107 @@ public class TestCaffeineEntityCacheEviction {
     Lock heldSegment = locks.getSegmentLock(heldKey);
     cache.put(held);
 
-    cache.withCacheLock(
-        heldKey,
-        () -> {
-          // A slow backend read holds this segment after its entry is evicted. Cleanup must not
-          // wait for it, otherwise evictions of unrelated keys accumulate behind this one.
-          cache.getCacheData().policy().eviction().get().setMaximum(0);
-          cache.getCacheData().cleanUp();
-          cache.getCacheData().policy().eviction().get().setMaximum(64);
-          for (int i = 0; i < 2_000; i++) {
-            BaseMetalake entity = TestUtil.getTestMetalake(100L + i, "entry" + i, "eviction");
-            if (locks.getSegmentLock(metalakeKey(entity)) == heldSegment) {
-              continue;
-            }
-            cache.put(entity);
-            cache.getCacheData().cleanUp();
-            Assertions.assertEquals(cache.getCacheData().asMap().size(), cache.size());
-            Assertions.assertTrue(cache.size() <= 64, "evicted keys must not accumulate");
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      cache.withCacheLock(
+          heldKey,
+          () -> {
+            // The worker evicts the held key on a different thread, so a callback cannot
+            // reacquire this segment reentrantly. It must finish before this thread releases it.
+            Future<?> eviction =
+                writer.submit(
+                    () -> {
+                      cache.getCacheData().policy().eviction().get().setMaximum(0);
+                      cache.getCacheData().cleanUp();
+                      Assertions.assertEquals(0, cache.size());
+                      cache.getCacheData().policy().eviction().get().setMaximum(64);
+                      int inserted = 0;
+                      for (long id = 100L; inserted < 2_000; id++) {
+                        BaseMetalake entity =
+                            TestUtil.getTestMetalake(id, "entry" + id, "eviction");
+                        // The put itself must not wait for the segment deliberately held here.
+                        if (locks.getSegmentLock(metalakeKey(entity)) == heldSegment) {
+                          continue;
+                        }
+                        cache.put(entity);
+                        cache.getCacheData().cleanUp();
+                        Assertions.assertEquals(cache.getCacheData().asMap().size(), cache.size());
+                        Assertions.assertTrue(
+                            cache.size() <= 64, "evicted keys must not accumulate");
+                        inserted++;
+                      }
+                    });
+            Assertions.assertDoesNotThrow(
+                () -> eviction.get(10, TimeUnit.SECONDS),
+                "eviction and unrelated puts must finish while the segment remains locked");
+          });
+    } finally {
+      writer.shutdownNow();
+      Assertions.assertTrue(writer.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testIndexRemovalPreservesLegacyCaffeineSubclassOverride() {
+    List<EntityCacheKey> removedKeys = new ArrayList<>();
+    CaffeineEntityCache cache =
+        new CaffeineEntityCache(countBoundedConfig(1), Runnable::run) {
+          /** {@inheritDoc} */
+          @Deprecated
+          @Override
+          protected void invalidateExpiredItem(EntityCacheKey key) {
+            removedKeys.add(key);
+            super.invalidateExpiredItem(key);
           }
-        });
+        };
+    BaseMetalake entity = TestUtil.getTestMetalake(1L, "metalake", "legacy hook");
+    EntityCacheKey key = metalakeKey(entity);
+    cache.put(entity);
+    cache.getCacheData().policy().eviction().get().setMaximum(0);
+    cache.getCacheData().cleanUp();
+    Assertions.assertEquals(List.of(key), removedKeys, "eviction must reach the legacy override");
+
+    removedKeys.clear();
+    cache.getCacheData().policy().eviction().get().setMaximum(1);
+    cache.put(entity);
+    cache.invalidate(entity.nameIdentifier(), entity.type());
+    Assertions.assertEquals(List.of(key), removedKeys, "explicit invalidation must reach it too");
+    Assertions.assertEquals(0, cache.size());
+  }
+
+  @Test
+  void testOversizedEntryRemovedBeforeIndexingWithInlineMaintenance() {
+    Config config = new Config() {};
+    config.set(Configs.CACHE_STATS_ENABLED, false);
+    CaffeineEntityCache cache = new CaffeineEntityCache(config, Runnable::run);
+    cache.getCacheData().policy().eviction().get().setMaximum(EntityCacheWeigher.SCHEMA_WEIGHT - 1);
+    SchemaEntity schema = TestUtil.getTestSchemaEntity();
+    EntityCacheKey key = EntityCacheKey.of(schema.nameIdentifier(), schema.type());
+
+    cache.put(schema);
+
+    Assertions.assertNull(cache.getCacheData().policy().getIfPresentQuietly(key));
+    Assertions.assertEquals(0, cache.size(), "an entry already rejected must not be indexed");
+  }
+
+  @Test
+  void testOversizedEntryRemainsIndexedUntilDeferredMaintenance() {
+    Config config = new Config() {};
+    config.set(Configs.CACHE_STATS_ENABLED, false);
+    Queue<Runnable> maintenance = new ArrayDeque<>();
+    CaffeineEntityCache cache = new CaffeineEntityCache(config, maintenance::add);
+    cache.getCacheData().policy().eviction().get().setMaximum(EntityCacheWeigher.SCHEMA_WEIGHT - 1);
+    runAll(maintenance);
+    SchemaEntity schema = TestUtil.getTestSchemaEntity();
+    EntityCacheKey key = EntityCacheKey.of(schema.nameIdentifier(), schema.type());
+
+    cache.put(schema);
+
+    Assertions.assertNotNull(cache.getCacheData().policy().getIfPresentQuietly(key));
+    Assertions.assertEquals(1, cache.size(), "the presence check does not enforce admission");
+    runAll(maintenance);
+    Assertions.assertNull(cache.getCacheData().policy().getIfPresentQuietly(key));
+    Assertions.assertEquals(0, cache.size(), "the SIZE notification must remove the index entry");
   }
 
   @Test

@@ -162,7 +162,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
               // A callback may hold Caffeine's eviction lock. The independent index lock is safe
               // because none of its holders can wait for that eviction lock or a segment lock.
               try {
-                invalidateExpiredItem(key);
+                removeIndexEntryIfAbsent(key);
               } catch (Throwable t) {
                 LOG.error(
                     "Failed to remove entity key={} from the cache index, cause={}", key, cause, t);
@@ -249,8 +249,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
         () -> {
           cacheData.put(entityCacheKey, entity);
           synchronized (indexLock) {
-            // Check and index atomically against removal callbacks. This policy lookup does not
-            // schedule maintenance or acquire Caffeine's eviction lock.
+            // Check and index atomically against removal callbacks. Skip entries already removed,
+            // including oversized entries rejected by synchronous maintenance. With asynchronous
+            // maintenance an oversized entry may still be present and get indexed; the later SIZE
+            // notification removes its index entry. This is not a synchronous admission check.
+            // The quiet lookup does not schedule maintenance or acquire Caffeine's eviction lock.
             if (cacheData.policy().getIfPresentQuietly(entityCacheKey) != null) {
               cacheIndex.put(entityCacheKey.toString(), entityCacheKey);
             }
@@ -294,7 +297,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * is safe even when a removal callback holds Caffeine's eviction lock.
    *
    * @param key The key of the evicted, expired, or invalidated entity
+   * @deprecated Use {@link #removeIndexEntryIfAbsent(EntityCacheKey)}. The legacy hook remains the
+   *     implementation target of the default bridge to preserve existing subclass overrides.
    */
+  @Deprecated
   @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
     synchronized (indexLock) {
@@ -330,7 +336,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private void invalidateHierarchy(EntityCacheKey key) {
     cacheData.invalidate(key);
-    invalidateExpiredItem(key);
+    removeIndexEntryIfAbsent(key);
 
     String identifier = key.identifier().toString();
     invalidateDescendants(identifier + NAME_LEVEL_BOUNDARY);
@@ -349,7 +355,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(keyPrefix));
     for (EntityCacheKey childKey : childKeys) {
       cacheData.invalidate(childKey);
-      invalidateExpiredItem(childKey);
+      removeIndexEntryIfAbsent(childKey);
     }
   }
 
