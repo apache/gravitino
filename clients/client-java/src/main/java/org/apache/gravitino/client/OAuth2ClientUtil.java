@@ -27,10 +27,11 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.dto.responses.OAuth2TokenResponse;
 import org.apache.gravitino.json.JsonUtils;
@@ -112,7 +113,7 @@ class OAuth2ClientUtil {
         if (authenticationMethod
                 == OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC) {
             Preconditions.checkArgument(
-                    credentialPair.getLeft() != null,
+                    StringUtils.isNotBlank(credentialPair.getLeft()),
                     "Client ID is required for client_secret_basic authentication");
             String encoded
                     = Base64.getEncoder()

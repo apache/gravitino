@@ -21,7 +21,6 @@ package org.apache.gravitino.client;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.client.OAuth2ClientAuthenticationMethod;
 /**
  * This class is the default implement of OAuth2TokenProvider.
  */
@@ -32,7 +31,7 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
   private String path;
   private String token;
   private OAuth2ClientAuthenticationMethod authenticationMethod =
-    OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST;;
+    OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST;
 
     private DefaultOAuth2TokenProvider() {
     }

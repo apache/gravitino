@@ -47,14 +47,14 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
     _path: Optional[str]
     _token: Optional[str]
     _authentication_method: OAuth2ClientAuthenticationMethod
+
     def __init__(
         self,
         uri: str = None,
         credential: str = None,
-        scope: str = None,
-        authentication_method: OAuth2ClientAuthenticationMethod =
-            OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
         path: str = None,
+        scope: str = None,
+        authentication_method: OAuth2ClientAuthenticationMethod = OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
     ):
         super().__init__(uri)
 
@@ -114,11 +114,19 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
             self._authentication_method
             == OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
         ):
+            if not client_id or not client_id.strip():
+                raise IllegalArgumentException(
+                    "client_id must be set when using client_secret_basic authentication"
+                )
+
             credentials = f"{client_id}:{client_secret}"
 
             encoded_credentials = base64.b64encode(
                 credentials.encode("utf-8")
-            ).decode("utf-8")
+            ).decode("utf-8" )
+
+
+
 
             headers["Authorization"] = f"Basic {encoded_credentials}"
 
@@ -127,7 +135,6 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
                 client_id=None,
                 client_secret=None,
                 scope=self._scope,
-                
             )
 
         else:
@@ -140,7 +147,7 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         resp = self._client.post_form(
             self._path,
             data=client_credential_request,
-             headers=headers,
+            headers=headers,
             error_handler=OAUTH_ERROR_HANDLER,
         )
         oauth2_resp = OAuth2TokenResponse.from_json(resp.body, infer_missing=True)

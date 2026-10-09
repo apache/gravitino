@@ -224,7 +224,7 @@ public class TestOAuth2TokenProvider {
                         .withStatusCode(HttpStatus.SC_OK)
                         .withBody(respJson);
 
-        mockServer
+         mockServer
                 .when(
                         HttpRequest.request()
                                 .withMethod("POST")
