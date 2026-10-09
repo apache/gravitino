@@ -46,8 +46,9 @@ public interface SupportsStatistics {
    * illegal, it will throw an IllegalStatisticNameException.
    *
    * <p>For Gravitino-managed table statistics, a concurrent creation or modification can fail the
-   * entire update with {@link OptimisticLockException}. No part of that update is committed; retry
-   * the operation against the current state.
+   * entire update with {@link OptimisticLockException}. No part of that update is committed. The
+   * caller decides whether to abort or retry against the current state; Gravitino does not
+   * automatically retry the write.
    *
    * @param statistics a map of statistic names to their values
    * @throws OptimisticLockException if a Gravitino-managed table statistic was concurrently created

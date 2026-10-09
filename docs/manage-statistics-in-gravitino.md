@@ -25,13 +25,14 @@ Updating creates a statistic that does not exist and overwrites one that does. R
 maintained by the system are not modifiable and the request is rejected.
 
 Concurrent creation or modification of the same statistic can return HTTP 409. The entire update
-batch is rolled back on a conflict; retry the operation against the current state. If the target
+batch is rolled back on a conflict. If the client chooses to retry, it should retry against the
+current state. If the target
 table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
 
-The built-in `GravitinoStatisticsUpdater` retries table-statistic conflicts up to three total write
-attempts, waiting 100 ms and then 200 ms. Each attempt resubmits the same computed values in a new
-request. Other failures are not retried; interruption stops retries, and an exhausted conflict
-propagates to the maintenance job's existing failure handling.
+OCC conflicts are an expected result of concurrent writes. Clients decide whether to abort or
+retry according to their application semantics. Gravitino does not automatically retry a
+conflicting write. The built-in statistics updater propagates the exception to its caller; a
+maintenance job can therefore fail on a conflict under its existing failure handling.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

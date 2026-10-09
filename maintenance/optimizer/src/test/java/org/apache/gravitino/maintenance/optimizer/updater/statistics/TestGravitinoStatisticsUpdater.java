@@ -22,8 +22,6 @@ package org.apache.gravitino.maintenance.optimizer.updater.statistics;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -36,7 +34,6 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.gravitino.stats.SupportsStatistics;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -130,27 +127,17 @@ class TestGravitinoStatisticsUpdater {
   }
 
   @Test
-  void testTableStatisticConflictRetriesSameValues() {
+  void testTableStatisticConflictPropagatesWithoutRetry() {
     GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
-    SupportsStatistics statistics = mockTableStatistics(updater);
-    Map<String, StatisticValue<?>> values = Map.of("row_count", StatisticValues.longValue(10L));
-    Mockito.doThrow(new OptimisticLockException("first conflict"))
-        .doThrow(new OptimisticLockException("second conflict"))
-        .doNothing()
-        .when(statistics)
-        .updateStatistics(values);
-
-    updater.updateTableStatistics(
-        NameIdentifier.of("catalog", "db", "table"), List.of(stat("row_count", 10L)));
-
-    Mockito.verify(statistics, Mockito.times(3)).updateStatistics(values);
-  }
-
-  @Test
-  void testTableStatisticConflictStopsAtAttemptLimit() {
-    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
-    SupportsStatistics statistics = mockTableStatistics(updater);
-    OptimisticLockException conflict = new OptimisticLockException("persistent conflict");
+    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
+    updater.setGravitinoClientForTest(client);
+    SupportsStatistics statistics =
+        client
+            .loadCatalog("catalog")
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of("db", "table"))
+            .supportsStatistics();
+    OptimisticLockException conflict = new OptimisticLockException("concurrent statistic update");
     Mockito.doThrow(conflict).when(statistics).updateStatistics(Mockito.anyMap());
 
     Assertions.assertSame(
@@ -160,95 +147,7 @@ class TestGravitinoStatisticsUpdater {
             () ->
                 updater.updateTableStatistics(
                     NameIdentifier.of("catalog", "db", "table"), List.of(stat("row_count", 10L)))));
-    Mockito.verify(statistics, Mockito.times(3)).updateStatistics(Mockito.anyMap());
-  }
-
-  @Test
-  void testTableStatisticNonConflictIsNotRetried() {
-    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
-    SupportsStatistics statistics = mockTableStatistics(updater);
-    IllegalArgumentException failure = new IllegalArgumentException("statistic is not modifiable");
-    Mockito.doThrow(failure).when(statistics).updateStatistics(Mockito.anyMap());
-
-    Assertions.assertSame(
-        failure,
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                updater.updateTableStatistics(
-                    NameIdentifier.of("catalog", "db", "table"), List.of(stat("row_count", 10L)))));
     Mockito.verify(statistics).updateStatistics(Mockito.anyMap());
-  }
-
-  @Test
-  void testTableStatisticConflictHonorsExistingInterruption() {
-    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
-    SupportsStatistics statistics = mockTableStatistics(updater);
-    OptimisticLockException conflict = new OptimisticLockException("conflict during cancellation");
-    Mockito.doThrow(conflict).when(statistics).updateStatistics(Mockito.anyMap());
-    Thread.currentThread().interrupt();
-    try {
-      Assertions.assertSame(
-          conflict,
-          Assertions.assertThrows(
-              OptimisticLockException.class,
-              () ->
-                  updater.updateTableStatistics(
-                      NameIdentifier.of("catalog", "db", "table"),
-                      List.of(stat("row_count", 10L)))));
-      Assertions.assertTrue(Thread.currentThread().isInterrupted());
-      Mockito.verify(statistics).updateStatistics(Mockito.anyMap());
-    } finally {
-      Thread.interrupted();
-    }
-  }
-
-  @Test
-  void testTableStatisticInterruptionDuringBackoffStopsRetry() throws Exception {
-    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
-    SupportsStatistics statistics = mockTableStatistics(updater);
-    OptimisticLockException conflict = new OptimisticLockException("conflict before interruption");
-    Mockito.doThrow(conflict).when(statistics).updateStatistics(Mockito.anyMap());
-    AtomicReference<Throwable> failure = new AtomicReference<>();
-    AtomicReference<Boolean> interrupted = new AtomicReference<>(false);
-    Thread worker =
-        new Thread(
-            () -> {
-              try {
-                updater.updateTableStatistics(
-                    NameIdentifier.of("catalog", "db", "table"), List.of(stat("row_count", 10L)));
-              } catch (Throwable e) {
-                failure.set(e);
-                interrupted.set(Thread.currentThread().isInterrupted());
-              }
-            });
-    worker.start();
-    try {
-      Awaitility.await()
-          .pollInterval(1, TimeUnit.MILLISECONDS)
-          .atMost(5, TimeUnit.SECONDS)
-          .until(() -> worker.getState() == Thread.State.TIMED_WAITING);
-      worker.interrupt();
-      worker.join(5000L);
-      Assertions.assertFalse(worker.isAlive());
-      Assertions.assertSame(conflict, failure.get());
-      Assertions.assertTrue(interrupted.get());
-      Assertions.assertInstanceOf(InterruptedException.class, conflict.getSuppressed()[0]);
-      Mockito.verify(statistics).updateStatistics(Mockito.anyMap());
-    } finally {
-      worker.interrupt();
-      worker.join(5000L);
-    }
-  }
-
-  private SupportsStatistics mockTableStatistics(GravitinoStatisticsUpdater updater) {
-    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
-    updater.setGravitinoClientForTest(client);
-    return client
-        .loadCatalog("catalog")
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of("db", "table"))
-        .supportsStatistics();
   }
 
   private StatisticEntry<?> stat(String name, long value) {
