@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender.handler.compactio
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
@@ -75,7 +76,7 @@ public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
     if (value == null) {
       return IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY;
     }
-    String strategyValue = value.toString().trim();
+    String strategyValue = value.toString().trim().toLowerCase(Locale.ROOT);
     return strategyValue.isEmpty()
         ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
         : strategyValue;
@@ -86,6 +87,6 @@ public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
     if (value == null) {
       return IcebergDataCompactionContent.DEFAULT_SORT_ORDER;
     }
-    return value.toString();
+    return value.toString().trim();
   }
 }

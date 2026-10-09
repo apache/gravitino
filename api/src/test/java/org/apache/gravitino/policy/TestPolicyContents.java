@@ -126,6 +126,18 @@ public class TestPolicyContents {
   }
 
   @Test
+  void testIcebergCompactionContentRejectsBinpackWithSortOrder() {
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
+                1000L, 1L, 1L, 100L, 50L, "binpack", "zorder(c1)", Map.of());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("sortOrder must be empty"));
+  }
+
+  @Test
   void testIcebergCompactionContentRejectsUnsupportedStrategy() {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)

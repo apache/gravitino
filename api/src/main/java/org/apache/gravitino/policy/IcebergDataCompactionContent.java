@@ -282,6 +282,11 @@ public class IcebergDataCompactionContent implements PolicyContent {
           StringUtils.isNotBlank(sortOrder),
           "sortOrder must be set when rewriteStrategy is '%s'",
           REWRITE_STRATEGY_SORT);
+    } else {
+      Preconditions.checkArgument(
+          StringUtils.isBlank(sortOrder),
+          "sortOrder must be empty when rewriteStrategy is '%s'",
+          rewriteStrategy);
     }
 
     rewriteOptions.forEach(
