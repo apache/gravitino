@@ -28,8 +28,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Verifies the Semantic Model authorization expressions against the rules in the Semantic Model
  * design: creation needs CREATE_SEMANTIC_MODEL under USE_CATALOG and USE_SCHEMA, list and load
- * accept SELECT_SEMANTIC_MODEL or MODIFY_SEMANTIC_MODEL, alter needs MODIFY_SEMANTIC_MODEL, and
- * drop needs ownership rather than any privilege.
+ * accept USE_SEMANTIC_MODEL or MODIFY_SEMANTIC_MODEL, alter needs MODIFY_SEMANTIC_MODEL, and drop
+ * needs ownership rather than any privilege.
  */
 public class TestSemanticModelAuthorizationExpression {
 
@@ -91,11 +91,11 @@ public class TestSemanticModelAuthorizationExpression {
             ImmutableSet.of(
                 "SEMANTIC_MODEL::OWNER", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
 
-    // Either SELECT or MODIFY loads the definition.
+    // Either USE or MODIFY loads the definition.
     assertTrue(
         evaluator.getResult(
             ImmutableSet.of(
-                "SEMANTIC_MODEL::SELECT_SEMANTIC_MODEL",
+                "SEMANTIC_MODEL::USE_SEMANTIC_MODEL",
                 "CATALOG::USE_CATALOG",
                 "SCHEMA::USE_SCHEMA")));
     assertTrue(
@@ -111,8 +111,8 @@ public class TestSemanticModelAuthorizationExpression {
     assertFalse(
         evaluator.getResult(
             ImmutableSet.of(
-                "METALAKE::SELECT_SEMANTIC_MODEL",
-                "SEMANTIC_MODEL::DENY_SELECT_SEMANTIC_MODEL",
+                "METALAKE::USE_SEMANTIC_MODEL",
+                "SEMANTIC_MODEL::DENY_USE_SEMANTIC_MODEL",
                 "CATALOG::USE_CATALOG",
                 "SCHEMA::USE_SCHEMA")));
   }
@@ -128,13 +128,12 @@ public class TestSemanticModelAuthorizationExpression {
     assertTrue(evaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
     assertTrue(evaluator.getResult(ImmutableSet.of("SCHEMA::OWNER")));
     assertTrue(evaluator.getResult(ImmutableSet.of("SEMANTIC_MODEL::OWNER")));
-    assertTrue(evaluator.getResult(ImmutableSet.of("SCHEMA::SELECT_SEMANTIC_MODEL")));
+    assertTrue(evaluator.getResult(ImmutableSet.of("SCHEMA::USE_SEMANTIC_MODEL")));
     assertTrue(evaluator.getResult(ImmutableSet.of("SEMANTIC_MODEL::MODIFY_SEMANTIC_MODEL")));
     assertFalse(evaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_SEMANTIC_MODEL")));
     assertFalse(
         evaluator.getResult(
-            ImmutableSet.of(
-                "METALAKE::SELECT_SEMANTIC_MODEL", "SCHEMA::DENY_SELECT_SEMANTIC_MODEL")));
+            ImmutableSet.of("METALAKE::USE_SEMANTIC_MODEL", "SCHEMA::DENY_USE_SEMANTIC_MODEL")));
   }
 
   @Test
@@ -157,11 +156,11 @@ public class TestSemanticModelAuthorizationExpression {
                 "CATALOG::USE_CATALOG",
                 "SCHEMA::USE_SCHEMA")));
 
-    // SELECT_SEMANTIC_MODEL is read-only and must not permit an alter.
+    // USE_SEMANTIC_MODEL is read-only and must not permit an alter.
     assertFalse(
         evaluator.getResult(
             ImmutableSet.of(
-                "SEMANTIC_MODEL::SELECT_SEMANTIC_MODEL",
+                "SEMANTIC_MODEL::USE_SEMANTIC_MODEL",
                 "CATALOG::USE_CATALOG",
                 "SCHEMA::USE_SCHEMA")));
   }
