@@ -36,6 +36,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -1409,7 +1410,118 @@ public class TestCatalogManager {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
-    Mockito.verify((CatalogDropAware) operations).onCatalogDropped();
+    // The drop hands the connector the schemas that remain externally (empty here: the wrapper's
+    // schema operations are stubbed to return nothing), so residual identifiers can be cleared.
+    Mockito.verify((CatalogDropAware) operations)
+        .onCatalogDropped(Mockito.eq(Collections.emptyList()));
+  }
+
+  @Test
+  void testDropUnmanagedCatalogCleansResidualExternalIdentifiers() throws Exception {
+    // Regression test for #13475: dropping an unmanaged catalog must tell the connector which
+    // external schemas remain, so it can clear the Gravitino identifiers those objects still carry.
+    NameIdentifier ident = NameIdentifier.of("metalake", "residual_identifier_drop_test");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
+
+    NameIdentifier externalSchema = NameIdentifier.of("metalake", ident.name(), "ext_schema");
+    CatalogManager.CatalogWrapper catalogWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
+    Capability capability = Mockito.mock(Capability.class);
+    CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+    Mockito.doReturn(catalog).when(catalogWrapper).catalog();
+    Mockito.doReturn(capability).when(catalogWrapper).capabilities();
+    Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
+    // The external system still holds the schema after the registration is dropped.
+    Mockito.doReturn(new NameIdentifier[] {externalSchema})
+        .when(catalogWrapper)
+        .doWithSchemaOps(any());
+
+    CatalogOperations operations =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
+              return function.apply(operations);
+            })
+        .when(catalogWrapper)
+        .doWithCatalogOps(any());
+
+    catalogManager.getCatalogCache().put(ident, catalogWrapper);
+    boolean dropped = catalogManager.dropCatalog(ident, true);
+
+    Assertions.assertTrue(dropped);
+    Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+    // The connector is handed the schemas that remain externally so it can strip the identifiers.
+    Mockito.verify((CatalogDropAware) operations)
+        .onCatalogDropped(Mockito.eq(Collections.singletonList(externalSchema)));
+  }
+
+  @Test
+  void testDropManagedCatalogPassesNoExternalSchemasForCleanup() throws Exception {
+    // For a managed catalog the external objects are dropped together with the registration, so
+    // there is nothing left to clean up: the connector must receive an empty list.
+    NameIdentifier ident = NameIdentifier.of("metalake", "managed_drop_no_residual_test");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
+
+    CatalogManager.CatalogWrapper catalogWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
+    Capability capability = Mockito.mock(Capability.class);
+    // managedStorage() supported => managed catalog.
+    CapabilityResult managedResult = CapabilityResult.SUPPORTED;
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+    Mockito.doReturn(catalog).when(catalogWrapper).catalog();
+    Mockito.doReturn(capability).when(catalogWrapper).capabilities();
+    Mockito.doReturn(managedResult).when(capability).managedStorage(any());
+    Mockito.doReturn(new NameIdentifier[] {}).when(catalogWrapper).doWithSchemaOps(any());
+
+    CatalogOperations operations =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
+              return function.apply(operations);
+            })
+        .when(catalogWrapper)
+        .doWithCatalogOps(any());
+
+    catalogManager.getCatalogCache().put(ident, catalogWrapper);
+    boolean dropped = catalogManager.dropCatalog(ident, true);
+
+    Assertions.assertTrue(dropped);
+    Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+    Mockito.verify((CatalogDropAware) operations)
+        .onCatalogDropped(Mockito.eq(Collections.emptyList()));
   }
 
   @Test
