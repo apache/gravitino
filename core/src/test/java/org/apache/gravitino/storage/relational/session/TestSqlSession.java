@@ -154,6 +154,26 @@ public class TestSqlSession {
   }
 
   @Test
+  public void testMinIdleCappedByMaxIdle() {
+    SqlSessionFactoryHelper.getInstance().close();
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(3);
+    try {
+      SqlSessionFactoryHelper.getInstance().init(config);
+      BasicDataSource dataSource =
+          (BasicDataSource)
+              SqlSessionFactoryHelper.getInstance()
+                  .getSqlSessionFactory()
+                  .getConfiguration()
+                  .getEnvironment()
+                  .getDataSource();
+      assertEquals(3, dataSource.getMaxIdle());
+      assertEquals(3, dataSource.getMinIdle());
+    } finally {
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
+    }
+  }
+
+  @Test
   public void testUnlimitedPoolStillLimitsIdleConnections() {
     SqlSessionFactoryHelper.getInstance().close();
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(-1);

@@ -43,7 +43,7 @@ closes it at once, and a later request has to open a new one. When the number of
 use keeps swinging by more than this limit, physical connections keep being closed and reopened,
 which adds latency. Setting it at or above the number of connections in use at steady peak
 concurrency avoids that. For example, with 64 concurrent clients listing metalakes against MySQL,
-a limit of `10` reopened about 1,400 to 2,700 connections every 15 seconds, `32` about 300 to 400,
+a limit of `10` reopened about 1,400 to 2,700 connections every 15 seconds, `32` about 270 to 440,
 and `64` almost none. Raise it only as far as the database connection budget of all servers allows.
 
 Idle connections are released slowly. The pool's evictor runs every ten minutes and checks at most

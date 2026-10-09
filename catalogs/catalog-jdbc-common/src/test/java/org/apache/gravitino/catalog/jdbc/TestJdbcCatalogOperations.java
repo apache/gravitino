@@ -124,6 +124,15 @@ public class TestJdbcCatalogOperations {
       Assertions.assertEquals(-1, dataSource.getMaxIdle());
       Assertions.assertEquals(2, dataSource.getMinIdle());
     }
+
+    // An idle limit below the minimum pool size also caps minIdle.
+    properties.remove("maxIdle");
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "1");
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      Assertions.assertEquals(1, dataSource.getMaxIdle());
+      Assertions.assertEquals(1, dataSource.getMinIdle());
+    }
   }
 
   @Test
