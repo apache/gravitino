@@ -112,3 +112,22 @@ Return the proper Postgresql image name for the init-postgresql initContainer
   {{- include "gravitino.imageReference" (dict "imageRoot" .Values.postgresql.image "global" .Values.global) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Return the proper database client image name for the DB schema initialization Job.
+If image.repository or image.tag are not set, sensible defaults are derived from
+entity.initializeSchema.databaseType.
+*/}}
+{{- define "db-init.image" -}}
+{{- $databaseType := .Values.entity.initializeSchema.databaseType -}}
+{{- $defaultRepository := "mysql" -}}
+{{- $defaultTag := "8.0" -}}
+{{- if eq $databaseType "postgresql" -}}
+  {{- $defaultRepository = "postgres" -}}
+  {{- $defaultTag = "16-alpine" -}}
+{{- end -}}
+{{- $repository := .Values.entity.initializeSchema.image.repository | default $defaultRepository -}}
+{{- $tag := .Values.entity.initializeSchema.image.tag | default $defaultTag -}}
+{{- $imageRoot := dict "registry" .Values.entity.initializeSchema.image.registry "repository" $repository "tag" $tag -}}
+{{- include "gravitino.imageReference" (dict "imageRoot" $imageRoot "global" .Values.global) -}}
+{{- end -}}

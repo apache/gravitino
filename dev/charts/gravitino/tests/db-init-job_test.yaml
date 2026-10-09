@@ -1,0 +1,193 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino DB init Job
+templates:
+  - gravitino-db-init-job.yaml
+tests:
+  - it: does not render the Job when schema initialization is disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render the Job when a bundled MySQL is enabled
+    set:
+      mysql:
+        enabled: true
+      entity:
+        initializeSchema:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render the Job when a bundled PostgreSQL is enabled
+    set:
+      postgresql:
+        enabled: true
+      entity:
+        initializeSchema:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the Job for MySQL with values-based credentials
+    release:
+      name: gravitino
+      namespace: gravitino-system
+    set:
+      entity:
+        jdbcUser: gravitino
+        jdbcPassword: gravitino123
+        initializeSchema:
+          enabled: true
+          databaseType: mysql
+          host: mysql.example.com
+          port: 3306
+          database: gravitino
+          image:
+            registry: docker.io
+            repository: ""
+            tag: ""
+            pullPolicy: IfNotPresent
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: gravitino-db-init
+      - equal:
+          path: metadata.namespace
+          value: gravitino-system
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-5"
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^docker\\.io/mysql:8\\.0$"
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: sqlfile
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: mysql.example.com
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_PORT
+            value: "3306"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_USER
+            value: gravitino
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_NAME
+            value: gravitino
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PWD
+            value: gravitino123
+          any: true
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "Waiting for MySQL to be ready"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'dir="/scripts/mysql"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'awk -F''\[-\]'' -v v="\$VERSION"'
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: scripts-emptydir
+            emptyDir: {}
+          any: true
+
+  - it: renders the Job for PostgreSQL with secret-based credentials
+    release:
+      name: gravitino
+    set:
+      entity:
+        jdbcUser: gravitino
+        initializeSchema:
+          enabled: true
+          databaseType: postgresql
+          host: pg.example.com
+          port: 5432
+          database: gravitino
+          passwordSecret: db-credentials
+          passwordSecretKey: db-password
+          image:
+            registry: docker.io
+            repository: ""
+            tag: ""
+            pullPolicy: IfNotPresent
+    asserts:
+      - isKind:
+          of: Job
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^docker\\.io/postgres:16-alpine$"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: pg.example.com
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: db-password
+          any: true
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "Waiting for PostgreSQL to be ready"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'dir="/scripts/postgresql"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'awk -F''\[-\]'' -v v="\$VERSION"'
