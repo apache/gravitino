@@ -31,6 +31,9 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ### Catalog Properties
 
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
+
 Any property that isn't defined by Gravitino can pass to PostgreSQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
@@ -39,16 +42,17 @@ When using Gravitino with Trino, pass the Trino PostgreSQL connector configurati
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the PostgreSQL catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                       | Default value | Required |
-|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `jdbc-url`              | A valid PostgreSQL JDBC URL, for example `jdbc:postgresql://localhost:5432/pg_database?sslmode=require`. If the URL omits the database, set `jdbc-database`. | (none)        | Yes      |
-| `jdbc-driver`           | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                           | (none)        | Yes      |
-| `jdbc-database`         | The database of the JDBC connection. Derived from `jdbc-url` when omitted. An explicit value must be nonblank and match the URL database when both are provided. | (none)        | Only if absent from `jdbc-url` |
-| `jdbc-user`             | The JDBC user name.                                                                                                                                               | (none)        | Yes      |
-| `jdbc-password`         | The JDBC password.                                                                                                                                                | (none)        | Yes      |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                    | `2`           | No       |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                   | `10`          | No       |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                 | `30000`       | No       |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required                       |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------------|
+| `jdbc-url`              | A valid PostgreSQL JDBC URL, for example `jdbc:postgresql://localhost:5432/pg_database?sslmode=require`. If the URL omits the database, set `jdbc-database`.                             | (none)        | Yes                            |
+| `jdbc-driver`           | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                                                  | (none)        | Yes                            |
+| `jdbc-database`         | The database of the JDBC connection. Derived from `jdbc-url` when omitted. An explicit value must be nonblank and match the URL database when both are provided.                         | (none)        | Only if absent from `jdbc-url` |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes                            |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes                            |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No                             |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No                             |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No                             |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No                             |
 
 :::caution
 Download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
@@ -122,8 +126,18 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 An unconstrained `Numeric` column, that is one declared without precision and scale, accepts values of up to
 131072 digits before and 16383 digits after the decimal point, and its precision and scale vary per row.
 Gravitino `Decimal` caps precision at 38 and is fixed per column, so such a column is mapped to the External
-Type `numeric` instead. A `Numeric(p, s)` column is mapped to `Decimal(p, s)` and a `Numeric(p)` column to
-`Decimal(p, 0)` as usual.
+Type `numeric` instead. A `Numeric(p, s)` column maps to `Decimal(p, s)` when `p` is at most 38
+and `s` is between 0 and `p`. Other constrained declarations, such as `numeric(39,0)`,
+`numeric(2,-3)`, and `numeric(3,5)`, map to External Types preserving their precision and scale.
+A `Numeric(p)` column follows the same rules with scale 0.
+
+The Spark JDBC, Trino PostgreSQL, and Flink connectors map these External Types to strings
+(`StringType`, unbounded `VARCHAR`, and `STRING`, respectively), using the fallback added in
+[PR #13042](https://github.com/apache/gravitino/pull/13042). This keeps schema type conversion
+from failing, but does not expose native decimal semantics in those engines. Consumers needing
+numeric operations must choose an explicit conversion compatible with their data and engine;
+Gravitino does not clamp precision or round scale to fit `Decimal`. Supported `Numeric(p, s)`
+columns continue to map to native decimal types.
 
 PostgreSQL array elements always accept NULL and cannot be declared otherwise, so an `Array` column is always
 mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and

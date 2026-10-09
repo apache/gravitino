@@ -20,11 +20,17 @@
 package org.apache.gravitino.authorization;
 
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -88,6 +94,22 @@ public class AuthorizationRequestContext {
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
   private volatile String originalAuthorizationExpression;
+
+  /**
+   * Ids of the roles bound to the caller when this request loaded role policies. The authorizer
+   * uses them to detect whether one of these roles lost its policies after the load.
+   */
+  private volatile List<Long> boundRoleIds = Collections.emptyList();
+
+  /**
+   * Authorizer-defined generation of the in-memory role policies this request last validated its
+   * bound roles against. A role cleared after this generation must be reloaded before the request
+   * evaluates it again.
+   */
+  private final AtomicLong rolePolicyGeneration = new AtomicLong();
+
+  /** Roles whose entities could not be read during this request's initial role load. */
+  private volatile Set<Long> unreadableRoleIds = Collections.emptySet();
 
   /**
    * The roles the caller has declared active for this request (role assumption). Read from the
@@ -230,6 +252,66 @@ public class AuthorizationRequestContext {
    */
   public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
     this.prefetchedRoleVersions = prefetchedRoleVersions;
+  }
+
+  /**
+   * Returns the ids of the roles bound to the caller when this request loaded role policies.
+   *
+   * @return the bound role ids; empty when no role has been loaded yet
+   */
+  public List<Long> getBoundRoleIds() {
+    return boundRoleIds;
+  }
+
+  /**
+   * Records the ids of the roles bound to the caller by this request's role load.
+   *
+   * @param boundRoleIds the bound role ids; must not be {@code null}
+   */
+  public void setBoundRoleIds(List<Long> boundRoleIds) {
+    this.boundRoleIds =
+        Collections.unmodifiableList(
+            new ArrayList<>(Objects.requireNonNull(boundRoleIds, "boundRoleIds must not be null")));
+  }
+
+  /**
+   * Returns the role policy generation this request last validated its bound roles against.
+   *
+   * @return the role policy generation
+   */
+  public long getRolePolicyGeneration() {
+    return rolePolicyGeneration.get();
+  }
+
+  /**
+   * Advances the role policy generation this request validated its bound roles against. Concurrent
+   * workers cannot move the recorded generation backwards.
+   *
+   * @param rolePolicyGeneration the role policy generation
+   */
+  public void setRolePolicyGeneration(long rolePolicyGeneration) {
+    this.rolePolicyGeneration.accumulateAndGet(rolePolicyGeneration, Math::max);
+  }
+
+  /**
+   * Returns the roles whose entities could not be read during the initial role load.
+   *
+   * @return the unreadable role ids; empty when all role entities were readable
+   */
+  public Set<Long> getUnreadableRoleIds() {
+    return unreadableRoleIds;
+  }
+
+  /**
+   * Records unreadable roles during the initial load so every check of this request fails closed.
+   *
+   * @param unreadableRoleIds the unreadable role ids; must not be {@code null}
+   */
+  public void setUnreadableRoleIds(Set<Long> unreadableRoleIds) {
+    this.unreadableRoleIds =
+        Collections.unmodifiableSet(
+            new HashSet<>(
+                Objects.requireNonNull(unreadableRoleIds, "unreadableRoleIds must not be null")));
   }
 
   /**

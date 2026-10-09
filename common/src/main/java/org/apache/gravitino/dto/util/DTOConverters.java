@@ -104,9 +104,12 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.RowFilterContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -675,6 +678,14 @@ public class DTOConverters {
           .build();
     }
 
+    if (policyContent instanceof IcebergOrphanFileRemovalContent) {
+      IcebergOrphanFileRemovalContent content = (IcebergOrphanFileRemovalContent) policyContent;
+      return PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withLocation(content.location())
+          .withDryRun(content.dryRun())
+          .build();
+    }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
           (IcebergDataCompactionContent) policyContent;
@@ -685,6 +696,20 @@ public class DTOConverters {
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .build();
+    }
+
+    if (policyContent instanceof RowFilterContent) {
+      RowFilterContent content = (RowFilterContent) policyContent;
+      return PolicyContentDTO.RowFilterContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof ColumnMaskContent) {
+      ColumnMaskContent content = (ColumnMaskContent) policyContent;
+      return PolicyContentDTO.ColumnMaskContentDTO.builder()
+          .withExpression(content.expression())
           .build();
     }
 
@@ -1532,6 +1557,12 @@ public class DTOConverters {
           customContentDTO.properties());
     }
 
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) {
+      PolicyContentDTO.IcebergOrphanFileRemovalContentDTO content =
+          (PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO;
+      return PolicyContents.icebergOrphanFileRemoval(
+          content.olderThanDays(), content.location(), content.dryRun());
+    }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
           (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
@@ -1542,6 +1573,18 @@ public class DTOConverters {
           icebergCompactionContentDTO.deleteFileNumberWeight(),
           icebergCompactionContentDTO.maxPartitionNum(),
           icebergCompactionContentDTO.rewriteOptions());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {
+      PolicyContentDTO.RowFilterContentDTO contentDTO =
+          (PolicyContentDTO.RowFilterContentDTO) policyContentDTO;
+      return PolicyContents.rowFilter(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.ColumnMaskContentDTO) {
+      PolicyContentDTO.ColumnMaskContentDTO contentDTO =
+          (PolicyContentDTO.ColumnMaskContentDTO) policyContentDTO;
+      return PolicyContents.columnMask(contentDTO.expression());
     }
 
     throw new IllegalArgumentException(
