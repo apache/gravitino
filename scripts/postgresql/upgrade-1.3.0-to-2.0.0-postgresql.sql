@@ -170,8 +170,8 @@ UPDATE owner_meta
 -- that snapshot changed. occ_version takes over the CAS; current_version again advances only when
 -- the stored snapshot changes. The default is the whole backfill, because occ_version is only ever
 -- compared against itself on the same row.
-ALTER TABLE fileset_meta ADD COLUMN occ_version INT NOT NULL DEFAULT 1;
+ALTER TABLE fileset_meta ADD COLUMN IF NOT EXISTS occ_version INT NOT NULL DEFAULT 1;
 COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency version';
 
-ALTER TABLE policy_meta ADD COLUMN occ_version INT NOT NULL DEFAULT 1;
+ALTER TABLE policy_meta ADD COLUMN IF NOT EXISTS occ_version INT NOT NULL DEFAULT 1;
 COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';
