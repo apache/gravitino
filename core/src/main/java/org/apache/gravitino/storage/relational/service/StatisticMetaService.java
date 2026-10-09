@@ -90,6 +90,7 @@ public class StatisticMetaService {
    * @param entity the metadata object that owns the statistics
    * @param type the metadata object type
    */
+  // Preserve the historical metric name for compatibility with existing monitoring.
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchInsertStatisticPOsOnDuplicateKeyUpdate")

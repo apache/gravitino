@@ -63,8 +63,9 @@ public interface SupportsStatistics {
    *
    * <p>For Gravitino-managed table statistics, a concurrent modification or same-name replacement
    * can fail the entire drop with {@link OptimisticLockException}. No part of that drop is
-   * committed; retry the operation against the current state. A statistic already removed by
-   * another drop is not a conflict and is not counted as dropped by this call.
+   * committed. The caller decides whether to abort or retry against the current state; Gravitino
+   * does not automatically retry the write. A statistic already removed by another drop is not a
+   * conflict and is not counted as dropped by this call.
    *
    * @param statistics a list of statistic names to be dropped
    * @return true if the statistics were successfully dropped, false if no statistics were dropped

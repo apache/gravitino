@@ -97,7 +97,7 @@ paths:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
         "409":
-          description: Conflict - The specified statistic is unmodifiable or was modified concurrently; retry a concurrent modification
+          description: Conflict - The specified statistic is unmodifiable or was modified concurrently; the caller decides whether to abort or retry against the current state
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -150,7 +150,7 @@ paths:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
         "409":
-          description: Conflict - The specified statistic is unmodifiable or was modified concurrently; retry a concurrent modification
+          description: Conflict - The specified statistic is unmodifiable or was modified concurrently; the caller decides whether to abort or retry against the current state
           content:
             application/vnd.gravitino.v1+json:
               schema:
