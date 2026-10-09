@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -42,6 +43,20 @@ public class IcebergDataCompactionContent implements PolicyContent {
   public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-rewrite-data-files";
   /** Prefix for rewrite options propagated to job options. */
   public static final String JOB_OPTIONS_PREFIX = "job.options.";
+  /**
+   * Rule key for Iceberg {@code rewrite_data_files} top-level {@code strategy} argument.
+   *
+   * <p>This is separate from {@link #JOB_OPTIONS_PREFIX} because Iceberg treats {@code strategy} as
+   * a procedure parameter, not an entry in the {@code options} map.
+   */
+  public static final String JOB_STRATEGY_KEY = "job.strategy";
+  /**
+   * Rule key for Iceberg {@code rewrite_data_files} top-level {@code sort_order} argument.
+   *
+   * <p>This is separate from {@link #JOB_OPTIONS_PREFIX} because Iceberg treats {@code sort_order}
+   * as a procedure parameter, not an entry in the {@code options} map.
+   */
+  public static final String JOB_SORT_ORDER_KEY = "job.sort-order";
   /** Rule key for trigger expression. */
   public static final String TRIGGER_EXPR_KEY = "trigger-expr";
   /** Rule key for score expression. */
@@ -72,7 +87,17 @@ public class IcebergDataCompactionContent implements PolicyContent {
   public static final long DEFAULT_MAX_PARTITION_NUM = 50L;
   /** Default rewrite options for Iceberg rewrite data files. */
   public static final Map<String, String> DEFAULT_REWRITE_OPTIONS = ImmutableMap.of();
+  /** Iceberg rewrite strategy value for binpack. */
+  public static final String REWRITE_STRATEGY_BINPACK = "binpack";
+  /** Iceberg rewrite strategy value for sort. */
+  public static final String REWRITE_STRATEGY_SORT = "sort";
+  /** Default Iceberg rewrite strategy. */
+  public static final String DEFAULT_REWRITE_STRATEGY = REWRITE_STRATEGY_BINPACK;
+  /** Default Iceberg sort order (empty means unset). */
+  public static final String DEFAULT_SORT_ORDER = "";
 
+  private static final Set<String> SUPPORTED_REWRITE_STRATEGIES =
+      ImmutableSet.of(REWRITE_STRATEGY_BINPACK, REWRITE_STRATEGY_SORT);
   private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
   private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
       ImmutableSet.of(
@@ -100,10 +125,12 @@ public class IcebergDataCompactionContent implements PolicyContent {
   private final Long deleteFileNumberWeight;
   private final Long maxPartitionNum;
   private final Map<String, String> rewriteOptions;
+  private final String rewriteStrategy;
+  private final String sortOrder;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
-    this(null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null);
   }
 
   IcebergDataCompactionContent(
@@ -112,7 +139,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
       Long dataFileMseWeight,
       Long deleteFileNumberWeight,
       Long maxPartitionNum,
-      Map<String, String> rewriteOptions) {
+      Map<String, String> rewriteOptions,
+      String rewriteStrategy,
+      String sortOrder) {
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -126,6 +155,11 @@ public class IcebergDataCompactionContent implements PolicyContent {
         rewriteOptions == null
             ? DEFAULT_REWRITE_OPTIONS
             : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
+    this.rewriteStrategy =
+        rewriteStrategy == null
+            ? DEFAULT_REWRITE_STRATEGY
+            : rewriteStrategy.trim().toLowerCase(Locale.ROOT);
+    this.sortOrder = sortOrder == null ? DEFAULT_SORT_ORDER : sortOrder.trim();
   }
 
   /**
@@ -182,6 +216,25 @@ public class IcebergDataCompactionContent implements PolicyContent {
     return rewriteOptions;
   }
 
+  /**
+   * Returns the Iceberg {@code rewrite_data_files} top-level {@code strategy} argument.
+   *
+   * @return rewrite strategy, one of {@value REWRITE_STRATEGY_BINPACK} or {@value
+   *     REWRITE_STRATEGY_SORT}
+   */
+  public String rewriteStrategy() {
+    return rewriteStrategy;
+  }
+
+  /**
+   * Returns the Iceberg {@code rewrite_data_files} top-level {@code sort_order} argument.
+   *
+   * @return sort order expression, or empty string when unset
+   */
+  public String sortOrder() {
+    return sortOrder;
+  }
+
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
     return SUPPORTED_OBJECT_TYPES;
@@ -204,6 +257,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
     rules.put(MAX_PARTITION_NUM_KEY, maxPartitionNum);
     rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
     rules.put(SCORE_EXPR_KEY, SCORE_EXPR);
+    rules.put(JOB_STRATEGY_KEY, rewriteStrategy);
+    rules.put(JOB_SORT_ORDER_KEY, sortOrder);
     rewriteOptions.forEach((key, value) -> rules.put(JOB_OPTIONS_PREFIX + key, value));
     return Collections.unmodifiableMap(rules);
   }
@@ -217,6 +272,17 @@ public class IcebergDataCompactionContent implements PolicyContent {
     Preconditions.checkArgument(dataFileMseWeight >= 0, "dataFileMseWeight must be >= 0");
     Preconditions.checkArgument(deleteFileNumberWeight >= 0, "deleteFileNumberWeight must be >= 0");
     Preconditions.checkArgument(maxPartitionNum > 0, "maxPartitionNum must be > 0");
+    Preconditions.checkArgument(
+        SUPPORTED_REWRITE_STRATEGIES.contains(rewriteStrategy),
+        "rewriteStrategy must be one of %s, but got '%s'",
+        SUPPORTED_REWRITE_STRATEGIES,
+        rewriteStrategy);
+    if (REWRITE_STRATEGY_SORT.equals(rewriteStrategy)) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(sortOrder),
+          "sortOrder must be set when rewriteStrategy is '%s'",
+          REWRITE_STRATEGY_SORT);
+    }
 
     rewriteOptions.forEach(
         (key, value) -> {
@@ -246,7 +312,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
         && Objects.equals(deleteFileNumberWeight, that.deleteFileNumberWeight)
         && Objects.equals(maxPartitionNum, that.maxPartitionNum)
-        && Objects.equals(rewriteOptions, that.rewriteOptions);
+        && Objects.equals(rewriteOptions, that.rewriteOptions)
+        && Objects.equals(rewriteStrategy, that.rewriteStrategy)
+        && Objects.equals(sortOrder, that.sortOrder);
   }
 
   @Override
@@ -257,7 +325,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
         dataFileMseWeight,
         deleteFileNumberWeight,
         maxPartitionNum,
-        rewriteOptions);
+        rewriteOptions,
+        rewriteStrategy,
+        sortOrder);
   }
 
   @Override
@@ -275,6 +345,12 @@ public class IcebergDataCompactionContent implements PolicyContent {
         + maxPartitionNum
         + ", rewriteOptions="
         + rewriteOptions
+        + ", rewriteStrategy='"
+        + rewriteStrategy
+        + '\''
+        + ", sortOrder='"
+        + sortOrder
+        + '\''
         + '}';
   }
 }

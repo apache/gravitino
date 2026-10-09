@@ -108,6 +108,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
+    @JsonProperty("rewriteStrategy")
+    private String rewriteStrategy;
+
+    @JsonProperty("sortOrder")
+    private String sortOrder;
+
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
 
@@ -177,6 +183,26 @@ public interface PolicyContentDTO extends PolicyContent {
           : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
+    /**
+     * Returns the Iceberg rewrite_data_files top-level strategy.
+     *
+     * @return rewrite strategy
+     */
+    public String rewriteStrategy() {
+      return rewriteStrategy == null
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+          : rewriteStrategy;
+    }
+
+    /**
+     * Returns the Iceberg rewrite_data_files top-level sort_order.
+     *
+     * @return sort order expression
+     */
+    public String sortOrder() {
+      return sortOrder == null ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER : sortOrder;
+    }
+
     @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
@@ -205,7 +231,9 @@ public interface PolicyContentDTO extends PolicyContent {
           dataFileMseWeight(),
           deleteFileNumberWeight(),
           maxPartitionNum(),
-          rewriteOptions());
+          rewriteOptions(),
+          rewriteStrategy(),
+          sortOrder());
     }
   }
 

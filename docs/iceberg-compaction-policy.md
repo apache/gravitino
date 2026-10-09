@@ -26,7 +26,12 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `dataFileMseWeight` | No | `1` | Score weight of `custom-data-file-mse`. Must be `>= 0`. |
 | `deleteFileNumberWeight` | No | `100` | Score weight of `custom-delete-file-number`. Must be `>= 0`. |
 | `maxPartitionNum` | No | `50` | Maximum number of partitions selected by optimizer. Must be `> 0`. |
-| `rewriteOptions` | No | `{}` | Additional rewrite options, expanded as `job.options.*` rules. |
+| `rewriteOptions` | No | `{}` | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules. |
+| `rewriteStrategy` | No | `binpack` | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`. |
+| `sortOrder` | No | `""` | Iceberg `rewrite_data_files` top-level `sort_order`. Required when `rewriteStrategy` is `sort`. |
+
+`rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
+parameters separate from the `options` map.
 
 ## Generated Rules and Properties
 
@@ -39,6 +44,8 @@ The policy content is converted to:
   - `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`
   - `score-expr=custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
   - `max-partition-num=<maxPartitionNum>`
+  - `job.strategy=<rewriteStrategy>`
+  - `job.sort-order=<sortOrder>`
   - `job.options.<key>=<value>` for each rewrite option
 
 ## Parameter Tuning Guide
@@ -89,6 +96,17 @@ Recommended `rewriteOptions`:
 - `target-file-size-bytes = 134217728`
 - `min-input-files = 5`
 - `delete-file-threshold = 1`
+
+### Rewrite Strategy and Sort Order
+
+Use `rewriteStrategy = sort` with a non-empty `sortOrder` when compaction should rewrite files with
+Iceberg sort or z-order, for example:
+
+- `rewriteStrategy = sort`
+- `sortOrder = zorder(c1,c2)`
+- `sortOrder = id DESC NULLS LAST`
+
+Keep the defaults (`binpack` and empty `sortOrder`) for size-based binpack compaction.
 
 ## Policy Examples
 
