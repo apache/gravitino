@@ -26,6 +26,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,6 +65,11 @@ public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizatio
   @Override
   protected String getIcebergAuxServiceName() {
     return EXPERIMENTAL_SERVICE_NAME;
+  }
+
+  @Override
+  protected TestDatabaseName getTestDatabaseName() {
+    return TestDatabaseName.PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT;
   }
 
   @Test
