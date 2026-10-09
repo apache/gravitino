@@ -539,9 +539,9 @@ An auxiliary service runs inside the Gravitino server process on its own port. T
 no default, but the `gravitino.conf` shipped in the distribution sets it to
 `iceberg-rest,lance-rest`, so both start unless you change the line.
 
-| Configuration Item           | Description                                                                                                                                                                   | Default Value |
-|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| `gravitino.auxService.names` | Comma-separated auxiliary services to start. Select either `iceberg-rest` or `iceberg-rest-experimental`, but not both. `lance-rest` can run with either Iceberg REST service. | (empty)       |
+| Configuration Item           | Description                                                                                                                  | Default Value |
+|------------------------------|------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.auxService.names` | Comma-separated auxiliary services to start. `iceberg-rest` is the Gravitino IRC server, `lance-rest` the Lance REST server. | (empty)       |
 
 The rest of the IRC configuration, and the `gravitino.lance-rest.*` properties of the Lance REST
 server, are documented with those services. See

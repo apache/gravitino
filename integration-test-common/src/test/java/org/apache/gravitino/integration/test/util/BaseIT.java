@@ -383,7 +383,7 @@ public class BaseIT {
 
     List<String> auxServicesList = new ArrayList<>();
     if (!ignoreIcebergAuxRestService) {
-      auxServicesList.add(getIcebergAuxServiceName());
+      auxServicesList.add("iceberg-rest");
     }
     if (!ignoreLanceAuxRestService) {
       auxServicesList.add("lance-rest");
@@ -699,15 +699,6 @@ public class BaseIT {
         JettyServerConfig.fromConfig(serverConfig, GRAVITINO_ICEBERG_REST_PREFIX);
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
-  }
-
-  /**
-   * Returns the Iceberg REST auxiliary service used by this integration test.
-   *
-   * @return the Iceberg REST auxiliary service name
-   */
-  protected String getIcebergAuxServiceName() {
-    return "iceberg-rest";
   }
 
   protected String getJDBCBackend() {

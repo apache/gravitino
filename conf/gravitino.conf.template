@@ -104,14 +104,12 @@ gravitino.authorization.enable = false
 gravitino.authorization.serviceAdmins = anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE
-# Auxiliary service names, separate by ','. Choose only one of iceberg-rest and
-# iceberg-rest-experimental. Either Iceberg service can run together with lance-rest.
+# Auxiliary service names, separate by ',', currently support iceberg-rest and lance-rest
 gravitino.auxService.names = iceberg-rest,lance-rest
 # Iceberg REST service classpath
 gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server/conf
-# To use the experimental Iceberg REST service, replace iceberg-rest with
-# iceberg-rest-experimental in gravitino.auxService.names and enable the following classpath.
-# gravitino.iceberg-rest-experimental.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
+# To use the experimental Iceberg dependencies, replace the classpath above with:
+# gravitino.iceberg-rest.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
 # Iceberg REST service host
 gravitino.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port
