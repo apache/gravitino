@@ -72,11 +72,11 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testCredentialsAreOptionalAndAccessKeyIdIsVisible() {
+  void testCredentialsAreOptionalAndHidden() {
     assertFalse(metadata.isRequiredProperty(AWS_ACCESS_KEY_ID));
     assertFalse(metadata.isRequiredProperty(AWS_SECRET_ACCESS_KEY));
-    // Access key ID is an identifier, same as s3-access-key-id; only the secret is hidden.
-    assertFalse(metadata.isHiddenProperty(AWS_ACCESS_KEY_ID));
+    // Both halves of the static pair are hidden, same as s3-access-key-id / s3-secret-access-key.
+    assertTrue(metadata.isHiddenProperty(AWS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(AWS_SECRET_ACCESS_KEY));
     // Same PropertyEntry instances as the shared definition, not a Glue-local copy.
     assertSame(

@@ -54,6 +54,18 @@ val venvPython = venvExecutable("python")
 val blackRequirement = "black==26.5.1"
 val isortRequirement = "isort==9.0.0"
 
+// Dev tooling used by the pylint and testPython tasks: pylint (and its transitive
+// astroid) for linting, pytest and parameterized for the unit tests. These live in
+// pyproject's [dependency-groups] dev, not the runtime dependencies, so
+// `uv pip install -e .` (installDependenciesWithUv) does not pull them in and they
+// never reach the shipped image. Pinned so a new release cannot change the lint/test
+// outcome in CI.
+val devToolRequirements = listOf(
+  "pylint==3.3.8",
+  "pytest==8.4.1",
+  "parameterized==0.9.0"
+)
+
 tasks {
   register<Exec>("installUv") {
     group = "python"
@@ -178,6 +190,25 @@ tasks {
     }
   }
 
+  register<Exec>("installDevTools") {
+    group = "python"
+    description = "Install dev-group tooling (pylint, pytest, parameterized) into the venv"
+    dependsOn("installDependenciesWithUv")
+    workingDir(pythonProjectDir)
+
+    doFirst {
+      commandLine(
+        listOf(getUvExecutable(), "pip", "install", "--python", venvPython) + devToolRequirements
+      )
+    }
+
+    doLast {
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("Failed to install dev tools. Exit code: ${executionResult.get().exitValue}")
+      }
+    }
+  }
+
   register("buildPython") {
     group = "python"
     description = "Build Python project"
@@ -190,7 +221,10 @@ tasks {
   register<Exec>("testPython") {
     group = "python"
     description = "Run Python unit tests with unittest"
-    dependsOn("buildPython")
+    // The tests import pytest/parameterized, which moved to pyproject's dev group and
+    // are therefore not installed by installDependenciesWithUv; installDevTools adds
+    // them to the venv.
+    dependsOn("buildPython", "installDevTools")
     workingDir(pythonProjectDir)
 
     commandLine(venvPython, "-m", "unittest", "discover", "-s", "tests", "-v")
@@ -268,6 +302,9 @@ tasks {
 }
 
 tasks.register<Exec>("pylint") {
+  // pylint moved to pyproject's dev group, so it is no longer installed by
+  // installDependenciesWithUv; installDevTools puts it into the venv for this task.
+  dependsOn("installDevTools")
   mustRunAfter("buildPython")
   commandLine(venvPython, "-m", "pylint", "./tests", "./mcp_server")
 }

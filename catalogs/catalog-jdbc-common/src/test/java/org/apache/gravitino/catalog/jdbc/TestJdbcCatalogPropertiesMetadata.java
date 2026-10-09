@@ -51,6 +51,7 @@ public class TestJdbcCatalogPropertiesMetadata {
 
     Assertions.assertFalse(propertiesMetadata.isHiddenProperty(JdbcConfig.POOL_MIN_SIZE.getKey()));
     Assertions.assertFalse(propertiesMetadata.isHiddenProperty(JdbcConfig.POOL_MAX_SIZE.getKey()));
+    Assertions.assertFalse(propertiesMetadata.isHiddenProperty(JdbcConfig.POOL_MAX_IDLE.getKey()));
   }
 
   @Test
@@ -63,6 +64,7 @@ public class TestJdbcCatalogPropertiesMetadata {
             .put(JdbcConfig.PASSWORD.getKey(), "password")
             .put(JdbcConfig.POOL_MIN_SIZE.getKey(), "5")
             .put(JdbcConfig.POOL_MAX_SIZE.getKey(), "20")
+            .put(JdbcConfig.POOL_MAX_IDLE.getKey(), "16")
             .build();
 
     CatalogEntity catalogEntity =
@@ -86,6 +88,12 @@ public class TestJdbcCatalogPropertiesMetadata {
     Map<String, String> loadedProperties = loadCatalog.properties();
     Assertions.assertEquals("5", loadedProperties.get(JdbcConfig.POOL_MIN_SIZE.getKey()));
     Assertions.assertEquals("20", loadedProperties.get(JdbcConfig.POOL_MAX_SIZE.getKey()));
+    Assertions.assertEquals("16", loadedProperties.get(JdbcConfig.POOL_MAX_IDLE.getKey()));
+    Assertions.assertEquals(
+        "16",
+        new JdbcCatalogPropertiesMetadata()
+            .transformProperties(loadedProperties)
+            .get(JdbcConfig.POOL_MAX_IDLE.getKey()));
   }
 
   /** Verifies the actual catalog configuration path for drivers without isValid support. */

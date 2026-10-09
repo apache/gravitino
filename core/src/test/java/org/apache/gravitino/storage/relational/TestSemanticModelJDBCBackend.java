@@ -46,12 +46,19 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.AIContextObject;
 import org.apache.gravitino.semantic.CustomExtension;
@@ -69,6 +76,8 @@ import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.POStorageReadRouting;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -79,6 +88,114 @@ import org.junit.jupiter.api.TestTemplate;
 
 /** Tests Semantic Model persistence and parent lifecycle behavior through {@link JDBCBackend}. */
 public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
+
+  @TestTemplate
+  public void testSemanticModelGrantRoundTrip() throws IOException {
+    Namespace namespace = createParents("grants");
+    SemanticModelEntity model =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "SalesModel", false, ImmutableMap.of());
+    backend.insert(model, false);
+    RoleEntity role =
+        semanticModelRole(
+            model,
+            List.of(
+                Privileges.SelectSemanticModel.allow(),
+                Privileges.ModifySemanticModel.allow(),
+                Privileges.ManageGrants.allow()));
+    backend.insert(role, false);
+    RoleEntity loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(role.securableObjects(), loaded.securableObjects());
+
+    SemanticModelEntity renamed =
+        semanticModel(model.id(), namespace, "RenamedModel", false, ImmutableMap.of());
+    backend.update(model.nameIdentifier(), model.type(), old -> renamed);
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals("RenamedModel", loaded.securableObjects().get(0).name());
+
+    RoleEntity updated =
+        backend.update(
+            role.nameIdentifier(),
+            Entity.EntityType.ROLE,
+            old ->
+                RoleEntity.builder()
+                    .withId(role.id())
+                    .withName(role.name())
+                    .withNamespace(role.namespace())
+                    .withAuditInfo(AUDIT_INFO)
+                    .withProperties(ImmutableMap.of())
+                    .withSecurableObjects(
+                        semanticModelRole(renamed, List.of(Privileges.SelectSemanticModel.allow()))
+                            .securableObjects())
+                    .build());
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(updated.securableObjects(), loaded.securableObjects());
+    backend.update(
+        role.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        old ->
+            RoleEntity.builder()
+                .withId(role.id())
+                .withName(role.name())
+                .withNamespace(role.namespace())
+                .withAuditInfo(AUDIT_INFO)
+                .withProperties(ImmutableMap.of())
+                .withSecurableObjects(List.of())
+                .build());
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertTrue(loaded.securableObjects().isEmpty());
+  }
+
+  @TestTemplate
+  public void testSemanticModelOwnerAndOrphanCleanup() throws IOException {
+    Namespace namespace = createParents("owner_cleanup");
+    SemanticModelEntity model =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "SalesModel", false, ImmutableMap.of());
+    SemanticModelEntity live =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "LiveModel", false, ImmutableMap.of());
+    backend.insert(model, false);
+    backend.insert(live, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(namespace.level(0)),
+            "owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    for (SemanticModelEntity entity : List.of(model, live)) {
+      OwnerMetaService.getInstance()
+          .setOwner(entity.nameIdentifier(), entity.type(), user.nameIdentifier(), user.type());
+      assertEquals(
+          user,
+          OwnerMetaService.getInstance()
+              .getOwner(entity.nameIdentifier(), entity.type())
+              .orElseThrow());
+      backend.insert(
+          semanticModelRole(entity, List.of(Privileges.SelectSemanticModel.allow())), false);
+    }
+    assertEquals(
+        0,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    assertTrue(backend.delete(model.nameIdentifier(), model.type(), false));
+    assertEquals(
+        2,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    assertEquals(
+        0,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    assertEquals(
+        user,
+        OwnerMetaService.getInstance().getOwner(live.nameIdentifier(), live.type()).orElseThrow());
+    RoleEntity liveRole =
+        backend.get(
+            AuthorizationUtils.ofRole(namespace.level(0), live.name()), Entity.EntityType.ROLE);
+    assertEquals(1, liveRole.securableObjects().size());
+  }
 
   @TestTemplate
   public void testCreateAndLoadRoundTrip() throws IOException {
@@ -519,6 +636,26 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
             NameIdentifier.of(metalakeNamespace.level(0)), Entity.EntityType.METALAKE, true));
     assertFalse(backend.exists(metalakeChild.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
     assertTrue(allVersionRowsAreSoftDeleted(metalakeChild.id()));
+  }
+
+  private RoleEntity semanticModelRole(SemanticModelEntity model, List<Privilege> privileges) {
+    return RoleEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(model.name())
+        .withNamespace(AuthorizationUtils.ofRoleNamespace(model.namespace().level(0)))
+        .withAuditInfo(AUDIT_INFO)
+        .withProperties(ImmutableMap.of())
+        .withSecurableObjects(
+            List.of(
+                SecurableObjects.parse(
+                    model.namespace().level(1)
+                        + "."
+                        + model.namespace().level(2)
+                        + "."
+                        + model.name(),
+                    MetadataObject.Type.SEMANTIC_MODEL,
+                    privileges)))
+        .build();
   }
 
   private Namespace createParents(String prefix) throws IOException {

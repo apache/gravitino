@@ -161,10 +161,23 @@ public interface Privilege {
     /** The privilege to list configured secrets providers. */
     VIEW_SECRET_PROVIDERS(0L, 1L << 36),
     /**
-     * The privilege to retrieve plaintext secrets and vend credentials for a metadata object via
-     * {@code getSecrets} / {@code getCredentials}.
+     * The privilege required to call {@code getSecrets}. Without {@link
+     * #INCLUDE_CREDENTIAL_SECRETS}, cloud access-key pairs are omitted from the result. Does not
+     * authorize {@code getCredentials}.
      */
-    USE_SECRET(0L, 1L << 37);
+    USE_SECRETS(0L, 1L << 37),
+    /**
+     * When held together with {@link #USE_SECRETS}, includes cloud access-key pairs and other
+     * credential secrets in the {@code getSecrets} result. Alone it does not authorize {@code
+     * getSecrets}. Does not authorize {@code getCredentials}.
+     */
+    INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38),
+    /** The privilege to create a semantic model. */
+    CREATE_SEMANTIC_MODEL(0L, 1L << 39),
+    /** The privilege to discover a semantic model and load its definition. */
+    SELECT_SEMANTIC_MODEL(0L, 1L << 40),
+    /** The privilege to rename a semantic model or alter its definition and metadata. */
+    MODIFY_SEMANTIC_MODEL(0L, 1L << 41);
 
     private final long highBits;
     private final long lowBits;
