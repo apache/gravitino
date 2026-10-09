@@ -22,15 +22,19 @@ import static org.apache.gravitino.hive.client.Util.updateConfigurationFromPrope
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -38,6 +42,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
@@ -174,10 +179,7 @@ public abstract class HiveShim {
   public HiveTable getTable(String catalogName, String databaseName, String tableName) {
     try {
       Table tb = client.getTable(databaseName, tableName);
-      if (hasDerivedColumnTypes(tb)) {
-        replaceDerivedColumns(tb, client.getFields(databaseName, tableName));
-      }
-      return HiveTableConverter.fromHiveTable(tb);
+      return convertTable(catalogName, tb);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
     }
@@ -311,7 +313,11 @@ public abstract class HiveShim {
     try {
       // Hive2 doesn't support catalog, so we ignore catalogName and use databaseName
       var tables = client.getTableObjectsByName(databaseName, allTables);
-      return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
+      List<HiveTable> converted = new ArrayList<>();
+      for (Table table : tables) {
+        converted.add(convertTable(catalogName, table));
+      }
+      return converted;
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
@@ -344,6 +350,66 @@ public abstract class HiveShim {
   }
 
   /**
+   * Resolves storage schemas and converts a table without loading column constraints.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param table The metastore table.
+   * @return The converted table, retaining its original derived schema for alters.
+   * @throws TException If the metastore cannot resolve the schema.
+   */
+  protected HiveTable convertTable(String catalogName, Table table) throws TException {
+    List<Column> original = resolveDerivedColumns(catalogName, table);
+    HiveTable converted = HiveTableConverter.fromHiveTable(table);
+    converted.setOriginalStorageColumns(original);
+    return converted;
+  }
+
+  /**
+   * Resolves only tables containing the SerDe-derived type marker.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param table The metastore table to update in memory.
+   * @return A copy of the original storage columns, or an empty list for an ordinary table.
+   * @throws TException If the metastore cannot resolve the schema.
+   */
+  protected List<Column> resolveDerivedColumns(String catalogName, Table table) throws TException {
+    if (!hasDerivedColumnTypes(table)) {
+      return Collections.emptyList();
+    }
+    List<Column> original =
+        table.getSd().getCols().stream()
+            .<Column>map(
+                field ->
+                    Column.of(
+                        field.getName(),
+                        Types.UnparsedType.of(field.getType()),
+                        field.getComment()))
+            .toList();
+    try {
+      replaceDerivedColumns(table, getFields(catalogName, table.getDbName(), table.getTableName()));
+    } catch (MetaException e) {
+      MetaException failure = new MetaException(derivedSchemaError(table));
+      failure.initCause(e);
+      throw failure;
+    }
+    return original;
+  }
+
+  /**
+   * Fetches storage columns using the version-specific metastore API.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param tableName The table name.
+   * @return Storage columns resolved by Hive Metastore.
+   * @throws TException If the metastore request fails.
+   */
+  protected List<FieldSchema> getFields(String catalogName, String databaseName, String tableName)
+      throws TException {
+    return client.getFields(databaseName, tableName);
+  }
+
+  /**
    * Returns whether a table contains column types that Hive expects its SerDe to resolve.
    *
    * @param table The Hive metastore table.
@@ -363,16 +429,24 @@ public abstract class HiveShim {
    * @param table The Hive metastore table to update in memory.
    * @param resolvedColumns The storage columns resolved by the Hive metastore.
    */
-  protected static void replaceDerivedColumns(Table table, List<FieldSchema> resolvedColumns) {
+  protected static void replaceDerivedColumns(
+      Table table, @Nullable List<FieldSchema> resolvedColumns) {
     if (resolvedColumns == null
         || resolvedColumns.isEmpty()
         || resolvedColumns.stream()
             .anyMatch(field -> TYPE_FROM_DESERIALIZER.equals(field.getType()))) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Hive Metastore did not resolve SerDe-derived column types for table %s.%s",
-              table.getDbName(), table.getTableName()));
+      throw new IllegalArgumentException(derivedSchemaError(table));
     }
     table.getSd().setCols(resolvedColumns);
+  }
+
+  private static String derivedSchemaError(Table table) {
+    return String.format(
+        "Hive Metastore did not resolve SerDe-derived column types for table %s.%s. "
+            + "Make sure the table SerDe is on the Hive Metastore classpath. For Hive 3, "
+            + "set metastore.storage.schema.reader.impl="
+            + "org.apache.hadoop.hive.metastore.SerDeStorageSchemaReader on Hive Metastore "
+            + "and restart the service.",
+        table.getDbName(), table.getTableName());
   }
 }

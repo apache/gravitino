@@ -113,6 +113,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.spark.sql.SparkSession;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
@@ -158,6 +162,74 @@ public class CatalogHive2IT extends BaseIT {
   private static String getInsertWithoutPartitionSql(
       String dbName, String tableName, String values) {
     return String.format("INSERT INTO %s.%s VALUES (%s)", dbName, tableName, values);
+  }
+
+  @Test
+  void testLoadAndAlterSerDeDerivedTable() throws Exception {
+    HiveConf conf = new HiveConf();
+    conf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
+    HiveMetaStoreClient metastore = new HiveMetaStoreClient(conf);
+    try {
+      String csvTableName = GravitinoITUtils.genRandomName("serde_csv");
+      NameIdentifier identifier = NameIdentifier.of(schemaName, csvTableName);
+      // Start with an ordinary external table, then create a separate SerDe-derived table
+      // directly through HMS so the test exercises the stored marker rather than a mock.
+      catalog
+          .asTableCatalog()
+          .createTable(
+              identifier,
+              new Column[] {Column.of("value", Types.StringType.get())},
+              null,
+              ImmutableMap.of(TABLE_TYPE, "EXTERNAL_TABLE"),
+              Transforms.EMPTY_TRANSFORM);
+      var csvTable = metastore.getTable(schemaName, csvTableName);
+      catalog.asTableCatalog().dropTable(identifier);
+      StorageDescriptor sd = csvTable.getSd();
+      sd.setCols(List.of(new FieldSchema("value", "<derived from deserializer>", "CSV column")));
+      sd.setSerdeInfo(
+          new SerDeInfo(
+              "csv", "org.apache.hadoop.hive.serde2.OpenCSVSerde", Collections.emptyMap()));
+      sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
+      sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+      metastore.createTable(csvTable);
+      Assertions.assertEquals(
+          "<derived from deserializer>",
+          metastore.getTable(schemaName, csvTableName).getSd().getCols().get(0).getType());
+
+      Table loaded = catalog.asTableCatalog().loadTable(identifier);
+      Assertions.assertEquals(1, loaded.columns().length);
+      Assertions.assertEquals(Types.StringType.get(), loaded.columns()[0].dataType());
+      List<HiveTable> batch =
+          hiveClientPool.run(
+              client ->
+                  client.getTableObjectsByName(hmsCatalog, schemaName, List.of(csvTableName)));
+      Assertions.assertEquals(Types.StringType.get(), batch.get(0).columns()[0].dataType());
+
+      catalog
+          .asTableCatalog()
+          .alterTable(identifier, TableChange.setProperty("serde_test", "value"));
+      catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("updated"));
+      var stored = metastore.getTable(schemaName, csvTableName);
+      Assertions.assertEquals(
+          "<derived from deserializer>", stored.getSd().getCols().get(0).getType());
+      Assertions.assertEquals("value", stored.getParameters().get("serde_test"));
+      Assertions.assertEquals("updated", stored.getParameters().get(COMMENT));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              catalog
+                  .asTableCatalog()
+                  .alterTable(
+                      identifier,
+                      TableChange.addColumn(
+                          new String[] {"added"},
+                          Types.StringType.get(),
+                          TableChange.ColumnPosition.defaultPos())));
+      Assertions.assertEquals(
+          1, metastore.getTable(schemaName, csvTableName).getSd().getColsSize());
+    } finally {
+      metastore.close();
+    }
   }
 
   private static String getInsertWithPartitionSql(

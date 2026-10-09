@@ -726,6 +726,11 @@ public class HiveCatalogOperations
           TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
           updatedProperties.remove(removeProperty.getProperty());
         } else if (change instanceof TableChange.ColumnChange) {
+          if (!currentTable.originalStorageColumns().isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot alter columns of a SerDe-derived table through Gravitino. "
+                    + "Update the schema through the table SerDe or its external schema definition.");
+          }
           applyColumnChange(updatedColumns, (TableChange.ColumnChange) change);
         } else {
           throw new IllegalArgumentException(
@@ -824,7 +829,9 @@ public class HiveCatalogOperations
     if (comment != null) {
       builder.withComment(comment);
     }
-    return builder.build();
+    HiveTable altered = builder.build();
+    altered.setOriginalStorageColumns(original.originalStorageColumns());
+    return altered;
   }
 
   private void applyColumnChange(List<Column> columns, TableChange.ColumnChange change) {

@@ -53,6 +53,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SQLDefaultConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,16 +160,21 @@ public class HiveShimV3 extends HiveShim {
     if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(tb.getTableType())) {
       return HiveTableConverter.fromHiveTable(tb);
     }
-    if (hasDerivedColumnTypes(tb)) {
-      List<FieldSchema> resolvedColumns =
-          invoke(
-              ExceptionTarget.table(tableName),
-              () -> client.getFields(catalogName, databaseName, tableName));
-      replaceDerivedColumns(tb, resolvedColumns);
-    }
+    List<Column> original =
+        invoke(ExceptionTarget.table(tableName), () -> resolveDerivedColumns(catalogName, tb));
     ColumnConstraints constraints = loadColumnConstraints(catalogName, databaseName, tableName);
-    return HiveTableConverter.fromHiveTable(
-        tb, notNullColumns(constraints), defaultValues(constraints));
+    HiveTable converted =
+        HiveTableConverter.fromHiveTable(
+            tb, notNullColumns(constraints), defaultValues(constraints));
+    converted.setOriginalStorageColumns(original);
+    return converted;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected List<FieldSchema> getFields(String catalogName, String databaseName, String tableName)
+      throws TException {
+    return client.getFields(catalogName, databaseName, tableName);
   }
 
   @Override
@@ -356,7 +362,13 @@ public class HiveShimV3 extends HiveShim {
     // This batch API is used to inspect tables while listing a schema. Loading constraints here
     // would add two sequential metastore calls per table. Full column metadata remains available
     // through getTable.
-    return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
+    return tables.stream()
+        .map(
+            table ->
+                invoke(
+                    ExceptionTarget.table(table.getTableName()),
+                    () -> convertTable(catalogName, table)))
+        .toList();
   }
 
   @Override
