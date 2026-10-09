@@ -543,7 +543,9 @@ class TestAuthorizationUtils {
         for (Privilege semantic :
             List.of(
                 Privileges.CreateSemanticModel.allow(),
-                Privileges.SelectSemanticModel.deny(),
+                Privileges.UseSemanticModel.deny(),
+                Privileges.allow("SELECT_SEMANTIC_MODEL"),
+                Privileges.deny("SELECT_SEMANTIC_MODEL"),
                 Privileges.ModifySemanticModel.allow())) {
           SecurableObject semanticOnly = SecurableObjects.parse(name, type, List.of(semantic));
           AuthorizationUtils.callAuthorizationPluginForSecurableObjects(

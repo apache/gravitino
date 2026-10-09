@@ -251,6 +251,8 @@ public class Privileges {
         // Semantic model
       case CREATE_SEMANTIC_MODEL:
         return CreateSemanticModel.allow();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.allow();
       case SELECT_SEMANTIC_MODEL:
         return SelectSemanticModel.allow();
       case MODIFY_SEMANTIC_MODEL:
@@ -395,6 +397,8 @@ public class Privileges {
         // Semantic model
       case CREATE_SEMANTIC_MODEL:
         return CreateSemanticModel.deny();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.deny();
       case SELECT_SEMANTIC_MODEL:
         return SelectSemanticModel.deny();
       case MODIFY_SEMANTIC_MODEL:
@@ -1770,6 +1774,42 @@ public class Privileges {
   }
 
   /** The privilege to discover a semantic model and load its definition. */
+  public static class UseSemanticModel extends GenericPrivilege<UseSemanticModel> {
+    private static final UseSemanticModel ALLOW_INSTANCE =
+        new UseSemanticModel(Condition.ALLOW, Name.USE_SEMANTIC_MODEL);
+    private static final UseSemanticModel DENY_INSTANCE =
+        new UseSemanticModel(Condition.DENY, Name.USE_SEMANTIC_MODEL);
+
+    private UseSemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseSemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseSemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SEMANTIC_MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /**
+   * The privilege to discover a semantic model and load its definition.
+   *
+   * @deprecated Use {@link UseSemanticModel} instead.
+   */
+  @Deprecated
   public static class SelectSemanticModel extends GenericPrivilege<SelectSemanticModel> {
     private static final SelectSemanticModel ALLOW_INSTANCE =
         new SelectSemanticModel(Condition.ALLOW, Name.SELECT_SEMANTIC_MODEL);

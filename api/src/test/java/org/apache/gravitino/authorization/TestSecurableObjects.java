@@ -114,7 +114,7 @@ public class TestSecurableObjects {
 
     SecurableObject semanticModel =
         SecurableObjects.ofSemanticModel(
-            schema, "sales_model", Lists.newArrayList(Privileges.SelectSemanticModel.allow()));
+            schema, "sales_model", Lists.newArrayList(Privileges.UseSemanticModel.allow()));
     Assertions.assertEquals("catalog.schema.sales_model", semanticModel.fullName());
     Assertions.assertEquals(MetadataObject.Type.SEMANTIC_MODEL, semanticModel.type());
 
@@ -122,7 +122,7 @@ public class TestSecurableObjects {
         SecurableObjects.of(
             MetadataObject.Type.SEMANTIC_MODEL,
             Lists.newArrayList("catalog", "schema", "sales_model"),
-            Lists.newArrayList(Privileges.SelectSemanticModel.allow()));
+            Lists.newArrayList(Privileges.UseSemanticModel.allow()));
     Assertions.assertEquals(semanticModel, anotherSemanticModel);
 
     Exception e =
@@ -199,7 +199,7 @@ public class TestSecurableObjects {
                 SecurableObjects.of(
                     MetadataObject.Type.SEMANTIC_MODEL,
                     Lists.newArrayList("metalake"),
-                    Lists.newArrayList(Privileges.SelectSemanticModel.allow())));
+                    Lists.newArrayList(Privileges.UseSemanticModel.allow())));
     Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
   }
 
@@ -241,7 +241,7 @@ public class TestSecurableObjects {
     Privilege executeFunction = Privileges.ExecuteFunction.allow();
     Privilege modifyFunction = Privileges.ModifyFunction.allow();
     Privilege createSemanticModel = Privileges.CreateSemanticModel.allow();
-    Privilege selectSemanticModel = Privileges.SelectSemanticModel.allow();
+    Privilege useSemanticModel = Privileges.UseSemanticModel.allow();
     Privilege modifySemanticModel = Privileges.ModifySemanticModel.allow();
     Privilege useSecrets = Privileges.UseSecrets.allow();
     Privilege includeCredentialSecrets = Privileges.IncludeCredentialSecrets.allow();
@@ -624,15 +624,15 @@ public class TestSecurableObjects {
     Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.COLUMN));
 
-    // Test select semantic model
-    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.SCHEMA));
-    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
-    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.MODEL));
-    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.ROLE));
-    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.COLUMN));
+    // Test use semantic model
+    Assertions.assertTrue(useSemanticModel.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useSemanticModel.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useSemanticModel.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useSemanticModel.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
+    Assertions.assertFalse(useSemanticModel.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(useSemanticModel.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(useSemanticModel.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useSemanticModel.canBindTo(MetadataObject.Type.COLUMN));
 
     // Test modify semantic model
     Assertions.assertTrue(modifySemanticModel.canBindTo(MetadataObject.Type.METALAKE));
@@ -646,7 +646,7 @@ public class TestSecurableObjects {
 
     // Deny instances must agree with their allow counterparts on binding
     Assertions.assertTrue(
-        Privileges.SelectSemanticModel.deny().canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
+        Privileges.UseSemanticModel.deny().canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
     Assertions.assertEquals(
         Privilege.Condition.DENY, Privileges.ModifySemanticModel.deny().condition());
     Assertions.assertEquals(
@@ -655,6 +655,28 @@ public class TestSecurableObjects {
     Assertions.assertEquals(
         Privileges.ModifySemanticModel.deny(),
         Privileges.deny(Privilege.Name.MODIFY_SEMANTIC_MODEL));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testUseSemanticModelPrivilege() {
+    Assertions.assertEquals(
+        Privileges.UseSemanticModel.allow(), Privileges.allow("USE_SEMANTIC_MODEL"));
+    Assertions.assertEquals(
+        Privileges.UseSemanticModel.deny(), Privileges.deny("USE_SEMANTIC_MODEL"));
+    Assertions.assertEquals(
+        "ALLOW use semantic model", Privileges.UseSemanticModel.allow().simpleString());
+    Assertions.assertEquals(
+        "DENY use semantic model", Privileges.UseSemanticModel.deny().simpleString());
+    Assertions.assertEquals(1L << 40, Privilege.Name.USE_SEMANTIC_MODEL.getLowBits());
+    Assertions.assertEquals(0L, Privilege.Name.USE_SEMANTIC_MODEL.getHighBits());
+    Assertions.assertEquals(
+        Privilege.Name.USE_SEMANTIC_MODEL.getLowBits(),
+        Privilege.Name.SELECT_SEMANTIC_MODEL.getLowBits());
+    Assertions.assertEquals(
+        Privileges.SelectSemanticModel.allow(), Privileges.allow("SELECT_SEMANTIC_MODEL"));
+    Assertions.assertEquals(
+        Privileges.SelectSemanticModel.deny(), Privileges.deny("SELECT_SEMANTIC_MODEL"));
   }
 
   @Test
