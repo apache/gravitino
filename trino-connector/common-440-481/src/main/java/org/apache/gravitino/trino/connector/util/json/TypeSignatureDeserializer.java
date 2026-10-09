@@ -16,6 +16,7 @@ package org.apache.gravitino.trino.connector.util.json;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.common.collect.ImmutableSet;
+import io.trino.spi.type.TypeSignature;
 import java.lang.reflect.Method;
 import java.util.Set;
 
@@ -23,12 +24,13 @@ import java.util.Set;
  * This class is reference to Trino source code io.trino.type.TypeSignatureDeserializer, use
  * refactoring to call the key method to handle Type serialization.
  *
- * <p>Trino 482 removed {@code io.trino.spi.type.TypeSignature}, so this deserializer avoids
- * referencing the class at compile time and resolves everything reflectively. It is only registered
- * on Trino versions that still expose {@code TypeSignature} (see {@code
- * JsonCodec#registerTypeSignatureDeserializer}); on newer versions it is never instantiated.
+ * <p>This shape targets Trino 440-481, which still expose {@code io.trino.spi.type.TypeSignature},
+ * and reference it at compile time. Trino 482 removed the class, so the 482+ modules ship their own
+ * placeholder shape. Trino only offers the signature parser on the server side ({@code
+ * io.trino.sql.analyzer.TypeSignatureTranslator}), so the parse entry point is still resolved
+ * through the runtime class loader.
  */
-public final class TypeSignatureDeserializer extends FromStringDeserializer<Object> {
+public final class TypeSignatureDeserializer extends FromStringDeserializer<TypeSignature> {
   /** Method to parse type signatures using reflection. */
   private final Method parseTypeSignatureMethod;
 
@@ -40,7 +42,7 @@ public final class TypeSignatureDeserializer extends FromStringDeserializer<Obje
    *     method cannot be found
    */
   public TypeSignatureDeserializer(ClassLoader classLoader) {
-    super(Object.class);
+    super(TypeSignature.class);
     try {
       Class<?> clazz = classLoader.loadClass("io.trino.sql.analyzer.TypeSignatureTranslator");
       parseTypeSignatureMethod =
@@ -51,9 +53,9 @@ public final class TypeSignatureDeserializer extends FromStringDeserializer<Obje
   }
 
   @Override
-  protected Object _deserialize(String value, DeserializationContext context) {
+  protected TypeSignature _deserialize(String value, DeserializationContext context) {
     try {
-      return parseTypeSignatureMethod.invoke(null, value, ImmutableSet.of());
+      return (TypeSignature) parseTypeSignatureMethod.invoke(null, value, ImmutableSet.of());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

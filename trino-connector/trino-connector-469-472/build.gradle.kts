@@ -85,7 +85,7 @@ sourceSets {
     java.srcDirs("../common/src/main/java", "../common-440-479/src/main/java", "../common-440-481/src/main/java")
   }
   test {
-    java.srcDirs("../common/src/test/java")
+    java.srcDirs("../common/src/test/java", "../common-440-481/src/test/java")
     resources.srcDirs("../common/src/test/resources")
   }
 }

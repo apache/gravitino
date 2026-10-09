@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
@@ -47,8 +48,18 @@ sourceSets {
     java.srcDirs("../common/src/main/java", "../common-440-479/src/main/java", "../common-440-481/src/main/java")
   }
   test {
-    java.srcDirs("../common/src/test/java")
+    java.srcDirs("../common/src/test/java", "../common-440-481/src/test/java")
     resources.srcDirs("../common/src/test/resources")
+  }
+}
+
+plugins.withId("com.diffplug.spotless") {
+  configure<SpotlessExtension> {
+    java {
+      // Keep Spotless within this module; the shared shape trees are formatted by the
+      // trino-connector parent project that owns them.
+      target(project.fileTree("src") { include("**/*.java") })
+    }
   }
 }
 

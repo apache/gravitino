@@ -348,9 +348,9 @@ public class JsonCodec {
 
       // Type serialization for plugin classes
       module.addDeserializer(Type.class, new TypeDeserializer(typeManager));
-      // Trino 482 removed io.trino.spi.type.TypeSignature; only register its deserializer on the
-      // versions that still expose the class, resolved reflectively so the shared source compiles
-      // against every supported Trino SPI.
+      // Trino 482 removed io.trino.spi.type.TypeSignature. The deserializer lives in the matching
+      // SPI-shape directory of each version-segment module, and is registered only when the
+      // TypeSignature class is present on the runtime SPI.
       registerTypeSignatureDeserializer(module, typeManager.getClass().getClassLoader());
 
       // Block serialization for plugin classes
