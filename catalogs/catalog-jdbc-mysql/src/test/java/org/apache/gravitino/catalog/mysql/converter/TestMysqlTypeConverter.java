@@ -99,6 +99,10 @@ public class TestMysqlTypeConverter {
     checkGravitinoTypeToJdbcType(TIMESTAMP, Types.TimestampType.withTimeZone());
     checkGravitinoTypeToJdbcType(DATETIME, Types.TimestampType.withoutTimeZone());
     checkGravitinoTypeToJdbcType(DECIMAL + "(10,2)", Types.DecimalType.of(10, 2));
+    checkGravitinoTypeToJdbcType("decimal(39,30)", Types.ExternalType.of("decimal(39,30)"));
+    checkGravitinoTypeToJdbcType("decimal(65,30)", Types.ExternalType.of("decimal(65,30)"));
+    checkGravitinoTypeToJdbcType(
+        "decimal(65,30) unsigned", Types.ExternalType.of("decimal(65,30) unsigned"));
     checkGravitinoTypeToJdbcType(VARCHAR + "(20)", Types.VarCharType.of(20));
     checkGravitinoTypeToJdbcType(CHAR + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());

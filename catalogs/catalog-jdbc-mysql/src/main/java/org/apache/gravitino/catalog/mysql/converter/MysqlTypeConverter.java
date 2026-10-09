@@ -26,6 +26,7 @@ import org.apache.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter {
 
+  // Keep this limit in sync with Types.DecimalType.checkPrecisionScale.
   static final int MAX_DECIMAL_PRECISION = 38;
   static final String BIT = "bit";
   static final String TINYINT = "tinyint";
@@ -175,6 +176,8 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       return Types.DecimalType.of(precision, scale);
     }
 
+    // MySQL supports precision up to 65, while Gravitino DecimalType is limited to 38.
+    // Preserve larger decimals as ExternalType so loading the table does not fail.
     String unsignedSuffix =
         DECIMAL_UNSIGNED.equalsIgnoreCase(typeBean.getTypeName()) ? " unsigned" : "";
     return Types.ExternalType.of(
