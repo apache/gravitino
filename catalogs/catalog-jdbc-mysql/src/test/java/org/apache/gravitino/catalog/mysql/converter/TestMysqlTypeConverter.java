@@ -75,6 +75,9 @@ public class TestMysqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL_UNSIGNED, 10, 2, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 30), DECIMAL, 38, 30, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 30), DECIMAL_UNSIGNED, 38, 30, 0);
+    checkJdbcTypeToGravitinoType(
+        Types.ExternalType.of("decimal(39,30) unsigned"), DECIMAL_UNSIGNED, 39, 30, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("decimal(39,30)"), DECIMAL, 39, 30, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("decimal(65,30)"), DECIMAL, 65, 30, 0);
     checkJdbcTypeToGravitinoType(

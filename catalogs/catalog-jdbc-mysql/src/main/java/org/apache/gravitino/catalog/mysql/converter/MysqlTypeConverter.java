@@ -173,6 +173,8 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     int precision = typeBean.getColumnSize();
     int scale = typeBean.getScale();
     if (precision <= MAX_DECIMAL_PRECISION) {
+      // Preserve the existing mapping for signed and unsigned decimals within the core limit.
+      // DecimalType does not represent unsignedness.
       return Types.DecimalType.of(precision, scale);
     }
 
