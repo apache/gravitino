@@ -1,0 +1,165 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Shared build configuration for the Trino version-segment modules. Each module applies the
+// java-library and maven-publish plugins, declares its Trino version range, OTel semconv version,
+// default SPI selection and shared source directories through extra properties, wires its
+// sourceSets, and then applies this script; everything else is defined once here.
+
+int minTrinoVersion = project.minTrinoVersion
+int maxTrinoVersion = project.maxTrinoVersion
+String otelSemconvVersion = project.otelSemconvVersion
+boolean defaultToRangeMin = project.defaultTrinoVersionIsMin
+
+int trinoVersion = providers.gradleProperty("trinoVersion")
+  .map { it.trim().toInteger() }
+  .getOrElse(defaultToRangeMin ? minTrinoVersion : maxTrinoVersion)
+
+// Validate version range
+if (!(trinoVersion in minTrinoVersion..maxTrinoVersion)) {
+  throw new IllegalArgumentException(
+    "Module ${project.path} supports Trino versions ${minTrinoVersion}-${maxTrinoVersion}, " +
+      "but trinoVersion=${trinoVersion} was specified. " +
+      "Please set '-PtrinoVersion=${minTrinoVersion}' (or any version in the supported range).")
+}
+
+// Trino 440-478's trino-spi runs on the JDK 24 toolchain; Trino 479+ needs JDK 25.
+// Error Prone is incompatible with both toolchains and disabled for every module by the
+// trino-connector parent build file.
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(trinoVersion >= 479 ? 25 : 24)
+  }
+}
+
+dependencies {
+  implementation project(":catalogs:catalog-common")
+  implementation project(path: ":clients:client-java-runtime", configuration: "shadow")
+  implementation libs.airlift.json
+  implementation libs.airlift.log
+  implementation libs.slf4j.jdk14
+  implementation libs.commons.collections4
+  implementation libs.commons.lang3
+  implementation "io.trino:trino-jdbc:${trinoVersion}"
+  runtimeOnly "io.opentelemetry.semconv:opentelemetry-semconv:${otelSemconvVersion}"
+  compileOnly libs.airlift.resolver
+  compileOnly("io.trino:trino-spi:${trinoVersion}") {
+    exclude group: "org.apache.logging.log4j"
+  }
+  testImplementation libs.awaitility
+  testImplementation libs.mockito.core
+  testImplementation libs.mysql.driver
+  testImplementation("io.trino:trino-memory:${trinoVersion}") {
+    exclude group: "org.antlr"
+    exclude group: "org.apache.logging.log4j"
+  }
+  testImplementation("io.trino:trino-testing:${trinoVersion}") {
+    exclude group: "org.apache.logging.log4j"
+    if (trinoVersion >= 479) {
+      exclude group: "org.junit.jupiter"
+      exclude group: "org.junit.platform"
+    }
+  }
+  if (trinoVersion >= 479) {
+    testImplementation enforcedPlatform("org.junit:junit-bom:5.11.4")
+    testImplementation "org.junit.jupiter:junit-jupiter-api"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine"
+  } else {
+    testRuntimeOnly libs.junit.jupiter.engine
+  }
+}
+
+plugins.withId("com.diffplug.spotless") {
+  spotless {
+    java {
+      // Keep Spotless within this module to avoid cross-project target errors; the shared shape
+      // trees are formatted by the trino-connector parent project that owns them.
+      target project.fileTree("src") { include "**/*.java" }
+    }
+  }
+}
+
+tasks.withType(JavaCompile).configureEach {
+  options.release = 17
+}
+
+tasks.withType(Test).configureEach {
+  extensions.findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension)?.enabled = false
+  if (trinoVersion >= 479) {
+    // Trino 479+ requires the JDK Vector API incubator module for SIMD block encoding.
+    jvmArgs "--add-modules=jdk.incubator.vector"
+  }
+}
+
+def copyRuntimeLibs = tasks.register("copyRuntimeLibs", Copy) {
+  dependsOn "jar"
+  from { configurations.runtimeClasspath.files.findAll { it.isFile() } }
+  into layout.buildDirectory.dir("libs")
+}
+
+def distributionDir = rootProject.layout.projectDirectory.dir("distribution/${rootProject.name}-${project.name}")
+
+def copyLibs = tasks.register("copyLibs", Copy) {
+  dependsOn copyRuntimeLibs, "build"
+  from layout.buildDirectory.dir("libs")
+  from(rootProject.layout.projectDirectory.dir("licenses")) {
+    into "licenses"
+  }
+  from rootProject.file("LICENSE.trino")
+  from rootProject.file("NOTICE.trino")
+  from rootProject.file("README.md")
+  into distributionDir
+  rename { fileName -> fileName.replace(".trino", "") }
+  outputs.dir distributionDir
+}
+
+def assembleTrinoConnector = tasks.register("assembleTrinoConnector", Tar) {
+  dependsOn copyLibs
+  group = "gravitino distribution"
+  finalizedBy "checksumTrinoConnector"
+  into "${rootProject.name}-${project.name}-${project.version}"
+  from distributionDir
+  compression = Compression.GZIP
+  archiveFileName = "${rootProject.name}-${project.name}-${project.version}.tar.gz"
+  destinationDirectory = rootProject.layout.projectDirectory.dir("distribution")
+}
+
+tasks.register("checksumTrinoConnector") {
+  group = "gravitino distribution"
+  dependsOn assembleTrinoConnector
+  def archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
+  def checksumFile = archiveFile.map { archive -> archive.asFile.toPath().resolveSibling("${archive.asFile.name}.sha256").toFile() }
+  inputs.file archiveFile
+  outputs.file checksumFile
+  doLast {
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    archiveFile.get().asFile.withInputStream { stream ->
+      byte[] buffer = new byte[8192]
+      int read
+      while ((read = stream.read(buffer)) > 0) {
+        digest.update(buffer, 0, read)
+      }
+    }
+    checksumFile.get().text = digest.digest().collect { String.format("%02x", it) }.join("")
+  }
+}
+
+tasks.named("build") {
+  finalizedBy copyRuntimeLibs
+}

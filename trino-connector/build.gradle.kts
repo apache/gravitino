@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import net.ltgt.gradle.errorprone.errorprone
+
 // This project builds nothing of its own; it groups the Trino version-segment modules and owns the
 // shared shape source trees (common/, common-440-479/, common-440-481/, common-480-481/) that the
 // modules compile through their sourceSets. Only Spotless stays enabled here.
@@ -36,5 +38,13 @@ plugins.withId("com.diffplug.spotless") {
         project.fileTree("common-480-481") { include("**/*.java") }
       )
     }
+  }
+}
+
+// Error Prone is incompatible with the JDK 24/25 toolchains the Trino SPI requires, so it is
+// disabled for every module below this project.
+subprojects {
+  tasks.withType<JavaCompile>().configureEach {
+    options.errorprone.isEnabled.set(false)
   }
 }
