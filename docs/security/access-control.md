@@ -210,7 +210,6 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
 | `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
 | `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
-| `SELECT_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Deprecated alias for `USE_SEMANTIC_MODEL` |
 | `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets

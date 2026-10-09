@@ -89,8 +89,7 @@ public class AuthorizationUtils {
   public static final ImmutableBiMap<Privilege.Name, Privilege.Name> DEPRECATED_PRIVILEGE_MAP =
       ImmutableBiMap.of(
           Privilege.Name.CREATE_MODEL, Privilege.Name.REGISTER_MODEL,
-          Privilege.Name.CREATE_MODEL_VERSION, Privilege.Name.LINK_MODEL_VERSION,
-          Privilege.Name.SELECT_SEMANTIC_MODEL, Privilege.Name.USE_SEMANTIC_MODEL);
+          Privilege.Name.CREATE_MODEL_VERSION, Privilege.Name.LINK_MODEL_VERSION);
 
   private static final Set<MetadataObject.Type> SKIP_APPLY_TYPES =
       Sets.newHashSet(
@@ -124,12 +123,10 @@ public class AuthorizationUtils {
           Privilege.Name.USE_MODEL,
           Privilege.Name.LINK_MODEL_VERSION);
 
-  @SuppressWarnings("deprecation")
   private static final Set<Privilege.Name> SEMANTIC_MODEL_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_SEMANTIC_MODEL,
           Privilege.Name.USE_SEMANTIC_MODEL,
-          Privilege.Name.SELECT_SEMANTIC_MODEL,
           Privilege.Name.MODIFY_SEMANTIC_MODEL);
 
   private static final Set<Privilege.Name> SKIP_APPLY_PRIVILEGES = SEMANTIC_MODEL_PRIVILEGES;

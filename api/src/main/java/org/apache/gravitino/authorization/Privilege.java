@@ -176,15 +176,6 @@ public interface Privilege {
     CREATE_SEMANTIC_MODEL(0L, 1L << 39),
     /** The privilege to discover a semantic model and load its definition. */
     USE_SEMANTIC_MODEL(0L, 1L << 40),
-    /**
-     * The privilege to discover a semantic model and load its definition.
-     *
-     * <p>Shares the same bit value as USE_SEMANTIC_MODEL for backward compatibility.
-     *
-     * @deprecated Use {@link #USE_SEMANTIC_MODEL} instead.
-     */
-    @Deprecated
-    SELECT_SEMANTIC_MODEL(0L, 1L << 40),
     /** The privilege to rename a semantic model or alter its definition and metadata. */
     MODIFY_SEMANTIC_MODEL(0L, 1L << 41);
 

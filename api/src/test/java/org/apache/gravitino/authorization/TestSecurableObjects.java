@@ -658,7 +658,6 @@ public class TestSecurableObjects {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
   public void testUseSemanticModelPrivilege() {
     Assertions.assertEquals(
         Privileges.UseSemanticModel.allow(), Privileges.allow("USE_SEMANTIC_MODEL"));
@@ -670,13 +669,6 @@ public class TestSecurableObjects {
         "DENY use semantic model", Privileges.UseSemanticModel.deny().simpleString());
     Assertions.assertEquals(1L << 40, Privilege.Name.USE_SEMANTIC_MODEL.getLowBits());
     Assertions.assertEquals(0L, Privilege.Name.USE_SEMANTIC_MODEL.getHighBits());
-    Assertions.assertEquals(
-        Privilege.Name.USE_SEMANTIC_MODEL.getLowBits(),
-        Privilege.Name.SELECT_SEMANTIC_MODEL.getLowBits());
-    Assertions.assertEquals(
-        Privileges.SelectSemanticModel.allow(), Privileges.allow("SELECT_SEMANTIC_MODEL"));
-    Assertions.assertEquals(
-        Privileges.SelectSemanticModel.deny(), Privileges.deny("SELECT_SEMANTIC_MODEL"));
   }
 
   @Test

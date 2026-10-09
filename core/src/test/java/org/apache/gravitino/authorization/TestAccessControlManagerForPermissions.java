@@ -453,23 +453,15 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @ParameterizedTest
-  @CsvSource({
-    "METALAKE,USE_SEMANTIC_MODEL",
-    "CATALOG,USE_SEMANTIC_MODEL",
-    "SCHEMA,USE_SEMANTIC_MODEL",
-    "METALAKE,SELECT_SEMANTIC_MODEL",
-    "CATALOG,SELECT_SEMANTIC_MODEL",
-    "SCHEMA,SELECT_SEMANTIC_MODEL"
-  })
-  void testSemanticModelPrivilegeUpdatesStayLocal(String scope, String privilegeName)
-      throws IOException {
+  @ValueSource(strings = {"METALAKE", "CATALOG", "SCHEMA"})
+  void testSemanticModelPrivilegeUpdatesStayLocal(String scope) throws IOException {
     MetadataObject.Type type = MetadataObject.Type.valueOf(scope);
     String fullName =
         type == MetadataObject.Type.METALAKE
             ? METALAKE
             : type == MetadataObject.Type.CATALOG ? CATALOG : CATALOG + "." + SCHEMA;
     MetadataObject object = MetadataObjects.parse(fullName, type);
-    String name = "semantic_updates_" + scope + "_" + privilegeName;
+    String name = "semantic_updates_" + scope;
     entityStore.put(
         RoleEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -480,7 +472,7 @@ public class TestAccessControlManagerForPermissions {
             .build(),
         false);
     PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
-    Privilege semantic = Privileges.allow(privilegeName);
+    Privilege semantic = Privileges.UseSemanticModel.allow();
     Privilege table = Privileges.SelectTable.allow();
     SecurableObject tableObject = SecurableObjects.parse(fullName, type, List.of(table));
     SecurableObject semanticObject = SecurableObjects.parse(fullName, type, List.of(semantic));
@@ -525,15 +517,6 @@ public class TestAccessControlManagerForPermissions {
     assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
     manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic, table));
     assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
-    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(semantic));
-    Privilege equivalent =
-        Privileges.allow(
-            privilegeName.equals("USE_SEMANTIC_MODEL")
-                ? "SELECT_SEMANTIC_MODEL"
-                : "USE_SEMANTIC_MODEL");
-    Role revoked = manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(equivalent));
-    Assertions.assertTrue(revoked.securableObjects().isEmpty());
-    Mockito.verifyNoInteractions(authorizationPlugin);
   }
 
   @Test
