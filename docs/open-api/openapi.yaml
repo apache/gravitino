@@ -637,11 +637,11 @@ components:
           - "SCHEMA"
           - "TABLE"
           - "VIEW"
+          - "SEMANTIC_MODEL"
           - "COLUMN"
           - "FILESET"
           - "TOPIC"
           - "MODEL"
-          - "MODEL_VERSION"
           - "FUNCTION"
           - "ROLE"
     metadataObjectFullName:

@@ -50,7 +50,8 @@ public class MetadataIdConverter {
           MetadataObject.Type.MODEL, Capability.Scope.MODEL,
           MetadataObject.Type.FILESET, Capability.Scope.FILESET,
           MetadataObject.Type.TOPIC, Capability.Scope.TOPIC,
-          MetadataObject.Type.COLUMN, Capability.Scope.COLUMN);
+          MetadataObject.Type.COLUMN, Capability.Scope.COLUMN,
+          MetadataObject.Type.SEMANTIC_MODEL, Capability.Scope.SEMANTIC_MODEL);
 
   private MetadataIdConverter() {}
 
@@ -102,13 +103,18 @@ public class MetadataIdConverter {
     }
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
+
+    if (scope == Capability.Scope.SEMANTIC_MODEL) {
+      return NameIdentifier.of(
+          CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
+    }
+
     NameIdentifier normalized = CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
 
     // For a table, resolve the normalized name to the physically stored name through the same
     // shared resolver the table dispatcher uses, so the identifier authorized here is the
-    // identifier
-    // the operation later runs on. For catalogs that do not implement the resolution capability
-    // (the vast majority) this is a pure identity call with no extra source access.
+    // identifier the operation later runs on. For catalogs that do not implement the resolution
+    // capability (the vast majority) this is a pure identity call with no extra source access.
     if (scope == Capability.Scope.TABLE) {
       return CapabilityHelpers.resolvePhysicalTableName(normalized, catalogManager);
     }

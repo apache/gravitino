@@ -148,6 +148,15 @@ public class SemanticModelDefinitionDTO {
   }
 
   /**
+   * Validates this Semantic Model definition without converting it to the API representation.
+   *
+   * @throws IllegalArgumentException If any definition field is invalid.
+   */
+  public void validate() throws IllegalArgumentException {
+    SemanticModelDefinitionValidator.validate(this);
+  }
+
+  /**
    * Converts this persistence DTO to an API Semantic Model definition.
    *
    * @return The API Semantic Model definition.

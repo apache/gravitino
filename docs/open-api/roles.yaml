@@ -215,7 +215,8 @@ components:
             - REGISTER_MODEL
             - LINK_MODEL_VERSION
             - USE_MODEL
-            - USE_SECRET
+            - USE_SECRETS
+            - INCLUDE_CREDENTIAL_SECRETS
             - REGISTER_FUNCTION
             - EXECUTE_FUNCTION
             - MODIFY_FUNCTION
@@ -231,6 +232,9 @@ components:
             - RUN_JOB
             - CREATE_VIEW
             - SELECT_VIEW
+            - CREATE_SEMANTIC_MODEL
+            - SELECT_SEMANTIC_MODEL
+            - MODIFY_SEMANTIC_MODEL
           description: The name of the privilege
         condition:
           type: string
@@ -259,6 +263,7 @@ components:
             - "TOPIC"
             - "ROLE"
             - "MODEL"
+            - "SEMANTIC_MODEL"
             - "FUNCTION"
             - "TAG"
             - "POLICY"
@@ -430,6 +435,7 @@ components:
           - "TOPIC"
           - "ROLE"
           - "MODEL"
+          - "SEMANTIC_MODEL"
           - "FUNCTION"
           - "TAG"
           - "POLICY"

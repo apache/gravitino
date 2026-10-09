@@ -35,14 +35,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -53,6 +49,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -67,6 +64,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
@@ -91,7 +89,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
@@ -793,6 +790,34 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobQueuesJobBeforeSubmission() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+    JobTemplateEntity shellJobTemplate =
+        newShellJobTemplateEntity("shell_job", "A shell job template");
+    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    // The job executor may start the job right after it is submitted, so the queued time must be
+    // taken before the submission to never be later than the reported started time.
+    AtomicReference<Instant> submittedAt = new AtomicReference<>();
+    when(jobExecutor.submitJob(any()))
+        .thenAnswer(
+            invocation -> {
+              Thread.sleep(5);
+              submittedAt.set(Instant.now());
+              return "job_execution_id_for_test";
+            });
+
+    JobEntity jobEntity = jobManager.runJob(metalake, "shell_job", Collections.emptyMap());
+
+    Assertions.assertTrue(
+        jobEntity.auditInfo().createTime().isBefore(submittedAt.get()),
+        "The queued time should be taken before the job is submitted");
+  }
+
+  @Test
   public void testRunJobPropagatesJobExecutorRejection() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
@@ -868,12 +893,118 @@ public class TestJobManager {
     Assertions.assertEquals(Lists.newArrayList("Hello!"), runtimeJobTemplateDTO.arguments());
     Assertions.assertEquals(jobTemplateEntity.name(), runtimeJobTemplateDTO.name());
     Assertions.assertEquals(jobTemplateEntity.comment(), runtimeJobTemplateDTO.comment());
-    // createRuntimeJobTemplate() also resolves the executable by fetching it into the job's
+    // JobTemplateResolver#resolve() also resolves the executable by fetching it into the job's
     // staging directory, so it ends up as a local staging-dir path rather than the original
     // "/bin/echo" - just confirm it was actually resolved to something under that directory.
     Assertions.assertTrue(
         runtimeJobTemplateDTO.executable().endsWith("echo"),
         () -> "Unexpected resolved executable: " + runtimeJobTemplateDTO.executable());
+  }
+
+  @Test
+  public void testRunJobResolvesDefaultValues() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity jobTemplateEntity =
+        newShellJobTemplateEntity(
+            "shell_job_with_defaults",
+            Lists.newArrayList(
+                "--greeting", "{{greeting:-Hi}}", "--note", "{{note:-}}", "{{name}}"));
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+    when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    JobEntity jobEntity =
+        jobManager.runJob(
+            metalake, jobTemplateEntity.name(), ImmutableMap.of("name", "Bob", "unused", "x"));
+
+    ShellJobTemplateDTO runtimeJobTemplateDTO =
+        (ShellJobTemplateDTO)
+            JsonUtils.anyFieldMapper()
+                .readValue(jobEntity.runtimeJobTemplate(), JobTemplateDTO.class);
+    Assertions.assertEquals(
+        Lists.newArrayList("--greeting", "Hi", "--note", "", "Bob"),
+        runtimeJobTemplateDTO.arguments());
+  }
+
+  @Test
+  public void testRunJobRejectsMissingParametersBeforeStaging() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity jobTemplateEntity =
+        newShellJobTemplateEntity(
+            "shell_job_with_required", Lists.newArrayList("{{b}}", "{{a}}", "{{c:-x}}"));
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.runJob(metalake, jobTemplateEntity.name(), Collections.emptyMap()));
+    Assertions.assertTrue(e.getMessage().contains("[a, b]"), e.getMessage());
+
+    verify(jobExecutor, never()).submitJob(any());
+    verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
+    // Nothing was created for the job, not even the directory its staging directory would live in.
+    Assertions.assertFalse(jobManager.jobStagingDir(0L).getParentFile().exists());
+  }
+
+  @Test
+  public void testRunJobRemovesStagingDirWhenTemplateResolutionFails() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName("shell_job_with_missing_executable")
+            .withExecutable("/non_existent_dir_" + UUID.randomUUID() + "/run.sh")
+            .build();
+    JobTemplateEntity jobTemplateEntity = toJobTemplateEntity(shellJobTemplate);
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, jobTemplateEntity.name(), Collections.emptyMap()));
+
+    verify(jobExecutor, never()).submitJob(any());
+    // The staging directory was created, and removed again when the template failed to resolve.
+    File jobRunsDir = jobManager.jobStagingDir(0L).getParentFile();
+    Assertions.assertTrue(jobRunsDir.isDirectory(), "The job staging directory was never created");
+    Assertions.assertArrayEquals(new String[0], jobRunsDir.list());
+  }
+
+  @Test
+  public void testRegisterAndAlterJobTemplateRejectConflictingDefaults() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity conflicting =
+        newShellJobTemplateEntity(
+            "shell_job_conflicting", Lists.newArrayList("{{mode:-all}}", "{{mode:-stats}}"));
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.registerJobTemplate(metalake, conflicting));
+    Assertions.assertTrue(e.getMessage().contains("mode"), e.getMessage());
+    verify(entityStore, never()).put(any(JobTemplateEntity.class), anyBoolean());
+
+    JobTemplateEntity valid = newShellJobTemplateEntity("shell_job", "A shell job template");
+    JobTemplateChange invalidUpdate =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.ShellTemplateUpdate.builder()
+                .withNewArguments(ImmutableList.of("--options", "{{options:-{}}"))
+                .build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> jobManager.updateJobTemplateEntity(valid.nameIdentifier(), valid, invalidUpdate));
   }
 
   @Test
@@ -1113,13 +1244,15 @@ public class TestJobManager {
 
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
 
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.QUEUED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.QUEUED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
     verify(entityStore, never())
         .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
 
     stubEntityStoreUpdateToApply(job);
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     // Once a job transitions to a terminal status, finishedAt must be set.
@@ -1159,7 +1292,8 @@ public class TestJobManager {
         .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
         .thenReturn(ImmutableList.of(metalake));
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
     stubEntityStoreUpdateToApply(job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
@@ -1202,7 +1336,8 @@ public class TestJobManager {
 
     // QUEUED -> STARTED: startedAt must be set, finishedAt must remain unset.
     stubEntityStoreUpdateToApply(job);
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.STARTED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.STARTED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     JobEntity startedJob = captureUpdatedJobEntity(job);
@@ -1216,7 +1351,8 @@ public class TestJobManager {
     Mockito.clearInvocations(entityStore);
     stubEntityStoreUpdateToApply(startedJob);
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(startedJob));
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     JobEntity finishedJob = captureUpdatedJobEntity(startedJob);
@@ -1262,8 +1398,8 @@ public class TestJobManager {
 
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(queuedJob));
     stubEntityStoreUpdateToApply(queuedJob);
-    when(jobExecutor.getJobStatus(queuedJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobExecutionInfo(queuedJob.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     JobEntity succeededJob = captureUpdatedJobEntity(queuedJob);
@@ -1306,8 +1442,8 @@ public class TestJobManager {
     when(jobManager.listJobs(metalake, Optional.empty()))
         .thenReturn(ImmutableList.of(cancellingJob));
     stubEntityStoreUpdateToApply(cancellingJob);
-    when(jobExecutor.getJobStatus(cancellingJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.CANCELLED);
+    when(jobExecutor.getJobExecutionInfo(cancellingJob.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.CANCELLED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     JobEntity cancelledJob = captureUpdatedJobEntity(cancellingJob);
@@ -1365,8 +1501,8 @@ public class TestJobManager {
     stubEntityStoreUpdateToApply(latestSucceeded);
     // The stale QUEUED snapshot leads the poll to observe (and try to apply) FAILED - a
     // different terminal status than the one the job has actually already settled into.
-    when(jobExecutor.getJobStatus(queuedSnapshot.jobExecutionId()))
-        .thenReturn(JobHandle.Status.FAILED);
+    when(jobExecutor.getJobExecutionInfo(queuedSnapshot.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.FAILED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     JobEntity result = captureUpdatedJobEntity(latestSucceeded);
@@ -1410,8 +1546,8 @@ public class TestJobManager {
     when(jobManager.listJobs(metalake, Optional.empty()))
         .thenReturn(ImmutableList.of(queuedSnapshot));
     stubEntityStoreUpdateToApply(latestCancelling);
-    when(jobExecutor.getJobStatus(queuedSnapshot.jobExecutionId()))
-        .thenReturn(JobHandle.Status.STARTED);
+    when(jobExecutor.getJobExecutionInfo(queuedSnapshot.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.STARTED));
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     JobEntity result = captureUpdatedJobEntity(latestCancelling);
@@ -1436,7 +1572,7 @@ public class TestJobManager {
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
-    verify(jobExecutor, never()).getJobStatus(any());
+    verify(jobExecutor, never()).getJobExecutionInfo(any());
     verify(entityStore, never())
         .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
   }
@@ -1449,8 +1585,10 @@ public class TestJobManager {
         newJobEntity("local-job-mine-1", JobHandle.Status.CANCELLING, Instant.now(), null);
     mockListActiveJobs(startedJob);
     when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
-    when(jobExecutor.getJobStatus(startedJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
+    when(jobExecutor.getJobExecutionInfo(startedJob.jobExecutionId()))
+        .thenReturn(
+            JobExecutionInfo.of(JobHandle.Status.STARTED),
+            JobExecutionInfo.of(JobHandle.Status.CANCELLING));
     stubEntityStoreUpdateToApply(startedJob);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
@@ -1464,8 +1602,10 @@ public class TestJobManager {
     JobEntity queuedJob =
         newJobEntity("local-job-mine-2", JobHandle.Status.CANCELLING, Instant.now(), null);
     mockListActiveJobs(queuedJob);
-    when(jobExecutor.getJobStatus(queuedJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.QUEUED, JobHandle.Status.CANCELLED);
+    when(jobExecutor.getJobExecutionInfo(queuedJob.jobExecutionId()))
+        .thenReturn(
+            JobExecutionInfo.of(JobHandle.Status.QUEUED),
+            JobExecutionInfo.of(JobHandle.Status.CANCELLED));
     stubEntityStoreUpdateToApply(queuedJob);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
@@ -1482,7 +1622,8 @@ public class TestJobManager {
         newJobEntity("local-job-mine-1", JobHandle.Status.CANCELLING, Instant.now(), null);
     mockListActiveJobs(job);
     when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.STARTED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.STARTED));
     doThrow(new RuntimeException("cancel failed")).when(jobExecutor).cancelJob(any());
     stubEntityStoreUpdateToApply(job);
 
@@ -1502,14 +1643,16 @@ public class TestJobManager {
     JobEntity job =
         newJobEntity("external-job-1", JobHandle.Status.CANCELLING, Instant.now(), null);
     mockListActiveJobs(job);
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.STARTED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.STARTED));
     stubEntityStoreUpdateToApply(job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     verify(jobExecutor, never()).cancelJob(any());
-    // The observed STARTED status never regresses the CANCELLING job.
-    Assertions.assertEquals(JobHandle.Status.CANCELLING, captureUpdatedJobEntity(job).status());
+    // The observed STARTED status never regresses the CANCELLING job, so nothing is written.
+    verify(entityStore, never())
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
   }
 
   @Test
@@ -1519,7 +1662,8 @@ public class TestJobManager {
         newJobEntity("local-job-mine-1", JobHandle.Status.CANCELLING, Instant.now(), null);
     mockListActiveJobs(job);
     when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
-    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
     stubEntityStoreUpdateToApply(job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
@@ -1582,10 +1726,8 @@ public class TestJobManager {
 
     try {
       JobTemplate jobTemplate =
-          JobManager.createRuntimeJobTemplate(
-              newShellJobTemplateEntity("shell_job", "echo"),
-              Collections.emptyMap(),
-              jobStagingDir);
+          new JobTemplateResolver(newShellJobTemplateEntity("shell_job", "echo"))
+              .resolve(Collections.emptyMap(), jobStagingDir);
       String executionId = ownerExecutor.submitJob(jobTemplate);
       Awaitility.await()
           .atMost(1, TimeUnit.MINUTES)
@@ -2234,10 +2376,10 @@ public class TestJobManager {
 
     when(jobManager.listJobs(metalake, Optional.empty()))
         .thenReturn(ImmutableList.of(conflictedJob, survivingJob));
-    when(jobExecutor.getJobStatus(conflictedJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
-    when(jobExecutor.getJobStatus(survivingJob.jobExecutionId()))
-        .thenReturn(JobHandle.Status.SUCCEEDED);
+    when(jobExecutor.getJobExecutionInfo(conflictedJob.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    when(jobExecutor.getJobExecutionInfo(survivingJob.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
 
     // A losing CAS must not stop this batch or future scheduled polls.
     NameIdentifier conflictedJobIdent = NameIdentifierUtil.ofJob(metalake, conflictedJob.name());
@@ -2282,6 +2424,26 @@ public class TestJobManager {
         .build();
   }
 
+  private JobTemplateEntity newShellJobTemplateEntity(String name, List<String> arguments) {
+    return toJobTemplateEntity(
+        ShellJobTemplate.builder()
+            .withName(name)
+            .withExecutable("/bin/echo")
+            .withArguments(arguments)
+            .build());
+  }
+
+  private JobTemplateEntity toJobTemplateEntity(JobTemplate jobTemplate) {
+    return JobTemplateEntity.builder()
+        .withId(new Random().nextLong())
+        .withName(jobTemplate.name())
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(jobTemplate))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
   private JobTemplateEntity newSparkJobTemplateEntity(String name, String comment) {
     SparkJobTemplate sparkJobTemplate =
         SparkJobTemplate.builder()
@@ -2313,6 +2475,317 @@ public class TestJobManager {
         .withFinishedAt(2L)
         .withStatus(JobHandle.Status.SUCCEEDED)
         .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
+  @Test
+  public void testPullJobStatusUsesExecutorReportedTimestamps() throws IOException {
+    // The job starts and finishes between two polls, so it is never observed as STARTED. The
+    // times reported by the job executor are recorded instead of the poll time.
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    JobEntity job = newJobEntity("job-execution-1", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(job);
+    Instant startedAt = queuedAt.plusSeconds(1);
+    Instant finishedAt = queuedAt.plusSeconds(2);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.SUCCEEDED)
+                .withStartedAt(startedAt)
+                .withFinishedAt(finishedAt)
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(job.jobExecutionId());
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity updatedJob = captureUpdatedJobEntity(job);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, updatedJob.status());
+    Assertions.assertEquals(startedAt.toEpochMilli(), updatedJob.startedAt());
+    Assertions.assertEquals(finishedAt.toEpochMilli(), updatedJob.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusReportedStartedAtReplacesPolledTime() throws IOException {
+    // An earlier poll recorded its own time as the started time, as the job executor didn't report
+    // one at that time. The time reported later replaces it.
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    JobEntity job =
+        JobEntity.builder()
+            .withId(idGenerator.nextId())
+            .withJobExecutionId("job-execution-1")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.STARTED)
+            .withStartedAt(queuedAt.plusSeconds(30).toEpochMilli())
+            .withFinishedAt(0L)
+            .withAuditInfo(AuditInfo.builder().withCreator("test").withCreateTime(queuedAt).build())
+            .build();
+    mockListActiveJobs(job);
+    Instant startedAt = queuedAt.plusSeconds(1);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.STARTED)
+                .withStartedAt(startedAt)
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(job.jobExecutionId());
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    // The job is updated even though its status doesn't change.
+    JobEntity updatedJob = captureUpdatedJobEntity(job);
+    Assertions.assertEquals(JobHandle.Status.STARTED, updatedJob.status());
+    Assertions.assertEquals(startedAt.toEpochMilli(), updatedJob.startedAt());
+    Assertions.assertEquals(0L, updatedJob.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusSkipsUpdateWhenNothingChanges() throws IOException {
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    Instant startedAt = queuedAt.plusSeconds(1);
+    JobEntity job =
+        JobEntity.builder()
+            .withId(idGenerator.nextId())
+            .withJobExecutionId("job-execution-1")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.STARTED)
+            .withStartedAt(startedAt.toEpochMilli())
+            .withFinishedAt(0L)
+            .withAuditInfo(AuditInfo.builder().withCreator("test").withCreateTime(queuedAt).build())
+            .build();
+    mockListActiveJobs(job);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.STARTED)
+                .withStartedAt(startedAt)
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(job.jobExecutionId());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(entityStore, never())
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+  }
+
+  @Test
+  public void testPullJobStatusIgnoresInconsistentReportedTimestamps() throws IOException {
+    Instant queuedAt = Instant.now().minusSeconds(60);
+
+    // A queued job has no started time, so a reported one is ignored and nothing changes.
+    JobEntity queuedJob = newJobEntity("job-execution-1", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(queuedJob);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.QUEUED)
+                .withStartedAt(queuedAt.plusSeconds(1))
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(queuedJob.jobExecutionId());
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    verify(entityStore, never())
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+
+    // A running job has no finished time, so a reported one is ignored.
+    JobEntity startingJob =
+        newJobEntity("job-execution-2", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(startingJob);
+    Instant startedAt = queuedAt.plusSeconds(1);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.STARTED)
+                .withStartedAt(startedAt)
+                .withFinishedAt(queuedAt.plusSeconds(2))
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(startingJob.jobExecutionId());
+    stubEntityStoreUpdateToApply(startingJob);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity startedJob = captureUpdatedJobEntity(startingJob);
+    Assertions.assertEquals(JobHandle.Status.STARTED, startedJob.status());
+    Assertions.assertEquals(startedAt.toEpochMilli(), startedJob.startedAt());
+    Assertions.assertEquals(0L, startedJob.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusCorrectsReportedTimestamps() throws IOException {
+    Instant queuedAt = Instant.now().minusSeconds(60);
+
+    // The clock of the job runner is behind, so the job is reported to start and finish before it
+    // was queued. Both times are raised to the queued time.
+    JobEntity skewedJob = newJobEntity("job-execution-1", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(skewedJob);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.SUCCEEDED)
+                .withStartedAt(queuedAt.minusSeconds(2))
+                .withFinishedAt(queuedAt.minusSeconds(1))
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(skewedJob.jobExecutionId());
+    stubEntityStoreUpdateToApply(skewedJob);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity correctedJob = captureUpdatedJobEntity(skewedJob);
+    Assertions.assertEquals(queuedAt.toEpochMilli(), correctedJob.startedAt());
+    Assertions.assertEquals(queuedAt.toEpochMilli(), correctedJob.finishedAt());
+
+    // The job is reported to finish before it started. The started time is dropped, while the
+    // finished time is kept for the cleanup of the finished job.
+    Mockito.clearInvocations(entityStore);
+    JobEntity invalidJob = newJobEntity("job-execution-2", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(invalidJob);
+    Instant finishedAt = queuedAt.plusSeconds(1);
+    doReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.FAILED)
+                .withStartedAt(queuedAt.plusSeconds(2))
+                .withFinishedAt(finishedAt)
+                .build())
+        .when(jobExecutor)
+        .getJobExecutionInfo(invalidJob.jobExecutionId());
+    stubEntityStoreUpdateToApply(invalidJob);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity failedJob = captureUpdatedJobEntity(invalidJob);
+    Assertions.assertEquals(JobHandle.Status.FAILED, failedJob.status());
+    Assertions.assertEquals(0L, failedJob.startedAt());
+    Assertions.assertEquals(finishedAt.toEpochMilli(), failedJob.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusDropsPolledStartedAtLaterThanReportedFinishedAt()
+      throws IOException {
+    // An earlier poll recorded its own time as the started time, and the job runner, whose clock
+    // is behind, reports the job finished before that. The recorded started time can't be right,
+    // so it is dropped, while the finished time is kept for the cleanup of the finished job.
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    JobEntity job =
+        newStartedJobEntity("job-execution-1", queuedAt, queuedAt.plusSeconds(30).toEpochMilli());
+    mockListActiveJobs(job);
+    Instant finishedAt = queuedAt.plusSeconds(10);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.SUCCEEDED)
+                .withFinishedAt(finishedAt)
+                .build());
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity updatedJob = captureUpdatedJobEntity(job);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, updatedJob.status());
+    Assertions.assertEquals(0L, updatedJob.startedAt());
+    Assertions.assertEquals(finishedAt.toEpochMilli(), updatedJob.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusKeepsCancellingJobUntilItFinishes() throws IOException {
+    // A CANCELLING job is only updated once it finishes, even if the job executor reports a
+    // started time for it before that.
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    JobEntity job = newJobEntity("external-job-1", JobHandle.Status.CANCELLING, queuedAt, null);
+    mockListActiveJobs(job);
+    Instant startedAt = queuedAt.plusSeconds(1);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.STARTED)
+                .withStartedAt(startedAt)
+                .build());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    verify(entityStore, never())
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+
+    // Once the job is cancelled, it is updated with the started time as well.
+    Instant finishedAt = queuedAt.plusSeconds(2);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.CANCELLED)
+                .withStartedAt(startedAt)
+                .withFinishedAt(finishedAt)
+                .build());
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity cancelledJob = captureUpdatedJobEntity(job);
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelledJob.status());
+    Assertions.assertEquals(startedAt.toEpochMilli(), cancelledJob.startedAt());
+    Assertions.assertEquals(finishedAt.toEpochMilli(), cancelledJob.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusIgnoresUnusableReportedTimestamps() throws IOException {
+    // Times that don't fit in epoch milliseconds, or are far in the future, are dropped instead of
+    // failing the status pull, and the time of the pull is used for the finished job instead.
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    JobEntity job = newJobEntity("job-execution-1", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(job);
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(
+            JobExecutionInfo.builder()
+                .withStatus(JobHandle.Status.SUCCEEDED)
+                .withStartedAt(Instant.now().plus(Duration.ofDays(365)))
+                .withFinishedAt(Instant.MAX)
+                .build());
+    stubEntityStoreUpdateToApply(job);
+
+    Instant pulledAfter = Instant.now();
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity updatedJob = captureUpdatedJobEntity(job);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, updatedJob.status());
+    Assertions.assertEquals(0L, updatedJob.startedAt());
+    Assertions.assertTrue(updatedJob.finishedAt() >= pulledAfter.toEpochMilli());
+    Assertions.assertTrue(updatedJob.finishedAt() <= Instant.now().toEpochMilli());
+  }
+
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToUpdateAJob() throws IOException {
+    // A failure on one job must not stop the status pull of the others, or escape the scheduled
+    // task, which would cancel all its later runs.
+    Instant queuedAt = Instant.now().minusSeconds(60);
+    JobEntity failingJob = newJobEntity("job-execution-1", JobHandle.Status.QUEUED, queuedAt, null);
+    JobEntity job = newJobEntity("job-execution-2", JobHandle.Status.QUEUED, queuedAt, null);
+    mockListActiveJobs(failingJob, job);
+    when(jobExecutor.getJobExecutionInfo(any()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    when(entityStore.update(
+            eq(NameIdentifierUtil.ofJob(metalake, failingJob.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any()))
+        .thenThrow(new RuntimeException("update failed"));
+    stubEntityStoreUpdateToApply(job, job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(entityStore)
+        .update(
+            eq(NameIdentifierUtil.ofJob(metalake, job.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any());
+  }
+
+  private JobEntity newStartedJobEntity(String executionId, Instant queuedAt, long startedAt) {
+    return JobEntity.builder()
+        .withId(idGenerator.nextId())
+        .withJobExecutionId(executionId)
+        .withNamespace(NamespaceUtil.ofJob(metalake))
+        .withJobTemplateName("shell_job")
+        .withStatus(JobHandle.Status.STARTED)
+        .withStartedAt(startedAt)
+        .withFinishedAt(0L)
+        .withAuditInfo(AuditInfo.builder().withCreator("test").withCreateTime(queuedAt).build())
         .build();
   }
 
@@ -2418,98 +2891,6 @@ public class TestJobManager {
             eq(Entity.EntityType.JOB),
             captor.capture());
     return captor.getValue().apply(latestJobEntity);
-  }
-
-  private HttpServer createLoopbackHttpServer(String response) throws IOException {
-    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    server.createContext(
-        "/artifact.jar",
-        exchange -> {
-          byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(200, bytes.length);
-          try (OutputStream outputStream = exchange.getResponseBody()) {
-            outputStream.write(bytes);
-          }
-        });
-    return server;
-  }
-
-  @Test
-  public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
-    File stagingDir = new File(testStagingDir);
-    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
-
-    Path missingFilePath =
-        Path.of(System.getProperty("java.io.tmpdir"), "missing-job-file-" + UUID.randomUUID());
-    String uri = missingFilePath.toUri().toString();
-
-    Assertions.assertThrows(
-        RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
-  }
-
-  @Test
-  public void testFetchFileFromUriSsrfBlocked() {
-    File stagingDir = new File(testStagingDir);
-    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
-    FileFetcher.get().initialize(true);
-
-    // Loopback address
-    RuntimeException e1 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e1);
-
-    // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
-    RuntimeException e2 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () ->
-                JobManager.fetchFileFromUri(
-                    "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e2);
-
-    // RFC-1918 private range
-    RuntimeException e3 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e3);
-
-    // Alibaba Cloud / Oracle Cloud metadata endpoint
-    RuntimeException e4 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e4);
-  }
-
-  @Test
-  public void testFetchFileFromUriShouldAllowLocalhostWhenBlockingDisabled() throws Exception {
-    File stagingDir = new File(testStagingDir);
-    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
-    HttpServer server = createLoopbackHttpServer("job artifact");
-
-    try {
-      server.start();
-      int port = server.getAddress().getPort();
-      FileFetcher.get().initialize(false);
-
-      String fetchedFile =
-          JobManager.fetchFileFromUri(
-              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000);
-
-      Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
-    } finally {
-      FileFetcher.get().initialize(true);
-      server.stop(0);
-    }
-  }
-
-  private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
-    Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
-    Assertions.assertTrue(
-        exception.getCause().getMessage().contains(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
   }
 
   @Test

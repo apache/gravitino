@@ -112,6 +112,19 @@ public class TestSecurableObjects {
             Lists.newArrayList(Privileges.SelectView.allow()));
     Assertions.assertEquals(view, anotherView);
 
+    SecurableObject semanticModel =
+        SecurableObjects.ofSemanticModel(
+            schema, "sales_model", Lists.newArrayList(Privileges.SelectSemanticModel.allow()));
+    Assertions.assertEquals("catalog.schema.sales_model", semanticModel.fullName());
+    Assertions.assertEquals(MetadataObject.Type.SEMANTIC_MODEL, semanticModel.type());
+
+    SecurableObject anotherSemanticModel =
+        SecurableObjects.of(
+            MetadataObject.Type.SEMANTIC_MODEL,
+            Lists.newArrayList("catalog", "schema", "sales_model"),
+            Lists.newArrayList(Privileges.SelectSemanticModel.allow()));
+    Assertions.assertEquals(semanticModel, anotherSemanticModel);
+
     Exception e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -178,6 +191,16 @@ public class TestSecurableObjects {
                     Lists.newArrayList("metalake"),
                     Lists.newArrayList(Privileges.SelectView.allow())));
     Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                SecurableObjects.of(
+                    MetadataObject.Type.SEMANTIC_MODEL,
+                    Lists.newArrayList("metalake"),
+                    Lists.newArrayList(Privileges.SelectSemanticModel.allow())));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
   }
 
   @Test
@@ -217,7 +240,11 @@ public class TestSecurableObjects {
     Privilege registerFunction = Privileges.RegisterFunction.allow();
     Privilege executeFunction = Privileges.ExecuteFunction.allow();
     Privilege modifyFunction = Privileges.ModifyFunction.allow();
-    Privilege useSecret = Privileges.UseSecret.allow();
+    Privilege createSemanticModel = Privileges.CreateSemanticModel.allow();
+    Privilege selectSemanticModel = Privileges.SelectSemanticModel.allow();
+    Privilege modifySemanticModel = Privileges.ModifySemanticModel.allow();
+    Privilege useSecrets = Privileges.UseSecrets.allow();
+    Privilege includeCredentialSecrets = Privileges.IncludeCredentialSecrets.allow();
 
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.TAG));
@@ -405,6 +432,7 @@ public class TestSecurableObjects {
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.VIEW));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.MODEL));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.FUNCTION));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.COLUMN));
 
@@ -440,18 +468,29 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.MODEL));
 
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.SCHEMA));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.TABLE));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.VIEW));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.TOPIC));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.FILESET));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.MODEL));
-    Assertions.assertTrue(useSecret.canBindTo(MetadataObject.Type.MODEL_VERSION));
-    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.ROLE));
-    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.COLUMN));
-    Assertions.assertFalse(useSecret.canBindTo(MetadataObject.Type.FUNCTION));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.VIEW));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(useSecrets.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(useSecrets.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useSecrets.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(useSecrets.canBindTo(MetadataObject.Type.FUNCTION));
+
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.VIEW));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(includeCredentialSecrets.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(includeCredentialSecrets.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(includeCredentialSecrets.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(includeCredentialSecrets.canBindTo(MetadataObject.Type.FUNCTION));
 
     Assertions.assertTrue(createTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertFalse(createTag.canBindTo(MetadataObject.Type.CATALOG));
@@ -574,6 +613,48 @@ public class TestSecurableObjects {
     Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create semantic model, which binds to the schema it creates into, not to the model
+    Assertions.assertTrue(createSemanticModel.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createSemanticModel.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createSemanticModel.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
+    Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createSemanticModel.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test select semantic model
+    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(selectSemanticModel.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
+    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(selectSemanticModel.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test modify semantic model
+    Assertions.assertTrue(modifySemanticModel.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(modifySemanticModel.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(modifySemanticModel.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(modifySemanticModel.canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
+    Assertions.assertFalse(modifySemanticModel.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(modifySemanticModel.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(modifySemanticModel.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(modifySemanticModel.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Deny instances must agree with their allow counterparts on binding
+    Assertions.assertTrue(
+        Privileges.SelectSemanticModel.deny().canBindTo(MetadataObject.Type.SEMANTIC_MODEL));
+    Assertions.assertEquals(
+        Privilege.Condition.DENY, Privileges.ModifySemanticModel.deny().condition());
+    Assertions.assertEquals(
+        Privileges.CreateSemanticModel.allow(),
+        Privileges.allow(Privilege.Name.CREATE_SEMANTIC_MODEL));
+    Assertions.assertEquals(
+        Privileges.ModifySemanticModel.deny(),
+        Privileges.deny(Privilege.Name.MODIFY_SEMANTIC_MODEL));
   }
 
   @Test

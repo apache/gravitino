@@ -103,7 +103,8 @@ Metalake (top level)
 │       ├── Topic
 │       ├── Fileset
 │       ├── Model
-│       └── Function
+│       ├── Function
+│       └── Semantic Model
 ├── Tag
 ├── Policy
 ├── Job Template
@@ -141,7 +142,7 @@ catalog, or schema, never to a table. Whoever creates a role owns it, and can al
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
 it, and it can be transferred at any time. It applies to metalakes, catalogs, schemas, tables, views,
-topics, filesets, models, functions, roles, tags, policies, job templates, and jobs.
+topics, filesets, models, semantic models, functions, roles, tags, policies, job templates, and jobs.
 
 ### Resolution
 
@@ -202,10 +203,14 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRET`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, ModelVersion | Retrieve plaintext secrets and vend credentials for objects in scope |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`) |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in the `getSecrets` result |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
+| `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
+| `SELECT_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
+| `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
@@ -222,11 +227,13 @@ they will be removed in a future release. Use the current names in new roles.
 | `MANAGE_USERS`          | Metalake                                                                | Add and remove users                               |
 | `MANAGE_GROUPS`         | Metalake                                                                | Add and remove groups                              |
 | `CREATE_ROLE`           | Metalake                                                                | Create roles                                       |
-| `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grant and revoke privileges on any object in scope |
+| `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function, Semantic Model | Grant and revoke privileges on any object in scope |
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
+| `VIEW_TAG`              | Metalake, Tag                                                           | Read tag metadata                                  |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
-| `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `VIEW_POLICY`           | Metalake, Policy                                                        | Read policy metadata                               |
+| `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
 | `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
@@ -238,12 +245,17 @@ object and its descendants.
 
 `APPLY_TAG`, `APPLY_POLICY`, and `USE_JOB_TEMPLATE` scope differently from every other privilege on
 this page. The object they bind to is the instrument the holder may use, not the object the operation
-acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder attach that one policy
-and no other, while granting it on the metalake lets them attach any policy in the metalake.
+acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder associate that
+policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it on the metalake
+covers any policy in that metalake.
 
-Attaching a tag or a policy is checked twice: the holder needs `APPLY_TAG` or `APPLY_POLICY` for the
-tag or policy in question, and separately needs access to the metadata object being tagged. A user
-cannot tag an object they could not otherwise reach.
+Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
+Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
+`APPLY_TAG` on the tag. Ownership can satisfy either check.
+
+Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
+`APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
+List results include only tags and policies the caller can read.
 
 ### Required Privileges
 
@@ -269,6 +281,7 @@ return only the entries the caller is entitled to see, which for a metalake owne
 | Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
 | Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
+| Semantic Model | `CREATE_SEMANTIC_MODEL` | `SELECT_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
 
 Testing a catalog connection follows the catalog row. Testing a catalog before it is created takes
 `CREATE_CATALOG`. Testing an existing catalog with its stored configuration takes `USE_CATALOG`, the
@@ -277,9 +290,11 @@ ownership, the same as altering it, because the caller chooses what the server c
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
-alter or delete. Fetching plaintext secrets (`getSecrets`) or vend credentials (`getCredentials`)
-requires owning the metalake or holding the `USE_SECRET` privilege. Callers who can load the object
-but lack that access receive an empty result rather than a forbidden error.
+alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
+`USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
+holds `INCLUDE_CREDENTIAL_SECRETS`. Vend credentials (`getCredentials`) requires no dedicated
+privilege beyond being able to load the object. Callers who can load the object but lack
+`USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and
@@ -297,17 +312,17 @@ owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object           | Create                  | Read                                   | Alter or delete | Use                                             |
-|------------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------------|
-| Metalake         | Service administrator   | Membership                             | Owner           |                                                 |
-| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                 |
-| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                 |
-| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                |
-| Tag              | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object    |
-| Policy           | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
-| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`     |
-| Job              |                         | Owner                                  | Owner           |                                                 |
-| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                 |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                                |
+|------------------|-------------------------|----------------------------------------|-----------------|----------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                    |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                    |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                    |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                   |
+| Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object       |
+| Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`        |
+| Job              |                         | Owner                                  | Owner           |                                                    |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                    |
 
 The secrets-provider registry is process-global server configuration; the metalake path only scopes
 authorization. Listing providers does not return secret material.

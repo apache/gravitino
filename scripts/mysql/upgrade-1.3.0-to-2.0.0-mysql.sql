@@ -17,30 +17,64 @@
 -- under the License.
 --
 
+-- MySQL has no ADD COLUMN / CREATE INDEX IF NOT EXISTS. Guard completed DDL
+-- so a failed upgrade can be restarted from the beginning without --force.
+-- Keep each operation in this session; no stored routines or extra privileges are required.
+
 -- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
 -- The 2.0 server no longer reads direct object-policy assignments from this table.
 
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
-ALTER TABLE `tag_meta`
-    ADD COLUMN `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND column_name = 'allowed_values'),
+    'SELECT 1',
+    'ALTER TABLE `tag_meta` ADD COLUMN `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT ''tag allowed values as a JSON string array, NULL allows any value, [] allows no value'' AFTER `properties`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `tag_relation_meta`
-    DROP INDEX `uk_ti_mi_mo_del`;
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'uk_ti_mi_mo_del'),
+    'SELECT 1',
+    'ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_mo_del`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `tag_relation_meta`
-    ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND column_name = 'tag_value'),
+    'SELECT 1',
+    'ALTER TABLE `tag_relation_meta` ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '''' COMMENT ''tag assignment value, empty string means no value'' AFTER `metadata_object_type`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `idp_user_meta`
-    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'idp_user_meta' AND column_name = 'enabled'),
+    'SELECT 1',
+    'ALTER TABLE `idp_user_meta` ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''whether the user is enabled, 0 is disabled, 1 is enabled'' AFTER `password_hash`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `idp_group_meta`
-    ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'idp_group_meta' AND column_name = 'group_comment'),
+    'SELECT 1',
+    'ALTER TABLE `idp_group_meta` ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '''' COMMENT ''idp group comment'' AFTER `group_name`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- add audit_info as nullable first for MySQL 5.7 compatibility (TEXT cannot have defaults)
-ALTER TABLE `idp_user_meta`
-    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp user audit info' AFTER `enabled`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'idp_user_meta' AND column_name = 'audit_info'),
+    'SELECT 1',
+    'ALTER TABLE `idp_user_meta` ADD COLUMN `audit_info` MEDIUMTEXT COMMENT ''idp user audit info'' AFTER `enabled`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 UPDATE `idp_user_meta`
     SET `audit_info` = '{}'
@@ -49,8 +83,13 @@ UPDATE `idp_user_meta`
 ALTER TABLE `idp_user_meta`
     MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user audit info' AFTER `enabled`;
 
-ALTER TABLE `idp_group_meta`
-    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp group audit info' AFTER `group_comment`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'idp_group_meta' AND column_name = 'audit_info'),
+    'SELECT 1',
+    'ALTER TABLE `idp_group_meta` ADD COLUMN `audit_info` MEDIUMTEXT COMMENT ''idp group audit info'' AFTER `group_comment`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 UPDATE `idp_group_meta`
     SET `audit_info` = '{}'
@@ -59,8 +98,13 @@ UPDATE `idp_group_meta`
 ALTER TABLE `idp_group_meta`
     MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp group audit info' AFTER `group_comment`;
 
-ALTER TABLE `idp_user_group_rel`
-    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'idp user group relation audit info' AFTER `group_id`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'idp_user_group_rel' AND column_name = 'audit_info'),
+    'SELECT 1',
+    'ALTER TABLE `idp_user_group_rel` ADD COLUMN `audit_info` MEDIUMTEXT COMMENT ''idp user group relation audit info'' AFTER `group_id`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 UPDATE `idp_user_group_rel`
     SET `audit_info` = '{}'
@@ -69,48 +113,351 @@ UPDATE `idp_user_group_rel`
 ALTER TABLE `idp_user_group_rel`
     MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user group relation audit info' AFTER `group_id`;
 
-CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
-CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'uk_ti_mi_mo_tv_del'),
+    'SELECT 1',
+    'CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'idx_tid_value'),
+    'SELECT 1',
+    'CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Index names are only scoped per-table in MySQL, so the same name could be
 -- reused across tables. Prefix each reused name with its table name so that
 -- every index name is unique across the whole schema. A database upgraded
 -- from 1.3.0 ends up with the same index names as a fresh 2.0.0 install.
-ALTER TABLE `schema_meta` RENAME INDEX `idx_mid` TO `schema_meta_idx_mid`;
-ALTER TABLE `table_meta` RENAME INDEX `uk_sid_tn_del` TO `table_meta_uk_sid_tn_del`;
-ALTER TABLE `table_meta` RENAME INDEX `idx_mid` TO `table_meta_idx_mid`;
-ALTER TABLE `table_meta` RENAME INDEX `idx_cid` TO `table_meta_idx_cid`;
-ALTER TABLE `table_column_version_info` RENAME INDEX `idx_mid` TO `table_column_version_info_idx_mid`;
-ALTER TABLE `table_column_version_info` RENAME INDEX `idx_cid` TO `table_column_version_info_idx_cid`;
-ALTER TABLE `table_column_version_info` RENAME INDEX `idx_sid` TO `table_column_version_info_idx_sid`;
-ALTER TABLE `fileset_meta` RENAME INDEX `uk_sid_fn_del` TO `fileset_meta_uk_sid_fn_del`;
-ALTER TABLE `fileset_meta` RENAME INDEX `idx_mid` TO `fileset_meta_idx_mid`;
-ALTER TABLE `fileset_meta` RENAME INDEX `idx_cid` TO `fileset_meta_idx_cid`;
-ALTER TABLE `fileset_version_info` RENAME INDEX `idx_mid` TO `fileset_version_info_idx_mid`;
-ALTER TABLE `fileset_version_info` RENAME INDEX `idx_cid` TO `fileset_version_info_idx_cid`;
-ALTER TABLE `fileset_version_info` RENAME INDEX `idx_sid` TO `fileset_version_info_idx_sid`;
-ALTER TABLE `topic_meta` RENAME INDEX `uk_sid_tn_del` TO `topic_meta_uk_sid_tn_del`;
-ALTER TABLE `topic_meta` RENAME INDEX `idx_mid` TO `topic_meta_idx_mid`;
-ALTER TABLE `topic_meta` RENAME INDEX `idx_cid` TO `topic_meta_idx_cid`;
-ALTER TABLE `user_role_rel` RENAME INDEX `idx_rid` TO `user_role_rel_idx_rid`;
-ALTER TABLE `group_role_rel` RENAME INDEX `idx_rid` TO `group_role_rel_idx_rid`;
-ALTER TABLE `tag_relation_meta` RENAME INDEX `idx_mid` TO `tag_relation_meta_idx_mid`;
-ALTER TABLE `model_meta` RENAME INDEX `idx_mid` TO `model_meta_idx_mid`;
-ALTER TABLE `model_meta` RENAME INDEX `idx_cid` TO `model_meta_idx_cid`;
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'schema_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'schema_meta' AND index_name = 'schema_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `schema_meta` RENAME INDEX `idx_mid` TO `schema_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `model_meta`
-    ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`,
-    ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
-ALTER TABLE `model_version_info` RENAME INDEX `idx_mid` TO `model_version_info_idx_mid`;
-ALTER TABLE `model_version_info` RENAME INDEX `idx_cid` TO `model_version_info_idx_cid`;
-ALTER TABLE `model_version_info` RENAME INDEX `idx_sid` TO `model_version_info_idx_sid`;
-ALTER TABLE `policy_version_info` RENAME INDEX `idx_mid` TO `policy_version_info_idx_mid`;
-ALTER TABLE `function_meta` RENAME INDEX `uk_sid_fn_del` TO `function_meta_uk_sid_fn_del`;
-ALTER TABLE `function_meta` RENAME INDEX `idx_mid` TO `function_meta_idx_mid`;
-ALTER TABLE `function_meta` RENAME INDEX `idx_cid` TO `function_meta_idx_cid`;
-ALTER TABLE `function_version_info` RENAME INDEX `idx_mid` TO `function_version_info_idx_mid`;
-ALTER TABLE `function_version_info` RENAME INDEX `idx_cid` TO `function_version_info_idx_cid`;
-ALTER TABLE `function_version_info` RENAME INDEX `idx_sid` TO `function_version_info_idx_sid`;
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'uk_sid_tn_del')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'table_meta_uk_sid_tn_del'),
+    'SELECT 1',
+    'ALTER TABLE `table_meta` RENAME INDEX `uk_sid_tn_del` TO `table_meta_uk_sid_tn_del`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'table_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `table_meta` RENAME INDEX `idx_mid` TO `table_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'table_meta_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `table_meta` RENAME INDEX `idx_cid` TO `table_meta_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'table_column_version_info_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `table_column_version_info` RENAME INDEX `idx_mid` TO `table_column_version_info_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'table_column_version_info_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `table_column_version_info` RENAME INDEX `idx_cid` TO `table_column_version_info_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'idx_sid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_column_version_info' AND index_name = 'table_column_version_info_idx_sid'),
+    'SELECT 1',
+    'ALTER TABLE `table_column_version_info` RENAME INDEX `idx_sid` TO `table_column_version_info_idx_sid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND index_name = 'uk_sid_fn_del')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND index_name = 'fileset_meta_uk_sid_fn_del'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_meta` RENAME INDEX `uk_sid_fn_del` TO `fileset_meta_uk_sid_fn_del`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND index_name = 'fileset_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_meta` RENAME INDEX `idx_mid` TO `fileset_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND index_name = 'fileset_meta_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_meta` RENAME INDEX `idx_cid` TO `fileset_meta_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_version_info' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_version_info' AND index_name = 'fileset_version_info_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_version_info` RENAME INDEX `idx_mid` TO `fileset_version_info_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_version_info' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_version_info' AND index_name = 'fileset_version_info_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_version_info` RENAME INDEX `idx_cid` TO `fileset_version_info_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_version_info' AND index_name = 'idx_sid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_version_info' AND index_name = 'fileset_version_info_idx_sid'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_version_info` RENAME INDEX `idx_sid` TO `fileset_version_info_idx_sid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'uk_sid_tn_del')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'topic_meta_uk_sid_tn_del'),
+    'SELECT 1',
+    'ALTER TABLE `topic_meta` RENAME INDEX `uk_sid_tn_del` TO `topic_meta_uk_sid_tn_del`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'topic_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `topic_meta` RENAME INDEX `idx_mid` TO `topic_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'topic_meta_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `topic_meta` RENAME INDEX `idx_cid` TO `topic_meta_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_role_rel' AND index_name = 'idx_rid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_role_rel' AND index_name = 'user_role_rel_idx_rid'),
+    'SELECT 1',
+    'ALTER TABLE `user_role_rel` RENAME INDEX `idx_rid` TO `user_role_rel_idx_rid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_role_rel' AND index_name = 'idx_rid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_role_rel' AND index_name = 'group_role_rel_idx_rid'),
+    'SELECT 1',
+    'ALTER TABLE `group_role_rel` RENAME INDEX `idx_rid` TO `group_role_rel_idx_rid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'tag_relation_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `tag_relation_meta` RENAME INDEX `idx_mid` TO `tag_relation_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_meta' AND index_name = 'model_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `model_meta` RENAME INDEX `idx_mid` TO `model_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_meta' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_meta' AND index_name = 'model_meta_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `model_meta` RENAME INDEX `idx_cid` TO `model_meta_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'model_meta' AND column_name = 'current_version'),
+    'SELECT 1',
+    'ALTER TABLE `model_meta` ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT ''model current version'' AFTER `model_latest_version`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'model_meta' AND column_name = 'last_version'),
+    'SELECT 1',
+    'ALTER TABLE `model_meta` ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT ''model last allocated version'' AFTER `current_version`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'model_version_info_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `model_version_info` RENAME INDEX `idx_mid` TO `model_version_info_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'model_version_info_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `model_version_info` RENAME INDEX `idx_cid` TO `model_version_info_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'idx_sid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'model_version_info_idx_sid'),
+    'SELECT 1',
+    'ALTER TABLE `model_version_info` RENAME INDEX `idx_sid` TO `model_version_info_idx_sid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'policy_version_info' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'policy_version_info' AND index_name = 'policy_version_info_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `policy_version_info` RENAME INDEX `idx_mid` TO `policy_version_info_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_meta' AND index_name = 'uk_sid_fn_del')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_meta' AND index_name = 'function_meta_uk_sid_fn_del'),
+    'SELECT 1',
+    'ALTER TABLE `function_meta` RENAME INDEX `uk_sid_fn_del` TO `function_meta_uk_sid_fn_del`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_meta' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_meta' AND index_name = 'function_meta_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `function_meta` RENAME INDEX `idx_mid` TO `function_meta_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_meta' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_meta' AND index_name = 'function_meta_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `function_meta` RENAME INDEX `idx_cid` TO `function_meta_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_version_info' AND index_name = 'idx_mid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_version_info' AND index_name = 'function_version_info_idx_mid'),
+    'SELECT 1',
+    'ALTER TABLE `function_version_info` RENAME INDEX `idx_mid` TO `function_version_info_idx_mid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_version_info' AND index_name = 'idx_cid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_version_info' AND index_name = 'function_version_info_idx_cid'),
+    'SELECT 1',
+    'ALTER TABLE `function_version_info` RENAME INDEX `idx_cid` TO `function_version_info_idx_cid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_version_info' AND index_name = 'idx_sid')
+    AND EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'function_version_info' AND index_name = 'function_version_info_idx_sid'),
+    'SELECT 1',
+    'ALTER TABLE `function_version_info` RENAME INDEX `idx_sid` TO `function_version_info_idx_sid`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- `table_version_info` had no primary key. `version` and `deleted_at` become
 -- NOT NULL and the existing unique key is promoted to the primary key, which
@@ -121,14 +468,28 @@ ALTER TABLE `function_version_info` RENAME INDEX `idx_sid` TO `function_version_
 --   SELECT COUNT(*) FROM `table_version_info`
 --    WHERE `version` IS NULL OR `deleted_at` IS NULL;
 -- The statement below fails rather than silently coercing NULL to 0.
-ALTER TABLE `table_version_info`
-    MODIFY COLUMN `version` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table current version',
-    MODIFY COLUMN `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
-    DROP INDEX `uk_table_id_version_deleted_at`,
-    ADD PRIMARY KEY (`table_id`, `version`, `deleted_at`);
+-- Skip only the exact completed conversion; unexpected keys must fail the ALTER.
+SET @ddl = IF((SELECT COUNT(*) = 3 AND SUM(
+        (seq_in_index = 1 AND column_name = 'table_id') OR
+        (seq_in_index = 2 AND column_name = 'version') OR
+        (seq_in_index = 3 AND column_name = 'deleted_at')) = 3
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_version_info' AND index_name = 'PRIMARY')
+    AND NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_version_info' AND index_name = 'uk_table_id_version_deleted_at'),
+    'SELECT 1',
+    'ALTER TABLE `table_version_info` MODIFY COLUMN `version` BIGINT(20) UNSIGNED NOT NULL COMMENT ''table current version'', MODIFY COLUMN `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''table deletion timestamp, 0 means not deleted'', DROP INDEX `uk_table_id_version_deleted_at`, ADD PRIMARY KEY (`table_id`, `version`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `job_run_meta`
-    ADD COLUMN `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at' AFTER `job_run_status`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'job_run_meta' AND column_name = 'job_started_at'),
+    'SELECT 1',
+    'ALTER TABLE `job_run_meta` ADD COLUMN `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''job started at'' AFTER `job_run_status`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
@@ -144,8 +505,13 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
 
-ALTER TABLE `job_run_meta`
-    ADD COLUMN `runtime_job_template` MEDIUMTEXT DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'job_run_meta' AND column_name = 'runtime_job_template'),
+    'SELECT 1',
+    'ALTER TABLE `job_run_meta` ADD COLUMN `runtime_job_template` MEDIUMTEXT DEFAULT NULL COMMENT ''job run runtime job template'' AFTER `job_finished_at`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
@@ -197,3 +563,25 @@ UPDATE `owner_meta` o
     SET o.`deleted_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
         o.`updated_at` = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
     WHERE o.`deleted_at` = 0 AND o.`id` <> d.keep_id;
+
+-- Separate the optimistic-concurrency token from the history version for fileset and policy.
+-- Until now `current_version` served as both: it is the join key into `*_version_info` and the
+-- value the CAS compares, so every alter had to advance it and write a snapshot even when nothing
+-- in that snapshot changed. `occ_version` takes over the CAS; `current_version` again advances
+-- only when the stored snapshot changes. The default is the whole backfill, because `occ_version`
+-- is only ever compared against itself on the same row.
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'fileset_meta' AND column_name = 'occ_version'),
+    'SELECT 1',
+    'ALTER TABLE `fileset_meta` ADD COLUMN `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT ''fileset optimistic concurrency version'' AFTER `last_version`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'policy_meta' AND column_name = 'occ_version'),
+    'SELECT 1',
+    'ALTER TABLE `policy_meta` ADD COLUMN `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT ''policy optimistic concurrency version'' AFTER `last_version`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

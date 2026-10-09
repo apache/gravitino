@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.job.local;
 
+import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.CANCEL_FORCE_KILL_DELAY_MS;
+import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_CANCEL_FORCE_KILL_DELAY_MS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_JOB_STATUS_KEEP_TIME_MS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_MAX_RUNNING_JOBS;
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.DEFAULT_WAITING_QUEUE_SIZE;
@@ -49,6 +51,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +69,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
@@ -92,8 +96,6 @@ public class LocalJobExecutor implements JobExecutor {
   private static final Logger LOG = LoggerFactory.getLogger(LocalJobExecutor.class);
 
   private static final String LOCAL_JOB_PREFIX = "local-job-";
-
-  private static final long UNEXPIRED_TIME_IN_MS = -1L;
 
   // Contains '.' and '-', which MetalakeNormalizeDispatcher rejects in metalake names on create and
   // rename, so it doesn't collide with a metalake's staging directory. A metalake created before
@@ -137,11 +139,13 @@ public class LocalJobExecutor implements JobExecutor {
 
   private ExecutorService jobPollingExecutorService;
 
-  // The job status map to keep track of the status of each job. In the meantime, the job status
-  // will be stored in the entity store, so we will clean the finished, cancelled and failed jobs
-  // from the map periodically to save the memory.
-  private Map<String, Pair<JobHandle.Status, Long>> jobStatus;
+  // The map to keep track of the status and the timestamps of each job. In the meantime, the job
+  // state will be stored in the entity store, so we will clean the finished, cancelled and failed
+  // jobs from the map periodically to save the memory.
+  private Map<String, JobExecutionInfo> jobInfos;
   private final Object lock = new Object();
+
+  private long cancelForceKillDelayMs;
 
   private long jobStatusKeepTimeInMs;
   private ScheduledExecutorService jobStatusCleanupExecutor;
@@ -169,6 +173,14 @@ public class LocalJobExecutor implements JobExecutor {
   @Override
   public void initialize(Map<String, String> configs) {
     this.configs = configs;
+    this.cancelForceKillDelayMs =
+        configs.containsKey(CANCEL_FORCE_KILL_DELAY_MS)
+            ? Long.parseLong(configs.get(CANCEL_FORCE_KILL_DELAY_MS))
+            : DEFAULT_CANCEL_FORCE_KILL_DELAY_MS;
+    Preconditions.checkArgument(
+        cancelForceKillDelayMs > 0,
+        "Cancel force-kill delay must be greater than 0, but got: %s",
+        cancelForceKillDelayMs);
     this.executorId = String.format("%08x", ThreadLocalRandom.current().nextInt());
     this.ownedJobIdPrefix = LOCAL_JOB_PREFIX + executorId + "-";
     LOG.info("Initializing local job executor with executor id {}", executorId);
@@ -244,7 +256,7 @@ public class LocalJobExecutor implements JobExecutor {
     threadPoolExecutor.allowCoreThreadTimeOut(true);
     this.jobExecutorService = threadPoolExecutor;
 
-    this.jobStatus = Maps.newHashMap();
+    this.jobInfos = Maps.newHashMap();
 
     this.jobStatusKeepTimeInMs =
         configs.containsKey(JOB_STATUS_KEEP_TIME_MS)
@@ -314,7 +326,7 @@ public class LocalJobExecutor implements JobExecutor {
         throw new IllegalStateException("Waiting queue is full, cannot submit job: " + jobTemplate);
       }
 
-      jobStatus.put(newJobId, Pair.of(JobHandle.Status.QUEUED, UNEXPIRED_TIME_IN_MS));
+      jobInfos.put(newJobId, JobExecutionInfo.of(JobHandle.Status.QUEUED));
     }
 
     // Written only once the job is accepted, so a rejected submission leaves no index behind.
@@ -323,55 +335,66 @@ public class LocalJobExecutor implements JobExecutor {
   }
 
   @Override
-  public JobHandle.Status getJobStatus(String jobId) throws NoSuchJobException {
+  public JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException {
     synchronized (lock) {
-      if (!jobStatus.containsKey(jobId)) {
+      JobExecutionInfo info = jobInfos.get(jobId);
+      if (info == null) {
         throw new NoSuchJobException("No job found with ID: %s", jobId);
       }
-      LOG.debug(
-          "Get status {} and finished time {} for job {}",
-          jobStatus.get(jobId).getLeft(),
-          jobStatus.get(jobId).getRight(),
-          jobId);
-      return jobStatus.get(jobId).getLeft();
+      LOG.debug("Get {} for job {}", info, jobId);
+      return info;
     }
   }
 
   @Override
   public void cancelJob(String jobId) throws NoSuchJobException {
     synchronized (lock) {
-      if (!jobStatus.containsKey(jobId)) {
+      JobExecutionInfo info = jobInfos.get(jobId);
+      if (info == null) {
         throw new NoSuchJobException("No job found with ID: %s", jobId);
       }
 
-      Pair<JobHandle.Status, Long> statusPair = jobStatus.get(jobId);
-      if (statusPair.getLeft() == JobHandle.Status.SUCCEEDED
-          || statusPair.getLeft() == JobHandle.Status.FAILED
-          || statusPair.getLeft() == JobHandle.Status.CANCELLED) {
+      if (info.status() == JobHandle.Status.SUCCEEDED
+          || info.status() == JobHandle.Status.FAILED
+          || info.status() == JobHandle.Status.CANCELLED) {
         LOG.warn("Job {} is already completed or cancelled, no action taken", jobId);
         return;
       }
 
-      if (statusPair.getLeft() == JobHandle.Status.CANCELLING) {
+      if (info.status() == JobHandle.Status.CANCELLING) {
         LOG.warn("Job {} is already being cancelled, no action taken", jobId);
         return;
       }
 
       // If the job is queued.
-      if (statusPair.getLeft() == JobHandle.Status.QUEUED) {
+      if (info.status() == JobHandle.Status.QUEUED) {
         waitingQueue.removeIf(p -> p.getLeft().equals(jobId));
-        jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLED, System.currentTimeMillis()));
+        finishJob(jobId, JobHandle.Status.CANCELLED);
         LOG.info("Job {} is cancelled from the waiting queue", jobId);
         return;
       }
 
-      if (statusPair.getLeft() == JobHandle.Status.STARTED) {
+      if (info.status() == JobHandle.Status.STARTED) {
         Process process = runningProcesses.get(jobId);
         if (process != null) {
           process.destroy();
+          // A process that traps or ignores SIGTERM would otherwise stay in
+          // CANCELLING forever and permanently occupy one of the fixed worker
+          // threads; escalate to a hard kill after a grace period.
+          long delayMs = cancelForceKillDelayMs;
+          jobStatusCleanupExecutor.schedule(
+              () -> {
+                if (process.isAlive()) {
+                  LOG.warn(
+                      "Job {} still alive {} ms after cancel, destroying forcibly", jobId, delayMs);
+                  process.destroyForcibly();
+                }
+              },
+              delayMs,
+              TimeUnit.MILLISECONDS);
         }
         LOG.info("Job {} is cancelling while running", jobId);
-        jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLING, UNEXPIRED_TIME_IN_MS));
+        jobInfos.put(jobId, info.toBuilder().withStatus(JobHandle.Status.CANCELLING).build());
       }
     }
   }
@@ -423,7 +446,7 @@ public class LocalJobExecutor implements JobExecutor {
     // Stop the job status and output index cleanup executors
     jobStatusCleanupExecutor.shutdownNow();
     outputIndexCleanupExecutor.shutdownNow();
-    jobStatus.clear();
+    jobInfos.clear();
   }
 
   public void runJob(Pair<String, JobTemplate> jobPair) {
@@ -434,8 +457,8 @@ public class LocalJobExecutor implements JobExecutor {
       Process process;
       synchronized (lock) {
         // This happens when the job is cancelled before it starts.
-        Pair<JobHandle.Status, Long> statusPair = jobStatus.get(jobId);
-        if (statusPair == null || statusPair.getLeft() != JobHandle.Status.QUEUED) {
+        JobExecutionInfo info = jobInfos.get(jobId);
+        if (info == null || info.status() != JobHandle.Status.QUEUED) {
           LOG.warn("Job {} is not in QUEUED state, cannot start it", jobId);
           return;
         }
@@ -443,27 +466,27 @@ public class LocalJobExecutor implements JobExecutor {
         LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
         process = processBuilder.start();
         runningProcesses.put(jobId, process);
-        jobStatus.put(jobId, Pair.of(JobHandle.Status.STARTED, UNEXPIRED_TIME_IN_MS));
+        jobInfos.put(jobId, info.started(Instant.now()));
       }
 
       LOG.info("Starting job: {}", jobId);
 
       int exitCode = process.waitFor();
-      if (exitCode == 0) {
-        LOG.info("Job {} completed successfully", jobId);
-        synchronized (lock) {
-          jobStatus.put(jobId, Pair.of(JobHandle.Status.SUCCEEDED, System.currentTimeMillis()));
-        }
-      } else {
-        synchronized (lock) {
-          JobHandle.Status oldStatus = jobStatus.get(jobId).getLeft();
-          if (oldStatus == JobHandle.Status.CANCELLING) {
-            LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
-            jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLED, System.currentTimeMillis()));
-          } else if (oldStatus == JobHandle.Status.STARTED) {
-            LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
-            jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
-          }
+      synchronized (lock) {
+        // The job may be missing if the executor is closed concurrently.
+        JobExecutionInfo current = jobInfos.get(jobId);
+        JobHandle.Status oldStatus = current == null ? null : current.status();
+        if (oldStatus == JobHandle.Status.CANCELLING) {
+          // A cancelled job whose process traps SIGTERM and still exits 0 was cancelled, not
+          // successful; consult the cancel state before the exit code.
+          LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
+          finishJob(jobId, JobHandle.Status.CANCELLED);
+        } else if (exitCode == 0) {
+          LOG.info("Job {} completed successfully", jobId);
+          finishJob(jobId, JobHandle.Status.SUCCEEDED);
+        } else if (oldStatus == null || oldStatus == JobHandle.Status.STARTED) {
+          LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
+          finishJob(jobId, JobHandle.Status.FAILED);
         }
       }
 
@@ -471,8 +494,7 @@ public class LocalJobExecutor implements JobExecutor {
       LOG.error("Error while executing job", e);
       // If an error occurs, we should mark the job as failed
       synchronized (lock) {
-        String jobId = jobPair.getLeft();
-        jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
+        finishJob(jobPair.getLeft(), JobHandle.Status.FAILED);
       }
     }
 
@@ -507,12 +529,13 @@ public class LocalJobExecutor implements JobExecutor {
     long currentTime = System.currentTimeMillis();
 
     synchronized (lock) {
-      jobStatus
-          .entrySet()
+      // Only the finished jobs have a finished time, the others are never removed.
+      jobInfos
+          .values()
           .removeIf(
-              entry ->
-                  entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
-                      && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs);
+              info ->
+                  info.finishedAt() != null
+                      && (currentTime - info.finishedAt().toEpochMilli()) >= jobStatusKeepTimeInMs);
     }
   }
 
@@ -559,6 +582,14 @@ public class LocalJobExecutor implements JobExecutor {
     } catch (IOException | RuntimeException e) {
       LOG.warn("Failed to clean up job output indexes under {}", outputIndexDir, e);
     }
+  }
+
+  // Must be called with the lock held. The started time, if any, is carried forward.
+  private void finishJob(String jobId, JobHandle.Status status) {
+    // The job may be missing if the executor is closed concurrently.
+    JobExecutionInfo info =
+        jobInfos.getOrDefault(jobId, JobExecutionInfo.of(JobHandle.Status.QUEUED));
+    jobInfos.put(jobId, info.finished(status, Instant.now()));
   }
 
   private List<String> getJobOutput(String jobId, String fileName, int maxLines, int maxBytes) {

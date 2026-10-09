@@ -277,14 +277,27 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Soft check for retrieving plaintext secrets or vend credentials. Only the metalake owner or a
-   * principal with {@code USE_SECRET} may receive non-empty results; others get an empty response
-   * rather than a forbidden error.
+   * Soft check required to call {@code getSecrets}. Only the metalake owner or a principal with
+   * {@code USE_SECRETS} may receive secrets; others get an empty response rather than a forbidden
+   * error. Whether cloud access-key pairs are included depends on {@link
+   * #FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION}.
    */
   public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
       """
                   METALAKE::OWNER ||
-                  ANY_USE_SECRET
+                  ANY_USE_SECRETS
+                  """;
+
+  /**
+   * Soft check that, together with {@link #FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION}, includes
+   * cloud access-key pairs in the {@code getSecrets} result. Alone it does not authorize {@code
+   * getSecrets}. Metalake owners and holders of {@code INCLUDE_CREDENTIAL_SECRETS} receive the
+   * unfiltered map when they also pass the {@code USE_SECRETS} check.
+   */
+  public static final String FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION =
+      """
+                  METALAKE::OWNER ||
+                  ANY_INCLUDE_CREDENTIAL_SECRETS
                   """;
 
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
@@ -299,6 +312,53 @@ public class AuthorizationExpressionConstants {
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||
               ANY_READ_FILESET ||
               ANY_WRITE_FILESET
+                  """;
+
+  /**
+   * Semantic Model list and load. Only Semantic Models the caller can select, modify, or owns are
+   * returned; a metalake or catalog owner, or a schema owner holding USE_CATALOG, sees them all.
+   */
+  public static final String LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (SEMANTIC_MODEL::OWNER || ANY_SELECT_SEMANTIC_MODEL || ANY_MODIFY_SEMANTIC_MODEL)
+                  """;
+
+  /** Semantic Model creation under a schema. */
+  public static final String CREATE_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_SEMANTIC_MODEL
+                  """;
+
+  /** Semantic Model rename and definition or metadata alteration. */
+  public static final String MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (SEMANTIC_MODEL::OWNER || ANY_MODIFY_SEMANTIC_MODEL)
+                  """;
+
+  /**
+   * Semantic Model drop. Unlike alter, MODIFY_SEMANTIC_MODEL is not enough: a caller who is neither
+   * a metalake, catalog, nor schema owner must own the Semantic Model itself.
+   */
+  public static final String DROP_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && SEMANTIC_MODEL::OWNER
+                  """;
+
+  public static final String FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL) ||
+                  ANY_SELECT_SEMANTIC_MODEL ||
+                  ANY_MODIFY_SEMANTIC_MODEL
                   """;
 
   public static final String LOAD_ROLE_AUTHORIZATION_EXPRESSION =
