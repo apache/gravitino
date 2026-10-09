@@ -19,7 +19,6 @@
 
 import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.file.FileTreeElement
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.kotlin.dsl.support.serviceOf
 
@@ -80,29 +79,13 @@ dependencies {
   testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
 
-// Shared-source files this module overrides with same-named local copies that use the Trino 480
-// SPI shapes (Optional<String> comments, SchemaFunctionName record accessors, credential-aware
-// page sink methods). The exclusion below matches only files under the shared source directory, so
-// the module-local shadow copies are still compiled.
-val sharedSourceRoot = file("../trino-connector/src/main/java").invariantSeparatorsPath
-val shadowedSharedSources =
-  setOf(
-    "util/ColumnComments.java",
-    "util/SchemaFunctionNames.java",
-    "GravitinoPageSinkProvider.java"
-  )
-
 sourceSets {
   main {
-    java.srcDirs("../trino-connector/src/main/java")
-    java.exclude { element ->
-      val path = (element as FileTreeElement).file.invariantSeparatorsPath
-      path.startsWith("$sharedSourceRoot/") && shadowedSharedSources.any { path.endsWith("/$it") }
-    }
+    java.srcDirs("../common/src/main/java", "../common-480-481/src/main/java", "../common-440-481/src/main/java")
   }
   test {
-    java.srcDirs("../trino-connector/src/test/java")
-    resources.srcDirs("../trino-connector/src/test/resources")
+    java.srcDirs("../common/src/test/java")
+    resources.srcDirs("../common/src/test/resources")
   }
 }
 

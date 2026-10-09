@@ -17,6 +17,24 @@
  * under the License.
  */
 
+// This project builds nothing of its own; it groups the Trino version-segment modules and owns the
+// shared shape source trees (common/, common-440-479/, common-440-481/, common-480-481/) that the
+// modules compile through their sourceSets. Only Spotless stays enabled here.
 tasks.all {
-    enabled = false
+  enabled = name.startsWith("spotless")
+}
+
+// The shared shape trees belong to no module, so no module's Spotless picks them up. Format them
+// from here, where they live, and keep the modules scoped to their own trees.
+plugins.withId("com.diffplug.spotless") {
+  configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+    java {
+      target(
+        project.fileTree("common") { include("**/*.java") },
+        project.fileTree("common-440-479") { include("**/*.java") },
+        project.fileTree("common-440-481") { include("**/*.java") },
+        project.fileTree("common-480-481") { include("**/*.java") }
+      )
+    }
+  }
 }

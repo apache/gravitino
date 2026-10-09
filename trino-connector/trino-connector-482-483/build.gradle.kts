@@ -19,7 +19,6 @@
 
 import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.file.FileTreeElement
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.kotlin.dsl.support.serviceOf
 
@@ -80,42 +79,13 @@ dependencies {
   testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
 
-// Shared-source files this module overrides with same-named local copies that use the Trino 482
-// SPI shapes (record accessors, Optional comments, credential-aware sink/source methods, the
-// Set<ColumnHandle> getSplits overload). The exclusion below matches only files under the shared
-// source directory, so the module-local shadow copies are still compiled.
-val sharedSourceRoot = file("../trino-connector/src/main/java").invariantSeparatorsPath
-val shadowedSharedSources =
-  setOf(
-    "util/ColumnComments.java",
-    "util/SchemaFunctionNames.java",
-    "util/TypeSignatures.java",
-    "GravitinoPageSinkProvider.java",
-    "GravitinoDataSourceProvider.java",
-    "GravitinoSplitManager.java"
-  )
-
 sourceSets {
   main {
-    java.srcDirs("../trino-connector/src/main/java")
-    // Trino 482 reworked ConnectorSplitSource.getNextBatch and removed the ConnectorSplitBatch
-    // return type, so the shared GravitinoSplitSource cannot compile against the Trino 482 SPI.
-    // This module supplies its own split source inside GravitinoSplitManager482 instead.
-    java.exclude("**/GravitinoSplitSource.java")
-    // Trino 480 changed ColumnMetadata.getComment() to Optional<String> and turned
-    // SchemaFunctionName into a record; Trino 482 removed Type.getTypeSignature(), the
-    // non-credential createPageSink/createMergeSink variants, the DynamicFilter getSplits
-    // overload, and the split-based createPageSource. This module supplies same-named local
-    // copies with the 482 shapes; the shared pre-480/482 classes are excluded so the module
-    // compiles with direct, compile-time-checked calls.
-    java.exclude { element ->
-      val path = (element as FileTreeElement).file.invariantSeparatorsPath
-      path.startsWith("$sharedSourceRoot/") && shadowedSharedSources.any { path.endsWith("/$it") }
-    }
+    java.srcDirs("../common/src/main/java")
   }
   test {
-    java.srcDirs("../trino-connector/src/test/java")
-    resources.srcDirs("../trino-connector/src/test/resources")
+    java.srcDirs("../common/src/test/java")
+    resources.srcDirs("../common/src/test/resources")
   }
 }
 

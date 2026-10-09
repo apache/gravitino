@@ -39,6 +39,19 @@ java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))
 }
 
+// The connector sources live in the shared shape directories next to this module (common/ plus the
+// shape directories it needs at the minimum supported Trino version); this module compiles them
+// against the range-minimum SPI and hosts the shared unit tests.
+sourceSets {
+  main {
+    java.srcDirs("../common/src/main/java", "../common-440-479/src/main/java", "../common-440-481/src/main/java")
+  }
+  test {
+    java.srcDirs("../common/src/test/java")
+    resources.srcDirs("../common/src/test/resources")
+  }
+}
+
 tasks.withType<JavaCompile>().configureEach {
   options.errorprone.isEnabled.set(false)
   options.release.set(17)
