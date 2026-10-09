@@ -32,9 +32,14 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** Integration test for Spark authorization through the experimental Iceberg REST service. */
+/**
+ * Integration test for Spark authorization through the experimental Iceberg REST service.
+ *
+ * <p>The inherited tests exercise table creation, loading, updates, deletion, listing, renaming,
+ * nested namespaces, and table privilege enforcement against the experimental Iceberg artifacts.
+ */
 @Tag("gravitino-docker-test")
-public class IcebergExperimentalAuthorizationIT extends IcebergAuthorizationIT {
+public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizationIT {
 
   private static final String EXPERIMENTAL_SERVICE_NAME = "iceberg-rest-experimental";
   private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-experimental-server";
