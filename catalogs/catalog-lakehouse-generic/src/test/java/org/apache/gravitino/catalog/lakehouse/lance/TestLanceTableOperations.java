@@ -47,6 +47,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -1295,6 +1296,104 @@ public class TestLanceTableOperations {
         loaded.properties().containsKey(LANCE_TABLE_DECLARED),
         "lance.declared must be removed after schema is written");
     verify(dataset).getSchema();
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Location validation before storage I/O (issue #13696)
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testRegisterRejectsLocationWithoutValidLanceDataset() throws Exception {
+    // Registering a table adopts an existing dataset at the caller-supplied location. A location
+    // that does not resolve to a valid Lance dataset must be rejected before any metadata is
+    // written, otherwise a later drop/purge would delete the unrelated directory.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("not-a-dataset").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_TABLE_REGISTER, "true");
+
+    Mockito.doThrow(new RuntimeException("Not a Lance dataset"))
+        .when(lanceTableOps)
+        .openDataset(eq(location), any());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertTrue(
+        failure.getMessage().contains("does not resolve to a valid Lance dataset"),
+        "Error must state the location is not a valid Lance dataset, got: " + failure.getMessage());
+    verify(store, never()).put(any(), Mockito.anyBoolean());
+  }
+
+  @Test
+  public void testRegisterRejectsBlankLocation() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(LANCE_TABLE_REGISTER, "true");
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertTrue(
+        failure.getMessage().contains("Table location must be specified"),
+        "Blank location must be rejected, got: " + failure.getMessage());
+    verify(store, never()).put(any(), Mockito.anyBoolean());
+  }
+
+  @Test
+  public void testRegisterAcceptsLocationWithValidLanceDataset() throws Exception {
+    // A location that opens as a valid Lance dataset passes validation and the table metadata is
+    // then written to the entity store.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("valid-dataset").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    properties.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(1L).toString());
+
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset)
+        .when(lanceTableOps)
+        .openDataset(eq(location), org.mockito.ArgumentMatchers.anyMap());
+
+    Table registered =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertEquals("table", registered.name());
+    verify(lanceTableOps).openDataset(eq(location), org.mockito.ArgumentMatchers.anyMap());
+    verify(store).put(any(), Mockito.anyBoolean());
   }
 
   private static TableEntity tableEntity(
