@@ -38,11 +38,13 @@ policy. A table with only `data_domain=risk` does not.
 | Type                        | Rules                                | Consumer                  |
 |-----------------------------|--------------------------------------|---------------------------|
 | `system_iceberg_compaction` | Compaction thresholds and scheduling | Table maintenance service |
+| `system_iceberg_rewrite_manifests` | Manifest count and average-size thresholds | Table maintenance service |
 | `custom`                    | A free-form map that you define      | A system that you provide |
 
 A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
 it does not interpret their names or values. Built-in types have a defined content shape. See
-[Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules and
+[Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules,
+[Iceberg manifest rewrite policy](./iceberg-rewrite-manifests-policy.md) for the manifest rules, and
 [Table maintenance service](./table-maintenance-service/optimizer.md) for a worked example.
 
 Policy content also has `properties` and `supportedObjectTypes`. Properties describe the policy

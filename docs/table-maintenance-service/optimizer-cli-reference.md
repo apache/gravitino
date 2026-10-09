@@ -237,15 +237,16 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Five job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
+The following Iceberg job templates ship with the service. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
-| Job template                          | What it does                             |
-|---------------------------------------|-------------------------------------------|
-| `builtin-iceberg-update-stats`        | Collects file statistics and metrics      |
-| `builtin-iceberg-rewrite-data-files`  | Compacts small data files                 |
-| `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
-| `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
-| `builtin-iceberg-rewrite-manifests`   | Consolidates small manifest files         |
+| Job template                            | What it does                              |
+| --------------------------------------- | ----------------------------------------- |
+| `builtin-iceberg-update-stats`          | Collects file statistics and metrics      |
+| `builtin-iceberg-rewrite-data-files`    | Compacts small data files                 |
+| `builtin-iceberg-expire-snapshots`      | Removes old snapshot metadata             |
+| `builtin-iceberg-remove-orphan-files`   | Removes unreferenced files from storage   |
+| `builtin-iceberg-rewrite-manifests`     | Consolidates small manifest files         |
+| `builtin-iceberg-update-manifest-stats` | Collects manifest statistics for one spec |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
@@ -281,6 +282,76 @@ table, so it must be asked for explicitly.
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
 
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
+
+## Update Manifest Statistics
+
+`builtin-iceberg-update-manifest-stats` is a separate Spark job that collects two table-level
+statistics, including for partitioned tables:
+
+| Statistic | Object entry for each decimal spec ID |
+| --- | --- |
+| `custom-manifest-number-by-spec` | Long manifest count |
+| `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
+
+The job reads manifest metadata without scanning file statistics. It works after partition
+evolution, including for specs whose partition fields are absent from older files.
+`builtin-iceberg-update-stats` and the `submit-update-stats-job` CLI retain their existing behavior;
+they do not collect manifest statistics. Submit the new template directly through the jobs API.
+
+Set `spec_id` in the job template's `jobConf` (`--spec-id` for the Spark main class) to collect
+an existing non-negative partition spec ID. Omission resolves the table's current default once.
+The collector reads data and delete manifests from one current Iceberg snapshot and filters by
+that resolved spec. A defined spec with no manifests, including a table without a snapshot,
+produces count `0` and average `0.0`. An unknown spec ID fails collection.
+
+The new template accepts `catalog_name`, `table_identifier`, optional `spec_id`,
+`updater_options`, and optional `spark_conf`, alongside the standard Spark template settings.
+`updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
+a `statistics_updater` that implements atomic merging. The template has no `update_mode`.
+For example:
+
+```bash
+curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jobTemplateName": "builtin-iceberg-update-manifest-stats",
+    "jobConf": {
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
+      "spec_id": "1",
+      "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+      "spark_master": "local[2]",
+      "spark_executor_instances": "1",
+      "spark_executor_cores": "1",
+      "spark_executor_memory": "1g",
+      "spark_driver_memory": "1g",
+      "catalog_type": "rest",
+      "catalog_uri": "http://localhost:9001/iceberg",
+      "warehouse_location": ""
+    }
+  }'
+```
+
+For example, collecting spec `1` can produce logical object values `{"0": 620, "1": 120}`
+and `{"0": 10485760.0, "1": 4194304.0}`. It replaces only spec `1`; spec `0` remains intact.
+REST requests wrap these objects in the existing `updates` map keyed by statistic name.
+
+Both measurements are sent in one atomic shallow merge through the table-statistics API
+(`PATCH /api/metalakes/{metalake}/objects/table/{fullName}/statistics`). The server reads,
+merges, and writes under the same table lock used by statistics readers, and persists the pair
+in one batch. Concurrent collectors using the same Gravitino server preserve each other's spec
+entries. This coordination uses the server's existing in-process tree lock, not a distributed
+lock across independent server instances. Route these collectors to the same server.
+`PUT` continues to replace complete statistic values. An older server rejects the new PATCH
+operation, and custom statistics updaters must implement `mergeTableStatistics`; there is no
+unsafe fallback to client-side read/modify/write.
+
+Consumers must read both objects from one table-statistics response and use the same resolved
+spec key in each. A missing object or key means collection is required, not zero manifests.
+`IcebergManifestStatistics.fromStatistics` returns an empty result for an incomplete pair.
+Retain the collector result's `specId()` through evaluation and submission; the two maps do not
+identify a previously resolved default spec. Do not resolve the default again after collection.
+Automatic manifest policy triggering is separate follow-up work.
 
 ## Rewrite Data Files
 
