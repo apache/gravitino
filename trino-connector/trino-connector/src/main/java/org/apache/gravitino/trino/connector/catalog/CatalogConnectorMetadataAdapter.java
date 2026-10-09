@@ -66,6 +66,17 @@ public class CatalogConnectorMetadataAdapter {
    */
   static final String RESERVED_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
 
+  /**
+   * View output columns are never physically stored by the underlying catalog (only the view's SQL
+   * text is), so unlike table columns they must not be constrained by a catalog's physical storage
+   * restrictions (e.g. Iceberg rejecting {@code varchar(n)}, Hive rejecting {@code timestamp with
+   * time zone}); doing so has rejected otherwise-valid view output types, or accepted them on
+   * create only to reject the same type when reloading the view. Use the unrestricted base
+   * transformer for view columns instead of the catalog-specific {@link #dataTypeTransformer}.
+   */
+  private static final GeneralDataTypeTransformer VIEW_DATA_TYPE_TRANSFORMER =
+      new GeneralDataTypeTransformer();
+
   /** The list of schema properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> schemaProperties;
 
@@ -200,7 +211,7 @@ public class CatalogConnectorMetadataAdapter {
                 column ->
                     new ViewColumn(
                         column.getName(),
-                        dataTypeTransformer.getTrinoType(column.getType()).getTypeId(),
+                        VIEW_DATA_TYPE_TRANSFORMER.getTrinoType(column.getType()).getTypeId(),
                         Optional.ofNullable(column.getComment())))
             .collect(Collectors.toList());
 
@@ -263,7 +274,7 @@ public class CatalogConnectorMetadataAdapter {
       columns.add(
           new GravitinoColumn(
               column.getName(),
-              dataTypeTransformer.getGravitinoType(trinoType),
+              VIEW_DATA_TYPE_TRANSFORMER.getGravitinoType(trinoType),
               i,
               column.getComment().orElse(null),
               true,

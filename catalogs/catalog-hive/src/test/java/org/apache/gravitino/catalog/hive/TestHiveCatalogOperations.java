@@ -1201,6 +1201,77 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testAlterViewReplacePreservesOwnerOfGenuinelyNativeViewWithUnchangedOwner()
+      throws Exception {
+    // A genuinely-native view's owner lives only in the encoded payload, never in the raw HMS
+    // parameters (unlike a Gravitino-created view, which also stores it as a property). Replacing
+    // such a view as the same owner emits no SetProperty for it (callers like
+    // CatalogConnectorMetadata.createView() only emit one when the owner actually changes), so
+    // ReplaceView alone must still preserve the owner instead of silently downgrading to INVOKER.
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    String encoded =
+        TrinoNativeViewCodec.encode(
+            new TrinoNativeViewCodec.ViewDefinition(
+                "SELECT 1",
+                null,
+                null,
+                List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
+                null,
+                "alice",
+                false,
+                List.of()));
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_hive"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertEquals("alice", decoded.owner);
+    Assertions.assertFalse(decoded.runAsInvoker);
+  }
+
+  @Test
   void testAlterViewReplaceRejectsExistingNonEmptyPath() throws Exception {
     // Gravitino's view model has no SQL path concept; replacing a native Trino view that has a
     // non-empty path would silently discard it. TrinoNativeViewCodec.encode() always writes an

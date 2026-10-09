@@ -222,6 +222,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
       // concept, so replacing a native Trino view with a non-empty SQL path would silently discard
       // it. Reject the replace instead of doing that.
       boolean currentTrinoViewHasUnrepresentableFields = false;
+      String currentOwner = null;
       if (isTrinoView) {
         TrinoNativeViewCodec.ViewDefinition currentDefinition;
         try {
@@ -235,11 +236,20 @@ class HiveViewCatalogOperations implements ViewCatalog {
               e);
         }
         currentTrinoViewHasUnrepresentableFields = !currentDefinition.path.isEmpty();
+        currentOwner = currentDefinition.owner;
       }
 
       String newViewName = currentHiveTable.name();
       String updatedViewOriginalText = currentHiveTable.viewOriginalText();
       Map<String, String> updatedProperties = Maps.newHashMap(currentHiveTable.properties());
+      // A native Trino view's owner lives only in the encoded payload, not in the raw HMS
+      // parameters just copied above, so seed it here. Without this, replacing such a view as the
+      // same owner looks like no change to computePropertyChanges() (it compares against the
+      // decoded owner exposed by toHiveView()), so no SetProperty is emitted, and ReplaceView would
+      // encode the new payload with this property missing, silently downgrading it to INVOKER.
+      if (currentOwner != null) {
+        updatedProperties.put(TRINO_VIEW_OWNER_PROPERTY, currentOwner);
+      }
       Column[] updatedColumns = copyColumns(currentHiveTable.columns());
       String updatedComment = currentHiveTable.comment();
       updatedProperties.remove(COMMENT);

@@ -26,6 +26,7 @@ import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.ConnectorViewDefinition;
 import io.trino.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.VarcharType;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.hive.HiveDataTypeTransformer;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergDataTypeTransformer;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -186,5 +189,69 @@ public class TestCatalogConnectorMetadataAdapterView {
             () -> adapter.createView(new SchemaTableName("s", "v1"), definition, Map.of()));
     assertEquals(
         GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
+  }
+
+  @Test
+  public void testCreateViewAllowsIcebergVarcharWithLength() {
+    // A view's output columns are never physically stored, so Iceberg's "VARCHAR must have no
+    // length" table-column restriction must not apply to them (e.g. SELECT 'x' AS c naturally
+    // produces varchar(1)); IcebergDataTypeTransformer.getGravitinoType() would otherwise reject
+    // it.
+    CatalogConnectorMetadataAdapter icebergAdapter =
+        new CatalogConnectorMetadataAdapter(
+            List.of(), List.of(), List.of(), new IcebergDataTypeTransformer());
+    ViewColumn column =
+        new ViewColumn("c", VarcharType.createVarcharType(1).getTypeId(), Optional.empty());
+    ConnectorViewDefinition definition =
+        new ConnectorViewDefinition(
+            "select 'x' as c",
+            Optional.empty(),
+            Optional.empty(),
+            List.of(column),
+            Optional.empty(),
+            Optional.empty(),
+            true,
+            List.of());
+
+    GravitinoView view =
+        icebergAdapter.createView(new SchemaTableName("s", "v1"), definition, Map.of());
+
+    assertEquals(Types.VarCharType.of(1), view.getColumns().get(0).getType());
+  }
+
+  @Test
+  public void testViewRoundTripsHiveTimestampWithTimeZone() {
+    // A view's output columns are never physically stored, so Hive's "no timestamp with time
+    // zone" table-column restriction must not apply to them; HiveDataTypeTransformer previously
+    // accepted this type on create (falling through to the unrestricted base transformer) but
+    // rejected it on getTrinoType(), so the view could be created but never reloaded.
+    CatalogConnectorMetadataAdapter hiveAdapter =
+        new CatalogConnectorMetadataAdapter(
+            List.of(), List.of(), List.of(), new HiveDataTypeTransformer());
+    ViewColumn column =
+        new ViewColumn(
+            "c",
+            TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3).getTypeId(),
+            Optional.empty());
+    ConnectorViewDefinition definition =
+        new ConnectorViewDefinition(
+            "select current_timestamp as c",
+            Optional.empty(),
+            Optional.empty(),
+            List.of(column),
+            Optional.empty(),
+            Optional.empty(),
+            true,
+            List.of());
+
+    GravitinoView view =
+        hiveAdapter.createView(new SchemaTableName("s", "v1"), definition, Map.of());
+    assertEquals(Types.TimestampType.withTimeZone(3), view.getColumns().get(0).getType());
+
+    ConnectorViewDefinition reloaded =
+        hiveAdapter.getViewDefinition(view, "current_catalog", /* singleMetalakeMode= */ true);
+    assertEquals(
+        TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3).getTypeId(),
+        reloaded.getColumns().get(0).getType());
   }
 }
