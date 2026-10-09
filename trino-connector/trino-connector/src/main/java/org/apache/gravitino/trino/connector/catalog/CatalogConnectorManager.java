@@ -563,18 +563,8 @@ public class CatalogConnectorManager {
       // Tracked outside the try so that a failure can still report the provider it knows about.
       String provider = null;
       try {
-<<<<<<< HEAD
-        Catalog catalog = metalake.loadCatalog(catalogName);
-        GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalakeName, catalog);
-=======
         Catalog catalog = allCatalogs.get(catalogName);
-        // Registration deliberately carries only the visible properties. The resolved secrets are
-        // added by each node in createCatalogConnectorContext(), so that they never reach the
-        // CREATE CATALOG statement, the catalog properties file Trino persists from it, or
-        // anything that quotes either of them back.
-        GravitinoCatalog gravitinoCatalog =
-            new GravitinoCatalog(metalakeName, catalog, visibleProps(catalog));
->>>>>>> 62240804b ([#13697] improvement(trino-connector): Load catalogs with a single detailed listing on refresh (#13698))
+        GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalakeName, catalog);
         provider = gravitinoCatalog.getProvider();
         // Checked before the already-registered path: a catalog can be dropped and recreated
         // under the same name with a type or provider this connector cannot serve, and treating
