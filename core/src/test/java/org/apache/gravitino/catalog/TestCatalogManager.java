@@ -679,6 +679,8 @@ public class TestCatalogManager {
     Assertions.assertEquals(2, catalogDescriptors.length);
     for (Catalog catalog : catalogDescriptors) {
       Assertions.assertEquals(provider, catalog.provider());
+      Assertions.assertEquals("comment", catalog.comment());
+      Assertions.assertNotNull(catalog.auditInfo());
       Assertions.assertTrue(catalog.properties().isEmpty());
     }
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));

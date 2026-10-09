@@ -211,6 +211,8 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO2.properties());
 
+    verify(manager).listCatalogsInfo(any(), eq(true));
+
     Response lightweightResp =
         target("/metalakes/metalake1/catalogs")
             .queryParam("details", "true")
