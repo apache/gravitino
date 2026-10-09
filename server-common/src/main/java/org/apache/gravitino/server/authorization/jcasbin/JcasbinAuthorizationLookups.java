@@ -113,6 +113,10 @@ public class JcasbinAuthorizationLookups {
     } catch (RuntimeException e) {
       // Never fall back to the raw key: it can retain an ID after canonical-name invalidation.
       // Catch only normalization failures; entity-store and cache-loader failures still propagate.
+      // Failures are not memoized, so a transient one can succeed on retry in the same request.
+      // The cost: while a catalog cannot initialize, every object of that catalog looked up in a
+      // request reloads it (connector initialization included) and logs this warning again. A
+      // per-request, per-catalog failure memo or a once-per-request warning would bound that.
       LOG.warn(
           "Cannot normalize metadata object {}:{} in metalake {}; authorization lookup is unresolved",
           metadataObject.type(),
