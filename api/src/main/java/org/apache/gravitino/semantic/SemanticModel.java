@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * A schema-scoped analytical Semantic Model managed by Gravitino. The entity composes its immutable
@@ -31,6 +32,12 @@ import org.apache.gravitino.annotation.Evolving;
  */
 @Evolving
 public interface SemanticModel extends Auditable {
+
+  /** The property key for the Apache Ossie document version. */
+  String PROPERTY_OSSIE_VERSION = "ossie-version";
+
+  /** The default Apache Ossie document version. */
+  String DEFAULT_OSSIE_VERSION = "0.2.0.dev0";
 
   /**
    * Returns the Semantic Model name.
@@ -62,6 +69,16 @@ public interface SemanticModel extends Auditable {
    */
   default Map<String, String> properties() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * Returns the tag operations for this Semantic Model.
+   *
+   * @return The {@link SupportsTags} if the Semantic Model supports tag operations.
+   * @throws UnsupportedOperationException If the Semantic Model does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Semantic Model does not support tag operations.");
   }
 
   /**
