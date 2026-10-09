@@ -38,6 +38,7 @@ import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,12 +68,14 @@ public class TestRelationalEntityStore {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    CatalogEntity updated = Mockito.mock(CatalogEntity.class);
+    Mockito.when(updated.nameIdentifier()).thenReturn(ident);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
 
     Mockito.doAnswer(
             invocation -> {
               Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
-              return null;
+              return updated;
             })
         .when(backend)
         .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
@@ -82,6 +85,22 @@ public class TestRelationalEntityStore {
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testRenameInvalidatesOldAndNewCacheKeys() throws Exception {
+    NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog_before");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog_after");
+    CatalogEntity updated = Mockito.mock(CatalogEntity.class);
+    Mockito.when(updated.nameIdentifier()).thenReturn(newIdent);
+    Mockito.when(backend.update(eq(oldIdent), eq(Entity.EntityType.CATALOG), any(Function.class)))
+        .thenReturn(updated);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    store.update(oldIdent, CatalogEntity.class, Entity.EntityType.CATALOG, entity -> entity);
+
+    Mockito.verify(cache).invalidate(oldIdent, Entity.EntityType.CATALOG);
+    Mockito.verify(cache).invalidate(newIdent, Entity.EntityType.CATALOG);
   }
 
   @Test

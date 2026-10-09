@@ -26,10 +26,12 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -41,10 +43,12 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -280,6 +284,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         EntityCombinedSchema reloaded =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {
+          StringIdentifier conflictingId =
+              getStringIdFromProperties(reloaded.schema().properties());
+          if (conflictingId != null) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Schema %s could not be imported because its Gravitino identifier %d "
+                        + "conflicts with an existing registration. Check the property '%s' on this schema "
+                        + "and remove a copied identifier before loading it again",
+                    ident, conflictingId.id(), StringIdentifier.ID_KEY),
+                e);
+          }
           throw new UnsupportedOperationException(
               "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
                   + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
@@ -635,14 +650,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
 
     long uid;
+    NameIdentifier observedOwner = null;
+    boolean caseAlias = false;
     if (stringId != null) {
-      // If the entity in the store doesn't match the one in the external system, we use the data
-      // of external system to correct it.
-      LOG.warn(
-          "The Schema uid {} existed but still needs to be imported, this could be happened "
-              + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
-              + "we need to overwrite the stored entity to keep consistency.",
+      LOG.info(
+          "Schema {} has external identifier {}; checking for a rename, alias, or copied ID",
+          identifier,
           stringId);
+      Pair<NameIdentifier, Boolean> owner = checkImportedIdNotCopied(identifier, stringId.id());
+      observedOwner = owner.getLeft();
+      caseAlias = owner.getRight();
       uid = stringId.id();
     } else {
       // If the entity doesn't exist, we import the entity from the external system.
@@ -665,12 +682,101 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
-    } catch (EntityAlreadyExistsException e) {
+      if (caseAlias) {
+        SchemaEntity registered = store.get(observedOwner, SCHEMA, SchemaEntity.class);
+        if (registered.id() != uid) {
+          throw new OptimisticLockException(
+              "The registered owner of schema ID %d changed during import; retry the load", uid);
+        }
+        return;
+      }
+      if (observedOwner != null && !observedOwner.equals(identifier)) {
+        store.update(observedOwner, SchemaEntity.class, SCHEMA, current -> schemaEntity);
+      } else {
+        // A new name must not overwrite an ID imported concurrently on another node.
+        boolean overwriteByName = stringId == null || store.exists(identifier, SCHEMA);
+        store.put(schemaEntity, overwriteByName);
+      }
+    } catch (EntityAlreadyExistsException | OptimisticLockException e) {
       throw e;
+    } catch (NoSuchEntityException e) {
+      throw new OptimisticLockException(
+          e, "The registered owner of schema ID %d changed during import; retry the load", uid);
     } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "import", identifier, e);
       throw new RuntimeException("Failed to import schema entity to the store", e);
+    }
+  }
+
+  /**
+   * Tells an external rename or case alias apart from a copied id before import. See {@code
+   * TableOperationDispatcher#checkImportedIdNotCopied}: the store cannot distinguish the two, so
+   * the external catalog is asked whether the id's current owner still exists.
+   */
+  private Pair<NameIdentifier, Boolean> checkImportedIdNotCopied(
+      NameIdentifier identifier, long id) {
+    NameIdentifier currentOwner = findRegisteredSchemaById(identifier.namespace(), id);
+    if (currentOwner == null || currentOwner.equals(identifier)) {
+      return Pair.of(currentOwner, false);
+    }
+    NameIdentifier catalogIdent = getCatalogIdentifier(identifier);
+    Pair<Boolean, Boolean> ownerStatus =
+        doWithCatalog(
+            catalogIdent,
+            c ->
+                c.doWithSchemaOps(
+                    ops -> {
+                      if (!ops.schemaExists(currentOwner)) {
+                        return Pair.of(false, false);
+                      }
+                      // REST backends may resolve case aliases without advertising this capability.
+                      // Only accept an alias when listing confirms a single matching object; two
+                      // case-distinct objects must still be rejected even if their ids are equal.
+                      if (currentOwner.name().equalsIgnoreCase(identifier.name())) {
+                        List<String> matchingNames =
+                            Arrays.stream(ops.listSchemas(identifier.namespace()))
+                                .map(NameIdentifier::name)
+                                .filter(name -> name.equalsIgnoreCase(identifier.name()))
+                                .distinct()
+                                .collect(Collectors.toList());
+                        if (matchingNames.size() == 1) {
+                          // The listing shows the real name. If it is the requested name, the
+                          // schema was renamed by case only and the registration must follow it;
+                          // otherwise the requested name is an alias of the registered schema.
+                          return Pair.of(false, !matchingNames.get(0).equals(identifier.name()));
+                        }
+                      }
+                      return Pair.of(true, false);
+                    }),
+            RuntimeException.class);
+    if (ownerStatus.getLeft()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Schema %s carries the Gravitino identifier %d of schema %s, which still exists. "
+                  + "The identifier was most likely copied with the schema properties. Remove "
+                  + "the property '%s' from %s and load it again",
+              identifier, id, currentOwner, StringIdentifier.ID_KEY, identifier));
+    }
+    LOG.info(
+        "Schema {} resolves to {} after an external rename or case-alias lookup; registration {}",
+        currentOwner,
+        identifier,
+        id);
+    return Pair.of(currentOwner, ownerStatus.getRight());
+  }
+
+  /** Returns the identifier of the live schema in the catalog that owns this id, if any. */
+  @Nullable
+  private NameIdentifier findRegisteredSchemaById(Namespace namespace, long id) {
+    try {
+      return store.list(namespace, SchemaEntity.class, SCHEMA).stream()
+          .filter(s -> s.id() == id)
+          .map(SchemaEntity::nameIdentifier)
+          .findFirst()
+          .orElse(null);
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to look up the schema registered with id %d under %s", id, namespace);
     }
   }
 

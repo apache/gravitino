@@ -98,6 +98,20 @@ public class TestOccWriteSupport {
   }
 
   @Test
+  void testOverwriteConflictDescribesOwner() {
+    DummyPO owner = new DummyPO("source", 2L);
+    EntityAlreadyExistsException error =
+        assertThrows(
+            EntityAlreadyExistsException.class,
+            () ->
+                OccWriteSupport.checkOverwriteIdNotOwnedByOtherParent(
+                    () -> owner,
+                    po -> po.parentId() == 1L,
+                    po -> "ID 42 belongs to parent " + po.parentId()));
+    assertEquals("ID 42 belongs to parent 2", error.getMessage());
+  }
+
+  @Test
   void testWriteFailureReturnsNoSuchEntityWhenNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake_test");
     RuntimeException ex =

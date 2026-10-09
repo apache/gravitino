@@ -62,10 +62,39 @@ public class OccWriteSupport {
       return current;
     }
     current = byIdLookup.get();
-    if (current != null && !sameParent.test(current)) {
-      throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
-    }
+    requireSameParent(
+        current, sameParent, owner -> "The entity ID already belongs to a different parent");
     return current;
+  }
+
+  /**
+   * Refuses an overwrite whose stable ID is already owned by a live row under another parent.
+   *
+   * <p>An import trusts the ID it finds in the external object. When that ID was copied from
+   * another object (copied table properties, a restored backup), an upsert keyed by the primary key
+   * would move the existing row, and every attachment keyed by that ID, to the new name and parent.
+   * The lookup must lock the row so the decision holds until the transaction ends. A same-parent
+   * match is allowed: that is how an external rename is re-registered.
+   *
+   * @param <T> the persistent object type
+   * @param byIdLockingLookup the locking lookup by stable ID
+   * @param sameParent checks whether the ID owner belongs to the target parent
+   * @param conflictDescription describes the conflicting owner
+   * @throws EntityAlreadyExistsException if the ID belongs to a live row under another parent
+   */
+  public static <T> void checkOverwriteIdNotOwnedByOtherParent(
+      Supplier<T> byIdLockingLookup,
+      Predicate<T> sameParent,
+      Function<T, String> conflictDescription) {
+    T owner = byIdLockingLookup.get();
+    requireSameParent(owner, sameParent, conflictDescription);
+  }
+
+  private static <T> void requireSameParent(
+      @Nullable T owner, Predicate<T> sameParent, Function<T, String> conflictDescription) {
+    if (owner != null && !sameParent.test(owner)) {
+      throw new EntityAlreadyExistsException("%s", conflictDescription.apply(owner));
+    }
   }
 
   /**
