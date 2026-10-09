@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.policy.expression.RestrictedRegoExpressionParserFacade;
 
 /** Built-in policy content for filtering rows of tagged tables. */
 public final class RowFilterContent extends ReadRestrictionContent {
@@ -69,7 +68,6 @@ public final class RowFilterContent extends ReadRestrictionContent {
   public void validate() throws IllegalArgumentException {
     super.validate();
     validateSource(expression, "row-filter expression");
-    RestrictedRegoExpressionParserFacade.parseRowFilter(expression);
   }
 
   @Override

@@ -94,23 +94,4 @@ public class TestReadRestrictionContent {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> PolicyContents.columnMask(maximumColumnMask + "é"));
   }
-
-  @Test
-  void testValidatesPolicySpecificRestrictedRegoPrograms() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> PolicyContents.rowFilter("mask := action(\"replace-with-null\")"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> PolicyContents.columnMask("filter := col(\"region\") == \"US\""));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> PolicyContents.rowFilter("filter := col(\"region\")"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            PolicyContents.columnMask(
-                "mask := action(\"show-last-4\") if col(\"region\") == \"US\" "
-                    + "else := action(\"replace-with-null\")"));
-  }
 }

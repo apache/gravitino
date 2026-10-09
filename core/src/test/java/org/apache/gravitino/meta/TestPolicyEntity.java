@@ -171,6 +171,32 @@ public class TestPolicyEntity {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, rowFilter));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.ROW_FILTER,
+                PolicyContents.rowFilter("mask := action(\"replace-with-null\")")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.COLUMN_MASK,
+                PolicyContents.columnMask("filter := col(\"region\") == \"US\"")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.ROW_FILTER,
+                PolicyContents.rowFilter("filter := col(\"region\")")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.COLUMN_MASK,
+                PolicyContents.columnMask(
+                    "mask := action(\"show-last-4\") if col(\"region\") == \"US\" "
+                        + "else := action(\"replace-with-null\")")));
   }
 
   private static PolicyEntity readRestrictionPolicy(

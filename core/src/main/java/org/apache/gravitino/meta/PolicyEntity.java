@@ -34,9 +34,12 @@ import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.RowFilterContent;
+import org.apache.gravitino.policy.expression.RestrictedRegoExpressionParserFacade;
 
 @ToString
 public class PolicyEntity implements Entity, Auditable, HasIdentifier {
@@ -199,6 +202,13 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         policyType.name(),
         content().getClass().getName());
     content().validate();
+    if (content() instanceof RowFilterContent) {
+      RestrictedRegoExpressionParserFacade.parseRowFilter(
+          ((RowFilterContent) content()).expression());
+    } else if (content() instanceof ColumnMaskContent) {
+      RestrictedRegoExpressionParserFacade.parseColumnMask(
+          ((ColumnMaskContent) content()).expression());
+    }
   }
 
   public static class Builder {
