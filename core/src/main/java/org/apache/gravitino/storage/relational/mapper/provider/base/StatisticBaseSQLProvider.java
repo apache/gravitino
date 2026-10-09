@@ -67,6 +67,7 @@ public class StatisticBaseSQLProvider {
         + ", last_version = current_version, current_version = current_version + 1"
         + " WHERE statistic_id = #{previous.statisticId}"
         + " AND metadata_object_id = #{previous.metadataObjectId}"
+        + " AND statistic_name = #{previous.statisticName}"
         + " AND current_version = #{previous.currentVersion} AND deleted_at = 0";
   }
 

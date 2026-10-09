@@ -28,6 +28,11 @@ Concurrent creation or modification of the same statistic can return HTTP 409. T
 batch is rolled back on a conflict; retry the operation against the current state. If the target
 table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
 
+The built-in `GravitinoStatisticsUpdater` retries table-statistic conflicts up to three total write
+attempts, waiting 100 ms and then 200 ms. Each attempt resubmits the same computed values in a new
+request. Other failures are not retried; interruption stops retries, and an exhausted conflict
+propagates to the maintenance job's existing failure handling.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 

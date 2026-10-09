@@ -41,7 +41,12 @@ public interface StatisticMetaMapper {
       @Param("entityId") long entityId,
       @Param("names") List<String> names);
 
-  /** Inserts a statistic only when no live row has the same name and target. */
+  /**
+   * Inserts a statistic only when no live row has the same name and target.
+   *
+   * <p>The statement fixes both versions to 1 and {@code deleted_at} to 0, ignoring those fields in
+   * the supplied PO.
+   */
   @InsertProvider(type = StatisticSQLProviderFactory.class, method = "insertStatisticPO")
   Integer insertStatisticPO(@Param("statisticPO") StatisticPO statisticPO);
 

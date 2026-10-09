@@ -85,7 +85,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             .withValue(StatisticValues.longValue(2L))
             .withAuditInfo(auditInfo)
             .build();
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(createStatisticEntity(auditInfo, 1L), unrelated),
         table.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -151,7 +151,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
   private Throwable writeFirstStatistic(
       StatisticMetaService service, TableEntity table, AuditInfo auditInfo, long value) {
     try {
-      service.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+      service.writeStatisticsWithVersion(
           List.of(createStatisticEntity(auditInfo, value)),
           table.nameIdentifier(),
           Entity.EntityType.TABLE);
@@ -173,7 +173,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     TableEntity table =
         createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "statistic_cas_table");
     StatisticEntity initial = createStatisticEntity(auditInfo, 10L);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(initial), table.nameIdentifier(), Entity.EntityType.TABLE);
     Long metalakeId =
         EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
@@ -184,8 +184,27 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             .get(0);
     Assertions.assertEquals(1L, stale.getCurrentVersion());
 
+    // Identity, target and version alone must not permit a delete for a different name.
+    StatisticPO wrongName =
+        StatisticPO.builder()
+            .withMetalakeId(stale.getMetalakeId())
+            .withStatisticId(stale.getStatisticId())
+            .withMetadataObjectId(stale.getMetadataObjectId())
+            .withMetadataObjectType(stale.getMetadataObjectType())
+            .withStatisticName("different_name")
+            .withStatisticValue(stale.getStatisticValue())
+            .withAuditInfo(stale.getAuditInfo())
+            .withCurrentVersion(stale.getCurrentVersion())
+            .withLastVersion(stale.getLastVersion())
+            .withDeletedAt(stale.getDeletedAt())
+            .build();
+    int wrongNameDeleted =
+        SessionUtils.getWithoutCommit(
+            StatisticMetaMapper.class, mapper -> mapper.deleteStatisticPOWithVersion(wrongName));
+    Assertions.assertEquals(0, wrongNameDeleted);
+
     StatisticEntity replacement = createStatisticEntity(auditInfo, 20L);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(replacement), table.nameIdentifier(), Entity.EntityType.TABLE);
     StatisticPO current =
         SessionUtils.getWithoutCommit(
@@ -238,7 +257,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
         NoSuchEntityException.class,
         () ->
             dropTableAfterSnapshot(writeTarget)
-                .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                .writeStatisticsWithVersion(
                     List.of(createStatisticEntity(auditInfo, 1L)),
                     writeTarget.nameIdentifier(),
                     Entity.EntityType.TABLE));
@@ -246,7 +265,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
 
     TableEntity deleteTarget =
         createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "dropped_delete");
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(createStatisticEntity(auditInfo, 1L)),
         deleteTarget.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -270,7 +289,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     createParentEntities(metalake, catalog, schema, auditInfo);
     TableEntity table =
         createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "double_drop");
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(createStatisticEntity(auditInfo, 1L)),
         table.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -309,7 +328,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     createParentEntities(metalake, catalog, schema, auditInfo);
     TableEntity table =
         createAndInsertTableEntity(Namespace.of(metalake, catalog, schema), "stale_service");
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(createStatisticEntity(auditInfo, 1L)),
         table.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -319,7 +338,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             OptimisticLockException.class,
             () ->
                 updateAfterSnapshot(table, auditInfo, 2L)
-                    .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                    .writeStatisticsWithVersion(
                         List.of(createStatisticEntity(auditInfo, 3L)),
                         table.nameIdentifier(),
                         Entity.EntityType.TABLE));
@@ -340,7 +359,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
   public void testStatisticWriteConflictRollsBackWholeBatch() throws Exception {
     TableEntity table = createBatchConflictTable("write");
     StatisticEntity unchanged = createNamedStatistic("a_existing", 10L);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(unchanged, createStatisticEntity(AUDIT_INFO, 1L)),
         table.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -350,7 +369,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             OptimisticLockException.class,
             () ->
                 updateAfterSnapshot(table, AUDIT_INFO, 2L)
-                    .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                    .writeStatisticsWithVersion(
                         // Deliberately unsorted: the conflicting name must execute last.
                         List.of(
                             createStatisticEntity(AUDIT_INFO, 3L),
@@ -370,7 +389,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
   public void testStatisticDeleteConflictRollsBackWholeBatch() throws Exception {
     TableEntity table = createBatchConflictTable("delete");
     StatisticEntity unchanged = createNamedStatistic("a_existing", 10L);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(unchanged, createStatisticEntity(AUDIT_INFO, 1L)),
         table.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -395,7 +414,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
   @TestTemplate
   public void testRecreatedStatisticIsNotChangedByStaleWriteOrDelete() throws Exception {
     TableEntity table = createBatchConflictTable("recreated");
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         List.of(createStatisticEntity(AUDIT_INFO, 1L)),
         table.nameIdentifier(),
         Entity.EntityType.TABLE);
@@ -411,7 +430,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
                   1,
                   statisticMetaService.batchDeleteStatisticPOs(
                       table.nameIdentifier(), Entity.EntityType.TABLE, names));
-              statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+              statisticMetaService.writeStatisticsWithVersion(
                   List.of(replacement), table.nameIdentifier(), Entity.EntityType.TABLE);
               return rows;
             }
@@ -424,7 +443,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
                   staleService.batchDeleteStatisticPOs(
                       table.nameIdentifier(), Entity.EntityType.TABLE, List.of("test"));
                 } else {
-                  staleService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                  staleService.writeStatisticsWithVersion(
                       List.of(createStatisticEntity(AUDIT_INFO, 3L)),
                       table.nameIdentifier(),
                       Entity.EntityType.TABLE);
@@ -471,7 +490,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
       @Override
       List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
         List<StatisticPO> rows = super.listStatisticPOs(endpoint, names);
-        statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+        statisticMetaService.writeStatisticsWithVersion(
             List.of(createStatisticEntity(auditInfo, value)),
             table.nameIdentifier(),
             Entity.EntityType.TABLE);
@@ -697,7 +716,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     StatisticEntity statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
 
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     List<StatisticEntity> listEntities =
@@ -711,7 +730,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntity = createStatisticEntity(auditInfo, 200L);
     statisticEntities.clear();
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     listEntities =
@@ -786,25 +805,25 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     List<StatisticEntity> statisticEntities = Lists.newArrayList();
     StatisticEntity statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, model.nameIdentifier(), Entity.EntityType.MODEL);
 
     // assert stats
@@ -899,25 +918,25 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, model.nameIdentifier(), Entity.EntityType.MODEL);
 
     // assert stats
@@ -980,25 +999,25 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntities = Lists.newArrayList();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+    statisticMetaService.writeStatisticsWithVersion(
         statisticEntities, model.nameIdentifier(), Entity.EntityType.MODEL);
 
     // assert stats count

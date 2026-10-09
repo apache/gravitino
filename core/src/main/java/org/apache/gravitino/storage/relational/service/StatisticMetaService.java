@@ -80,11 +80,10 @@ public class StatisticMetaService {
   /**
    * Creates or replaces statistics of a metadata object by name.
    *
-   * <p>The name keeps the historical upsert name and metric, but the write is no longer a blind
-   * upsert. Existing statistics are replaced only if their version is unchanged since this call
-   * read them, and missing statistics are inserted only if nobody created them meanwhile; both
-   * cases otherwise fail the whole batch with {@link OptimisticLockException}. The target is fenced
-   * in the same transaction, so a target dropped or replaced after its ID was resolved fails with
+   * <p>Existing statistics are replaced only if their version is unchanged since this call read
+   * them, and missing statistics are inserted only if nobody created them meanwhile; both cases
+   * otherwise fail the whole batch with {@link OptimisticLockException}. The target is fenced in
+   * the same transaction, so a target dropped or replaced after its ID was resolved fails with
    * {@link NoSuchEntityException}.
    *
    * @param statisticEntities the statistics to write; names must be unique in the batch
@@ -94,7 +93,7 @@ public class StatisticMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
-  public void batchInsertStatisticPOsOnDuplicateKeyUpdate(
+  public void writeStatisticsWithVersion(
       List<StatisticEntity> statisticEntities, NameIdentifier entity, Entity.EntityType type) {
     if (statisticEntities == null || statisticEntities.isEmpty()) {
       return;

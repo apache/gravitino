@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
@@ -37,11 +38,20 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.PartitionPathSerdeUtils;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.SupportsStatistics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Statistics updater that persists table/partition statistics to Gravitino. */
 public class GravitinoStatisticsUpdater implements StatisticsUpdater {
 
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoStatisticsUpdater.class);
+  private static final int MAX_WRITE_ATTEMPTS = 3;
+  private static final long RETRY_BACKOFF_MILLIS = 100L;
+
+  /** The name used to select this statistics updater. */
   public static final String NAME = "gravitino-statistics-updater";
+
   private GravitinoClient gravitinoClient;
 
   @Override
@@ -77,12 +87,37 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
     if (tableStatisticsMap.isEmpty()) {
       return;
     }
-    gravitinoClient
-        .loadCatalog(IdentifierUtils.getCatalogNameFromTableIdentifier(tableIdentifier))
-        .asTableCatalog()
-        .loadTable(IdentifierUtils.removeCatalogFromIdentifier(tableIdentifier))
-        .supportsStatistics()
-        .updateStatistics(tableStatisticsMap);
+    SupportsStatistics statistics =
+        gravitinoClient
+            .loadCatalog(IdentifierUtils.getCatalogNameFromTableIdentifier(tableIdentifier))
+            .asTableCatalog()
+            .loadTable(IdentifierUtils.removeCatalogFromIdentifier(tableIdentifier))
+            .supportsStatistics();
+    // A conflict rolls back the whole server-side batch. Resubmit the same computed values so the
+    // next request reads current versions; do not recalculate statistics or retry other failures.
+    for (int attempt = 1; ; attempt++) {
+      try {
+        statistics.updateStatistics(tableStatisticsMap);
+        return;
+      } catch (OptimisticLockException e) {
+        if (attempt >= MAX_WRITE_ATTEMPTS || Thread.currentThread().isInterrupted()) {
+          throw e;
+        }
+        LOG.warn(
+            "Statistic write conflict for {}; retrying attempt {} of {}",
+            tableIdentifier,
+            attempt + 1,
+            MAX_WRITE_ATTEMPTS,
+            e);
+        try {
+          Thread.sleep(RETRY_BACKOFF_MILLIS * attempt);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          e.addSuppressed(interrupted);
+          throw e;
+        }
+      }
+    }
   }
 
   private Map<String, StatisticValue<?>> getTableStatisticsMap(List<StatisticEntry<?>> statistics) {

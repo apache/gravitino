@@ -673,7 +673,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             "All entities must be in the same namespace for batchPut operation.");
 
         StatisticMetaService.getInstance()
-            .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+            .writeStatisticsWithVersion(
                 statisticEntities,
                 NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
                 Entity.EntityType.TABLE);
