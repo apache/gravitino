@@ -217,8 +217,11 @@ public class GeneralDataTypeTransformer {
     } else if (typeClass == io.trino.spi.type.CharType.class) {
       return Types.FixedCharType.of(((io.trino.spi.type.CharType) type).getLength());
     } else if (typeClass == io.trino.spi.type.VarcharType.class) {
-      return Types.VarCharType.of(
-          ((io.trino.spi.type.VarcharType) type).getLength().orElse(Integer.MAX_VALUE - 1));
+      io.trino.spi.type.VarcharType varcharType = (io.trino.spi.type.VarcharType) type;
+      if (varcharType.getLength().isEmpty()) {
+        return Types.StringType.get();
+      }
+      return Types.VarCharType.of(varcharType.getLength().get());
     } else if (typeClass == io.trino.spi.type.VarbinaryType.class) {
       return Types.BinaryType.get();
     } else if (typeClass == io.trino.spi.type.DateType.class) {
