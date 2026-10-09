@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -121,6 +122,17 @@ public class StatisticMetaService {
                 pos.stream().map(StatisticPO::getStatisticName).collect(Collectors.toList()))
             .stream()
             .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    // A collation that ignores trailing spaces (MySQL) returns the row of "name" for "name ", and
+    // its unique key treats them as the same statistic. Writing "name " can never succeed there, so
+    // it is rejected as an illegal name instead of a conflict that suggests a retry.
+    for (String stored : previous.keySet()) {
+      if (!names.contains(stored)) {
+        throw new IllegalStatisticNameException(
+            "Statistic name is equivalent to the existing statistic '%s' of %s in the backend"
+                + " collation; names must not differ only in trailing spaces",
+            stored, entity);
+      }
+    }
     List<StatisticPO> inserts = new ArrayList<>();
     List<StatisticPO> updates = new ArrayList<>();
     for (StatisticPO po : pos) {
@@ -133,21 +145,22 @@ public class StatisticMetaService {
     }
     // Each kind of write is one statement. Any mismatch fails the whole transaction, so the batch
     // either applies completely or not at all.
-    SessionUtils.doMultipleWithCommit(
+    runFencedTransaction(
         () -> {
           LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
-          if (!inserts.isEmpty()) {
-            executeCas(
-                mapper -> mapper.batchInsertStatisticPOs(inserts), inserts.size(), inserts, entity);
+          if (!inserts.isEmpty()
+              && executeStatement(mapper -> mapper.batchInsertStatisticPOs(inserts))
+                  != inserts.size()) {
+            throw statisticConflict(null, names(inserts), entity);
           }
-          if (!updates.isEmpty()) {
-            executeCas(
-                mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates),
-                updates.size(),
-                updates,
-                entity);
+          if (!updates.isEmpty()
+              && executeStatement(mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates))
+                  != updates.size()) {
+            throw statisticConflict(null, names(updates), entity);
           }
-        });
+        },
+        pos,
+        entity);
   }
 
   /**
@@ -197,17 +210,11 @@ public class StatisticMetaService {
       return 0;
     }
     int[] deleted = new int[] {0};
-    SessionUtils.doMultipleWithCommit(
+    runFencedTransaction(
         () -> {
           LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
-          try {
-            deleted[0] =
-                SessionUtils.getWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.batchDeleteStatisticPOsWithVersion(observedRows));
-          } catch (RuntimeException e) {
-            throw translateConflict(e, observedRows, identifier);
-          }
+          deleted[0] =
+              executeStatement(mapper -> mapper.batchDeleteStatisticPOsWithVersion(observedRows));
           if (deleted[0] == observedRows.size()) {
             return;
           }
@@ -218,7 +225,9 @@ public class StatisticMetaService {
           if (!live.isEmpty()) {
             throw statisticConflict(null, names(live), identifier);
           }
-        });
+        },
+        observedRows,
+        identifier);
     return deleted[0];
   }
 
@@ -230,36 +239,37 @@ public class StatisticMetaService {
             mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
   }
 
-  /**
-   * Runs one batch statement that must change exactly {@code expected} rows, and reports a short
-   * count or a concurrency failure of the statement as a conflict.
-   */
+  /** Runs one batch statement in the current transaction and returns its row count. */
   @VisibleForTesting
-  static void executeCas(
-      Function<StatisticMetaMapper, Integer> statement,
-      int expected,
-      List<StatisticPO> pos,
-      NameIdentifier target) {
-    int changed;
+  int executeStatement(Function<StatisticMetaMapper, Integer> statement) {
+    return SessionUtils.getWithoutCommit(StatisticMetaMapper.class, statement);
+  }
+
+  /**
+   * Runs a fenced statistic transaction. A failure caused by a concurrent writer anywhere in the
+   * transaction, including the fence's locking reads, is reported as a conflict on {@code pos}.
+   */
+  private static void runFencedTransaction(
+      Runnable operations, List<StatisticPO> pos, NameIdentifier target) {
     try {
-      changed = SessionUtils.getWithoutCommit(StatisticMetaMapper.class, statement);
+      SessionUtils.doMultipleWithCommit(operations);
     } catch (RuntimeException e) {
       throw translateConflict(e, pos, target);
-    }
-    if (changed != expected) {
-      throw statisticConflict(null, names(pos), target);
     }
   }
 
   /**
    * Converts a failure caused by a concurrent writer into a conflict. A duplicate insert means a
-   * statistic was created after the snapshot. A deadlock or serialization failure can happen
-   * because a batch statement locks its rows in the order of the database's plan, which differs
-   * between batches. The whole batch is rolled back either way, so both are reported as a conflict
-   * rather than an internal server error.
+   * statistic was created after the snapshot. A deadlock, serialization failure or lock wait
+   * timeout can happen because a batch statement locks its rows in the order of the database's
+   * plan, which differs between batches. The whole batch is rolled back either way, so these are
+   * reported as a conflict rather than an internal server error.
    */
   private static RuntimeException translateConflict(
       RuntimeException failure, List<StatisticPO> pos, NameIdentifier target) {
+    if (failure instanceof OptimisticLockException) {
+      return failure;
+    }
     if (isDuplicateKey(failure) || isConcurrencyFailure(failure)) {
       return statisticConflict(failure, names(pos), target);
     }
@@ -270,7 +280,7 @@ public class StatisticMetaService {
       @Nullable Throwable cause, List<String> names, NameIdentifier target) {
     return new OptimisticLockException(
         cause,
-        "One or more of the statistics %s of %s were modified concurrently; retry the operation",
+        "One or more of the statistics %s of %s were changed concurrently; retry the operation",
         names,
         target);
   }
@@ -311,8 +321,10 @@ public class StatisticMetaService {
   }
 
   /**
-   * Returns whether a failure is a deadlock or serialization failure. MySQL and H2 report SQLState
-   * 40001 (MySQL error code 1213 for a deadlock), and PostgreSQL reports 40001 or 40P01.
+   * Returns whether a failure is a deadlock, serialization failure or lock wait timeout caused by a
+   * concurrent writer. PostgreSQL reports SQLState 40001 or 40P01 and H2 reports 40001. MySQL
+   * reports error code 1213 for a deadlock, and Connector/J also reports a lock wait timeout (error
+   * code 1205) with SQLState 40001; it is treated the same way.
    */
   private static boolean isConcurrencyFailure(Throwable failure) {
     return hasSqlException(failure, Set.of("40001", "40P01"), 1213);

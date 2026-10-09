@@ -33,11 +33,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -391,15 +393,12 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertTrue(statisticsByName(table).isEmpty());
   }
 
-  /** Verifies deadlocks, serialization failures and short counts of a batch become conflicts. */
+  /** Verifies concurrency failures of batch statements become conflicts on writes and drops. */
   @TestTemplate
-  public void testBatchStatementConcurrencyFailuresAreConflicts() {
-    NameIdentifier target = NameIdentifier.of("metalake", "catalog", "schema", "table");
-    StatisticPO po =
-        StatisticPO.initializeStatisticPOs(
-                List.of(createNamedStatistic("a", 1L)), 1L, 2L, MetadataObject.Type.TABLE)
-            .get(0);
-    List<StatisticPO> pos = List.of(po);
+  public void testBatchStatementConcurrencyFailuresAreConflicts() throws Exception {
+    TableEntity table = createBatchConflictTable("deadlock");
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(createNamedStatistic("a", 1L)), table.nameIdentifier(), Entity.EntityType.TABLE);
 
     for (SQLException failure :
         List.of(
@@ -407,45 +406,81 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             new SQLException("PostgreSQL deadlock", "40P01"),
             new SQLException("serialization failure", "40001"),
             new SQLException("duplicate key", "23505"))) {
-      OptimisticLockException conflict =
+      StatisticMetaService failing = failingStatements(new PersistenceException(failure));
+      OptimisticLockException writeConflict =
           Assertions.assertThrows(
               OptimisticLockException.class,
               () ->
-                  StatisticMetaService.executeCas(
-                      mapper -> {
-                        throw new PersistenceException(failure);
-                      },
-                      1,
-                      pos,
-                      target));
-      Assertions.assertSame(failure, conflict.getCause().getCause());
-      Assertions.assertTrue(conflict.getMessage().contains("[a]"));
-      Assertions.assertTrue(conflict.getMessage().contains(target.toString()));
+                  failing.writeStatisticsWithVersion(
+                      List.of(createNamedStatistic("a", 2L), createNamedStatistic("b", 2L)),
+                      table.nameIdentifier(),
+                      Entity.EntityType.TABLE));
+      Assertions.assertSame(failure, writeConflict.getCause().getCause());
+      Assertions.assertTrue(writeConflict.getMessage().contains("[a, b]"));
+      Assertions.assertTrue(writeConflict.getMessage().contains(table.nameIdentifier().toString()));
+
+      OptimisticLockException dropConflict =
+          Assertions.assertThrows(
+              OptimisticLockException.class,
+              () ->
+                  failing.batchDeleteStatisticPOs(
+                      table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a")));
+      Assertions.assertSame(failure, dropConflict.getCause().getCause());
     }
 
     PersistenceException connectionFailure =
         new PersistenceException(new SQLException("connection lost", "08006"));
+    StatisticMetaService failing = failingStatements(connectionFailure);
     Assertions.assertSame(
         connectionFailure,
         Assertions.assertThrows(
             PersistenceException.class,
             () ->
-                StatisticMetaService.executeCas(
-                    mapper -> {
-                      throw connectionFailure;
-                    },
-                    1,
-                    pos,
-                    target)));
-
-    OptimisticLockException shortCount =
+                failing.writeStatisticsWithVersion(
+                    List.of(createNamedStatistic("a", 3L)),
+                    table.nameIdentifier(),
+                    Entity.EntityType.TABLE)));
+    Assertions.assertSame(
+        connectionFailure,
         Assertions.assertThrows(
-            OptimisticLockException.class,
-            () -> StatisticMetaService.executeCas(mapper -> 0, 1, pos, target));
-    Assertions.assertNull(shortCount.getCause());
+            PersistenceException.class,
+            () ->
+                failing.batchDeleteStatisticPOs(
+                    table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a"))));
+
+    Map<String, StatisticEntity> remaining = statisticsByName(table);
+    Assertions.assertEquals(1, remaining.size());
+    Assertions.assertEquals(1L, remaining.get("a").value().value());
   }
 
-  /** Verifies a drop matches only the exact requested name, even under a padding collation. */
+  /** Verifies a write of a name equal to an existing one under a padding collation is illegal. */
+  @TestTemplate
+  public void testWriteOfNameDifferingOnlyInTrailingSpaces() throws Exception {
+    TableEntity table = createBatchConflictTable("trailing_space_write");
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(createNamedStatistic("name", 1L)), table.nameIdentifier(), Entity.EntityType.TABLE);
+
+    List<StatisticEntity> padded = List.of(createNamedStatistic("name ", 2L));
+    if ("mysql".equalsIgnoreCase(backendType)) {
+      // MySQL's collation treats "name " as "name", so the write can never succeed.
+      Assertions.assertThrows(
+          IllegalStatisticNameException.class,
+          () ->
+              statisticMetaService.writeStatisticsWithVersion(
+                  padded, table.nameIdentifier(), Entity.EntityType.TABLE));
+      Assertions.assertEquals(1, statisticsByName(table).size());
+    } else {
+      statisticMetaService.writeStatisticsWithVersion(
+          padded, table.nameIdentifier(), Entity.EntityType.TABLE);
+      Assertions.assertEquals(2L, statisticsByName(table).get("name ").value().value());
+    }
+    Assertions.assertEquals(1L, statisticsByName(table).get("name").value().value());
+  }
+
+  /**
+   * Verifies a drop matches only the exact requested name, even under a padding collation. Only the
+   * MySQL backend, whose collation ignores trailing spaces, can return "name" for "name ".
+   */
   @TestTemplate
   public void testDropDoesNotDropNameWithoutTrailingSpace() throws Exception {
     TableEntity table = createBatchConflictTable("trailing_space");
@@ -624,6 +659,15 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertTrue(conflict.getMessage().contains("test"));
     Assertions.assertTrue(conflict.getMessage().contains(table.nameIdentifier().toString()));
     Assertions.assertTrue(conflict.getMessage().contains("retry the operation"));
+  }
+
+  private static StatisticMetaService failingStatements(RuntimeException failure) {
+    return new StatisticMetaService() {
+      @Override
+      int executeStatement(Function<StatisticMetaMapper, Integer> statement) {
+        throw failure;
+      }
+    };
   }
 
   private StatisticMetaService updateAfterSnapshot(
