@@ -38,6 +38,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
@@ -68,9 +69,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
@@ -92,6 +94,19 @@ import org.slf4j.LoggerFactory;
  * JobExecutorFactory} sets from {@code gravitino.job.stagingDir}.
  */
 public class LocalJobExecutor implements JobExecutor {
+
+  /** A submitted job waiting to run, with the directory it runs in. */
+  private static final class QueuedJob {
+    private final String jobId;
+    private final JobTemplate jobTemplate;
+    private final File workingDir;
+
+    private QueuedJob(String jobId, JobTemplate jobTemplate, File workingDir) {
+      this.jobId = jobId;
+      this.jobTemplate = jobTemplate;
+      this.workingDir = workingDir;
+    }
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(LocalJobExecutor.class);
 
@@ -133,7 +148,7 @@ public class LocalJobExecutor implements JobExecutor {
 
   private Map<String, String> configs;
 
-  private BlockingQueue<Pair<String, JobTemplate>> waitingQueue;
+  private BlockingQueue<QueuedJob> waitingQueue;
 
   private ExecutorService jobExecutorService;
 
@@ -310,27 +325,34 @@ public class LocalJobExecutor implements JobExecutor {
   }
 
   @Override
-  public String submitJob(JobTemplate jobTemplate) {
-    // Validate the job can be launched before queueing it, so that a misconfiguration is reported
-    // to the caller directly instead of only failing the job asynchronously in the worker thread.
+  public String submitJob(JobContext context, JobTemplate jobTemplate) {
+    // Validate the job can be launched before fetching its resources and queueing it, so that a
+    // misconfiguration is reported to the caller directly instead of only failing the job
+    // asynchronously in the worker thread.
     if (jobTemplate instanceof SparkJobTemplate) {
       SparkProcessBuilder.resolveSparkSubmit(configs);
     }
 
+    // The job runs in its staging directory, next to its localized resources.
+    File workingDir = context.stagingDir();
+    JobTemplate localizedJobTemplate =
+        JobResourceUtils.localizeJobTemplate(jobTemplate, workingDir);
+
     String newJobId = ownedJobIdPrefix + UUID.randomUUID();
-    Pair<String, JobTemplate> jobPair = Pair.of(newJobId, jobTemplate);
+    QueuedJob queuedJob = new QueuedJob(newJobId, localizedJobTemplate, workingDir);
 
     synchronized (lock) {
-      // Add the job template to the waiting queue
-      if (!waitingQueue.offer(jobPair)) {
-        throw new IllegalStateException("Waiting queue is full, cannot submit job: " + jobTemplate);
+      // Add the job to the waiting queue
+      if (!waitingQueue.offer(queuedJob)) {
+        throw new IllegalStateException(
+            "Waiting queue is full, cannot submit job: " + localizedJobTemplate);
       }
 
       jobInfos.put(newJobId, JobExecutionInfo.of(JobHandle.Status.QUEUED));
     }
 
     // Written only once the job is accepted, so a rejected submission leaves no index behind.
-    writeOutputIndex(newJobId, jobTemplate);
+    writeOutputIndex(newJobId, workingDir);
     return newJobId;
   }
 
@@ -368,7 +390,7 @@ public class LocalJobExecutor implements JobExecutor {
 
       // If the job is queued.
       if (info.status() == JobHandle.Status.QUEUED) {
-        waitingQueue.removeIf(p -> p.getLeft().equals(jobId));
+        waitingQueue.removeIf(queuedJob -> queuedJob.jobId.equals(jobId));
         finishJob(jobId, JobHandle.Status.CANCELLED);
         LOG.info("Job {} is cancelled from the waiting queue", jobId);
         return;
@@ -449,11 +471,9 @@ public class LocalJobExecutor implements JobExecutor {
     jobInfos.clear();
   }
 
-  public void runJob(Pair<String, JobTemplate> jobPair) {
+  private void runJob(QueuedJob queuedJob) {
+    String jobId = queuedJob.jobId;
     try {
-      String jobId = jobPair.getLeft();
-      JobTemplate jobTemplate = jobPair.getRight();
-
       Process process;
       synchronized (lock) {
         // This happens when the job is cancelled before it starts.
@@ -463,7 +483,8 @@ public class LocalJobExecutor implements JobExecutor {
           return;
         }
 
-        LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
+        LocalProcessBuilder processBuilder =
+            LocalProcessBuilder.create(queuedJob.jobTemplate, queuedJob.workingDir, configs);
         process = processBuilder.start();
         runningProcesses.put(jobId, process);
         jobInfos.put(jobId, info.started(Instant.now()));
@@ -494,23 +515,23 @@ public class LocalJobExecutor implements JobExecutor {
       LOG.error("Error while executing job", e);
       // If an error occurs, we should mark the job as failed
       synchronized (lock) {
-        finishJob(jobPair.getLeft(), JobHandle.Status.FAILED);
+        finishJob(jobId, JobHandle.Status.FAILED);
       }
     }
 
-    runningProcesses.remove(jobPair.getLeft());
+    runningProcesses.remove(jobId);
   }
 
   public void pollJob() {
     while (!finished) {
       try {
-        Pair<String, JobTemplate> jobPair = waitingQueue.poll(3000, TimeUnit.MILLISECONDS);
-        if (jobPair == null) {
+        QueuedJob queuedJob = waitingQueue.poll(3000, TimeUnit.MILLISECONDS);
+        if (queuedJob == null) {
           // If no job is available, continue to the next iteration
           continue;
         }
 
-        jobExecutorService.submit(() -> runJob(jobPair));
+        jobExecutorService.submit(() -> runJob(queuedJob));
 
       } catch (InterruptedException e) {
         LOG.warn("Polling job interrupted");
@@ -629,15 +650,11 @@ public class LocalJobExecutor implements JobExecutor {
     return true;
   }
 
-  private void writeOutputIndex(String jobId, JobTemplate jobTemplate) {
+  private void writeOutputIndex(String jobId, File jobWorkingDir) {
     // The job is already queued, so any failure here must not fail the submission: the caller
     // would then clean up the staging directory of a job that still runs.
     try {
-      Path workingDir =
-          LocalProcessBuilder.resolveWorkingDirectory(jobTemplate)
-              .toPath()
-              .toAbsolutePath()
-              .normalize();
+      Path workingDir = jobWorkingDir.toPath().toAbsolutePath().normalize();
       if (!workingDir.startsWith(stagingRoot) || workingDir.equals(stagingRoot)) {
         LOG.warn(
             "The working directory {} of job {} is not under the job staging directory {}, so "
