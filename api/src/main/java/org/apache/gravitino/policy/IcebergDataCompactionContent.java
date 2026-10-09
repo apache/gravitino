@@ -49,14 +49,14 @@ public class IcebergDataCompactionContent implements PolicyContent {
    * <p>This is separate from {@link #JOB_OPTIONS_PREFIX} because Iceberg treats {@code strategy} as
    * a procedure parameter, not an entry in the {@code options} map.
    */
-  public static final String JOB_STRATEGY_KEY = "job.strategy";
+  public static final String REWRITE_STRATEGY_KEY = "rewriteStrategy";
   /**
    * Rule key for Iceberg {@code rewrite_data_files} top-level {@code sort_order} argument.
    *
    * <p>This is separate from {@link #JOB_OPTIONS_PREFIX} because Iceberg treats {@code sort_order}
    * as a procedure parameter, not an entry in the {@code options} map.
    */
-  public static final String JOB_SORT_ORDER_KEY = "job.sort-order";
+  public static final String SORT_ORDER_KEY = "sortOrder";
   /** Rule key for trigger expression. */
   public static final String TRIGGER_EXPR_KEY = "trigger-expr";
   /** Rule key for score expression. */
@@ -257,8 +257,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
     rules.put(MAX_PARTITION_NUM_KEY, maxPartitionNum);
     rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
     rules.put(SCORE_EXPR_KEY, SCORE_EXPR);
-    rules.put(JOB_STRATEGY_KEY, rewriteStrategy);
-    rules.put(JOB_SORT_ORDER_KEY, sortOrder);
+    rules.put(REWRITE_STRATEGY_KEY, rewriteStrategy);
+    rules.put(SORT_ORDER_KEY, sortOrder);
     rewriteOptions.forEach((key, value) -> rules.put(JOB_OPTIONS_PREFIX + key, value));
     return Collections.unmodifiableMap(rules);
   }

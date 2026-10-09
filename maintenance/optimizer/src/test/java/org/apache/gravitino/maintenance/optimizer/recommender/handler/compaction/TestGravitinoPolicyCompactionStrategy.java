@@ -112,8 +112,8 @@ class TestGravitinoPolicyCompactionStrategy {
     Mockito.when(policy.content()).thenReturn(content);
 
     GravitinoStrategy strategy = new GravitinoStrategy(policy);
-    Assertions.assertEquals("sort", strategy.rules().get("job.strategy"));
-    Assertions.assertEquals("id DESC NULLS LAST", strategy.rules().get("job.sort-order"));
+    Assertions.assertEquals("sort", strategy.rules().get("rewriteStrategy"));
+    Assertions.assertEquals("id DESC NULLS LAST", strategy.rules().get("sortOrder"));
     Assertions.assertEquals(Map.of("target-file-size-bytes", "1048576"), strategy.jobOptions());
 
     NameIdentifier tableId = NameIdentifier.of("catalog", "db", "table");

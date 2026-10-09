@@ -71,7 +71,7 @@ public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
   }
 
   private static String readRewriteStrategy(Strategy strategy) {
-    Object value = strategy.rules().get(IcebergDataCompactionContent.JOB_STRATEGY_KEY);
+    Object value = strategy.rules().get(IcebergDataCompactionContent.REWRITE_STRATEGY_KEY);
     if (value == null) {
       return IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY;
     }
@@ -82,7 +82,7 @@ public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
   }
 
   private static String readSortOrder(Strategy strategy) {
-    Object value = strategy.rules().get(IcebergDataCompactionContent.JOB_SORT_ORDER_KEY);
+    Object value = strategy.rules().get(IcebergDataCompactionContent.SORT_ORDER_KEY);
     if (value == null) {
       return IcebergDataCompactionContent.DEFAULT_SORT_ORDER;
     }

@@ -42,8 +42,8 @@ public class TestPolicyContents {
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
     Assertions.assertEquals(50L, content.rules().get("max-partition-num"));
-    Assertions.assertEquals("binpack", content.rules().get("job.strategy"));
-    Assertions.assertEquals("", content.rules().get("job.sort-order"));
+    Assertions.assertEquals("binpack", content.rules().get("rewriteStrategy"));
+    Assertions.assertEquals("", content.rules().get("sortOrder"));
     Assertions.assertNull(content.rules().get("job.options.target-file-size-bytes"));
     Assertions.assertNull(content.rules().get("job.options.min-input-files"));
     Assertions.assertNull(content.rules().get("job.options.delete-file-threshold"));
@@ -73,8 +73,8 @@ public class TestPolicyContents {
         content.rules().get("score-expr"));
     Assertions.assertEquals("1048576", content.rules().get("job.options.target-file-size-bytes"));
     Assertions.assertEquals("1", content.rules().get("job.options.min-input-files"));
-    Assertions.assertEquals("binpack", content.rules().get("job.strategy"));
-    Assertions.assertEquals("", content.rules().get("job.sort-order"));
+    Assertions.assertEquals("binpack", content.rules().get("rewriteStrategy"));
+    Assertions.assertEquals("", content.rules().get("sortOrder"));
     Assertions.assertEquals(
         ImmutableSet.of(
             MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE),
@@ -108,8 +108,8 @@ public class TestPolicyContents {
 
     Assertions.assertEquals("sort", content.rewriteStrategy());
     Assertions.assertEquals("zorder(c1,c2)", content.sortOrder());
-    Assertions.assertEquals("sort", content.rules().get("job.strategy"));
-    Assertions.assertEquals("zorder(c1,c2)", content.rules().get("job.sort-order"));
+    Assertions.assertEquals("sort", content.rules().get("rewriteStrategy"));
+    Assertions.assertEquals("zorder(c1,c2)", content.rules().get("sortOrder"));
     Assertions.assertEquals("5", content.rules().get("job.options.min-input-files"));
     Assertions.assertDoesNotThrow(content::validate);
   }
