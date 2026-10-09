@@ -514,20 +514,57 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
-  public void testRejectEnvironments() {
+  @SuppressWarnings("unchecked")
+  public void testEnvironments() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                "spark.conf.spark.kubernetes.driverEnv.REGION",
+                "default-region",
+                "spark.conf.spark.executorEnv.STAGE",
+                "default-stage"));
     SparkJobTemplate template =
         SparkJobTemplate.builder()
             .withName("user-job")
             .withExecutable("https://repo/app.jar")
             .withClassName("org.example.App")
-            .withEnvironments(ImmutableMap.of("TOKEN", "secret"))
+            .withEnvironments(ImmutableMap.of("REGION", "us-west", "app.mode-1", "", "TZ", "UTC"))
+            .withConfigs(ImmutableMap.of("spark.executorEnv.TZ", "Asia/Shanghai"))
             .build();
-    IllegalArgumentException e =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
-    Assertions.assertTrue(e.getMessage().contains("TOKEN"));
-    Assertions.assertFalse(e.getMessage().contains("secret"));
+
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+
+    // Set for the driver and the executors, in place of the defaults of the job executor.
+    Assertions.assertEquals("us-west", sparkConf.get("spark.kubernetes.driverEnv.REGION"));
+    Assertions.assertEquals("us-west", sparkConf.get("spark.executorEnv.REGION"));
+    Assertions.assertEquals("", sparkConf.get("spark.kubernetes.driverEnv.app.mode-1"));
+    Assertions.assertEquals("", sparkConf.get("spark.executorEnv.app.mode-1"));
+    // The Spark configurations of the job template take precedence.
+    Assertions.assertEquals("UTC", sparkConf.get("spark.kubernetes.driverEnv.TZ"));
+    Assertions.assertEquals("Asia/Shanghai", sparkConf.get("spark.executorEnv.TZ"));
+    // A default that the job template doesn't set is kept.
+    Assertions.assertEquals("default-stage", sparkConf.get("spark.executorEnv.STAGE"));
+  }
+
+  @Test
+  public void testRejectInvalidEnvironmentName() {
+    for (String invalid : new String[] {"", "MY VAR", "A=B", "1ST", "PATH/X"}) {
+      SparkJobTemplate template =
+          SparkJobTemplate.builder()
+              .withName("user-job")
+              .withExecutable("https://repo/app.jar")
+              .withClassName("org.example.App")
+              .withEnvironments(ImmutableMap.of(invalid, "secret-value"))
+              .build();
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+      Assertions.assertTrue(e.getMessage().contains("user-job"), e.getMessage());
+      // The value of an environment variable never goes into an error message.
+      Assertions.assertFalse(e.getMessage().contains("secret-value"), e.getMessage());
+    }
   }
 
   public static K8sJobExecutorConfigs newConfigs(Map<String, String> extra) {
