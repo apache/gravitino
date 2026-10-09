@@ -1916,7 +1916,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             Entity.EntityType.CATALOG);
     Optional<Long> catalogId = lookups.resolveMetadataId(catalog, metalake, requestContext);
     if (!catalogId.isPresent()) {
-      // Without a catalog ID even a catalog-scoped guard cannot be installed safely.
+      // Without a catalog ID even a catalog-scoped guard cannot be installed safely. A missing
+      // catalog makes normalization report a missing object instead, so this is only reachable
+      // when the catalog is dropped between the two lookups. Skipping the DENY could drop it for
+      // a catalog recreated under the same name, so fail this load; the next request retries.
       throw new IllegalStateException(
           "Cannot resolve catalog for unresolved deny policy on " + object.fullName());
     }

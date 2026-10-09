@@ -796,6 +796,13 @@ public class TestJcasbinAuthorizer {
               })
           .when(catalogs)
           .doWithCatalog(eq(NameIdentifier.of(METALAKE, "broken")), any());
+      // The catalog has recovered but the role is still in its retry backoff: only the guard keeps
+      // the ancestor ALLOW from granting the denied table.
+      assertTrue(
+          getPartialRoleLoadBackoffCache(jcasbinAuthorizer).getIfPresent(DENY_ROLE_ID).isPresent());
+      assertFalse(
+          evaluator.evaluate(
+              tableMetadataNames("broken", "denied"), new AuthorizationRequestContext()));
       getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(DENY_ROLE_ID);
       assertFalse(
           evaluator.evaluate(

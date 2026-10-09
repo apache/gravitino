@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -244,22 +245,31 @@ public class TestAuthorizationRequestContext {
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     MetadataObject object = MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE);
     AtomicInteger calls = new AtomicInteger();
-    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
     ExecutorService workers = Executors.newFixedThreadPool(2);
     try {
       Callable<MetadataObject> lookup =
-          () -> {
-            assertTrue(start.await(5, TimeUnit.SECONDS));
-            return context.computeNormalizedMetadataObjectIfAbsent(
-                "ml::table",
-                key -> {
-                  calls.incrementAndGet();
-                  return object;
-                });
-          };
+          () ->
+              context.computeNormalizedMetadataObjectIfAbsent(
+                  "ml::table",
+                  key -> {
+                    calls.incrementAndGet();
+                    entered.countDown();
+                    try {
+                      assertTrue(release.await(5, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                      Thread.currentThread().interrupt();
+                      throw new IllegalStateException(e);
+                    }
+                    return object;
+                  });
       Future<MetadataObject> first = workers.submit(lookup);
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      // The second lookup starts while the first is still normalizing, so it must wait for it.
       Future<MetadataObject> second = workers.submit(lookup);
-      start.countDown();
+      assertThrows(TimeoutException.class, () -> second.get(200, TimeUnit.MILLISECONDS));
+      release.countDown();
       assertEquals(object, first.get(5, TimeUnit.SECONDS));
       assertEquals(object, second.get(5, TimeUnit.SECONDS));
       assertEquals(1, calls.get());
