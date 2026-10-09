@@ -60,6 +60,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1471,6 +1472,7 @@ public class TestJcasbinAuthorizer {
             currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, requestContext));
   }
 
+  /** Verifies bounded cache eviction races preserve composite authorization decisions. */
   @Test
   public void testConcurrentEvictionNeverFlipsCompositeDecisions() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -1485,24 +1487,25 @@ public class TestJcasbinAuthorizer {
     // the same way a TTL or size eviction does. It evicts at most once per request, at a random
     // point in it, so a request never sees more clears than a check may reload; a check that runs
     // out of reloads fails closed by design, which is covered by testRepeatedEvictionsFailClosed.
-    AtomicLong requestSeq = new AtomicLong();
-    AtomicReference<Boolean> running = new AtomicReference<>(true);
+    // Each request waits for its eviction round to finish before the next request starts, so a
+    // delayed eviction cannot spill into another request and exceed the intended reload budget.
+    Semaphore evictionRequests = new Semaphore(0);
+    Semaphore completedEvictions = new Semaphore(0);
     AtomicLong evictions = new AtomicLong();
     Thread evictor =
         new Thread(
             () -> {
-              long evictedSeq = 0L;
-              while (running.get()) {
-                long seq = requestSeq.get();
-                if (seq == evictedSeq) {
-                  Thread.yield();
-                  continue;
+              try {
+                while (!Thread.currentThread().isInterrupted()) {
+                  evictionRequests.acquire();
+                  LockSupport.parkNanos(ThreadLocalRandom.current().nextLong(200_000L));
+                  loadedRoles.invalidate(ALLOW_ROLE_ID);
+                  loadedRoles.invalidate(DENY_ROLE_ID);
+                  evictions.incrementAndGet();
+                  completedEvictions.release();
                 }
-                LockSupport.parkNanos(ThreadLocalRandom.current().nextLong(200_000L));
-                loadedRoles.invalidate(ALLOW_ROLE_ID);
-                loadedRoles.invalidate(DENY_ROLE_ID);
-                evictions.incrementAndGet();
-                evictedSeq = seq;
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
               }
             });
     evictor.setDaemon(true);
@@ -1513,7 +1516,7 @@ public class TestJcasbinAuthorizer {
       mockDirectUserRoles(allowRole);
       for (int i = 0; i < 500; i++) {
         AuthorizationRequestContext ctx = new AuthorizationRequestContext();
-        requestSeq.incrementAndGet();
+        evictionRequests.release();
         assertFalse(
             jcasbinAuthorizer.authorize(
                 currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, ctx));
@@ -1521,13 +1524,14 @@ public class TestJcasbinAuthorizer {
             jcasbinAuthorizer.authorize(
                 currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, ctx),
             "an eviction must not deny a granted check");
+        assertTrue(completedEvictions.tryAcquire(5, TimeUnit.SECONDS));
       }
 
       // Denied: the allow role and the deny role are both held. No decision may be allowed.
       mockDirectUserRoles(allowRole, denyRole);
       for (int i = 0; i < 500; i++) {
         AuthorizationRequestContext ctx = new AuthorizationRequestContext();
-        requestSeq.incrementAndGet();
+        evictionRequests.release();
         assertFalse(
             jcasbinAuthorizer.authorize(
                 currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, ctx));
@@ -1537,12 +1541,14 @@ public class TestJcasbinAuthorizer {
                 && !jcasbinAuthorizer.deny(
                     currentPrincipal, METALAKE, catalogObject(), USE_CATALOG, ctx),
             "an eviction must not allow a denied check");
+        assertTrue(completedEvictions.tryAcquire(5, TimeUnit.SECONDS));
       }
     } finally {
-      running.set(false);
+      evictor.interrupt();
       evictor.join(5000L);
     }
-    assertTrue(evictions.get() > 0, "the evictor must have raced with the requests");
+    assertFalse(evictor.isAlive(), "the evictor must stop before the test exits");
+    assertEquals(1000L, evictions.get(), "each request must complete exactly one eviction round");
   }
 
   private static MetadataObject metalakeObject() {

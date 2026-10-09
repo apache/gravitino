@@ -1706,8 +1706,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Evaluates one authorization check against role policies that are at least as complete as the
-   * ones the request loaded.
+   * Evaluates one authorization check after repairing role policies cleared since this request
+   * loaded its roles.
    *
    * <p>A request loads its roles once, but each check releases {@link #rolePolicyLock} before the
    * next one starts. In between, a {@link #loadedRoles} TTL or size eviction, or a privilege change
@@ -1717,9 +1717,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * whether a bound role was cleared after the request's recorded generation. If so, it reloads the
    * cleared roles outside the lock, the same way a request's role load does, and checks again.
    *
-   * <p>Earlier checks of the request stay valid because they ran against complete policies. This
-   * keeps each check's evaluation inside one read-locked section without holding the lock across
-   * metadata or DB lookups.
+   * <p>Earlier decisions keep their existing request-scoped results. Each new policy evaluation
+   * runs inside one read-locked section without holding the lock across metadata or DB lookups.
+   * Partial role-policy resolution keeps its existing per-object behavior; reliable completeness
+   * tracking for the deny-existence scan is handled separately in issue #13691.
    *
    * @return the evaluation result, or empty when the request's roles kept being cleared or could
    *     not be reloaded; the caller must then fail closed
