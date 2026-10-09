@@ -35,10 +35,17 @@ policy. A table with only `data_domain=risk` does not.
 
 ### Policy Types and Content
 
-| Type                        | Rules                                | Consumer                  |
-|-----------------------------|--------------------------------------|---------------------------|
-| `system_iceberg_compaction` | Compaction thresholds and scheduling | Table maintenance service |
-| `custom`                    | A free-form map that you define      | A system that you provide |
+| Type                                 | Rules                                | Consumer                  |
+|--------------------------------------|--------------------------------------|---------------------------|
+| `system_iceberg_compaction`          | Compaction thresholds and scheduling | Table maintenance service |
+| `system_iceberg_orphan_file_removal` | Orphan-file cleanup options          | Table maintenance service |
+| `system_row_filter`                  | Row-filter expression                | Not enforced yet          |
+| `system_column_mask`                 | Column-mask expression               | Not enforced yet          |
+| `custom`                             | A free-form map that you define      | A system that you provide |
+
+The row-filter and column-mask policy types can be created and associated with tags, but Gravitino
+does not enforce them yet. Until enforcement is available, these policy types do not restrict data
+access.
 
 A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
 it does not interpret their names or values. Built-in types have a defined content shape. See

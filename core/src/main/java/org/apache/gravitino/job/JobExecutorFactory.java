@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
@@ -115,5 +116,43 @@ public class JobExecutorFactory {
             + "Gravitino uses to track the jobs. It was likely built against an older version of "
             + "Gravitino, rebuild it against this version and implement the method.",
         jobExecutorClass.getName());
+
+    // Both submit methods have a default implementation, one delegating to the other, so a job
+    // executor must implement at least one of them.
+    Preconditions.checkArgument(
+        implementsMethod(jobExecutorClass, "submitJob", JobContext.class, JobTemplate.class)
+            || implementsMethod(jobExecutorClass, "submitJob", JobTemplate.class),
+        "Job executor %s implements neither JobExecutor#submitJob(JobContext, JobTemplate) nor "
+            + "JobExecutor#submitJob(JobTemplate), implement one of them to submit jobs.",
+        jobExecutorClass.getName());
+
+    // LocalJobExecutor submits jobs through submitJob(JobContext, JobTemplate) and never calls the
+    // deprecated submitJob(JobTemplate), so a subclass that overrides only the latter would have
+    // its override silently skipped.
+    Preconditions.checkArgument(
+        !LocalJobExecutor.class.isAssignableFrom(jobExecutorClass)
+            || !implementsMethod(jobExecutorClass, "submitJob", JobTemplate.class)
+            || declaringClassOf(jobExecutorClass, "submitJob", JobContext.class, JobTemplate.class)
+                != LocalJobExecutor.class,
+        "Job executor %s extends LocalJobExecutor and overrides the deprecated "
+            + "JobExecutor#submitJob(JobTemplate), which LocalJobExecutor never calls. Override "
+            + "submitJob(JobContext, JobTemplate) instead.",
+        jobExecutorClass.getName());
+  }
+
+  private static boolean implementsMethod(
+      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
+    // An inherited default method of the interface is declared by the interface itself.
+    return declaringClassOf(jobExecutorClass, name, parameterTypes) != JobExecutor.class;
+  }
+
+  private static Class<?> declaringClassOf(
+      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
+    try {
+      return jobExecutorClass.getMethod(name, parameterTypes).getDeclaringClass();
+    } catch (NoSuchMethodException e) {
+      // Never happens for a JobExecutor, as the interface declares the method.
+      throw new IllegalArgumentException(e);
+    }
   }
 }

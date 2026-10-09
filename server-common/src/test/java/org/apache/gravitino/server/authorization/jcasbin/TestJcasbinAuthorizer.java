@@ -83,12 +83,20 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
@@ -110,6 +118,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.casbin.jcasbin.main.Enforcer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -2197,6 +2206,139 @@ public class TestJcasbinAuthorizer {
 
     // Verify it's removed from the cache
     assertFalse(loadedRoles.getIfPresent(testRoleId).isPresent());
+  }
+
+  @Test
+  public void testSemanticModelRenameDropAndNameReuseInvalidateLocalCache() throws Exception {
+    GravitinoCache<String, Long> cache = getMetadataIdCache(jcasbinAuthorizer);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(cache, getOwnerRelCache(jcasbinAuthorizer));
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("case insensitive");
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
+    NameIdentifier oldIdent = NameIdentifier.of(METALAKE, "catalog", "schema", "SalesModel");
+    NameIdentifier newIdent = NameIdentifier.of(oldIdent.namespace(), "RenamedModel");
+    MetadataObject oldObject =
+        MetadataObjects.parse("catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL);
+    MetadataObject newObject =
+        MetadataObjects.parse("catalog.ScHeMa.RenamedModel", MetadataObject.Type.SEMANTIC_MODEL);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+        .thenReturn(Optional.of(100L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+        .thenReturn(Optional.of(200L));
+    assertEquals(
+        Optional.of(100L),
+        lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+    assertEquals(
+        Optional.of(200L),
+        lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+    SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+    SemanticModel renamed = mock(SemanticModel.class);
+    when(renamed.name()).thenReturn(newIdent.name());
+    SemanticModelChange rename = SemanticModelChange.rename(newIdent.name());
+    when(dispatcher.alterSemanticModel(oldIdent, rename)).thenReturn(renamed);
+    when(dispatcher.dropSemanticModel(newIdent)).thenReturn(true);
+    when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);
+    SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher, () -> null);
+    try {
+      hook.alterSemanticModel(oldIdent, rename);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .thenReturn(Optional.empty());
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .thenReturn(Optional.of(100L));
+      assertEquals(
+          Optional.empty(),
+          lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+      hook.dropSemanticModel(newIdent);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(newObject, METALAKE))
+          .thenReturn(Optional.of(300L));
+      assertEquals(
+          Optional.of(300L),
+          lookups.resolveMetadataId(newObject, METALAKE, new AuthorizationRequestContext()));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(oldObject, METALAKE))
+          .thenReturn(Optional.of(400L));
+      assertEquals(
+          Optional.of(400L),
+          lookups.resolveMetadataId(oldObject, METALAKE, new AuthorizationRequestContext()));
+    } finally {
+      when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(null);
+      when(gravitinoEnv.catalogManager()).thenReturn(null);
+    }
+  }
+
+  @Test
+  public void testSemanticModelCacheKeepsCaseSensitiveSchemasDistinct() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(
+            getMetadataIdCache(jcasbinAuthorizer), getOwnerRelCache(jcasbinAuthorizer));
+    MetadataObject lower =
+        MetadataObjects.parse("catalog.schema.SalesModel", MetadataObject.Type.SEMANTIC_MODEL);
+    MetadataObject upper =
+        MetadataObjects.parse("catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(lower, METALAKE))
+        .thenReturn(Optional.of(100L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(upper, METALAKE))
+        .thenReturn(Optional.of(200L));
+    try {
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(lower, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(200L),
+          lookups.resolveMetadataId(upper, METALAKE, new AuthorizationRequestContext()));
+      jcasbinAuthorizer.handleEntityNameIdMappingChange(
+          METALAKE,
+          NameIdentifier.of(METALAKE, "catalog", "SCHEMA", "SalesModel"),
+          Entity.EntityType.SEMANTIC_MODEL);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(upper, METALAKE))
+          .thenReturn(Optional.of(300L));
+      assertEquals(
+          Optional.of(300L),
+          lookups.resolveMetadataId(upper, METALAKE, new AuthorizationRequestContext()));
+      assertEquals(
+          Optional.of(100L),
+          lookups.resolveMetadataId(lower, METALAKE, new AuthorizationRequestContext()));
+    } finally {
+      when(gravitinoEnv.catalogManager()).thenReturn(null);
+    }
   }
 
   @Test
