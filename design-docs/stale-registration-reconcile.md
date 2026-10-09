@@ -106,7 +106,11 @@ Dropping a schema through `SchemaDispatcher` currently does all of the
 following:
 
 - `SchemaOperationDispatcher.dropSchema`: deletes from the source catalog,
-  deletes the store registration, cleans write-through secrets via
+  deletes the store registration via `store.delete(ident, SCHEMA, cascade)`,
+  which in one transaction soft-deletes the associated owner, tag-object,
+  securable-object and statistic rows for the schema and (on cascade) all
+  its descendant tables, topics, filesets, columns, models and views
+  (`SchemaMetaService.deleteSchema`), and cleans write-through secrets via
   `SecretManager.deleteSecretsFromProperties`, all under a WRITE tree lock on
   the catalog node (`TreeLockUtils.doWithTreeLock`). (On cascade, filesets
   are dropped via `FilesetDispatcher` first, before the catalog lock is
@@ -116,6 +120,11 @@ following:
   `authorizationPluginRemovePrivileges` so Ranger plugins drop privileges.
 - `SchemaEventDispatcher`: emits `DropSchemaEvent` for audit, search index
   and webhooks.
+
+The topic side is symmetric: `TopicOperationDispatcher.dropTopic` deletes the
+store registration via `store.delete(ident, TOPIC)`, and
+`TopicMetaService.deleteTopicDependents` soft-deletes the owner, tag-object,
+securable-object and statistic rows for the topic in the same transaction.
 
 ### 4.2 What #13279 already added
 
@@ -304,6 +313,18 @@ accessMetadataType = MetadataObject.Type.CATALOG)` on both endpoints.
 5. **Observability.** Each round logs: catalogs scanned, catalogs skipped as
    unreachable, stale entities found, removals attempted/succeeded. A metric
    for stale-count per catalog can be added once the shape settles.
+6. **Associated metadata is cleaned with the registration.** Removal goes
+   through the standard drop path, so all metadata attached to the stale
+   registration is cleaned in the same transaction or hook phase: owner,
+   tag-object links, securable objects (internal ACL) and statistics are
+   soft-deleted by `SchemaMetaService.deleteSchema` /
+   `TopicMetaService.deleteTopicDependents`; policies detach automatically
+   because policies bind to tags, not to objects directly; Ranger privileges
+   are removed by the hook dispatcher's `authorizationPluginRemovePrivileges`;
+   write-through secrets are removed by `SecretManager`. No orphan owner, tag
+   or policy rows are left behind. As a backstop,
+   `OrphanedMetadataObjectRelationService` periodically soft-deletes any
+   relation rows whose target metadata object no longer exists.
 
 ---
 
