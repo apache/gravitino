@@ -155,6 +155,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
         rewriteStrategy == null
             ? DEFAULT_REWRITE_STRATEGY
             : rewriteStrategy.trim().toLowerCase(Locale.ROOT);
+    // Null → "" for binpack (Iceberg leaves sort_order unset). When rewriteStrategy is
+    // "sort", validate() requires a non-blank sortOrder — do not treat "" as valid for sort.
     this.sortOrder = sortOrder == null ? DEFAULT_SORT_ORDER : sortOrder.trim();
     this.rewriteOptions =
         rewriteOptions == null
