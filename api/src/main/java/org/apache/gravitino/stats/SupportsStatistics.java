@@ -45,14 +45,14 @@ public interface SupportsStatistics {
    * unmodifiable, it will throw an UnmodifiableStatisticException. If the statistic name is
    * illegal, it will throw an IllegalStatisticNameException.
    *
-   * <p>For Gravitino-managed table statistics, a concurrent creation or modification can fail the
-   * entire update with {@link OptimisticLockException}. No part of that update is committed. The
-   * caller decides whether to abort or retry against the current state; Gravitino does not
-   * automatically retry the write.
+   * <p>For Gravitino-managed table statistics, a concurrent creation, modification or deletion can
+   * fail the entire update with {@link OptimisticLockException}. No part of that update is
+   * committed. The caller decides whether to abort or retry against the current state; Gravitino
+   * does not automatically retry the write.
    *
    * @param statistics a map of statistic names to their values
-   * @throws OptimisticLockException if a Gravitino-managed table statistic was concurrently created
-   *     or modified
+   * @throws OptimisticLockException if a Gravitino-managed table statistic was concurrently
+   *     created, modified or deleted
    */
   void updateStatistics(Map<String, StatisticValue<?>> statistics)
       throws UnmodifiableStatisticException, IllegalStatisticNameException;

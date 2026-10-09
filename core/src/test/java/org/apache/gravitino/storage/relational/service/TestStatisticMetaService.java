@@ -60,6 +60,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -388,6 +389,74 @@ public class TestStatisticMetaService extends TestJDBCBackend {
         losingDrop.batchDeleteStatisticPOs(
             table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a", "b")));
     Assertions.assertTrue(statisticsByName(table).isEmpty());
+  }
+
+  /** Verifies deadlocks, serialization failures and short counts of a batch become conflicts. */
+  @TestTemplate
+  public void testBatchStatementConcurrencyFailuresAreConflicts() {
+    NameIdentifier target = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    StatisticPO po =
+        StatisticPO.initializeStatisticPOs(
+                List.of(createNamedStatistic("a", 1L)), 1L, 2L, MetadataObject.Type.TABLE)
+            .get(0);
+    List<StatisticPO> pos = List.of(po);
+
+    for (SQLException failure :
+        List.of(
+            new SQLException("MySQL deadlock", "40001", 1213),
+            new SQLException("PostgreSQL deadlock", "40P01"),
+            new SQLException("serialization failure", "40001"),
+            new SQLException("duplicate key", "23505"))) {
+      OptimisticLockException conflict =
+          Assertions.assertThrows(
+              OptimisticLockException.class,
+              () ->
+                  StatisticMetaService.executeCas(
+                      mapper -> {
+                        throw new PersistenceException(failure);
+                      },
+                      1,
+                      pos,
+                      target));
+      Assertions.assertSame(failure, conflict.getCause().getCause());
+      Assertions.assertTrue(conflict.getMessage().contains("[a]"));
+      Assertions.assertTrue(conflict.getMessage().contains(target.toString()));
+    }
+
+    PersistenceException connectionFailure =
+        new PersistenceException(new SQLException("connection lost", "08006"));
+    Assertions.assertSame(
+        connectionFailure,
+        Assertions.assertThrows(
+            PersistenceException.class,
+            () ->
+                StatisticMetaService.executeCas(
+                    mapper -> {
+                      throw connectionFailure;
+                    },
+                    1,
+                    pos,
+                    target)));
+
+    OptimisticLockException shortCount =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () -> StatisticMetaService.executeCas(mapper -> 0, 1, pos, target));
+    Assertions.assertNull(shortCount.getCause());
+  }
+
+  /** Verifies a drop matches only the exact requested name, even under a padding collation. */
+  @TestTemplate
+  public void testDropDoesNotDropNameWithoutTrailingSpace() throws Exception {
+    TableEntity table = createBatchConflictTable("trailing_space");
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(createNamedStatistic("name", 1L)), table.nameIdentifier(), Entity.EntityType.TABLE);
+
+    Assertions.assertEquals(
+        0,
+        statisticMetaService.batchDeleteStatisticPOs(
+            table.nameIdentifier(), Entity.EntityType.TABLE, List.of("name ")));
+    Assertions.assertEquals(1L, statisticsByName(table).get("name").value().value());
   }
 
   /** Verifies a write or delete based on a stale version fails without touching the newer value. */

@@ -137,31 +137,15 @@ public class StatisticMetaService {
         () -> {
           LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
           if (!inserts.isEmpty()) {
-            int inserted;
-            try {
-              inserted =
-                  SessionUtils.getWithoutCommit(
-                      StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(inserts));
-            } catch (RuntimeException e) {
-              // A writer can create the same statistic after the snapshot above. A duplicate
-              // insert is a stale snapshot, not an internal server error.
-              if (isDuplicateKey(e)) {
-                throw statisticConflict(e, names(inserts), entity);
-              }
-              throw e;
-            }
-            if (inserted != inserts.size()) {
-              throw statisticConflict(null, names(inserts), entity);
-            }
+            executeCas(
+                mapper -> mapper.batchInsertStatisticPOs(inserts), inserts.size(), inserts, entity);
           }
           if (!updates.isEmpty()) {
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates));
-            if (updated != updates.size()) {
-              throw statisticConflict(null, names(updates), entity);
-            }
+            executeCas(
+                mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates),
+                updates.size(),
+                updates,
+                entity);
           }
         });
   }
@@ -202,15 +186,28 @@ public class StatisticMetaService {
     if (previous.isEmpty()) {
       return 0;
     }
-    List<StatisticPO> observedRows = new ArrayList<>(previous.values());
+    // Look up by the exact requested names. A collation that ignores trailing spaces can return the
+    // row of "name" for a request of "name "; dropping "name " must not drop "name".
+    List<StatisticPO> observedRows =
+        orderedNames.stream()
+            .map(previous::get)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    if (observedRows.isEmpty()) {
+      return 0;
+    }
     int[] deleted = new int[] {0};
     SessionUtils.doMultipleWithCommit(
         () -> {
           LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
-          deleted[0] =
-              SessionUtils.getWithoutCommit(
-                  StatisticMetaMapper.class,
-                  mapper -> mapper.batchDeleteStatisticPOsWithVersion(observedRows));
+          try {
+            deleted[0] =
+                SessionUtils.getWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper -> mapper.batchDeleteStatisticPOsWithVersion(observedRows));
+          } catch (RuntimeException e) {
+            throw translateConflict(e, observedRows, identifier);
+          }
           if (deleted[0] == observedRows.size()) {
             return;
           }
@@ -233,11 +230,47 @@ public class StatisticMetaService {
             mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
   }
 
+  /**
+   * Runs one batch statement that must change exactly {@code expected} rows, and reports a short
+   * count or a concurrency failure of the statement as a conflict.
+   */
+  @VisibleForTesting
+  static void executeCas(
+      Function<StatisticMetaMapper, Integer> statement,
+      int expected,
+      List<StatisticPO> pos,
+      NameIdentifier target) {
+    int changed;
+    try {
+      changed = SessionUtils.getWithoutCommit(StatisticMetaMapper.class, statement);
+    } catch (RuntimeException e) {
+      throw translateConflict(e, pos, target);
+    }
+    if (changed != expected) {
+      throw statisticConflict(null, names(pos), target);
+    }
+  }
+
+  /**
+   * Converts a failure caused by a concurrent writer into a conflict. A duplicate insert means a
+   * statistic was created after the snapshot. A deadlock or serialization failure can happen
+   * because a batch statement locks its rows in the order of the database's plan, which differs
+   * between batches. The whole batch is rolled back either way, so both are reported as a conflict
+   * rather than an internal server error.
+   */
+  private static RuntimeException translateConflict(
+      RuntimeException failure, List<StatisticPO> pos, NameIdentifier target) {
+    if (isDuplicateKey(failure) || isConcurrencyFailure(failure)) {
+      return statisticConflict(failure, names(pos), target);
+    }
+    return failure;
+  }
+
   private static OptimisticLockException statisticConflict(
       @Nullable Throwable cause, List<String> names, NameIdentifier target) {
     return new OptimisticLockException(
         cause,
-        "The statistics %s of %s were modified concurrently; retry the operation",
+        "One or more of the statistics %s of %s were modified concurrently; retry the operation",
         names,
         target);
   }
@@ -274,10 +307,23 @@ public class StatisticMetaService {
    * and MySQL reports error code 1062, the same codes the backend exception converters match.
    */
   private static boolean isDuplicateKey(Throwable failure) {
+    return hasSqlException(failure, Set.of("23505"), 1062);
+  }
+
+  /**
+   * Returns whether a failure is a deadlock or serialization failure. MySQL and H2 report SQLState
+   * 40001 (MySQL error code 1213 for a deadlock), and PostgreSQL reports 40001 or 40P01.
+   */
+  private static boolean isConcurrencyFailure(Throwable failure) {
+    return hasSqlException(failure, Set.of("40001", "40P01"), 1213);
+  }
+
+  private static boolean hasSqlException(
+      Throwable failure, Set<String> sqlStates, int mysqlErrorCode) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
       if (cause instanceof SQLException) {
         SQLException sql = (SQLException) cause;
-        if ("23505".equals(sql.getSQLState()) || sql.getErrorCode() == 1062) {
+        if (sqlStates.contains(sql.getSQLState()) || sql.getErrorCode() == mysqlErrorCode) {
           return true;
         }
       }

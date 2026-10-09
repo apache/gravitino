@@ -24,7 +24,7 @@ may reserve later.
 Updating creates a statistic that does not exist and overwrites one that does. Reserved statistics
 maintained by the system are not modifiable and the request is rejected.
 
-Concurrent creation or modification of the same statistic can return HTTP 409. The entire update
+Concurrent creation, modification or deletion of the same statistic can return HTTP 409. The entire update
 batch is rolled back on a conflict. If the client chooses to retry, it should retry against the
 current state. If the target
 table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
