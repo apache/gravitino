@@ -226,6 +226,70 @@ tasks {
     environment = envMap
   }
 
+  // Keep Daft's supported PyIceberg dependencies separate from the Python client.
+  val daftIcebergPythonVersion = project.rootProject.extra["pythonVersion"].toString()
+  val daftIcebergOsDir = when {
+    org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "MacOSX"
+    org.gradle.internal.os.OperatingSystem.current().isLinux -> "Linux"
+    else -> throw GradleException("Daft Iceberg IT only supports macOS and Linux")
+  }
+  val daftIcebergCondaExecutable = project.file(
+    "${project.rootDir}/.gradle/python/$daftIcebergOsDir/Miniforge3/bin/conda"
+  )
+  val daftIcebergEnvDir =
+    project.layout.buildDirectory.dir("daft-iceberg-it-env").get().asFile
+  val daftIcebergPythonExecutable = daftIcebergEnvDir.resolve("bin/python")
+
+  val daftIcebergDependencies by registering {
+    group = "verification"
+    description = "Install isolated dependencies for the Daft Iceberg REST contract."
+    dependsOn("miniforgeSetup")
+    doLast {
+      if (!daftIcebergPythonExecutable.exists()) {
+        project.exec {
+          executable = daftIcebergCondaExecutable.absolutePath
+          args = listOf(
+            "create", "--prefix", daftIcebergEnvDir.absolutePath,
+            "python=$daftIcebergPythonVersion", "--yes"
+          )
+        }
+      }
+      project.exec {
+        executable = daftIcebergPythonExecutable.absolutePath
+        workingDir = projectDir
+        args = listOf("-m", "pip", "install", "-r", "requirements-daft-iceberg.txt")
+      }
+      project.exec {
+        executable = daftIcebergPythonExecutable.absolutePath
+        args = listOf("-m", "pip", "check")
+      }
+    }
+  }
+
+  register("daftIcebergIT") {
+    group = "verification"
+    description = "Run the Daft Native Iceberg REST contract against Gravitino."
+    dependsOn(daftIcebergDependencies)
+    doLast {
+      project.exec {
+        executable = daftIcebergPythonExecutable.absolutePath
+        workingDir = projectDir
+        environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        environment("DAFT_RUNNER", "native")
+        environment("DAFT_ICEBERG_IT_REQUIRED", "true")
+        environment("NO_PROXY", "localhost,127.0.0.1")
+        environment("no_proxy", "localhost,127.0.0.1")
+        environment("DAFT_ICEBERG_IT_LOG_DIR", projectDir.path + "/build/daft-iceberg-it-logs")
+        environment("PYTHONPATH", projectDir.path)
+        args = listOf(
+          "-m", "unittest", "-v",
+          "tests.unittests.test_daft_iceberg_test_env",
+          "tests.integration.test_daft_iceberg"
+        )
+      }
+    }
+  }
+
   val unitCoverageReport by registering(VenvTask::class){
     venvExec = "coverage"
     args = listOf("html")
