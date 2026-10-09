@@ -287,6 +287,49 @@ public class TestOssieDocumentConverter {
         "$.metrics[0]: must be an object");
   }
 
+  /** Verifies that document errors retain their paths and native validation is still wrapped. */
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testPreservesValidationErrorMessages(OssieFormat format) throws Exception {
+    ObjectNode root = documentWithExtension("EXAMPLE", "{}");
+    root.putNull("description");
+    IllegalSemanticModelException rootError =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () -> OssieDocumentConverter.importDocument(ossieDocument(root, format)));
+    assertEquals("$.description: must not be null", rootError.getMessage());
+    assertNull(rootError.getCause());
+
+    root.remove("description");
+    ObjectNode dataset = (ObjectNode) root.at("/datasets/0");
+    ObjectNode field =
+        dataset.putArray("fields").addObject().put("name", "id").put("datatype", 123);
+    field
+        .putObject("expression")
+        .putArray("dialects")
+        .addObject()
+        .put("dialect", "ANSI_SQL")
+        .put("expression", "id");
+    IllegalSemanticModelException nestedError =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () -> OssieDocumentConverter.importDocument(ossieDocument(root, format)));
+    assertEquals("$.datasets[0].fields[0].datatype: must be a string", nestedError.getMessage());
+    assertNull(nestedError.getCause());
+
+    field.remove("datatype");
+    field.remove("expression");
+    IllegalSemanticModelException builderError =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () -> OssieDocumentConverter.importDocument(ossieDocument(root, format)));
+    assertEquals(
+        "Cannot convert Apache Ossie document to a Gravitino Semantic Model: "
+            + "expression must not be null",
+        builderError.getMessage());
+    assertEquals(IllegalArgumentException.class, builderError.getCause().getClass());
+  }
+
   @Test
   public void testJsonFormatDoesNotFallBackToYaml() {
     String yaml =

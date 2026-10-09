@@ -94,18 +94,6 @@ public final class OssieDocumentConverter {
 
   private static final Set<String> AI_CONTEXT_PROPERTIES =
       Set.of("instructions", "synonyms", "examples");
-  private static final Map<DataType, String> DATA_TYPE_NAMES =
-      Map.of(
-          DataType.STRING, "String",
-          DataType.INTEGER, "Integer",
-          DataType.DECIMAL, "Decimal",
-          DataType.FLOAT, "Float",
-          DataType.BOOLEAN, "Boolean",
-          DataType.DATE, "Date",
-          DataType.TIME, "Time",
-          DataType.DATE_TIME, "DateTime",
-          DataType.DATE_TIME_TZ, "DateTimeTz",
-          DataType.OPAQUE, "Opaque");
 
   private static final ObjectMapper JSON_MAPPER = createJsonMapper();
   private static final ObjectMapper YAML_MAPPER = createYamlMapper();
@@ -280,6 +268,8 @@ public final class OssieDocumentConverter {
         throw new IllegalArgumentException("\"name\" field is required and cannot be empty");
       }
       return new ImportedSemanticModel(name, comment, readDefinition(root), properties);
+    } catch (IllegalSemanticModelException e) {
+      throw e;
     } catch (IllegalArgumentException e) {
       throw new IllegalSemanticModelException(
           e,
@@ -499,7 +489,7 @@ public final class OssieDocumentConverter {
       return null;
     }
     for (DataType type : DataType.values()) {
-      if (value.equals(DATA_TYPE_NAMES.get(type))) {
+      if (value.equals(dataTypeName(type))) {
         return type;
       }
     }
@@ -509,8 +499,23 @@ public final class OssieDocumentConverter {
             + value
             + ". Supported values: "
             + Arrays.stream(DataType.values())
-                .map(DATA_TYPE_NAMES::get)
+                .map(OssieDocumentConverter::dataTypeName)
                 .collect(Collectors.joining(", ")));
+  }
+
+  private static String dataTypeName(DataType dataType) {
+    return switch (dataType) {
+      case STRING -> "String";
+      case INTEGER -> "Integer";
+      case DECIMAL -> "Decimal";
+      case FLOAT -> "Float";
+      case BOOLEAN -> "Boolean";
+      case DATE -> "Date";
+      case TIME -> "Time";
+      case DATE_TIME -> "DateTime";
+      case DATE_TIME_TZ -> "DateTimeTz";
+      case OPAQUE -> "Opaque";
+    };
   }
 
   @Nullable
@@ -582,10 +587,6 @@ public final class OssieDocumentConverter {
     node.put("name", dataset.name());
     NameIdentifier source = dataset.source();
     String[] namespace = source.namespace().levels();
-    if (namespace.length != 2) {
-      throw invalid(
-          "$.datasets." + dataset.name() + ".source", "must contain exactly catalog.schema.name");
-    }
     node.put(
         "source",
         formatOssieSourceSegment(namespace[0])
@@ -623,8 +624,7 @@ public final class OssieDocumentConverter {
     }
     putOptional(node, "label", field.label());
     putOptional(node, "description", field.description());
-    putOptional(
-        node, "datatype", field.datatype() == null ? null : DATA_TYPE_NAMES.get(field.datatype()));
+    putOptional(node, "datatype", field.datatype() == null ? null : dataTypeName(field.datatype()));
     putOptional(node, "ai_context", writeAIContext(field.aiContext()));
     writeObjectArray(
         node,
@@ -656,9 +656,7 @@ public final class OssieDocumentConverter {
     node.set("expression", writeExpression(metric.expression()));
     putOptional(node, "description", metric.description());
     putOptional(
-        node,
-        "datatype",
-        metric.datatype() == null ? null : DATA_TYPE_NAMES.get(metric.datatype()));
+        node, "datatype", metric.datatype() == null ? null : dataTypeName(metric.datatype()));
     putOptional(node, "ai_context", writeAIContext(metric.aiContext()));
     writeObjectArray(
         node,
