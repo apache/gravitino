@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.policy.expression.RestrictedRegoExpressionParserFacade;
 
 /** Built-in policy content for masking columns of tagged tables or tagged columns. */
 public final class ColumnMaskContent extends ReadRestrictionContent {
@@ -68,6 +69,7 @@ public final class ColumnMaskContent extends ReadRestrictionContent {
   public void validate() throws IllegalArgumentException {
     super.validate();
     validateSource(expression, "column-mask expression");
+    RestrictedRegoExpressionParserFacade.parseColumnMask(expression);
   }
 
   @Override

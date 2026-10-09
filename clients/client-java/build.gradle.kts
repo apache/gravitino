@@ -96,6 +96,7 @@ tasks.test {
 
 tasks.javadoc {
   dependsOn(":api:javadoc", ":common:javadoc")
+  exclude("org/apache/gravitino/policy/expression/antlr/**")
   source =
     sourceSets["main"].allJava +
     project(":api").sourceSets["main"].allJava +

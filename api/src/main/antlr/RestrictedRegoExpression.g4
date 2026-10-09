@@ -117,9 +117,18 @@ LBRACKET: '[';
 RBRACKET: ']';
 COMMA: ',';
 
+// Keep keywords, numbers, and built-in names from being recognized as prefixes of a bare
+// identifier. Bare identifiers are not supported by restricted-rego-v1, so these tokens are left
+// for the parser to reject.
+INVALID_NUMBER_IDENTIFIER
+    : '-'? ('0' | [1-9] [0-9]*) ('.' [0-9]+)? [a-zA-Z_] [a-zA-Z0-9_]*
+    ;
+
 NUMBER: '-'? ('0' | [1-9] [0-9]*) ('.' [0-9]+)?;
 
 STRING: '"' (ESCAPE | ~["\\\u0000-\u001F])* '"';
+
+IDENTIFIER: [a-zA-Z_] [a-zA-Z0-9_]*;
 
 fragment ESCAPE: '\\' (["\\/bfnrt] | 'u' HEX HEX HEX HEX);
 fragment HEX: [0-9a-fA-F];

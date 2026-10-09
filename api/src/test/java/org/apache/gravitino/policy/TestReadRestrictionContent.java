@@ -61,7 +61,8 @@ public class TestReadRestrictionContent {
     Assertions.assertNotEquals(
         PolicyContents.rowFilter(expression), PolicyContents.rowFilter("filter := true"));
     Assertions.assertNotEquals(
-        PolicyContents.rowFilter(expression), PolicyContents.columnMask(expression));
+        PolicyContents.rowFilter(expression),
+        PolicyContents.columnMask("mask := action(\"replace-with-null\")"));
   }
 
   @Test
@@ -76,14 +77,40 @@ public class TestReadRestrictionContent {
   void testValidatesUtf8ExpressionLength() {
     Assertions.assertEquals(16 * 1024, ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES);
 
-    String maximumLength = "é".repeat(ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES / 2);
-    String tooLong = maximumLength + "a";
+    String rowFilterPrefix = "filter := true";
+    String maximumRowFilter =
+        rowFilterPrefix
+            + " ".repeat(ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES - rowFilterPrefix.length());
+    String columnMaskPrefix = "mask := action(\"replace-with-null\")";
+    String maximumColumnMask =
+        columnMaskPrefix
+            + " "
+                .repeat(ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES - columnMaskPrefix.length());
 
-    Assertions.assertDoesNotThrow(() -> PolicyContents.rowFilter(maximumLength));
-    Assertions.assertDoesNotThrow(() -> PolicyContents.columnMask(maximumLength));
+    Assertions.assertDoesNotThrow(() -> PolicyContents.rowFilter(maximumRowFilter));
+    Assertions.assertDoesNotThrow(() -> PolicyContents.columnMask(maximumColumnMask));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> PolicyContents.rowFilter(tooLong));
+        IllegalArgumentException.class, () -> PolicyContents.rowFilter(maximumRowFilter + "é"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> PolicyContents.columnMask(tooLong));
+        IllegalArgumentException.class, () -> PolicyContents.columnMask(maximumColumnMask + "é"));
+  }
+
+  @Test
+  void testValidatesPolicySpecificRestrictedRegoPrograms() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PolicyContents.rowFilter("mask := action(\"replace-with-null\")"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PolicyContents.columnMask("filter := col(\"region\") == \"US\""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PolicyContents.rowFilter("filter := col(\"region\")"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PolicyContents.columnMask(
+                "mask := action(\"show-last-4\") if col(\"region\") == \"US\" "
+                    + "else := action(\"replace-with-null\")"));
   }
 }
