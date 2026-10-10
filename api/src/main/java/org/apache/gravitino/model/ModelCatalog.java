@@ -95,16 +95,11 @@ public interface ModelCatalog {
    * model is registered, in the meantime, the model version (version 0) will also be created and
    * linked to the registered model.
    *
-   * <p>If linking the model version fails (with {@link ModelVersionAliasesAlreadyExistException} or
-   * any other exception), the just-registered model is removed again (best effort), so a failed
-   * call does not leave an orphan model with zero versions behind. The rollback only removes the
-   * model when it still has zero versions, because models are not owned by the caller: another
-   * actor may have linked a version to this model concurrently, and {@link
-   * #deleteModel(NameIdentifier)} cascades to all versions. When versions were linked concurrently
-   * (or the check itself fails), the model is left in place and only the original exception is
-   * propagated. The check and the delete are not atomic: a model version linked between them may
-   * still be removed by the cascade delete. If the rollback itself fails, its exception is attached
-   * to the original as a suppressed exception.
+   * <p>If linking the model version fails, the model is deleted before the exception is rethrown,
+   * unless it already has a version, because {@link #deleteModel(NameIdentifier)} also deletes the
+   * model's versions. The check and the delete are not atomic, so a version linked between them is
+   * deleted too. If the check or the delete fails, its exception is added to the rethrown one with
+   * {@link Throwable#addSuppressed(Throwable)}.
    *
    * @param ident The name identifier of the model.
    * @param uris The names and URIs of the model version artifact.
@@ -132,16 +127,12 @@ public interface ModelCatalog {
     try {
       linkModelVersion(ident, uris, aliases, comment, properties);
     } catch (RuntimeException e) {
-      // Best-effort compensation: drop the just-registered model so a failed registration does
-      // not leave an orphan model with zero versions; propagate the original failure. Only roll
-      // back a model that still has no versions, since deleteModel cascades to all versions and
-      // another actor may have linked one concurrently.
       try {
+        // deleteModel also deletes versions, so only roll back a model that is still empty.
         if (listModelVersions(ident).length == 0) {
           deleteModel(ident);
         }
       } catch (RuntimeException compensationFailure) {
-        // Attach as suppressed so the original linking failure stays the primary exception.
         e.addSuppressed(compensationFailure);
       }
       throw e;

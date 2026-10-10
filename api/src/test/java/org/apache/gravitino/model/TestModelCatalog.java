@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,9 @@ public class TestModelCatalog {
     @Override
     public Model registerModel(
         NameIdentifier ident, String comment, Map<String, String> properties) {
-      models.add(ident);
+      if (!models.add(ident)) {
+        throw new ModelAlreadyExistsException("model %s already exists", ident);
+      }
       return null;
     }
 
@@ -174,6 +177,26 @@ public class TestModelCatalog {
 
     // Another actor linked a version to the model concurrently; deleteModel cascades to all
     // versions, so the rollback must not remove the model in this case.
+    Assertions.assertTrue(catalog.models.contains(ident));
+    Assertions.assertEquals(0, catalog.deleteModelCalls);
+  }
+
+  @Test
+  void testRegisterModelDoesNotDeleteExistingModel() {
+    FailingLinkModelCatalog catalog = new FailingLinkModelCatalog();
+    NameIdentifier ident = NameIdentifier.of("schema", "model1");
+    catalog.models.add(ident);
+
+    // Registering fails before any version is linked, so the existing model must not be deleted.
+    Assertions.assertThrows(
+        ModelAlreadyExistsException.class,
+        () ->
+            catalog.registerModel(
+                ident,
+                ImmutableMap.of("uri", "file:///tmp/m"),
+                new String[] {"alias"},
+                "comment",
+                Collections.emptyMap()));
     Assertions.assertTrue(catalog.models.contains(ident));
     Assertions.assertEquals(0, catalog.deleteModelCalls);
   }
