@@ -51,12 +51,14 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.types.DataField;
@@ -209,6 +211,105 @@ public class TestGravitinoPaimonTable {
         exception
             .getMessage()
             .contains(String.format("Paimon table %s already exists", tableIdentifier)));
+  }
+
+  @Test
+  void testNanosecondTimestampRoundTrip() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(paimonSchema.name(), "test_nanosecond_timestamp");
+    Column[] columns =
+        new Column[] {
+          GravitinoPaimonColumn.builder()
+              .withName("timestamp_ns")
+              .withType(Types.TimestampType.withoutTimeZone(9))
+              .withNullable(true)
+              .build(),
+          GravitinoPaimonColumn.builder()
+              .withName("timestamp_tz_ns")
+              .withType(Types.TimestampType.withTimeZone(9))
+              .withNullable(true)
+              .build()
+        };
+
+    paimonCatalogOperations.createTable(
+        tableIdentifier,
+        columns,
+        PAIMON_COMMENT,
+        Collections.emptyMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(9), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(9), loadedTable.columns()[1].dataType());
+
+    NameIdentifier invalidTableIdentifier =
+        NameIdentifier.of(paimonSchema.name(), "test_picosecond_timestamp");
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOperations.createTable(
+                    invalidTableIdentifier,
+                    new Column[] {
+                      GravitinoPaimonColumn.builder()
+                          .withName("timestamp_ps")
+                          .withType(Types.TimestampType.withoutTimeZone(10))
+                          .withNullable(true)
+                          .build()
+                    },
+                    PAIMON_COMMENT,
+                    Collections.emptyMap(),
+                    new Transform[0],
+                    Distributions.NONE,
+                    new SortOrder[0]));
+    Assertions.assertEquals(
+        "Paimon supports Gravitino timestamp precision from 0 to 9, but got: 10.",
+        exception.getMessage());
+    Assertions.assertFalse(paimonCatalogOperations.tableExists(invalidTableIdentifier));
+  }
+
+  @Test
+  void testVariantRoundTrip() {
+    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), "test_variant");
+    Column variantColumn =
+        GravitinoPaimonColumn.builder()
+            .withName("variant_col")
+            .withType(Types.VariantType.get())
+            .withNullable(true)
+            .build();
+
+    paimonCatalogOperations.createTable(
+        tableIdentifier,
+        new Column[] {variantColumn},
+        PAIMON_COMMENT,
+        Collections.emptyMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);
+    Assertions.assertEquals(Types.VariantType.get(), loadedTable.columns()[0].dataType());
+    Assertions.assertTrue(loadedTable.columns()[0].nullable());
+  }
+
+  @Test
+  void testUnknownTypeRejectedWithoutMutation() {
+    assertUnsupportedTypeRejectedWithoutMutation(Types.NullType.get(), "unknown");
+  }
+
+  @Test
+  void testGeometryTypeRejectedWithoutMutation() {
+    assertUnsupportedTypeRejectedWithoutMutation(Types.GeometryType.of("EPSG:3857"), "geometry");
+  }
+
+  @Test
+  void testGeographyTypeRejectedWithoutMutation() {
+    assertUnsupportedTypeRejectedWithoutMutation(
+        Types.GeographyType.of("EPSG:4326", "karney"), "geography");
   }
 
   @Test
@@ -686,6 +787,66 @@ public class TestGravitinoPaimonTable {
         new VarCharType(Integer.MAX_VALUE).notNull(), paimonTableSchema.fields().get(2).type());
     Assertions.assertArrayEquals(
         primaryKeys.toArray(new String[0]), paimonTableSchema.primaryKeys().toArray(new String[0]));
+  }
+
+  private void assertUnsupportedTypeRejectedWithoutMutation(Type type, String tableNameSuffix) {
+    String expectedMessage =
+        String.format("Paimon does not support Gravitino %s data type.", type.simpleString());
+    NameIdentifier createIdentifier =
+        NameIdentifier.of(paimonSchema.name(), "test_rejected_create_" + tableNameSuffix);
+    Column unsupportedColumn =
+        GravitinoPaimonColumn.builder()
+            .withName("unsupported_col")
+            .withType(type)
+            .withNullable(true)
+            .build();
+
+    IllegalArgumentException createException =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOperations.createTable(
+                    createIdentifier,
+                    new Column[] {unsupportedColumn},
+                    PAIMON_COMMENT,
+                    Collections.emptyMap(),
+                    new Transform[0],
+                    Distributions.NONE,
+                    new SortOrder[0]));
+    Assertions.assertEquals(expectedMessage, createException.getMessage());
+    Assertions.assertFalse(paimonCatalogOperations.tableExists(createIdentifier));
+
+    NameIdentifier alterIdentifier =
+        NameIdentifier.of(paimonSchema.name(), "test_rejected_alter_" + tableNameSuffix);
+    paimonCatalogOperations.createTable(
+        alterIdentifier,
+        new Column[] {
+          GravitinoPaimonColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(true)
+              .build()
+        },
+        PAIMON_COMMENT,
+        Collections.emptyMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    IllegalArgumentException alterException =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOperations.alterTable(
+                    alterIdentifier,
+                    TableChange.setProperty("v3-mutation-marker", "must-not-exist"),
+                    TableChange.addColumn(new String[] {"unsupported_col"}, type, true)));
+    Assertions.assertEquals(expectedMessage, alterException.getMessage());
+
+    Table unmodifiedTable = paimonCatalogOperations.loadTable(alterIdentifier);
+    Assertions.assertFalse(unmodifiedTable.properties().containsKey("v3-mutation-marker"));
+    Assertions.assertEquals(1, unmodifiedTable.columns().length);
+    Assertions.assertEquals("id", unmodifiedTable.columns()[0].name());
   }
 
   private static String genRandomName() {
