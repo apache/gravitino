@@ -33,6 +33,16 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
+  /**
+   * Returns whether the backend's {@code statistic_meta} key ignores trailing spaces, so that
+   * "name" and "name " are the same statistic.
+   *
+   * @return {@code true} if names that differ only in trailing spaces collide
+   */
+  public boolean namesIgnoreTrailingSpaces() {
+    return false;
+  }
+
   /** Inserts new live statistics in one statement without upsert fallback. */
   public String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs) {
     return "<script>INSERT INTO "

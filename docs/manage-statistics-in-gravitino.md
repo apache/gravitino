@@ -25,12 +25,12 @@ Updating creates a statistic that does not exist and overwrites one that does. R
 maintained by the system are not modifiable and the request is rejected.
 
 Concurrent creation, modification or deletion of the same statistic can return HTTP 409, as can a
-write that times out waiting for a concurrent writer. The entire update
-batch is rolled back on a conflict. If the client chooses to retry, it should retry against the
-current state. If the target
+write that times out waiting for a concurrent writer. The entire update batch is rolled back on a
+conflict. If the client chooses to retry, it should retry against the current state. If the target
 table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
-On a MySQL backend, whose collation ignores trailing spaces, a name that differs from an existing
-statistic only in trailing spaces is rejected with HTTP 400.
+On a MySQL backend, whose collation ignores trailing spaces, a name that differs only in trailing
+spaces from an existing statistic, or from another name in the same request, is rejected with
+HTTP 400.
 
 OCC conflicts are an expected result of concurrent writes. Clients decide whether to abort or
 retry according to their application semantics. Gravitino does not automatically retry a

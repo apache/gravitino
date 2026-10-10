@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticSQLProviderFactory;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -51,6 +53,10 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * statistic.
  */
 public class StatisticMetaService {
+
+  private static final int MYSQL_LOCK_WAIT_TIMEOUT = 1205;
+  private static final int MYSQL_DEADLOCK = 1213;
+  private static final int H2_LOCK_TIMEOUT = 50200;
 
   private static final StatisticMetaService INSTANCE = new StatisticMetaService();
 
@@ -116,6 +122,9 @@ public class StatisticMetaService {
       }
     }
     pos.sort(Comparator.comparing(StatisticPO::getStatisticName));
+    if (StatisticSQLProviderFactory.namesIgnoreTrailingSpaces()) {
+      rejectTrailingSpaceAliases(pos, entity);
+    }
     Map<String, StatisticPO> previous =
         listStatisticPOs(
                 namespacedEntityId,
@@ -127,10 +136,15 @@ public class StatisticMetaService {
     // it is rejected as an illegal name instead of a conflict that suggests a retry.
     for (String stored : previous.keySet()) {
       if (!names.contains(stored)) {
+        String requested =
+            names.stream()
+                .filter(name -> withoutTrailingSpaces(name).equals(withoutTrailingSpaces(stored)))
+                .findFirst()
+                .orElse(stored);
         throw new IllegalStatisticNameException(
-            "Statistic name is equivalent to the existing statistic '%s' of %s in the backend"
+            "Statistic name '%s' is equivalent to the existing statistic '%s' of %s in the backend"
                 + " collation; names must not differ only in trailing spaces",
-            stored, entity);
+            requested, stored, entity);
       }
     }
     List<StatisticPO> inserts = new ArrayList<>();
@@ -144,27 +158,24 @@ public class StatisticMetaService {
       }
     }
     // Each kind of write is one statement. Any mismatch fails the whole transaction, so the batch
-    // either applies completely or not at all.
-    try {
-      runFencedTransaction(
-          () -> {
-            LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
-            if (!inserts.isEmpty()
-                && executeStatement(mapper -> mapper.batchInsertStatisticPOs(inserts))
-                    != inserts.size()) {
-              throw statisticConflict(null, names(inserts), entity);
-            }
-            if (!updates.isEmpty()
-                && executeStatement(mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates))
-                    != updates.size()) {
-              throw statisticConflict(null, names(updates), entity);
-            }
-          },
-          pos,
-          entity);
-    } catch (OptimisticLockException e) {
-      throw collationCollisionOr(e, inserts, namespacedEntityId, entity);
-    }
+    // either applies completely or not at all. Trailing-space aliases were rejected above, so a
+    // duplicate key on the insert can only come from a concurrent creator and is a conflict.
+    runFencedTransaction(
+        () -> {
+          LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
+          if (!inserts.isEmpty()
+              && executeStatement(mapper -> mapper.batchInsertStatisticPOs(inserts))
+                  != inserts.size()) {
+            throw statisticConflict(null, names(inserts), entity);
+          }
+          if (!updates.isEmpty()
+              && executeStatement(mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates))
+                  != updates.size()) {
+            throw statisticConflict(null, names(updates), entity);
+          }
+        },
+        pos,
+        entity);
   }
 
   /**
@@ -289,32 +300,30 @@ public class StatisticMetaService {
   }
 
   /**
-   * Distinguishes a duplicate insert caused by the backend collation from a concurrent creator. A
-   * collation that ignores trailing spaces (MySQL) rejects "name " in the same request as "name",
-   * or next to an existing "name", on every attempt. If no live row has exactly one of the inserted
-   * names after the rollback, nobody else created them, so the names are illegal for this backend.
+   * Rejects requested names that the backend key treats as one statistic because they differ only
+   * in trailing spaces. Such a request can never succeed, so it fails as an illegal name before any
+   * write instead of as a conflict that suggests a retry.
    */
-  private static RuntimeException collationCollisionOr(
-      OptimisticLockException conflict,
-      List<StatisticPO> inserts,
-      NamespacedEntityId endpoint,
-      NameIdentifier target) {
-    if (inserts.isEmpty() || !isDuplicateKey(conflict)) {
-      return conflict;
+  private static void rejectTrailingSpaceAliases(List<StatisticPO> pos, NameIdentifier target) {
+    Map<String, String> requestedByKey = new HashMap<>();
+    for (StatisticPO po : pos) {
+      String name = po.getStatisticName();
+      String other = requestedByKey.putIfAbsent(withoutTrailingSpaces(name), name);
+      if (other != null) {
+        throw new IllegalStatisticNameException(
+            "Statistic names '%s' and '%s' of %s are the same statistic in the backend collation;"
+                + " names must not differ only in trailing spaces",
+            other, name, target);
+      }
     }
-    Set<String> live =
-        liveStatistics(endpoint, names(inserts)).stream()
-            .map(StatisticPO::getStatisticName)
-            .collect(Collectors.toSet());
-    if (inserts.stream().anyMatch(po -> live.contains(po.getStatisticName()))) {
-      return conflict;
+  }
+
+  private static String withoutTrailingSpaces(String name) {
+    int end = name.length();
+    while (end > 0 && name.charAt(end - 1) == ' ') {
+      end--;
     }
-    return new IllegalStatisticNameException(
-        conflict.getCause(),
-        "Statistic names %s of %s collide with each other or with an existing statistic in the"
-            + " backend collation; names must not differ only in trailing spaces",
-        names(inserts),
-        target);
+    return name.substring(0, end);
   }
 
   private static OptimisticLockException statisticConflict(
@@ -363,20 +372,25 @@ public class StatisticMetaService {
 
   /**
    * Returns whether a failure is a deadlock, serialization failure or lock wait timeout caused by a
-   * concurrent writer. PostgreSQL reports SQLState 40001 or 40P01 and H2 reports 40001. MySQL
-   * reports error code 1213 for a deadlock and 1205 for a lock wait timeout; both are matched by
-   * error code because the SQLState of a lock wait timeout depends on the driver.
+   * concurrent writer. PostgreSQL reports SQLState 40001 or 40P01, or 55P03 for a lock timeout. H2
+   * reports 40001 for a deadlock and error code 50200 (SQLState HYT00) for a lock wait timeout.
+   * MySQL reports error code 1213 for a deadlock and 1205 for a lock wait timeout. Vendor error
+   * codes are matched because the SQLState of a lock wait timeout depends on the driver.
    */
   private static boolean isConcurrencyFailure(Throwable failure) {
-    return hasSqlException(failure, Set.of("40001", "40P01"), Set.of(1213, 1205));
+    return hasSqlException(
+        failure,
+        Set.of("40001", "40P01", "55P03"),
+        Set.of(MYSQL_DEADLOCK, MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT));
   }
 
   private static boolean hasSqlException(
-      Throwable failure, Set<String> sqlStates, Set<Integer> mysqlErrorCodes) {
+      Throwable failure, Set<String> sqlStates, Set<Integer> vendorErrorCodes) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
       if (cause instanceof SQLException) {
         SQLException sql = (SQLException) cause;
-        if (sqlStates.contains(sql.getSQLState()) || mysqlErrorCodes.contains(sql.getErrorCode())) {
+        if (sqlStates.contains(sql.getSQLState())
+            || vendorErrorCodes.contains(sql.getErrorCode())) {
           return true;
         }
       }

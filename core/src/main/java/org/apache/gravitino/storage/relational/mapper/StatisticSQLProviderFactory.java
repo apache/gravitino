@@ -31,7 +31,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticSQLProviderFactory {
 
-  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {}
+  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {
+    // The shipped MySQL schema uses a PAD SPACE collation for statistic_meta.
+    @Override
+    public boolean namesIgnoreTrailingSpaces() {
+      return true;
+    }
+  }
 
   static class StatisticH2Provider extends StatisticBaseSQLProvider {}
 
@@ -54,6 +60,16 @@ public class StatisticSQLProviderFactory {
     JDBCBackend.JDBCBackendType jdbcBackendType =
         JDBCBackend.JDBCBackendType.fromString(databaseId);
     return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
+  }
+
+  /**
+   * Returns whether the current backend treats statistic names that differ only in trailing spaces
+   * as the same statistic.
+   *
+   * @return {@code true} for backends whose statistic key ignores trailing spaces
+   */
+  public static boolean namesIgnoreTrailingSpaces() {
+    return getProvider().namesIgnoreTrailingSpaces();
   }
 
   /** Returns SQL for a strict multi-row statistic insert. */

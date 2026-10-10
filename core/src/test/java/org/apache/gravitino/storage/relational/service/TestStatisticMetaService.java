@@ -65,6 +65,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestStatisticMetaService extends TestJDBCBackend {
@@ -406,7 +407,9 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             new SQLException("PostgreSQL deadlock", "40P01"),
             new SQLException("serialization failure", "40001"),
             new SQLException("MySQL lock wait timeout", "40001", 1205),
-            new SQLException("MySQL lock wait timeout", "HY000", 1205))) {
+            new SQLException("MySQL lock wait timeout", "HY000", 1205),
+            new SQLException("H2 lock wait timeout", "HYT00", 50200),
+            new SQLException("PostgreSQL lock timeout", "55P03"))) {
       StatisticMetaService failing = failingStatements(new PersistenceException(failure));
       OptimisticLockException writeConflict =
           Assertions.assertThrows(
@@ -429,20 +432,21 @@ public class TestStatisticMetaService extends TestJDBCBackend {
       Assertions.assertSame(failure, dropConflict.getCause().getCause());
     }
 
-    // A duplicate key on a drop is a conflict. On a write it is a conflict only if a live row now
-    // has one of the inserted names (see testConcurrentFirstStatisticWritesReportConflict);
-    // otherwise the names collided with each other in the backend collation.
+    // A duplicate key is a conflict on a write and on a drop. Names that collide only in the
+    // backend
+    // collation are rejected before the write, so a duplicate key can only come from a concurrent
+    // creator, even if that creator's row is gone again by the time the caller looks.
     SQLException duplicate = new SQLException("duplicate key", "23505");
     StatisticMetaService duplicating = failingStatements(new PersistenceException(duplicate));
-    IllegalStatisticNameException collision =
+    OptimisticLockException writeDuplicate =
         Assertions.assertThrows(
-            IllegalStatisticNameException.class,
+            OptimisticLockException.class,
             () ->
                 duplicating.writeStatisticsWithVersion(
                     List.of(createNamedStatistic("b", 2L)),
                     table.nameIdentifier(),
                     Entity.EntityType.TABLE));
-    Assertions.assertSame(duplicate, collision.getCause().getCause());
+    Assertions.assertSame(duplicate, writeDuplicate.getCause().getCause());
     OptimisticLockException dropDuplicate =
         Assertions.assertThrows(
             OptimisticLockException.class,
@@ -476,6 +480,40 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertEquals(1L, remaining.get("a").value().value());
   }
 
+  /** Verifies a real H2 lock wait timeout on the fenced write is reported as a conflict. */
+  @TestTemplate
+  public void testH2LockWaitTimeoutIsConflict() throws Exception {
+    Assumptions.assumeTrue("h2".equalsIgnoreCase(backendType), "H2 lock wait timeout only");
+    TableEntity table = createBatchConflictTable("h2_lock_timeout");
+
+    // Hold the table row that the write fences on, so the write waits until H2 gives up.
+    try (SqlSession holder =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false);
+        Statement statement = holder.getConnection().createStatement()) {
+      try (ResultSet ignored =
+          statement.executeQuery(
+              "SELECT table_id FROM table_meta WHERE table_id = " + table.id() + " FOR UPDATE")) {
+        OptimisticLockException conflict =
+            Assertions.assertThrows(
+                OptimisticLockException.class,
+                () ->
+                    statisticMetaService.writeStatisticsWithVersion(
+                        List.of(createNamedStatistic("a", 1L)),
+                        table.nameIdentifier(),
+                        Entity.EntityType.TABLE));
+        Throwable cause = conflict;
+        while (cause != null && !(cause instanceof SQLException)) {
+          cause = cause.getCause();
+        }
+        Assertions.assertNotNull(cause, "the lock wait timeout stays attached for diagnosis");
+        Assertions.assertEquals(50200, ((SQLException) cause).getErrorCode());
+      } finally {
+        holder.rollback();
+      }
+    }
+    Assertions.assertTrue(statisticsByName(table).isEmpty());
+  }
+
   /** Verifies a write of a name equal to an existing one under a padding collation is illegal. */
   @TestTemplate
   public void testWriteOfNameDifferingOnlyInTrailingSpaces() throws Exception {
@@ -486,11 +524,15 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     List<StatisticEntity> padded = List.of(createNamedStatistic("name ", 2L));
     if ("mysql".equalsIgnoreCase(backendType)) {
       // MySQL's collation treats "name " as "name", so the write can never succeed.
-      Assertions.assertThrows(
-          IllegalStatisticNameException.class,
-          () ->
-              statisticMetaService.writeStatisticsWithVersion(
-                  padded, table.nameIdentifier(), Entity.EntityType.TABLE));
+      IllegalStatisticNameException e =
+          Assertions.assertThrows(
+              IllegalStatisticNameException.class,
+              () ->
+                  statisticMetaService.writeStatisticsWithVersion(
+                      padded, table.nameIdentifier(), Entity.EntityType.TABLE));
+      // The message names both the requested name and the stored statistic it collides with.
+      Assertions.assertTrue(e.getMessage().contains("'name '"), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("'name'"), e.getMessage());
       Assertions.assertEquals(1, statisticsByName(table).size());
     } else {
       statisticMetaService.writeStatisticsWithVersion(
@@ -512,13 +554,18 @@ public class TestStatisticMetaService extends TestJDBCBackend {
         List.of(createNamedStatistic("y", 10L), createNamedStatistic("y ", 20L));
 
     if ("mysql".equalsIgnoreCase(backendType)) {
-      // MySQL's unique key treats "x " as "x", so these requests can never succeed.
+      // MySQL's unique key treats "x " as "x", so these requests can never succeed. They are
+      // rejected before any statement runs, so they cannot be mistaken for a concurrent creator.
       for (List<StatisticEntity> request : List.of(bothNew, updateAndAlias)) {
-        Assertions.assertThrows(
-            IllegalStatisticNameException.class,
-            () ->
-                statisticMetaService.writeStatisticsWithVersion(
-                    request, table.nameIdentifier(), Entity.EntityType.TABLE));
+        IllegalStatisticNameException e =
+            Assertions.assertThrows(
+                IllegalStatisticNameException.class,
+                () ->
+                    statisticMetaService.writeStatisticsWithVersion(
+                        request, table.nameIdentifier(), Entity.EntityType.TABLE));
+        String alias = request.get(0).name();
+        Assertions.assertTrue(e.getMessage().contains("'" + alias + "'"), e.getMessage());
+        Assertions.assertTrue(e.getMessage().contains("'" + alias + " '"), e.getMessage());
       }
       Map<String, StatisticEntity> current = statisticsByName(table);
       Assertions.assertEquals(1, current.size());
