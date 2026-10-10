@@ -31,7 +31,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticSQLProviderFactory {
 
-  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {}
+  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {
+    // The shipped MySQL schema uses a PAD SPACE collation for statistic_meta.
+    @Override
+    public boolean namesIgnoreTrailingSpaces() {
+      return true;
+    }
+  }
 
   static class StatisticH2Provider extends StatisticBaseSQLProvider {}
 
@@ -56,14 +62,32 @@ public class StatisticSQLProviderFactory {
     return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
   }
 
-  public static String batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
-    return getProvider().batchInsertStatisticPOsOnDuplicateKeyUpdate(statisticPOs);
+  /**
+   * Returns whether the current backend treats statistic names that differ only in trailing spaces
+   * as the same statistic.
+   *
+   * @return {@code true} for backends whose statistic key ignores trailing spaces
+   */
+  public static boolean namesIgnoreTrailingSpaces() {
+    return getProvider().namesIgnoreTrailingSpaces();
   }
 
-  public static String batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    return getProvider().batchDeleteStatisticPOs(entityId, statisticNames);
+  /** Returns SQL for a strict multi-row statistic insert. */
+  public static String batchInsertStatisticPOs(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchInsertStatisticPOs(statisticPOs);
+  }
+
+  /** Returns SQL for a version-checked batch statistic update. */
+  public static String batchUpdateStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchUpdateStatisticPOsWithVersion(statisticPOs);
+  }
+
+  /** Returns SQL for a version-checked batch statistic soft delete. */
+  public static String batchDeleteStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchDeleteStatisticPOsWithVersion(statisticPOs);
   }
 
   public static String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
@@ -73,6 +97,14 @@ public class StatisticSQLProviderFactory {
   public static String listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") Long entityId) {
     return getProvider().listStatisticPOsByEntityId(metalakeId, entityId);
+  }
+
+  /** Returns SQL to select only the named live statistics. */
+  public static String listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") Long entityId,
+      @Param("names") List<String> names) {
+    return getProvider().listStatisticPOsByNames(metalakeId, entityId, names);
   }
 
   public static String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {

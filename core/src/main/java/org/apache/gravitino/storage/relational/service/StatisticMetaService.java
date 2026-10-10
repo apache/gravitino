@@ -20,14 +20,30 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticSQLProviderFactory;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -38,13 +54,18 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 public class StatisticMetaService {
 
+  private static final int MYSQL_LOCK_WAIT_TIMEOUT = 1205;
+  private static final int MYSQL_DEADLOCK = 1213;
+  private static final int H2_LOCK_TIMEOUT = 50200;
+
   private static final StatisticMetaService INSTANCE = new StatisticMetaService();
 
   public static StatisticMetaService getInstance() {
     return INSTANCE;
   }
 
-  private StatisticMetaService() {}
+  @VisibleForTesting
+  StatisticMetaService() {}
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -63,10 +84,24 @@ public class StatisticMetaService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Creates or replaces statistics of a metadata object by name.
+   *
+   * <p>Existing statistics are replaced only if their version is unchanged since this call read
+   * them, and missing statistics are inserted only if nobody created them meanwhile; both cases
+   * otherwise fail the whole batch with {@link OptimisticLockException}. The target is fenced in
+   * the same transaction, so a target dropped or replaced after its ID was resolved fails with
+   * {@link NoSuchEntityException}.
+   *
+   * @param statisticEntities the statistics to write; names must be unique in the batch
+   * @param entity the metadata object that owns the statistics
+   * @param type the metadata object type
+   */
+  // Preserve the historical metric name for compatibility with existing monitoring.
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
-  public void batchInsertStatisticPOsOnDuplicateKeyUpdate(
+  public void writeStatisticsWithVersion(
       List<StatisticEntity> statisticEntities, NameIdentifier entity, Entity.EntityType type) {
     if (statisticEntities == null || statisticEntities.isEmpty()) {
       return;
@@ -79,19 +114,84 @@ public class StatisticMetaService {
             namespacedEntityId.namespaceIds()[0],
             namespacedEntityId.entityId(),
             NameIdentifierUtil.toMetadataObject(entity, type).type());
-    // Statistics have their own write API, so they do not inherit the schema fence from the
-    // metadata object update path. Fence schema-scoped targets explicitly to keep a schema cascade
-    // from deleting the target and then missing this independently committed statistic upsert.
-    doWithSchemaWriteLockIfNeeded(
-        entity,
-        type,
-        namespacedEntityId,
-        () ->
-            SessionUtils.doWithoutCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos)));
+    Set<String> names = new HashSet<>();
+    for (StatisticPO po : pos) {
+      if (!names.add(po.getStatisticName())) {
+        throw new IllegalArgumentException(
+            "Duplicate statistic name in batch: " + po.getStatisticName());
+      }
+    }
+    pos.sort(Comparator.comparing(StatisticPO::getStatisticName));
+    if (StatisticSQLProviderFactory.namesIgnoreTrailingSpaces()) {
+      rejectTrailingSpaceAliases(pos, entity);
+    }
+    Map<String, StatisticPO> previous =
+        listStatisticPOs(
+                namespacedEntityId,
+                pos.stream().map(StatisticPO::getStatisticName).collect(Collectors.toList()))
+            .stream()
+            .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    // A collation that ignores trailing spaces (MySQL) returns the row of "name" for "name ", and
+    // its unique key treats them as the same statistic. Writing "name " can never succeed there, so
+    // it is rejected as an illegal name instead of a conflict that suggests a retry.
+    for (String stored : previous.keySet()) {
+      if (!names.contains(stored)) {
+        String requested =
+            names.stream()
+                .filter(name -> withoutTrailingSpaces(name).equals(withoutTrailingSpaces(stored)))
+                .findFirst()
+                .orElse(stored);
+        throw new IllegalStatisticNameException(
+            "Statistic name '%s' is equivalent to the existing statistic '%s' of %s in the backend"
+                + " collation; names must not differ only in trailing spaces",
+            requested, stored, entity);
+      }
+    }
+    List<StatisticPO> inserts = new ArrayList<>();
+    List<StatisticPO> updates = new ArrayList<>();
+    for (StatisticPO po : pos) {
+      StatisticPO old = previous.get(po.getStatisticName());
+      if (old == null) {
+        inserts.add(po);
+      } else {
+        updates.add(replacementOf(old, po));
+      }
+    }
+    // Each kind of write is one statement. Any mismatch fails the whole transaction, so the batch
+    // either applies completely or not at all. Trailing-space aliases were rejected above, so a
+    // duplicate key on the insert can only come from a concurrent creator and is a conflict.
+    runFencedTransaction(
+        () -> {
+          LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
+          if (!inserts.isEmpty()
+              && executeStatement(mapper -> mapper.batchInsertStatisticPOs(inserts))
+                  != inserts.size()) {
+            throw statisticConflict(null, names(inserts), entity);
+          }
+          if (!updates.isEmpty()
+              && executeStatement(mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates))
+                  != updates.size()) {
+            throw statisticConflict(null, names(updates), entity);
+          }
+        },
+        pos,
+        entity);
   }
 
+  /**
+   * Soft-deletes the named statistics of a metadata object.
+   *
+   * <p>Each statistic is deleted only at the version this call read. A statistic that was changed
+   * meanwhile fails the whole batch with {@link OptimisticLockException}; one that a concurrent
+   * drop already removed is not counted, like a name that does not exist. A same-name replacement
+   * is a conflict even if its version matches the deleted row. A target dropped or replaced after
+   * its ID was resolved fails with {@link NoSuchEntityException} when there are rows to delete.
+   *
+   * @param identifier the metadata object that owns the statistics
+   * @param type the metadata object type
+   * @param statisticNames the statistic names to delete
+   * @return the number of statistics this call deleted
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchDeleteStatisticPOs")
@@ -100,11 +200,202 @@ public class StatisticMetaService {
     if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
-    Long entityId = EntityIdService.getEntityId(identifier, type);
+    NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, type);
+    Set<String> orderedNames =
+        statisticNames.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(TreeSet::new));
+    if (orderedNames.isEmpty()) {
+      return 0;
+    }
+    Map<String, StatisticPO> previous =
+        listStatisticPOs(observed, new ArrayList<>(orderedNames)).stream()
+            .collect(Collectors.toMap(StatisticPO::getStatisticName, Function.identity()));
+    if (previous.isEmpty()) {
+      return 0;
+    }
+    // Look up by the exact requested names. A collation that ignores trailing spaces can return the
+    // row of "name" for a request of "name "; dropping "name " must not drop "name".
+    List<StatisticPO> observedRows =
+        orderedNames.stream()
+            .map(previous::get)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    if (observedRows.isEmpty()) {
+      return 0;
+    }
+    int[] deleted = new int[] {0};
+    runFencedTransaction(
+        () -> {
+          LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
+          deleted[0] =
+              executeStatement(mapper -> mapper.batchDeleteStatisticPOsWithVersion(observedRows));
+          if (deleted[0] == observedRows.size()) {
+            return;
+          }
+          // Some observed rows were not deleted. A name that is still live was changed or
+          // replaced meanwhile, which is a conflict. Otherwise a concurrent drop already removed
+          // it; like a drop of a missing name, that is not a conflict and is simply not counted.
+          List<StatisticPO> live = liveStatistics(observed, names(observedRows));
+          if (!live.isEmpty()) {
+            throw statisticConflict(null, names(live), identifier);
+          }
+        },
+        observedRows,
+        identifier);
+    return deleted[0];
+  }
 
-    return SessionUtils.doWithCommitAndFetchResult(
+  @VisibleForTesting
+  List<StatisticPO> listStatisticPOs(NamespacedEntityId endpoint, List<String> names) {
+    return SessionUtils.getWithoutCommit(
         StatisticMetaMapper.class,
-        mapper -> mapper.batchDeleteStatisticPOs(entityId, statisticNames));
+        mapper ->
+            mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
+  }
+
+  /** Runs one batch statement in the current transaction and returns its row count. */
+  @VisibleForTesting
+  int executeStatement(Function<StatisticMetaMapper, Integer> statement) {
+    return SessionUtils.getWithoutCommit(StatisticMetaMapper.class, statement);
+  }
+
+  /**
+   * Runs a fenced statistic transaction. A failure caused by a concurrent writer anywhere in the
+   * transaction, including the fence's locking reads, is reported as a conflict on {@code pos}.
+   */
+  private static void runFencedTransaction(
+      Runnable operations, List<StatisticPO> pos, NameIdentifier target) {
+    try {
+      SessionUtils.doMultipleWithCommit(operations);
+    } catch (RuntimeException e) {
+      throw translateConflict(e, pos, target);
+    }
+  }
+
+  /**
+   * Converts a failure caused by a concurrent writer into a conflict. A duplicate insert means a
+   * statistic was created after the snapshot. A deadlock, serialization failure or lock wait
+   * timeout can happen because a batch statement locks its rows in the order of the database's
+   * plan, which differs between batches. The whole batch is rolled back either way, so these are
+   * reported as a conflict rather than an internal server error.
+   */
+  private static RuntimeException translateConflict(
+      RuntimeException failure, List<StatisticPO> pos, NameIdentifier target) {
+    if (failure instanceof OptimisticLockException) {
+      return failure;
+    }
+    if (isDuplicateKey(failure)) {
+      return statisticConflict(failure, names(pos), target);
+    }
+    if (isConcurrencyFailure(failure)) {
+      return new OptimisticLockException(
+          failure,
+          "The statistics %s of %s could not be changed because of a concurrent operation"
+              + " (deadlock or lock wait timeout); retry the operation",
+          names(pos),
+          target);
+    }
+    return failure;
+  }
+
+  /**
+   * Rejects requested names that the backend key treats as one statistic because they differ only
+   * in trailing spaces. Such a request can never succeed, so it fails as an illegal name before any
+   * write instead of as a conflict that suggests a retry.
+   */
+  private static void rejectTrailingSpaceAliases(List<StatisticPO> pos, NameIdentifier target) {
+    Map<String, String> requestedByKey = new HashMap<>();
+    for (StatisticPO po : pos) {
+      String name = po.getStatisticName();
+      String other = requestedByKey.putIfAbsent(withoutTrailingSpaces(name), name);
+      if (other != null) {
+        throw new IllegalStatisticNameException(
+            "Statistic names '%s' and '%s' of %s are the same statistic in the backend collation;"
+                + " names must not differ only in trailing spaces",
+            other, name, target);
+      }
+    }
+  }
+
+  private static String withoutTrailingSpaces(String name) {
+    int end = name.length();
+    while (end > 0 && name.charAt(end - 1) == ' ') {
+      end--;
+    }
+    return name.substring(0, end);
+  }
+
+  private static OptimisticLockException statisticConflict(
+      @Nullable Throwable cause, List<String> names, NameIdentifier target) {
+    return new OptimisticLockException(
+        cause,
+        "One or more of the statistics %s of %s were changed concurrently; retry the operation",
+        names,
+        target);
+  }
+
+  private static List<StatisticPO> liveStatistics(NamespacedEntityId endpoint, List<String> names) {
+    return SessionUtils.getWithoutCommit(
+        StatisticMetaMapper.class,
+        mapper ->
+            mapper.listStatisticPOsByNames(endpoint.namespaceIds()[0], endpoint.entityId(), names));
+  }
+
+  private static List<String> names(List<StatisticPO> pos) {
+    return pos.stream().map(StatisticPO::getStatisticName).sorted().collect(Collectors.toList());
+  }
+
+  /** Returns a PO that identifies the observed row and carries the replacement value. */
+  private static StatisticPO replacementOf(StatisticPO observed, StatisticPO replacement) {
+    return StatisticPO.builder()
+        .withStatisticId(observed.getStatisticId())
+        .withStatisticName(observed.getStatisticName())
+        .withMetalakeId(observed.getMetalakeId())
+        .withMetadataObjectId(observed.getMetadataObjectId())
+        .withMetadataObjectType(observed.getMetadataObjectType())
+        .withCurrentVersion(observed.getCurrentVersion())
+        .withLastVersion(observed.getLastVersion())
+        .withDeletedAt(observed.getDeletedAt())
+        .withStatisticValue(replacement.getStatisticValue())
+        .withAuditInfo(replacement.getAuditInfo())
+        .build();
+  }
+
+  /**
+   * Returns whether a failure is a unique-key violation. PostgreSQL and H2 report SQLState 23505,
+   * and MySQL reports error code 1062, the same codes the backend exception converters match.
+   */
+  private static boolean isDuplicateKey(Throwable failure) {
+    return hasSqlException(failure, Set.of("23505"), Set.of(1062));
+  }
+
+  /**
+   * Returns whether a failure is a deadlock, serialization failure or lock wait timeout caused by a
+   * concurrent writer. PostgreSQL reports SQLState 40001 or 40P01, or 55P03 for a lock timeout. H2
+   * reports 40001 for a deadlock and error code 50200 (SQLState HYT00) for a lock wait timeout.
+   * MySQL reports error code 1213 for a deadlock and 1205 for a lock wait timeout. Vendor error
+   * codes are matched because the SQLState of a lock wait timeout depends on the driver.
+   */
+  private static boolean isConcurrencyFailure(Throwable failure) {
+    return hasSqlException(
+        failure,
+        Set.of("40001", "40P01", "55P03"),
+        Set.of(MYSQL_DEADLOCK, MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT));
+  }
+
+  private static boolean hasSqlException(
+      Throwable failure, Set<String> sqlStates, Set<Integer> vendorErrorCodes) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SQLException) {
+        SQLException sql = (SQLException) cause;
+        if (sqlStates.contains(sql.getSQLState())
+            || vendorErrorCodes.contains(sql.getErrorCode())) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Monitored(
@@ -114,35 +405,5 @@ public class StatisticMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,
         mapper -> mapper.deleteStatisticsByLegacyTimeline(legacyTimeline, limit));
-  }
-
-  private void doWithSchemaWriteLockIfNeeded(
-      NameIdentifier identifier,
-      Entity.EntityType type,
-      NamespacedEntityId namespacedEntityId,
-      Runnable writeOperation) {
-    long[] namespaceIds = namespacedEntityId.namespaceIds();
-    Long schemaId;
-    switch (type) {
-      case SCHEMA:
-        schemaId = namespacedEntityId.entityId();
-        break;
-      case TABLE:
-      case VIEW:
-      case COLUMN:
-      case FILESET:
-      case TOPIC:
-      case MODEL:
-      case FUNCTION:
-        schemaId = namespaceIds[2];
-        break;
-      default:
-        SessionUtils.doMultipleWithCommit(writeOperation);
-        return;
-    }
-
-    SchemaMetaService.getInstance()
-        .doWithSchemaWriteLock(
-            identifier, schemaId, namespaceIds[1], namespaceIds[0], writeOperation);
   }
 }
