@@ -248,9 +248,9 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
     assertStatus(404, post(ADMIN, catalog, "exists"));
   }
 
-  /** Verifies anonymous fallback uses the service user's privileges and records its ownership. */
+  /** Anonymous requests are rejected when authorization is enabled; see GH-13093. */
   @Test
-  public void testServiceIdentityFallbackIsAuthorized() throws Exception {
+  public void testServiceIdentityFallbackIsRejected() throws Exception {
     String catalog = "lance_authz_fallback_catalog";
     CreateNamespaceRequest body = new CreateNamespaceRequest();
     body.addIdItem(catalog);
@@ -264,7 +264,7 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
                         + "/create?delimiter=."))
             .header("Content-Type", "application/json");
     assertStatus(
-        200,
+        403,
         httpClient.send(
             anonymous
                 .POST(
@@ -272,25 +272,6 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
                         ObjectMapperProvider.objectMapper().writeValueAsString(body)))
                 .build(),
             HttpResponse.BodyHandlers.ofString()));
-    GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
-    Assertions.assertEquals(WRITER, metalake.loadCatalog(catalog).auditInfo().creator());
-    // Ownership is usable by the real service user after creation through anonymous fallback.
-    assertStatus(200, drop(WRITER, catalog, null, "cascade"));
-
-    HttpRequest denied =
-        HttpRequest.newBuilder()
-            .uri(
-                URI.create(
-                    String.format("http://localhost:%d/lance", getLanceRESTServerPort())
-                        + "/v1/namespace/"
-                        + HIDDEN_CATALOG
-                        + "/describe?delimiter=."))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{}"))
-            .build();
-    assertStatus(403, httpClient.send(denied, HttpResponse.BodyHandlers.ofString()));
-    // An authenticated reader cannot borrow the fallback user's CREATE_CATALOG privilege.
-    assertStatus(403, create(USER, catalog, null, Map.of()));
   }
 
   /** Verifies standalone HTTP backend calls use service credentials rather than caller roles. */
