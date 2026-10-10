@@ -1917,6 +1917,29 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testReadWithStableModelRereadsAfterConcurrentModelAlter() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("model_alter_read_alias");
+    AtomicInteger reads = new AtomicInteger();
+
+    String result =
+        ModelVersionMetaService.getInstance()
+            .readWithStableModel(
+                version.modelIdentifier(),
+                modelPO -> {
+                  if (reads.incrementAndGet() == 1) {
+                    // A comment-only alter cannot tear the version rows, but it advances the
+                    // model's aggregate token, so the read is re-run.
+                    updateModelUnchecked(version.modelIdentifier(), "altered model comment");
+                    return "before alter";
+                  }
+                  return "after alter";
+                });
+
+    Assertions.assertEquals("after alter", result);
+    Assertions.assertEquals(2, reads.get());
+  }
+
+  @TestTemplate
   public void testReadWithStableModelGivesUpWhenModelKeepsChanging() throws IOException {
     ModelVersionEntity version = insertModelWithVersion("busy_read_alias");
     AtomicInteger reads = new AtomicInteger();
@@ -2074,6 +2097,24 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
       NameIdentifier identifier, Function<ModelVersionEntity, ModelVersionEntity> updater) {
     try {
       ModelVersionMetaService.getInstance().updateModelVersion(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void updateModelUnchecked(NameIdentifier modelIdent, String comment) {
+    try {
+      Function<ModelEntity, ModelEntity> updater =
+          current ->
+              createModelEntity(
+                  current.id(),
+                  current.namespace(),
+                  current.name(),
+                  comment,
+                  current.latestVersion(),
+                  current.properties(),
+                  current.auditInfo());
+      ModelMetaService.getInstance().updateModel(modelIdent, updater);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

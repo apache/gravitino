@@ -346,20 +346,7 @@ public class TestOwnerManager {
   @Test
   @Order(6)
   public void testConcurrentSetOwnerKeepsOneOwner() throws Exception {
-    String catalogName = "catalog_owner_race";
-    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    entityStore.put(
-        CatalogEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(catalogName)
-            .withNamespace(Namespace.of(METALAKE))
-            .withType(Catalog.Type.RELATIONAL)
-            .withProvider("test")
-            .withAuditInfo(audit)
-            .build(),
-        false);
-    MetadataObject catalogObject =
-        MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
+    MetadataObject catalogObject = createCatalog("catalog_owner_race");
 
     for (int i = 0; i < 10; i++) {
       List<Object> outcomes =
@@ -387,8 +374,8 @@ public class TestOwnerManager {
   @Test
   @Order(7)
   public void testOwnerOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
-    MetadataObject catalogObject =
-        MetadataObjects.of(Lists.newArrayList("catalog_owner_race"), MetadataObject.Type.CATALOG);
+    // Use a catalog of its own so the test does not depend on running after another one.
+    MetadataObject catalogObject = createCatalog("catalog_owner_lock_free");
 
     // A metalake WRITE lock covers every principal and metadata object below it. Owner writes are
     // fenced by the entity store, so none of them may wait for it.
@@ -405,5 +392,20 @@ public class TestOwnerManager {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> ownerManager.getOwner(METALAKE, catalogObject));
     }
+  }
+
+  private static MetadataObject createCatalog(String catalogName) throws IOException {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    entityStore.put(
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    return MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
   }
 }

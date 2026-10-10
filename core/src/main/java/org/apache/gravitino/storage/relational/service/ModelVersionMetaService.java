@@ -27,15 +27,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -67,9 +64,6 @@ public class ModelVersionMetaService {
 
   /** How many times a model-version read is re-run when the model changes underneath it. */
   @VisibleForTesting static final int MAX_STABLE_READ_ATTEMPTS = 3;
-
-  /** Upper bound of the random pause between two attempts of a model-version read. */
-  private static final long MAX_STABLE_READ_BACKOFF_MILLIS = 10;
 
   private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
 
@@ -461,6 +455,11 @@ public class ModelVersionMetaService {
    * transaction, so an unchanged version after the read proves the rows belong to one committed
    * state. A changed version re-runs the read, up to {@link #MAX_STABLE_READ_ATTEMPTS} times.
    *
+   * <p>{@code current_version} is the model's aggregate concurrency token, so model-level writes
+   * such as a comment or property change through {@code alterModel} also advance it. Those writes
+   * cannot tear the version and alias rows, but they still make a concurrent read retry, and a
+   * model altered on every attempt fails the read with {@link OptimisticLockException}.
+   *
    * @param modelIdent the identifier of the model whose rows are read
    * @param read the read to run against the observed model row
    * @return the result of a read that saw no concurrent model change
@@ -490,16 +489,12 @@ public class ModelVersionMetaService {
       if (attempt >= MAX_STABLE_READ_ATTEMPTS) {
         throw ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, modelIdent);
       }
+      // Re-read immediately: a read through the entity cache holds its cache segment lock here,
+      // so pausing would also stall unrelated entities hashed to the same segment.
       LOG.debug(
           "Model {} changed during attempt {} of a model-version read, reading it again",
           modelIdent,
           attempt);
-      // A short random pause keeps readers of a busy model from re-reading in lockstep with the
-      // writer stream that just invalidated them. A read through the entity cache holds its cache
-      // segment lock here, so the pause is kept to a few milliseconds.
-      Uninterruptibles.sleepUninterruptibly(
-          ThreadLocalRandom.current().nextLong(1, MAX_STABLE_READ_BACKOFF_MILLIS + 1),
-          TimeUnit.MILLISECONDS);
     }
   }
 

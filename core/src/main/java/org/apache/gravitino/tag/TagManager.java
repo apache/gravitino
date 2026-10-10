@@ -30,7 +30,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -467,6 +469,20 @@ public class TagManager implements TagDispatcher {
       }
       return tags.stream().map(Tag::name).distinct().toArray(String[]::new);
     } catch (NoSuchEntityException e) {
+      // A tag deleted concurrently is reported by the store when its row is locked; tell it apart
+      // from a missing metadata object so the caller is not told the object is gone.
+      Optional<String> missingTag =
+          Stream.concat(Arrays.stream(tagValuesToAdd), Arrays.stream(tagValuesToRemove))
+              .map(TagValue::name)
+              .filter(tagName -> isMissingEntity(e, Entity.EntityType.TAG, tagName))
+              .findFirst();
+      if (missingTag.isPresent()) {
+        throw new NoSuchTagException(
+            e,
+            "Failed to associate tags for metadata object %s because tag %s does not exist",
+            metadataObject,
+            missingTag.get());
+      }
       throw new NoSuchMetadataObjectException(
           e, "Failed to associate tags for metadata object %s due to not found", metadataObject);
     } catch (EntityAlreadyExistsException e) {

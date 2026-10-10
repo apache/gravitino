@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -69,6 +70,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -76,6 +78,7 @@ import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -1364,14 +1367,58 @@ public class TestTagManager {
 
       Assertions.assertEquals(Boolean.TRUE, outcomes.get(0));
       Object associate = outcomes.get(1);
+      // A loser must report the deleted tag, not claim the table is missing.
       Assertions.assertTrue(
-          associate instanceof String[] || associate instanceof NotFoundException,
+          associate instanceof String[] || associate instanceof NoSuchTagException,
           "Unexpected associate outcome: " + associate);
       Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, tagName));
       Assertions.assertFalse(
           Arrays.asList(tagManager.listTagsForMetadataObject(METALAKE, tableObject))
               .contains(tagName));
     }
+  }
+
+  @Test
+  public void testAssociateReportsMissingTagSeparatelyFromMissingObject() throws Exception {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    EntityStore store = mock(EntityStore.class);
+    SupportsRelationOperations relationOperations = mock(SupportsRelationOperations.class);
+    when(store.relationOperations()).thenReturn(relationOperations);
+    TagManager manager = new TagManager(idGenerator, store);
+
+    // The store names a tag deleted before its row was locked, for added and removed tags alike.
+    stubAssociateFailure(relationOperations, Entity.EntityType.TAG, "removed_tag");
+    NoSuchTagException missingTag =
+        Assertions.assertThrows(
+            NoSuchTagException.class,
+            () ->
+                manager.associateTagsForMetadataObject(
+                    METALAKE,
+                    tableObject,
+                    new String[] {"added_tag"},
+                    new String[] {"removed_tag"}));
+    Assertions.assertTrue(missingTag.getMessage().contains("removed_tag"));
+
+    stubAssociateFailure(relationOperations, Entity.EntityType.TABLE, TABLE);
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            manager.associateTagsForMetadataObject(
+                METALAKE, tableObject, new String[] {"added_tag"}, null));
+  }
+
+  private static void stubAssociateFailure(
+      SupportsRelationOperations relationOperations, Entity.EntityType type, String name)
+      throws IOException {
+    Mockito.doThrow(
+            new NoSuchEntityException(
+                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                type.name().toLowerCase(Locale.ROOT),
+                name))
+        .when(relationOperations)
+        .updateEntityRelations(any(), any(), any(), any(), any());
   }
 
   private static Set<String> tagNames(Tag[] tags) {
