@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyContentSupport;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.IdGenerator;
@@ -132,6 +133,9 @@ public class PolicyManager implements PolicyDispatcher {
         NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
         () -> {
+          content.validate();
+          TableMaintenancePolicyContentSupport.validateMaintenanceFields(type, content);
+
           PolicyEntity policyEntity =
               PolicyEntity.builder()
                   .withId(idGenerator.nextId())
@@ -256,6 +260,16 @@ public class PolicyManager implements PolicyDispatcher {
     return objectPolicyResolver.resolve(metalake, metadataObject);
   }
 
+  @Override
+  public PolicyEntity[] listDirectPolicyInfosForMetadataObject(
+      String metalake, MetadataObject metadataObject) {
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    // Direct policy-to-metadata-object relations are not stored on main yet; tag-based policies
+    // are returned from {@link #listPolicyInfosForMetadataObject}.
+    return new PolicyEntity[0];
+  }
+
   private PolicyEntity getPolicyWithoutLock(String metalake, String policyName) {
     try {
       return entityStore.get(
@@ -375,6 +389,10 @@ public class PolicyManager implements PolicyDispatcher {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
+
+    newContent.validate();
+    TableMaintenancePolicyContentSupport.validateMaintenanceFields(
+        policyEntity.policyType(), newContent);
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);

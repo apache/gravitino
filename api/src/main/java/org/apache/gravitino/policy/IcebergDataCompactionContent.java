@@ -28,8 +28,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.maintenance.policy.MaintenanceSensitiveOptionKeys;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
+import org.apache.gravitino.maintenance.policy.TableMaintenanceTaskType;
 
 /** Built-in policy content for Iceberg compaction strategy. */
 public class IcebergDataCompactionContent implements PolicyContent {
@@ -127,10 +131,11 @@ public class IcebergDataCompactionContent implements PolicyContent {
   private final String rewriteStrategy;
   private final String sortOrder;
   private final Map<String, String> rewriteOptions;
+  @Nullable private final TableMaintenancePolicyFields maintenanceFields;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
-    this(null, null, null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null, null);
   }
 
   IcebergDataCompactionContent(
@@ -142,6 +147,28 @@ public class IcebergDataCompactionContent implements PolicyContent {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
+    this(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
+        rewriteOptions,
+        null);
+  }
+
+  IcebergDataCompactionContent(
+      Long minDataFileMse,
+      Long minDeleteFileNumber,
+      Long dataFileMseWeight,
+      Long deleteFileNumberWeight,
+      Long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions,
+      @Nullable TableMaintenancePolicyFields maintenanceFields) {
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -162,6 +189,17 @@ public class IcebergDataCompactionContent implements PolicyContent {
         rewriteOptions == null
             ? DEFAULT_REWRITE_OPTIONS
             : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
+    this.maintenanceFields = maintenanceFields;
+  }
+
+  /**
+   * Returns TMS scheduling and job options stored in this policy content, when set.
+   *
+   * @return maintenance fields or {@code null}
+   */
+  @Nullable
+  public TableMaintenancePolicyFields maintenanceFields() {
+    return maintenanceFields;
   }
 
   /**
@@ -291,6 +329,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
           rewriteStrategy);
     }
 
+    MaintenanceSensitiveOptionKeys.validateNonSensitive(rewriteOptions, "rewriteOptions");
     rewriteOptions.forEach(
         (key, value) -> {
           Preconditions.checkArgument(StringUtils.isNotBlank(key), "rewrite option key is blank");
@@ -306,6 +345,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
           Preconditions.checkArgument(
               StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
         });
+    if (maintenanceFields != null) {
+      maintenanceFields.validate(TableMaintenanceTaskType.COMPACTION);
+    }
   }
 
   @Override
@@ -321,7 +363,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
         && Objects.equals(maxPartitionNum, that.maxPartitionNum)
         && Objects.equals(rewriteStrategy, that.rewriteStrategy)
         && Objects.equals(sortOrder, that.sortOrder)
-        && Objects.equals(rewriteOptions, that.rewriteOptions);
+        && Objects.equals(rewriteOptions, that.rewriteOptions)
+        && Objects.equals(maintenanceFields, that.maintenanceFields);
   }
 
   @Override
@@ -334,7 +377,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
         maxPartitionNum,
         rewriteStrategy,
         sortOrder,
-        rewriteOptions);
+        rewriteOptions,
+        maintenanceFields);
   }
 
   @Override
@@ -358,6 +402,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
         + '\''
         + ", rewriteOptions="
         + rewriteOptions
+        + ", maintenanceFields="
+        + maintenanceFields
         + '}';
   }
 }
