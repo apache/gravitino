@@ -187,7 +187,7 @@ public class TestModelCatalog {
     NameIdentifier ident = NameIdentifier.of("schema", "model1");
     catalog.models.add(ident);
 
-    // Registering fails before any version is linked, so the existing model must not be deleted.
+    // registerModel throws before the rollback can run; a model this call did not create must stay.
     Assertions.assertThrows(
         ModelAlreadyExistsException.class,
         () ->
