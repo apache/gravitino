@@ -20,6 +20,9 @@ jobs:
           distribution: temurin
           cache: gradle
 
+      - name: Free up disk space
+        run: dev/ci/util_free_space.sh
+
       - name: Package Gravitino
         run: ./gradlew compileDistribution -PskipWeb=true -x test
 
