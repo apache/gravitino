@@ -29,6 +29,8 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
+import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -38,6 +40,33 @@ import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
 public interface PolicyContentDTO extends PolicyContent {
+
+  /** JSON DTO for {@link TableMaintenanceSchedule}. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class TableMaintenanceScheduleDTO {
+    @JsonProperty("onCommit")
+    private Boolean onCommit;
+
+    @JsonProperty("crontab")
+    private String crontab;
+
+    private TableMaintenanceScheduleDTO() {}
+
+    /**
+     * Converts to domain schedule.
+     *
+     * @return domain object or null when unset
+     */
+    public TableMaintenanceSchedule toDomain() {
+      if (onCommit == null && crontab == null) {
+        return null;
+      }
+      return new TableMaintenanceSchedule(onCommit, crontab);
+    }
+  }
 
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode
@@ -113,6 +142,15 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
+
+    @JsonProperty("schedule")
+    private TableMaintenanceScheduleDTO schedule;
+
+    @JsonProperty("minIntervalMs")
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    private Map<String, String> jobOptions;
 
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
@@ -224,6 +262,21 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
+    /**
+     * Returns TMS scheduling fields when present in the request body.
+     *
+     * @return maintenance fields or {@code null}
+     */
+    public TableMaintenancePolicyFields maintenanceFields() {
+      if (schedule == null
+          && minIntervalMs == null
+          && (jobOptions == null || jobOptions.isEmpty())) {
+        return null;
+      }
+      return new TableMaintenancePolicyFields(
+          schedule == null ? null : schedule.toDomain(), minIntervalMs, jobOptions);
+    }
+
     private PolicyContent toDomainContent() {
       return PolicyContents.icebergDataCompaction(
           minDataFileMse(),
@@ -233,7 +286,8 @@ public interface PolicyContentDTO extends PolicyContent {
           maxPartitionNum(),
           rewriteStrategy(),
           sortOrder(),
-          rewriteOptions());
+          rewriteOptions(),
+          maintenanceFields());
     }
   }
 

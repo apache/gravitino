@@ -119,8 +119,6 @@ public class TestPolicyDTO {
             .withDataFileMseWeight(2L)
             .withDeleteFileNumberWeight(150L)
             .withMaxPartitionNum(99L)
-            .withRewriteStrategy("sort")
-            .withSortOrder("zorder(c1,c2)")
             .withRewriteOptions(
                 ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
             .build();
@@ -171,10 +169,40 @@ public class TestPolicyDTO {
     Assertions.assertEquals(
         IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM, contentDTO.maxPartitionNum());
     Assertions.assertTrue(contentDTO.rewriteOptions().isEmpty());
-    Assertions.assertEquals(
-        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY, contentDTO.rewriteStrategy());
-    Assertions.assertEquals(
-        IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
+    Assertions.assertDoesNotThrow(contentDTO::validate);
+  }
+
+  @Test
+  public void testIcebergCompactionPolicyMaintenanceFieldsSerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withSchedule(
+                PolicyContentDTO.TableMaintenanceScheduleDTO.builder()
+                    .withOnCommit(true)
+                    .withCrontab("0 1 * * *")
+                    .build())
+            .withMinIntervalMs(7200000L)
+            .withJobOptions(ImmutableMap.of("uri", "http://irc:9001/iceberg"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction-tms")
+            .withPolicyType("system_iceberg_compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+    PolicyContentDTO.IcebergCompactionContentDTO contentDTO =
+        (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
+
+    Assertions.assertNotNull(contentDTO.maintenanceFields());
+    Assertions.assertTrue(contentDTO.maintenanceFields().schedule().onCommit());
+    Assertions.assertEquals(7200000L, contentDTO.maintenanceFields().minIntervalMs());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
 }
