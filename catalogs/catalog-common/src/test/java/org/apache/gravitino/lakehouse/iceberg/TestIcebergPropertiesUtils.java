@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -173,5 +174,16 @@ public class TestIcebergPropertiesUtils {
     catalogProperties = ImmutableMap.of();
     backendName = IcebergPropertiesUtils.getCatalogBackendName(catalogProperties);
     Assertions.assertEquals("memory", backendName);
+  }
+  @Test
+  void testS3ProxyEndpointPropertyIsMapped() {
+    Map<String, String> gravitinoProps =
+        ImmutableMap.of(S3Properties.GRAVITINO_S3_PROXY_ENDPOINT, "http://proxy:8080");
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProps);
+    Assertions.assertEquals(
+        "http://proxy:8080",
+        icebergProps.get(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT),
+        "s3-proxy-endpoint must be translated to http-client.proxy-endpoint for Iceberg");
   }
 }
