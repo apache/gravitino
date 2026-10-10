@@ -137,7 +137,6 @@ public class MetadataIdConverter {
    *
    * @return the types covered by the production capability mapping
    */
-  @VisibleForTesting
   public static Set<MetadataObject.Type> catalogScopedTypes() {
     return METADATA_SCOPE_MAPPING.keySet();
   }
