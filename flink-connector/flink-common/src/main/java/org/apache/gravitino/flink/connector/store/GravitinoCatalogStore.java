@@ -220,6 +220,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   }
 
   private static Map<String, String> propsWithSecrets(Catalog catalog) {
-    return PropertyUtils.propertiesWithSecrets(catalog.properties(), catalog::supportsSecrets);
+    return PropertyUtils.propertiesWithSecretsAndCredentials(
+        catalog.properties(), catalog::supportsSecrets, catalog::supportsCredentials);
   }
 }

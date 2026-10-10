@@ -48,11 +48,18 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 
 - The Kafka catalog supports creating, updating, deleting, and listing topics.
 
+::::caution Topic names containing dots
+When authorization is enabled, topic names containing dots are unsupported, and one such topic can
+cause the entire topic list request to fail. See
+[Names containing dots](./security/access-control.md#names-containing-dots) for details and the
+workaround.
+::::
+
 ### Topic Properties
 
 | Property name        | Description                              | Default value                                                                       | Required |
 |----------------------|------------------------------------------|-------------------------------------------------------------------------------------|----------|
-| `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partition` property in the broker.              | No       |
+| `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partitions` property in the broker.              | No       |
 | `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       |
 
 Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.

@@ -23,10 +23,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
@@ -64,29 +66,35 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Every listener failure is logged at {@code ERROR}, so a listener that keeps failing stays
  * visible in the logs even though the poller keeps going.
+ *
+ * <p>Each poll cycle reads at most one batch. A full batch means more rows may be waiting, so the
+ * next cycle starts right away instead of after the poll interval; an empty or partial batch, or a
+ * failed cycle, waits the full interval. A backlog is therefore drained as fast as batches can be
+ * read and delivered, while an idle or failing poller still polls only once per interval.
  */
 public class EntityChangeLogPoller implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityChangeLogPoller.class);
-
-  /** Max entity-change rows to fetch per batch. */
-  private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 2000;
 
   /** Max records rendered in a batch summary log line. */
   private static final int MAX_SUMMARIZED_RECORDS = 20;
 
   private final List<EntityChangeLogListener> listeners = new CopyOnWriteArrayList<>();
   private final long pollIntervalSecs;
+  private final int batchSize;
   private final EntityChangeLogMetricsSource metrics;
 
   private ScheduledExecutorService scheduler;
+  private volatile boolean closed = false;
   private volatile long entityPollHighWaterId = 0;
+  private boolean tailSampleAttempted;
+  private long lastTailSampleNanos;
 
   /**
    * Creates an {@link EntityChangeLogPoller} with an unregistered metrics source for callers that
    * do not use the server metrics system.
    *
-   * @param pollIntervalSecs interval between successive polling cycles
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
    */
   public EntityChangeLogPoller(long pollIntervalSecs) {
     this(pollIntervalSecs, new EntityChangeLogMetricsSource());
@@ -95,13 +103,28 @@ public class EntityChangeLogPoller implements AutoCloseable {
   /**
    * Creates a poller using the metrics source registered by the entity store.
    *
-   * @param pollIntervalSecs interval between successive polling cycles
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
    * @param metrics process-local change log metrics
    */
   public EntityChangeLogPoller(long pollIntervalSecs, EntityChangeLogMetricsSource metrics) {
+    this(pollIntervalSecs, Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE, metrics);
+  }
+
+  /**
+   * Creates a poller with a custom batch size, using the metrics source registered by the entity
+   * store.
+   *
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
+   * @param batchSize maximum number of change log rows read per polling cycle
+   * @param metrics process-local change log metrics
+   */
+  public EntityChangeLogPoller(
+      long pollIntervalSecs, int batchSize, EntityChangeLogMetricsSource metrics) {
     Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
+    Preconditions.checkArgument(batchSize > 0, "batchSize must be positive");
     this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
     this.pollIntervalSecs = pollIntervalSecs;
+    this.batchSize = batchSize;
   }
 
   /**
@@ -136,7 +159,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   /**
-   * Initializes the high-water cursor to the current DB tail and schedules periodic polling.
+   * Initializes the high-water cursor to the current DB tail and schedules the first poll one
+   * interval later. A poller cannot be started again after {@link #close()}.
    *
    * <p>On every start (including restarts), the cursor is set to the current maximum change ID in
    * the DB, so historical change records written before this server process started are NOT
@@ -145,33 +169,30 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * cache.
    */
   public void start() {
+    Preconditions.checkState(!closed, "A closed entity change log poller cannot be restarted");
     entityPollHighWaterId =
         getOrDefault(
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
     metrics.setDbTailId(entityPollHighWaterId);
+    tailSampleAttempted = true;
+    lastTailSampleNanos = nanoTime();
     metrics.setCursorId(entityPollHighWaterId);
     LOG.info(
-        "Starting entity change log poller at high-water id {} with a {} second interval, "
-            + "{} listener(s) registered",
+        "Starting entity change log poller at high-water id {} with a {} second interval and a "
+            + "batch size of {}, {} listener(s) registered",
         entityPollHighWaterId,
         pollIntervalSecs,
+        batchSize,
         listeners.size());
 
-    scheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r);
-              t.setName("Gravitino-EntityChangeLogPoller");
-              t.setDaemon(true);
-              return t;
-            });
-    scheduler.scheduleWithFixedDelay(
-        this::pollChanges, pollIntervalSecs, pollIntervalSecs, TimeUnit.SECONDS);
+    scheduler = createScheduler();
+    scheduleNextPoll(TimeUnit.SECONDS.toMillis(pollIntervalSecs));
   }
 
   @Override
   public void close() {
+    closed = true;
     if (scheduler != null) {
       scheduler.shutdown();
       try {
@@ -190,28 +211,99 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   @VisibleForTesting
-  void pollChanges() {
-    try (Timer.Context ignored = metrics.timePoll()) {
-      doPollChanges();
-    } catch (Throwable e) {
-      // Catch Throwable, not Exception: this method is the task handed to
-      // scheduleWithFixedDelay(), and anything that escapes it cancels all future runs for good,
-      // silently. A listener or its recovery path can throw an Error as well as an Exception.
-      // Losing the poller would stop cache invalidation for every listener in this process, so we
-      // log and let the next cycle run.
-      if (handleInterruptIfAny(e, "Entity change poll")) {
-        return;
+  ScheduledExecutorService createScheduler() {
+    ScheduledThreadPoolExecutor executor =
+        new ScheduledThreadPoolExecutor(
+            1,
+            r -> {
+              Thread t = new Thread(r);
+              t.setName("Gravitino-EntityChangeLogPoller");
+              t.setDaemon(true);
+              return t;
+            });
+    // Drop polls whose delay has not elapsed so close() does not wait for an idle poll. Already-due
+    // tasks, including zero-delay drain hops, can still run after shutdown(); runPollCycle's closed
+    // guard prevents those tasks from accessing the closing store.
+    executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+    return executor;
+  }
+
+  @VisibleForTesting
+  long nanoTime() {
+    return System.nanoTime();
+  }
+
+  /**
+   * Runs one poll cycle and schedules the next one: immediately when the cycle read a full batch,
+   * otherwise after the poll interval. A failed cycle also waits the full interval, so a database
+   * outage is not retried in a tight loop.
+   */
+  private void runPollCycle() {
+    if (closed) {
+      return;
+    }
+    long nextDelayMillis = TimeUnit.SECONDS.toMillis(pollIntervalSecs);
+    try {
+      if (pollChanges()) {
+        // Continuous draining is intentional: every cycle advances the cursor and is bounded by
+        // batchSize. Tail sampling is rate-limited separately so diagnostics do not double the
+        // database query rate while a sustained backlog is being consumed.
+        nextDelayMillis = 0;
       }
-      metrics.pollFailed();
-      LOG.warn("Entity change poll failed at high-water id {}", entityPollHighWaterId, e);
+    } finally {
+      // pollChanges() catches Throwable, but scheduling in finally keeps the poller alive even if
+      // that ever changes: a cycle that is not rescheduled stops cache invalidation for good.
+      scheduleNextPoll(nextDelayMillis);
     }
   }
 
-  private synchronized void doPollChanges() {
-    BatchDelivery delivery = fetchNextDelivery();
-    if (delivery != null) {
-      deliver(delivery);
+  private void scheduleNextPoll(long delayMillis) {
+    if (closed) {
+      return;
     }
+    try {
+      scheduler.schedule(this::runPollCycle, delayMillis, TimeUnit.MILLISECONDS);
+    } catch (RejectedExecutionException e) {
+      // Only a shut-down scheduler rejects work, and close() sets closed before shutting down.
+      if (!closed) {
+        LOG.error("Could not schedule the next entity change log poll", e);
+      }
+    }
+  }
+
+  /**
+   * Polls one batch and delivers it to the listeners.
+   *
+   * @return true if the batch was full, so more rows may be waiting and the next poll should not
+   *     wait for the interval; false if the poller caught up or the poll failed
+   */
+  @VisibleForTesting
+  boolean pollChanges() {
+    try (Timer.Context ignored = metrics.timePoll()) {
+      return doPollChanges();
+    } catch (Throwable e) {
+      // Catch Throwable, not Exception: a listener or its recovery path can throw an Error as well
+      // as an Exception. Losing the poller would stop cache invalidation for every listener in
+      // this process, so we log and let the next cycle run after the normal interval.
+      if (handleInterruptIfAny(e, "Entity change poll")) {
+        return false;
+      }
+      metrics.pollFailed();
+      LOG.warn("Entity change poll failed at high-water id {}", entityPollHighWaterId, e);
+      return false;
+    }
+  }
+
+  private synchronized boolean doPollChanges() {
+    BatchDelivery delivery = fetchNextDelivery();
+    if (delivery == null) {
+      return false;
+    }
+    deliver(delivery);
+    // A full batch is the backlog signal. The sampled tail id would be more precise, but that
+    // sample is best-effort and may be missing; a full batch with nothing behind it only costs one
+    // extra empty poll before the normal interval resumes.
+    return delivery.changes.size() >= batchSize;
   }
 
   @Nullable
@@ -221,18 +313,27 @@ public class EntityChangeLogPoller implements AutoCloseable {
     // The tail is for observability only. A failed sample must not suppress delivery of rows
     // already fetched successfully or hold the cursor back.
     @Nullable Long dbTailId = null;
-    try {
-      dbTailId =
-          getOrDefault(
-              SessionUtils.getWithoutCommit(
-                  EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
-      metrics.setDbTailId(dbTailId);
-    } catch (RuntimeException e) {
-      if (handleInterruptIfAny(e, "Entity change log tail sample")) {
-        throw e;
+    long nowNanos = nanoTime();
+    if (changes.size() < batchSize
+        || !tailSampleAttempted
+        || nowNanos - lastTailSampleNanos >= TimeUnit.SECONDS.toNanos(pollIntervalSecs)) {
+      // A full batch already signals backlog. Sample at most once per interval during a drain,
+      // including failed attempts, while partial/empty polls refresh the caught-up state.
+      tailSampleAttempted = true;
+      lastTailSampleNanos = nowNanos;
+      try {
+        dbTailId =
+            getOrDefault(
+                SessionUtils.getWithoutCommit(
+                    EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+        metrics.setDbTailId(dbTailId);
+      } catch (RuntimeException e) {
+        if (handleInterruptIfAny(e, "Entity change log tail sample")) {
+          throw e;
+        }
+        metrics.tailSampleFailed();
+        LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
       }
-      metrics.tailSampleFailed();
-      LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
     }
     metrics.pollSucceeded(changes.size());
     long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - fetchStartNanos);
@@ -291,8 +392,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   private List<EntityChangeRecord> fetchEntityChanges() {
     return SessionUtils.getWithoutCommit(
-        EntityChangeLogMapper.class,
-        m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
+        EntityChangeLogMapper.class, m -> m.selectEntityChanges(entityPollHighWaterId, batchSize));
   }
 
   private static boolean handleInterruptIfAny(Throwable e, String context) {
