@@ -339,7 +339,7 @@ public class TestManagedTableOperations {
   @Test
   public void testAlterTableDeleteAndRenameInOneRequest() {
     // Deleting a lower-position column shifts the columns after it, so renaming the last one in
-    // the same request used to re-insert it past the end of the list.
+    // the same request must not re-insert it past the end of the list.
     NameIdentifier lastIdent = createThreeColumnTable("rename_last");
     Table renamedLast =
         tableOperations.alterTable(
@@ -350,7 +350,7 @@ public class TestManagedTableOperations {
         new String[] {"col2", "col3_renamed"},
         Arrays.stream(renamedLast.columns()).map(Column::name).toArray(String[]::new));
 
-    // Renaming a column that is not last used to move it behind the columns that followed it.
+    // Renaming a column that is not last must not move it behind col3.
     NameIdentifier middleIdent = createThreeColumnTable("rename_middle");
     Table renamedMiddle =
         tableOperations.alterTable(

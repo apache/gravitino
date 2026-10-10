@@ -410,9 +410,9 @@ public abstract class ManagedTableOperations implements TableCatalog {
         if (newPosition.isPresent()) {
           newColumns.add(newColumn.position(), newColumn);
         } else {
-          // Stored positions go stale as sibling changes in the same alter add or
-          // remove columns, so without an explicit position change the column goes
-          // back to the list index it was removed from.
+          // Stored positions go stale as sibling changes in the same alter add,
+          // remove or move columns, so without an explicit position change the
+          // column goes back to the list index it was removed from.
           newColumns.add(removedIndex, newColumn);
         }
 
