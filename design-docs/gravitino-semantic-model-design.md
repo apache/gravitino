@@ -640,13 +640,13 @@ Semantic Models are new securable metadata objects. The design introduces:
 | Privilege               | Purpose                                           |
 |-------------------------|---------------------------------------------------|
 | `CREATE_SEMANTIC_MODEL` | Create a Semantic Model under a schema            |
-| `SELECT_SEMANTIC_MODEL` | Discover and load the model definition            |
+| `USE_SEMANTIC_MODEL` | Discover and load the model definition            |
 | `MODIFY_SEMANTIC_MODEL` | Rename or alter the model definition and metadata |
 
 - **Create.** A metalake or catalog owner may create directly; a schema owner also requires
   `USE_CATALOG`; otherwise, the caller requires `USE_CATALOG`, `USE_SCHEMA`, and
   `CREATE_SEMANTIC_MODEL`.
-- **List and load.** Return only models on which the caller has `SELECT_SEMANTIC_MODEL`,
+- **List and load.** Return only models on which the caller has `USE_SEMANTIC_MODEL`,
   `MODIFY_SEMANTIC_MODEL`, or ownership.
 - **Alter.** Requires `MODIFY_SEMANTIC_MODEL` or ownership.
 - **Drop.** A metalake or catalog owner may drop directly; a schema owner also requires
