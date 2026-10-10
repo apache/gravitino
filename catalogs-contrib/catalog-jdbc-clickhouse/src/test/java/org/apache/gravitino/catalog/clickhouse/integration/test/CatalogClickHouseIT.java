@@ -3769,8 +3769,8 @@ public class CatalogClickHouseIT extends BaseIT {
                 + "  `id` UInt64,\n"
                 + "  `token_text` String,\n"
                 + "  `ngram_text` String,\n"
-                + "  INDEX `idx_tokens` `token_text` TYPE full_text(0) GRANULARITY 1,\n"
-                + "  INDEX `idx_ngrams` `ngram_text` TYPE full_text(3) GRANULARITY 1\n"
+                + "  INDEX `idx_tokens` `token_text` TYPE text(tokenizer = 'default') GRANULARITY 1,\n"
+                + "  INDEX `idx_ngrams` `ngram_text` TYPE text(tokenizer = 'ngram', ngram_size = 3) GRANULARITY 1\n"
                 + ") ENGINE = MergeTree ORDER BY `id` COMMENT 'text index IT' "
                 + "SETTINGS allow_experimental_full_text_index = 1",
             schemaName, tableName));
