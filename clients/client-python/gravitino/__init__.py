@@ -16,6 +16,7 @@
 # under the License.
 
 import importlib
+from typing import TYPE_CHECKING
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.schema import Schema
@@ -27,6 +28,9 @@ from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.name_identifier import NameIdentifier
+
+if TYPE_CHECKING:
+    from gravitino.filesystem import gvfs
 
 
 def __getattr__(name):

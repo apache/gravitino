@@ -28,6 +28,13 @@ class TestPackageMetadata(unittest.TestCase):
     """Verify the built package separates core and optional dependencies."""
 
     def test_core_requirements_and_storage_extras(self):
+        metadata, source_files = self._read_package_metadata()
+
+        self._assert_core_requirements(metadata)
+        self._assert_source_manifest(source_files)
+        self._assert_storage_extras(metadata)
+
+    def _read_package_metadata(self):
         client_root = Path(__file__).resolve().parents[2]
         with tempfile.TemporaryDirectory() as egg_base:
             result = subprocess.run(
@@ -58,13 +65,12 @@ class TestPackageMetadata(unittest.TestCase):
                 .read_text(encoding="utf-8")
                 .splitlines()
             )
+        return metadata, source_files
 
+    def _assert_core_requirements(self, metadata):
         requirements = metadata.get_all("Requires-Dist", [])
-        extra_marker = "extra =="
         base_requirements = [
-            requirement
-            for requirement in requirements
-            if extra_marker not in requirement
+            requirement for requirement in requirements if "extra ==" not in requirement
         ]
         base_names = {
             re.split(r"[<>=!~; ]", requirement, maxsplit=1)[0]
@@ -73,7 +79,6 @@ class TestPackageMetadata(unittest.TestCase):
             .replace("_", "-")
             for requirement in base_requirements
         }
-
         self.assertIn("dataclasses-json", base_names)
         self.assertIn("simplejson", base_names)
         for optional_name in (
@@ -108,6 +113,7 @@ class TestPackageMetadata(unittest.TestCase):
             }.issubset(extras)
         )
 
+    def _assert_source_manifest(self, source_files):
         for requirements_file in (
             "requirements.txt",
             "requirements-dev.txt",
@@ -122,23 +128,9 @@ class TestPackageMetadata(unittest.TestCase):
             with self.subTest(source=requirements_file):
                 self.assertIn(requirements_file, source_files)
 
+    def _assert_storage_extras(self, metadata):
         shared_gvfs_requirements = {"cachetools", "fsspec", "readerwriterlock"}
-
-        def requirement_names_for_extra(extra_name):
-            extra_requirements = [
-                requirement
-                for requirement in requirements
-                if f'extra == "{extra_name}"' in requirement
-            ]
-            return {
-                re.split(r"[<>=!~; ]", requirement, maxsplit=1)[0]
-                .strip()
-                .lower()
-                .replace("_", "-")
-                for requirement in extra_requirements
-            }
-
-        gvfs_requirements = requirement_names_for_extra("gvfs")
+        gvfs_requirements = self._requirement_names_for_extra(metadata, "gvfs")
         self.assertTrue(shared_gvfs_requirements.issubset(gvfs_requirements))
         self.assertTrue(
             gvfs_requirements.isdisjoint({"pyarrow", "s3fs", "gcsfs", "ossfs", "adlfs"})
@@ -152,13 +144,30 @@ class TestPackageMetadata(unittest.TestCase):
             ("azure", "adlfs"),
         ):
             with self.subTest(extra=extra_name):
-                extra_requirements = requirement_names_for_extra(extra_name)
+                extra_requirements = self._requirement_names_for_extra(
+                    metadata, extra_name
+                )
                 self.assertTrue(shared_gvfs_requirements.issubset(extra_requirements))
                 self.assertIn(provider, extra_requirements)
 
-        storage_requirements = requirement_names_for_extra("storage")
+        storage_requirements = self._requirement_names_for_extra(metadata, "storage")
         self.assertTrue(
             shared_gvfs_requirements.union(
                 {"pyarrow", "s3fs", "gcsfs", "ossfs", "adlfs"}
             ).issubset(storage_requirements)
         )
+
+    @staticmethod
+    def _requirement_names_for_extra(metadata, extra_name):
+        extra_requirements = [
+            requirement
+            for requirement in metadata.get_all("Requires-Dist", [])
+            if f'extra == "{extra_name}"' in requirement
+        ]
+        return {
+            re.split(r"[<>=!~; ]", requirement, maxsplit=1)[0]
+            .strip()
+            .lower()
+            .replace("_", "-")
+            for requirement in extra_requirements
+        }
