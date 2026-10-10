@@ -40,6 +40,7 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+  testImplementation(project(":core", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))

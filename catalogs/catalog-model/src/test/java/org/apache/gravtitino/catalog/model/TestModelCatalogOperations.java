@@ -48,9 +48,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -86,6 +88,7 @@ import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -2071,6 +2074,75 @@ public class TestModelCatalogOperations {
 
   private String randomSchemaName() {
     return "schema_" + UUID.randomUUID().toString().replace("-", "");
+  }
+
+  @Test
+  public void testConcurrentLinkModelVersionAllocatesDistinctVersions() throws Exception {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, "model_race");
+    ops.registerModel(modelIdent, null, StringIdentifier.newPropertiesWithId(newStringId(), null));
+
+    AtomicInteger aliasSeq = new AtomicInteger();
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(
+            8,
+            () -> {
+              ops.linkModelVersion(
+                  modelIdent,
+                  ImmutableMap.of("n1", "u1"),
+                  new String[] {"alias_" + aliasSeq.getAndIncrement()},
+                  null,
+                  StringIdentifier.newPropertiesWithId(newStringId(), null));
+              return null;
+            });
+
+    outcomes.forEach(Assertions::assertNull);
+    int[] versions = ops.listModelVersions(modelIdent);
+    Arrays.sort(versions);
+    Assertions.assertArrayEquals(new int[] {0, 1, 2, 3, 4, 5, 6, 7}, versions);
+    Assertions.assertEquals(8, ops.getModel(modelIdent).latestVersion());
+    for (ModelVersion version : ops.listModelVersionInfos(modelIdent)) {
+      Assertions.assertEquals(1, version.aliases().length);
+      Assertions.assertEquals(
+          version.version(), ops.getModelVersion(modelIdent, version.aliases()[0]).version());
+    }
+  }
+
+  @Test
+  public void testConcurrentLinkModelVersionWithSameAliasHasOneWinner() throws Exception {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, "model_alias_race");
+    ops.registerModel(modelIdent, null, StringIdentifier.newPropertiesWithId(newStringId(), null));
+
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(
+            8,
+            () -> {
+              ops.linkModelVersion(
+                  modelIdent,
+                  ImmutableMap.of("n1", "u1"),
+                  new String[] {"prod"},
+                  null,
+                  StringIdentifier.newPropertiesWithId(newStringId(), null));
+              return "linked";
+            });
+
+    Assertions.assertEquals(1, outcomes.stream().filter("linked"::equals).count());
+    outcomes.stream()
+        .filter(o -> !"linked".equals(o))
+        .forEach(
+            o -> Assertions.assertInstanceOf(ModelVersionAliasesAlreadyExistException.class, o));
+    int[] versions = ops.listModelVersions(modelIdent);
+    Assertions.assertEquals(1, versions.length);
+    Assertions.assertEquals(versions[0], ops.getModelVersion(modelIdent, "prod").version());
+  }
+
+  private StringIdentifier newStringId() {
+    return StringIdentifier.fromId(idGenerator.nextId());
   }
 
   private void createSchema(String schemaName) {

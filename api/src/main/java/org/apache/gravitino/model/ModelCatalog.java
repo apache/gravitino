@@ -35,6 +35,11 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /**
  * The ModelCatalog interface defines the public API for managing model objects in a schema. If the
  * catalog implementation supports model objects, it should implement this interface.
+ *
+ * <p>Gravitino does not serialize calls to this interface: methods may be invoked concurrently,
+ * including for the same model, from one server or from several. An implementation must keep
+ * version numbers and aliases unique under concurrent calls itself, for example by enforcing them
+ * in its storage.
  */
 @Evolving
 public interface ModelCatalog {

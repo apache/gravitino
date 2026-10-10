@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -1862,6 +1863,93 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         () -> ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident));
 
     Assertions.assertFalse(ModelVersionMetaService.getInstance().deleteModelVersion(ident));
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelRereadsAfterConcurrentVersionChange() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
+    AtomicInteger reads = new AtomicInteger();
+
+    String result =
+        ModelVersionMetaService.getInstance()
+            .readWithStableModel(
+                version.modelIdentifier(),
+                modelPO -> {
+                  if (reads.incrementAndGet() == 1) {
+                    // A writer commits between the version-row and alias-row reads of the first
+                    // attempt, so that attempt may have combined two states.
+                    updateModelVersionUnchecked(
+                        version.nameIdentifier(), current -> copyModelVersion(current, "changed"));
+                    return "torn";
+                  }
+                  return "stable";
+                });
+
+    Assertions.assertEquals("stable", result);
+    Assertions.assertEquals(2, reads.get());
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelGivesUpWhenModelKeepsChanging() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("busy_read_alias");
+    AtomicInteger reads = new AtomicInteger();
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .readWithStableModel(
+                    version.modelIdentifier(),
+                    modelPO -> {
+                      updateModelVersionUnchecked(
+                          version.nameIdentifier(),
+                          current ->
+                              copyModelVersion(current, "change " + reads.incrementAndGet()));
+                      return null;
+                    }));
+    Assertions.assertEquals(ModelVersionMetaService.MAX_STABLE_READ_ATTEMPTS, reads.get());
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelReportsModelDroppedDuringRead() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("dropped_read_alias");
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .readWithStableModel(
+                    version.modelIdentifier(),
+                    modelPO -> {
+                      Assertions.assertTrue(
+                          ModelMetaService.getInstance().deleteModel(version.modelIdentifier()));
+                      return null;
+                    }));
+  }
+
+  private ModelVersionEntity insertModelWithVersion(String alias) throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path"),
+            ImmutableList.of(alias),
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+    return version;
   }
 
   private String randomModelName() {
