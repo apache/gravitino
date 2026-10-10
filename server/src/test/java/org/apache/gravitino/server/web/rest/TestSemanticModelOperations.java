@@ -25,9 +25,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -37,14 +39,21 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
@@ -61,10 +70,14 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.CustomExtension;
@@ -75,11 +88,13 @@ import org.apache.gravitino.semantic.Dialects;
 import org.apache.gravitino.semantic.Expression;
 import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
-import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -89,8 +104,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /** Tests Semantic Model REST lifecycle operations and their error mappings. */
 public class TestSemanticModelOperations extends BaseOperationsTest {
@@ -106,6 +125,10 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   private final SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+  private final TableDispatcher tables = mock(TableDispatcher.class);
+  private final ViewDispatcher views = mock(ViewDispatcher.class);
+  private boolean viewsSupported = true;
+  private GravitinoAuthorizer sourceAuthorizer = new PassThroughAuthorizer();
   private final String metalake = "semantic_model_metalake";
   private final String catalog = "semantic_model_catalog";
   private final String schema = "semantic_model_schema";
@@ -128,6 +151,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(SemanticModelDispatcher.class).ranked(2);
+            bind(new SemanticModelSourceValidator(
+                    tables, views, () -> sourceAuthorizer, ident -> viewsSupported))
+                .to(SemanticModelSourceValidator.class);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -136,8 +162,14 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   @BeforeEach
   void resetDispatcher() {
-    reset(dispatcher);
-    doCallRealMethod().when(dispatcher).importOssieDocument(any(), any());
+    reset(dispatcher, tables, views);
+    viewsSupported = true;
+    sourceAuthorizer = new PassThroughAuthorizer();
+    Table table = mock(Table.class);
+    Column column = mock(Column.class);
+    when(column.name()).thenReturn("order_id");
+    when(table.columns()).thenReturn(new Column[] {column});
+    when(tables.loadTable(any())).thenReturn(table);
     doCallRealMethod().when(dispatcher).exportOssieDocument(any(), any());
   }
 
@@ -166,6 +198,93 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testListSemanticModelsFiltersUnauthorizedEntries() throws IllegalAccessException {
+    NameIdentifier visible = semanticModelIdentifier("visible");
+    NameIdentifier hidden = semanticModelIdentifier("hidden");
+    NameIdentifier[] listed = {visible, hidden};
+    NameIdentifier[] filtered = {visible};
+    when(dispatcher.listSemanticModels(namespace)).thenReturn(listed);
+    SemanticModelOperations operations =
+        new SemanticModelOperations(
+            dispatcher,
+            new SemanticModelSourceValidator(tables, views, () -> sourceAuthorizer, ident -> true));
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    try (MockedStatic<MetadataAuthzHelper> helper = mockStatic(MetadataAuthzHelper.class)) {
+      helper
+          .when(
+              () ->
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants
+                          .FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                      EntityType.SEMANTIC_MODEL,
+                      listed))
+          .thenReturn(filtered);
+      Response response = operations.listSemanticModels(metalake, catalog, schema);
+      Assertions.assertEquals(200, response.getStatus());
+      Assertions.assertArrayEquals(
+          filtered, ((EntityListResponse) response.getEntity()).identifiers());
+      helper.verify(
+          () ->
+              MetadataAuthzHelper.filterByExpression(
+                  metalake,
+                  AuthorizationExpressionConstants.FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                  EntityType.SEMANTIC_MODEL,
+                  listed));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "denied", "connection", "column"})
+  void testOssieImportValidatesSourcesBeforePersistence(String failure) {
+    String yaml =
+        "version: 0.2.0.dev0\nname: sales\ndatasets:\n"
+            + "  - name: orders\n    source: catalog.schema.orders\n    primary_key: [order_id]\n";
+    Response.Status status = Response.Status.BAD_REQUEST;
+    int code = ErrorConstants.ILLEGAL_ARGUMENTS_CODE;
+    Class<? extends Exception> type = IllegalSemanticModelException.class;
+    String message = "does not exist";
+    switch (failure) {
+      case "missing":
+        viewsSupported = false;
+        when(tables.loadTable(any())).thenThrow(new NoSuchTableException("missing"));
+        break;
+      case "denied":
+        sourceAuthorizer = mock(GravitinoAuthorizer.class);
+        status = Response.Status.FORBIDDEN;
+        code = ErrorConstants.FORBIDDEN_CODE;
+        type = ForbiddenException.class;
+        message = "Not authorized";
+        break;
+      case "connection":
+        when(tables.loadTable(any())).thenThrow(new ConnectionFailedException("offline"));
+        status = Response.Status.BAD_GATEWAY;
+        code = ErrorConstants.CONNECTION_FAILED_CODE;
+        type = ConnectionFailedException.class;
+        message = "offline";
+        break;
+      case "column":
+        Table table = mock(Table.class);
+        when(table.columns()).thenReturn(new Column[0]);
+        when(tables.loadTable(any())).thenReturn(table);
+        message = "order_id";
+        break;
+      default:
+        throw new AssertionError(failure);
+    }
+    assertError(
+        postDocument(semanticModelPath() + "/ossie", yaml, "application/yaml"),
+        status,
+        code,
+        type.getSimpleName(),
+        message);
+    verifyNoInteractions(dispatcher, views);
+    if (failure.equals("denied")) {
+      verifyNoInteractions(tables);
+    }
+  }
+
+  @Test
   void testLoadSemanticModelReturnsCompleteDefinitionWithoutWrites() {
     NameIdentifier ident = semanticModelIdentifier("sales");
     SemanticModel semanticModel = semanticModel("sales", "Sales definitions");
@@ -178,6 +297,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     body.validate();
     Assertions.assertEquals("sales", body.getSemanticModel().name());
     Assertions.assertEquals("Sales definitions", body.getSemanticModel().comment());
+    verifyNoInteractions(tables, views);
     Assertions.assertEquals(semanticModel.definition(), body.getSemanticModel().definition());
     Assertions.assertEquals("orders", body.getSemanticModel().definition().datasets()[0].name());
     Assertions.assertEquals(
@@ -544,6 +664,175 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testSourceValidationRunsWithAuthorizationDisabled(boolean replaceDefinition) {
+    when(tables.loadTable(any())).thenThrow(new NoSuchTableException("missing table"));
+    when(views.loadView(any())).thenThrow(new NoSuchViewException("missing view"));
+    assertError(
+        writeDefinition(replaceDefinition, semanticModelDefinition()),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalSemanticModelException.class.getSimpleName(),
+        "does not exist");
+    verifyNoInteractions(dispatcher);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void testMissingSourceWithoutViewSupport(
+      boolean replaceDefinition, boolean authorizationEnabled) {
+    viewsSupported = false;
+    if (authorizationEnabled) {
+      sourceAuthorizer = mock(GravitinoAuthorizer.class);
+      when(sourceAuthorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+    }
+    when(tables.loadTable(any())).thenThrow(new NoSuchTableException("missing table"));
+    when(views.loadView(any()))
+        .thenThrow(new UnsupportedOperationException("Catalog does not support view operations"));
+    assertError(
+        writeDefinition(replaceDefinition, semanticModelDefinition()),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalSemanticModelException.class.getSimpleName(),
+        "does not exist");
+    verifyNoInteractions(dispatcher, views);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMissingColumnWithAuthorizationDisabled(boolean replaceDefinition) {
+    Table table = mock(Table.class);
+    when(table.columns()).thenReturn(new Column[0]);
+    when(tables.loadTable(any())).thenReturn(table);
+    assertError(
+        writeDefinition(replaceDefinition, semanticModelDefinition()),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalSemanticModelException.class.getSimpleName(),
+        "order_id");
+    verifyNoInteractions(dispatcher);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDeniedSourceIsNotResolvedOrPersisted(boolean replaceDefinition) {
+    sourceAuthorizer = mock(GravitinoAuthorizer.class);
+    assertError(
+        writeDefinition(replaceDefinition, semanticModelDefinition()),
+        Response.Status.FORBIDDEN,
+        ErrorConstants.FORBIDDEN_CODE,
+        ForbiddenException.class.getSimpleName(),
+        "Not authorized");
+    verifyNoInteractions(tables, views, dispatcher);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testSourceConnectionFailureIsBadGateway(boolean replaceDefinition) {
+    when(tables.loadTable(any())).thenThrow(new ConnectionFailedException("source unavailable"));
+    assertError(
+        writeDefinition(replaceDefinition, semanticModelDefinition()),
+        Response.Status.BAD_GATEWAY,
+        ErrorConstants.CONNECTION_FAILED_CODE,
+        ConnectionFailedException.class.getSimpleName(),
+        "source unavailable");
+    verifyNoInteractions(views, dispatcher);
+  }
+
+  @ParameterizedTest
+  @MethodSource("whitespaceSources")
+  void testWhitespaceSourceValidation(
+      int segment, boolean replaceDefinition, boolean authorizationEnabled, boolean sourceExists) {
+    if (authorizationEnabled) {
+      sourceAuthorizer = mock(GravitinoAuthorizer.class);
+      when(sourceAuthorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+    }
+    String[] parts = {catalog, schema, "orders"};
+    parts[segment] = "   ";
+    NameIdentifier source = NameIdentifier.of(parts);
+    NameIdentifier fullSource = NameIdentifier.of(metalake, parts[0], parts[1], parts[2]);
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder()
+            .withDatasets(
+                new Dataset[] {
+                  Dataset.builder()
+                      .withName("orders")
+                      .withSource(source)
+                      .withPrimaryKey(new String[] {"order_id"})
+                      .build()
+                })
+            .build();
+    if (!sourceExists) {
+      when(tables.loadTable(fullSource)).thenThrow(new NoSuchTableException("missing table"));
+      when(views.loadView(fullSource)).thenThrow(new NoSuchViewException("missing view"));
+    }
+    when(dispatcher.createSemanticModel(any(), any(), any(), any()))
+        .thenReturn(semanticModel("sales", null));
+    when(dispatcher.alterSemanticModel(any(), any(SemanticModelChange[].class)))
+        .thenReturn(semanticModel("sales", null));
+    Response response = writeDefinition(replaceDefinition, definition);
+    if (segment == 0) {
+      assertError(
+          response,
+          Response.Status.BAD_REQUEST,
+          ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+          IllegalArgumentException.class.getSimpleName(),
+          "Metadata object full name cannot be blank");
+      verifyNoInteractions(tables, views, dispatcher);
+      return;
+    }
+    if (sourceExists) {
+      // Characterize existing behavior: resolvable names are not rejected solely for whitespace.
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+      if (replaceDefinition) {
+        verify(dispatcher).alterSemanticModel(any(), any(SemanticModelChange[].class));
+      } else {
+        verify(dispatcher).createSemanticModel(any(), any(), eq(definition), any());
+      }
+      verifyNoInteractions(views);
+    } else {
+      assertError(
+          response,
+          Response.Status.BAD_REQUEST,
+          ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+          IllegalSemanticModelException.class.getSimpleName(),
+          "does not exist");
+      verify(views).loadView(fullSource);
+      verifyNoInteractions(dispatcher);
+    }
+    verify(tables).loadTable(fullSource);
+  }
+
+  private static Stream<Arguments> whitespaceSources() {
+    return IntStream.range(0, 3)
+        .boxed()
+        .flatMap(
+            segment ->
+                Stream.of(false, true)
+                    .flatMap(
+                        replace ->
+                            Stream.of(false, true)
+                                .flatMap(
+                                    authorized ->
+                                        Stream.of(false, true)
+                                            .map(
+                                                exists ->
+                                                    Arguments.of(
+                                                        segment, replace, authorized, exists)))));
+  }
+
+  private Response writeDefinition(boolean replaceDefinition, SemanticModelDefinition definition) {
+    return replaceDefinition
+        ? put(
+            semanticModelPath() + "/sales",
+            new SemanticModelUpdatesRequest(
+                List.of(
+                    new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+                        SemanticModelDefinitionDTO.fromDefinition(definition)))))
+        : post(semanticModelPath(), createRequest("sales", null, definition));
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"application/json", "application/json; charset=UTF-8"})
   void testImportOssieYamlAndJsonDocuments(String jsonMediaType) {
     NameIdentifier salesIdent = semanticModelIdentifier("sales");
@@ -609,8 +898,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     jsonBody.validate();
     Assertions.assertEquals("inventory", jsonBody.getSemanticModel().name());
 
-    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
-    verify(dispatcher).importOssieDocument(namespace, OssieDocument.json(json));
     ArgumentCaptor<SemanticModelDefinition> definitionCaptor =
         ArgumentCaptor.forClass(SemanticModelDefinition.class);
     verify(dispatcher)
@@ -660,7 +947,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     SemanticModelResponse body = response.readEntity(SemanticModelResponse.class);
     body.validate();
     Assertions.assertEquals("marketing", body.getSemanticModel().name());
-    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
     verify(dispatcher)
         .createSemanticModel(
             eq(ident),
@@ -730,7 +1016,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalSemanticModelException.class.getSimpleName(),
         "query sources are not supported");
-    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(querySource));
 
     assertError(
         target(semanticModelPath() + "/sales/ossie").queryParam("format", "csv").request().get(),
@@ -767,7 +1052,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalSemanticModelException.class.getSimpleName(),
         "Cannot parse Apache Ossie JSON");
-    verify(dispatcher).importOssieDocument(namespace, OssieDocument.json(yaml));
     verifyNoMoreInteractions(dispatcher);
   }
 
