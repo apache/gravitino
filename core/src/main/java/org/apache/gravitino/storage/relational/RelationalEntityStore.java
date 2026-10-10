@@ -59,7 +59,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,6 +231,11 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     invalidateCache(ident, entityType);
+    if (!ident.equals(updatedEntity.nameIdentifier())) {
+      // A rename frees the old name and takes the new one. The new name may still be cached for an
+      // entity that another server has since removed, so drop that entry as well.
+      invalidateCache(updatedEntity.nameIdentifier(), entityType);
+    }
     return updatedEntity;
   }
 
@@ -325,11 +329,6 @@ public class RelationalEntityStore
     } finally {
       invalidateCache(ident, entityType);
     }
-  }
-
-  @Override
-  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) {
-    throw new UnsupportedOperationException("Unsupported operation in relational entity store.");
   }
 
   @Override

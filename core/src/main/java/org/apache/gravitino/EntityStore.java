@@ -29,8 +29,71 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.utils.Executable;
 
+/**
+ * Stores Gravitino metadata entities.
+ *
+ * <p>Several Gravitino servers may share one store, so every guarantee below also holds between
+ * servers, not only between threads of one server.
+ *
+ * <h2>Writes</h2>
+ *
+ * <ul>
+ *   <li>Each write ({@link #put}, {@link #update}, {@link #delete}, {@link #deleteAndGet}, {@link
+ *       #batchPut} and {@link #batchDelete}) is atomic: it takes effect completely, including the
+ *       data the entity owns such as columns and versions, or not at all. Relations that point at a
+ *       deleted entity are covered only where {@link #delete(NameIdentifier, EntityType, boolean)}
+ *       says so.
+ *   <li>Concurrent writes to the same entity are resolved optimistically. The write that loses
+ *       fails with {@link OptimisticLockException} and changes nothing. A write that creates an
+ *       entity does not lose to a concurrent write this way; a concurrent create of the same name
+ *       fails with {@link EntityAlreadyExistsException} instead.
+ *   <li>The store never retries a failed write. The caller decides whether to read the current
+ *       state and try again, or to report the conflict.
+ * </ul>
+ *
+ * <h2>Outcomes</h2>
+ *
+ * <table border="1">
+ *   <caption>Result of each operation in each situation</caption>
+ *   <tr><th>Situation</th><th>Result</th></tr>
+ *   <tr><td>The entity does not exist</td>
+ *       <td>{@link #get} and {@link #update} throw {@link NoSuchEntityException}; {@link #delete}
+ *       returns {@code false}; {@link #deleteAndGet} returns an empty result; {@link #exists}
+ *       returns {@code false}; {@link #batchGet} leaves it out of the result.</td></tr>
+ *   <tr><td>The parent of a new entity, or another entity it refers to, does not exist</td>
+ *       <td>{@link #put} throws {@link NoSuchEntityException}.</td></tr>
+ *   <tr><td>The name is already taken</td>
+ *       <td>{@link #put} without overwrite and a renaming {@link #update} throw {@link
+ *       EntityAlreadyExistsException}.</td></tr>
+ *   <tr><td>A concurrent write to the entity won</td>
+ *       <td>{@link #update}, {@link #delete} and {@link #deleteAndGet} throw {@link
+ *       OptimisticLockException}. If that write deleted or renamed the entity, the result is the
+ *       one for an entity that does not exist instead.</td></tr>
+ *   <tr><td>A delete finds children that block it</td>
+ *       <td>{@link #delete} throws {@link NonEmptyEntityException}: a non-cascade delete of a
+ *       metalake, catalog or schema with children, or any delete of a job template with unfinished
+ *       jobs.</td></tr>
+ *   <tr><td>The store cannot hold the entity type</td>
+ *       <td>The operation throws {@link UnsupportedEntityTypeException}; {@link #batchPut} and
+ *       {@link #batchDelete} throw {@link IllegalArgumentException}.</td></tr>
+ *   <tr><td>The storage itself fails</td>
+ *       <td>The operation throws {@link IOException} or a runtime exception; callers must handle
+ *       both.</td></tr>
+ * </table>
+ *
+ * <h2>Reads</h2>
+ *
+ * <p>{@link #get}, {@link #batchGet} and {@link #exists} may be answered from a per-server cache.
+ * Changes made on this server are visible to its next read, but changes made on another server
+ * reach the cache only after a delay. Such a read can therefore return an entity that another
+ * server has already changed or deleted, and {@link #exists} can return {@code true} for it. A
+ * {@code false} from {@link #exists} and every {@link #list} read the storage. Writes always act on
+ * the stored entity, never on a cached copy.
+ */
 public interface EntityStore extends Closeable {
 
   /**
@@ -46,7 +109,8 @@ public interface EntityStore extends Closeable {
 
   /**
    * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
-   * deserialize them into the specified {@link Entity} object.
+   * deserialize them into the specified {@link Entity} object. This is the same as {@link
+   * #list(Namespace, Class, EntityType, boolean)} with {@code allFields} set to {@code false}.
    *
    * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
    * may not be consistent.
@@ -60,7 +124,7 @@ public interface EntityStore extends Closeable {
    */
   default <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
-    return list(namespace, type, entityType, true /* allFields */);
+    return list(namespace, type, entityType, false /* allFields */);
   }
 
   /**
@@ -77,7 +141,9 @@ public interface EntityStore extends Closeable {
    * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provides
    *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
    *     true, the method will fetch all the fields, Otherwise, the method will fetch all the fields
-   *     except for high-cost fields.
+   *     except for high-cost fields. An implementation that cannot skip fields should treat {@code
+   *     false} like {@code true} instead of failing, because {@link #list(Namespace, Class,
+   *     EntityType)} passes {@code false}.
    * @return the list of entities
    * @throws IOException if the list operation fails
    */
@@ -90,6 +156,9 @@ public interface EntityStore extends Closeable {
   /**
    * Check if the entity with the specified {@link org.apache.gravitino.NameIdentifier} exists.
    *
+   * <p>A {@code true} result may come from the cache and be stale; a {@code false} result reflects
+   * the storage. See the class documentation.
+   *
    * @param ident the name identifier of the entity
    * @param entityType the general type of the entity,
    * @return true if the entity exists, false otherwise
@@ -98,12 +167,15 @@ public interface EntityStore extends Closeable {
   boolean exists(NameIdentifier ident, EntityType entityType) throws IOException;
 
   /**
-   * Store the entity into the underlying storage. If the entity already exists, it will overwrite
-   * the existing entity.
+   * Store a new entity into the underlying storage. This is the same as {@link #put(Entity,
+   * boolean)} without overwrite: it fails if an entity with the same name already exists.
    *
    * @param e the entity to store
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
+   * @throws EntityAlreadyExistsException if an entity with the same name already exists
+   * @throws NoSuchEntityException if the parent of the entity, or another entity it refers to, does
+   *     not exist
    */
   default <E extends Entity & HasIdentifier> void put(E e) throws IOException {
     put(e, false);
@@ -113,8 +185,10 @@ public interface EntityStore extends Closeable {
    * Store the entity into the underlying storage. According to the {@code overwritten} flag, it
    * will overwrite the existing entity or throw an {@link EntityAlreadyExistsException}.
    *
-   * <p>Note. The implementation should be transactional, and should be able to handle concurrent
-   * store of entities.
+   * <p>Without overwrite, the insert is atomic with respect to other inserts: of several concurrent
+   * inserts of the same name, exactly one succeeds. With overwrite, whether the stored entity keeps
+   * the id of the entity it replaces depends on the implementation; callers must not rely on
+   * either. A model version is always inserted as a new version, and the flag is ignored.
    *
    * @param e the entity to store
    * @param overwritten whether to overwrite the existing entity
@@ -122,6 +196,8 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     set to false
+   * @throws NoSuchEntityException if the parent of the entity, or another entity it refers to, does
+   *     not exist
    */
   <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
@@ -129,14 +205,19 @@ public interface EntityStore extends Closeable {
   /**
    * Update the entity into the underlying storage.
    *
-   * <p>Note: the {@link org.apache.gravitino.NameIdentifier} of the updated entity may be changed.
-   * Based on the design of the storage key, the implementation may have two implementations.
+   * <p>The store reads the entity from the storage, not from the cache, and calls {@code updater}
+   * exactly once with it. The updater returns the new state of the entity; throwing from it aborts
+   * the update with nothing written. The updater runs before the write is known to succeed, so it
+   * must not have effects outside the returned entity. If another write to the entity commits
+   * between the read and this write, the update fails with {@link OptimisticLockException}, or with
+   * {@link NoSuchEntityException} if that write deleted or renamed the entity.
    *
-   * <p>1) if the storage key is name relevant, it needs to delete the old entity and store the new
-   * entity with the new key. 2) or if the storage key is name irrelevant, it can just store the new
-   * entity with the current key.
-   *
-   * <p>Note: the whole update operation should be in one transaction.
+   * <p>For an entity type that supports renaming, the updater may change the name, which renames
+   * the entity; the new name must be free. Whether a type supports renaming is decided by the
+   * implementation; a model version, for example, cannot be renamed. The updater must not change
+   * the id, and an implementation rejects such an update with {@link IllegalArgumentException}.
+   * After a rename, neither the old nor the new name is served from a stale cache entry on this
+   * server; other servers follow after the delay described in the class documentation.
    *
    * @param ident the name identifier of the entity
    * @param type the detailed type of the entity
@@ -145,8 +226,10 @@ public interface EntityStore extends Closeable {
    * @param entityType the general type of the entity
    * @return E the updated entity
    * @throws IOException if the store operation fails
-   * @throws NoSuchEntityException if the entity does not exist
-   * @throws EntityAlreadyExistsException if the updated entity already existed.
+   * @throws NoSuchEntityException if the entity does not exist, or a concurrent write deleted or
+   *     renamed it
+   * @throws EntityAlreadyExistsException if the entity is renamed to a name that is already taken
+   * @throws OptimisticLockException if a concurrent write to the entity committed first
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
@@ -155,8 +238,8 @@ public interface EntityStore extends Closeable {
   /**
    * Get the entity from the underlying storage.
    *
-   * <p>Note. The implementation should be thread-safe, and should be able to handle concurrent
-   * retrieve of entities.
+   * <p>The result may come from the cache and not yet reflect a change made on another server. See
+   * the class documentation.
    *
    * @param ident the unique identifier of the entity
    * @param entityType the general type of the entity
@@ -170,27 +253,43 @@ public interface EntityStore extends Closeable {
       throws NoSuchEntityException, IOException;
 
   /**
-   * Batch get the entity from the underlying storage.
+   * Batch get the entities from the underlying storage. All identifiers must be in the same
+   * namespace; an implementation may reject a mixed list, but is not required to when it can answer
+   * from its cache.
    *
-   * @param idents the unique identifier of the entity
-   * @param entityType the general type of the entity
+   * <p>An identifier with no entity is left out of the result instead of failing the call, so the
+   * result may be shorter than {@code idents}; a failure to read the storage is thrown. The order
+   * of the result is unspecified. Like {@link #get}, entities may come from the cache.
+   *
+   * @param idents the unique identifiers of the entities
+   * @param entityType the general type of the entities
    * @param clazz the entity class instance
    * @param <E> the class of entity
-   * @return the entity retrieved from the underlying storage
-   * @throws NoSuchEntityException if the entity does not exist
+   * @return the entities that exist, in unspecified order
+   * @throws UnsupportedEntityTypeException if the store cannot batch get this entity type
+   * @throws IllegalArgumentException if the identifiers are not all in the same namespace and the
+   *     implementation rejects the list
    */
   <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> idents, EntityType entityType, Class<E> clazz);
 
   /**
-   * Batch get the entity from the underlying storage.
+   * Batch get the entities from the underlying storage. All identifiers must be in the same
+   * namespace; an implementation may reject a mixed list, but is not required to when it can answer
+   * from its cache.
    *
-   * @param idents the unique identifier of the entity
-   * @param entityType the general type of the entity
+   * <p>An identifier with no entity is left out of the result instead of failing the call, so the
+   * result may be shorter than {@code idents}; a failure to read the storage is thrown. The order
+   * of the result is unspecified. Like {@link #get}, entities may come from the cache.
+   *
+   * @param idents the unique identifiers of the entities
+   * @param entityType the general type of the entities
    * @param clazz the entity class instance
    * @param <E> the class of entity
-   * @return the entity retrieved from the underlying storage
-   * @throws NoSuchEntityException if the entity does not exist
+   * @return the entities that exist, in unspecified order
+   * @throws UnsupportedEntityTypeException if the store cannot batch get this entity type
+   * @throws IllegalArgumentException if the identifiers are not all in the same namespace and the
+   *     implementation rejects the list
    */
   default <E extends Entity & HasIdentifier> E[] batchGet(
       NameIdentifier[] idents, EntityType entityType, Class<E> clazz) {
@@ -200,11 +299,12 @@ public interface EntityStore extends Closeable {
 
   /**
    * Delete the entity from the underlying storage by the specified {@link
-   * org.apache.gravitino.NameIdentifier}.
+   * org.apache.gravitino.NameIdentifier}. This is the same as {@link #delete(NameIdentifier,
+   * EntityType, boolean)} without cascade.
    *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
-   * @return true if the entity exists and is deleted successfully, false otherwise
+   * @return true if the entity exists and is deleted successfully, false if it does not exist
    * @throws IOException if the delete operation fails
    */
   default boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
@@ -215,11 +315,27 @@ public interface EntityStore extends Closeable {
    * Delete the entity from the underlying storage by the specified {@link
    * org.apache.gravitino.NameIdentifier}.
    *
+   * <p>A missing entity is reported by returning {@code false}, never by throwing {@link
+   * NoSuchEntityException}. Deleting an entity also deletes the data it owns, such as columns and
+   * versions. Relations that point at the entity, such as tags, policies, owners and privileges,
+   * are removed in the same write for most entity types, but not for all of them: the owners of
+   * jobs and job templates, for example, are left for a background cleanup to remove later. A
+   * caller must not rely on those relations being gone when this method returns.
+   *
+   * <p>{@code cascade} applies to entities that contain other entities: a metalake (catalogs), a
+   * catalog (schemas) and a schema (tables, views, filesets, topics, functions, models, semantic
+   * models and nested schemas). Without cascade, deleting such an entity while it still has
+   * children fails with {@link NonEmptyEntityException}; with cascade, the children are deleted
+   * too. For every other entity type the flag has no effect. Independently of {@code cascade}, a
+   * job template that still has unfinished jobs cannot be deleted.
+   *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
-   * @param cascade support cascade delete or not
-   * @return true if the entity exists and is deleted successfully, false otherwise
+   * @param cascade whether to delete the children of a metalake, catalog or schema
+   * @return true if the entity exists and is deleted successfully, false if it does not exist
    * @throws IOException if the delete operation fails
+   * @throws NonEmptyEntityException if the entity has children that block the delete, see above
+   * @throws OptimisticLockException if a concurrent write to the entity committed first
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
@@ -245,10 +361,10 @@ public interface EntityStore extends Closeable {
   /**
    * Deletes an entity and returns the snapshot chosen by the delete operation.
    *
-   * <p>The default implementation is intended for stores that serialize operations through {@link
-   * #executeInTransaction(Executable)}. Stores that can read and delete with one native
-   * compare-and-set should override this method so the returned snapshot is exactly the one that
-   * was deleted.
+   * <p>The default implementation reads the entity and then deletes it, so the returned snapshot
+   * may differ from the entity that was deleted if a concurrent write lands in between. Stores that
+   * can read and delete in one atomic step should override this method so the returned snapshot is
+   * exactly the one that was deleted.
    *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity
@@ -304,10 +420,14 @@ public interface EntityStore extends Closeable {
    * Batch delete entities from the underlying storage by the specified list of {@link
    * org.apache.gravitino.NameIdentifier} and {@link EntityType}.
    *
+   * <p>Only some entity types support batch deletion, and all entities must have the same type.
+   *
    * @param entitiesToDelete the list of pairs of name identifiers and entity types to be deleted
    * @param cascade if true, cascade delete the entities, otherwise just delete the entities
    * @return the number of entities deleted
    * @throws IOException if the batch delete operation fails
+   * @throws IllegalArgumentException if the entity type or the combination of arguments is not
+   *     supported
    */
   int batchDelete(List<Pair<NameIdentifier, EntityType>> entitiesToDelete, boolean cascade)
       throws IOException;
@@ -315,12 +435,17 @@ public interface EntityStore extends Closeable {
   /**
    * Batch put entities into the underlying storage.
    *
+   * <p>Only some entity types support batch insertion, and all entities must have the same type.
+   *
    * @param entities the list of entities to be stored
-   * @param overwritten if true, overwrite the existing entities, otherwise throw an
+   * @param overwritten if true, overwrite the existing entities, otherwise throw an {@link
+   *     EntityAlreadyExistsException}
    * @param <E> the type of the entities
    * @throws IOException if the batch put operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     false
+   * @throws IllegalArgumentException if the entity type or the combination of arguments is not
+   *     supported
    */
   <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
@@ -334,9 +459,19 @@ public interface EntityStore extends Closeable {
    * @return the return value of the executable
    * @throws IOException if the execution fails
    * @throws E if the execution fails
+   * @throws UnsupportedOperationException unless an implementation overrides this method
+   * @deprecated The store does not support transactions composed by the caller: each write method
+   *     is atomic on its own (see the class documentation), and the relational store never
+   *     implemented this method. Atomicity across several entities is tracked in <a
+   *     href="https://github.com/apache/gravitino/issues/13632">#13632</a>. This method will be
+   *     removed in a future release.
    */
-  <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException;
+  @Deprecated
+  default <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+      throws E, IOException {
+    throw new UnsupportedOperationException(
+        "The entity store does not support transactions composed by the caller");
+  }
 
   /**
    * Get the extra relation operations that are supported by the entity store.

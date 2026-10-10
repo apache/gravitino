@@ -290,8 +290,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
                 metalake, catalogName, tableIdentifier, HierarchicalSchemaUtil.schemaSeparator()),
             Entity.EntityType.TABLE);
       }
-    } catch (NoSuchEntityException ignore) {
-      // Ignore if the table entity does not exist.
     } catch (IOException ioe) {
       throw new RuntimeException("io exception when deleting table entity", ioe);
     }

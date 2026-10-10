@@ -467,8 +467,8 @@ public class TestManagedSemanticModelOperations {
                     operations.alterSemanticModel(IDENT, SemanticModelChange.removeProperty("key")))
             .getCause());
 
-    when(store.delete(IDENT, Entity.EntityType.SEMANTIC_MODEL))
-        .thenThrow(new NoSuchEntityException("Missing model"));
+    // The store reports a missing entity by returning false, not by throwing.
+    when(store.delete(IDENT, Entity.EntityType.SEMANTIC_MODEL)).thenReturn(false);
     assertFalse(operations.dropSemanticModel(IDENT));
     IOException dropFailure = new IOException("Drop failed");
     doThrow(dropFailure).when(store).delete(IDENT, Entity.EntityType.SEMANTIC_MODEL);

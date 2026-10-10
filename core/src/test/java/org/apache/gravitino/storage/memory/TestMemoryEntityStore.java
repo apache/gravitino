@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -103,7 +104,7 @@ public class TestMemoryEntityStore {
       if (overwritten) {
         entityMap.put(ident, e);
       } else {
-        executeInTransaction(
+        runAtomically(
             () -> {
               if (exists(e.nameIdentifier(), e.type())) {
                 throw new EntityAlreadyExistsException("Entity %s already exists", ident);
@@ -118,7 +119,7 @@ public class TestMemoryEntityStore {
     public <E extends Entity & HasIdentifier> E update(
         NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
         throws IOException, NoSuchEntityException {
-      return executeInTransaction(
+      return runAtomically(
           () -> {
             E e = (E) entityMap.get(ident);
             if (e == null) {
@@ -151,7 +152,11 @@ public class TestMemoryEntityStore {
     @Override
     public <E extends Entity & HasIdentifier> List<E> batchGet(
         List<NameIdentifier> idents, EntityType entityType, Class<E> e) {
-      return idents.stream().map(ident -> (E) entityMap.get(ident)).toList();
+      // Like the relational store, leave out identifiers that have no entity.
+      return idents.stream()
+          .map(ident -> (E) entityMap.get(ident))
+          .filter(Objects::nonNull)
+          .toList();
     }
 
     @Override
@@ -174,8 +179,8 @@ public class TestMemoryEntityStore {
       return prev != null;
     }
 
-    @Override
-    public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+    /** Runs the executable under the store lock and restores the entities if it fails. */
+    private <R, E extends Exception> R runAtomically(Executable<R, E> executable)
         throws E, IOException {
       lock.lock();
       Map<NameIdentifier, Entity> snapshot = createSnapshot();
