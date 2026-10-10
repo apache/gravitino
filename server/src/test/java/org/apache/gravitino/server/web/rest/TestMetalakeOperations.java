@@ -25,19 +25,24 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -47,9 +52,16 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.MetalakeChange;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -67,11 +79,14 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
+import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
@@ -115,6 +130,7 @@ public class TestMetalakeOperations extends BaseOperationsTest {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(MetalakeOperations.class);
+    resourceConfig.register(ObjectMapperProvider.class).register(JacksonFeature.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -184,6 +200,139 @@ public class TestMetalakeOperations extends BaseOperationsTest {
     Assertions.assertEquals(2, metalakes.length);
     Assertions.assertEquals(metalakeName, metalakes[0].name());
     Assertions.assertEquals(metalakeName, metalakes[1].name());
+  }
+
+  @Test
+  public void testListMetalakesIncludesOwner()
+      throws IllegalAccessException, JsonProcessingException {
+    OwnerDispatcher previousOwners = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", owners, true);
+    try {
+      when(metalakeManager.listMetalakes())
+          .thenReturn(
+              new BaseMetalake[] {
+                newBaseMetalake("lake0", 1L),
+                newBaseMetalake("lake1", 2L),
+                newBaseMetalake("lake2", 3L)
+              });
+      when(owners.getOwner(
+              "lake0", MetadataObjects.of(null, "lake0", MetadataObject.Type.METALAKE)))
+          .thenReturn(
+              Optional.of(OwnerDTO.builder().withName("alice").withType(Owner.Type.USER).build()));
+      when(owners.getOwner(
+              "lake1", MetadataObjects.of(null, "lake1", MetadataObject.Type.METALAKE)))
+          .thenReturn(
+              Optional.of(
+                  OwnerDTO.builder().withName("admins").withType(Owner.Type.GROUP).build()));
+      when(owners.getOwner(
+              "lake2", MetadataObjects.of(null, "lake2", MetadataObject.Type.METALAKE)))
+          .thenReturn(Optional.empty());
+
+      try (Response response = target("/metalakes").request().get()) {
+        Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        JsonNode entries =
+            ObjectMapperProvider.objectMapper()
+                .readTree(response.readEntity(String.class))
+                .get("metalakes");
+
+        Assertions.assertEquals(3, entries.size());
+        Assertions.assertEquals("lake0", entries.get(0).get("name").asText());
+        // Enum values are serialized in lower case, e.g. "user" and "group".
+        Assertions.assertEquals("alice", entries.get(0).get("owner").get("name").asText());
+        Assertions.assertEquals("user", entries.get(0).get("owner").get("type").asText());
+        Assertions.assertEquals("admins", entries.get(1).get("owner").get("name").asText());
+        Assertions.assertEquals("group", entries.get(1).get("owner").get("type").asText());
+        // An unassigned owner is returned explicitly as null.
+        Assertions.assertTrue(entries.get(2).has("owner"));
+        Assertions.assertTrue(entries.get(2).get("owner").isNull());
+      }
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", previousOwners, true);
+    }
+  }
+
+  @Test
+  public void testListMetalakesOwnerIsNullWithoutAuthorization()
+      throws IllegalAccessException, JsonProcessingException {
+    OwnerDispatcher previousOwners = GravitinoEnv.getInstance().ownerDispatcher();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    try {
+      when(metalakeManager.listMetalakes())
+          .thenReturn(new BaseMetalake[] {newBaseMetalake("lake", 1L)});
+
+      try (Response response = target("/metalakes").request().get()) {
+        Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        JsonNode entry =
+            ObjectMapperProvider.objectMapper()
+                .readTree(response.readEntity(String.class))
+                .get("metalakes")
+                .get(0);
+
+        Assertions.assertEquals("lake", entry.get("name").asText());
+        Assertions.assertTrue(entry.has("owner"));
+        Assertions.assertTrue(entry.get("owner").isNull());
+      }
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", previousOwners, true);
+    }
+  }
+
+  @Test
+  public void testListMetalakesResolvesOwnerOnlyForVisibleMetalakes()
+      throws IllegalAccessException, JsonProcessingException {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Config config = env.config();
+    GravitinoAuthorizerProvider authorizerProvider = GravitinoAuthorizerProvider.getInstance();
+    GravitinoAuthorizer previousAuthorizer = authorizerProvider.getGravitinoAuthorizer();
+    OwnerDispatcher previousOwners = env.ownerDispatcher();
+
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.isMetalakeUser(eq("visible"), any())).thenReturn(true);
+    when(authorizer.isMetalakeUser(eq("hidden"), any())).thenReturn(false);
+    FieldUtils.writeField(env, "ownerDispatcher", owners, true);
+    FieldUtils.writeField(authorizerProvider, "gravitinoAuthorizer", authorizer, true);
+    Mockito.doReturn(true).when(config).get(ENABLE_AUTHORIZATION);
+    Mockito.doReturn(4).when(config).get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
+    try {
+      when(metalakeManager.listMetalakes())
+          .thenReturn(
+              new BaseMetalake[] {newBaseMetalake("visible", 1L), newBaseMetalake("hidden", 2L)});
+      when(owners.getOwner(
+              "visible", MetadataObjects.of(null, "visible", MetadataObject.Type.METALAKE)))
+          .thenReturn(
+              Optional.of(OwnerDTO.builder().withName("alice").withType(Owner.Type.USER).build()));
+
+      try (Response response = target("/metalakes").request().get()) {
+        Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        JsonNode entries =
+            ObjectMapperProvider.objectMapper()
+                .readTree(response.readEntity(String.class))
+                .get("metalakes");
+
+        Assertions.assertEquals(1, entries.size());
+        Assertions.assertEquals("visible", entries.get(0).get("name").asText());
+        Assertions.assertEquals("alice", entries.get(0).get("owner").get("name").asText());
+      }
+
+      // Ownership of metalakes that the caller cannot see must not be resolved.
+      verify(owners, never()).getOwner(eq("hidden"), any());
+    } finally {
+      FieldUtils.writeField(env, "ownerDispatcher", previousOwners, true);
+      FieldUtils.writeField(authorizerProvider, "gravitinoAuthorizer", previousAuthorizer, true);
+      Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    }
+  }
+
+  private static BaseMetalake newBaseMetalake(String name, Long id) {
+    return BaseMetalake.builder()
+        .withName(name)
+        .withId(id)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("admin").withCreateTime(Instant.EPOCH).build())
+        .withVersion(SchemaVersion.V_0_1)
+        .build();
   }
 
   @Test
