@@ -72,13 +72,13 @@ public class K8sJobExecutorConfigs {
   public static final String DEFAULT_NAME_PREFIX = "gravitino-job";
 
   /** How long the resources listed in a namespace are cached for the job status queries. */
-  public static final String STATUS_CACHE_TTL_MS = "statusCacheTtlMs";
+  public static final String STATUS_CACHE_TTL_MS = "statusCacheTtlInMs";
 
   /** The default status cache TTL, 5 seconds. */
   public static final long DEFAULT_STATUS_CACHE_TTL_MS = 5_000L;
 
   /** A job whose resource still has no status after this time is considered failed. */
-  public static final String NO_STATUS_TIMEOUT_MS = "noStatusTimeoutMs";
+  public static final String NO_STATUS_TIMEOUT_MS = "noStatusTimeoutInMs";
 
   /** The default no status timeout, 10 minutes. */
   public static final long DEFAULT_NO_STATUS_TIMEOUT_MS = 10 * 60 * 1000L;
@@ -96,22 +96,22 @@ public class K8sJobExecutorConfigs {
   public static final String DEFAULT_SPARK_SERVICE_ACCOUNT = "spark";
 
   /** How long the pods of a finished Spark job are retained, so that its output can be read. */
-  public static final String SPARK_RESOURCE_RETAIN_DURATION_MS = "spark.resourceRetainDurationMs";
+  public static final String SPARK_RESOURCE_RETAIN_DURATION_MS = "spark.resourceRetainDurationInMs";
 
   /** The default pod retain duration, 1 day. */
   public static final long DEFAULT_SPARK_RESOURCE_RETAIN_DURATION_MS = 24 * 60 * 60 * 1000L;
 
   /** The time to live of a SparkApplication after it stops. */
-  public static final String SPARK_TTL_AFTER_STOP_MS = "spark.ttlAfterStopMs";
+  public static final String SPARK_TTL_AFTER_STOP_MS = "spark.ttlAfterStopInMs";
 
   /** The default SparkApplication time to live after it stops, 7 days. */
   public static final long DEFAULT_SPARK_TTL_AFTER_STOP_MS = 7 * 24 * 60 * 60 * 1000L;
 
   /** How long the operator waits for the driver pod to start. */
-  public static final String SPARK_DRIVER_START_TIMEOUT_MS = "spark.driverStartTimeoutMs";
+  public static final String SPARK_DRIVER_START_TIMEOUT_MS = "spark.driverStartTimeoutInMs";
 
   /** How long the operator waits for the driver to be ready. */
-  public static final String SPARK_DRIVER_READY_TIMEOUT_MS = "spark.driverReadyTimeoutMs";
+  public static final String SPARK_DRIVER_READY_TIMEOUT_MS = "spark.driverReadyTimeoutInMs";
 
   /**
    * The default of the operator's start timeouts, 1 hour, so that a job waits for resources instead

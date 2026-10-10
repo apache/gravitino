@@ -76,6 +76,27 @@ public class TestK8sJobExecutorConfigs {
   }
 
   @Test
+  public void testDurationKeys() {
+    // The duration keys end with InMs, like the other job configurations of Gravitino.
+    Map<String, String> map = new HashMap<>(requiredConfigs());
+    map.put("statusCacheTtlInMs", "1");
+    map.put("noStatusTimeoutInMs", "2");
+    map.put("spark.resourceRetainDurationInMs", "3");
+    map.put("spark.ttlAfterStopInMs", "4");
+    map.put("spark.driverStartTimeoutInMs", "5");
+    map.put("spark.driverReadyTimeoutInMs", "6");
+
+    K8sJobExecutorConfigs configs = new K8sJobExecutorConfigs(map);
+
+    Assertions.assertEquals(1L, configs.statusCacheTtlMs());
+    Assertions.assertEquals(2L, configs.noStatusTimeoutMs());
+    Assertions.assertEquals(3L, configs.sparkResourceRetainDurationMs());
+    Assertions.assertEquals(4L, configs.sparkTtlAfterStopMs());
+    Assertions.assertEquals(5L, configs.sparkDriverStartTimeoutMs());
+    Assertions.assertEquals(6L, configs.sparkDriverReadyTimeoutMs());
+  }
+
+  @Test
   public void testRequiredSparkConfigs() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
