@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
+from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.exceptions.base import (
     BadRequestException,
     IllegalArgumentException,
@@ -30,7 +31,27 @@ from tests.unittests.auth import mock_base
 OAUTH_PORT = 1082
 
 
+class _TestOAuth2TokenProvider(OAuth2TokenProvider):
+    def _get_access_token(self):
+        return None
+
+    def validate(self):
+        pass
+
+
 class TestOAuth2TokenProvider(unittest.TestCase):
+    @patch("gravitino.utils.http_client.build_opener")
+    def test_close_delegates_without_request(self, build_opener):
+        provider = _TestOAuth2TokenProvider("http://localhost")
+        client = provider._client
+
+        with patch.object(client, "close", wraps=client.close) as client_close:
+            provider.close()
+            provider.close()
+
+        self.assertEqual(2, client_close.call_count)
+        build_opener.assert_not_called()
+
     def test_provider_init_exception(self):
         with self.assertRaises(IllegalArgumentException):
             _ = DefaultOAuth2TokenProvider(uri="test")
