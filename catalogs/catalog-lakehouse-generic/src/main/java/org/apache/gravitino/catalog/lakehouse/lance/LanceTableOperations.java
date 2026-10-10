@@ -72,6 +72,7 @@ import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
+import org.lance.WriteDatasetBuilder;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
@@ -419,13 +420,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     Map<String, String> storageProps =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
-    try (Dataset ignored =
-        Dataset.write()
-            .schema(convertColumnsToArrowSchema(columns))
-            .uri(location)
-            .mode(WriteParams.WriteMode.CREATE)
-            .storageOptions(storageProps)
-            .execute()) {
+    try (Dataset ignored = createDataset(location, columns, storageProps)) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
       long datasetVersion = ignored.version();
@@ -459,6 +454,23 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
+  }
+
+  /**
+   * Creates an empty Lance dataset for the columns. The Lance file format version is chosen from
+   * the blob columns, because blob v2 and legacy blob each require a different version.
+   */
+  Dataset createDataset(String location, Column[] columns, Map<String, String> storageOptions) {
+    Schema schema = convertColumnsToArrowSchema(columns);
+    WriteDatasetBuilder builder =
+        Dataset.write()
+            .schema(schema)
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .storageOptions(storageOptions);
+    LanceDataTypeConverter.requiredFileFormatVersion(schema.getFields())
+        .ifPresent(builder::dataStorageVersion);
+    return builder.execute();
   }
 
   private Schema convertColumnsToArrowSchema(Column[] columns) {
@@ -854,6 +866,7 @@ public class LanceTableOperations extends ManagedTableOperations {
           Field field =
               LanceDataTypeConverter.CONVERTER.toArrowField(
                   columnName, addColumn.getDataType(), true);
+          LanceDataTypeConverter.checkFileFormatVersion(field, dataset.getLanceFileFormatVersion());
           dataset.addColumns(List.of(field));
         } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
