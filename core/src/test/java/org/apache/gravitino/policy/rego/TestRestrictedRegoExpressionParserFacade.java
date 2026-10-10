@@ -16,29 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy.expression;
+package org.apache.gravitino.policy.rego;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Column;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Comparison;
-import org.apache.gravitino.policy.expression.CanonicalExpression.ComparisonOperator;
-import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Literal;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralArray;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalExpression;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalOperator;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
-import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.MaskAction;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RowFilter;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RuleType;
+import java.util.Objects;
+import java.util.stream.Stream;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Column;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Comparison;
+import org.apache.gravitino.policy.rego.CanonicalExpression.ComparisonOperator;
+import org.apache.gravitino.policy.rego.CanonicalExpression.GroupMembership;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Literal;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralArray;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralType;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalExpression;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalOperator;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Not;
+import org.apache.gravitino.policy.rego.CanonicalExpression.SessionUser;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.ColumnMask;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.MaskAction;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RowFilter;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RuleType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests for {@link RestrictedRegoExpressionParserFacade}. */
@@ -283,7 +294,7 @@ public class TestRestrictedRegoExpressionParserFacade {
   }
 
   @Test
-  void testRejectsInvalidUnicodeScalarsAndColumnNul() {
+  void testRejectsInvalidUnicodeScalarsAndNul() {
     String isolatedSurrogate = "\\" + "uD800";
     String nul = "\\" + "u0000";
     Assertions.assertThrows(
@@ -295,6 +306,30 @@ public class TestRestrictedRegoExpressionParserFacade {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> parseFilterExpression("col(\"" + nul + "\") == \"x\""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> parseFilterExpression("is_group_member(\"" + nul + "\")"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> parseFilterExpression("col(\"x\") == \"" + nul + "\""));
+  }
+
+  @Test
+  void testRejectsNonAsciiUnicodeEscapeDigits() {
+    List<String> invalidEscapes =
+        List.of(
+            unicodeEscape(0x0660, 0x0660, 0x0664, 0x0661),
+            unicodeEscape(0xFF10, 0xFF10, 0xFF14, 0xFF11),
+            unicodeEscape(0x0966, 0x0966, 0x096A, 0x0967),
+            unicodeEscape('0', '0', 0x0664, 0x0661));
+
+    for (String invalidEscape : invalidEscapes) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> parseFilterExpression("col(\"" + invalidEscape + "\") == \"x\""));
+      Assertions.assertTrue(error.getMessage().contains("invalid Unicode escape"));
+    }
   }
 
   @Test
@@ -328,9 +363,76 @@ public class TestRestrictedRegoExpressionParserFacade {
         IllegalArgumentException.class,
         () -> parseFilterExpression("col(\"value\") in " + literalArray(257)));
 
+    Assertions.assertDoesNotThrow(
+        () ->
+            parseFilterExpression(
+                "col(\"left\") in "
+                    + literalArray(128)
+                    + " or col(\"right\") in "
+                    + literalArray(128)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            parseFilterExpression(
+                "col(\"left\") in "
+                    + literalArray(128)
+                    + " or col(\"right\") in "
+                    + literalArray(129)));
+
+    String maximumNumber = "1" + "0".repeat(255);
+    Assertions.assertDoesNotThrow(
+        () -> parseFilterExpression("col(\"value\") == " + maximumNumber));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> parseFilterExpression("col(\"value\") == " + maximumNumber + "0"));
+
     Assertions.assertDoesNotThrow(() -> parseFilterExpression(balancedAndExpression(0, 85)));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> parseFilterExpression(balancedAndExpression(0, 86)));
+  }
+
+  @Test
+  void testChecksLoweredRowFilterArrayElementCountAtSaveTime() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            RestrictedRegoExpressionParserFacade.parseRowFilter(
+                "filter := true if col(\"value\") in " + literalArray(128) + " else := false"));
+
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                RestrictedRegoExpressionParserFacade.parseRowFilter(
+                    "filter := true if col(\"value\") in " + literalArray(129) + " else := false"));
+    Assertions.assertTrue(error.getMessage().contains("lowered row-filter literal arrays"));
+  }
+
+  @ParameterizedTest(name = "{index}: {0} {1}")
+  @MethodSource("restrictedRegoCases")
+  void testRestrictedRegoCases(String expectation, String source, String expectedMessage) {
+    if (expectation.equals("valid")) {
+      Assertions.assertDoesNotThrow(() -> RestrictedRegoExpressionParserFacade.parse(source));
+      return;
+    }
+
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> RestrictedRegoExpressionParserFacade.parse(source));
+    Assertions.assertTrue(
+        error.getMessage().contains(expectedMessage),
+        () ->
+            "Expected message containing '" + expectedMessage + "' but was: " + error.getMessage());
+  }
+
+  @Test
+  void testParsesDocumentedPrograms() throws IOException {
+    List<String> programs = documentedPrograms(repositoryRoot().resolve("docs/policies.md"));
+
+    Assertions.assertEquals(2, programs.size());
+    for (String program : programs) {
+      Assertions.assertDoesNotThrow(() -> RestrictedRegoExpressionParserFacade.parse(program));
+    }
   }
 
   @ParameterizedTest
@@ -456,6 +558,64 @@ public class TestRestrictedRegoExpressionParserFacade {
                     "filter := col(\"x\") == 1 == true"));
     Assertions.assertTrue(
         chainedComparisonError.getMessage().contains("chained comparisons are not supported"));
+  }
+
+  private static Stream<Arguments> restrictedRegoCases() throws IOException {
+    InputStream input =
+        Objects.requireNonNull(
+            TestRestrictedRegoExpressionParserFacade.class.getResourceAsStream(
+                "/restricted-rego-v1-cases.txt"),
+            "restricted Rego test cases");
+    List<Arguments> cases = new ArrayList<>();
+    try (BufferedReader reader =
+        new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.isBlank() || line.startsWith("#")) {
+          continue;
+        }
+        String[] fields = line.split("\\t", -1);
+        Assertions.assertTrue(
+            fields.length == 2 || fields.length == 3, "Invalid restricted Rego test case: " + line);
+        cases.add(Arguments.of(fields[0], fields[1], fields.length == 3 ? fields[2] : ""));
+      }
+    }
+    return cases.stream();
+  }
+
+  private static Path repositoryRoot() {
+    Path current = Path.of("").toAbsolutePath();
+    while (current != null) {
+      if (Files.isRegularFile(current.resolve("docs/policies.md"))) {
+        return current;
+      }
+      current = current.getParent();
+    }
+    throw new IllegalStateException(
+        "Cannot locate repository root from the test working directory");
+  }
+
+  private static List<String> documentedPrograms(Path policiesDocument) throws IOException {
+    List<String> programs = new ArrayList<>();
+    StringBuilder current = null;
+    for (String line : Files.readAllLines(policiesDocument, StandardCharsets.UTF_8)) {
+      if (line.equals("```restricted-rego-v1")) {
+        Assertions.assertNull(current, "Nested restricted Rego documentation fence");
+        current = new StringBuilder();
+      } else if (current != null && line.equals("```")) {
+        programs.add(current.toString().stripTrailing());
+        current = null;
+      } else if (current != null) {
+        current.append(line).append('\n');
+      }
+    }
+    Assertions.assertNull(current, "Unclosed restricted Rego documentation fence");
+    return programs;
+  }
+
+  private static String unicodeEscape(int first, int second, int third, int fourth) {
+    return "\\u"
+        + new String(new char[] {(char) first, (char) second, (char) third, (char) fourth});
   }
 
   private static CanonicalExpression parseFilterExpression(String expression) {

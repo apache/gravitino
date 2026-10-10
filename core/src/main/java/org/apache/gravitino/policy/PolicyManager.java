@@ -41,7 +41,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.expression.RestrictedRegoExpressionParserFacade;
+import org.apache.gravitino.policy.rego.RestrictedRegoExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;

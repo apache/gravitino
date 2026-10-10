@@ -54,12 +54,16 @@ syntax owned by Gravitino. Each expression is one complete rule, not an arbitrar
 row filter starts with `filter :=` and produces a Boolean predicate. A column mask starts with
 `mask := action("...")` and produces an allowlisted masking action.
 
-For example:
+For example, a row-filter program can select the first matching predicate:
 
-```text
+```restricted-rego-v1
 filter := col("region") == "US" if is_group_member("auditors")
 else := col("owner") == session_user()
+```
 
+This column-mask program selects a masking action in the same way:
+
+```restricted-rego-v1
 mask := action("show-last-4") if is_group_member("support")
 else := action("replace-with-null")
 ```
@@ -76,6 +80,25 @@ The syntax supports these constructs:
 - comparisons `==`, `!=`, `<`, `<=`, `>`, `>=`, and `in`; and
 - Boolean operators `and`, `or`, and `not`.
 
+Keywords and built-in function names are case-sensitive. For example, only lowercase `in` is an
+operator; `In`, `IN`, and `iN` are invalid.
+
+Supported operand shapes are:
+
+| Form | Operators | Requirements |
+| --- | --- | --- |
+| Boolean predicates | `and`, `or`, `not` | Every operand must be Boolean. |
+| Column and non-null literal | `==`, `!=`, `<`, `<=`, `>`, `>=` | Either operand order; types must be compatible. Boolean literals support only `==` and `!=`. |
+| String column and `session_user()` | `==`, `!=` | Either operand order. |
+| `session_user()` and string literal | `==`, `!=` | Either operand order. |
+| Column and `null` | `==`, `!=` | Either operand order. |
+| Column and literal array | `in` | Column on the left; array must be non-empty and homogeneous. |
+| `session_user()` and string array | `in` | `session_user()` on the left; array must be non-empty. |
+| `is_group_member("group")` | none | Produces a Boolean request-context predicate. |
+
+Column-to-column and literal-to-literal comparisons, ordering on `session_user()`, null array
+elements, nested arrays, and comparisons on `is_group_member(...)` are invalid.
+
 Column-mask actions are `mask-alphanum`, `mask-to-fixed-value`, `replace-with-null`, `show-first-4`,
 `show-last-4`, `truncate-to-year`, `truncate-to-month`, `sha-256-global`, and
 `sha-256-query-local`.
@@ -86,7 +109,9 @@ Validation applies these limits when a policy is created or its content is updat
 - operation depth 8 for the source and lowered row-filter predicate;
 - 256 nodes for the source AST and lowered row-filter predicate;
 - 4 KiB of UTF-8 for each decoded string literal; and
-- 256 elements in a literal array.
+- 256 bytes for each numeric literal;
+- 256 elements in a literal array; and
+- 256 array elements in total in the source and lowered row-filter predicate.
 
 Bare identifiers, arbitrary functions, comments, packages, imports, variables, chained
 comparisons, nested arrays, and a conditional rule without a final `else` are rejected. Read paths

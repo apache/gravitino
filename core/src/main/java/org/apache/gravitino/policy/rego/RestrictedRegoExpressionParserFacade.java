@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy.expression;
+package org.apache.gravitino.policy.rego;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
@@ -25,21 +25,21 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.policy.ReadRestrictionContent;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Comparison;
-import org.apache.gravitino.policy.expression.CanonicalExpression.ComparisonOperator;
-import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Literal;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralArray;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalExpression;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalOperator;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
-import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.FilterBranch;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.MaskAction;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.MaskBranch;
-import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RowFilter;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Comparison;
+import org.apache.gravitino.policy.rego.CanonicalExpression.ComparisonOperator;
+import org.apache.gravitino.policy.rego.CanonicalExpression.GroupMembership;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Literal;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralArray;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralType;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalExpression;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalOperator;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Not;
+import org.apache.gravitino.policy.rego.CanonicalExpression.SessionUser;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.ColumnMask;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.FilterBranch;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.MaskAction;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.MaskBranch;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RowFilter;
 
 /** Parses and validates complete programs in the {@code restricted-rego-v1} source dialect. */
 public final class RestrictedRegoExpressionParserFacade {
@@ -48,6 +48,8 @@ public final class RestrictedRegoExpressionParserFacade {
   private static final int MAX_AST_NODES = 256;
   private static final int MAX_STRING_BYTES = 4 * 1024;
   private static final int MAX_ARRAY_ELEMENTS = 256;
+  private static final int MAX_TOTAL_ARRAY_ELEMENTS = 256;
+  private static final int MAX_NUMERIC_LITERAL_BYTES = 256;
 
   private RestrictedRegoExpressionParserFacade() {}
 
@@ -106,17 +108,23 @@ public final class RestrictedRegoExpressionParserFacade {
     program.validate();
     List<CanonicalExpression> expressions = expressions(program);
     int nodeCount = 0;
+    int arrayElementCount = 0;
     for (CanonicalExpression expression : expressions) {
       Preconditions.checkArgument(
           expression.depth() <= MAX_SOURCE_DEPTH,
           "restricted-rego-v1 source depth must not exceed %s",
           MAX_SOURCE_DEPTH);
       nodeCount += countNodes(expression);
+      arrayElementCount += countArrayElements(expression);
     }
     Preconditions.checkArgument(
         nodeCount <= MAX_AST_NODES,
         "restricted-rego-v1 AST must not exceed %s nodes",
         MAX_AST_NODES);
+    Preconditions.checkArgument(
+        arrayElementCount <= MAX_TOTAL_ARRAY_ELEMENTS,
+        "restricted-rego-v1 literal arrays must not contain more than %s total elements",
+        MAX_TOTAL_ARRAY_ELEMENTS);
     if (program instanceof RowFilter) {
       CanonicalExpression lowered = ((RowFilter) program).lower();
       Preconditions.checkArgument(
@@ -127,6 +135,10 @@ public final class RestrictedRegoExpressionParserFacade {
           countNodes(lowered) <= MAX_AST_NODES,
           "lowered row-filter AST must not exceed %s nodes",
           MAX_AST_NODES);
+      Preconditions.checkArgument(
+          countArrayElements(lowered) <= MAX_TOTAL_ARRAY_ELEMENTS,
+          "lowered row-filter literal arrays must not contain more than %s total elements",
+          MAX_TOTAL_ARRAY_ELEMENTS);
     }
   }
 
@@ -164,6 +176,43 @@ public final class RestrictedRegoExpressionParserFacade {
       return count;
     }
     return 1;
+  }
+
+  private static int countArrayElements(CanonicalExpression expression) {
+    if (expression instanceof Comparison) {
+      Comparison comparison = (Comparison) expression;
+      return countArrayElements(comparison.left()) + countArrayElements(comparison.right());
+    }
+    if (expression instanceof Not) {
+      return countArrayElements(((Not) expression).operand());
+    }
+    if (expression instanceof LogicalExpression) {
+      int count = 0;
+      for (CanonicalExpression child : ((LogicalExpression) expression).operands()) {
+        count += countArrayElements(child);
+      }
+      return count;
+    }
+    if (expression instanceof LiteralArray) {
+      return ((LiteralArray) expression).values().size();
+    }
+    return 0;
+  }
+
+  private static boolean isAsciiHexDigit(char value) {
+    return (value >= '0' && value <= '9')
+        || (value >= 'a' && value <= 'f')
+        || (value >= 'A' && value <= 'F');
+  }
+
+  private static int asciiHexValue(char value) {
+    if (value >= '0' && value <= '9') {
+      return value - '0';
+    }
+    if (value >= 'a' && value <= 'f') {
+      return value - 'a' + 10;
+    }
+    return value - 'A' + 10;
   }
 
   private static final class SourceParser {
@@ -458,7 +507,15 @@ public final class RestrictedRegoExpressionParserFacade {
             result.append('\t');
             break;
           case 'u':
-            result.append((char) Integer.parseInt(token.text.substring(index + 1, index + 5), 16));
+            int codeUnit = 0;
+            for (int digitIndex = index + 1; digitIndex < index + 5; digitIndex++) {
+              char digit = token.text.charAt(digitIndex);
+              if (!isAsciiHexDigit(digit)) {
+                throw error(token, "invalid Unicode escape in string");
+              }
+              codeUnit = codeUnit * 16 + asciiHexValue(digit);
+            }
+            result.append((char) codeUnit);
             index += 4;
             break;
           default:
@@ -554,6 +611,12 @@ public final class RestrictedRegoExpressionParserFacade {
       }
       if (isDigit(current) || (current == '-' && isDigit(peekNext()))) {
         scanNumber(tokenLine, tokenColumn);
+        if (offset - tokenOffset > MAX_NUMERIC_LITERAL_BYTES) {
+          throw lexicalError(
+              tokenLine,
+              tokenColumn,
+              "numeric literal must not exceed " + MAX_NUMERIC_LITERAL_BYTES + " bytes");
+        }
         if (!atEnd() && isIdentifierStart(peek())) {
           throw lexicalError(
               tokenLine, tokenColumn, "numeric literal must be separated from identifiers");
@@ -607,7 +670,7 @@ public final class RestrictedRegoExpressionParserFacade {
         char escaped = advance();
         if (escaped == 'u') {
           for (int index = 0; index < 4; index++) {
-            if (atEnd() || Character.digit(advance(), 16) < 0) {
+            if (atEnd() || !isAsciiHexDigit(advance())) {
               throw lexicalError(tokenLine, tokenColumn, "invalid Unicode escape in string");
             }
           }

@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy.expression;
+package org.apache.gravitino.policy.rego;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalExpression;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalOperator;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalExpression;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalOperator;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Not;
 
 /** A parsed, unresolved program in the {@code restricted-rego-v1} source dialect. */
 public interface RestrictedRegoProgram {
@@ -145,9 +145,9 @@ public interface RestrictedRegoProgram {
       result.validate();
       condition.validate();
       Preconditions.checkArgument(
-          ExpressionValidation.isPredicate(result), "filter branch result must be Boolean");
+          ExpressionValidator.isPredicate(result), "filter branch result must be Boolean");
       Preconditions.checkArgument(
-          ExpressionValidation.isPredicate(condition), "filter branch condition must be Boolean");
+          ExpressionValidator.isPredicate(condition), "filter branch condition must be Boolean");
     }
 
     @Override
@@ -255,7 +255,7 @@ public interface RestrictedRegoProgram {
       }
       fallback.validate();
       Preconditions.checkArgument(
-          ExpressionValidation.isPredicate(fallback), "filter fallback must be Boolean");
+          ExpressionValidator.isPredicate(fallback), "filter fallback must be Boolean");
     }
 
     @Override
@@ -316,9 +316,9 @@ public interface RestrictedRegoProgram {
       Preconditions.checkArgument(condition != null, "mask branch condition cannot be null");
       condition.validate();
       Preconditions.checkArgument(
-          ExpressionValidation.isPredicate(condition), "mask branch condition must be Boolean");
+          ExpressionValidator.isPredicate(condition), "mask branch condition must be Boolean");
       Preconditions.checkArgument(
-          ExpressionValidation.isContextOnly(condition),
+          ExpressionValidator.isContextOnly(condition),
           "column-mask condition cannot contain col(...)");
     }
 

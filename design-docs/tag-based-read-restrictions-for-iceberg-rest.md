@@ -361,7 +361,9 @@ Save-time validation applies these limits before canonicalization:
 - operation depth: 8;
 - source AST nodes: 256;
 - decoded string literal: 4 KiB of UTF-8; and
-- array elements: 256.
+- numeric literal: 256 bytes;
+- array elements: 256 per literal; and
+- total array elements: 256 in the source and lowered row-filter predicate.
 
 The lowered row-filter predicate also has maximum operation depth 8 and maximum AST nodes 256.
 Canonicalization cannot make an oversized expression valid.

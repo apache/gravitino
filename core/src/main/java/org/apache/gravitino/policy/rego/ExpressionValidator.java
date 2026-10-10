@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy.expression;
+package org.apache.gravitino.policy.rego;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Column;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Comparison;
-import org.apache.gravitino.policy.expression.CanonicalExpression.ComparisonOperator;
-import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Literal;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralArray;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalExpression;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
-import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Column;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Comparison;
+import org.apache.gravitino.policy.rego.CanonicalExpression.ComparisonOperator;
+import org.apache.gravitino.policy.rego.CanonicalExpression.GroupMembership;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Literal;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralArray;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralType;
+import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalExpression;
+import org.apache.gravitino.policy.rego.CanonicalExpression.Not;
+import org.apache.gravitino.policy.rego.CanonicalExpression.SessionUser;
 
 /** Semantic validation helpers for unresolved restricted Rego expressions. */
-final class ExpressionValidation {
-  private ExpressionValidation() {}
+final class ExpressionValidator {
+  private ExpressionValidator() {}
 
   static boolean isPredicate(CanonicalExpression expression) {
     if (expression instanceof Comparison
@@ -116,6 +116,7 @@ final class ExpressionValidation {
   static void validateUnicodeScalars(String value, String description) {
     for (int index = 0; index < value.length(); index++) {
       char current = value.charAt(index);
+      Preconditions.checkArgument(current != '\0', "%s cannot contain NUL", description);
       if (Character.isHighSurrogate(current)) {
         Preconditions.checkArgument(
             index + 1 < value.length() && Character.isLowSurrogate(value.charAt(index + 1)),

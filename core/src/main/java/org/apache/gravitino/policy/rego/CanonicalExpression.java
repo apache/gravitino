@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy.expression;
+package org.apache.gravitino.policy.rego;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
@@ -197,7 +197,7 @@ public interface CanonicalExpression {
       left.validate();
       right.validate();
       try {
-        ExpressionValidation.validateComparison(operator, left, right);
+        ExpressionValidator.validateComparison(operator, left, right);
       } catch (IllegalArgumentException exception) {
         throw new IllegalArgumentException(
             exception.getMessage() + "; offending comparison: " + this, exception);
@@ -253,7 +253,7 @@ public interface CanonicalExpression {
       Preconditions.checkArgument(operand != null, "not requires an operand");
       operand.validate();
       Preconditions.checkArgument(
-          ExpressionValidation.isPredicate(operand), "not operand must be a boolean predicate");
+          ExpressionValidator.isPredicate(operand), "not operand must be a boolean predicate");
     }
 
     @Override
@@ -335,7 +335,7 @@ public interface CanonicalExpression {
             child != null, "%s operand cannot be null", operator.sourceToken());
         child.validate();
         Preconditions.checkArgument(
-            ExpressionValidation.isPredicate(child),
+            ExpressionValidator.isPredicate(child),
             "%s operands must be boolean predicates",
             operator.sourceToken());
       }
@@ -394,8 +394,7 @@ public interface CanonicalExpression {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "column name cannot be empty");
-      Preconditions.checkArgument(name.indexOf('\0') < 0, "column name cannot contain NUL");
-      ExpressionValidation.validateUnicodeScalars(name, "column name");
+      ExpressionValidator.validateUnicodeScalars(name, "column name");
     }
 
     @Override
@@ -472,7 +471,7 @@ public interface CanonicalExpression {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(group != null && !group.isEmpty(), "group name cannot be empty");
-      ExpressionValidation.validateUnicodeScalars(group, "group name");
+      ExpressionValidator.validateUnicodeScalars(group, "group name");
     }
 
     @Override
@@ -553,7 +552,7 @@ public interface CanonicalExpression {
         case STRING:
           Preconditions.checkArgument(value instanceof String, "string literal must be a string");
           Preconditions.checkArgument(!negativeZero, "string literal cannot be negative zero");
-          ExpressionValidation.validateUnicodeScalars((String) value, "string literal");
+          ExpressionValidator.validateUnicodeScalars((String) value, "string literal");
           break;
         case NUMBER:
           Preconditions.checkArgument(
