@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# expectation<TAB>source<TAB>expected error substring
-valid	filter := col("owner") == session_user()
-valid	filter := session_user() in ["alice", "bob"]
-valid	filter := col("region") in ["US", "CA"] or col("level") >= 3
-valid	filter := col("letter") == "\u0041"
-valid	filter := true if is_group_member("auditors") else := false
-valid	mask := action("show-last-4") if is_group_member("support") else := action("replace-with-null")
-invalid	filter := col("region") In ["US"]	unsupported identifier In
-invalid	filter := col("region") IN ["US"]	unsupported identifier IN
-invalid	filter := col("region") iN ["US"]	unsupported identifier iN
-invalid	filter := col("left") == col("right")	Unsupported operands
-invalid	filter := 1 == 1	Unsupported operands
-invalid	filter := col("active") > true	boolean literal supports only == and !=
-invalid	filter := session_user() < "bob"	session_user() supports only == and !=
-invalid	filter := col("region") in []	expected a literal array element
-invalid	filter := col("region") in ["US", 1]	array literals must have one homogeneous non-null type
-invalid	filter := true if is_group_member("auditors")	expected final else branch
-invalid	mask := action("show-last-4") if col("region") == "US" else := action("replace-with-null")	column-mask condition cannot contain col(...)
+# case name<TAB>source
+column-session-user	filter := col("owner") == session_user()
+session-user-array	filter := session_user() in ["alice", "bob"]
+logical-precedence	filter := col("region") in ["US", "CA"] or col("level") >= 3
+unicode-escape	filter := col("letter") == "\u0041"
+non-ascii-unicode-escape	filter := col("\u٠٠٤١") == "x"
+group-name-nul	filter := is_group_member("\u0000")
+conditional-filter	filter := true if is_group_member("auditors") else := false
+conditional-mask	mask := action("show-last-4") if is_group_member("support") else := action("replace-with-null")
+uppercase-in-title	filter := col("region") In ["US"]
+uppercase-in	filter := col("region") IN ["US"]
+mixed-case-in	filter := col("region") iN ["US"]
+column-to-column	filter := col("left") == col("right")
+literal-to-literal	filter := 1 == 1
+boolean-ordering	filter := col("active") > true
+session-user-ordering	filter := session_user() < "bob"
+empty-array	filter := col("region") in []
+heterogeneous-array	filter := col("region") in ["US", 1]
+missing-final-else	filter := true if is_group_member("auditors")
+column-dependent-mask	mask := action("show-last-4") if col("region") == "US" else := action("replace-with-null")

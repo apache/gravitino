@@ -18,18 +18,14 @@
  */
 package org.apache.gravitino.policy.rego;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Stream;
 import org.apache.gravitino.policy.rego.CanonicalExpression.Column;
 import org.apache.gravitino.policy.rego.CanonicalExpression.Comparison;
 import org.apache.gravitino.policy.rego.CanonicalExpression.ComparisonOperator;
@@ -48,12 +44,30 @@ import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RuleType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests for {@link RestrictedRegoExpressionParserFacade}. */
 public class TestRestrictedRegoExpressionParserFacade {
+
+  private static final String GOLDEN_CASES_RESOURCE = "/restricted-rego-v1-cases.txt";
+  private static final String GOLDEN_FILE =
+      "core/src/test/resources/restricted-rego-v1-cases.golden";
+  private static final String UPDATE_GOLDEN_ENV = "GRAVITINO_UPDATE_RESTRICTED_REGO_GOLDEN";
+  private static final String GOLDEN_LICENSE_HEADER =
+      "# Licensed to the Apache Software Foundation (ASF) under one or more\n"
+          + "# contributor license agreements. See the NOTICE file distributed with\n"
+          + "# this work for additional information regarding copyright ownership.\n"
+          + "# The ASF licenses this file to You under the Apache License, Version 2.0\n"
+          + "# (the \"License\"); you may not use this file except in compliance with\n"
+          + "# the License. You may obtain a copy of the License at\n"
+          + "#\n"
+          + "#     http://www.apache.org/licenses/LICENSE-2.0\n"
+          + "#\n"
+          + "# Unless required by applicable law or agreed to in writing, software\n"
+          + "# distributed under the License is distributed on an \"AS IS\" BASIS,\n"
+          + "# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n"
+          + "# See the License for the specific language governing permissions and\n"
+          + "# limitations under the License.\n";
 
   @Test
   void testParsesTypedRules() {
@@ -407,22 +421,21 @@ public class TestRestrictedRegoExpressionParserFacade {
     Assertions.assertTrue(error.getMessage().contains("lowered row-filter literal arrays"));
   }
 
-  @ParameterizedTest(name = "{index}: {0} {1}")
-  @MethodSource("restrictedRegoCases")
-  void testRestrictedRegoCases(String expectation, String source, String expectedMessage) {
-    if (expectation.equals("valid")) {
-      Assertions.assertDoesNotThrow(() -> RestrictedRegoExpressionParserFacade.parse(source));
-      return;
+  @Test
+  void testRestrictedRegoGoldenFile() throws IOException {
+    String actual = renderGoldenResults();
+    Path goldenFile = repositoryRoot().resolve(GOLDEN_FILE);
+    if (Boolean.parseBoolean(System.getenv(UPDATE_GOLDEN_ENV))) {
+      Files.writeString(goldenFile, actual, StandardCharsets.UTF_8);
     }
 
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> RestrictedRegoExpressionParserFacade.parse(source));
-    Assertions.assertTrue(
-        error.getMessage().contains(expectedMessage),
-        () ->
-            "Expected message containing '" + expectedMessage + "' but was: " + error.getMessage());
+    String expected = Files.readString(goldenFile, StandardCharsets.UTF_8);
+    Assertions.assertEquals(
+        expected,
+        actual,
+        "Golden output changed. Review the parser behavior and regenerate with "
+            + UPDATE_GOLDEN_ENV
+            + "=true if the change is intentional.");
   }
 
   @Test
@@ -560,27 +573,41 @@ public class TestRestrictedRegoExpressionParserFacade {
         chainedComparisonError.getMessage().contains("chained comparisons are not supported"));
   }
 
-  private static Stream<Arguments> restrictedRegoCases() throws IOException {
-    InputStream input =
-        Objects.requireNonNull(
-            TestRestrictedRegoExpressionParserFacade.class.getResourceAsStream(
-                "/restricted-rego-v1-cases.txt"),
-            "restricted Rego test cases");
-    List<Arguments> cases = new ArrayList<>();
-    try (BufferedReader reader =
-        new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        if (line.isBlank() || line.startsWith("#")) {
-          continue;
-        }
-        String[] fields = line.split("\\t", -1);
-        Assertions.assertTrue(
-            fields.length == 2 || fields.length == 3, "Invalid restricted Rego test case: " + line);
-        cases.add(Arguments.of(fields[0], fields[1], fields.length == 3 ? fields[2] : ""));
+  private static String renderGoldenResults() throws IOException {
+    StringBuilder result = new StringBuilder(GOLDEN_LICENSE_HEADER);
+    List<String> lines;
+    try (InputStream input =
+        TestRestrictedRegoExpressionParserFacade.class.getResourceAsStream(GOLDEN_CASES_RESOURCE)) {
+      Assertions.assertNotNull(input, "restricted Rego golden cases");
+      lines = new String(input.readAllBytes(), StandardCharsets.UTF_8).lines().toList();
+    }
+
+    for (String line : lines) {
+      if (line.isBlank() || line.startsWith("#")) {
+        continue;
+      }
+      String[] fields = line.split("\\t", 2);
+      Assertions.assertEquals(2, fields.length, "Invalid restricted Rego golden case: " + line);
+      String name = fields[0];
+      String source = fields[1];
+      result.append('\n').append("=== ").append(name).append(" ===\n");
+      result.append("source: ").append(escapeGoldenValue(source)).append('\n');
+      try {
+        RestrictedRegoProgram program = RestrictedRegoExpressionParserFacade.parse(source);
+        result.append("result: ").append(escapeGoldenValue(program.toString())).append('\n');
+      } catch (IllegalArgumentException exception) {
+        result.append("error: ").append(escapeGoldenValue(exception.getMessage())).append('\n');
       }
     }
-    return cases.stream();
+    return result.toString();
+  }
+
+  private static String escapeGoldenValue(String value) {
+    return value
+        .replace("\\", "\\\\")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        .replace("\t", "\\t");
   }
 
   private static Path repositoryRoot() {
