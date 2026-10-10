@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Assertions;
  * concurrently with it or waits for it. Waiting is detected by observing the operation thread
  * parked inside {@link TreeLockNode}, not by sleeping, so the assertions do not depend on timing.
  */
-final class TreeLockTestSupport {
+public final class TreeLockTestSupport {
 
   private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
@@ -49,7 +49,8 @@ final class TreeLockTestSupport {
    * Asserts that {@code operation} completes while {@code held} is still held, i.e. the operation
    * does not contend with that lock.
    */
-  static void assertRunsConcurrentlyWith(HeldLock held, Runnable operation) throws Exception {
+  public static void assertRunsConcurrentlyWith(HeldLock held, Runnable operation)
+      throws Exception {
     OperationRun run = OperationRun.start(operation);
     try {
       if (run.awaitDoneOrParked() == Outcome.PARKED) {
@@ -67,7 +68,7 @@ final class TreeLockTestSupport {
    * Asserts that {@code operation} parks on a tree lock while {@code held} is held and completes
    * once the lock is released.
    */
-  static void assertWaitsFor(HeldLock held, Runnable operation) throws Exception {
+  public static void assertWaitsFor(HeldLock held, Runnable operation) throws Exception {
     OperationRun run = OperationRun.start(operation);
     try {
       Assertions.assertEquals(
@@ -151,7 +152,7 @@ final class TreeLockTestSupport {
   }
 
   /** A tree lock held by a dedicated thread until {@link #release()} or {@link #close()}. */
-  static final class HeldLock implements AutoCloseable {
+  public static final class HeldLock implements AutoCloseable {
     private final NameIdentifier identifier;
     private final LockType lockType;
     private final CountDownLatch acquired = new CountDownLatch(1);
@@ -166,7 +167,7 @@ final class TreeLockTestSupport {
     }
 
     /** Acquires the lock on a helper thread and returns once it is held. */
-    static HeldLock acquire(NameIdentifier identifier, LockType lockType) throws Exception {
+    public static HeldLock acquire(NameIdentifier identifier, LockType lockType) throws Exception {
       HeldLock held = new HeldLock(identifier, lockType);
       held.holder.start();
       held.acquired.await(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -196,7 +197,7 @@ final class TreeLockTestSupport {
     }
 
     /** Releases the lock and waits for the holder thread to exit. */
-    void release() throws InterruptedException {
+    public void release() throws InterruptedException {
       releaseSignal.countDown();
       holder.join(TIMEOUT.toMillis());
     }

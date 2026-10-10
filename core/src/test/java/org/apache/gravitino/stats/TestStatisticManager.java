@@ -49,6 +49,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -59,9 +61,12 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -73,6 +78,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -403,6 +409,80 @@ public class TestStatisticManager {
       Assertions.assertEquals(
           value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
     }
+  }
+
+  @Test
+  public void testTableStatisticsDoNotWaitForTableTreeLock() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put("lock_free", StatisticValues.longValue(1L));
+
+    // Table-level statistics are upserted and deleted in one entity-store transaction, so they
+    // must not contend with an in-flight table operation that holds the table tree lock.
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter, () -> statisticManager.updateStatistics(METALAKE, tableObject, stats));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter, () -> statisticManager.listStatistics(METALAKE, tableObject));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter,
+          () ->
+              statisticManager.dropStatistics(
+                  METALAKE, tableObject, Lists.newArrayList("lock_free")));
+    }
+  }
+
+  @Test
+  public void testPartitionStatisticUpdateStillWaitsForTableTreeLock() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put("locked", StatisticValues.longValue(1L));
+    List<PartitionStatisticsUpdate> updates =
+        Lists.newArrayList(PartitionStatisticsModification.update("p_lock", stats));
+
+    // A pluggable partition statistic storage need not update atomically, so this path keeps the
+    // tree lock until the storages do.
+    TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        tableWriter,
+        () -> statisticManager.updatePartitionStatistics(METALAKE, tableObject, updates));
+  }
+
+  @Test
+  public void testConcurrentUpdateStatisticsKeepsOneValuePerName() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    AtomicLong nextValue = new AtomicLong();
+
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(
+            8,
+            () -> {
+              Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+              stats.put("race", StatisticValues.longValue(nextValue.getAndIncrement()));
+              statisticManager.updateStatistics(METALAKE, tableObject, stats);
+              return null;
+            });
+
+    outcomes.forEach(Assertions::assertNull);
+    List<Statistic> raced =
+        statisticManager.listStatistics(METALAKE, tableObject).stream()
+            .filter(statistic -> "race".equals(statistic.name()))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(1, raced.size());
+    long value = (Long) raced.get(0).value().get().value();
+    Assertions.assertTrue(value >= 0 && value < 8, "Unexpected value " + value);
+    Assertions.assertTrue(
+        statisticManager.dropStatistics(METALAKE, tableObject, Lists.newArrayList("race")));
   }
 
   @Test
