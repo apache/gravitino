@@ -52,6 +52,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +96,8 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.storage.relational.BackendTestSelector;
+import org.apache.gravitino.storage.relational.CoreBackend;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
@@ -110,6 +113,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@CoreBackend.All
 abstract class AbstractEntityStorageTest {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractEntityStorageTest.class);
 
@@ -119,14 +123,18 @@ abstract class AbstractEntityStorageTest {
   protected static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[][] storageProvider() {
-    return new Object[][] {
-      {"h2", true},
-      {"h2", false},
-      {"mysql", true},
-      {"mysql", false},
-      {"postgresql", true},
-      {"postgresql", false}
-    };
+    Object[][] backends =
+        new Object[][] {
+          {"h2", true},
+          {"h2", false},
+          {"mysql", true},
+          {"mysql", false},
+          {"postgresql", true},
+          {"postgresql", false}
+        };
+    return Arrays.stream(backends)
+        .filter(arguments -> BackendTestSelector.isSelected((String) arguments[0]))
+        .toArray(Object[][]::new);
   }
 
   @AfterEach

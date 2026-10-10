@@ -84,6 +84,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+@CoreBackend.All
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith({
   BackendTestExtension.class,

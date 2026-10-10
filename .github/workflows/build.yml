@@ -93,7 +93,11 @@ jobs:
           fi
 
           echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
+      - name: List build shards
+        id: shards
+        run: echo "build_shards=$(dev/ci/test-shards.sh build --list)" >> "${GITHUB_OUTPUT}"
     outputs:
+      build_shards: ${{ steps.shards.outputs.build_shards }}
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
@@ -147,17 +151,18 @@ jobs:
             spark-connector/**/*.log
 
   build:
-    # The type of runner that the job will run on
+    name: build (${{ matrix.java-version }}, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         java-version: [ 17 ]
+        # Shards are defined in dev/ci/test-shards.sh.
+        shard: ${{ fromJSON(needs.changes.outputs.build_shards) }}
     timeout-minutes: 120
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-java-toolchains
@@ -165,6 +170,7 @@ jobs:
           java-version: ${{ matrix.java-version }}
 
       - name: Test publish to local
+        if: matrix.shard == 'others'
         run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
 
       - name: Free up disk space
@@ -185,6 +191,10 @@ jobs:
       - name: Build with Gradle
         run: |
           if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
+            if [ "${{ matrix.shard }}" != "others" ]; then
+              echo "Only maintenance modules changed; they are built by the 'others' shard."
+              exit 0
+            fi
             ./gradlew \
               :maintenance:optimizer-api:build \
               :maintenance:updaters:build \
@@ -196,12 +206,20 @@ jobs:
             exit 0
           fi
 
+          shard_args_text="$(dev/ci/test-shards.sh build "${{ matrix.shard }}")"
+          mapfile -t shard_args <<< "${shard_args_text}"
+
+          skip_docker_tests=false
+          case "${{ matrix.shard }}" in
+            core-unit|core-h2) skip_docker_tests=true ;;
+          esac
+
           gradle_args=(
-            build
+            "${shard_args[@]}"
             --max-workers=2
             -PskipWeb=true
             -PskipITs
-            -PskipDockerTests=false
+            "-PskipDockerTests=${skip_docker_tests}"
             -x :clients:client-python:build
             -x :catalogs-contrib:catalog-jdbc-clickhouse:test
             -x :catalogs-contrib:catalog-jdbc-hologres:test
@@ -223,13 +241,238 @@ jobs:
 
           ./gradlew "${gradle_args[@]}"
 
+      - name: Resolve core test lane
+        id: core-lane
+        if: >-
+          success() &&
+          needs.changes.outputs.maintenance_module_only_changes != 'true' &&
+          startsWith(matrix.shard, 'core-')
+        env:
+          CORE_SHARD: ${{ matrix.shard }}
+        run: |
+          lane="${CORE_SHARD#core-}"
+          task_path="$(dev/ci/test-shards.sh build "${CORE_SHARD}")"
+          if [ -z "${lane}" ] || [ "${lane}" = "${CORE_SHARD}" ] || \
+            [ -z "${task_path}" ] || [[ "${task_path}" == *$'\n'* ]] || \
+            [[ "${task_path}" != :core:* ]]; then
+            echo "Invalid core shard mapping: ${CORE_SHARD} -> ${task_path}" >&2
+            exit 1
+          fi
+          task="${task_path#:core:}"
+          if [ -z "${task}" ] || [[ "${task}" == *:* ]]; then
+            echo "Invalid core task path: ${task_path}" >&2
+            exit 1
+          fi
+          echo "lane=${lane}" >> "${GITHUB_OUTPUT}"
+          echo "task=${task}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate core test manifest
+        if: steps.core-lane.outcome == 'success'
+        env:
+          CORE_LANE: ${{ steps.core-lane.outputs.lane }}
+          CORE_TASK: ${{ steps.core-lane.outputs.task }}
+        run: |
+          mkdir -p core/build/test-manifests
+          python3 dev/ci/core_test_identity.py manifest \
+            --lane "${CORE_LANE}" \
+            --results "core/build/test-results/${CORE_TASK}" \
+            --output "core/build/test-manifests/${CORE_LANE}.json"
+
+      - name: Validate core test evidence
+        if: steps.core-lane.outcome == 'success'
+        env:
+          CORE_LANE: ${{ steps.core-lane.outputs.lane }}
+          CORE_TASK: ${{ steps.core-lane.outputs.task }}
+        run: |
+          test -s "core/build/test-manifests/${CORE_LANE}.json"
+          junit_xml="$(find "core/build/test-results/${CORE_TASK}" \
+            -type f -name 'TEST-*.xml' -print -quit)"
+          test -n "${junit_xml}"
+          test -s "${junit_xml}"
+          test -s "build/reports/tests/core/${CORE_TASK}/index.html"
+          test -s "core/build/jacoco/${CORE_TASK}.exec"
+
+      - name: Upload core test evidence
+        if: steps.core-lane.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-${{ steps.core-lane.outputs.lane }}-test-evidence
+          path: |
+            core/build/test-manifests/${{ steps.core-lane.outputs.lane }}.json
+            core/build/test-results/${{ steps.core-lane.outputs.task }}
+            build/reports/tests/core/${{ steps.core-lane.outputs.task }}
+            core/build/jacoco/${{ steps.core-lane.outputs.task }}.exec
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload coverage data
+        if: >-
+          github.event_name == 'pull_request' &&
+          !startsWith(matrix.shard, 'core-')
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-${{ matrix.shard }}
+          # build.gradle.kts anchors the artifact at the repository root, so the report paths keep
+          # their module prefix, which jacoco_report.py uses to name modules.
+          path: |
+            build.gradle.kts
+            **/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload unit tests report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: unit test report ${{ matrix.shard }}
+          path: |
+            build/reports
+            build/reports/tests/core
+            core/build/test-results
+            core/build/test-manifests
+            core/build/jacoco/*.exec
+            catalogs-contrib/**/*.log
+            catalogs-contrib/**/*.tar
+            catalogs/**/*.log
+            catalogs/**/*.tar
+
+  core-test-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [ changes, build ]
+    if: >-
+      always() &&
+      needs.changes.outputs.source_changes == 'true' &&
+      needs.changes.outputs.maintenance_module_only_changes != 'true' &&
+      needs.build.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test core identity tool
+        run: python3 -B -m unittest discover -s dev/ci/tests -p 'test_core_test_identity.py'
+
+      - name: Download unit evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: core-unit-test-evidence
+          path: core-test-evidence/unit
+
+      - name: Download H2 evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: core-h2-test-evidence
+          path: core-test-evidence/h2
+
+      - name: Download MySQL evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: core-mysql-test-evidence
+          path: core-test-evidence/mysql
+
+      - name: Download PostgreSQL evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: core-postgresql-test-evidence
+          path: core-test-evidence/postgresql
+
+      - name: Reconcile core test identities
+        run: |
+          mkdir -p core/build/test-manifests
+          python3 dev/ci/core_test_identity.py reconcile \
+            --manifests \
+            core-test-evidence/unit/core/build/test-manifests/unit.json \
+            core-test-evidence/h2/core/build/test-manifests/h2.json \
+            core-test-evidence/mysql/core/build/test-manifests/mysql.json \
+            core-test-evidence/postgresql/core/build/test-manifests/postgresql.json \
+            --output core/build/test-manifests/summary.json
+
+      - name: Upload core test contract
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-test-contract
+          path: core/build/test-manifests/summary.json
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [ changes, build, core-test-contract ]
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success' &&
+      (needs.changes.outputs.maintenance_module_only_changes == 'true' ||
+      needs['core-test-contract'].result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        with:
+          java-version: 17
+
       - name: Fetch base branch for coverage diff
-        if: github.event_name == 'pull_request'
         run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Download coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jacoco-*
+          merge-multiple: true
+
+      - name: Download unit evidence
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: core-unit-test-evidence
+          path: core-test-evidence/unit
+
+      - name: Download H2 evidence
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: core-h2-test-evidence
+          path: core-test-evidence/h2
+
+      - name: Download MySQL evidence
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: core-mysql-test-evidence
+          path: core-test-evidence/mysql
+
+      - name: Download PostgreSQL evidence
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: core-postgresql-test-evidence
+          path: core-test-evidence/postgresql
+
+      - name: Generate combined core coverage
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        run: |
+          mkdir -p core/build/jacoco
+          install -m 0644 \
+            core-test-evidence/unit/core/build/jacoco/coreUnitTest.exec \
+            core/build/jacoco/coreUnitTest.exec
+          install -m 0644 \
+            core-test-evidence/h2/core/build/jacoco/coreH2Test.exec \
+            core/build/jacoco/coreH2Test.exec
+          install -m 0644 \
+            core-test-evidence/mysql/core/build/jacoco/coreMySQLTest.exec \
+            core/build/jacoco/coreMySQLTest.exec
+          install -m 0644 \
+            core-test-evidence/postgresql/core/build/jacoco/corePostgreSQLTest.exec \
+            core/build/jacoco/corePostgreSQLTest.exec
+          ./gradlew \
+            :core:jacocoTestReport \
+            -PcoreSuiteCoverage=true \
+            -PskipWeb=true
+          test -s core/build/reports/jacoco/test/jacocoTestReport.xml
 
       - name: Generate Coverage Report
         id: coverage
-        if: github.event_name == 'pull_request'
         run: |
           python3 dev/ci/jacoco_report.py \
             --base-ref "${{ github.base_ref }}" \
@@ -240,32 +483,21 @@ jobs:
             --output coverage-report.md
 
       - name: Save PR number
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        if: steps.coverage.outputs.has_reports == 'true'
         run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
 
       - name: Upload Coverage Report
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        if: steps.coverage.outputs.has_reports == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
             coverage-report.md
             pr-number.txt
+            core/build/reports/jacoco/test/jacocoTestReport.xml
 
       - name: Output Coverage Info
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        if: steps.coverage.outputs.has_reports == 'true'
         run: |
           echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
-
-      - name: Upload unit tests report
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: unit test report
-          path: |
-            build/reports
-            catalogs-contrib/**/*.log
-            catalogs-contrib/**/*.tar
-            catalogs/**/*.log
-            catalogs/**/*.tar
