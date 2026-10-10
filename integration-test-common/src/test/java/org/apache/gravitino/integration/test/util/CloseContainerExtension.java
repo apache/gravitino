@@ -32,14 +32,11 @@ import org.slf4j.LoggerFactory;
 public class CloseContainerExtension implements BeforeAllCallback {
   @Override
   public void beforeAll(ExtensionContext extensionContext) {
-    // Ensure that the container suite is initialized before closing it
-    if (ContainerSuite.initialized()) {
-      synchronized (CloseContainerExtension.class) {
-        extensionContext
-            .getRoot()
-            .getStore(ExtensionContext.Namespace.GLOBAL)
-            .getOrComputeIfAbsent(CloseableContainer.class);
-      }
+    synchronized (CloseContainerExtension.class) {
+      extensionContext
+          .getRoot()
+          .getStore(ExtensionContext.Namespace.GLOBAL)
+          .getOrComputeIfAbsent(CloseableContainer.class);
     }
   }
 
@@ -48,13 +45,9 @@ public class CloseContainerExtension implements BeforeAllCallback {
     private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
 
     @Override
-    public void close() {
-      try {
-        CONTAINER_SUITE.close();
-        LOGGER.info("Containers were closed successfully");
-      } catch (Exception e) {
-        LOGGER.warn("Containers were not closed as expected", e);
-      }
+    public void close() throws Exception {
+      CONTAINER_SUITE.close();
+      LOGGER.info("Containers were closed successfully");
     }
   }
 }
