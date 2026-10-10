@@ -128,6 +128,7 @@ public class JsonUtils {
   private static final String LIST = "list";
   private static final String MAP = "map";
   private static final String UNION = "union";
+  private static final String VECTOR = "vector";
   private static final String UNPARSED = "unparsed";
   private static final String UNPARSED_TYPE = "unparsedType";
   private static final String EXTERNAL = "external";
@@ -139,6 +140,7 @@ public class JsonUtils {
   private static final String STRUCT_FIELD_COMMENT = "comment";
   private static final String LIST_ELEMENT_NULLABLE = "containsNull";
   private static final String LIST_ELEMENT_TYPE = "elementType";
+  private static final String VECTOR_DIMENSION = "dimension";
   private static final String MAP_KEY_TYPE = "keyType";
   private static final String MAP_VALUE_TYPE = "valueType";
   private static final String MAP_VALUE_NULLABLE = "valueContainsNull";
@@ -188,6 +190,8 @@ public class JsonUtils {
   private static final Pattern TIME = Pattern.compile("time\\((\\d+)\\)");
   private static final Pattern TIMESTAMP_TZ = Pattern.compile("timestamp_tz\\((\\d+)\\)");
   private static final Pattern TIMESTAMP = Pattern.compile("timestamp\\((\\d+)\\)");
+  private static final Pattern VECTOR_LITERAL =
+      Pattern.compile("vector\\((.*)\\)", Pattern.CASE_INSENSITIVE);
 
   /**
    * Abstract iterator class for iterating over elements of a JSON array.
@@ -707,6 +711,9 @@ public class JsonUtils {
       case UNION:
         writeUnionType((Types.UnionType) dataType, gen);
         break;
+      case VECTOR:
+        writeVectorType((Types.VectorType) dataType, gen);
+        break;
       case UNPARSED:
         writeUnparsedType((Types.UnparsedType) dataType, gen);
         break;
@@ -754,6 +761,10 @@ public class JsonUtils {
         return readUnionType(node);
       }
 
+      if (VECTOR.equals(type)) {
+        return readVectorType(node);
+      }
+
       if (UNPARSED.equals(type)) {
         return readUnparsedType(node);
       }
@@ -777,6 +788,16 @@ public class JsonUtils {
     }
     gen.writeEndArray();
 
+    gen.writeEndObject();
+  }
+
+  private static void writeVectorType(Types.VectorType vectorType, JsonGenerator gen)
+      throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(TYPE, VECTOR);
+    gen.writeFieldName(LIST_ELEMENT_TYPE);
+    writeDataType(vectorType.elementType(), gen);
+    gen.writeNumberField(VECTOR_DIMENSION, vectorType.dimension());
     gen.writeEndObject();
   }
 
@@ -904,7 +925,45 @@ public class JsonUtils {
       return Types.TimestampType.withoutTimeZone(Integer.parseInt(timestamp.group(1)));
     }
 
+    Matcher vector = VECTOR_LITERAL.matcher(orignalTypeString);
+    if (vector.matches()) {
+      return readVectorLiteral(vector.group(1), orignalTypeString);
+    }
+
     return Types.UnparsedType.of(orignalTypeString);
+  }
+
+  private static Type readVectorLiteral(String body, String originalTypeString) {
+    try {
+      int separator = findTopLevelLastComma(body);
+      if (separator < 0) {
+        Type elementType = fromPrimitiveTypeString(body.trim().toLowerCase(), body.trim());
+        return Types.VectorType.of(elementType);
+      }
+
+      String elementTypeString = body.substring(0, separator).trim();
+      String dimensionString = body.substring(separator + 1).trim();
+      Type elementType =
+          fromPrimitiveTypeString(elementTypeString.toLowerCase(), elementTypeString);
+      return Types.VectorType.of(elementType, Integer.parseInt(dimensionString));
+    } catch (IllegalArgumentException e) {
+      return Types.UnparsedType.of(originalTypeString);
+    }
+  }
+
+  private static int findTopLevelLastComma(String value) {
+    int depth = 0;
+    for (int index = value.length() - 1; index >= 0; index--) {
+      char character = value.charAt(index);
+      if (character == ')') {
+        depth++;
+      } else if (character == '(') {
+        depth--;
+      } else if (character == ',' && depth == 0) {
+        return index;
+      }
+    }
+    return -1;
   }
 
   private static Types.StructType readStructType(JsonNode node) {
@@ -958,6 +1017,19 @@ public class JsonUtils {
       unionTypes.add(readDataType(type));
     }
     return Types.UnionType.of(unionTypes.toArray(new Type[0]));
+  }
+
+  private static Types.VectorType readVectorType(JsonNode node) {
+    Preconditions.checkArgument(
+        node.has(LIST_ELEMENT_TYPE),
+        "Cannot parse vector type from missing element type: %s",
+        node);
+    Preconditions.checkArgument(
+        node.has(VECTOR_DIMENSION) && node.get(VECTOR_DIMENSION).canConvertToInt(),
+        "Cannot parse vector type from missing or invalid dimension: %s",
+        node);
+    return Types.VectorType.of(
+        readDataType(node.get(LIST_ELEMENT_TYPE)), node.get(VECTOR_DIMENSION).intValue());
   }
 
   private static Types.StructType.Field readStructField(JsonNode node) {
