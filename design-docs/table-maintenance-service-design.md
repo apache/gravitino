@@ -85,11 +85,11 @@ listener and leaves the IdP-style plugin model used elsewhere on the main server
 TMS schedules three kinds of work (policy expand, cron Spark submit, commit-triggered Spark
 submit). Industry options compared below:
 
-|                                  | **db-scheduler** (Chosen) | JobRunr | ShedLock   | Quartz JDBC |
-| -------------------------------- | ------------------------- | ------- | ---------- | ----------- |
-| License                          | Apache 2.0                | LGPL v3 | Apache 2.0 | Apache 2.0  |
-| Cluster CAS + heartbeat          | Yes                       | Yes     | Lock only  | Yes (heavy) |
-| Fits long-lived expand + one-shot submits | Yes                | Yes     | No         | Yes         |
+|                                           | **db-scheduler** (Chosen) | JobRunr | ShedLock   | Quartz JDBC |
+| ----------------------------------------- | ------------------------- | ------- | ---------- | ----------- |
+| License                                   | Apache 2.0                | LGPL v3 | Apache 2.0 | Apache 2.0  |
+| Cluster CAS + heartbeat                   | Yes                       | Yes     | Lock only  | Yes (heavy) |
+| Fits long-lived expand + one-shot submits | Yes                       | Yes     | No         | Yes         |
 
 **Chosen:** db-scheduler — Apache 2.0, one `scheduled_tasks` table with built-in heartbeat, and it
 fits both long-lived expand leases and one-shot cron/commit submits (three pools: expand / cron /
@@ -101,8 +101,8 @@ can do the job but is heavier than needed here.
 Question surveyed: if metrics were sampled at snapshot `S0` but `currentSnapshotId` is already
 newer, do systems still trigger maintenance?
 
-|                                                     | **Amoro** | **Floe** | **OpenHouse** |
-| --------------------------------------------------- | --------- | -------- | ------------- |
+|                                                       | **Amoro** | **Floe**            | **OpenHouse**       |
+| ----------------------------------------------------- | --------- | ------------------- | ------------------- |
 | Gate when metrics `snapshotId` ≠ `currentSnapshotId`? | **Yes**   | No (not considered) | No (not considered) |
 
 **Amoro:** evaluates / plans against the then-current snapshot and binds that id as
@@ -207,10 +207,10 @@ Policy content is versioned, edited through Policy APIs, and readable with `VIEW
 
 TMS talks to **two** backends with **two** identities, so there are two prefixes:
 
-| Prefix                                 | Who uses it                                              |
-| -------------------------------------- | -------------------------------------------------------- |
+| Prefix                                 | Who uses it                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------- |
 | `gravitino.maintenance.gravitinoAuth.` | Control plane (expand / submit / RBAC) and Jobs that call **Gravitino** |
-| `gravitino.maintenance.ircAuth.`       | Spark Jobs that call **Iceberg REST**                    |
+| `gravitino.maintenance.ircAuth.`       | Spark Jobs that call **Iceberg REST**                                   |
 
 They are not interchangeable: one principal for metalake APIs, one for IRC.
 
@@ -226,11 +226,11 @@ each — it does not write secrets back into policy content:
 
 db-scheduler runs **three** task kinds in `scheduled_tasks`:
 
-| Kind | `task_name`     | Role                                              |
-| ---- | --------------- | ------------------------------------------------- |
-| 1    | `policy-expand` | Long-lived lease per policy; fans out cron-jobs   |
-| 2    | `cron-job`      | One-shot crontab Spark submit                     |
-| 3    | `commit-job`    | One-shot commit-triggered chained Spark submit    |
+| Kind | `task_name`     | Role                                            |
+| ---- | --------------- | ----------------------------------------------- |
+| 1    | `policy-expand` | Long-lived lease per policy; fans out cron-jobs |
+| 2    | `cron-job`      | One-shot crontab Spark submit                   |
+| 3    | `commit-job`    | One-shot commit-triggered chained Spark submit  |
 
 **policy-expand** stays after each pick. **cron-job** and **commit-job** are deleted after a
 short `runJob`. Spark lifetime and in-flight checks use `table_maintenance_job`, not those
@@ -239,11 +239,11 @@ one-shot rows.
 Every node may poll; **exactly one claim wins** per due instance (CAS + heartbeat). Missed
 heartbeats free only a hung **short** callback — not a long-running Spark Job.
 
-| Pool   | Registers       | Default threads | conf key (`gravitino.maintenance.`) |
-| ------ | --------------- | --------------- | ----------------------------------- |
-| Expand | policy-expand   | 4               | `scheduler.expand.threads`          |
-| Cron   | cron-job        | 8               | `scheduler.cron.threads`            |
-| Commit | commit-job      | 4               | `scheduler.commit.threads`          |
+| Pool   | Registers     | Default threads | conf key (`gravitino.maintenance.`) |
+| ------ | ------------- | --------------- | ----------------------------------- |
+| Expand | policy-expand | 4               | `scheduler.expand.threads`          |
+| Cron   | cron-job      | 8               | `scheduler.cron.threads`            |
+| Commit | commit-job    | 4               | `scheduler.commit.threads`          |
 
 PK is `(task_name, task_instance)`. `scheduled_tasks` uses upstream db-scheduler DDL.
 
@@ -436,19 +436,18 @@ where needed, mutate tables, and run Jobs.
 
 ### 7.1 Enablement
 
-| Key                                       | Description                                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `gravitino.server.rest.extensionPackages` | Include TMS Feature package (e.g. `org.apache.gravitino.maintenance.web.rest.feature`)           |
-| `gravitino.auxService.names`              | Include `iceberg-rest` when using IRC (same JVM)                                                 |
-| `gravitino.eventListener.names`           | Include a TMS commit-job listener name (e.g. `tms-commit-job`)                                   |
-| `gravitino.eventListener.{name}.class`    | FQCN of the TMS `EventListenerPlugin` that upserts commit-job on `IcebergUpdateTableEvent`       |
+| Key                                       | Description                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `gravitino.server.rest.extensionPackages` | Include TMS Feature package (e.g. `org.apache.gravitino.maintenance.web.rest.feature`)     |
+| `gravitino.auxService.names`              | Include `iceberg-rest` when using IRC (same JVM)                                           |
+| `gravitino.eventListener.names`           | Include a TMS commit-job listener name (e.g. `tms-commit-job`)                             |
+| `gravitino.eventListener.{name}.class`    | FQCN of the TMS `EventListenerPlugin` that upserts commit-job on `IcebergUpdateTableEvent` |
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
 gravitino.auxService.names = iceberg-rest
 gravitino.eventListener.names = tms-commit-job
-gravitino.eventListener.tms-commit-job.class = \
-  org.apache.gravitino.maintenance.listener.IcebergUpdateTableEventListener
+gravitino.eventListener.tms-commit-job.class = org.apache.gravitino.maintenance.listener.IcebergUpdateTableEventListener
 gravitino.maintenance.scheduler.expand.threads = 4
 gravitino.maintenance.scheduler.cron.threads = 8
 gravitino.maintenance.scheduler.commit.threads = 4
@@ -505,15 +504,15 @@ Illustrative auth keys (same shape under each prefix; values may be SecretManage
 the deployment supports them). Auth keys are **overlaid** onto each bag; they do not replace
 non-sensitive updater / policy props:
 
-| Key (suffix)        | Example                                  | Notes                |
-| ------------------- | ---------------------------------------- | -------------------- |
-| `authType`          | `none` / `basic` / `oauth2` / `kerberos` | Auth mode            |
-| `password`          | secret ref or plaintext                  | basic                |
-| `oauth2ServerUri`   | `https://idp/…/token`                    | oauth token endpoint |
-| `oauthCredential`   | `client_id:client_secret`                | oauth credential     |
-| `oauthScope`        | (IdP-defined; e.g. Azure `api://…/.default`) | oauth scope      |
-| `kerberosPrincipal` | `tms/_HOST@REALM`                        | Kerberos             |
-| `keytab`            | path or secret ref                       | Kerberos             |
+| Key (suffix)        | Example                                      | Notes                |
+| ------------------- | -------------------------------------------- | -------------------- |
+| `authType`          | `none` / `basic` / `oauth2` / `kerberos`     | Auth mode            |
+| `password`          | secret ref or plaintext                      | basic                |
+| `oauth2ServerUri`   | `https://idp/…/token`                        | oauth token endpoint |
+| `oauthCredential`   | `client_id:client_secret`                    | oauth credential     |
+| `oauthScope`        | (IdP-defined; e.g. Azure `api://…/.default`) | oauth scope          |
+| `kerberosPrincipal` | `tms/_HOST@REALM`                            | Kerberos             |
+| `keytab`            | path or secret ref                           | Kerberos             |
 
 ```properties
 # Gravitino client (control plane)
@@ -531,13 +530,13 @@ gravitino.maintenance.ircAuth.oauthCredential = client_id:client_secret
 
 ## 8. Work Plan and Checklist
 
-| Phase | Work                                                                                  |
-| ----- | ------------------------------------------------------------------------------------- |
-| 1     | `TableMaintenanceRESTFeature`; start/stop three db-scheduler pools                    |
-| 2     | `PolicyExpandPipeline` + `MaintenanceSparkSubmitPipeline` + gates                     |
-| 3     | Migrations: `scheduled_tasks`, `table_maintenance_job`, `table_snapshot_metrics`      |
-| 4     | IRC EventListener upserts commit-job; policy create → INSERT expand; Job listener     |
-| 5     | Metrics, shutdown, docs; `gravitino.conf` client auth; privilege docs                 |
+| Phase | Work                                                                              |
+| ----- | --------------------------------------------------------------------------------- |
+| 1     | `TableMaintenanceRESTFeature`; start/stop three db-scheduler pools                |
+| 2     | `PolicyExpandPipeline` + `MaintenanceSparkSubmitPipeline` + gates                 |
+| 3     | Migrations: `scheduled_tasks`, `table_maintenance_job`, `table_snapshot_metrics`  |
+| 4     | IRC EventListener upserts commit-job; policy create → INSERT expand; Job listener |
+| 5     | Metrics, shutdown, docs; `gravitino.conf` client auth; privilege docs             |
 
 Implementation checklist:
 
