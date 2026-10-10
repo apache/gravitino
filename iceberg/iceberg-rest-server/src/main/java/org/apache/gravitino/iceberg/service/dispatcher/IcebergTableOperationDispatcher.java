@@ -28,6 +28,7 @@ import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -136,6 +137,36 @@ public interface IcebergTableOperationDispatcher {
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest);
+
+  /**
+   * Fetch the result of a previously submitted async scan plan.
+   *
+   * <p>When {@link #planTableScan} returns a {@code SUBMITTED} status with a plan ID, clients use
+   * this method to poll for the result.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param planId The plan identifier returned by a prior {@link #planTableScan} call.
+   * @return A {@link FetchPlanningResultResponse} containing the current plan status and, when
+   *     complete, the scan tasks.
+   * @throws org.apache.iceberg.exceptions.NoSuchPlanIdException if the plan ID is unknown.
+   */
+  FetchPlanningResultResponse fetchPlanningResult(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId);
+
+  /**
+   * Cancel a previously submitted async scan plan.
+   *
+   * <p>When {@link #planTableScan} returns a {@code SUBMITTED} status with a plan ID, clients use
+   * this method to cancel the in-progress plan.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param planId The plan identifier returned by a prior {@link #planTableScan} call.
+   * @throws org.apache.iceberg.exceptions.NoSuchPlanIdException if the plan ID is unknown.
+   */
+  void cancelPlanning(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId);
 
   /**
    * Fetch the scan tasks for a {@code plan-task} returned by a prior {@link #planTableScan} call,
