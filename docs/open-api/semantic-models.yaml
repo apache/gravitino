@@ -74,10 +74,10 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
-        "501":
-          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelAlreadyExistsResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "502":
           $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
         "5XX":
@@ -96,7 +96,8 @@ paths:
       description: >-
         Imports one standalone Apache Ossie document and creates the represented Semantic Model.
         The request body is the raw JSON or YAML document, not a JSON-encoded string. Content-Type
-        selects the parser, and parsing does not fall back to another format.
+        selects the parser; when the header is absent, the body is parsed as YAML. Parsing does not
+        fall back to another format.
       operationId: importOssieDocument
       requestBody:
         required: true
@@ -134,14 +135,14 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
-        "501":
-          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelAlreadyExistsResponse"
         "415":
           description: >-
-            Unsupported Media Type - Content-Type must be application/json, application/yaml,
-            application/x-yaml, or text/yaml
+            Unsupported Media Type - An explicitly supplied Content-Type is not one of
+            application/json, application/yaml, application/x-yaml, or text/yaml
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "502":
           $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
         "5XX":
@@ -202,10 +203,10 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelNotFoundResponse"
-        "501":
-          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelAlterConflictResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "502":
           $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
         "5XX":
@@ -237,10 +238,10 @@ paths:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
                 NoSuchCatalogException:
                   $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
-        "501":
-          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelOptimisticLockResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
