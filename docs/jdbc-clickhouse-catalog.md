@@ -299,11 +299,15 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
 
   When adding a data-skipping index to an existing table through Gravitino's `ALTER TABLE ADD INDEX`, existing data parts are not synchronously backfilled, and Gravitino does not issue a materialization command. To materialize the index on existing data, run `ALTER TABLE <table> MATERIALIZE INDEX <index_name>` directly in ClickHouse. This can take time, especially for vector indexes; ClickHouse may also materialize indexes during later background merges, depending on its settings.
 
-  - Legacy `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` metadata read from ClickHouse versions that expose these definitions. Their reported type expression is retained in `clickhouse_type_full`; parsed parameters are exposed as `annoy_trees` or `usearch_distance_function`. These index types are metadata-only: Gravitino rejects CREATE TABLE definitions, ALTER TABLE ADD INDEX requests, and table recreation that use them. They do not provide insert or vector-search support. Gravitino does not automatically migrate them to `vector_similarity`; any migration must be explicit.
+  - Legacy `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` metadata read from ClickHouse versions that expose these definitions. Their reported type expression is retained in `clickhouse_type_full`.
+  - Annoy parameters are exposed as `annoy_distance_function` (`L2Distance` or `cosineDistance`) and `annoy_trees`. USearch parameters are exposed as `usearch_distance_function` (`L2Distance` or `cosineDistance`) and `usearch_scalar_kind` (`f64`, `f32`, `f16`, or `i8`). Only parameters present in the reported expression are materialized; omitted parameters are not inferred. Empty parameter lists and bare legacy type names are valid metadata forms.
+  - These index types are metadata-only: Gravitino rejects CREATE TABLE definitions, ALTER TABLE ADD INDEX requests, and table recreation that use them. They do not provide insert or vector-search support. Gravitino does not automatically migrate them to `vector_similarity`; any migration must be explicit.
 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
   On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
+  The legacy fallback query may return only the bare `annoy` or `usearch` type name. Gravitino preserves that reported name without a parsing warning; parameter properties remain absent because the server did not expose them.
 
   For `DATA_SKIPPING_VECTOR_SIMILARITY`, Gravitino restores parameters from the legacy `type` value when present. If the legacy value is bare and cannot provide the required parameters, the index is skipped with a warning.
 

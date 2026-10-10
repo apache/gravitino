@@ -115,8 +115,14 @@ public class ClickHouseConstants {
     /** Property key for the number of trees in a legacy Annoy index. */
     public static final String ANNOY_TREES = "annoy_trees";
 
+    /** Property key for the distance function in a legacy Annoy index. */
+    public static final String ANNOY_DISTANCE_FUNCTION = "annoy_distance_function";
+
     /** Property key for the distance function in a legacy USearch index. */
     public static final String USEARCH_DISTANCE_FUNCTION = "usearch_distance_function";
+
+    /** Property key for the scalar kind in a legacy USearch index. */
+    public static final String USEARCH_SCALAR_KIND = "usearch_scalar_kind";
 
     /** Property key for ClickHouse's complete index type expression. */
     public static final String CLICKHOUSE_TYPE_FULL = "clickhouse_type_full";

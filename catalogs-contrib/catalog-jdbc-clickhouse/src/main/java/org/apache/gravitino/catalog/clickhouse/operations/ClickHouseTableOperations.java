@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.ANNOY_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.ANNOY_TREES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.BLOOM_FILTER_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
@@ -37,6 +38,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_SCALAR_KIND;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DIMENSIONS;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_QUANTIZATION;
@@ -2603,15 +2605,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     int paramsStart = normalizedTypeFull.indexOf('(');
-    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
     if (paramsStart < 0 && StringUtils.equalsIgnoreCase(expectedType, normalizedTypeFull)) {
-      LOG.warn(
-          "ClickHouse metadata does not expose legacy {} parameters for index '{}'; "
-              + "preserving the reported type expression only",
-          expectedType,
-          indexName);
       return Map.copyOf(properties);
     }
+    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
     if (paramsStart <= 0
         || paramsEnd != normalizedTypeFull.length() - 1
         || !StringUtils.equalsIgnoreCase(
@@ -2626,37 +2623,81 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return Map.copyOf(properties);
     }
 
-    String[] parameters = normalizedTypeFull.substring(paramsStart + 1, paramsEnd).split(",", -1);
-    if (indexType == Index.IndexType.DATA_SKIPPING_ANNOY
-        && parameters.length == 1
-        && StringUtils.isBlank(parameters[0])) {
+    // ClickHouse documents both parameter lists as optional, so an empty list is valid metadata.
+    String parameterText = normalizedTypeFull.substring(paramsStart + 1, paramsEnd);
+    if (StringUtils.isBlank(parameterText)) {
       return Map.copyOf(properties);
     }
-    if (parameters.length != 1 || StringUtils.isBlank(parameters[0])) {
-      LOG.warn(
-          "Could not parse parameters in legacy ClickHouse type expression '{}' for index '{}'; "
-              + "preserving the complete expression",
-          rawTypeFull,
-          indexName);
-      return Map.copyOf(properties);
-    }
+    // These parameters are fixed identifiers or an integer, so commas delimit the argument list.
+    String[] parameters = parameterText.split(",", -1);
 
-    String parameter = unquoteMetadataParameter(parameters[0].trim());
     if (indexType == Index.IndexType.DATA_SKIPPING_ANNOY) {
-      if (parameter.matches("[0-9]+")) {
-        properties.put(ANNOY_TREES, parameter);
+      if (parameters.length == 1) {
+        String parameter = unquoteMetadataParameter(parameters[0].trim());
+        if (isUnsignedInteger(parameter)) {
+          // Preserve the one-argument form that predates the optional distance parameter.
+          properties.put(ANNOY_TREES, parameter);
+        } else if (isLegacyAnnUsearchDistanceFunction(parameter)) {
+          properties.put(ANNOY_DISTANCE_FUNCTION, parameter);
+        } else {
+          warnUnparsedLegacyAnnUsearchParameters(rawTypeFull, expectedType, indexName);
+        }
+      } else if (parameters.length == 2) {
+        String distanceFunction = unquoteMetadataParameter(parameters[0].trim());
+        String trees = unquoteMetadataParameter(parameters[1].trim());
+        if (isLegacyAnnUsearchDistanceFunction(distanceFunction) && isUnsignedInteger(trees)) {
+          properties.put(ANNOY_DISTANCE_FUNCTION, distanceFunction);
+          properties.put(ANNOY_TREES, trees);
+        } else {
+          warnUnparsedLegacyAnnUsearchParameters(rawTypeFull, expectedType, indexName);
+        }
       } else {
-        LOG.warn(
-            "Could not parse Annoy tree count '{}' from legacy ClickHouse type expression '{}' "
-                + "for index '{}'; preserving the complete expression",
-            parameter,
-            rawTypeFull,
-            indexName);
+        warnUnparsedLegacyAnnUsearchParameters(rawTypeFull, expectedType, indexName);
+      }
+    } else if (parameters.length == 1) {
+      String distanceFunction = unquoteMetadataParameter(parameters[0].trim());
+      if (isLegacyAnnUsearchDistanceFunction(distanceFunction)) {
+        properties.put(USEARCH_DISTANCE_FUNCTION, distanceFunction);
+      } else {
+        warnUnparsedLegacyAnnUsearchParameters(rawTypeFull, expectedType, indexName);
+      }
+    } else if (parameters.length == 2) {
+      String distanceFunction = unquoteMetadataParameter(parameters[0].trim());
+      String scalarKind = unquoteMetadataParameter(parameters[1].trim());
+      if (isLegacyAnnUsearchDistanceFunction(distanceFunction)
+          && isLegacyUsearchScalarKind(scalarKind)) {
+        properties.put(USEARCH_DISTANCE_FUNCTION, distanceFunction);
+        properties.put(USEARCH_SCALAR_KIND, scalarKind);
+      } else {
+        warnUnparsedLegacyAnnUsearchParameters(rawTypeFull, expectedType, indexName);
       }
     } else {
-      properties.put(USEARCH_DISTANCE_FUNCTION, parameter);
+      warnUnparsedLegacyAnnUsearchParameters(rawTypeFull, expectedType, indexName);
     }
     return Map.copyOf(properties);
+  }
+
+  private static boolean isUnsignedInteger(String value) {
+    return value.matches("[0-9]+");
+  }
+
+  private static boolean isLegacyAnnUsearchDistanceFunction(String value) {
+    return StringUtils.equalsIgnoreCase("L2Distance", value)
+        || StringUtils.equalsIgnoreCase("cosineDistance", value);
+  }
+
+  private static boolean isLegacyUsearchScalarKind(String value) {
+    return StringUtils.equalsAnyIgnoreCase(value, "f64", "f32", "f16", "i8");
+  }
+
+  private static void warnUnparsedLegacyAnnUsearchParameters(
+      String typeFull, String expectedType, String indexName) {
+    LOG.warn(
+        "Could not parse parameters in legacy ClickHouse type expression '{}' for index '{}' "
+            + "of type {}; preserving the complete expression",
+        typeFull,
+        indexName,
+        expectedType);
   }
 
   private static String unquoteMetadataParameter(String parameter) {
