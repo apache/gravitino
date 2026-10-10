@@ -399,6 +399,12 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
+      // Registering a table adopts an existing dataset at the caller-supplied location. Validate
+      // that the location really resolves to a valid Lance dataset before we record it in
+      // Gravitino; otherwise an unrelated directory could be registered and later removed by
+      // drop/purge (see issue #13696). This must happen before any storage I/O or metadata write.
+      validateExistingDatasetLocation(ident, location, properties);
+
       // Currently, register operation does not read the schema from the underlying Lance dataset.
       // So we can't get the version of the dataset here.
       return super.createTable(
@@ -895,6 +901,38 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   Dataset openDataset(String location) {
     return openDataset(location, Map.of());
+  }
+
+  /**
+   * Validates that a caller-supplied location resolves to an existing, valid Lance dataset before
+   * any storage I/O adopts it. Registering a table stores the location verbatim; when a later
+   * drop/purge runs it deletes the dataset at that location. Without this check a plain directory
+   * could be registered and then removed as if it were a Lance dataset (issue #13696).
+   *
+   * @param ident the table being registered, used only for the error message
+   * @param location the caller-supplied dataset location
+   * @param properties the table properties, used to resolve storage options
+   * @throws IllegalArgumentException if the location is blank or does not resolve to a valid Lance
+   *     dataset
+   */
+  void validateExistingDatasetLocation(
+      NameIdentifier ident, String location, Map<String, String> properties) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(location),
+        "Table location must be specified when registering Lance table %s",
+        ident);
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
+    try (Dataset ignored = openDataset(location, storageOptions)) {
+      // Opening a non-Lance location throws; reaching here confirms a valid dataset.
+      LOG.debug("Validated Lance dataset at location {} for table {}", location, ident);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Location %s for Lance table %s does not resolve to a valid Lance dataset",
+              location, ident),
+          e);
+    }
   }
 
   Dataset openDataset(String location, Map<String, String> storageOptions) {
