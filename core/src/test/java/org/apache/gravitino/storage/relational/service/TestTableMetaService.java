@@ -120,11 +120,9 @@ public class TestTableMetaService extends TestJDBCBackend {
                         metalakeName, catalogName, schemaName, "table_legacy_delete"))
             .getTableId();
 
-    // Soft-delete ONE old version with an expired timeline directly, leaving the
-    // current live version row (deleted_at = 0) in place.
-    long expired = System.currentTimeMillis() - 10_000;
     // Soft-delete ONE old version with an expired timeline, leaving the current live version
     // row (deleted_at = 0) in place.
+    long expired = System.currentTimeMillis() - 10_000;
     execSql(
         "UPDATE table_version_info SET deleted_at = "
             + expired
