@@ -101,6 +101,12 @@ public class AuthorizationRequestContext {
    */
   private volatile List<Long> boundRoleIds = Collections.emptyList();
 
+  /** String subjects for the request's role union, built once rather than per object check. */
+  private volatile Set<String> boundRoleSubjects = Collections.emptySet();
+
+  /** String subjects restricted to the request's active role selection. */
+  private volatile Set<String> activeRoleSubjects = Collections.emptySet();
+
   /**
    * Authorizer-defined generation of the in-memory role policies this request last validated its
    * bound roles against. A role cleared after this generation must be reloaded before the request
@@ -252,6 +258,7 @@ public class AuthorizationRequestContext {
    */
   public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
     this.prefetchedRoleVersions = prefetchedRoleVersions;
+    updateActiveRoleSubjects();
   }
 
   /**
@@ -272,6 +279,12 @@ public class AuthorizationRequestContext {
     this.boundRoleIds =
         Collections.unmodifiableList(
             new ArrayList<>(Objects.requireNonNull(boundRoleIds, "boundRoleIds must not be null")));
+    Set<String> subjects = new HashSet<>();
+    for (Long roleId : this.boundRoleIds) {
+      subjects.add(String.valueOf(roleId));
+    }
+    this.boundRoleSubjects = Collections.unmodifiableSet(subjects);
+    updateActiveRoleSubjects();
   }
 
   /**
@@ -332,6 +345,38 @@ public class AuthorizationRequestContext {
    */
   public void setActiveRoles(ActiveRoles activeRoles) {
     this.activeRoles = Objects.requireNonNull(activeRoles, "activeRoles must not be null");
+    updateActiveRoleSubjects();
+  }
+
+  /**
+   * Returns immutable role-id subjects for policy evaluation, optionally restricted to active
+   * roles. Only roles bound by this request are included. DENY checks must pass {@code false} so
+   * inactive roles cannot hide denies. The sets are reused across object checks in a list request.
+   *
+   * @param activeOnly whether to restrict subjects to the active role selection
+   * @return role ids represented as strings; empty when no bound role matches
+   */
+  public Set<String> getBoundRoleSubjects(boolean activeOnly) {
+    return activeOnly ? activeRoleSubjects : boundRoleSubjects;
+  }
+
+  private void updateActiveRoleSubjects() {
+    if (activeRoles.isAll()) {
+      activeRoleSubjects = boundRoleSubjects;
+      return;
+    }
+    if (activeRoles.isNone() || boundRoleIds.isEmpty() || prefetchedRoleVersions == null) {
+      activeRoleSubjects = Collections.emptySet();
+      return;
+    }
+    Set<String> subjects = new HashSet<>();
+    for (Long roleId : boundRoleIds) {
+      RoleUpdatedAt role = prefetchedRoleVersions.get(roleId);
+      if (role != null && activeRoles.roleNames().contains(role.getRoleName())) {
+        subjects.add(String.valueOf(roleId));
+      }
+    }
+    activeRoleSubjects = Collections.unmodifiableSet(subjects);
   }
 
   /**
