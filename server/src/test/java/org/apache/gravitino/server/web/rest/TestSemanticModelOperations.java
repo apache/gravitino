@@ -34,12 +34,17 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
@@ -63,6 +68,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.rest.RESTUtils;
@@ -658,6 +664,53 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     SemanticModelResponse body = response.readEntity(SemanticModelResponse.class);
+    body.validate();
+    Assertions.assertEquals("marketing", body.getSemanticModel().name());
+    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
+    verify(dispatcher)
+        .createSemanticModel(
+            eq(ident),
+            eq(null),
+            any(SemanticModelDefinition.class),
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testImportOssieDocumentWithoutContentTypeDefaultsToYaml()
+      throws IOException, InterruptedException {
+    NameIdentifier ident = semanticModelIdentifier("marketing");
+    when(dispatcher.createSemanticModel(
+            eq(ident),
+            eq(null),
+            any(SemanticModelDefinition.class),
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
+        .thenReturn(semanticModel("marketing", null));
+
+    String yaml =
+        """
+        version: 0.2.0.dev0
+        name: marketing
+        datasets:
+          - name: campaigns
+            source: semantic_model_catalog.semantic_model_schema.campaigns
+            fields: []
+        """;
+    // The Jersey client may supply an entity media type, so send a raw HTTP request instead.
+    HttpRequest request =
+        HttpRequest.newBuilder(target(semanticModelPath() + "/ossie").getUri())
+            .timeout(Duration.ofSeconds(10))
+            .header(HttpHeaders.ACCEPT, VND_V1_JSON)
+            .POST(HttpRequest.BodyPublishers.ofString(yaml))
+            .build();
+    Assertions.assertTrue(request.headers().firstValue(HttpHeaders.CONTENT_TYPE).isEmpty());
+
+    HttpResponse<String> response =
+        HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.statusCode());
+    SemanticModelResponse body =
+        JsonUtils.objectMapper().readValue(response.body(), SemanticModelResponse.class);
     body.validate();
     Assertions.assertEquals("marketing", body.getSemanticModel().name());
     verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
