@@ -1,0 +1,151 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Container Image Advisories
+
+on:
+  schedule:
+    - cron: "23 7 1 * *"
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Optional registry image (prefer repo@sha256:digest); blank scans the maintained list'
+        type: string
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      image:
+        description: 'Published registry image to scan'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-image-advisories-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  targets:
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    continue-on-error: true
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Test advisory reporting and target selection
+        run: python3 -m unittest discover -s dev/ci -p test_container_image_report.py -v
+      - name: Read the explicit image list
+        id: targets
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          requested = os.environ["IMAGE"]
+          images = [requested] if requested else [
+              entry["image"] for entry in json.loads(Path("dev/ci/container-scan-images.json").read_text())["images"]
+          ]
+          if not images or len(images) > 256 or len(images) != len(set(images)):
+              raise ValueError("Expected 1–256 unique image references")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("matrix=" + json.dumps({"image": images}) + "\n")
+          PY
+      - name: Warn if target selection failed
+        if: failure()
+        run: echo '::warning::Image target selection failed; no clean scan is claimed.'
+
+  scan:
+    needs: targets
+    if: needs.targets.outputs.matrix != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    name: Advisory / ${{ matrix.image }}
+    env:
+      CONTAINER_IMAGE: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Record image reference
+        run: |
+          mkdir -p container-report
+          printf '%s\n' "$CONTAINER_IMAGE" > container-report/image.txt
+      - name: Inventory Linux amd64 registry image without running it
+        id: sbom
+        continue-on-error: true
+        timeout-minutes: 12
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        env:
+          SYFT_PLATFORM: linux/amd64
+        with:
+          image: registry:${{ env.CONTAINER_IMAGE }}
+          format: syft-json
+          output-file: container-report/sbom.json
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+      - name: Scan inventoried packages, including unfixed vulnerabilities
+        id: scan
+        if: steps.sbom.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: container-report/sbom.json
+          output-format: json
+          output-file: container-report/vulnerabilities.json
+          fail-build: false
+          only-fixed: false
+      - name: Summarize findings and coverage as warnings only
+        id: report
+        if: always()
+        continue-on-error: true
+        env:
+          SBOM_OUTCOME: ${{ steps.sbom.outcome }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          python3 dev/ci/container_image_report.py --image "$CONTAINER_IMAGE" \
+            --directory container-report --sbom-outcome "$SBOM_OUTCOME" --scan-outcome "$SCAN_OUTCOME" \
+            | tee container-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain per-image evidence
+        id: upload
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-image-${{ strategy.job-index }}
+          path: container-report/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Warn about unavailable reports
+        if: always() && (steps.report.outcome != 'success' || steps.upload.outcome != 'success')
+        run: |
+          echo '::warning title=Container report unavailable::Summary or artifact retention failed. Inspect the per-image steps; no clean scan is claimed.'
+          echo 'Summary or artifact retention failed; scan evidence is incomplete.' >> "$GITHUB_STEP_SUMMARY"
