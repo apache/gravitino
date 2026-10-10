@@ -106,6 +106,27 @@ public class ClickHouseConstants {
     public static final String HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION =
         "hnsw_candidate_list_size_for_construction";
 
+    /** The name of the legacy Annoy data-skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_ANNOY = "annoy";
+
+    /** The name of the legacy USearch data-skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_USEARCH = "usearch";
+
+    /** Property key for the number of trees in a legacy Annoy index. */
+    public static final String ANNOY_TREES = "annoy_trees";
+
+    /** Property key for the distance function in a legacy Annoy index. */
+    public static final String ANNOY_DISTANCE_FUNCTION = "annoy_distance_function";
+
+    /** Property key for the distance function in a legacy USearch index. */
+    public static final String USEARCH_DISTANCE_FUNCTION = "usearch_distance_function";
+
+    /** Property key for the scalar kind in a legacy USearch index. */
+    public static final String USEARCH_SCALAR_KIND = "usearch_scalar_kind";
+
+    /** Property key for ClickHouse's complete index type expression. */
+    public static final String CLICKHOUSE_TYPE_FULL = "clickhouse_type_full";
+
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
 
