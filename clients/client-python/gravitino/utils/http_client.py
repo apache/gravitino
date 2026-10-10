@@ -93,7 +93,7 @@ class HTTPClient:
             client_config
         )
         self.host = host
-        self.request_headers = request_headers or {}
+        self.request_headers = dict(request_headers or {})
         self.timeout = gravitino_client_config.get_client_request_timeout()
         self.is_debug = is_debug
         self.auth_data_provider = auth_data_provider
@@ -112,7 +112,9 @@ class HTTPClient:
         return url
 
     def _update_headers(self, request_headers):
-        self.request_headers.update(request_headers)
+        merged_headers = self.request_headers.copy()
+        merged_headers.update(request_headers)
+        return merged_headers
 
     def _mask_auth_headers(self, headers):
         if self.is_debug:
@@ -169,22 +171,22 @@ class HTTPClient:
 
         if data:
             request_data = urlencode(data.to_dict()).encode()
-            self._update_headers(self.FORMDATA_HEADER)
+            request_headers = self._update_headers(self.FORMDATA_HEADER)
         else:
             if json:
                 request_data = json.to_json().encode("utf-8")
 
-            self._update_headers(self.JSON_HEADER)
+            request_headers = self._update_headers(self.JSON_HEADER)
 
         if headers:
-            self._update_headers(headers)
+            request_headers.update(headers)
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
-        if self.request_headers:
-            for key, value in self.request_headers.items():
+        if request_headers:
+            for key, value in request_headers.items():
                 request.add_header(key, value)
-        if request_data and ("Content-Type" not in self.request_headers):
+        if request_data and ("Content-Type" not in request_headers):
             request.add_header("Content-Type", "application/json")
         if self.auth_data_provider is not None:
             request.add_header(
