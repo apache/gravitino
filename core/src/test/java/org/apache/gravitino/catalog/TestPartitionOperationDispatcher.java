@@ -184,6 +184,21 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
           tableWrite, () -> partitionOperationDispatcher.listPartitionNames(TABLE_IDENT));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           tableWrite,
+          () ->
+              Assertions.assertTrue(
+                  Arrays.stream(partitionOperationDispatcher.listPartitions(TABLE_IDENT))
+                      .anyMatch(p -> p.name().equals(partition.name()))));
+      // The test catalog does not support purge; reaching its exception proves that this entry
+      // point also proceeds while another thread holds the table lock.
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () ->
+              Assertions.assertThrows(
+                  UnsupportedOperationException.class,
+                  () ->
+                      partitionOperationDispatcher.purgePartition(TABLE_IDENT, partition.name())));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
           () -> partitionOperationDispatcher.dropPartition(TABLE_IDENT, partition.name()));
     }
 

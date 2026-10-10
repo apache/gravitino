@@ -41,6 +41,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -61,10 +62,10 @@ public class ModelVersionMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ModelVersionMetaService.class);
 
-  private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
-
   /** How many times a model-version read is re-run when the model changes underneath it. */
   @VisibleForTesting static final int MAX_STABLE_READ_ATTEMPTS = 3;
+
+  private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
 
   public static ModelVersionMetaService getInstance() {
     return INSTANCE;
@@ -458,7 +459,7 @@ public class ModelVersionMetaService {
    * @param read the read to run against the observed model row
    * @return the result of a read that saw no concurrent model change
    * @throws NoSuchEntityException if the model does not exist, or was dropped during the read
-   * @throws org.apache.gravitino.exceptions.OptimisticLockException if the model kept changing
+   * @throws OptimisticLockException if the model kept changing
    */
   @VisibleForTesting
   <T> T readWithStableModel(NameIdentifier modelIdent, Function<ModelPO, T> read) {

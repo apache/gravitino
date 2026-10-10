@@ -36,6 +36,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
@@ -1331,17 +1332,49 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           catalogWriter,
           () ->
+              modelOperationDispatcher.listModels(
+                  Namespace.of(metalake, catalog, "schema_model_lock_2")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModel(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.alterModel(
+                  modelIdent, ModelChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
               modelOperationDispatcher.linkModelVersion(
                   modelIdent, ImmutableMap.of("n1", "u1"), new String[] {"a1"}, null, null));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           catalogWriter, () -> modelOperationDispatcher.getModelVersion(modelIdent, "a1"));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersion(modelIdent, 0));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.listModelVersions(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
           catalogWriter, () -> modelOperationDispatcher.listModelVersionInfos(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n1"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "a1", "n1"));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           catalogWriter,
           () ->
               modelOperationDispatcher.alterModelVersion(
                   modelIdent, 0, ModelVersionChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.alterModelVersion(
+                  modelIdent, "a1", ModelVersionChange.updateComment("changed by alias")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.linkModelVersion(
+                  modelIdent, ImmutableMap.of("n2", "u2"), new String[] {"a2"}, null, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.deleteModelVersion(modelIdent, "a2"));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           catalogWriter, () -> modelOperationDispatcher.deleteModelVersion(modelIdent, 0));
       TreeLockTestSupport.assertRunsConcurrentlyWith(

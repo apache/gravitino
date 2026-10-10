@@ -1866,6 +1866,33 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetModelVersionByNumberRereadsConcurrentUpdate() throws IOException {
+    assertModelVersionReadRereads(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(version.nameIdentifier())));
+  }
+
+  @TestTemplate
+  public void testGetModelVersionByAliasRereadsConcurrentUpdate() throws IOException {
+    assertModelVersionReadRereads(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(
+                        NameIdentifier.of(version.namespace(), "stable_read_alias"))));
+  }
+
+  @TestTemplate
+  public void testListModelVersionsRereadsConcurrentUpdate() throws IOException {
+    assertModelVersionReadRereads(
+        version ->
+            ModelVersionMetaService.getInstance()
+                .listModelVersionsByNamespace(version.namespace()));
+  }
+
+  @TestTemplate
   public void testReadWithStableModelRereadsAfterConcurrentVersionChange() throws IOException {
     ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
     AtomicInteger reads = new AtomicInteger();
@@ -1925,6 +1952,46 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                           ModelMetaService.getInstance().deleteModel(version.modelIdentifier()));
                       return null;
                     }));
+  }
+
+  private void assertModelVersionReadRereads(
+      Function<ModelVersionEntity, List<ModelVersionEntity>> read) throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
+    AtomicInteger versionReads = new AtomicInteger();
+    try (MockedStatic<SessionUtils> sessions =
+        Mockito.mockStatic(SessionUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      sessions
+          .when(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      Mockito.eq(ModelVersionMetaMapper.class), Mockito.any()))
+          .thenAnswer(
+              invocation -> {
+                Object rows = invocation.callRealMethod();
+                if (versionReads.incrementAndGet() == 1) {
+                  // Commit after the first version-row query, before its alias query. Without
+                  // the stable-read check the caller would see the old URI and the new alias.
+                  updateModelVersionUnchecked(
+                      version.nameIdentifier(),
+                      current ->
+                          ModelVersionEntity.builder()
+                              .withModelIdentifier(current.modelIdentifier())
+                              .withVersion(current.version())
+                              .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "new_path"))
+                              .withAliases(ImmutableList.of("stable_read_alias", "new_alias"))
+                              .withComment(current.comment())
+                              .withProperties(current.properties())
+                              .withAuditInfo(current.auditInfo())
+                              .build());
+                }
+                return rows;
+              });
+
+      List<ModelVersionEntity> result = read.apply(version);
+      Assertions.assertEquals(1, result.size());
+      Assertions.assertEquals("new_path", result.get(0).uris().get(ModelVersion.URI_NAME_UNKNOWN));
+      Assertions.assertTrue(result.get(0).aliases().contains("new_alias"));
+    }
   }
 
   private ModelVersionEntity insertModelWithVersion(String alias) throws IOException {

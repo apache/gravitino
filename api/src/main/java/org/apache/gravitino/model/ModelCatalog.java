@@ -31,6 +31,7 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 
 /**
  * The ModelCatalog interface defines the public API for managing model objects in a schema. If the
@@ -40,6 +41,11 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
  * including for the same model, from one server or from several. An implementation must keep
  * version numbers and aliases unique under concurrent calls itself, for example by enforcing them
  * in its storage.
+ *
+ * <p>Conflicting operations may fail with {@link OptimisticLockException}. This includes reads when
+ * concurrent changes prevent obtaining consistent model-version metadata. Callers may retry reads
+ * with a bounded number of attempts; before retrying writes, reload the metadata and reconsider the
+ * intended change.
  */
 @Evolving
 public interface ModelCatalog {
