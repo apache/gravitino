@@ -149,7 +149,7 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
-    return writeStatistics(metalake, type, fullName, request, false);
+    return writeStatistics(metalake, type, fullName, request, WriteMode.REPLACE);
   }
 
   /**
@@ -174,7 +174,7 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
-    return writeStatistics(metalake, type, fullName, request, true);
+    return writeStatistics(metalake, type, fullName, request, WriteMode.MERGE);
   }
 
   @POST
@@ -484,7 +484,7 @@ public class StatisticOperations {
       String type,
       String fullName,
       StatisticsUpdateRequest request,
-      boolean merge) {
+      WriteMode mode) {
     if (request == null) {
       return ExceptionHandlers.handleStatisticException(
           OperationType.UPDATE,
@@ -497,7 +497,7 @@ public class StatisticOperations {
     try {
       LOG.info(
           "Received {} statistics request for object full name: {} type: {} in the metalake {}",
-          merge ? "merge" : "update",
+          mode == WriteMode.MERGE ? "merge" : "update",
           fullName,
           type,
           metalake);
@@ -521,7 +521,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            if (merge) {
+            if (mode == WriteMode.MERGE) {
               statisticDispatcher.mergeStatistics(metalake, object, statisticMaps);
             } else {
               statisticDispatcher.updateStatistics(metalake, object, statisticMaps);
@@ -586,5 +586,10 @@ public class StatisticOperations {
         request.getDrops().stream()
             .map(PartitionStatisticsDropDTO::partitionName)
             .collect(Collectors.toList()));
+  }
+
+  private enum WriteMode {
+    REPLACE,
+    MERGE
   }
 }

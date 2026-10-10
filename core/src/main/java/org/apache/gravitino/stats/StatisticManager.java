@@ -177,13 +177,13 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
   @Override
   public void updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
-    writeStatistics(metalake, metadataObject, statistics, false);
+    writeStatistics(metalake, metadataObject, statistics, WriteMode.REPLACE);
   }
 
   @Override
   public void mergeStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
-    writeStatistics(metalake, metadataObject, statistics, true);
+    writeStatistics(metalake, metadataObject, statistics, WriteMode.MERGE);
   }
 
   @Override
@@ -392,7 +392,7 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
       String metalake,
       MetadataObject metadataObject,
       Map<String, StatisticValue<?>> statistics,
-      boolean merge) {
+      WriteMode mode) {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       TreeLockUtils.doWithTreeLock(
@@ -401,7 +401,7 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
           (Executable<Void, IOException>)
               () -> {
                 Map<String, StatisticValue<?>> values = new HashMap<>(statistics);
-                if (merge) {
+                if (mode == WriteMode.MERGE) {
                   Map<String, StatisticValue<?>> existing = new HashMap<>();
                   for (StatisticEntity entity :
                       store.list(
@@ -458,5 +458,10 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private enum WriteMode {
+    REPLACE,
+    MERGE
   }
 }
