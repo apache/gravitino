@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -41,8 +43,10 @@ import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.view.ViewMetadata;
@@ -106,6 +110,21 @@ public class TestIcebergViewCatalogOperations {
         "Rename cannot be combined with other view changes.", exception.getMessage());
 
     verify(wrapper, never()).renameView(any());
+  }
+
+  @Test
+  public void testAlterViewRenameTranslatesAlreadyExistsException() {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    doThrow(new AlreadyExistsException("view already exists"))
+        .when(wrapper)
+        .renameView(any(RenameTableRequest.class));
+
+    Assertions.assertThrows(
+        ViewAlreadyExistsException.class,
+        () -> operations.alterView(ident, ViewChange.rename("view2")));
   }
 
   @Test

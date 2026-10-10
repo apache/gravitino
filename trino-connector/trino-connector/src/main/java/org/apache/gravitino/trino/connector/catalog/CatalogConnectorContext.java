@@ -162,6 +162,15 @@ public class CatalogConnectorContext {
   }
 
   /**
+   * Returns the view properties associated with this context.
+   *
+   * @return the view properties
+   */
+  public List<PropertyMetadata<?>> getViewProperties() {
+    return adapter.getViewProperties();
+  }
+
+  /**
    * Returns the Gravitino connector configuration.
    *
    * @return the Gravitino config
