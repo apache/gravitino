@@ -19,12 +19,15 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -110,10 +113,13 @@ public class TestOwnerManager {
         .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -278,6 +284,45 @@ public class TestOwnerManager {
           MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
 
       ownerManager.setOwner(METALAKE, catalogObject, USER, Owner.Type.USER);
+
+      Mockito.verify(authorizer)
+          .handleMetadataOwnerChange(
+              Mockito.eq(METALAKE),
+              Mockito.isNull(),
+              Mockito.eq(NameIdentifier.of(METALAKE, catalogName)),
+              Mockito.eq(Entity.EntityType.CATALOG));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+    }
+  }
+
+  @Test
+  @Order(5)
+  public void testInitialOwnerSetByBatchNotifiesAuthorizer()
+      throws IllegalAccessException, IOException {
+    String catalogName = "catalog_initial_owner_notify_batch";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(catalog, false);
+
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer originalAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+    try {
+      MetadataObject catalogObject =
+          MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
+
+      ownerManager.setOwners(
+          METALAKE, Collections.singletonList(catalogObject), USER, Owner.Type.USER);
 
       Mockito.verify(authorizer)
           .handleMetadataOwnerChange(

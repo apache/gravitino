@@ -135,13 +135,13 @@ Keep your private key secure and saved somewhere other than just on your compute
     Use the following command to generate hashes for a release:
 
     ```shell
-    shasum -a 256 <filename>.[zip|tar.gz] > <filename>.[zip|tar.gz].sha256
+    shasum -a 512 <filename>.[zip|tar.gz] > <filename>.[zip|tar.gz].sha512
     ```
 
-    For example, to generate a hash for the Gravitino 0.2.0 release you would use this command:
+    For example, to generate a hash for the Gravitino 1.3.1 release you would use this command:
 
     ```shell
-    shasum -a 256 gravitino.0.2.0.zip > gravitino.0.2.0.zip.sha256
+    shasum -a 512 gravitino-1.3.1-bin.tar.gz > gravitino-1.3.1-bin.tar.gz.sha512
     ```
 
 4. **Copy your public key to the KEYS file:**
@@ -155,7 +155,7 @@ Keep your private key secure and saved somewhere other than just on your compute
 
 5. **Publish hashes and signatures:**
 
-    Upload the generated .asc and .sha256 files along with the release artifacts and KEYS file to the release area.
+    Upload the generated .asc and .sha512 files along with the release artifacts and KEYS file to the release area.
 
 ## Verify a Release
 
@@ -188,13 +188,13 @@ Keep your private key secure and saved somewhere other than just on your compute
     Check if the hashes match, using the following command:
 
     ```shell
-    diff -u <filename>.[zip|tar.gz].sha256 <(shasum -a 256 <filename>.[zip|tar.gz])
+    diff -u <filename>.[zip|tar.gz].sha512 <(shasum -a 512 <filename>.[zip|tar.gz])
     ```
 
-    For example to verify the Gravitino 2.0 zip file you would use this command:
+    For example to verify the Gravitino 1.3.1 binary tarball you would use this command:
 
     ```shell
-    diff -u gravitino.0.2.0.zip.sha256 <(shasum -a 256 gravitino.0.2.0.zip)
+    diff -u gravitino-1.3.1-bin.tar.gz.sha512 <(shasum -a 512 gravitino-1.3.1-bin.tar.gz)
     ```
 
     This command ensures that the signatures match and that there are no differences between them.

@@ -25,11 +25,14 @@ Gravitino saves some system information in schema and table comments, like
 ### Catalog Capabilities
 
 - Gravitino catalog corresponds to the Doris instance.
-- Supports metadata management of Doris (1.2.x, 3.0.x, 4.0.x).
+- Supports metadata management of Doris (1.2.x, 2.1.x, 3.0.x, 4.0.x).
 - Supports table index (PRIMARY_KEY, UNIQUE_KEY, INVERTED, BITMAP (legacy), ANN/VECTOR).
 - Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 ### Catalog Properties
+
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
 
 Pass to a Doris data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
@@ -41,18 +44,34 @@ more details.
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Doris catalog has the following properties:
 
-| Configuration item      | Description                                                                                       | Default value | Required |
-|-------------------------|---------------------------------------------------------------------------------------------------|---------------|----------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`               | (none)        | Yes      |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                          | (none)        | Yes      |
-| `jdbc-user`             | The JDBC user name.                                                                               | (none)        | Yes      |
-| `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                      | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                 | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No       |
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
+
+### Doris 2.1.0 Table Comments
+
+Doris 2.1.0 can discard table comments when its Nereids planner handles `CREATE TABLE`.
+After every table creation, on all Doris versions, Gravitino reads the stored comment from
+`information_schema.TABLES` and, if it differs, restores it with
+`ALTER TABLE ... MODIFY COMMENT`, including Gravitino's table identifier. On affected servers,
+the JDBC user must have permission to alter the created table. The connector leaves the
+planner settings unchanged.
+
+If the comment lookup or restoration fails after `CREATE TABLE` succeeds, Gravitino reports
+that the table was created but its comment could not be verified or restored. Doris DDL is
+not rolled back, so the table remains and may be missing its Gravitino identifier. Drop the
+created table in Doris before retrying creation; otherwise, the retry fails because the table
+already exists.
 
 ### Driver Version Compatibility
 
@@ -84,7 +103,7 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
@@ -243,6 +262,7 @@ The Doris catalog supports the following index types. Each index applies to a si
 - `SHOW INDEX` does not escape embedded double quotes in property keys or values. Gravitino therefore does not guarantee their round-trip and rejects metadata that falls outside the supported flat quoted-pair format.
 - Index comments are not currently represented by the Gravitino `Index` API and are not preserved on round-trip.
 - `BITMAP` is a write-only legacy type for backward compatibility with Doris 1.2.x. The write path generates a bare `INDEX` (no USING clause), but the read path maps it back to `INVERTED` because Doris 4.0.6 removed BITMAP from the grammar. Creating a BITMAP index and reading it back will show `INVERTED`.
+- Native Doris `NGRAM_BF` indexes are detected during table loading but are not currently representable by a Gravitino index type. Loading a table that contains one fails with `UnsupportedOperationException` instead of mapping it to an unrelated Gravitino index type. Creating or altering NGRAM_BF indexes through Gravitino and preserving their `gram_size` or `bf_size` properties are not supported.
 :::
 
 **Primary Key example:**

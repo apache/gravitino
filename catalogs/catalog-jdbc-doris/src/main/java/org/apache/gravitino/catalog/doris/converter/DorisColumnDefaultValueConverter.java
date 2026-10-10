@@ -32,15 +32,102 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+
+  /**
+   * Converts an ADD COLUMN default value to Doris SQL.
+   *
+   * @param defaultValue the Gravitino default value
+   * @param doubleEscapeBackslashes whether to add the extra backslash escaping required by Doris
+   *     3.x ALTER ADD COLUMN
+   * @return the Doris SQL representation
+   */
+  public String fromGravitinoForAddColumn(
+      Expression defaultValue, boolean doubleEscapeBackslashes) {
+    return fromGravitinoForAddColumn(defaultValue, doubleEscapeBackslashes, false);
+  }
+
+  /**
+   * Converts an ADD COLUMN default value to Doris SQL with a selected string-literal delimiter.
+   *
+   * @param defaultValue the Gravitino default value
+   * @param doubleEscapeBackslashes whether to add the extra backslash escaping required by Doris
+   *     3.x ALTER ADD COLUMN
+   * @param useSingleQuoteDelimiter whether string literals should use single quotes and doubled
+   *     apostrophes, as required by the legacy Doris parser for adjacent double quotes
+   * @return the Doris SQL representation
+   */
+  public String fromGravitinoForAddColumn(
+      Expression defaultValue, boolean doubleEscapeBackslashes, boolean useSingleQuoteDelimiter) {
+    if (defaultValue instanceof Literal) {
+      Literal<?> literal = (Literal<?>) defaultValue;
+      if (literal.equals(Literals.NULL)) {
+        return super.fromGravitino(defaultValue);
+      }
+      // Doris 1.2 parses literal defaults as quoted strings and uses MySQL-style escaping.
+      if (literal.dataType() instanceof Type.NumericType
+          || literal.dataType() instanceof Types.StringType
+          || literal.dataType() instanceof Types.VarCharType
+          || literal.dataType() instanceof Types.FixedCharType) {
+        return quoteDorisLiteral(
+            String.valueOf(literal.value()), doubleEscapeBackslashes, useSingleQuoteDelimiter);
+      }
+    }
+    // Doris accepts the base converter's standard SQL syntax for date/time literals and
+    // expressions.
+    return super.fromGravitino(defaultValue);
+  }
+
+  /**
+   * Converts a loaded default value for a Doris MODIFY COLUMN definition.
+   *
+   * <p>String literals containing quote or backslash characters need Doris-specific escaping.
+   * Unparsed expressions come from native Doris metadata and are passed through unchanged.
+   *
+   * @param defaultValue the loaded Gravitino default value
+   * @param doubleEscapeBackslashes whether Doris 3.x requires an additional backslash-escaping
+   *     layer
+   * @param tripleEscapeQuotes whether Doris 3.x MODIFY COLUMN requires three backslashes before an
+   *     embedded double quote
+   * @return the Doris SQL representation, or {@code null} when the default is unset
+   */
+  @Nullable
+  public String fromGravitinoForModifyColumn(
+      Expression defaultValue, boolean doubleEscapeBackslashes, boolean tripleEscapeQuotes) {
+    if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {
+      return null;
+    }
+
+    if (defaultValue instanceof UnparsedExpression) {
+      return ((UnparsedExpression) defaultValue).unparsedExpression();
+    }
+
+    if (defaultValue instanceof Literal) {
+      Literal<?> literal = (Literal<?>) defaultValue;
+      if (literal.value() != null
+          && (literal.dataType() instanceof Types.StringType
+              || literal.dataType() instanceof Types.VarCharType
+              || literal.dataType() instanceof Types.FixedCharType)) {
+        String value = String.valueOf(literal.value());
+        if (value.indexOf('\\') >= 0 || value.indexOf('\'') >= 0 || value.indexOf('"') >= 0) {
+          return quoteDorisModifyLiteral(value, doubleEscapeBackslashes, tripleEscapeQuotes);
+        }
+      }
+    }
+
+    return super.fromGravitino(defaultValue);
+  }
 
   @Override
   public Expression toGravitino(
@@ -90,13 +177,54 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
             : Literals.timestampLiteral(
                 LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case JdbcTypeConverter.VARCHAR:
-        return Literals.of(columnDefaultValue, Types.VarCharType.of(columnType.getColumnSize()));
+        return Literals.of(
+            unescapeDorisLiteral(columnDefaultValue),
+            Types.VarCharType.of(columnType.getColumnSize()));
       case CHAR:
-        return Literals.of(columnDefaultValue, Types.FixedCharType.of(columnType.getColumnSize()));
+        return Literals.of(
+            unescapeDorisLiteral(columnDefaultValue),
+            Types.FixedCharType.of(columnType.getColumnSize()));
       case JdbcTypeConverter.TEXT:
-        return Literals.stringLiteral(columnDefaultValue);
+        return Literals.stringLiteral(unescapeDorisLiteral(columnDefaultValue));
       default:
         return UnparsedExpression.of(columnDefaultValue);
     }
+  }
+
+  private static String quoteDorisLiteral(
+      String value, boolean doubleEscapeBackslashes, boolean useSingleQuoteDelimiter) {
+    String escapedBackslash = doubleEscapeBackslashes ? "\\\\\\\\" : "\\\\";
+    String escaped = value.replace("\\", escapedBackslash);
+    if (useSingleQuoteDelimiter) {
+      escaped = escaped.replace("'", "''");
+      return "'" + escaped + "'";
+    }
+    escaped = escaped.replace("\"", "\\\"");
+    return "\"" + escaped + "\"";
+  }
+
+  private static String quoteDorisModifyLiteral(
+      String value, boolean doubleEscapeBackslashes, boolean tripleEscapeQuotes) {
+    String escapedBackslash = doubleEscapeBackslashes ? "\\".repeat(4) : "\\".repeat(2);
+    String escapedQuote = "\\".repeat(tripleEscapeQuotes ? 3 : 1) + "\"";
+    String escaped = value.replace("\\", escapedBackslash).replace("\"", escapedQuote);
+    return "\"" + escaped + "\"";
+  }
+
+  private static String unescapeDorisLiteral(String value) {
+    StringBuilder result = new StringBuilder(value.length());
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (current == '\\' && i + 1 < value.length()) {
+        char next = value.charAt(i + 1);
+        if (next == '\\' || next == '\'' || next == '"') {
+          result.append(next);
+          i++;
+          continue;
+        }
+      }
+      result.append(current);
+    }
+    return result.toString();
   }
 }

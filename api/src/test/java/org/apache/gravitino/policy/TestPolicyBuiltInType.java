@@ -29,6 +29,10 @@ public class TestPolicyBuiltInType {
     Assertions.assertEquals(
         Policy.BuiltInType.ICEBERG_COMPACTION,
         Policy.BuiltInType.fromPolicyType("system_iceberg_compaction"));
+    Assertions.assertEquals(
+        Policy.BuiltInType.ROW_FILTER, Policy.BuiltInType.fromPolicyType("system_row_filter"));
+    Assertions.assertEquals(
+        Policy.BuiltInType.COLUMN_MASK, Policy.BuiltInType.fromPolicyType("system_column_mask"));
   }
 
   @Test
@@ -41,14 +45,25 @@ public class TestPolicyBuiltInType {
   }
 
   @Test
+  void testSingleReadRestrictionTypeIsUnsupported() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> Policy.BuiltInType.fromPolicyType("system_read_restriction"));
+  }
+
+  @Test
   void testBuiltInTypePolicyTypeValue() {
     Assertions.assertEquals(
         "system_iceberg_compaction", Policy.BuiltInType.ICEBERG_COMPACTION.policyType());
+    Assertions.assertEquals("system_row_filter", Policy.BuiltInType.ROW_FILTER.policyType());
+    Assertions.assertEquals("system_column_mask", Policy.BuiltInType.COLUMN_MASK.policyType());
   }
 
   @Test
   void testBuiltInTypeContentClass() {
     Assertions.assertEquals(
         IcebergDataCompactionContent.class, Policy.BuiltInType.ICEBERG_COMPACTION.contentClass());
+    Assertions.assertEquals(RowFilterContent.class, Policy.BuiltInType.ROW_FILTER.contentClass());
+    Assertions.assertEquals(ColumnMaskContent.class, Policy.BuiltInType.COLUMN_MASK.contentClass());
   }
 }

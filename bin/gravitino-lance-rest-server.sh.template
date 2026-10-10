@@ -113,6 +113,8 @@ function start() {
     mkdir -p "${GRAVITINO_LOG_DIR}"
   fi
 
+  rotate_out_file "${GRAVITINO_OUTFILE}"
+
   nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME} >> "${GRAVITINO_OUTFILE}" 2>&1 &
 
   pid=$!

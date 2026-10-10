@@ -135,9 +135,10 @@ token cannot be exchanged, so it would carry no identity to the IRC. Set
 
 - One IRC serves exactly one metalake, fixed at startup by
   `gravitino.iceberg-rest.gravitino-metalake`. The Gravitino server only reports the IRC's endpoint
-  for that metalake. In multi-metalake mode (`gravitino.use-single-metalake=false`), a non-REST
-  Iceberg catalog in another metalake therefore requires a metalake-scoped manual URI or remains
-  unregistered while REST routing is enabled.
+  for that metalake. When several metalakes are loaded (`gravitino.catalog-name-with-metalake=true` or `gravitino.metalake` unset), a non-REST
+  Iceberg catalog in another metalake therefore requires a manual URI (`gravitino.iceberg.rest-uri`
+  as the default, overridden per metalake by `gravitino.iceberg.rest-uri.<metalake_name>`) or
+  remains unregistered while REST routing is enabled.
 - A catalog created with `catalog-backend=rest` keeps pointing at its own configured `uri` and is
   not re-routed, since it already reaches an Iceberg REST catalog directly.
 - A deployment that does not run the IRC must set

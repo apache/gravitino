@@ -20,11 +20,21 @@ package org.apache.gravitino.connector;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestHiddenPropertyMaskUtils {
+
+  @AfterEach
+  void resetAdditionalMatcher() {
+    SecretPropertyUtils.configureSensitiveKeyKeywords(new Config(false) {});
+  }
 
   @Test
   void testMaskHiddenPropertiesByName() {
@@ -129,7 +139,13 @@ public class TestHiddenPropertyMaskUtils {
             return ImmutableMap.of(
                 "aws-region",
                 PropertyEntry.stringOptionalPropertyEntry(
-                    "aws-region", "region", false, null, false));
+                    "aws-region", "region", false, null, false),
+                "azure-storage-account-name",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "azure-storage-account-name", "account", false, null, false),
+                "credential-providers",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "credential-providers", "providers", false, null, false));
           }
         };
 
@@ -148,18 +164,43 @@ public class TestHiddenPropertyMaskUtils {
             "azure-storage-account-key",
             "abs-key",
             "azure-storage-account-name",
-            "abs-account");
+            "abs-account",
+            "credential-providers",
+            "s3-token");
     Map<String, String> masked = HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
 
     Assertions.assertEquals("us-east-2", masked.get("aws-region"));
     Assertions.assertEquals("s3://bucket/prefix", masked.get("warehouse"));
+    Assertions.assertEquals("abs-account", masked.get("azure-storage-account-name"));
+    Assertions.assertEquals("s3-token", masked.get("credential-providers"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-access-key-id"));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("s3-secret-access-key"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("custom-token"));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-key"));
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("azure-storage-account-name"));
+  }
+
+  @Test
+  void testMaskHiddenPropertiesMasksAdditionalSensitiveKey() {
+    Config config = new Config(false) {};
+    config.set(Configs.SENSITIVE_KEY_KEYWORDS, List.of("passwrod"));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
+    PropertiesMetadata metadata =
+        new PropertiesMetadata() {
+          @Override
+          public Map<String, PropertyEntry<?>> propertyEntries() {
+            return ImmutableMap.of(
+                "jdbc-user",
+                PropertyEntry.stringOptionalPropertyEntry("jdbc-user", "user", false, null, false));
+          }
+        };
+
+    Map<String, String> properties =
+        ImmutableMap.of("jdbc-user", "root", "jdbc-passwrod", "typo-secret");
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
+
+    Assertions.assertEquals("root", masked.get("jdbc-user"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("jdbc-passwrod"));
   }
 }

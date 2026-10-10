@@ -119,15 +119,6 @@ public interface PolicyDispatcher {
   boolean deletePolicy(String metalake, String policyName);
 
   /**
-   * List all metadata objects associated with the specified policy under a metalake.
-   *
-   * @param metalake the name of the metalake
-   * @param policyName the name of the policy
-   * @return The array of metadata objects associated with the specified policy.
-   */
-  MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName);
-
-  /**
    * List tag names directly associated with the specified policy.
    *
    * @param metalake The name of the metalake.
@@ -172,30 +163,4 @@ public interface PolicyDispatcher {
    * @return The array of policies associated with the specified metadata object.
    */
   PolicyEntity[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject);
-
-  /**
-   * Associate policies to a metadata object under a metalake.
-   *
-   * @param metalake the name of the metalake
-   * @param metadataObject the metadata object to associate policies with
-   * @param policiesToAdd the policies to be added to the metadata object
-   * @param policiesToRemove the policies to remove from the metadata object
-   * @return An array of updated policy names.
-   */
-  String[] associatePoliciesForMetadataObject(
-      String metalake,
-      MetadataObject metadataObject,
-      String[] policiesToAdd,
-      String[] policiesToRemove);
-
-  /**
-   * Get a specific policy associated with the specified metadata object.
-   *
-   * @param metalake the name of the metalake
-   * @param metadataObject the metadata object for which to retrieve the policy
-   * @param policyName the name of the policy to retrieve
-   * @return The policy associated with the metadata object.
-   */
-  PolicyEntity getPolicyForMetadataObject(
-      String metalake, MetadataObject metadataObject, String policyName);
 }

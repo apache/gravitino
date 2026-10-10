@@ -31,4 +31,21 @@ public class TestJdbcConfig {
     properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
     Assertions.assertDoesNotThrow(() -> new JdbcConfig(properties));
   }
+
+  @Test
+  public void testMaxIdleDefaultsAndCap() {
+    JdbcConfig defaultConfig = new JdbcConfig(Maps.newHashMap());
+    Assertions.assertEquals(8, defaultConfig.getPoolMaxIdle());
+
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "6");
+    Assertions.assertEquals(6, new JdbcConfig(properties).getPoolMaxIdle());
+
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "4");
+    Assertions.assertEquals(4, new JdbcConfig(properties).getPoolMaxIdle());
+
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "0");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new JdbcConfig(properties).getPoolMaxIdle());
+  }
 }

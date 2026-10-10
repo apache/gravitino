@@ -116,3 +116,32 @@ class TestIndexSerdes(unittest.TestCase):
         json_dict = json.loads(json_string)
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
+
+    def test_vector_similarity_index_properties_round_trip(self):
+        json_string = """
+        {
+            "indexes": [
+                {
+                    "indexType": "DATA_SKIPPING_VECTOR_SIMILARITY",
+                    "name": "idx_vector",
+                    "fieldNames": [["embedding"]],
+                    "properties": {
+                        "type": "hnsw",
+                        "distance_function": "L2Distance",
+                        "dimensions": "3"
+                    }
+                }
+            ]
+        }
+        """
+
+        index = MockDataClass.from_json(json_string).indexes[0]
+        self.assertEqual(index.type(), Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY)
+        self.assertEqual(
+            index.properties(),
+            {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
+        )
+        self.assertDictEqual(
+            json.loads(json_string),
+            json.loads(MockDataClass(indexes=[index]).to_json()),
+        )

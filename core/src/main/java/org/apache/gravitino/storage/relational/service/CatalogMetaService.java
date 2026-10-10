@@ -46,12 +46,14 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -293,6 +295,10 @@ public class CatalogMetaService {
                   mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
+                  TableVersionMapper.class,
+                  mapper -> mapper.softDeleteTableVersionsByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
                   TableColumnMapper.class,
                   mapper -> mapper.softDeleteColumnsByCatalogId(catalogId)),
           () ->
@@ -328,10 +334,6 @@ public class CatalogMetaService {
                   mapper -> mapper.softDeleteTagMetadataObjectRelsByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeletePolicyMetadataObjectRelsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
                   mapper -> mapper.softDeleteModelVersionAliasRelsByCatalogId(catalogId)),
           () ->
@@ -352,7 +354,15 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewVersionInfoMapper.class,
-                  mapper -> mapper.softDeleteViewVersionsByCatalogId(catalogId)));
+                  mapper -> mapper.softDeleteViewVersionsByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelMetaMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelVersionInfoMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelVersionsByCatalogId(catalogId)));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -393,13 +403,7 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyMetadataObjectRelMapper.class,
-                  mapper ->
-                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())));
+                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)));
     }
 
     return true;

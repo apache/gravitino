@@ -381,14 +381,19 @@ public class JobOperations {
   public Response getJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("jobId") @AuthorizationMetadata(type = Entity.EntityType.JOB) String jobId) {
+      @PathParam("jobId") @AuthorizationMetadata(type = Entity.EntityType.JOB) String jobId,
+      @QueryParam("includeOutput") @DefaultValue("false") boolean includeOutput,
+      @QueryParam("outputMaxLines") Integer outputMaxLines,
+      @QueryParam("outputMaxBytes") Integer outputMaxBytes) {
     LOG.info("Received request to get job {} in metalake {}", jobId, metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            JobEntity jobEntity = jobOperationDispatcher.getJob(metalake, jobId);
+            JobEntity jobEntity =
+                jobOperationDispatcher.getJob(
+                    metalake, jobId, includeOutput, outputMaxLines, outputMaxBytes);
             LOG.info("Retrieved job {} in metalake: {}", jobId, metalake);
             return Utils.ok(new JobResponse(toDTO(jobEntity)));
           });
@@ -411,6 +416,14 @@ public class JobOperations {
           String metalake,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.RUN_JOB)
           JobRunRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleJobException(
+          OperationType.RUN,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received request to run job {} in metalake: {}", request.getJobTemplateName(), metalake);
 
@@ -536,7 +549,9 @@ public class JobOperations {
         jobEntity.auditInfo().createTime(),
         jobEntity.startedAtAsInstant(),
         jobEntity.finishedAtAsInstant(),
-        toRuntimeJobTemplateDTO(jobEntity));
+        toRuntimeJobTemplateDTO(jobEntity),
+        jobEntity.stdout(),
+        jobEntity.stderr());
   }
 
   /**

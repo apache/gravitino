@@ -35,6 +35,9 @@ import org.apache.commons.lang3.StringUtils;
 @EqualsAndHashCode(callSuper = true)
 @ToString
 public class OAuth2TokenResponse extends BaseResponse {
+  // Excluded from toString: these are bearer credentials, and the response object ending up in
+  // a log line must not leak them.
+  @ToString.Exclude
   @JsonProperty("access_token")
   private final String accessToken;
 
@@ -51,6 +54,7 @@ public class OAuth2TokenResponse extends BaseResponse {
   @JsonProperty("scope")
   private final String scope;
 
+  @ToString.Exclude
   @Nullable
   @JsonProperty("refresh_token")
   private final String refreshToken;

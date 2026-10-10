@@ -17,6 +17,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.junit.jupiter.api.Assertions;
@@ -40,9 +41,17 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(1, yearPartitions.length);
     assertSingleFieldTransform(yearPartitions[0], Transforms.NAME_OF_YEAR, "event_time");
 
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> operations.parsePartitioning("cityHash64(user_id) % 16"));
+    Transform[] weekStartPartitions = operations.parsePartitioning("toStartOfWeek(event_time)");
+    Assertions.assertEquals(1, weekStartPartitions.length);
+    assertFunctionTransform(weekStartPartitions[0], "toStartOfWeek", "event_time");
+
+    Transform[] monthStartPartitions = operations.parsePartitioning("toStartOfMonth(event_time)");
+    Assertions.assertEquals(1, monthStartPartitions.length);
+    assertFunctionTransform(monthStartPartitions[0], "toStartOfMonth", "event_time");
+
+    // A native expression that cannot be structured returns an empty transform array. The raw
+    // expression is instead exposed through the read-only partition-key property during load.
+    Assertions.assertEquals(0, operations.parsePartitioning("cityHash64(user_id) % 16").length);
 
     Transform[] identityPartitions = operations.parsePartitioning("metric_type");
     Assertions.assertEquals(1, identityPartitions.length);
@@ -53,8 +62,59 @@ public class TestClickHouseTableOperationsPartitioning {
     assertSingleFieldTransform(tuplePartitions[0], Transforms.NAME_OF_MONTH, "ts");
     assertSingleFieldTransform(tuplePartitions[1], Transforms.NAME_OF_IDENTITY, "tenant_id");
 
+    Transform[] functionTuplePartitions =
+        operations.parsePartitioning("(toStartOfWeek(ts), toStartOfMonth(created_at))");
+    Assertions.assertEquals(2, functionTuplePartitions.length);
+    assertFunctionTransform(functionTuplePartitions[0], "toStartOfWeek", "ts");
+    assertFunctionTransform(functionTuplePartitions[1], "toStartOfMonth", "created_at");
+
     Assertions.assertEquals(0, operations.parsePartitioning("tuple()").length);
     Assertions.assertEquals(0, operations.parsePartitioning("  ").length);
+  }
+
+  @Test
+  public void testNestedExpressionInsideKnownTransformIsNotMisrepresented() {
+    // A nested expression inside toYear cannot be mapped to a single-field year transform, so the
+    // whole partition key is treated as unsupported and returns an empty transform array rather
+    // than misrepresenting it as year("f(x)").
+    Assertions.assertEquals(0, operations.parsePartitioning("toYear(toString(event_time))").length);
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toStartOfMonth(toDate(event_time))").length);
+  }
+
+  @Test
+  public void testBacktickQuotedColumnNameIsStructured() {
+    // A backtick-quoted column name (which may contain special characters such as "-") is a real
+    // column reference and must be structured rather than rejected.
+    Transform[] monthPartitions = operations.parsePartitioning("toYYYYMM(`event-time`)");
+    Assertions.assertEquals(1, monthPartitions.length);
+    assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "event-time");
+
+    Transform[] weekStartPartitions = operations.parsePartitioning("toStartOfWeek(`event-time`)");
+    Assertions.assertEquals(1, weekStartPartitions.length);
+    assertFunctionTransform(weekStartPartitions[0], "toStartOfWeek", "event-time");
+
+    Transform[] monthStartPartitions = operations.parsePartitioning("toStartOfMonth(`event-time`)");
+    Assertions.assertEquals(1, monthStartPartitions.length);
+    assertFunctionTransform(monthStartPartitions[0], "toStartOfMonth", "event-time");
+
+    Transform[] identityPartitions = operations.parsePartitioning("`event-time`");
+    Assertions.assertEquals(1, identityPartitions.length);
+    assertSingleFieldTransform(identityPartitions[0], Transforms.NAME_OF_IDENTITY, "event-time");
+  }
+
+  @Test
+  public void testWeekModeAndTimezoneFormsRemainUnstructured() {
+    Assertions.assertEquals(0, operations.parsePartitioning("toStartOfWeek(event_time, 1)").length);
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toStartOfWeek(event_time, 1, 'Asia/Shanghai')").length);
+  }
+
+  private void assertFunctionTransform(
+      Transform transform, String expectedName, String expectedColumn) {
+    Assertions.assertEquals(expectedName, transform.name());
+    Assertions.assertEquals(1, transform.arguments().length);
+    Assertions.assertEquals(NamedReference.field(expectedColumn), transform.arguments()[0]);
   }
 
   private void assertSingleFieldTransform(

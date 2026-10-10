@@ -176,8 +176,12 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.SCHEMA);
     boolean dropped = dispatcher.dropSchema(ident, cascade);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.SCHEMA, locations);
+    // Only a schema that was really dropped loses its privileges; a false result means the
+    // registration was kept.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.SCHEMA, locations);
+    }
     return dropped;
   }
 

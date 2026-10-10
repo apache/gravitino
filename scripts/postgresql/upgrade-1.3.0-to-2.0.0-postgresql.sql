@@ -21,6 +21,9 @@
 
 
 
+-- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
+-- The 2.0 server no longer reads direct object-policy assignments from this table.
+
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
 
@@ -147,3 +150,28 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'stru
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
+
+-- Merge duplicate live owners left by concurrent assignments: the newest live row
+-- (largest id) wins, and older ones are soft-deleted.
+UPDATE owner_meta
+    SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
+        updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    WHERE deleted_at = 0
+      AND id < (
+        SELECT MAX(d.id) FROM owner_meta d
+        WHERE d.deleted_at = 0
+          AND d.metadata_object_id = owner_meta.metadata_object_id
+          AND d.metadata_object_type = owner_meta.metadata_object_type
+      );
+
+-- Separate the optimistic-concurrency token from the history version for fileset and policy.
+-- Until now current_version served as both: it is the join key into *_version_info and the value
+-- the CAS compares, so every alter had to advance it and write a snapshot even when nothing in
+-- that snapshot changed. occ_version takes over the CAS; current_version again advances only when
+-- the stored snapshot changes. The default is the whole backfill, because occ_version is only ever
+-- compared against itself on the same row.
+ALTER TABLE fileset_meta ADD COLUMN IF NOT EXISTS occ_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency version';
+
+ALTER TABLE policy_meta ADD COLUMN IF NOT EXISTS occ_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';

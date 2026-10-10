@@ -29,8 +29,8 @@ means implementing an executor. See
 
 ### Register a Shell Template
 
-A shell template runs an executable. Placeholders in `arguments`, `environments`, and `customFields`
-are filled in when a job runs.
+A shell template runs an executable. Its placeholders are filled in with the job configuration when
+a job runs. See [Placeholders](#placeholders).
 
 ```json
 {
@@ -44,8 +44,34 @@ are filled in when a job runs.
 }
 ```
 
-`executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
-HTTP, HTTPS, FTP, and FTPS URLs.
+`executable` and `scripts` are fetched by the job executor. With the `local` job executor they must
+be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
+
+Each of them is fetched into the job's working directory under the file name of its path, so it
+must point to a file, and two different resources of a template must not share a file name: a run
+is rejected otherwise, instead of one file silently overwriting the other. The same applies to the
+`executable`, `jars`, `files` and `archives` of a Spark template.
+
+`executable` can also be a command name with no path, such as `python` or `bash`. Such a command is
+not fetched, it is looked up where the job runs: the `local` job executor looks it up on the `PATH`
+of the Gravitino server process, and setting `PATH` in `environments` doesn't change that. The
+scripts are still fetched next to it, into the job's working directory, so a template can run a
+script with an installed interpreter:
+
+```json
+{
+  "name": "python_report",
+  "jobType": "shell",
+  "executable": "python",
+  "arguments": ["report.py", "{{date}}"],
+  "scripts": ["https://repo.example.com/jobs/report.py"]
+}
+```
+
+A file name without a path, such as `run.sh`, is a command name too. Earlier versions fetched it as
+a file relative to the working directory of the Gravitino server; to run a file, write its absolute
+path or URI instead. To avoid running a different program than the one that was fetched, a run is
+rejected when a script has the same file name as a command-name `executable`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -84,6 +110,53 @@ an error that names the missing setting, and no job is created.
   "configs": {"spark.executor.memory": "4g"}
 }
 ```
+
+### Placeholders
+
+Any string in a template can contain placeholders: `executable`, `className`, the entries of
+`scripts`, `jars`, `files`, and `archives`, and the keys and values of `environments`, `configs`,
+and `customFields`. When a job runs, each placeholder is replaced with a value from the job
+configuration (`jobConf`).
+
+| Syntax              | Meaning                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------|
+| `{{name}}`          | Required. A run without a value for `name` is rejected.                                      |
+| `{{name:-default}}` | Optional. `default` is used when the job configuration has no value. It can be empty: `{{name:-}}`. |
+| `\{{`               | A literal `{{`, for example to pass `{{ds}}` to another tool. Written as `"\\{{"` in JSON.   |
+
+For example, a template with `"arguments": ["--date", "{{date}}", "--mode", "{{mode:-full}}"]` run
+with `{"date": "2026-09-22"}` passes `--date 2026-09-22 --mode full` to the job.
+
+:::caution
+Templates registered before Gravitino supported default values could pass an unresolved
+placeholder through to the job as literal text, which is how templates carried another tool's
+syntax, such as `{{ds}}` or `{{.Values.image}}`. A placeholder with no value is now a required
+parameter, so those runs are rejected. Escape such text as `\{{ds}}`, or give the parameter a
+default value.
+:::
+
+- A value in the job configuration is used as is, including an empty string `""`. A `null` value
+  counts as no value. Values are never scanned for placeholders.
+- A default declared on one occurrence of a parameter applies to all of its occurrences. A
+  template that gives the same parameter different defaults is rejected when it is registered or
+  updated.
+- A default value is used as is and can span lines, but its braces must be balanced, so the
+  placeholder ends at the first `}}` outside of them. This makes a JSON object a valid default, for
+  example `{{options:-{"k":"v"}}}`. A default with unbalanced braces, such as `{{options:-{}}`, is
+  rejected when the template is registered or updated.
+- If any required parameter has no value, the run request fails with an error that lists all the
+  missing parameters. No job is created and no file is downloaded.
+- Keys in the job configuration that the template does not use are ignored, and the server logs a
+  warning.
+- A placeholder name can contain ASCII letters, digits, `_`, `.`, and `-`. Text such as
+  `{{ name }}`, with spaces, is not a placeholder and is passed through as is.
+- Only `{{` needs escaping. A placeholder always starts with `{{`, so `}}` on its own is plain
+  text. A value that ends with a backslash right before a placeholder doubles it, as in
+  `\\{{name}}`, which keeps one backslash and still resolves the placeholder. A backslash anywhere
+  else is plain text.
+- A placeholder whose default value contains braces cannot be immediately followed by a literal
+  `}`, because it is then unclear which `}}` closes it. Put the whole structure in the default
+  value, or insert a space. A default value without braces, such as `{"k":{{v:-1}}}`, is fine.
 
 ### List, Get, and Delete Templates
 
@@ -224,29 +297,129 @@ cancelling = client.cancel_job(job_id)
 Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
 `CANCELLED`, and one that finishes first keeps the status it finished with.
 
+A job carries three timestamps:
+
+- `queuedAt`: when Gravitino submitted the job to the job executor.
+- `startedAt`: when the job started executing.
+- `finishedAt`: when the job finished.
+
+Gravitino pulls job statuses from the job executor every `gravitino.job.statusPullIntervalInMs`,
+so a job's status can lag behind by up to this interval. The timestamps usually don't lag: the local
+job executor reports when each job actually started and finished, even for a job that starts and
+finishes between two pulls. A job executor that doesn't report these times gets the time Gravitino
+first observes the job running or finished instead. In that case, a job that finishes between two
+pulls has no `startedAt`.
+
+The local job executor only keeps a job's state in memory. When that state is lost before Gravitino
+records the finished job, the actual times are lost too, and the job's `finishedAt` is the time
+Gravitino marks it as finished instead:
+
+- If Gravitino can't pull the job within `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` after it
+  finished, the job is marked as `FAILED`, or `CANCELLED` if it was being cancelled, on the next pull.
+- If the server running the job exits, the job is expired as described in
+  [Configurations for Local Job Executor](#configurations-for-local-job-executor).
+
+### Get a Job's Output
+
+A job's captured stdout/stderr can be fetched alongside its metadata by asking for it explicitly.
+Output is fetched live from the job executor on every call rather than stored in Gravitino, so it's
+only included when requested - a plain `getJob`/`get_job` call, or `listJobs`/`list_jobs`, never
+returns it.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+JobHandle job = client.getJob(jobId, true);
+List<String> stdout = job.stdout();
+List<String> stderr = job.stderr();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+job = client.get_job(job_id, include_output=True)
+stdout = job.stdout()
+stderr = job.stderr()
+```
+
+</TabItem>
+</Tabs>
+
+Output is only kept for as long as the job executor retains it. The local job executor keeps it in
+the job's staging directory, so it's available until the staging directory is cleaned up
+(`gravitino.job.stagingDirKeepTimeInMs` after the job finishes), also across server restarts.
+What's returned is always the tail of the output (the most recent content), capped
+by `gravitino.job.outputMaxLines` (line count) and `gravitino.job.outputMaxBytes` (byte size),
+whichever limit is hit first.
+
+The REST API also accepts `outputMaxLines`/`outputMaxBytes` query parameters to request less output
+than these global caps for a single call (e.g. a quick check that doesn't need the full 1000
+lines) - a value larger than the global cap is clamped down to it, so the global configuration
+always remains a hard upper bound:
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true&outputMaxLines=50&outputMaxBytes=8192"
+```
+
+:::caution
+When multiple Gravitino servers share the same metadata store, `gravitino.job.stagingDir` must be on
+storage shared by all servers (for example an NFS mount) for the local job executor to return a
+job's output from any server. The servers may mount it at different paths. Otherwise, only the
+server that ran a job can return its output, and the other servers return empty output rather than
+an error.
+:::
+
+The local job executor finds a job's output through a small index file it writes to
+`<gravitino.job.stagingDir>/.job-output-index` when the job is submitted:
+
+- Jobs submitted before Gravitino 2.0.0, or during a rolling upgrade by a server that isn't upgraded
+  yet, have no index file and return empty output.
+- Deleting this directory makes the output of existing jobs unavailable. After downgrading to an
+  earlier version, it isn't used anymore and can be removed.
+- A missing index returns empty output, but an index that exists and can't be read, for example
+  while the shared storage is unavailable, fails the request with an error rather than returning
+  empty output that looks like the job printed nothing.
+
 ### Job System Configuration
 
 Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
-| Property name                          | Description                                                                       | Default value                 | Required |
-|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|
-| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       |
-| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
-| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
-| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
+| Property name                          | Description                                                                                                                                                          | Default value                 | Required |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|----------|
+| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs. Must be shared by all servers in a multi-server deployment, see [Get a Job's Output](#get-a-jobs-output) | `/tmp/gravitino/jobs/staging` | No       |
+| `gravitino.job.executor`               | The job executor to use for running jobs                                                                                                                             | `local`                       | No       |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed                                                                                    | `604800000` (7 days)          | No       |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor                                                                                            | `300000` (5 minutes)          | No       |
+| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output                                                                                      | `1000`                        | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output                                                                                       | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
 
-| Property name                                       | Description                                                                                                                                       | Default value                          | Required |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
-| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
-| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
-| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
-| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+| Property name                                          | Description                                                                                                                                                                                  | Default value                          | Required |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
+| `gravitino.jobExecutor.local.waitingQueueSize`         | The size of the waiting queue for queued jobs in the local job executor                                                                                                                      | `100`                                  | No       |
+| `gravitino.jobExecutor.local.maxRunningJobs`           | The maximum number of running jobs in the local job executor                                                                                                                                 | `max(1, min(available cores / 2, 10))` | No       |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs`    | The time in milliseconds to keep the job status in the local job executor                                                                                                                    | `3600000` (1 hour)                     | No       |
+| `gravitino.jobExecutor.local.cancelForceKillDelayInMs` | How long in milliseconds a cancelled job's process may keep running after it is asked to stop before the executor kills it forcibly. Raise it for jobs that need longer to shut down cleanly | `30000` (30 seconds)                   | No       |
+| `gravitino.jobExecutor.local.sparkHome`                | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job                                            | `None`                                 | No       |
+
+The local job executor always uses `gravitino.job.stagingDir` as its staging directory, the same one
+the job system stages jobs in. A `gravitino.jobExecutor.local.stagingDir` setting is ignored.
 
 The local job executor runs up to `gravitino.jobExecutor.local.maxRunningJobs` jobs at the same
 time, each in its own process on the Gravitino server host, and queues the others. Make sure the
@@ -261,6 +434,8 @@ only tracks the jobs it runs itself:
 - Cancelling a job on a server that doesn't run it marks the job as `CANCELLING`, and the server
   running the job cancels it the next time it pulls job statuses. This can take up to
   `gravitino.job.statusPullIntervalInMs`.
+- A job's output can be read from any server only if `gravitino.job.stagingDir` is shared by all
+  servers, see [Get a Job's Output](#get-a-jobs-output).
 - If a server exits while running jobs, nobody can track these jobs anymore. When such a job has
   not been updated for `gravitino.job.stagingDirKeepTimeInMs`, it is marked as `FAILED`, or as
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another

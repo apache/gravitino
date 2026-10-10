@@ -98,7 +98,7 @@ today. Attaching a tag to a fileset goes through the API.
 
 | Privilege        | Grantable on                          | What it allows              |
 |------------------|---------------------------------------|-----------------------------|
-| `CREATE_FILESET` | Metalake, catalog, schema, or fileset | Creating filesets           |
+| `CREATE_FILESET` | Metalake, catalog, or schema          | Creating filesets           |
 | `READ_FILESET`   | Metalake, catalog, schema, or fileset | Reading a fileset's files   |
 | `WRITE_FILESET`  | Metalake, catalog, schema, or fileset | Writing a fileset's files   |
 

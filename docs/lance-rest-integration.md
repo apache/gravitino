@@ -57,10 +57,41 @@ The following table outlines the tested compatibility between Gravitino versions
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
+## Format boundary
+
+The Lance REST service is a Lance table namespace, even when its metadata backend is a
+format-agnostic Generic Catalog. The REST table operations therefore validate the stored
+`format` property before returning Lance metadata or applying a table mutation.
+
+When an identifier is occupied by a known non-Lance table, direct Lance table operations fail
+with HTTP `400` and an `INVALID_INPUT` error. `TableExists` presents that entry as absent and
+returns the normal table-not-found response. The underlying Generic Catalog metadata and storage
+location remain unchanged.
+
+The same boundary applies to create requests that target an existing entity through the Lance
+delegator:
+
+| Request mode         | Existing non-Lance entity                            |
+| -------------------- | ---------------------------------------------------- |
+| `CREATE`             | `409` conflict, as for any existing table name       |
+| `EXIST_OK`           | `400 INVALID_INPUT`                                  |
+| `OVERWRITE`          | `400 INVALID_INPUT`; metadata and data are preserved |
+| Register `OVERWRITE` | `400 INVALID_INPUT`; metadata and data are preserved |
+
+The validation is performed after the normal authorization checks. It does not convert existing
+Generic Catalog unknown-format loading errors or change the Generic Catalog's format-agnostic
+`ListTables` behavior.
+
 ### Reproducing the matrix locally
 
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:
+
+For Lance Spark, the default `test` task uses the explicitly verified `0.5.1`
+bundle, while `lanceSparkMatrixTest` uses the declared matrix
+(`0.2.0`, `0.4.0`, and `0.5.1`). Passing `-PlanceSparkBundleVersions=...` is a
+targeted diagnostic override; the supplied versions form the matrix and the
+first supplied version remains the primary for the normal `test` task.
 
 ```bash
 # lance-spark — runs LanceSparkRESTServiceIT once per bundle version.
@@ -177,7 +208,7 @@ logging.basicConfig(level=logging.INFO)
 # Replace /path/to/lance-spark-bundle-3.5_2.12-X.X.XX.jar with your actual JAR path and version;
 # refer to the compatibility matrix for supported lance-spark versions.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.4.0.jar "
+    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.5.1.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--master local[1] pyspark-shell"

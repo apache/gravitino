@@ -70,9 +70,9 @@ public interface SupportsEntityStoreCache {
    *
    * <p>Only self-contained entities are approved. User/group/role are deliberately excluded because
    * they contain relation-derived data whose source can change through another entity. Model/model
-   * version and function are also excluded because they carry load-bearing pointers that must not
-   * be served stale. Other unapproved and newly introduced entity types go straight to the store
-   * until their invalidation behavior has been validated.
+   * version, Semantic Model, and function are also excluded because they carry load-bearing content
+   * that must not be served stale. Other unapproved and newly introduced entity types go straight
+   * to the store until their invalidation behavior has been validated.
    *
    * <p>Implementations must also invoke {@link #invalidateOnKeyChange(Entity)} for every entity,
    * including non-cacheable ones, since a non-cacheable entity may still invalidate a cacheable

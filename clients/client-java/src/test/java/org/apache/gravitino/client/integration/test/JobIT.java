@@ -19,6 +19,7 @@
 package org.apache.gravitino.client.integration.test;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -380,6 +381,8 @@ public class JobIT extends BaseIT {
             .withClassName("org.apache.gravitino.test.SparkJob")
             .build();
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+    File jobRunsDir = new File(testStagingDir, "job-runs");
+    Set<String> jobStagingDirsBefore = listFileNames(jobRunsDir);
 
     // The run request is rejected with the reason instead of being queued and failing later.
     IllegalArgumentException e =
@@ -396,9 +399,11 @@ public class JobIT extends BaseIT {
 
     // No job is created, and the staging directory of the rejected job is removed.
     Assertions.assertTrue(metalake.listJobs(template.name()).isEmpty());
-    String[] jobStagingDirs =
-        new File(testStagingDir, METALAKE_NAME + File.separator + template.name()).list();
-    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+    // Directories of earlier jobs may expire meanwhile, but no new one may be left behind.
+    Set<String> jobStagingDirsAfter = listFileNames(jobRunsDir);
+    Assertions.assertTrue(
+        jobStagingDirsBefore.containsAll(jobStagingDirsAfter),
+        "Staging directories left behind: " + jobStagingDirsAfter);
 
     // Shell jobs are not affected by the missing Spark installation.
     JobTemplate shellTemplate = builder.withName("test_run_shell_without_spark_submit").build();
@@ -509,6 +514,49 @@ public class JobIT extends BaseIT {
     // reaches a terminal status and its entity has gone through the status-poll update path.
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(runtimeJobTemplate, retrievedJob.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testRunAndGetJobOutput() {
+    JobTemplate template = builder.withName("test_run_get_output").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    JobHandle jobHandle =
+        metalake.runJob(
+            template.name(),
+            ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+
+    // Plain getJob never carries output.
+    Assertions.assertTrue(jobHandle.stdout().isEmpty());
+    Assertions.assertTrue(jobHandle.stderr().isEmpty());
+
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(
+            () -> {
+              JobHandle updatedJob = metalake.getJob(jobHandle.jobId());
+              return updatedJob.jobStatus() == JobHandle.Status.SUCCEEDED;
+            });
+
+    // getJob still never carries output, even after the job finishes.
+    JobHandle finishedJob = metalake.getJob(jobHandle.jobId());
+    Assertions.assertTrue(finishedJob.stdout().isEmpty());
+    Assertions.assertTrue(finishedJob.stderr().isEmpty());
+
+    // getJob(jobId, true) fetches the captured stdout/stderr.
+    JobHandle jobWithOutput = metalake.getJob(jobHandle.jobId(), true);
+    List<String> stdout = jobWithOutput.stdout();
+    Assertions.assertTrue(stdout.contains("starting test test job"));
+    Assertions.assertTrue(stdout.contains("in common script"));
+    Assertions.assertTrue(stdout.contains("value1"));
+    Assertions.assertTrue(stdout.contains("success"));
+    Assertions.assertTrue(stdout.contains("value2"));
+    // The test script never writes to stderr.
+    Assertions.assertTrue(jobWithOutput.stderr().isEmpty());
+
+    // Test get output for a non-existent job.
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> metalake.getJob("non_existent_job_id", true));
   }
 
   @Test
@@ -626,6 +674,11 @@ public class JobIT extends BaseIT {
             .build();
     GravitinoEnv.getInstance().entityStore().put(job, false /* overwrite */);
     return job;
+  }
+
+  private static Set<String> listFileNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Collections.emptySet() : ImmutableSet.copyOf(names);
   }
 
   private String generateTestEntryScript() {

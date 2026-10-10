@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -36,9 +37,6 @@ import org.apache.gravitino.utils.JdbcUrlUtils;
  * connection pools. The apache-dbcp2 connection pool is used here.
  */
 public class DataSourceUtils {
-
-  /** SQL statements for database connection pool testing. */
-  private static final String POOL_TEST_QUERY = "SELECT 1";
 
   // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
   // config map is handed to BasicDataSourceFactory, so allowing these would either run arbitrary
@@ -76,11 +74,14 @@ public class DataSourceUtils {
     // configuration. Its INIT parameter allows arbitrary SQL (and Java code via CREATE ALIAS)
     // to execute at connection time, and the H2 driver class must also be blocked to prevent
     // bypassing this check via a mismatched driver and URL combination.
-    String decodedUrl = recursiveDecode(jdbcConfig.getJdbcUrl().toLowerCase());
-    if (decodedUrl.startsWith("jdbc:h2")) {
+    String lowerUrl = jdbcConfig.getJdbcUrl().toLowerCase(Locale.ROOT);
+    boolean isH2Url =
+        JdbcUrlUtils.decodedFormsForScan(lowerUrl).stream()
+            .anyMatch(form -> form.startsWith("jdbc:h2"));
+    if (isH2Url) {
       throw new GravitinoRuntimeException("H2 JDBC URL is not allowed in catalog configuration");
     }
-    if (jdbcConfig.getJdbcDriver().toLowerCase().startsWith("org.h2.")) {
+    if (jdbcConfig.getJdbcDriver().toLowerCase(Locale.ROOT).startsWith("org.h2.")) {
       throw new GravitinoRuntimeException("H2 JDBC driver is not allowed in catalog configuration");
     }
     // Reject DBCP2 pool properties that load arbitrary classes via reflection before handing the
@@ -132,6 +133,10 @@ public class DataSourceUtils {
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
     JdbcUrlUtils.validateJdbcConfig(
         jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
+    // Keep DBCP's default Connection.isValid() validation unless a validationQuery is explicitly
+    // configured. DBCP caches a validation query as a prepared statement, and MySQL Connector/J
+    // switches back to the database captured at prepare time when executing it. That switch fails
+    // when the captured database is empty, so healthy connections would be discarded.
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -148,11 +153,19 @@ public class DataSourceUtils {
     String password = jdbcConfig.getPassword();
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
-    basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
-    // Set each time a connection is taken out from the connection pool, a test statement will be
-    // executed to confirm whether the connection is valid.
+    // Preserve maxIdle supplied through the existing DBCP bypass unless the canonical setting is
+    // explicitly configured. The canonical default applies to catalogs without either setting.
+    if (jdbcConfig.getAllConfig().containsKey(JdbcConfig.POOL_MAX_IDLE.getKey())
+        || !jdbcConfig.getAllConfig().containsKey("maxIdle")) {
+      basicDataSource.setMaxIdle(jdbcConfig.getPoolMaxIdle());
+    }
+    int maxIdle = basicDataSource.getMaxIdle();
+    basicDataSource.setMinIdle(
+        maxIdle >= 0
+            ? Math.min(jdbcConfig.getPoolMinSize(), maxIdle)
+            : jdbcConfig.getPoolMinSize());
+    // Validate connections on borrow when enabled.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
-    basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
   }
@@ -203,23 +216,6 @@ public class DataSourceUtils {
         }
       }
     }
-  }
-
-  private static String recursiveDecode(String url) {
-    String prev;
-    String decoded = url;
-    int max = 5;
-
-    do {
-      prev = decoded;
-      try {
-        decoded = java.net.URLDecoder.decode(prev, "UTF-8");
-      } catch (Exception e) {
-        throw new GravitinoRuntimeException("Unable to decode JDBC URL");
-      }
-    } while (!prev.equals(decoded) && --max > 0);
-
-    return decoded;
   }
 
   public static void closeDataSource(DataSource dataSource) {

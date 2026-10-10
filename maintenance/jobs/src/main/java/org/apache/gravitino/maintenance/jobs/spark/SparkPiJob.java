@@ -40,7 +40,7 @@ public class SparkPiJob implements BuiltInJob {
 
   private static final String NAME = JobTemplateProvider.BUILTIN_NAME_PREFIX + "sparkpi";
   // Bump VERSION whenever SparkPi template behavior changes (name/executable/class/args/configs).
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -49,7 +49,7 @@ public class SparkPiJob implements BuiltInJob {
         .withComment("Built-in SparkPi job template")
         .withExecutable(resolveExecutable(SparkPiJob.class))
         .withClassName(SparkPiJob.class.getName())
-        .withArguments(Collections.singletonList("{{slices}}"))
+        .withArguments(Collections.singletonList("{{slices:-2}}"))
         .withConfigs(buildSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
@@ -94,11 +94,11 @@ public class SparkPiJob implements BuiltInJob {
 
   private Map<String, String> buildSparkConfigs() {
     Map<String, String> configs = new HashMap<>();
-    configs.put("spark.master", "{{spark_master}}");
-    configs.put("spark.executor.instances", "{{spark_executor_instances}}");
-    configs.put("spark.executor.cores", "{{spark_executor_cores}}");
-    configs.put("spark.executor.memory", "{{spark_executor_memory}}");
-    configs.put("spark.driver.memory", "{{spark_driver_memory}}");
+    configs.put("spark.master", "{{spark_master:-local[*]}}");
+    configs.put("spark.executor.instances", "{{spark_executor_instances:-1}}");
+    configs.put("spark.executor.cores", "{{spark_executor_cores:-1}}");
+    configs.put("spark.executor.memory", "{{spark_executor_memory:-1g}}");
+    configs.put("spark.driver.memory", "{{spark_driver_memory:-1g}}");
     return Collections.unmodifiableMap(configs);
   }
 }
