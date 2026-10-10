@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -45,6 +47,7 @@ import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Test;
@@ -546,5 +549,41 @@ public class TestAuthorizationRequestContext {
     assertThrows(UnsupportedOperationException.class, () -> context.getBoundRoleIds().add(4L));
     assertThrows(NullPointerException.class, () -> context.setBoundRoleIds(null));
     assertEquals(7L, context.getRolePolicyGeneration());
+  }
+
+  @Test
+  public void testRoleSubjectsAreImmutableAndReused() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertTrue(context.getBoundRoleSubjects(false).isEmpty());
+    context.setBoundRoleIds(Arrays.asList(1L, 2L, 1L));
+    assertEquals(Set.of("1", "2"), context.getBoundRoleSubjects(false));
+    assertSame(context.getBoundRoleSubjects(false), context.getBoundRoleSubjects(true));
+    assertSame(context.getBoundRoleSubjects(false), context.getBoundRoleSubjects(false));
+    assertThrows(
+        UnsupportedOperationException.class, () -> context.getBoundRoleSubjects(false).add("3"));
+    context.setActiveRoles(ActiveRoles.none());
+    assertTrue(context.getBoundRoleSubjects(true).isEmpty());
+    assertEquals(Set.of("1", "2"), context.getBoundRoleSubjects(false));
+  }
+
+  @Test
+  public void testActiveSubjectsIncludeOnlyHeldNamedRoles() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setActiveRoles(ActiveRoles.of(Arrays.asList("held", "unheld")));
+    context.setBoundRoleIds(Arrays.asList(1L, 2L));
+    assertTrue(context.getBoundRoleSubjects(true).isEmpty());
+    context.setPrefetchedRoleVersions(
+        Map.of(
+            1L, new RoleUpdatedAt(1L, "held", 1L),
+            2L, new RoleUpdatedAt(2L, "inactive", 1L),
+            3L, new RoleUpdatedAt(3L, "unheld", 1L)));
+    assertEquals(Set.of("1"), context.getBoundRoleSubjects(true));
+    assertSame(context.getBoundRoleSubjects(true), context.getBoundRoleSubjects(true));
+    assertThrows(
+        UnsupportedOperationException.class, () -> context.getBoundRoleSubjects(true).clear());
+    context.setBoundRoleIds(Arrays.asList(2L));
+    assertTrue(context.getBoundRoleSubjects(true).isEmpty());
+    context.setActiveRoles(ActiveRoles.all());
+    assertEquals(Set.of("2"), context.getBoundRoleSubjects(true));
   }
 }
