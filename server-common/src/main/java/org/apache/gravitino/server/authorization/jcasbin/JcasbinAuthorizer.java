@@ -75,6 +75,7 @@ import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
@@ -873,8 +874,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     /**
      * The fail-closed result returned when the caller's role policies cannot be kept loaded for the
-     * duration of a check: {@code false} for the allow authorizer and {@code true} for the deny
-     * authorizer, so an unstable policy state can only reject a request.
+     * duration of a check, or when the checked object's name cannot be normalized: {@code false}
+     * for the allow authorizer and {@code true} for the deny authorizer, so an unstable policy
+     * state can only reject a request.
      */
     private final boolean unstablePolicyResult;
 
@@ -968,8 +970,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObject metadataObject,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      Optional<Long> metadataId =
-          lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+      JcasbinAuthorizationLookups.MetadataIdResolution resolution =
+          lookups.resolveMetadataIdResult(metadataObject, metalake, requestContext);
+      if (resolution.normalizationFailed()) {
+        // Failure to resolve a DENY scope must not let a parent ALLOW grant access, even when
+        // the role's policies are already loaded. Missing entities retain their existing semantics.
+        return unstablePolicyResult;
+      }
+      Optional<Long> metadataId = resolution.metadataId();
       if (!metadataId.isPresent()) {
         return false;
       }
@@ -1443,7 +1451,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
       // Resolve every securable object to a metadata id before touching the enforcers, so the
       // critical section below stays free of DB round-trips.
-      ResolvedRolePolicies resolved = resolveRolePolicies(roleEntity, requestContext);
+      Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(roleEntity, requestContext);
+      if (!resolution.isPresent()) {
+        unreadableRoleIds.add(roleId);
+        continue;
+      }
+      ResolvedRolePolicies resolved = resolution.get();
 
       if (!replaceRolePolicies(roleId, dbUpdatedAt, resolved)) {
         // Another request completed this version (or a newer one) while this request was resolving
@@ -1720,11 +1733,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *
    * <p>A securable object that cannot be resolved to a metadata id is reported in {@link
    * ResolvedRolePolicies#getUnresolvedObjects()} rather than silently dropped. That normally means
-   * the object has been dropped while the role still references it, but it is indistinguishable
-   * from a transient lookup failure, and the two must not be conflated: the caller relies on this
-   * flag to decide whether the resulting enforcer state is complete enough to be cached.
+   * the object has been dropped while the role still references it. Transient normalization
+   * failures also leave the role incomplete, but require a conservative catalog-scoped guard for
+   * DENY privileges. If that guard cannot be installed, returns empty so the caller marks the role
+   * unreadable without publishing any of its policies. The caller records a loaded marker only when
+   * all objects were resolved.
    */
-  private ResolvedRolePolicies resolveRolePolicies(
+  private Optional<ResolvedRolePolicies> resolveRolePolicies(
       RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     String roleIdStr = String.valueOf(roleEntity.id());
@@ -1735,37 +1750,94 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     List<String> unresolvedObjects = new ArrayList<>();
 
     for (SecurableObject securableObject : securableObjects) {
-      Optional<Long> metadataId =
-          lookups.resolveMetadataId(securableObject, metalake, requestContext);
+      JcasbinAuthorizationLookups.MetadataIdResolution resolution =
+          lookups.resolveMetadataIdResult(securableObject, metalake, requestContext);
+      Optional<Long> metadataId = resolution.metadataId();
       if (!metadataId.isPresent()) {
         unresolvedObjects.add(securableObject.type().name() + ":" + securableObject.fullName());
+        if (resolution.normalizationFailed()
+            && !addUnresolvedDenyPolicies(
+                securableObject, metalake, roleIdStr, requestContext, allowRows, denyRows)) {
+          return Optional.empty();
+        }
         continue;
       }
-      String metadataIdStr = String.valueOf(metadataId.get());
-      for (Privilege privilege : securableObject.privileges()) {
-        Privilege.Condition condition = privilege.condition();
-        String action =
-            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
-                .name()
-                .toUpperCase(Locale.ROOT);
-        if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
-          denyRows.add(
-              new String[] {
-                roleIdStr, securableObject.type().name(), metadataIdStr, action, AuthConstants.ALLOW
-              });
-        }
+      addPolicyRows(
+          roleIdStr,
+          securableObject.type(),
+          metadataId.get(),
+          securableObject.privileges(),
+          allowRows,
+          denyRows);
+    }
+    return Optional.of(new ResolvedRolePolicies(allowRows, denyRows, unresolvedObjects));
+  }
 
-        allowRows.add(
+  private boolean addUnresolvedDenyPolicies(
+      SecurableObject object,
+      String metalake,
+      String roleId,
+      AuthorizationRequestContext requestContext,
+      List<String[]> allowRows,
+      List<String[]> denyRows) {
+    List<Privilege> denies =
+        object.privileges().stream()
+            .filter(privilege -> privilege.condition() == Privilege.Condition.DENY)
+            .collect(Collectors.toList());
+    if (denies.isEmpty()) {
+      return true;
+    }
+    // An unresolved child DENY must not disappear while an ancestor or another role grants
+    // ALLOW. Conservatively deny the same privileges throughout its catalog until the existing
+    // partial-role retry resolves the precise object again. Catalog IDs need no capability lookup,
+    // and other catalogs remain usable. A missing entity alone does not broaden existing policies.
+    MetadataObject catalog =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.getCatalogIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, object)),
+            Entity.EntityType.CATALOG);
+    Optional<Long> catalogId = lookups.resolveMetadataId(catalog, metalake, requestContext);
+    if (!catalogId.isPresent()) {
+      // Without a catalog ID even a catalog-scoped guard cannot be installed safely. A missing
+      // catalog makes normalization report a missing object instead, so this is only reachable
+      // when the catalog is dropped between the two lookups. Skipping the DENY could drop it for
+      // a catalog recreated under the same name. Mark the role unreadable and publish none of
+      // its policies; the next request retries.
+      LOG.warn("Cannot resolve catalog for unresolved deny policy on {}", object.fullName());
+      return false;
+    }
+    addPolicyRows(
+        roleId, MetadataObject.Type.CATALOG, catalogId.get(), denies, allowRows, denyRows);
+    return true;
+  }
+
+  private static void addPolicyRows(
+      String roleId,
+      MetadataObject.Type type,
+      long metadataId,
+      List<Privilege> privileges,
+      List<String[]> allowRows,
+      List<String[]> denyRows) {
+    for (Privilege privilege : privileges) {
+      String action =
+          AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+              .name()
+              .toUpperCase(Locale.ROOT);
+      if (privilege.condition() == Privilege.Condition.DENY) {
+        denyRows.add(
             new String[] {
-              roleIdStr,
-              securableObject.type().name(),
-              metadataIdStr,
-              action,
-              condition.name().toLowerCase(Locale.ROOT)
+              roleId, type.name(), String.valueOf(metadataId), action, AuthConstants.ALLOW
             });
       }
+      allowRows.add(
+          new String[] {
+            roleId,
+            type.name(),
+            String.valueOf(metadataId),
+            action,
+            privilege.condition().name().toLowerCase(Locale.ROOT)
+          });
     }
-    return new ResolvedRolePolicies(allowRows, denyRows, unresolvedObjects);
   }
 
   /**

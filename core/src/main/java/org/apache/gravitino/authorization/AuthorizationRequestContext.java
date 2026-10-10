@@ -32,12 +32,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -79,6 +82,13 @@ public class AuthorizationRequestContext {
 
   /** Per-request group identity cache. Key: {@code metalake::groupName}. */
   private final Map<String, Optional<GroupUpdatedAt>> groupInfoCache = new ConcurrentHashMap<>();
+
+  /** Per-request raw-name → canonical metadata object cache. */
+  private final Map<String, MetadataObject> normalizedMetadataObjects = new ConcurrentHashMap<>();
+
+  /** Serializes normalization per catalog and retains capability failures for this request. */
+  private final Map<NameIdentifier, CatalogNormalizationState> catalogNormalizationStates =
+      new ConcurrentHashMap<>();
 
   /** Per-request name→id cache. Deduplicates resolveMetadataId within a single request. */
   private final Map<String, Long> metadataIdCache = new ConcurrentHashMap<>();
@@ -212,6 +222,56 @@ public class AuthorizationRequestContext {
     return groupInfoCache.computeIfAbsent(
         key,
         k -> Objects.requireNonNull(loader.apply(k), "Group info loader must not return null"));
+  }
+
+  /**
+   * Normalizes each raw metadata name at most once per request.
+   *
+   * <p>The key must include the metalake, object type and raw name. Successful results are a
+   * request-local snapshot; failures are not cached, so a later lookup may retry. A fresh request
+   * must resolve current catalog rules again. This map must not be shared across mutations.
+   *
+   * @param key the raw metadata object's cache key
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, Function<String, MetadataObject> loader) {
+    return normalizedMetadataObjects.computeIfAbsent(
+        key,
+        k -> Objects.requireNonNull(loader.apply(k), "Normalization loader must not return null"));
+  }
+
+  /**
+   * Normalizes a raw name while remembering capability failures for its catalog in this request.
+   *
+   * <p>Catalog lookups are serialized so concurrent objects cannot retry a failed initialization.
+   * Missing catalogs are not memoized; a fresh request can retry any capability failure.
+   *
+   * @param key the raw metadata object's cache key
+   * @param catalogIdentifier the containing catalog, including its metalake
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   * @throws RuntimeException if normalization failed for this catalog
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, NameIdentifier catalogIdentifier, Function<String, MetadataObject> loader) {
+    CatalogNormalizationState state =
+        catalogNormalizationStates.computeIfAbsent(
+            catalogIdentifier, ignored -> new CatalogNormalizationState());
+    synchronized (state) {
+      if (state.failure != null) {
+        throw state.failure;
+      }
+      try {
+        return computeNormalizedMetadataObjectIfAbsent(key, loader);
+      } catch (NotFoundException e) {
+        throw e;
+      } catch (RuntimeException e) {
+        state.failure = e;
+        throw e;
+      }
+    }
   }
 
   /** Per-request name→id dedup. Loader must return a non-null id or throw. */
@@ -392,5 +452,9 @@ public class AuthorizationRequestContext {
     private final String metalake;
     private final MetadataObject metadataObject;
     private final Privilege.Name privilege;
+  }
+
+  private static class CatalogNormalizationState {
+    @Nullable private RuntimeException failure;
   }
 }
