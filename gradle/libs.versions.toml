@@ -68,6 +68,7 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
+datastrato-iceberg = "1.13.0"
 # Last Iceberg release compatible with Spark 3.3.
 iceberg4spark33 = "1.8.1"
 iceberg4spark35 = "1.11.0"
