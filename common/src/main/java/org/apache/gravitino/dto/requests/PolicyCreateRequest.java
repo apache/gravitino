@@ -64,7 +64,13 @@ public class PolicyCreateRequest implements RESTRequest {
         name = "system_iceberg_compaction"),
     @JsonSubTypes.Type(
         value = PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.class,
-        name = "system_iceberg_orphan_file_removal")
+        name = "system_iceberg_orphan_file_removal"),
+    @JsonSubTypes.Type(
+        value = PolicyContentDTO.RowFilterContentDTO.class,
+        name = "system_row_filter"),
+    @JsonSubTypes.Type(
+        value = PolicyContentDTO.ColumnMaskContentDTO.class,
+        name = "system_column_mask")
   })
   private final PolicyContentDTO policyContent;
 

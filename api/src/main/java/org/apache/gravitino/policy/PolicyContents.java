@@ -127,6 +127,26 @@ public class PolicyContents {
     return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
   }
 
+  /**
+   * Creates a row-filter policy for tagged tables.
+   *
+   * @param expression row-filter expression
+   * @return validated read-restriction policy content
+   */
+  public static RowFilterContent rowFilter(String expression) {
+    return new RowFilterContent(expression);
+  }
+
+  /**
+   * Creates a column-mask policy for tagged tables or columns.
+   *
+   * @param expression column-mask expression
+   * @return validated read-restriction policy content
+   */
+  public static ColumnMaskContent columnMask(String expression) {
+    return new ColumnMaskContent(expression);
+  }
+
   private PolicyContents() {}
 
   /**
