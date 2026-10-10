@@ -55,14 +55,20 @@ gravitino_admin_client = GravitinoAdminClient(
    uri="http://localhost:8090",
    client_config={"gravitino_client_request_timeout": 60},
 )
-# ...
+try:
+    # ...
+finally:
+    gravitino_admin_client.close()
 
 gravitino_client = GravitinoClient(
    uri="http://localhost:8090",
    metalake_name="test",
    client_config={"gravitino_client_request_timeout": 60},
 )
-# ...
+try:
+    # ...
+finally:
+    gravitino_client.close()
 ```
 
 ### Python Client Configuration
