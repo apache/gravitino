@@ -26,6 +26,7 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     UnauthorizedException,
 )
+from gravitino.utils.http_client import HTTPClient
 from tests.unittests.auth import mock_base
 
 OAUTH_PORT = 1082
@@ -43,9 +44,10 @@ class TestOAuth2TokenProvider(unittest.TestCase):
     @patch("gravitino.utils.http_client.build_opener")
     def test_close_delegates_without_request(self, build_opener):
         provider = _TestOAuth2TokenProvider("http://localhost")
-        client = provider._client
 
-        with patch.object(client, "close", wraps=client.close) as client_close:
+        with patch.object(
+            HTTPClient, "close", autospec=True, side_effect=HTTPClient.close
+        ) as client_close:
             provider.close()
             provider.close()
 
