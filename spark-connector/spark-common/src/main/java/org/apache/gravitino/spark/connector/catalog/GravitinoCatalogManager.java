@@ -171,7 +171,8 @@ public class GravitinoCatalogManager {
   public void close() {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
-    // Caffeine dispatches the removal listener asynchronously, so shutdown closes explicitly.
+    // The removal listener runs on cacheExecutor and may finish after close() returns, so close
+    // clients here. Expired entries not yet evicted are skipped by asMap() and left to the listener.
     clients.asMap().forEach(GravitinoCatalogManager::closeClient);
     clients.invalidateAll();
     gravitinoCatalogs.invalidateAll();
