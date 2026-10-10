@@ -27,12 +27,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -64,6 +67,9 @@ public class ModelVersionMetaService {
 
   /** How many times a model-version read is re-run when the model changes underneath it. */
   @VisibleForTesting static final int MAX_STABLE_READ_ATTEMPTS = 3;
+
+  /** Upper bound of the random pause between two attempts of a model-version read. */
+  private static final long MAX_STABLE_READ_BACKOFF_MILLIS = 10;
 
   private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
 
@@ -484,6 +490,11 @@ public class ModelVersionMetaService {
       if (attempt >= MAX_STABLE_READ_ATTEMPTS) {
         throw ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, modelIdent);
       }
+      // A short random pause keeps readers of a busy model from re-reading in lockstep with the
+      // writer stream that just invalidated them.
+      Uninterruptibles.sleepUninterruptibly(
+          ThreadLocalRandom.current().nextLong(1, MAX_STABLE_READ_BACKOFF_MILLIS + 1),
+          TimeUnit.MILLISECONDS);
     }
   }
 

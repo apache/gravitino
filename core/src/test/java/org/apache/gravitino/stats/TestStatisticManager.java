@@ -115,7 +115,9 @@ public class TestStatisticManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
@@ -448,12 +450,13 @@ public class TestStatisticManager {
 
     // A pluggable partition statistic storage need not update atomically, so this path keeps the
     // tree lock until the storages do.
-    TreeLockTestSupport.HeldLock tableWriter =
+    try (TreeLockTestSupport.HeldLock tableWriter =
         TreeLockTestSupport.HeldLock.acquire(
-            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE);
-    TreeLockTestSupport.assertWaitsFor(
-        tableWriter,
-        () -> statisticManager.updatePartitionStatistics(METALAKE, tableObject, updates));
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () -> statisticManager.updatePartitionStatistics(METALAKE, tableObject, updates));
+    }
   }
 
   @Test

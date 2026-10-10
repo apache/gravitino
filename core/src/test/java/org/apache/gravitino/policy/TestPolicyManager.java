@@ -65,11 +65,13 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -78,6 +80,7 @@ import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -244,7 +247,9 @@ public class TestPolicyManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
@@ -633,6 +638,34 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject));
     Assertions.assertEquals(
         0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
+  }
+
+  @Test
+  public void testPolicyOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+
+    // A metalake WRITE lock covers every policy below it. Policy operations are fenced by the
+    // entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock metalakeWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> createCustomPolicy(METALAKE, policyName, content));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.getPolicy(METALAKE, policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.disablePolicy(METALAKE, policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              policyManager.alterPolicy(
+                  METALAKE, policyName, PolicyChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.listTagAssociationsForPolicy(METALAKE, policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.deletePolicy(METALAKE, policyName));
+    }
   }
 
   @Test

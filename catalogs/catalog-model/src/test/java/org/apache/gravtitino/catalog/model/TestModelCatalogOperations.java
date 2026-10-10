@@ -122,7 +122,9 @@ public class TestModelCatalogOperations {
     // they will be set automatically by the configuration file if you set ENTITY_RELATIONAL_STORE
     // as EMBEDDED_ENTITY_RELATIONAL_STORE.
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", STORE_PATH));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", STORE_PATH));
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");

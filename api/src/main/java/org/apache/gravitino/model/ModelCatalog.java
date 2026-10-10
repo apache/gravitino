@@ -45,7 +45,9 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
  * <p>Conflicting operations may fail with {@link OptimisticLockException}. This includes reads when
  * concurrent changes prevent obtaining consistent model-version metadata. Callers may retry reads
  * with a bounded number of attempts; before retrying writes, reload the metadata and reconsider the
- * intended change.
+ * intended change. For example, {@link #deleteModel} and {@link #alterModel} fail this way when a
+ * version of the model was linked, altered or deleted after the model was read, so that a drop
+ * never removes a version it did not observe.
  */
 @Evolving
 public interface ModelCatalog {

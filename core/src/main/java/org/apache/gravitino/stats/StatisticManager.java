@@ -283,10 +283,9 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
       List<MetadataObjectStatisticsUpdate> statisticsToUpdate = Lists.newArrayList();
       statisticsToUpdate.add(
           MetadataObjectStatisticsUpdate.of(metadataObject, partitionStatistics));
-      // Unlike table-level statistics, partition statistics keep the tree lock: a partition
-      // statistic storage is pluggable and need not update atomically (the Lance storage deletes
-      // and
-      // then appends in two commits), so two concurrent updates of one table could leave
+      // Unlike table-level statistics, partition statistics keep the tree lock. A partition
+      // statistic storage is pluggable and need not update atomically: the Lance storage deletes
+      // and then appends in two commits, so two concurrent updates of one table could leave
       // duplicates.
       TreeLockUtils.doWithTreeLock(
           identifier,

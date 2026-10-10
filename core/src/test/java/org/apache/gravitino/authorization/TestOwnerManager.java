@@ -63,11 +63,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -113,7 +115,9 @@ public class TestOwnerManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
@@ -377,6 +381,29 @@ public class TestOwnerManager {
           (USER.equals(owner.name()) && owner.type() == Owner.Type.USER)
               || (GROUP.equals(owner.name()) && owner.type() == Owner.Type.GROUP),
           "Unexpected owner " + owner.name());
+    }
+  }
+
+  @Test
+  @Order(7)
+  public void testOwnerOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
+    MetadataObject catalogObject =
+        MetadataObjects.of(Lists.newArrayList("catalog_owner_race"), MetadataObject.Type.CATALOG);
+
+    // A metalake WRITE lock covers every principal and metadata object below it. Owner writes are
+    // fenced by the entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock metalakeWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> ownerManager.setOwner(METALAKE, catalogObject, USER, Owner.Type.USER));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              ownerManager.setOwners(
+                  METALAKE, Collections.singletonList(catalogObject), GROUP, Owner.Type.GROUP));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> ownerManager.getOwner(METALAKE, catalogObject));
     }
   }
 }

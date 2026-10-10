@@ -66,6 +66,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -73,6 +74,7 @@ import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -90,6 +92,7 @@ import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -169,7 +172,9 @@ public class TestTagManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
@@ -1258,6 +1263,37 @@ public class TestTagManager {
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
+    }
+  }
+
+  @Test
+  public void testTagOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    // A metalake WRITE lock covers every tag and metadata object below it. Tag operations are
+    // fenced by the entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock metalakeWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.createTag(METALAKE, "lock_free_tag", null, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.getTag(METALAKE, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> tagManager.alterTag(METALAKE, "lock_free_tag", TagChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, tableObject, new String[] {"lock_free_tag"}, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listTagsForMetadataObject(METALAKE, tableObject));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listMetadataObjectsForTag(METALAKE, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.deleteTag(METALAKE, "lock_free_tag"));
     }
   }
 

@@ -255,6 +255,10 @@ public class PolicyManager implements PolicyDispatcher {
             builder.withEnabled(expectedEnabledState);
             return builder.build();
           });
+    } catch (NoSuchEntityException e) {
+      // The policy was dropped between the state check above and this update.
+      throw new NoSuchPolicyException(
+          e, "Policy with name %s under metalake %s does not exist", policyName, metalake);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to change policy {} enabled state under metalake {}", policyName, metalake, ioe);
