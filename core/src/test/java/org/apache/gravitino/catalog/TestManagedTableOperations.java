@@ -350,7 +350,7 @@ public class TestManagedTableOperations {
         new String[] {"col2", "col3_renamed"},
         Arrays.stream(renamedLast.columns()).map(Column::name).toArray(String[]::new));
 
-    // Renaming a column that is not last must not move it behind col3.
+    // After deleting col1 in the same request, renaming col2 must not move it behind col3.
     NameIdentifier middleIdent = createThreeColumnTable("rename_middle");
     Table renamedMiddle =
         tableOperations.alterTable(
