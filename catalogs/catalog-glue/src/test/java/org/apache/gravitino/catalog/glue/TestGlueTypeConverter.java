@@ -220,9 +220,71 @@ class TestGlueTypeConverter {
   }
 
   @Test
-  void testFromGravitinoUnsupportedTypeThrows() {
-    assertThrows(
-        IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));
+  void testFromGravitinoNanosecondTimestampThrows() {
+    IllegalArgumentException timestampError =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.TimestampType.withoutTimeZone(9)));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: timestamp(9). "
+            + "Glue cannot safely preserve timestamp precision greater than 6.",
+        timestampError.getMessage());
+
+    IllegalArgumentException timestampTzError =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.TimestampType.withTimeZone(9)));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: timestamp_tz(9). "
+            + "Glue cannot safely preserve timestamp precision greater than 6.",
+        timestampTzError.getMessage());
+  }
+
+  @Test
+  void testFromGravitinoVariantThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.VariantType.get()));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: variant. "
+            + "Glue Hive and Iceberg table paths do not define a Variant column type.",
+        error.getMessage());
+  }
+
+  @Test
+  void testFromGravitinoUnknownThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: unknown. "
+            + "Glue Hive and Iceberg table paths require a concrete column type.",
+        error.getMessage());
+  }
+
+  @Test
+  void testFromGravitinoGeometryThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.GeometryType.of("EPSG:3857")));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: geometry. "
+            + "Glue Hive and Iceberg table paths do not preserve Geometry CRS semantics.",
+        error.getMessage());
+  }
+
+  @Test
+  void testFromGravitinoGeographyThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "SPHERICAL")));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: geography. "
+            + "Glue Hive and Iceberg table paths do not preserve Geography CRS and edge "
+            + "algorithm semantics.",
+        error.getMessage());
   }
 
   // -------------------------------------------------------------------------

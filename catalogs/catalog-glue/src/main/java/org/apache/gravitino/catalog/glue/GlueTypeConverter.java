@@ -184,6 +184,27 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public String fromGravitino(Type type) {
+    if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: geography. "
+              + "Glue Hive and Iceberg table paths do not preserve Geography CRS and edge "
+              + "algorithm semantics.");
+    }
+    if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: geometry. "
+              + "Glue Hive and Iceberg table paths do not preserve Geometry CRS semantics.");
+    }
+    if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: unknown. "
+              + "Glue Hive and Iceberg table paths require a concrete column type.");
+    }
+    if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: variant. "
+              + "Glue Hive and Iceberg table paths do not define a Variant column type.");
+    }
     if (type instanceof Types.BooleanType) return BOOLEAN;
     if (type instanceof Types.ByteType) return TINYINT;
     if (type instanceof Types.ShortType) return SMALLINT;
@@ -194,9 +215,15 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.StringType) return STRING;
     if (type instanceof Types.DateType) return DATE;
     if (type instanceof Types.TimestampType) {
+      Types.TimestampType tsType = (Types.TimestampType) type;
+      if (tsType.hasPrecisionSet() && tsType.precision() > 6) {
+        throw new IllegalArgumentException(
+            "Unsupported Gravitino type for Glue: "
+                + type.simpleString()
+                + ". Glue cannot safely preserve timestamp precision greater than 6.");
+      }
       // Glue/Hive timestamps are timezoneless; see:
       // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
-      Types.TimestampType tsType = (Types.TimestampType) type;
       if (tsType.hasTimeZone()) {
         throw new IllegalArgumentException(
             "Unsupported Gravitino type for Glue: "
