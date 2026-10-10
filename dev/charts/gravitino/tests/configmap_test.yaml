@@ -51,7 +51,7 @@ tests:
           pattern: "rootLogger\\.level = info"
       - matchRegex:
           path: data["log4j2.properties"]
-          pattern: "logger\\.jcasbin\\.name = org\\.casbin\\.jcasbin"
+          pattern: "logger\\.jcasbin\\.name = org\\.apache\\.gravitino\\.server\\.authorization\\.jcasbin"
       - matchRegex:
           path: data["log4j2.properties"]
           pattern: "logger\\.jcasbin\\.level = warn"

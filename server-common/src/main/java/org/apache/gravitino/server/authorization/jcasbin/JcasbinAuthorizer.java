@@ -1480,6 +1480,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         rolePolicyLock.readLock().unlock();
       }
       if (reloads == MAX_ROLE_POLICY_RELOADS) {
+        LOG.warn(
+            "Role policies changed during all {} reload attempts for metalake {}; failing closed. "
+                + "Retry the request after role updates settle",
+            MAX_ROLE_POLICY_RELOADS,
+            metalake);
         return Optional.empty();
       }
       synchronized (context) {

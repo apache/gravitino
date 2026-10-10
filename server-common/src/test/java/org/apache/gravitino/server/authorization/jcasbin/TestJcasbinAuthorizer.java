@@ -1132,7 +1132,7 @@ public class TestJcasbinAuthorizer {
     mockedRoleVersions.put(
         otherRoleId, new RoleUpdatedAt(otherRoleId, otherRoleName, nextRoleVersion()));
     AtomicReference<Boolean> armed = new AtomicReference<>(false);
-    // Reloading either role evicts the other one, so the request's roles never become stable.
+    // Reloading either role explicitly invalidates the other, preventing a stable policy view.
     doAnswer(
             invocation -> {
               if (armed.get()) {
@@ -1315,12 +1315,10 @@ public class TestJcasbinAuthorizer {
     GravitinoCache<Long, CachedRolePolicies> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
 
     // Requests run on this thread because the static mocks are thread-local. The evictor only
-    // touches the loaded-role cache, whose removal listener clears policies under the write lock,
-    // the same way a TTL or size eviction does. It evicts at most once per request, at a random
-    // point in it, so a request never sees more clears than a check may reload; a check that runs
-    // out of reloads fails closed by design, which is covered by testRepeatedEvictionsFailClosed.
+    // removes shared cache entries, as TTL or size eviction does. Pinned request views must retain
+    // their policies without reloading, regardless of when this ordinary eviction happens.
     // Each request waits for its eviction round to finish before the next request starts, so a
-    // delayed eviction cannot spill into another request and exceed the intended reload budget.
+    // delayed eviction cannot spill into another request.
     Semaphore evictionRequests = new Semaphore(0);
     Semaphore completedEvictions = new Semaphore(0);
     AtomicLong evictions = new AtomicLong();
@@ -4369,8 +4367,7 @@ public class TestJcasbinAuthorizer {
         jcasbinAuthorizer.authorize(
             currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, requestContext));
 
-    // TTL expiry or size eviction runs the removal listener, which clears the role's p-rows but
-    // keeps the user's g-row. The request will not run its one-time role load again.
+    // TTL expiry or size eviction removes only the shared index. This request retains its view.
     getLoadedRolesCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
 
     assertTrue(
