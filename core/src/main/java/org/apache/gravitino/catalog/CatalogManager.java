@@ -1417,11 +1417,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+              // Unmanaged catalogs keep their external schemas and tables. Those objects still
+              // carry the Gravitino identifier written at create/import time, so a catalog that
+              // later manages them again would inherit stale ownership (see issue #13475). Collect
+              // the schemas that remain in the external system and let the connector strip the
+              // identifiers; managed catalogs already dropped their external objects above, so the
+              // list stays empty.
+              List<NameIdentifier> remainingExternalSchemas =
+                  managedStorage ? Collections.emptyList() : listExternalSchemas(catalogWrapper);
               try {
                 catalogWrapper.doWithCatalogOps(
                     operations -> {
                       if (operations instanceof CatalogDropAware) {
-                        ((CatalogDropAware) operations).onCatalogDropped();
+                        ((CatalogDropAware) operations).onCatalogDropped(remainingExternalSchemas);
                       }
                       return null;
                     });
@@ -1460,6 +1468,37 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return properties == null || properties.isEmpty()
         ? Collections.emptyMap()
         : new HashMap<>(properties);
+  }
+
+  /**
+   * Lists the schemas that still exist in the external system for a catalog that is being dropped,
+   * so the connector can strip the Gravitino identifier from those objects. A failure to reach the
+   * external system is logged and treated as "nothing to clean up": the identifier cleanup is
+   * best-effort and must never make a drop fail.
+   *
+   * @param catalogWrapper The wrapper of the catalog being dropped.
+   * @return The identifiers of the schemas that remain in the external system; empty if the
+   *     external schemas cannot be listed.
+   */
+  private List<NameIdentifier> listExternalSchemas(CatalogWrapper catalogWrapper) {
+    NameIdentifier catalogIdent = catalogWrapper.catalog().entity().nameIdentifier();
+    try {
+      NameIdentifier[] schemas =
+          catalogWrapper.doWithSchemaOps(
+              schemaOps ->
+                  schemaOps.listSchemas(
+                      NamespaceUtil.ofSchema(
+                          catalogWrapper.catalog().entity().namespace().level(0),
+                          catalogWrapper.catalog().name())));
+      return schemas == null ? Collections.emptyList() : Arrays.asList(schemas);
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to list external schemas of catalog {} while cleaning up residual identifiers; "
+              + "the drop continues without external cleanup",
+          catalogIdent,
+          e);
+      return Collections.emptyList();
+    }
   }
 
   /**
