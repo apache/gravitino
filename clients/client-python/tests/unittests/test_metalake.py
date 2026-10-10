@@ -15,9 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
 from unittest.mock import MagicMock
 
+from gravitino.api.catalog import Catalog
+from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.constants.error import ErrorConstants
@@ -33,6 +36,73 @@ from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HA
 
 
 class TestMetalake(unittest.TestCase):
+    def test_list_catalogs_info_properties(self):
+        for include_properties in (None, True, False):
+            with self.subTest(include_properties=include_properties):
+                rest_client = MagicMock()
+                properties = {} if include_properties is False else {"in-use": "true"}
+                rest_client.get.return_value.body = json.dumps(
+                    {
+                        "code": 0,
+                        "catalogs": [
+                            {
+                                "name": "catalog",
+                                "type": "relational",
+                                "provider": "hive",
+                                "comment": "test catalog",
+                                "properties": properties,
+                                "audit": {"creator": "tester"},
+                            }
+                        ],
+                    }
+                ).encode("utf-8")
+                metalake = GravitinoMetalake(
+                    MetalakeDTO("metalake/name", None, {}, None), rest_client
+                )
+                catalogs = (
+                    metalake.list_catalogs_info()
+                    if include_properties is None
+                    else metalake.list_catalogs_info(
+                        include_properties=include_properties
+                    )
+                )
+                rest_client.get.assert_called_once_with(
+                    "api/metalakes/metalake%2Fname/catalogs",
+                    params={
+                        "details": "true",
+                        "includeProperties": (
+                            "false" if include_properties is False else "true"
+                        ),
+                    },
+                    error_handler=CATALOG_ERROR_HANDLER,
+                )
+                self.assertEqual(1, len(catalogs))
+                catalog = catalogs[0]
+                self.assertEqual("catalog", catalog.name())
+                self.assertEqual(Catalog.Type.RELATIONAL, catalog.type())
+                self.assertEqual("hive", catalog.provider())
+                self.assertEqual("test catalog", catalog.comment())
+                self.assertEqual(properties, catalog.properties())
+                self.assertEqual("tester", catalog.audit_info().creator())
+
+    def test_client_list_catalogs_info_delegation(self):
+        client = MagicMock(spec=GravitinoClient)
+        for include_properties in (None, True, False):
+            with self.subTest(include_properties=include_properties):
+                metalake = client.get_metalake.return_value
+                metalake.reset_mock()
+                catalogs = (
+                    GravitinoClient.list_catalogs_info(client)
+                    if include_properties is None
+                    else GravitinoClient.list_catalogs_info(
+                        client, include_properties=include_properties
+                    )
+                )
+                metalake.list_catalogs_info.assert_called_once_with(
+                    True if include_properties is None else include_properties
+                )
+                self.assertIs(metalake.list_catalogs_info.return_value, catalogs)
+
     def test_existing_catalog_connection(self):
         rest_client = MagicMock()
         rest_client.post.return_value.body = b'{"code":0}'

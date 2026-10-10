@@ -27,6 +27,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -177,7 +178,8 @@ public class TestCatalogOperations extends BaseOperationsTest {
     TestCatalog catalog1 = buildCatalog("metalake1", "catalog1");
     TestCatalog catalog2 = buildCatalog("metalake1", "catalog2");
 
-    when(manager.listCatalogsInfo(any())).thenReturn(new Catalog[] {catalog1, catalog2});
+    when(manager.listCatalogsInfo(any(), anyBoolean()))
+        .thenReturn(new Catalog[] {catalog1, catalog2});
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -209,7 +211,21 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO2.properties());
 
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogsInfo(any());
+    verify(manager).listCatalogsInfo(any(), eq(true));
+
+    Response lightweightResp =
+        target("/metalakes/metalake1/catalogs")
+            .queryParam("details", "true")
+            .queryParam("includeProperties", "false")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), lightweightResp.getStatus());
+    verify(manager).listCatalogsInfo(any(), eq(false));
+
+    doThrow(new NoSuchMetalakeException("mock error"))
+        .when(manager)
+        .listCatalogsInfo(any(), anyBoolean());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .queryParam("details", "true")

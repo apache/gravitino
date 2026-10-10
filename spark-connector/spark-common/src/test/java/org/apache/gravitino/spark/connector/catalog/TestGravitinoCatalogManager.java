@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
@@ -130,6 +132,51 @@ public class TestGravitinoCatalogManager {
     assertEquals(1, clientFactory.clientCount());
     assertEquals(1, clientFactory.loadCount());
     assertSame(first, second);
+  }
+
+  @Test
+  void testCatalogLoadFailureIncludesNameAndPreservesCause() {
+    GravitinoCatalogManager manager = createManager(new SparkConf(false));
+    GravitinoClient client = manager.getClient(manager.currentIdentity());
+    RuntimeException cause = new RuntimeException("Gravitino server unreachable");
+    when(client.loadCatalog(CATALOG_NAME)).thenThrow(cause);
+
+    RuntimeException failure =
+        assertThrows(RuntimeException.class, () -> manager.getGravitinoCatalogInfo(CATALOG_NAME));
+
+    assertEquals("Failed to load catalog " + CATALOG_NAME, failure.getMessage());
+    assertSame(cause, failure.getCause());
+  }
+
+  @Test
+  void testCatalogDescriptorsAreNotStoredInCompleteCatalogCache() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoCatalogManager manager = createManager(sparkConf);
+    Catalog relationalDescriptor = mock(Catalog.class);
+    when(relationalDescriptor.name()).thenReturn(CATALOG_NAME);
+    when(relationalDescriptor.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(relationalDescriptor.provider()).thenReturn("hive");
+    Catalog filesetDescriptor = mock(Catalog.class);
+    when(filesetDescriptor.name()).thenReturn("fileset_catalog");
+    when(filesetDescriptor.type()).thenReturn(Catalog.Type.FILESET);
+    clientFactory.catalogDescriptors = new Catalog[] {relationalDescriptor, filesetDescriptor};
+
+    manager.loadRelationalCatalogs();
+
+    verify(clientFactory.lastClient()).listCatalogsInfo(false);
+    verify(clientFactory.lastClient(), never()).listCatalogsInfo();
+    verify(clientFactory.lastClient(), never()).listCatalogsInfo(true);
+    assertEquals(1, clientFactory.listCount());
+    assertEquals(0, clientFactory.loadCount());
+    assertEquals(1, manager.getCatalogs().size());
+    assertSame(relationalDescriptor, manager.getCatalogs().get(CATALOG_NAME));
+
+    Catalog loaded = manager.getGravitinoCatalogInfo(CATALOG_NAME);
+    Catalog cached = manager.getGravitinoCatalogInfo(CATALOG_NAME);
+
+    assertNotSame(relationalDescriptor, loaded);
+    assertSame(loaded, cached);
+    assertEquals(1, clientFactory.loadCount());
   }
 
   @Test
@@ -300,11 +347,21 @@ public class TestGravitinoCatalogManager {
     private final List<AtomicBoolean> closedFlags = new ArrayList<>();
     private final AtomicInteger clients = new AtomicInteger();
     private final AtomicInteger loads = new AtomicInteger();
+    private final AtomicInteger lists = new AtomicInteger();
+    private Catalog[] catalogDescriptors = new Catalog[0];
+    private GravitinoClient lastClient;
 
     @Override
     public GravitinoClient apply(GravitinoIdentity identity) {
       clients.incrementAndGet();
       GravitinoClient client = mock(GravitinoClient.class);
+      lastClient = client;
+      when(client.listCatalogsInfo(false))
+          .thenAnswer(
+              invocation -> {
+                lists.incrementAndGet();
+                return catalogDescriptors;
+              });
       when(client.loadCatalog(anyString()))
           .thenAnswer(
               invocation -> {
@@ -336,6 +393,14 @@ public class TestGravitinoCatalogManager {
 
     int loadCount() {
       return loads.get();
+    }
+
+    int listCount() {
+      return lists.get();
+    }
+
+    GravitinoClient lastClient() {
+      return lastClient;
     }
 
     int closedCount() {

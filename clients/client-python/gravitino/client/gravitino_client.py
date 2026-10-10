@@ -95,8 +95,21 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     def list_catalogs(self) -> List[str]:
         return self.get_metalake().list_catalogs()
 
-    def list_catalogs_info(self) -> List[Catalog]:
-        return self.get_metalake().list_catalogs_info()
+    def list_catalogs_info(self, include_properties: bool = True) -> List[Catalog]:
+        """List catalogs, optionally omitting their properties.
+
+        Args:
+            include_properties: Whether to resolve catalog properties. Defaults to True.
+                False returns lightweight descriptors with empty properties, retaining
+                name, type, provider, comment, and audit information.
+
+        Returns:
+            A list of catalogs under the current metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake does not exist.
+        """
+        return self.get_metalake().list_catalogs_info(include_properties)
 
     def load_catalog(self, name: str) -> Catalog:
         return self.get_metalake().load_catalog(name)
