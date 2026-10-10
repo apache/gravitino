@@ -435,13 +435,13 @@ public class HologresTableOperations extends JdbcTableOperations
 
   @Override
   protected String generateAlterTableSql(
-      String schemaName, String tableName, TableChange... changes) {
+      Connection connection, String schemaName, String tableName, TableChange... changes) {
     // Not all operations require the original table information, so lazy loading is used here
     JdbcTable lazyLoadTable = null;
     List<String> alterSql = new ArrayList<>();
     for (TableChange change : changes) {
       if (change instanceof TableChange.UpdateComment) {
-        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, schemaName, tableName, lazyLoadTable);
         alterSql.add(updateCommentDefinition((TableChange.UpdateComment) change, lazyLoadTable));
       } else if (change instanceof TableChange.SetProperty) {
         throw new IllegalArgumentException("Set property is not supported yet");
@@ -449,7 +449,7 @@ public class HologresTableOperations extends JdbcTableOperations
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, schemaName, tableName, lazyLoadTable);
         alterSql.addAll(addColumnFieldDefinition(addColumn, lazyLoadTable));
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -467,7 +467,7 @@ public class HologresTableOperations extends JdbcTableOperations
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         throw new IllegalArgumentException("Hologres does not support column position.");
       } else if (change instanceof TableChange.DeleteColumn) {
-        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        lazyLoadTable = getOrCreateTable(connection, schemaName, tableName, lazyLoadTable);
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
         if (StringUtils.isNotEmpty(deleteColSql)) {

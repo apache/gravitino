@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.starrocks.operation;
 
+import java.sql.Connection;
 import java.util.Collections;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -65,12 +66,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
     }
 
     public String alterTableSql(String tableName, TableChange... changes) {
-      return generateAlterTableSql("database", tableName, changes);
+      return generateAlterTableSql(null, "database", tableName, changes);
     }
 
     @Override
     protected JdbcTable getOrCreateTable(
-        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+        Connection connection,
+        String databaseName,
+        String tableName,
+        JdbcTable lazyLoadCreateTable) {
       return JdbcTable.builder()
           .withName(tableName)
           .withComment(
