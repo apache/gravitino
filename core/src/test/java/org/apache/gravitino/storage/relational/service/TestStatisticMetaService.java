@@ -405,7 +405,8 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             new SQLException("MySQL deadlock", "40001", 1213),
             new SQLException("PostgreSQL deadlock", "40P01"),
             new SQLException("serialization failure", "40001"),
-            new SQLException("duplicate key", "23505"))) {
+            new SQLException("MySQL lock wait timeout", "40001", 1205),
+            new SQLException("MySQL lock wait timeout", "HY000", 1205))) {
       StatisticMetaService failing = failingStatements(new PersistenceException(failure));
       OptimisticLockException writeConflict =
           Assertions.assertThrows(
@@ -427,6 +428,28 @@ public class TestStatisticMetaService extends TestJDBCBackend {
                       table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a")));
       Assertions.assertSame(failure, dropConflict.getCause().getCause());
     }
+
+    // A duplicate key on a drop is a conflict. On a write it is a conflict only if a live row now
+    // has one of the inserted names (see testConcurrentFirstStatisticWritesReportConflict);
+    // otherwise the names collided with each other in the backend collation.
+    SQLException duplicate = new SQLException("duplicate key", "23505");
+    StatisticMetaService duplicating = failingStatements(new PersistenceException(duplicate));
+    IllegalStatisticNameException collision =
+        Assertions.assertThrows(
+            IllegalStatisticNameException.class,
+            () ->
+                duplicating.writeStatisticsWithVersion(
+                    List.of(createNamedStatistic("b", 2L)),
+                    table.nameIdentifier(),
+                    Entity.EntityType.TABLE));
+    Assertions.assertSame(duplicate, collision.getCause().getCause());
+    OptimisticLockException dropDuplicate =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                duplicating.batchDeleteStatisticPOs(
+                    table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a")));
+    Assertions.assertSame(duplicate, dropDuplicate.getCause().getCause());
 
     PersistenceException connectionFailure =
         new PersistenceException(new SQLException("connection lost", "08006"));
@@ -475,6 +498,41 @@ public class TestStatisticMetaService extends TestJDBCBackend {
       Assertions.assertEquals(2L, statisticsByName(table).get("name ").value().value());
     }
     Assertions.assertEquals(1L, statisticsByName(table).get("name").value().value());
+  }
+
+  /** Verifies names that collide only under a padding collation in one request are illegal. */
+  @TestTemplate
+  public void testWriteOfTrailingSpaceAliasesInOneRequest() throws Exception {
+    TableEntity table = createBatchConflictTable("trailing_space_batch");
+    List<StatisticEntity> bothNew =
+        List.of(createNamedStatistic("x", 1L), createNamedStatistic("x ", 2L));
+    statisticMetaService.writeStatisticsWithVersion(
+        List.of(createNamedStatistic("y", 1L)), table.nameIdentifier(), Entity.EntityType.TABLE);
+    List<StatisticEntity> updateAndAlias =
+        List.of(createNamedStatistic("y", 10L), createNamedStatistic("y ", 20L));
+
+    if ("mysql".equalsIgnoreCase(backendType)) {
+      // MySQL's unique key treats "x " as "x", so these requests can never succeed.
+      for (List<StatisticEntity> request : List.of(bothNew, updateAndAlias)) {
+        Assertions.assertThrows(
+            IllegalStatisticNameException.class,
+            () ->
+                statisticMetaService.writeStatisticsWithVersion(
+                    request, table.nameIdentifier(), Entity.EntityType.TABLE));
+      }
+      Map<String, StatisticEntity> current = statisticsByName(table);
+      Assertions.assertEquals(1, current.size());
+      Assertions.assertEquals(1L, current.get("y").value().value());
+    } else {
+      statisticMetaService.writeStatisticsWithVersion(
+          bothNew, table.nameIdentifier(), Entity.EntityType.TABLE);
+      statisticMetaService.writeStatisticsWithVersion(
+          updateAndAlias, table.nameIdentifier(), Entity.EntityType.TABLE);
+      Map<String, StatisticEntity> current = statisticsByName(table);
+      Assertions.assertEquals(4, current.size());
+      Assertions.assertEquals(10L, current.get("y").value().value());
+      Assertions.assertEquals(20L, current.get("y ").value().value());
+    }
   }
 
   /**

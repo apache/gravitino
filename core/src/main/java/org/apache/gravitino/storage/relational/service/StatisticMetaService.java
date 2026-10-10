@@ -145,22 +145,26 @@ public class StatisticMetaService {
     }
     // Each kind of write is one statement. Any mismatch fails the whole transaction, so the batch
     // either applies completely or not at all.
-    runFencedTransaction(
-        () -> {
-          LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
-          if (!inserts.isEmpty()
-              && executeStatement(mapper -> mapper.batchInsertStatisticPOs(inserts))
-                  != inserts.size()) {
-            throw statisticConflict(null, names(inserts), entity);
-          }
-          if (!updates.isEmpty()
-              && executeStatement(mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates))
-                  != updates.size()) {
-            throw statisticConflict(null, names(updates), entity);
-          }
-        },
-        pos,
-        entity);
+    try {
+      runFencedTransaction(
+          () -> {
+            LiveEndpointService.lockLiveEndpoint(entity, type, namespacedEntityId);
+            if (!inserts.isEmpty()
+                && executeStatement(mapper -> mapper.batchInsertStatisticPOs(inserts))
+                    != inserts.size()) {
+              throw statisticConflict(null, names(inserts), entity);
+            }
+            if (!updates.isEmpty()
+                && executeStatement(mapper -> mapper.batchUpdateStatisticPOsWithVersion(updates))
+                    != updates.size()) {
+              throw statisticConflict(null, names(updates), entity);
+            }
+          },
+          pos,
+          entity);
+    } catch (OptimisticLockException e) {
+      throw collationCollisionOr(e, inserts, namespacedEntityId, entity);
+    }
   }
 
   /**
@@ -270,10 +274,47 @@ public class StatisticMetaService {
     if (failure instanceof OptimisticLockException) {
       return failure;
     }
-    if (isDuplicateKey(failure) || isConcurrencyFailure(failure)) {
+    if (isDuplicateKey(failure)) {
       return statisticConflict(failure, names(pos), target);
     }
+    if (isConcurrencyFailure(failure)) {
+      return new OptimisticLockException(
+          failure,
+          "The statistics %s of %s could not be changed because of a concurrent operation"
+              + " (deadlock or lock wait timeout); retry the operation",
+          names(pos),
+          target);
+    }
     return failure;
+  }
+
+  /**
+   * Distinguishes a duplicate insert caused by the backend collation from a concurrent creator. A
+   * collation that ignores trailing spaces (MySQL) rejects "name " in the same request as "name",
+   * or next to an existing "name", on every attempt. If no live row has exactly one of the inserted
+   * names after the rollback, nobody else created them, so the names are illegal for this backend.
+   */
+  private static RuntimeException collationCollisionOr(
+      OptimisticLockException conflict,
+      List<StatisticPO> inserts,
+      NamespacedEntityId endpoint,
+      NameIdentifier target) {
+    if (inserts.isEmpty() || !isDuplicateKey(conflict)) {
+      return conflict;
+    }
+    Set<String> live =
+        liveStatistics(endpoint, names(inserts)).stream()
+            .map(StatisticPO::getStatisticName)
+            .collect(Collectors.toSet());
+    if (inserts.stream().anyMatch(po -> live.contains(po.getStatisticName()))) {
+      return conflict;
+    }
+    return new IllegalStatisticNameException(
+        conflict.getCause(),
+        "Statistic names %s of %s collide with each other or with an existing statistic in the"
+            + " backend collation; names must not differ only in trailing spaces",
+        names(inserts),
+        target);
   }
 
   private static OptimisticLockException statisticConflict(
@@ -317,25 +358,25 @@ public class StatisticMetaService {
    * and MySQL reports error code 1062, the same codes the backend exception converters match.
    */
   private static boolean isDuplicateKey(Throwable failure) {
-    return hasSqlException(failure, Set.of("23505"), 1062);
+    return hasSqlException(failure, Set.of("23505"), Set.of(1062));
   }
 
   /**
    * Returns whether a failure is a deadlock, serialization failure or lock wait timeout caused by a
    * concurrent writer. PostgreSQL reports SQLState 40001 or 40P01 and H2 reports 40001. MySQL
-   * reports error code 1213 for a deadlock, and Connector/J also reports a lock wait timeout (error
-   * code 1205) with SQLState 40001; it is treated the same way.
+   * reports error code 1213 for a deadlock and 1205 for a lock wait timeout; both are matched by
+   * error code because the SQLState of a lock wait timeout depends on the driver.
    */
   private static boolean isConcurrencyFailure(Throwable failure) {
-    return hasSqlException(failure, Set.of("40001", "40P01"), 1213);
+    return hasSqlException(failure, Set.of("40001", "40P01"), Set.of(1213, 1205));
   }
 
   private static boolean hasSqlException(
-      Throwable failure, Set<String> sqlStates, int mysqlErrorCode) {
+      Throwable failure, Set<String> sqlStates, Set<Integer> mysqlErrorCodes) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
       if (cause instanceof SQLException) {
         SQLException sql = (SQLException) cause;
-        if (sqlStates.contains(sql.getSQLState()) || sql.getErrorCode() == mysqlErrorCode) {
+        if (sqlStates.contains(sql.getSQLState()) || mysqlErrorCodes.contains(sql.getErrorCode())) {
           return true;
         }
       }
