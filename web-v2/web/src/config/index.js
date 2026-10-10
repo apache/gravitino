@@ -123,6 +123,8 @@ export const ColumnTypeSupportAutoIncrement = [
 
 export const ColumnWithParamType = ['char', 'varchar', 'fixed']
 
+export const ColumnWithPrecisionType = ['time', 'timestamp', 'timestamp_tz']
+
 export const ColumnSpesicalType = ['union', 'list', 'map', 'struct']
 
 export const UnsupportColumnType = {
@@ -155,7 +157,22 @@ export const UnsupportColumnType = {
     'binary',
     'time'
   ],
+  'jdbc-oceanbase': ['boolean', 'fixed', 'struct', 'list', 'map', 'interval_day', 'interval_year', 'union', 'uuid'],
+  'jdbc-starrocks': ['fixed', 'timestamp_tz', 'interval_day', 'interval_year', 'union', 'uuid'],
   'lakehouse-generic': ['char', 'varchar', 'time', 'timestamp_tz'],
+  'lakehouse-hudi': [
+    'byte',
+    'char',
+    'fixed',
+    'interval_day',
+    'interval_year',
+    'short',
+    'time',
+    'timestamp_tz',
+    'union',
+    'uuid',
+    'varchar'
+  ],
   'lakehouse-paimon': ['interval_day', 'interval_year', 'union', 'uuid'],
   'jdbc-clickhouse': [
     'binary',
