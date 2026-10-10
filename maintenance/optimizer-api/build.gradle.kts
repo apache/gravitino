@@ -38,6 +38,7 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

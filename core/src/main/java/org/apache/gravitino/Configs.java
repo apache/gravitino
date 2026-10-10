@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.secret.SensitivePropertyKeyKeywords;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -53,6 +54,10 @@ public class Configs {
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS =
       "gravitino.entity.store.relational.maxConnections";
+
+  /** Configuration key for the entity-store pool's maximum idle connections. */
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS_KEY =
+      "gravitino.entity.store.relational.maxIdleConnections";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY =
       "gravitino.entity.store.relational.maxWaitMillis";
@@ -94,6 +99,9 @@ public class Configs {
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
+
+  /** Default maximum idle connections retained by the entity-store pool on each server. */
+  public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 10;
 
   public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
 
@@ -161,6 +169,15 @@ public class Configs {
           .intConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
 
+  /** Maximum idle connections retained by the entity-store pool, capped by maxConnections. */
+  public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS_KEY)
+          .doc("The maximum number of idle connections retained by the JDBC Backend pool")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS);
+
   public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY)
           .doc(
@@ -188,6 +205,9 @@ public class Configs {
           .createWithDefault(60 * 60 * 1000L);
 
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
+  /** Default maximum number of entity change log records read in one polling cycle. */
+  public static final int DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE = 2000;
+
   public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
   public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
@@ -198,6 +218,20 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
+
+  /**
+   * Maximum records read per entity change log poll. A full batch triggers an immediate next poll;
+   * empty or partial batches wait for the configured poll interval.
+   */
+  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_POLL_BATCH_SIZE =
+      new ConfigBuilder("gravitino.entityChangeLog.pollBatchSize")
+          .doc(
+              "The maximum number of entity change log records read per poll. A full batch is"
+                  + " followed by another poll right away instead of after the poll interval")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
@@ -493,7 +527,7 @@ public class Configs {
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
           .doc(
-              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
+              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds. "
                   + "Default is 3,600,000 ms (1 hour).")
           .version(ConfigConstants.VERSION_1_0_0)
           .longConf()
@@ -547,7 +581,11 @@ public class Configs {
 
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
-          .doc("Directory for managing staging files when running jobs.")
+          .doc(
+              "Directory for managing staging files when running jobs. When multiple Gravitino "
+                  + "servers share the same metadata store, it must be on storage shared by all "
+                  + "servers, otherwise the output of a job run by the local job executor can "
+                  + "only be retrieved from the server that ran it.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -583,6 +621,31 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
+
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_LINES =
+      new ConfigBuilder("gravitino.job.outputMaxLines")
+          .doc(
+              "The maximum number of lines returned by JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr. This is resolved by JobManager and passed as an "
+                  + "argument to those two APIs, so all executors honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_BYTES =
+      new ConfigBuilder("gravitino.job.outputMaxBytes")
+          .doc(
+              "The maximum number of bytes read from the tail of a job's captured stdout/stderr "
+                  + "when retrieving its output. Bounds both the read cost and the response size "
+                  + "regardless of how the content is shaped (e.g. a single very long line). "
+                  + "This is resolved by JobManager and passed as an argument to "
+                  + "JobExecutor#getJobStdout and JobExecutor#getJobStderr, so all executors "
+                  + "honor the same cap.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(256 * 1024); // 256KB
 
   public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
       new ConfigBuilder(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
@@ -636,4 +699,23 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
+
+  public static final ConfigEntry<List<String>> SENSITIVE_KEY_KEYWORDS =
+      new ConfigBuilder("gravitino.secret.sensitiveKeyKeywords")
+          .doc(
+              "Comma-separated property key keywords treated as credential-like. Matching is "
+                  + "case-insensitive; each entry is a literal substring of the property key, "
+                  + "not a regular expression. This list replaces the default "
+                  + "(secret, password, token, credential, access, account). Set a shorter list "
+                  + "to stop masking keys that only match a default keyword, add words such as "
+                  + "private or passwrod, or set an empty value to disable name-based matching.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null
+                      && valueList.stream().allMatch(SensitivePropertyKeyKeywords::isValidKeyword),
+              SensitivePropertyKeyKeywords.invalidKeywordMessage())
+          .createWithDefault(SensitivePropertyKeyKeywords.defaultKeywords());
 }

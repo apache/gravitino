@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS `fileset_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'fileset audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset last version',
+    `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset optimistic concurrency version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
     PRIMARY KEY (`fileset_id`),
     UNIQUE KEY `fileset_meta_uk_sid_fn_del` (`schema_id`, `fileset_name`, `deleted_at`),
@@ -325,7 +326,7 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`,`deleted_at`),
+    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
     KEY `idx_meid` (`metadata_object_id`),
     KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
@@ -389,6 +390,7 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy last version',
+    `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`policy_id`),
     UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`)
@@ -407,21 +409,6 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
     KEY `policy_version_info_idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
-
-CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
-    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
-    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy relation audit info',
-    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation current version',
-    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation last version',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy relation deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
-    KEY `idx_pid` (`policy_id`),
-    KEY `policy_relation_meta_idx_mid` (`metadata_object_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

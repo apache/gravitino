@@ -29,6 +29,12 @@ import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
   @Override
+  public String selectGroupMetaByIdForShare(Long groupId) {
+    // H2 has no shared row-lock syntax, matching the other parent-fencing providers.
+    return selectGroupMetaByIdForUpdate(groupId);
+  }
+
+  @Override
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"

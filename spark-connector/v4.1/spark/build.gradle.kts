@@ -148,6 +148,7 @@ dependencies {
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly(libs.lance.namespace.apache.client)
   compileOnly(libs.aws.glue)
 
   annotationProcessor(libs.lombok)
@@ -244,6 +245,7 @@ dependencies {
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)

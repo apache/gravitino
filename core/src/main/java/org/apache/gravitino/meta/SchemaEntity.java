@@ -25,6 +25,7 @@ import java.util.Map;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -38,7 +39,10 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment or description of the schema");
+      Field.optional(
+          "comment",
+          "The comment or description of the schema",
+          EntityFieldLimits.MAX_COMMENT_LENGTH);
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the schema");
 

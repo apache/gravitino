@@ -156,6 +156,8 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 
 Setting `gravitino.client.session.forwardUser=true` creates a dedicated Gravitino client per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user` or service identity. It is supported with `authType=simple` and `authType=oauth2`. For OAuth2 sessions without a forwarded token, the connector reuses the shared service metadata instead.
 
+`authType=basic` does not support forwarding, and setting `forwardUser=true` with `authType=basic` fails at connector startup — Trino's SPI does not propagate the session user's password to connectors after coordinator-side authentication, so there is no credential to forward. With `authType=basic`, every Trino query is authorized against Gravitino as the configured `gravitino.client.basic.username`, not the individual Trino session user; Gravitino-side per-user authorization (e.g. table access denials) does not apply to queries made through this connector. If per-user authorization is required, use `authType=simple` or `authType=oauth2` with `forwardUser=true` instead.
+
 **Configuration (`authType=simple`):**
 
 ```properties

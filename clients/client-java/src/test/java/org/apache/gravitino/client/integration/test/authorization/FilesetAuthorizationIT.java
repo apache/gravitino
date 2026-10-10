@@ -371,7 +371,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(8)
-  public void testUseSecretPrivilegeForGetSecrets() {
+  public void testUseSecretsPrivilegeForGetSecrets() {
     String filesetName = "secret_fileset";
     String secretKey = "access_token";
     String secretValue = "plain-token-value";
@@ -404,7 +404,8 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, readableFileset.properties().get(secretKey));
     assertEquals("visible-value", readableFileset.properties().get("visible-key"));
 
-    // Can load the object but lacks USE_SECRET → empty secrets (not ForbiddenException).
+    // Can load the object but lacks USE_SECRETS → empty secrets
+    // (not ForbiddenException).
     Map<String, String> secretsWithoutPrivilege = readableFileset.supportsSecrets().getSecrets();
     assertTrue(secretsWithoutPrivilege.isEmpty());
 
@@ -413,7 +414,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     MetadataObject schemaObject =
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA);
     gravitinoMetalake.grantPrivilegesToRole(
-        role, schemaObject, ImmutableList.of(Privileges.UseSecret.allow()));
+        role, schemaObject, ImmutableList.of(Privileges.UseSecrets.allow()));
     assertEquals(
         secretValue,
         normalFilesetCatalog
@@ -424,16 +425,16 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // DENY on the fileset overrides schema-level allow → empty again.
     gravitinoMetalake.grantPrivilegesToRole(
-        role, filesetObject, ImmutableList.of(Privileges.UseSecret.deny()));
+        role, filesetObject, ImmutableList.of(Privileges.UseSecrets.deny()));
     assertTrue(
         normalFilesetCatalog.loadFileset(filesetIdent).supportsSecrets().getSecrets().isEmpty());
 
     gravitinoMetalake.revokePrivilegesFromRole(
-        role, schemaObject, ImmutableSet.of(Privileges.UseSecret.allow()));
+        role, schemaObject, ImmutableSet.of(Privileges.UseSecrets.allow()));
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         filesetObject,
-        ImmutableSet.of(Privileges.ReadFileset.allow(), Privileges.UseSecret.deny()));
+        ImmutableSet.of(Privileges.ReadFileset.allow(), Privileges.UseSecrets.deny()));
     adminFilesetCatalog.dropFileset(filesetIdent);
   }
 

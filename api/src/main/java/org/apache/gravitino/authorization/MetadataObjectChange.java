@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
@@ -157,7 +158,7 @@ public interface MetadataObjectChange {
 
     private RemoveMetadataObject(MetadataObject metadataObject, List<String> locations) {
       this.metadataObject = metadataObject;
-      this.locations = locations;
+      this.locations = locations == null ? null : ImmutableList.copyOf(locations);
     }
 
     /**
@@ -180,28 +181,29 @@ public interface MetadataObjectChange {
 
     /**
      * Compares this RemoveMetadataObject instance with another object for equality. The comparison
-     * is based on the old metadata entity.
+     * is based on the metadata entity and the locations.
      *
      * @param o The object to compare with this instance.
-     * @return true if the given object represents the same rename metadata entity; false otherwise.
+     * @return true if the given object represents the same remove metadata entity; false otherwise.
      */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
-      RenameMetadataObject that = (RenameMetadataObject) o;
-      return metadataObject.equals(that.metadataObject);
+      RemoveMetadataObject that = (RemoveMetadataObject) o;
+      return Objects.equals(metadataObject, that.metadataObject)
+          && Objects.equals(locations, that.locations);
     }
 
     /**
      * Generates a hash code for this RemoveMetadataObject instance. The hash code is based on the
-     * old metadata entity.
+     * metadata entity and the locations.
      *
-     * @return A hash code value for this update metadata entity operation.
+     * @return A hash code value for this remove metadata entity operation.
      */
     @Override
     public int hashCode() {
-      return Objects.hash(metadataObject);
+      return Objects.hash(metadataObject, locations);
     }
 
     /**

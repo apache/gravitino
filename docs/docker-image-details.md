@@ -318,7 +318,7 @@ Changelog
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
-    - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](../dev/docker/kerberos-hive)
+    - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](https://github.com/apache/gravitino/tree/main/dev/docker/kerberos-hive)
 
 ## Hive Image
 

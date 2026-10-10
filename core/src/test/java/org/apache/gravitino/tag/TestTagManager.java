@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.tag;
 
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -51,11 +54,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -65,8 +70,10 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -133,12 +140,16 @@ public class TestTagManager {
 
   private static final String FUNCTION = "function_for_tag_test";
 
+  private static final String SEMANTIC_MODEL = "semantic_model_for_tag_test";
+
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
   private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
   private static final ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
   private static final FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
+  private static final SemanticModelDispatcher semanticModelDispatcher =
+      mock(SemanticModelDispatcher.class);
 
   private static EntityStore entityStore;
 
@@ -159,10 +170,13 @@ public class TestTagManager {
         .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -284,6 +298,11 @@ public class TestTagManager {
         GravitinoEnv.getInstance(), "internalViewDispatcher", viewDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalFunctionDispatcher", functionDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalSemanticModelDispatcher",
+        semanticModelDispatcher,
+        true);
 
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
@@ -441,6 +460,49 @@ public class TestTagManager {
     Assertions.assertEquals("new comment", removedPropTag.comment());
     Map<String, String> expectedProp2 = ImmutableMap.of("k2", "v2");
     Assertions.assertEquals(expectedProp2, removedPropTag.properties());
+  }
+
+  @Test
+  public void testTagNameAndCommentLength() {
+    String maxLengthName = StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH);
+    String tooLongName = maxLengthName + "a";
+    String maxLengthComment = StringUtils.repeat("c", EntityFieldLimits.MAX_COMMENT_LENGTH);
+    String tooLongComment = maxLengthComment + "c";
+
+    Exception e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.createTag(METALAKE, tooLongName, null, null));
+    Assertions.assertEquals("The name of the tag must not exceed 128 characters", e.getMessage());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.createTag(METALAKE, "tag1", tooLongComment, null));
+    Assertions.assertEquals(
+        "The comment of the tag must not exceed 256 characters", e.getMessage());
+
+    Tag tag = tagManager.createTag(METALAKE, maxLengthName, maxLengthComment, null);
+    Assertions.assertEquals(maxLengthName, tag.name());
+    Assertions.assertEquals(maxLengthComment, tag.comment());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tagManager.alterTag(METALAKE, maxLengthName, TagChange.rename(tooLongName)));
+    Assertions.assertEquals("The name of the tag must not exceed 128 characters", e.getMessage());
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tagManager.alterTag(
+                    METALAKE, maxLengthName, TagChange.updateComment(tooLongComment)));
+    Assertions.assertEquals(
+        "The comment of the tag must not exceed 256 characters", e.getMessage());
+
+    Tag unchanged = tagManager.getTag(METALAKE, maxLengthName);
+    Assertions.assertEquals(maxLengthComment, unchanged.comment());
   }
 
   @Test
@@ -1098,6 +1160,44 @@ public class TestTagManager {
   }
 
   @Test
+  public void testSemanticModelIsSupportedForTags() {
+    Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);
+
+    MetadataObject semanticModelObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofSemanticModel(METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL),
+            Entity.EntityType.SEMANTIC_MODEL);
+    Assertions.assertEquals(MetadataObject.Type.SEMANTIC_MODEL, semanticModelObject.type());
+    Assertions.assertEquals(
+        CATALOG + "." + SCHEMA + "." + SEMANTIC_MODEL, semanticModelObject.fullName());
+
+    // A Semantic Model is an accepted tag target, so an absent one must fail existence validation
+    // rather than be rejected as an unsupported metadata object type.
+    when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(false);
+
+    Throwable e =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () ->
+                tagManager.associateTagsForMetadataObject(
+                    METALAKE, semanticModelObject, new String[] {tag1.name()}, null));
+    Assertions.assertTrue(
+        e.getMessage()
+            .contains(
+                "Metadata object "
+                    + semanticModelObject.fullName()
+                    + " type SEMANTIC_MODEL doesn't exist"),
+        e.getMessage());
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> tagManager.listTagsForMetadataObject(METALAKE, semanticModelObject));
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
+  }
+
+  @Test
   public void testPolicyAssociationsForTag() throws IOException {
     String tagName = "policy_tag";
     String policyName = "policy_for_tag";
@@ -1146,10 +1246,10 @@ public class TestTagManager {
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
       Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
 
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("finance"));
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
       associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
       Assertions.assertEquals(
-          TagValueSelector.of("finance"),
+          TagValueSelector.of("engineering"),
           PolicyAssociationSelectorSerde.deserialize(
               associations[0].relationValue().orElseThrow()));
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);

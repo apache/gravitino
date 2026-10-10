@@ -54,6 +54,32 @@ class TestField {
   }
 
   @Test
+  void testFieldMaxLength() {
+    Field field = Field.required("name", "Name of the person", 3);
+
+    assertDoesNotThrow(() -> field.validate("abc"));
+
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> field.validate("abcd"));
+    assertEquals("Field name must not exceed 3 characters", ex.getMessage());
+
+    ex =
+        assertThrows(
+            IllegalArgumentException.class, () -> field.validate("abcd", Entity.EntityType.TAG));
+    assertEquals("The name of the tag must not exceed 3 characters", ex.getMessage());
+
+    Field optional = Field.optional("comment", "Comment of the person", 3);
+    assertDoesNotThrow(() -> optional.validate(null));
+  }
+
+  @Test
+  void testBuilderInvalidMaxLength() {
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> Field.required("name", "Name", 0));
+    assertEquals("Field max length must be positive", ex.getMessage());
+  }
+
+  @Test
   void testBuilderMissingName() {
     IllegalArgumentException ex =
         assertThrows(IllegalArgumentException.class, () -> Field.required(null, Integer.class));

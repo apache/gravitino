@@ -25,13 +25,14 @@ import io.trino.spi.connector.SchemaTableName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
 /** This class managed all the system tables */
 public class GravitinoSystemTableFactory {
 
   private final CatalogConnectorManager catalogConnectorManager;
-  private final String metalake;
+  @Nullable private final String metalake;
 
   // Per instance, not static: the tables are bound to one CatalogConnectorManager, and only the
   // manager on the coordinator runs the load loop that fills in the registration state. A shared
@@ -43,10 +44,11 @@ public class GravitinoSystemTableFactory {
    *
    * @param catalogConnectorManager the manager for catalog connectors
    * @param metalake the metalake this connector is configured with; the tables only report on it,
-   *     so that two entry catalogs pointed at different metalakes do not report each other's state
+   *     so that two entry catalogs pointed at different metalakes do not report each other's state.
+   *     Null when no metalake is configured, the tables then report on every metalake
    */
   public GravitinoSystemTableFactory(
-      CatalogConnectorManager catalogConnectorManager, String metalake) {
+      CatalogConnectorManager catalogConnectorManager, @Nullable String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
     this.metalake = metalake;
 
