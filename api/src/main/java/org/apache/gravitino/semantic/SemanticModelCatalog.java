@@ -86,6 +86,55 @@ public interface SemanticModelCatalog {
           IllegalSemanticModelException;
 
   /**
+   * Imports a standalone Apache Ossie document as a new Semantic Model in a schema.
+   *
+   * <p>The model name comes from the document. Import uses the same validation as {@link
+   * #createSemanticModel}; it does not replace an existing model. The document is parsed according
+   * to its declared format, without falling back to another format.
+   *
+   * <p>REST clients send {@link OssieDocument#content()} as the raw request body, without
+   * JSON-encoding the document string again. The {@code Content-Type} header selects the parser:
+   * {@code application/json} for JSON, or {@code application/yaml}, {@code application/x-yaml}, or
+   * {@code text/yaml} for YAML. If the header is absent, the REST endpoint defaults to YAML.
+   *
+   * <p>A root {@link CustomExtension#GRAVITINO_PROPERTIES_VENDOR} extension is consumed as model
+   * properties before creation. Its data must encode a JSON object with string values, and at most
+   * one such extension is allowed. Other custom extensions are preserved.
+   *
+   * @param namespace The destination schema namespace.
+   * @param document The standalone Ossie document and its serialization format.
+   * @return The created Semantic Model.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws SemanticModelAlreadyExistsException If a model with the document's name already exists.
+   * @throws IllegalSemanticModelException If the document or Semantic Model definition is invalid.
+   * @throws UnsupportedOperationException If Ossie import is not supported.
+   */
+  default SemanticModel importOssieDocument(Namespace namespace, OssieDocument document)
+      throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
+          IllegalSemanticModelException {
+    throw new UnsupportedOperationException("Ossie import is not supported");
+  }
+
+  /**
+   * Exports a Semantic Model as a standalone Apache Ossie document.
+   *
+   * <p>The {@link SemanticModel#PROPERTY_OSSIE_VERSION} property supplies the document version.
+   * Other properties, if present, are serialized as a JSON object in the data of a root {@link
+   * CustomExtension#GRAVITINO_PROPERTIES_VENDOR} extension.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param format The requested serialization format.
+   * @return The serialized Ossie document and its format.
+   * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
+   * @throws IllegalSemanticModelException If the model cannot be represented as an Ossie document.
+   * @throws UnsupportedOperationException If Ossie export is not supported.
+   */
+  default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format)
+      throws NoSuchSemanticModelException, IllegalSemanticModelException {
+    throw new UnsupportedOperationException("Ossie export is not supported");
+  }
+
+  /**
    * Applies changes atomically to a Semantic Model.
    *
    * <p>If any change is rejected or the resulting Semantic Model is invalid, no change is applied.

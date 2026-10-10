@@ -103,11 +103,22 @@ public class MetadataIdConverter {
     }
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
+
     if (scope == Capability.Scope.SEMANTIC_MODEL) {
       return NameIdentifier.of(
           CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
     }
-    return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+
+    NameIdentifier normalized = CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+
+    // For a table, resolve the normalized name to the physically stored name through the same
+    // shared resolver the table dispatcher uses, so the identifier authorized here is the
+    // identifier the operation later runs on. For catalogs that do not implement the resolution
+    // capability (the vast majority) this is a pure identity call with no extra source access.
+    if (scope == Capability.Scope.TABLE) {
+      return CapabilityHelpers.resolvePhysicalTableName(normalized, catalogManager);
+    }
+    return normalized;
   }
 
   private static Long extractIdFromEntity(Entity entity) {

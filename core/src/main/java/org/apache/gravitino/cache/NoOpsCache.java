@@ -44,6 +44,7 @@ public class NoOpsCache extends BaseEntityCache {
   }
 
   /** {@inheritDoc} */
+  @Deprecated
   @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
     // do nothing

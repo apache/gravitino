@@ -358,6 +358,8 @@ class TestCompactionStrategyHandler {
             tableId,
             strategy.jobOptions(),
             strategy.jobTemplateName(),
+            "binpack",
+            "",
             tableMetadata.columns(),
             tableMetadata.partitioning(),
             List.of());
