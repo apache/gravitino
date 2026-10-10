@@ -51,6 +51,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -69,6 +70,7 @@ import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -91,6 +93,68 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class TestHiveCatalogOperations {
+  @Test
+  void testDerivedSchemaMetadataAltersPreserveMarkerAndRejectColumnChanges() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+    CachedClientPool pool = mock(CachedClientPool.class);
+    HiveClient client = mock(HiveClient.class);
+    when(pool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(client);
+            });
+    op.clientPool = pool;
+    HiveTable derived =
+        HiveTable.builder()
+            .withName("csv")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[] {Column.of("value", Types.StringType.get())})
+            .withProperties(Maps.newHashMap())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    derived.setOriginalStorageColumns(
+        List.of(
+            Column.of("value", Types.UnparsedType.of("<derived from deserializer>"), "original")));
+    when(client.getTable(anyString(), anyString(), anyString())).thenReturn(derived);
+    ArgumentCaptor<HiveTable> altered = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(client)
+        .alterTable(anyString(), eq("db"), eq("csv"), altered.capture(), anyBoolean());
+
+    op.alterTable(
+        NameIdentifier.of("db", "csv"),
+        TableChange.setProperty("key", "value"),
+        TableChange.updateComment("updated"));
+    HiveTable metadataOnly = altered.getValue();
+    Assertions.assertEquals("value", metadataOnly.properties().get("key"));
+    Assertions.assertEquals("updated", metadataOnly.comment());
+    Assertions.assertEquals(
+        "<derived from deserializer>",
+        ((Types.UnparsedType) metadataOnly.originalStorageColumns().get(0).dataType())
+            .unparsedType());
+    op.alterTable(NameIdentifier.of("db", "csv"), TableChange.rename("renamed"));
+    Assertions.assertEquals("renamed", altered.getValue().name());
+    Assertions.assertEquals(
+        derived.originalStorageColumns(), altered.getValue().originalStorageColumns());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterTable(
+                    NameIdentifier.of("db", "csv"),
+                    TableChange.addColumn(
+                        new String[] {"added"},
+                        Types.StringType.get(),
+                        TableChange.ColumnPosition.defaultPos())));
+    Assertions.assertTrue(failure.getMessage().contains("SerDe-derived table"));
+    verify(client, times(2)).alterTable(anyString(), anyString(), anyString(), any(), anyBoolean());
+  }
+
   @Test
   void testPropertyMeta() {
     Map<String, PropertyEntry<?>> propertyEntryMap =

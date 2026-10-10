@@ -49,6 +49,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.DefaultConstraintsRequest;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.SQLDefaultConstraint;
@@ -337,6 +338,72 @@ class TestHiveShimV3 {
 
     verify(client, never()).getNotNullConstraints(any());
     verify(client, never()).getDefaultConstraints(any());
+  }
+
+  @Test
+  void testGetTableResolvesDerivedColumnTypesWithCatalog() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+
+    Column plainColumn = Column.of("value", Types.StringType.get(), null, true, false, null);
+    Table hiveTable = HiveTableConverter.toHiveTable(testTable(plainColumn));
+    hiveTable.setCatName(CATALOG);
+    hiveTable.getSd().getCols().get(0).setType("<derived from deserializer>");
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(hiveTable);
+    when(client.getFields(CATALOG, DB, TABLE))
+        .thenReturn(List.of(new FieldSchema("value", "string", "from deserializer")));
+
+    HiveTable loaded = shim.getTable(CATALOG, DB, TABLE);
+
+    assertEquals(Types.StringType.get(), loaded.columns()[0].dataType());
+    assertEquals("from deserializer", loaded.columns()[0].comment());
+    verify(client).getFields(CATALOG, DB, TABLE);
+  }
+
+  @Test
+  void testBatchResolvesDerivedColumnsWithCatalog() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table derived =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+    Table regular =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.IntegerType.get())));
+    regular.setTableName("regular");
+    when(client.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "regular")))
+        .thenReturn(List.of(derived, regular));
+    when(client.getFields(CATALOG, DB, TABLE))
+        .thenReturn(List.of(new FieldSchema("value", "string", null)));
+
+    List<HiveTable> loaded = shim.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "regular"));
+
+    assertEquals(Types.StringType.get(), loaded.get(0).columns()[0].dataType());
+    assertEquals(Types.IntegerType.get(), loaded.get(1).columns()[0].dataType());
+    assertEquals(
+        "<derived from deserializer>",
+        HiveTableConverter.toHiveTable(loaded.get(0)).getSd().getCols().get(0).getType());
+    verify(client).getFields(CATALOG, DB, TABLE);
+    verify(client, never()).getFields(CATALOG, DB, "regular");
+    verify(client, never()).getNotNullConstraints(any());
+    verify(client, never()).getDefaultConstraints(any());
+  }
+
+  @Test
+  void testGetFieldsFailureIncludesServerConfigurationGuidance() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table derived =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(derived);
+    when(client.getFields(CATALOG, DB, TABLE))
+        .thenThrow(new MetaException("Storage schema reading not supported"));
+
+    RuntimeException failure =
+        assertThrows(RuntimeException.class, () -> shim.getTable(CATALOG, DB, TABLE));
+
+    assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+    verify(client, never()).getNotNullConstraints(any());
   }
 
   @Test
