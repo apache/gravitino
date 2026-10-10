@@ -20,5 +20,5 @@
 # Installed via the `lance` extra (`pip install -e .[lance]`).
 # The same pins are also included in requirements-dev.txt so that the default
 # integration-test run works out of the box with `pip install -r requirements-dev.txt`.
-ray==2.55.1
+ray==2.58.0
 lance-ray==0.4.2
