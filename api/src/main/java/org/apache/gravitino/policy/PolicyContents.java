@@ -130,8 +130,14 @@ public class PolicyContents {
   /**
    * Creates a row-filter policy for tagged tables.
    *
-   * @param expression row-filter expression
-   * @return validated read-restriction policy content
+   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
+   * filter :=}. The server performs grammar and semantic validation when the policy is created or
+   * updated.
+   *
+   * @param expression complete row-filter program
+   * @return structurally validated read-restriction policy content
+   * @throws IllegalArgumentException if the expression is blank or exceeds {@link
+   *     ReadRestrictionContent#MAX_SOURCE_LENGTH_BYTES}
    */
   public static RowFilterContent rowFilter(String expression) {
     return new RowFilterContent(expression);
@@ -140,8 +146,14 @@ public class PolicyContents {
   /**
    * Creates a column-mask policy for tagged tables or columns.
    *
-   * @param expression column-mask expression
-   * @return validated read-restriction policy content
+   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
+   * mask := action(...)}. The server performs grammar and semantic validation when the policy is
+   * created or updated.
+   *
+   * @param expression complete column-mask program
+   * @return structurally validated read-restriction policy content
+   * @throws IllegalArgumentException if the expression is blank or exceeds {@link
+   *     ReadRestrictionContent#MAX_SOURCE_LENGTH_BYTES}
    */
   public static ColumnMaskContent columnMask(String expression) {
     return new ColumnMaskContent(expression);

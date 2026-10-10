@@ -449,7 +449,12 @@ components:
           type: string
           minLength: 1
           pattern: '[\s\S]*\S[\s\S]*'
-          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+          description: >-
+            A complete restricted-rego-v1 row-filter program beginning with `filter :=`.
+            Results and conditions must be Boolean. The program may use col("name"),
+            session_user(), is_group_member("group"), literals, comparisons, in, and/or/not,
+            including ordered `else := ... if ...` branches with a final `else`. The UTF-8 source
+            must not exceed 16 KiB; see the Policies documentation for grammar, limits, and examples.
 
     ColumnMaskContent:
       type: object
@@ -461,7 +466,12 @@ components:
           type: string
           minLength: 1
           pattern: '[\s\S]*\S[\s\S]*'
-          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+          description: >-
+            A complete restricted-rego-v1 column-mask program beginning with
+            `mask := action("...")`. Conditions are optional, must use only trusted request
+            context, and require ordered `else := action(...) if ...` branches plus a final
+            `else`. The UTF-8 source must not exceed 16 KiB; see the Policies documentation for
+            allowlisted actions, grammar, limits, and examples.
 
     RowFilterPolicy:
       allOf:

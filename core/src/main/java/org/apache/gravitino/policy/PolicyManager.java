@@ -41,6 +41,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.rego.RestrictedRegoExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -128,6 +129,7 @@ public class PolicyManager implements PolicyDispatcher {
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
+    validateReadRestrictionContent(type, content);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
@@ -371,6 +373,7 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
@@ -382,5 +385,17 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withContent(newContent);
 
     return builder.build();
+  }
+
+  private static void validateReadRestrictionContent(
+      Policy.BuiltInType policyType, PolicyContent content) {
+    if (policyType == Policy.BuiltInType.ROW_FILTER && content instanceof RowFilterContent) {
+      RestrictedRegoExpressionParserFacade.parseRowFilter(
+          ((RowFilterContent) content).expression());
+    } else if (policyType == Policy.BuiltInType.COLUMN_MASK
+        && content instanceof ColumnMaskContent) {
+      RestrictedRegoExpressionParserFacade.parseColumnMask(
+          ((ColumnMaskContent) content).expression());
+    }
   }
 }

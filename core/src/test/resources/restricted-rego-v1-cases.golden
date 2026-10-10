@@ -1,0 +1,90 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+=== column-session-user ===
+source: filter := col("owner") == session_user()
+result: RowFilter{branches=[], fallback=Comparison{operator=EQ, left=Column{name='owner'}, right=SessionUser{}}}
+
+=== session-user-array ===
+source: filter := session_user() in ["alice", "bob"]
+result: RowFilter{branches=[], fallback=Comparison{operator=IN, left=SessionUser{}, right=LiteralArray{elementType=STRING, values=[Literal{literalType=STRING, value=alice, negativeZero=false}, Literal{literalType=STRING, value=bob, negativeZero=false}]}}}
+
+=== logical-precedence ===
+source: filter := col("region") in ["US", "CA"] or col("level") >= 3
+result: RowFilter{branches=[], fallback=LogicalExpression{operator=OR, operands=[Comparison{operator=IN, left=Column{name='region'}, right=LiteralArray{elementType=STRING, values=[Literal{literalType=STRING, value=US, negativeZero=false}, Literal{literalType=STRING, value=CA, negativeZero=false}]}}, Comparison{operator=GTE, left=Column{name='level'}, right=Literal{literalType=NUMBER, value=3, negativeZero=false}}]}}
+
+=== unicode-escape ===
+source: filter := col("letter") == "\\u0041"
+result: RowFilter{branches=[], fallback=Comparison{operator=EQ, left=Column{name='letter'}, right=Literal{literalType=STRING, value=A, negativeZero=false}}}
+
+=== non-ascii-unicode-escape ===
+source: filter := col("\\u٠٠٤١") == "x"
+error: Invalid restricted-rego-v1 program at line 1, column 15: invalid Unicode escape in string
+
+=== group-name-nul ===
+source: filter := is_group_member("\\u0000")
+error: group name cannot contain NUL
+
+=== conditional-filter ===
+source: filter := true if is_group_member("auditors") else := false
+result: RowFilter{branches=[FilterBranch{result=Literal{literalType=BOOLEAN, value=true, negativeZero=false}, condition=GroupMembership{group='auditors'}}], fallback=Literal{literalType=BOOLEAN, value=false, negativeZero=false}}
+
+=== conditional-mask ===
+source: mask := action("show-last-4") if is_group_member("support") else := action("replace-with-null")
+result: ColumnMask{branches=[MaskBranch{action=SHOW_LAST_4, condition=GroupMembership{group='support'}}], fallback=REPLACE_WITH_NULL}
+
+=== uppercase-in-title ===
+source: filter := col("region") In ["US"]
+error: Invalid restricted-rego-v1 program at line 1, column 25: unsupported identifier In
+
+=== uppercase-in ===
+source: filter := col("region") IN ["US"]
+error: Invalid restricted-rego-v1 program at line 1, column 25: unsupported identifier IN
+
+=== mixed-case-in ===
+source: filter := col("region") iN ["US"]
+error: Invalid restricted-rego-v1 program at line 1, column 25: unsupported identifier iN
+
+=== column-to-column ===
+source: filter := col("left") == col("right")
+error: Unsupported operands for == in restricted-rego-v1; offending comparison: Comparison{operator=EQ, left=Column{name='left'}, right=Column{name='right'}}
+
+=== literal-to-literal ===
+source: filter := 1 == 1
+error: Unsupported operands for == in restricted-rego-v1; offending comparison: Comparison{operator=EQ, left=Literal{literalType=NUMBER, value=1, negativeZero=false}, right=Literal{literalType=NUMBER, value=1, negativeZero=false}}
+
+=== boolean-ordering ===
+source: filter := col("active") > true
+error: boolean literal supports only == and !=; offending comparison: Comparison{operator=GT, left=Column{name='active'}, right=Literal{literalType=BOOLEAN, value=true, negativeZero=false}}
+
+=== session-user-ordering ===
+source: filter := session_user() < "bob"
+error: session_user() supports only == and !=; offending comparison: Comparison{operator=LT, left=SessionUser{}, right=Literal{literalType=STRING, value=bob, negativeZero=false}}
+
+=== empty-array ===
+source: filter := col("region") in []
+error: Invalid restricted-rego-v1 program at line 1, column 29: expected a literal array element
+
+=== heterogeneous-array ===
+source: filter := col("region") in ["US", 1]
+error: array literals must have one homogeneous non-null type
+
+=== missing-final-else ===
+source: filter := true if is_group_member("auditors")
+error: Invalid restricted-rego-v1 program at line 1, column 46: expected final else branch
+
+=== column-dependent-mask ===
+source: mask := action("show-last-4") if col("region") == "US" else := action("replace-with-null")
+error: column-mask condition cannot contain col(...)
