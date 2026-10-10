@@ -339,9 +339,9 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_CREATE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
-            "ANY_SELECT_SEMANTIC_MODEL",
-            "((ANY(SELECT_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
-                + "&& !(ANY(DENY_SELECT_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
+            "ANY_USE_SEMANTIC_MODEL",
+            "((ANY(USE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
+                + "&& !(ANY(DENY_USE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_MODIFY_SEMANTIC_MODEL",

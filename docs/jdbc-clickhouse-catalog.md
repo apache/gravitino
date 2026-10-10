@@ -46,19 +46,23 @@ Use your staging validation results and the official ClickHouse documentation as
 
 ### Catalog Properties
 
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
+
 Pass any JDBC pool property that Gravitino does not define by adding the `gravitino.bypass.` prefix (for example `gravitino.bypass.maxWaitMillis`). See [commons-dbcp configuration](https://commons.apache.org/proper/commons-dbcp/configuration.html) for details.
 
 When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`, and `jdbc-password`. Common catalog properties are listed [here](./gravitino-server-config.md#catalog-properties-configuration); ClickHouse adds no extra catalog-scoped keys.
 
-| Configuration item      | Description                                                           | Default value | Required |
-|-------------------------|-----------------------------------------------------------------------|---------------|----------|
-| `jdbc-url`              | JDBC URL, for example `jdbc:clickhouse://localhost:8123`              | (none)        | Yes      |
-| `jdbc-driver`           | JDBC driver class, for example `com.clickhouse.jdbc.ClickHouseDriver` | (none)        | Yes      |
-| `jdbc-user`             | JDBC user name                                                        | (none)        | Yes      |
-| `jdbc-password`         | JDBC password                                                         | (none)        | Yes      |
-| `jdbc.pool.min-size`    | Minimum pool size                                                     | `2`           | No       |
-| `jdbc.pool.max-size`    | Maximum pool size                                                     | `10`          | No       |
-| `jdbc.pool.max-wait-ms` | Max wait time for a connection                                        | `30000`       | No       |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL, for example `jdbc:clickhouse://localhost:8123`                                                                                                                                 | (none)        | Yes      |
+| `jdbc-driver`           | JDBC driver class, for example `com.clickhouse.jdbc.ClickHouseDriver`                                                                                                                    | (none)        | Yes      |
+| `jdbc-user`             | JDBC user name                                                                                                                                                                           | (none)        | Yes      |
+| `jdbc-password`         | JDBC password                                                                                                                                                                            | (none)        | Yes      |
+| `jdbc.pool.min-size`    | Minimum pool size                                                                                                                                                                        | `2`           | No       |
+| `jdbc.pool.max-size`    | Maximum pool size                                                                                                                                                                        | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | Max wait time for a connection                                                                                                                                                           | `30000`       | No       |
 
 ### Create a ClickHouse Catalog
 

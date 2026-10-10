@@ -251,8 +251,8 @@ public class Privileges {
         // Semantic model
       case CREATE_SEMANTIC_MODEL:
         return CreateSemanticModel.allow();
-      case SELECT_SEMANTIC_MODEL:
-        return SelectSemanticModel.allow();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.allow();
       case MODIFY_SEMANTIC_MODEL:
         return ModifySemanticModel.allow();
 
@@ -395,8 +395,8 @@ public class Privileges {
         // Semantic model
       case CREATE_SEMANTIC_MODEL:
         return CreateSemanticModel.deny();
-      case SELECT_SEMANTIC_MODEL:
-        return SelectSemanticModel.deny();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.deny();
       case MODIFY_SEMANTIC_MODEL:
         return ModifySemanticModel.deny();
 
@@ -1770,27 +1770,27 @@ public class Privileges {
   }
 
   /** The privilege to discover a semantic model and load its definition. */
-  public static class SelectSemanticModel extends GenericPrivilege<SelectSemanticModel> {
-    private static final SelectSemanticModel ALLOW_INSTANCE =
-        new SelectSemanticModel(Condition.ALLOW, Name.SELECT_SEMANTIC_MODEL);
-    private static final SelectSemanticModel DENY_INSTANCE =
-        new SelectSemanticModel(Condition.DENY, Name.SELECT_SEMANTIC_MODEL);
+  public static class UseSemanticModel extends GenericPrivilege<UseSemanticModel> {
+    private static final UseSemanticModel ALLOW_INSTANCE =
+        new UseSemanticModel(Condition.ALLOW, Name.USE_SEMANTIC_MODEL);
+    private static final UseSemanticModel DENY_INSTANCE =
+        new UseSemanticModel(Condition.DENY, Name.USE_SEMANTIC_MODEL);
 
-    private SelectSemanticModel(Condition condition, Name name) {
+    private UseSemanticModel(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static SelectSemanticModel allow() {
+    public static UseSemanticModel allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static SelectSemanticModel deny() {
+    public static UseSemanticModel deny() {
       return DENY_INSTANCE;
     }
 

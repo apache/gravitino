@@ -20,10 +20,10 @@ package org.apache.gravitino.catalog;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieDocumentConverter;
+import org.apache.gravitino.semantic.OssieDocumentConverter.ImportedSemanticModel;
 import org.apache.gravitino.semantic.OssieFormat;
-import org.apache.gravitino.semantic.OssieSemanticModelDocumentConverter;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 
@@ -37,14 +37,13 @@ public interface SemanticModelDispatcher extends SemanticModelCatalog {
    * normalization and validation chain as a structured create request.
    */
   @Override
-  default SemanticModel importOssieSemanticModel(Namespace namespace, OssieDocument document) {
-    SemanticModelCreateRequest request =
-        OssieSemanticModelDocumentConverter.importDocument(document);
+  default SemanticModel importOssieDocument(Namespace namespace, OssieDocument document) {
+    ImportedSemanticModel model = OssieDocumentConverter.importDocument(document);
     return createSemanticModel(
-        NameIdentifier.of(namespace, request.getName()),
-        request.getComment(),
-        request.toDefinition(),
-        request.getProperties());
+        NameIdentifier.of(namespace, model.name()),
+        model.comment(),
+        model.definition(),
+        model.properties());
   }
 
   /**
@@ -53,7 +52,7 @@ public interface SemanticModelDispatcher extends SemanticModelCatalog {
    * <p>Loads the model through this dispatcher's native load operation before serializing it.
    */
   @Override
-  default OssieDocument exportOssieSemanticModel(NameIdentifier ident, OssieFormat format) {
-    return OssieSemanticModelDocumentConverter.exportDocument(loadSemanticModel(ident), format);
+  default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return OssieDocumentConverter.exportDocument(loadSemanticModel(ident), format);
   }
 }

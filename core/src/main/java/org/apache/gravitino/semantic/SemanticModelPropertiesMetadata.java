@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.semantic;
 
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 
 import com.google.common.base.Preconditions;
@@ -41,7 +41,7 @@ public final class SemanticModelPropertiesMetadata implements PropertiesMetadata
               .withRequired(false)
               .withImmutable(false)
               .withJavaType(String.class)
-              .withDefaultValue(DEFAULT_OSSIE_VERSION)
+              .withDefaultValue(DEFAULT_VERSION)
               .withDecoder(SemanticModelPropertiesMetadata::decodeOssieVersion)
               .withEncoder(Function.identity())
               .withHidden(false)

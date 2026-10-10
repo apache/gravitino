@@ -32,11 +32,17 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface SemanticModel extends Auditable {
 
-  /** The property key for the Apache Ossie document version. */
+  /**
+   * The property key for the Apache Ossie document version.
+   *
+   * <p>For native Semantic Model creation, Gravitino persists {@link OssieVersion#DEFAULT_VERSION}
+   * when this property is omitted and preserves explicitly supplied non-blank values. The persisted
+   * value is retained if the server default changes later.
+   *
+   * <p>This property can be updated or removed. If it is absent, Ossie exports use the current
+   * default version.
+   */
   String PROPERTY_OSSIE_VERSION = "ossie-version";
-
-  /** The default Apache Ossie document version. */
-  String DEFAULT_OSSIE_VERSION = "0.2.0.dev0";
 
   /**
    * Returns the Semantic Model name.

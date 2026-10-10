@@ -19,12 +19,15 @@
 
 package org.apache.gravitino.policy;
 
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -242,10 +245,13 @@ public class TestPolicyManager {
         .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -456,6 +462,31 @@ public class TestPolicyManager {
     Assertions.assertFalse(
         removeEx.getMessage().contains("%s"),
         "format args were not substituted: " + removeEx.getMessage());
+  }
+
+  @Test
+  public void testCreateUpdateAndGetRowFilterPolicy() {
+    String policyName = "row_filter_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent originalContent = PolicyContents.rowFilter("filter := col(\"region\") == \"US\"");
+
+    PolicyEntity created =
+        policyManager.createPolicy(
+            METALAKE, policyName, Policy.BuiltInType.ROW_FILTER, null, true, originalContent);
+
+    Assertions.assertEquals(originalContent, created.content());
+    Assertions.assertEquals(
+        ImmutableSet.of(MetadataObject.Type.TABLE), created.content().supportedObjectTypes());
+    Assertions.assertEquals(
+        originalContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    PolicyContent updatedContent = PolicyContents.rowFilter("filter := col(\"region\") == \"EU\"");
+    PolicyEntity updated =
+        policyManager.alterPolicy(
+            METALAKE, policyName, PolicyChange.updateContent("system_row_filter", updatedContent));
+
+    Assertions.assertEquals(updatedContent, updated.content());
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
   }
 
   @Test

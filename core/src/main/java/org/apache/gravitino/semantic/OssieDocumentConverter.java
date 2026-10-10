@@ -19,10 +19,9 @@
 package org.apache.gravitino.semantic;
 
 import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadFeature;
@@ -36,20 +35,23 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
-import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 
 /** Converts between standalone Apache Ossie documents and Gravitino Semantic Models. */
-public final class OssieSemanticModelDocumentConverter {
+public final class OssieDocumentConverter {
 
   private static final Set<String> ROOT_PROPERTIES =
       Set.of(
@@ -90,23 +92,26 @@ public final class OssieSemanticModelDocumentConverter {
   private static final Set<String> DIMENSION_PROPERTIES = Set.of("is_time");
   private static final Set<String> CUSTOM_EXTENSION_PROPERTIES = Set.of("vendor_name", "data");
 
+  private static final Set<String> AI_CONTEXT_PROPERTIES =
+      Set.of("instructions", "synonyms", "examples");
+
   private static final ObjectMapper JSON_MAPPER = createJsonMapper();
   private static final ObjectMapper YAML_MAPPER = createYamlMapper();
 
-  private OssieSemanticModelDocumentConverter() {}
+  private OssieDocumentConverter() {}
 
   /**
-   * Converts one standalone Apache Ossie YAML or JSON document into a create request.
+   * Converts one standalone Apache Ossie YAML or JSON document into native model values.
    *
    * @param document The standalone Ossie document.
-   * @return The converted Semantic Model create request.
+   * @return The model name, comment, native definition, and properties.
    * @throws IllegalSemanticModelException If the document cannot be parsed or represented by
    *     Gravitino.
    */
-  public static SemanticModelCreateRequest importDocument(OssieDocument document) {
+  public static ImportedSemanticModel importDocument(OssieDocument document) {
     Objects.requireNonNull(document, "document must not be null");
     ObjectNode root = parseDocument(document);
-    return toCreateRequest(root);
+    return toImportedModel(root);
   }
 
   /**
@@ -122,10 +127,7 @@ public final class OssieSemanticModelDocumentConverter {
     Objects.requireNonNull(semanticModel, "semanticModel must not be null");
     Objects.requireNonNull(format, "format must not be null");
 
-    ObjectNode definition =
-        JSON_MAPPER.valueToTree(
-            SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()));
-    transformNativeDefinition(definition);
+    ObjectNode definition = writeDefinition(semanticModel.definition());
 
     ObjectNode root = JSON_MAPPER.createObjectNode();
     root.put("version", ossieVersion(semanticModel.properties()));
@@ -137,7 +139,7 @@ public final class OssieSemanticModelDocumentConverter {
     stashProperties(root, semanticModel.properties());
 
     // Validate the generated document through the same conversion path used for imports.
-    toCreateRequest(root.deepCopy());
+    toImportedModel(root.deepCopy());
 
     try {
       if (format == OssieFormat.JSON) {
@@ -151,14 +153,70 @@ public final class OssieSemanticModelDocumentConverter {
     }
   }
 
+  /** Native model values parsed from an Ossie document, before the model is created. */
+  public static final class ImportedSemanticModel {
+
+    private final String name;
+    @Nullable private final String comment;
+    private final SemanticModelDefinition definition;
+    private final Map<String, String> properties;
+
+    private ImportedSemanticModel(
+        String name,
+        @Nullable String comment,
+        SemanticModelDefinition definition,
+        Map<String, String> properties) {
+      this.name = name;
+      this.comment = comment;
+      this.definition = definition;
+      this.properties = Map.copyOf(properties);
+    }
+
+    /**
+     * Returns the model name supplied by the document.
+     *
+     * @return The model name.
+     */
+    public String name() {
+      return name;
+    }
+
+    /**
+     * Returns the document description.
+     *
+     * @return The model comment, or {@code null} when absent.
+     */
+    @Nullable
+    public String comment() {
+      return comment;
+    }
+
+    /**
+     * Returns the parsed native definition.
+     *
+     * @return The immutable Semantic Model definition.
+     */
+    public SemanticModelDefinition definition() {
+      return definition;
+    }
+
+    /**
+     * Returns the Gravitino properties, including the Ossie version.
+     *
+     * @return The immutable properties.
+     */
+    public Map<String, String> properties() {
+      return properties;
+    }
+  }
+
   private static ObjectMapper createJsonMapper() {
     JsonFactory factory =
         JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     return JsonMapper.builder(factory)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
         .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
-        .build()
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        .build();
   }
 
   private static ObjectMapper createYamlMapper() {
@@ -170,18 +228,14 @@ public final class OssieSemanticModelDocumentConverter {
     return new ObjectMapper(factory)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-        .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS);
   }
 
   private static ObjectNode parseDocument(OssieDocument document) {
     String content = document.content();
-    if (StringUtils.isBlank(content)) {
-      throw new IllegalSemanticModelException("Apache Ossie document must not be empty");
-    }
     try {
       ObjectMapper mapper = document.format() == OssieFormat.JSON ? JSON_MAPPER : YAML_MAPPER;
-      // Check the whole document, without enabling this on nested DTO deserializers.
+      // Reject trailing content after the standalone document.
       JsonNode parsed =
           mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(content);
       if (!(parsed instanceof ObjectNode)) {
@@ -194,10 +248,10 @@ public final class OssieSemanticModelDocumentConverter {
     }
   }
 
-  private static SemanticModelCreateRequest toCreateRequest(ObjectNode root) {
+  private static ImportedSemanticModel toImportedModel(ObjectNode root) {
     validateObject(root, "$", ROOT_PROPERTIES);
-    validateOptionalText(root, "name", "$");
-    validateOptionalText(root, "description", "$");
+    String name = readText(root, "name", "$");
+    String comment = readText(root, "description", "$");
     String ossieVersion = validateVersion(root.get("version"));
 
     Map<String, String> properties = new LinkedHashMap<>(extractProperties(root));
@@ -208,28 +262,15 @@ public final class OssieSemanticModelDocumentConverter {
           "Gravitino property '" + PROPERTY_OSSIE_VERSION + "' conflicts with $.version");
     }
     properties.put(PROPERTY_OSSIE_VERSION, ossieVersion);
-    ObjectNode definition = JSON_MAPPER.createObjectNode();
-    copy(root, definition, "ai_context");
-    copy(root, definition, "datasets");
-    copy(root, definition, "relationships");
-    copy(root, definition, "metrics");
-    copy(root, definition, "custom_extensions");
-    transformOssieDefinition(definition, "$");
-
-    ObjectNode requestNode = JSON_MAPPER.createObjectNode();
-    copy(root, requestNode, "name");
-    if (root.has("description")) {
-      requestNode.set("comment", root.get("description"));
-    }
-    requestNode.set("definition", definition);
-    requestNode.set("properties", JSON_MAPPER.valueToTree(properties));
 
     try {
-      SemanticModelCreateRequest request =
-          JSON_MAPPER.treeToValue(requestNode, SemanticModelCreateRequest.class);
-      request.validate();
-      return request;
-    } catch (JsonProcessingException | IllegalArgumentException e) {
+      if (StringUtils.isBlank(name)) {
+        throw new IllegalArgumentException("\"name\" field is required and cannot be empty");
+      }
+      return new ImportedSemanticModel(name, comment, readDefinition(root), properties);
+    } catch (IllegalSemanticModelException e) {
+      throw e;
+    } catch (IllegalArgumentException e) {
       throw new IllegalSemanticModelException(
           e,
           "Cannot convert Apache Ossie document to a Gravitino Semantic Model: %s",
@@ -245,7 +286,7 @@ public final class OssieSemanticModelDocumentConverter {
   }
 
   private static String ossieVersion(Map<String, String> properties) {
-    String version = properties.getOrDefault(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION);
+    String version = properties.getOrDefault(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
     if (StringUtils.isBlank(version)) {
       throw invalid(
           "$.version",
@@ -254,55 +295,52 @@ public final class OssieSemanticModelDocumentConverter {
     return version;
   }
 
-  private static void transformOssieDefinition(ObjectNode definition, String path) {
-    validateAIContext(definition.get("ai_context"), path + ".ai_context");
-    transformObjectArray(
-        definition.get("datasets"),
-        path + ".datasets",
-        OssieSemanticModelDocumentConverter::transformOssieDataset);
-    transformObjectArray(
-        definition.get("relationships"),
-        path + ".relationships",
-        OssieSemanticModelDocumentConverter::transformOssieRelationship);
-    transformObjectArray(
-        definition.get("metrics"),
-        path + ".metrics",
-        OssieSemanticModelDocumentConverter::transformOssieMetric);
-    transformOssieCustomExtensions(
-        definition.get("custom_extensions"), path + ".custom_extensions");
-    rename(definition, "ai_context", "aiContext");
-    rename(definition, "custom_extensions", "customExtensions");
+  private static SemanticModelDefinition readDefinition(ObjectNode root) {
+    return SemanticModelDefinition.builder()
+        .withAIContext(readAIContext(root.get("ai_context"), "$.ai_context"))
+        .withDatasets(
+            readObjectArray(
+                root.get("datasets"),
+                "$.datasets",
+                OssieDocumentConverter::readDataset,
+                Dataset[]::new))
+        .withRelationships(
+            readObjectArray(
+                root.get("relationships"),
+                "$.relationships",
+                OssieDocumentConverter::readRelationship,
+                Relationship[]::new))
+        .withMetrics(
+            readObjectArray(
+                root.get("metrics"),
+                "$.metrics",
+                OssieDocumentConverter::readMetric,
+                Metric[]::new))
+        .withCustomExtensions(
+            readCustomExtensions(root.get("custom_extensions"), "$.custom_extensions"))
+        .build();
   }
 
-  private static void transformOssieDataset(ObjectNode dataset, String path) {
+  private static Dataset readDataset(ObjectNode dataset, String path) {
     validateObject(dataset, path, DATASET_PROPERTIES);
-    validateOptionalText(dataset, "name", path);
-    validateOptionalText(dataset, "description", path);
-    validateOptionalStringArray(dataset, "primary_key", path);
-    validateOptionalStringArrayArray(dataset, "unique_keys", path);
-    JsonNode source = dataset.get("source");
-    if (source != null) {
-      if (!source.isTextual()) {
-        throw invalid(path + ".source", "must be a string");
-      }
-      String sourceValue = source.textValue();
-      String[] parts = parseOssieSource(sourceValue, path + ".source");
-      ObjectNode identifier = JSON_MAPPER.createObjectNode();
-      identifier.putArray("namespace").add(parts[0]).add(parts[1]);
-      identifier.put("name", parts[2]);
-      dataset.set("source", identifier);
-    }
-
-    validateAIContext(dataset.get("ai_context"), path + ".ai_context");
-    transformObjectArray(
-        dataset.get("fields"),
-        path + ".fields",
-        OssieSemanticModelDocumentConverter::transformOssieField);
-    transformOssieCustomExtensions(dataset.get("custom_extensions"), path + ".custom_extensions");
-    rename(dataset, "primary_key", "primaryKey");
-    rename(dataset, "unique_keys", "uniqueKeys");
-    rename(dataset, "ai_context", "aiContext");
-    rename(dataset, "custom_extensions", "customExtensions");
+    String source = readText(dataset, "source", path);
+    return Dataset.builder()
+        .withName(readText(dataset, "name", path))
+        .withSource(
+            source == null ? null : NameIdentifier.of(parseOssieSource(source, path + ".source")))
+        .withPrimaryKey(readStringArray(dataset, "primary_key", path))
+        .withUniqueKeys(readStringArrays(dataset, "unique_keys", path))
+        .withDescription(readText(dataset, "description", path))
+        .withAIContext(readAIContext(dataset.get("ai_context"), path + ".ai_context"))
+        .withFields(
+            readObjectArray(
+                dataset.get("fields"),
+                path + ".fields",
+                OssieDocumentConverter::readField,
+                Field[]::new))
+        .withCustomExtensions(
+            readCustomExtensions(dataset.get("custom_extensions"), path + ".custom_extensions"))
+        .build();
   }
 
   private static String[] parseOssieSource(String source, String path) {
@@ -364,155 +402,209 @@ public final class OssieSemanticModelDocumentConverter {
     return parts.toArray(new String[0]);
   }
 
-  private static void transformOssieField(ObjectNode field, String path) {
+  private static Field readField(ObjectNode field, String path) {
     validateObject(field, path, FIELD_PROPERTIES);
-    validateOptionalText(field, "name", path);
-    validateOptionalText(field, "label", path);
-    validateOptionalText(field, "description", path);
-    validateOptionalText(field, "datatype", path);
-    transformOssieExpression(field.get("expression"), path + ".expression");
-    JsonNode dimension = field.get("dimension");
-    if (dimension != null) {
-      if (!(dimension instanceof ObjectNode)) {
-        throw invalid(path + ".dimension", "must be an object");
-      }
-      ObjectNode dimensionObject = (ObjectNode) dimension;
-      validateObject(dimensionObject, path + ".dimension", DIMENSION_PROPERTIES);
-      validateOptionalBoolean(dimensionObject, "is_time", path + ".dimension");
-      rename(dimensionObject, "is_time", "isTime");
-    }
-    validateAIContext(field.get("ai_context"), path + ".ai_context");
-    transformOssieCustomExtensions(field.get("custom_extensions"), path + ".custom_extensions");
-    rename(field, "ai_context", "aiContext");
-    rename(field, "custom_extensions", "customExtensions");
+    return Field.builder()
+        .withName(readText(field, "name", path))
+        .withExpression(readExpression(field.get("expression"), path + ".expression"))
+        .withDimension(readDimension(field.get("dimension"), path + ".dimension"))
+        .withLabel(readText(field, "label", path))
+        .withDescription(readText(field, "description", path))
+        .withDatatype(readDataType(field, path))
+        .withAIContext(readAIContext(field.get("ai_context"), path + ".ai_context"))
+        .withCustomExtensions(
+            readCustomExtensions(field.get("custom_extensions"), path + ".custom_extensions"))
+        .build();
   }
 
-  private static void transformOssieRelationship(ObjectNode relationship, String path) {
+  private static Relationship readRelationship(ObjectNode relationship, String path) {
     validateObject(relationship, path, RELATIONSHIP_PROPERTIES);
-    validateOptionalText(relationship, "name", path);
-    validateOptionalText(relationship, "from", path);
-    validateOptionalText(relationship, "to", path);
-    validateOptionalStringArray(relationship, "from_columns", path);
-    validateOptionalStringArray(relationship, "to_columns", path);
-    validateAIContext(relationship.get("ai_context"), path + ".ai_context");
-    transformOssieCustomExtensions(
-        relationship.get("custom_extensions"), path + ".custom_extensions");
-    rename(relationship, "from_columns", "fromColumns");
-    rename(relationship, "to_columns", "toColumns");
-    rename(relationship, "ai_context", "aiContext");
-    rename(relationship, "custom_extensions", "customExtensions");
+    return Relationship.builder()
+        .withName(readText(relationship, "name", path))
+        .withFrom(readText(relationship, "from", path))
+        .withTo(readText(relationship, "to", path))
+        .withFromColumns(readStringArray(relationship, "from_columns", path))
+        .withToColumns(readStringArray(relationship, "to_columns", path))
+        .withAIContext(readAIContext(relationship.get("ai_context"), path + ".ai_context"))
+        .withCustomExtensions(
+            readCustomExtensions(
+                relationship.get("custom_extensions"), path + ".custom_extensions"))
+        .build();
   }
 
-  private static void transformOssieMetric(ObjectNode metric, String path) {
+  private static Metric readMetric(ObjectNode metric, String path) {
     validateObject(metric, path, METRIC_PROPERTIES);
-    validateOptionalText(metric, "name", path);
-    validateOptionalText(metric, "description", path);
-    validateOptionalText(metric, "datatype", path);
-    transformOssieExpression(metric.get("expression"), path + ".expression");
-    validateAIContext(metric.get("ai_context"), path + ".ai_context");
-    transformOssieCustomExtensions(metric.get("custom_extensions"), path + ".custom_extensions");
-    rename(metric, "ai_context", "aiContext");
-    rename(metric, "custom_extensions", "customExtensions");
+    return Metric.builder()
+        .withName(readText(metric, "name", path))
+        .withExpression(readExpression(metric.get("expression"), path + ".expression"))
+        .withDescription(readText(metric, "description", path))
+        .withDatatype(readDataType(metric, path))
+        .withAIContext(readAIContext(metric.get("ai_context"), path + ".ai_context"))
+        .withCustomExtensions(
+            readCustomExtensions(metric.get("custom_extensions"), path + ".custom_extensions"))
+        .build();
   }
 
-  private static void transformOssieExpression(@Nullable JsonNode expression, String path) {
-    if (expression == null) {
-      return;
+  @Nullable
+  private static Expression readExpression(@Nullable JsonNode node, String path) {
+    if (node == null) {
+      return null;
     }
-    if (!(expression instanceof ObjectNode)) {
-      throw invalid(path, "must be an object");
-    }
-    ObjectNode expressionObject = (ObjectNode) expression;
-    validateObject(expressionObject, path, EXPRESSION_PROPERTIES);
-    transformObjectArray(
-        expressionObject.get("dialects"),
-        path + ".dialects",
-        (dialectExpression, dialectPath) -> {
-          validateObject(dialectExpression, dialectPath, DIALECT_EXPRESSION_PROPERTIES);
-          validateOptionalText(dialectExpression, "dialect", dialectPath);
-          validateOptionalText(dialectExpression, "expression", dialectPath);
-        });
+    ObjectNode expression = requireObject(node, path);
+    validateObject(expression, path, EXPRESSION_PROPERTIES);
+    return Expression.builder()
+        .withDialects(
+            readObjectArray(
+                expression.get("dialects"),
+                path + ".dialects",
+                OssieDocumentConverter::readDialectExpression,
+                DialectExpression[]::new))
+        .build();
   }
 
-  private static void transformOssieCustomExtensions(@Nullable JsonNode extensions, String path) {
-    transformObjectArray(
-        extensions,
+  private static DialectExpression readDialectExpression(ObjectNode dialect, String path) {
+    validateObject(dialect, path, DIALECT_EXPRESSION_PROPERTIES);
+    return DialectExpression.builder()
+        .withDialect(readText(dialect, "dialect", path))
+        .withExpression(readText(dialect, "expression", path))
+        .build();
+  }
+
+  @Nullable
+  private static Dimension readDimension(@Nullable JsonNode node, String path) {
+    if (node == null) {
+      return null;
+    }
+    ObjectNode dimension = requireObject(node, path);
+    validateObject(dimension, path, DIMENSION_PROPERTIES);
+    validateOptionalBoolean(dimension, "is_time", path);
+    JsonNode isTime = dimension.get("is_time");
+    return Dimension.builder().withIsTime(isTime == null ? null : isTime.booleanValue()).build();
+  }
+
+  @Nullable
+  private static DataType readDataType(ObjectNode object, String path) {
+    String value = readText(object, "datatype", path);
+    if (value == null) {
+      return null;
+    }
+    for (DataType type : DataType.values()) {
+      if (value.equals(dataTypeName(type))) {
+        return type;
+      }
+    }
+    throw invalid(
+        path + ".datatype",
+        "Unknown Semantic Model data type: "
+            + value
+            + ". Supported values: "
+            + Arrays.stream(DataType.values())
+                .map(OssieDocumentConverter::dataTypeName)
+                .collect(Collectors.joining(", ")));
+  }
+
+  private static String dataTypeName(DataType dataType) {
+    return switch (dataType) {
+      case STRING -> "String";
+      case INTEGER -> "Integer";
+      case DECIMAL -> "Decimal";
+      case FLOAT -> "Float";
+      case BOOLEAN -> "Boolean";
+      case DATE -> "Date";
+      case TIME -> "Time";
+      case DATE_TIME -> "DateTime";
+      case DATE_TIME_TZ -> "DateTimeTz";
+      case OPAQUE -> "Opaque";
+    };
+  }
+
+  @Nullable
+  private static CustomExtension[] readCustomExtensions(@Nullable JsonNode node, String path) {
+    return readObjectArray(
+        node,
         path,
         (extension, extensionPath) -> {
           validateObject(extension, extensionPath, CUSTOM_EXTENSION_PROPERTIES);
-          validateOptionalText(extension, "vendor_name", extensionPath);
-          validateOptionalText(extension, "data", extensionPath);
-          rename(extension, "vendor_name", "vendorName");
-        });
+          return CustomExtension.builder()
+              .withVendorName(readText(extension, "vendor_name", extensionPath))
+              .withData(readText(extension, "data", extensionPath))
+              .build();
+        },
+        CustomExtension[]::new);
   }
 
-  private static void validateAIContext(@Nullable JsonNode context, String path) {
-    if (context == null) {
-      return;
+  @Nullable
+  private static AIContext readAIContext(@Nullable JsonNode node, String path) {
+    if (node == null) {
+      return null;
     }
-    if (context.isTextual()) {
-      return;
+    if (node.isTextual()) {
+      return AIContext.of(node.textValue());
     }
-    if (!(context instanceof ObjectNode)) {
+    if (!(node instanceof ObjectNode)) {
       throw invalid(path, "must be a string or object");
     }
-
-    ObjectNode object = (ObjectNode) context;
-    validateOptionalText(object, "instructions", path);
-    validateOptionalStringArray(object, "synonyms", path);
-    validateOptionalStringArray(object, "examples", path);
+    ObjectNode object = (ObjectNode) node;
+    Map<String, Object> additionalProperties = new LinkedHashMap<>();
+    object
+        .fields()
+        .forEachRemaining(
+            entry -> {
+              if (!AI_CONTEXT_PROPERTIES.contains(entry.getKey())) {
+                additionalProperties.put(
+                    entry.getKey(), JSON_MAPPER.convertValue(entry.getValue(), Object.class));
+              }
+            });
+    return AIContext.of(
+        AIContextObject.builder()
+            .withInstructions(readText(object, "instructions", path))
+            .withSynonyms(readStringArray(object, "synonyms", path))
+            .withExamples(readStringArray(object, "examples", path))
+            .withAdditionalProperties(additionalProperties)
+            .build());
   }
 
-  private static void transformNativeDefinition(ObjectNode definition) {
-    transformObjectArray(
-        definition.get("datasets"),
-        "$.datasets",
-        OssieSemanticModelDocumentConverter::transformNativeDataset);
-    transformObjectArray(
-        definition.get("relationships"),
-        "$.relationships",
-        OssieSemanticModelDocumentConverter::transformNativeRelationship);
-    transformObjectArray(
-        definition.get("metrics"),
-        "$.metrics",
-        OssieSemanticModelDocumentConverter::transformNativeMetric);
-    transformNativeCustomExtensions(definition.get("customExtensions"), "$.custom_extensions");
-    rename(definition, "aiContext", "ai_context");
-    rename(definition, "customExtensions", "custom_extensions");
+  private static ObjectNode writeDefinition(SemanticModelDefinition definition) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    putOptional(node, "ai_context", writeAIContext(definition.aiContext()));
+    writeObjectArray(node, "datasets", definition.datasets(), OssieDocumentConverter::writeDataset);
+    writeObjectArray(
+        node,
+        "relationships",
+        definition.relationships(),
+        OssieDocumentConverter::writeRelationship);
+    writeObjectArray(node, "metrics", definition.metrics(), OssieDocumentConverter::writeMetric);
+    writeObjectArray(
+        node,
+        "custom_extensions",
+        definition.customExtensions(),
+        OssieDocumentConverter::writeCustomExtension);
+    return node;
   }
 
-  private static void transformNativeDataset(ObjectNode dataset, String path) {
-    JsonNode source = dataset.get("source");
-    if (!(source instanceof ObjectNode)) {
-      throw invalid(path + ".source", "must be a Gravitino source identifier");
-    }
-    JsonNode namespace = source.get("namespace");
-    JsonNode name = source.get("name");
-    if (!(namespace instanceof ArrayNode)
-        || namespace.size() != 2
-        || !namespace.get(0).isTextual()
-        || !namespace.get(1).isTextual()
-        || name == null
-        || !name.isTextual()) {
-      throw invalid(path + ".source", "must contain exactly catalog.schema.name");
-    }
-    dataset.put(
+  private static ObjectNode writeDataset(Dataset dataset) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    node.put("name", dataset.name());
+    NameIdentifier source = dataset.source();
+    String[] namespace = source.namespace().levels();
+    node.put(
         "source",
-        formatOssieSourceSegment(namespace.get(0).textValue())
+        formatOssieSourceSegment(namespace[0])
             + "."
-            + formatOssieSourceSegment(namespace.get(1).textValue())
+            + formatOssieSourceSegment(namespace[1])
             + "."
-            + formatOssieSourceSegment(name.textValue()));
-
-    transformObjectArray(
-        dataset.get("fields"),
-        path + ".fields",
-        OssieSemanticModelDocumentConverter::transformNativeField);
-    transformNativeCustomExtensions(dataset.get("customExtensions"), path + ".custom_extensions");
-    rename(dataset, "primaryKey", "primary_key");
-    rename(dataset, "uniqueKeys", "unique_keys");
-    rename(dataset, "aiContext", "ai_context");
-    rename(dataset, "customExtensions", "custom_extensions");
+            + formatOssieSourceSegment(source.name()));
+    putOptional(node, "primary_key", dataset.primaryKey());
+    putOptional(node, "unique_keys", dataset.uniqueKeys());
+    putOptional(node, "description", dataset.description());
+    putOptional(node, "ai_context", writeAIContext(dataset.aiContext()));
+    writeObjectArray(node, "fields", dataset.fields(), OssieDocumentConverter::writeField);
+    writeObjectArray(
+        node,
+        "custom_extensions",
+        dataset.customExtensions(),
+        OssieDocumentConverter::writeCustomExtension);
+    return node;
   }
 
   private static String formatOssieSourceSegment(String segment) {
@@ -522,36 +614,97 @@ public final class OssieSemanticModelDocumentConverter {
     return "`" + segment.replace("`", "``") + "`";
   }
 
-  private static void transformNativeField(ObjectNode field, String path) {
-    JsonNode dimension = field.get("dimension");
-    if (dimension instanceof ObjectNode) {
-      rename((ObjectNode) dimension, "isTime", "is_time");
+  private static ObjectNode writeField(Field field) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    node.put("name", field.name());
+    node.set("expression", writeExpression(field.expression()));
+    if (field.dimension() != null) {
+      ObjectNode dimension = node.putObject("dimension");
+      putOptional(dimension, "is_time", field.dimension().isTime());
     }
-    transformNativeCustomExtensions(field.get("customExtensions"), path + ".custom_extensions");
-    rename(field, "aiContext", "ai_context");
-    rename(field, "customExtensions", "custom_extensions");
+    putOptional(node, "label", field.label());
+    putOptional(node, "description", field.description());
+    putOptional(node, "datatype", field.datatype() == null ? null : dataTypeName(field.datatype()));
+    putOptional(node, "ai_context", writeAIContext(field.aiContext()));
+    writeObjectArray(
+        node,
+        "custom_extensions",
+        field.customExtensions(),
+        OssieDocumentConverter::writeCustomExtension);
+    return node;
   }
 
-  private static void transformNativeRelationship(ObjectNode relationship, String path) {
-    transformNativeCustomExtensions(
-        relationship.get("customExtensions"), path + ".custom_extensions");
-    rename(relationship, "fromColumns", "from_columns");
-    rename(relationship, "toColumns", "to_columns");
-    rename(relationship, "aiContext", "ai_context");
-    rename(relationship, "customExtensions", "custom_extensions");
+  private static ObjectNode writeRelationship(Relationship relationship) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    node.put("name", relationship.name());
+    node.put("from", relationship.from());
+    node.put("to", relationship.to());
+    putOptional(node, "from_columns", relationship.fromColumns());
+    putOptional(node, "to_columns", relationship.toColumns());
+    putOptional(node, "ai_context", writeAIContext(relationship.aiContext()));
+    writeObjectArray(
+        node,
+        "custom_extensions",
+        relationship.customExtensions(),
+        OssieDocumentConverter::writeCustomExtension);
+    return node;
   }
 
-  private static void transformNativeMetric(ObjectNode metric, String path) {
-    transformNativeCustomExtensions(metric.get("customExtensions"), path + ".custom_extensions");
-    rename(metric, "aiContext", "ai_context");
-    rename(metric, "customExtensions", "custom_extensions");
+  private static ObjectNode writeMetric(Metric metric) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    node.put("name", metric.name());
+    node.set("expression", writeExpression(metric.expression()));
+    putOptional(node, "description", metric.description());
+    putOptional(
+        node, "datatype", metric.datatype() == null ? null : dataTypeName(metric.datatype()));
+    putOptional(node, "ai_context", writeAIContext(metric.aiContext()));
+    writeObjectArray(
+        node,
+        "custom_extensions",
+        metric.customExtensions(),
+        OssieDocumentConverter::writeCustomExtension);
+    return node;
   }
 
-  private static void transformNativeCustomExtensions(@Nullable JsonNode extensions, String path) {
-    transformObjectArray(
-        extensions,
-        path,
-        (extension, extensionPath) -> rename(extension, "vendorName", "vendor_name"));
+  private static ObjectNode writeExpression(Expression expression) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    writeObjectArray(
+        node,
+        "dialects",
+        expression.dialects(),
+        dialect -> {
+          ObjectNode value = JSON_MAPPER.createObjectNode();
+          value.put("dialect", dialect.dialect());
+          value.put("expression", dialect.expression());
+          return value;
+        });
+    return node;
+  }
+
+  private static ObjectNode writeCustomExtension(CustomExtension extension) {
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    node.put("vendor_name", extension.vendorName());
+    node.put("data", extension.data());
+    return node;
+  }
+
+  @Nullable
+  private static JsonNode writeAIContext(@Nullable AIContext context) {
+    if (context == null) {
+      return null;
+    }
+    if (context.isText()) {
+      return JSON_MAPPER.getNodeFactory().textNode(context.text());
+    }
+    AIContextObject object = context.object();
+    ObjectNode node = JSON_MAPPER.createObjectNode();
+    putOptional(node, "instructions", object.instructions());
+    putOptional(node, "synonyms", object.synonyms());
+    putOptional(node, "examples", object.examples());
+    object
+        .additionalProperties()
+        .forEach((key, value) -> node.set(key, JSON_MAPPER.valueToTree(value)));
+    return node;
   }
 
   private static void stashProperties(ObjectNode root, Map<String, String> properties) {
@@ -745,35 +898,78 @@ public final class OssieSemanticModelDocumentConverter {
     }
   }
 
-  private static void transformObjectArray(
-      @Nullable JsonNode node, String path, ObjectTransformer transformer) {
+  @Nullable
+  private static String readText(ObjectNode object, String name, String path) {
+    validateOptionalText(object, name, path);
+    JsonNode value = object.get(name);
+    return value == null ? null : value.textValue();
+  }
+
+  @Nullable
+  private static String[] readStringArray(ObjectNode object, String name, String path) {
+    validateOptionalStringArray(object, name, path);
+    return object.has(name) ? stringArray(object.get(name)) : null;
+  }
+
+  private static String[] stringArray(JsonNode array) {
+    String[] values = new String[array.size()];
+    for (int index = 0; index < values.length; index++) {
+      values[index] = array.get(index).textValue();
+    }
+    return values;
+  }
+
+  @Nullable
+  private static String[][] readStringArrays(ObjectNode object, String name, String path) {
+    validateOptionalStringArrayArray(object, name, path);
+    JsonNode array = object.get(name);
+    if (array == null) {
+      return null;
+    }
+    String[][] values = new String[array.size()][];
+    for (int index = 0; index < values.length; index++) {
+      values[index] = stringArray(array.get(index));
+    }
+    return values;
+  }
+
+  private static ObjectNode requireObject(JsonNode node, String path) {
+    if (!(node instanceof ObjectNode)) {
+      throw invalid(path, "must be an object");
+    }
+    return (ObjectNode) node;
+  }
+
+  @Nullable
+  private static <T> T[] readObjectArray(
+      @Nullable JsonNode node, String path, ObjectReader<T> reader, IntFunction<T[]> arrayFactory) {
     if (node == null) {
-      return;
+      return null;
     }
     if (!(node instanceof ArrayNode)) {
       throw invalid(path, "must be an array of objects");
     }
-    ArrayNode array = (ArrayNode) node;
-    for (int index = 0; index < array.size(); index++) {
-      JsonNode item = array.get(index);
-      if (!(item instanceof ObjectNode)) {
-        throw invalid(path + "[" + index + "]", "must be an object");
+    T[] values = arrayFactory.apply(node.size());
+    for (int index = 0; index < values.length; index++) {
+      String itemPath = path + "[" + index + "]";
+      values[index] = reader.read(requireObject(node.get(index), itemPath), itemPath);
+    }
+    return values;
+  }
+
+  private static <T> void writeObjectArray(
+      ObjectNode object, String name, @Nullable T[] values, Function<T, ObjectNode> writer) {
+    if (values != null) {
+      ArrayNode array = object.putArray(name);
+      for (T value : values) {
+        array.add(writer.apply(value));
       }
-      transformer.transform((ObjectNode) item, path + "[" + index + "]");
     }
   }
 
-  private static void copy(ObjectNode source, ObjectNode target, String name) {
-    JsonNode value = source.get(name);
+  private static void putOptional(ObjectNode object, String name, @Nullable Object value) {
     if (value != null) {
-      target.set(name, value.deepCopy());
-    }
-  }
-
-  private static void rename(ObjectNode object, String source, String target) {
-    JsonNode value = object.remove(source);
-    if (value != null) {
-      object.set(target, value);
+      object.set(name, JSON_MAPPER.valueToTree(value));
     }
   }
 
@@ -789,7 +985,7 @@ public final class OssieSemanticModelDocumentConverter {
   }
 
   @FunctionalInterface
-  private interface ObjectTransformer {
-    void transform(ObjectNode object, String path);
+  private interface ObjectReader<T> {
+    T read(ObjectNode object, String path);
   }
 }

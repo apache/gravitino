@@ -315,7 +315,7 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Semantic Model list and load. Only Semantic Models the caller can select, modify, or owns are
+   * Semantic Model list and load. Only Semantic Models the caller can use, modify, or owns are
    * returned; a metalake or catalog owner, or a schema owner holding USE_CATALOG, sees them all.
    */
   public static final String LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
@@ -323,7 +323,7 @@ public class AuthorizationExpressionConstants {
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA &&
-                  (SEMANTIC_MODEL::OWNER || ANY_SELECT_SEMANTIC_MODEL || ANY_MODIFY_SEMANTIC_MODEL)
+                  (SEMANTIC_MODEL::OWNER || ANY_USE_SEMANTIC_MODEL || ANY_MODIFY_SEMANTIC_MODEL)
                   """;
 
   /** Semantic Model creation under a schema. */
@@ -357,7 +357,7 @@ public class AuthorizationExpressionConstants {
   public static final String FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL) ||
-                  ANY_SELECT_SEMANTIC_MODEL ||
+                  ANY_USE_SEMANTIC_MODEL ||
                   ANY_MODIFY_SEMANTIC_MODEL
                   """;
 

@@ -44,12 +44,11 @@ public class TestSemanticModelCatalog {
     SemanticModelCatalog catalog = new ExistsOnlySemanticModelCatalog();
     assertThrows(
         UnsupportedOperationException.class,
-        () -> catalog.importOssieSemanticModel(Namespace.of("schema"), OssieDocument.yaml("")));
+        () -> catalog.importOssieDocument(Namespace.of("schema"), OssieDocument.yaml("{}")));
     assertThrows(
         UnsupportedOperationException.class,
         () ->
-            catalog.exportOssieSemanticModel(
-                NameIdentifier.of("schema", "existing"), OssieFormat.YAML));
+            catalog.exportOssieDocument(NameIdentifier.of("schema", "existing"), OssieFormat.YAML));
   }
 
   private static class ExistsOnlySemanticModelCatalog implements SemanticModelCatalog {

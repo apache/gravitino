@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -41,8 +41,8 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieDocumentConverter;
 import org.apache.gravitino.semantic.OssieFormat;
-import org.apache.gravitino.semantic.OssieSemanticModelDocumentConverter;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -126,13 +126,13 @@ public class TestSemanticModelNormalizeDispatcher {
   @Test
   public void testOssieImportUsesNativeCreateNormalization() {
     SemanticModel model = mock(SemanticModel.class);
-    Map<String, String> properties = Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION);
+    Map<String, String> properties = Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
     when(delegate.createSemanticModel(
             eq(NORMALIZED_IDENT), isNull(), any(SemanticModelDefinition.class), eq(properties)))
         .thenReturn(model);
 
     assertEquals(
-        model, dispatcher.importOssieSemanticModel(INPUT_NAMESPACE, ossieDocument("SalesModel")));
+        model, dispatcher.importOssieDocument(INPUT_NAMESPACE, ossieDocument("SalesModel")));
 
     ArgumentCaptor<SemanticModelDefinition> definition =
         ArgumentCaptor.forClass(SemanticModelDefinition.class);
@@ -146,7 +146,7 @@ public class TestSemanticModelNormalizeDispatcher {
   public void testOssieImportRejectsInvalidModelName() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> dispatcher.importOssieSemanticModel(INPUT_NAMESPACE, ossieDocument("invalid model")));
+        () -> dispatcher.importOssieDocument(INPUT_NAMESPACE, ossieDocument("invalid model")));
     verifyNoInteractions(delegate);
   }
 
@@ -158,11 +158,10 @@ public class TestSemanticModelNormalizeDispatcher {
     when(model.properties()).thenReturn(Map.of());
     when(delegate.loadSemanticModel(NORMALIZED_IDENT)).thenReturn(model);
 
-    OssieDocument document = dispatcher.exportOssieSemanticModel(INPUT_IDENT, OssieFormat.JSON);
+    OssieDocument document = dispatcher.exportOssieDocument(INPUT_IDENT, OssieFormat.JSON);
 
     assertEquals(OssieFormat.JSON, document.format());
-    assertEquals(
-        "SalesModel", OssieSemanticModelDocumentConverter.importDocument(document).getName());
+    assertEquals("SalesModel", OssieDocumentConverter.importDocument(document).name());
     verify(delegate).loadSemanticModel(NORMALIZED_IDENT);
     verifyNoMoreInteractions(delegate);
   }

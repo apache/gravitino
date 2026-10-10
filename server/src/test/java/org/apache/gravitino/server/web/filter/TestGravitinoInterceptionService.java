@@ -201,7 +201,7 @@ public class TestGravitinoInterceptionService {
               "dropSemanticModel", String.class, String.class, String.class, String.class);
       Method importOssie =
           SemanticModelOperations.class.getMethod(
-              "importOssieSemanticModel",
+              "importOssieDocument",
               String.class,
               String.class,
               String.class,
@@ -209,7 +209,7 @@ public class TestGravitinoInterceptionService {
               HttpHeaders.class);
       Method exportOssie =
           SemanticModelOperations.class.getMethod(
-              "exportOssieSemanticModel",
+              "exportOssieDocument",
               String.class,
               String.class,
               String.class,

@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.semantic;
 
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,7 +39,7 @@ public class TestSemanticModelPropertiesMetadata {
 
     assertFalse(entry.isRequired());
     assertFalse(entry.isImmutable());
-    assertEquals(DEFAULT_OSSIE_VERSION, entry.getDefaultValue());
+    assertEquals(DEFAULT_VERSION, entry.getDefaultValue());
     assertEquals("future-version", entry.decode("future-version"));
     assertThrows(IllegalArgumentException.class, () -> entry.decode(" "));
   }

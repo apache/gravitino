@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-import static org.apache.gravitino.semantic.SemanticModel.DEFAULT_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -170,7 +170,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     when(column.name()).thenReturn("order_id");
     when(table.columns()).thenReturn(new Column[] {column});
     when(tables.loadTable(any())).thenReturn(table);
-    doCallRealMethod().when(dispatcher).exportOssieSemanticModel(any(), any());
+    doCallRealMethod().when(dispatcher).exportOssieDocument(any(), any());
   }
 
   @Test
@@ -841,7 +841,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(salesIdent),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION))))
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
         .thenReturn(semanticModel("sales", "Sales definitions"));
     when(dispatcher.createSemanticModel(
             eq(inventoryIdent),
@@ -905,7 +905,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(salesIdent),
             eq("Sales definitions"),
             definitionCaptor.capture(),
-            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION)));
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
     Assertions.assertEquals(
         NameIdentifier.of(catalog, schema, "orders"),
         definitionCaptor.getValue().datasets()[0].source());
@@ -929,7 +929,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION))))
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
         .thenReturn(semanticModel("marketing", null));
 
     String yaml =
@@ -952,7 +952,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_OSSIE_VERSION)));
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -994,8 +994,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         json.at("/datasets/0/source").textValue());
     Assertions.assertFalse(json.has("semantic_model"));
     Assertions.assertFalse(json.has("definition"));
-    verify(dispatcher).exportOssieSemanticModel(ident, OssieFormat.YAML);
-    verify(dispatcher).exportOssieSemanticModel(ident, OssieFormat.JSON);
+    verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
+    verify(dispatcher).exportOssieDocument(ident, OssieFormat.JSON);
     verify(dispatcher, times(2)).loadSemanticModel(ident);
     verifyNoMoreInteractions(dispatcher);
   }
@@ -1023,6 +1023,23 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalArgumentException.class.getSimpleName(),
         "expected yaml or json");
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testOssieImportRejectsBlankContentBeforeDispatch() {
+    for (String mediaType : new String[] {"application/yaml", MediaType.APPLICATION_JSON}) {
+      for (String content : new String[] {"", " \t\r\n"}) {
+        try (Response response = postDocument(semanticModelPath() + "/ossie", content, mediaType)) {
+          assertError(
+              response,
+              Response.Status.BAD_REQUEST,
+              ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+              IllegalArgumentException.class.getSimpleName(),
+              "content must not be blank");
+        }
+      }
+    }
     verifyNoMoreInteractions(dispatcher);
   }
 

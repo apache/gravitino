@@ -60,12 +60,11 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangeListener.class);
 
   /**
-   * Entity types that are cacheable in the entity store — and therefore emitted into {@code
-   * entity_change_log} — but that live in a virtual namespace ({@code
-   * <metalake>.system.<kind>.<name>}) instead of under a catalog. Their change-log identifier has
-   * more levels than {@link MetadataObjects#of} accepts for the matching type, and the JCasbin
-   * {@code metadataIdCache} never keys on them, so they are dropped before any mapping is
-   * attempted.
+   * Entity types that are emitted into {@code entity_change_log} but live in a virtual namespace
+   * ({@code <metalake>.system.<kind>.<name>}) instead of under a catalog. Their change-log
+   * identifier has more levels than {@link MetadataObjects#of} accepts for the matching type, so
+   * only the leaf name is mapped. Authorization resolves them by that name, so the JCasbin {@code
+   * metadataIdCache} does key on them and peers must drop the mapping after a delete or rename.
    */
   private static final Set<MetadataObject.Type> VIRTUAL_NAMESPACE_TYPES =
       ImmutableSet.of(
@@ -219,11 +218,12 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * Invalidates the affected {@code metadataIdCache} keys from an entity-change batch.
    *
    * <p><b>Contract with the writer side:</b> {@code entity_change_log.full_name} must be the
-   * <i>pre-mutation</i> name (the name that consumers currently have cached). {@code JDBCBackend}
-   * emits the pre-mutation identifier on update and the current name on drop, so the cacheKey we
-   * build here resolves to the entry a peer node would have populated under that name. If a future
-   * change starts emitting the new post-rename name, this invalidation will silently miss and stale
-   * entries will only clear via LRU eviction.
+   * <i>pre-mutation</i> name (the name that consumers currently have cached). Every writer ({@code
+   * JDBCBackend}, and the services that log types it skips, such as {@code ModelMetaService} and
+   * {@code JobTemplateMetaService}) emits the pre-mutation identifier on update and the current
+   * name on drop, so the cacheKey we build here resolves to the entry a peer node would have
+   * populated under that name. If a future change starts emitting the new post-rename name, this
+   * invalidation will silently miss and stale entries will only clear via LRU eviction.
    *
    * <p><b>Bad rows:</b> a record this listener cannot understand is logged and skipped instead of
    * being thrown up. Such a row does not point at any cache key, so skipping it leaves nothing
@@ -254,10 +254,6 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
         mdType = MetadataObject.Type.valueOf(entityType.toUpperCase(Locale.ROOT));
       } catch (IllegalArgumentException e) {
         LOG.warn("Unknown entity type in change log: {}", entityType);
-        continue;
-      }
-
-      if (VIRTUAL_NAMESPACE_TYPES.contains(mdType)) {
         continue;
       }
 
@@ -303,6 +299,9 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   static MetadataObject metadataObjectFromChangeLog(
       String metalake, String fullName, MetadataObject.Type type) {
     NameIdentifier ident = EntityChangeLogNameIdentifierCodec.decode(fullName);
+    if (VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      return MetadataObjects.of(null, ident.name(), type);
+    }
     List<String> names = new ArrayList<>(Arrays.asList(ident.namespace().levels()));
     names.add(ident.name());
     if (type != MetadataObject.Type.METALAKE

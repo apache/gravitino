@@ -173,8 +173,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
+          # libssl1.1 is not in the runner's apt sources, so the .deb is fetched directly.
+          deb=libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          for host in archive.ubuntu.com nz2.archive.ubuntu.com security.ubuntu.com; do
+            wget --tries=3 --timeout=30 -O "$deb" "https://$host/ubuntu/pool/main/o/openssl/$deb" && break
+            rm -f "$deb"
+          done
+          [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
+          sudo dpkg -i "$deb"
 
       - name: Build with Gradle
         run: |

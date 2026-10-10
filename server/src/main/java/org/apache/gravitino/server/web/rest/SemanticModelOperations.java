@@ -52,8 +52,9 @@ import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieDocumentConverter;
+import org.apache.gravitino.semantic.OssieDocumentConverter.ImportedSemanticModel;
 import org.apache.gravitino.semantic.OssieFormat;
-import org.apache.gravitino.semantic.OssieSemanticModelDocumentConverter;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -218,7 +219,7 @@ public class SemanticModelOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.CREATE_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
-  public Response importOssieSemanticModel(
+  public Response importOssieDocument(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
@@ -238,12 +239,14 @@ public class SemanticModelOperations {
                 MediaType.APPLICATION_JSON_TYPE.isCompatible(headers.getMediaType())
                     ? OssieDocument.json(document)
                     : OssieDocument.yaml(document);
+            ImportedSemanticModel imported = OssieDocumentConverter.importDocument(ossieDocument);
+            sourceValidator.validate(metalake, imported.definition());
             SemanticModel semanticModel =
-                createSemanticModelEntity(
-                    metalake,
-                    catalog,
-                    schema,
-                    OssieSemanticModelDocumentConverter.importDocument(ossieDocument));
+                dispatcher.createSemanticModel(
+                    NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, imported.name()),
+                    imported.comment(),
+                    imported.definition(),
+                    imported.properties());
             LOG.info(
                 "Apache Ossie Semantic Model imported: {}.{}.{}.{}",
                 metalake,
@@ -437,7 +440,7 @@ public class SemanticModelOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SEMANTIC_MODEL)
-  public Response exportOssieSemanticModel(
+  public Response exportOssieDocument(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
@@ -459,7 +462,7 @@ public class SemanticModelOperations {
             OssieFormat outputFormat = parseOssieFormat(format);
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
-            OssieDocument document = dispatcher.exportOssieSemanticModel(ident, outputFormat);
+            OssieDocument document = dispatcher.exportOssieDocument(ident, outputFormat);
             String mediaType =
                 document.format() == OssieFormat.JSON
                     ? MediaType.APPLICATION_JSON
