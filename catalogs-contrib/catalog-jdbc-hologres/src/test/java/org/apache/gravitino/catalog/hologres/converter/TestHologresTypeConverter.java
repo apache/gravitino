@@ -145,13 +145,43 @@ public class TestHologresTypeConverter {
     hologresType = converter.fromGravitino(Types.TimestampType.withTimeZone());
     Assertions.assertEquals("timestamptz", hologresType);
 
-    // Test fromGravitino with timezone and precision - Hologres does not support precision
-    hologresType = converter.fromGravitino(Types.TimestampType.withTimeZone(6));
-    Assertions.assertEquals("timestamptz", hologresType);
-
-    // Test fromGravitino without timezone and precision - Hologres does not support precision
+    // Hologres stores timestamp without time zone with microsecond precision.
     hologresType = converter.fromGravitino(Types.TimestampType.withoutTimeZone(6));
     Assertions.assertEquals("timestamp", hologresType);
+
+    // Hologres stores timestamp with time zone with millisecond precision.
+    hologresType = converter.fromGravitino(Types.TimestampType.withTimeZone(3));
+    Assertions.assertEquals("timestamptz", hologresType);
+  }
+
+  @Test
+  public void testTimestampMetadataIsNormalizedToNativePrecision() {
+    JdbcTypeConverter.JdbcTypeBean typeBean =
+        new JdbcTypeConverter.JdbcTypeBean(HologresTypeConverter.TIMESTAMP);
+    typeBean.setDatetimePrecision(9);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(HologresTypeConverter.MAX_TIMESTAMP_PRECISION),
+        converter.toGravitino(typeBean));
+
+    typeBean = new JdbcTypeConverter.JdbcTypeBean(HologresTypeConverter.TIMESTAMP_TZ);
+    typeBean.setDatetimePrecision(6);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(HologresTypeConverter.MAX_TIMESTAMPTZ_PRECISION),
+        converter.toGravitino(typeBean));
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampTypes() {
+    Type[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Type type : nanosecondTypes) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> converter.fromGravitino(type));
+      Assertions.assertTrue(exception.getMessage().contains("cannot preserve Gravitino type"));
+    }
   }
 
   @Test
@@ -250,6 +280,71 @@ public class TestHologresTypeConverter {
     // Test fromGravitino for external type
     String hologresType = converter.fromGravitino(Types.ExternalType.of("jsonb"));
     Assertions.assertEquals("jsonb", hologresType);
+
+    typeBean = new JdbcTypeConverter.JdbcTypeBean("jsonb");
+    gravitinoType = converter.toGravitino(typeBean);
+    Assertions.assertEquals(Types.ExternalType.of("jsonb"), gravitinoType);
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> converter.fromGravitino(Types.VariantType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
+
+  @Test
+  public void testRejectUnknownType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> converter.fromGravitino(Types.NullType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres table columns cannot represent Gravitino Unknown (NullType)"));
+
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean("unknown");
+    Assertions.assertEquals(Types.ExternalType.of("unknown"), converter.toGravitino(typeBean));
+  }
+
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.fromGravitino(Types.GeometryType.of("EPSG:3857")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics"));
+
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean("geometry");
+    Assertions.assertEquals(Types.ExternalType.of("geometry"), converter.toGravitino(typeBean));
+  }
+
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
+
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean("geography");
+    Assertions.assertEquals(Types.ExternalType.of("geography"), converter.toGravitino(typeBean));
   }
 
   @Test
