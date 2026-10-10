@@ -111,9 +111,9 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
   @Override
   public String deleteTableVersionByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    // table_version holds one row per (table_id, version): keying the subselect on
-    // table_id would delete every version row of any table with one expired
-    // tombstone, including live rows. Select the physical row ids instead.
+    // table_version_info has no row id and holds several rows per table_id, so
+    // matching on table_id would also delete the live row of any table with one
+    // expired tombstone. Match the physical row ids instead.
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE ctid IN (SELECT ctid FROM "
