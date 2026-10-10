@@ -25,16 +25,13 @@ plugins {
 
 dependencies {
   annotationProcessor(libs.lombok)
+
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(project(":server-common"))
 
-  implementation(libs.bundles.jersey)
-  implementation(libs.db.scheduler)
   implementation(libs.guava)
   implementation(libs.mybatis)
-  implementation(libs.servlet)
 
   compileOnly(libs.lombok)
   compileOnly(libs.slf4j.api)
