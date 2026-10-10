@@ -33,12 +33,14 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -77,6 +79,8 @@ import org.slf4j.LoggerFactory;
 public class IcebergViewOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewOperations.class);
+
+  @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
 
   private ObjectMapper icebergObjectMapper;
   private IcebergViewOperationDispatcher viewOperationDispatcher;
@@ -187,16 +191,18 @@ public class IcebergViewOperations {
           @AuthorizationMetadata(type = EntityType.VIEW)
           @Encoded()
           @PathParam("view")
-          String view) {
+          String view,
+      @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
-        "Load Iceberg view, catalog: {}, namespace: {}, view: {}",
+        "Load Iceberg view, catalog: {}, namespace: {}, view: {}, if-none-match: {}",
         catalogName,
         icebergNS,
-        viewName);
+        viewName,
+        ifNoneMatch);
     try {
       return Utils.doAs(
           httpRequest,
@@ -206,7 +212,16 @@ public class IcebergViewOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.loadView(context, viewIdentifier);
-            return IcebergRESTUtils.ok(loadViewResponse);
+
+            // Views have no snapshots query parameter, so the ETag depends only on the view
+            // metadata file location, which changes whenever the view metadata is rewritten.
+            Optional<EntityTag> etag =
+                IcebergRESTUtils.generateViewETag(
+                    loadViewResponse.metadata().metadataFileLocation());
+            if (etag.isPresent() && IcebergRESTUtils.etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
+            }
+            return IcebergRESTUtils.buildResponseWithETag(loadViewResponse, etag);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
