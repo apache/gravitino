@@ -103,7 +103,7 @@ def create_client(
         _check_auth_config(auth_type, GVFSConfig.OAUTH2_SCOPE, oauth2_scope)
 
         oauth2_token_provider: OAuth2TokenProvider = DefaultOAuth2TokenProvider(
-            oauth2_server_uri, oauth2_credential, oauth2_path, oauth2_scope
+            oauth2_server_uri, oauth2_credential, oauth2_scope, oauth2_path
         )
 
         return GravitinoClient(

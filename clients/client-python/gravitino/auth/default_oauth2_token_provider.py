@@ -32,6 +32,7 @@ from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLE
 from gravitino.auth.oauth2_client_authentication_method import (
     OAuth2ClientAuthenticationMethod,
 )
+from urllib.parse import quote_plus
 
 CLIENT_CREDENTIALS = "client_credentials"
 CREDENTIAL_SPLITTER = ":"
@@ -52,8 +53,9 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         self,
         uri: str = None,
         credential: str = None,
-        path: str = None,
         scope: str = None,
+        path: str = None,
+        *,
         authentication_method: OAuth2ClientAuthenticationMethod = OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
     ):
         super().__init__(uri)
@@ -119,11 +121,13 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
                     "client_id must be set when using client_secret_basic authentication"
                 )
 
-            credentials = f"{client_id}:{client_secret}"
+            encoded_client_id = quote_plus(client_id, safe="")
+            encoded_client_secret = quote_plus(client_secret, safe="")
+            credentials = f"{encoded_client_id}:{encoded_client_secret}"
 
             encoded_credentials = base64.b64encode(
                 credentials.encode("utf-8")
-            ).decode("utf-8" )
+            ).decode("utf-8")
 
 
 

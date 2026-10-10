@@ -156,3 +156,25 @@ class TestOAuth2TokenProvider(unittest.TestCase):
                     OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
                 ),
             )
+
+    @patch(
+        "gravitino.utils.http_client.HTTPClient.post_form",
+        return_value=mock_base.mock_authentication_with_basic_jwt(),
+    )
+    def test_client_secret_basic_encodes_reserved_characters(self, mock_post_form):
+        DefaultOAuth2TokenProvider(
+            uri=f"http://127.0.0.1:{OAUTH_PORT}",
+            credential="client@id:s ecret:/+?",
+            path="oauth/token",
+            scope="test",
+            authentication_method=(
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+            ),
+        )
+
+        _, kwargs = mock_post_form.call_args
+
+        self.assertEqual(
+            kwargs["headers"]["Authorization"],
+            "Basic Y2xpZW50JTQwaWQ6cytlY3JldCUzQSUyRiUyQiUzRg==",
+        )

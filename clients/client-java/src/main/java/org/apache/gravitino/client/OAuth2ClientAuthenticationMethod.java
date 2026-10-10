@@ -19,18 +19,12 @@
 
 package org.apache.gravitino.client;
 
-/**
- * Authentication method used by OAuth2 client credentials flow.
- */
+/** Authentication method used by OAuth2 client credentials flow. */
 public enum OAuth2ClientAuthenticationMethod {
 
-  /**
-   * Client credentials are sent in the request body.
-   */
+  /** Client credentials are sent in the request body. */
   CLIENT_SECRET_POST,
 
-  /**
-   * Client credentials are sent using HTTP Basic authentication.
-   */
+  /** Client credentials are sent using HTTP Basic authentication. */
   CLIENT_SECRET_BASIC
 }
