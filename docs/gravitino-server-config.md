@@ -349,12 +349,11 @@ in memory, so raise `pollBatchSize` in moderate steps.
 #### Tree Lock
 
 Gravitino serializes some conflicting metadata operations with an in-memory tree lock. It is the
-only lock implementation available, and it is per-server. Partition, tag, policy, owner, model and
-table-level statistic operations do not take it. Partition operations delegate consistency to the
-catalog implementation; metadata operations rely on the entity store's transaction and concurrency
-controls. Conflicting writes may return HTTP 409, while an idempotent delete may return `false` if
-another delete or rename wins. Partition statistics still take the tree lock, because a partition
-statistic storage need not update atomically.
+only lock implementation available, and it is per-server. Partition, tag, policy, owner and model
+operations do not take it. Partition operations delegate consistency to the catalog implementation;
+the other operations rely on the entity store's transaction and concurrency controls. Conflicting
+writes may return HTTP 409, while an idempotent delete may return `false` if another delete or
+rename wins. Statistic operations still take the tree lock.
 
 | Configuration Item                   | Description                                          | Default Value |
 |--------------------------------------|------------------------------------------------------|---------------|

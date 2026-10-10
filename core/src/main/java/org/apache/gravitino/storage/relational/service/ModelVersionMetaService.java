@@ -490,8 +490,13 @@ public class ModelVersionMetaService {
       if (attempt >= MAX_STABLE_READ_ATTEMPTS) {
         throw ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, modelIdent);
       }
+      LOG.debug(
+          "Model {} changed during attempt {} of a model-version read, reading it again",
+          modelIdent,
+          attempt);
       // A short random pause keeps readers of a busy model from re-reading in lockstep with the
-      // writer stream that just invalidated them.
+      // writer stream that just invalidated them. A read through the entity cache holds its cache
+      // segment lock here, so the pause is kept to a few milliseconds.
       Uninterruptibles.sleepUninterruptibly(
           ThreadLocalRandom.current().nextLong(1, MAX_STABLE_READ_BACKOFF_MILLIS + 1),
           TimeUnit.MILLISECONDS);

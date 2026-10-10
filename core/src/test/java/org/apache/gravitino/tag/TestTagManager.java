@@ -1271,9 +1271,26 @@ public class TestTagManager {
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    String policyName = "lock_free_policy";
+    entityStore.put(
+        PolicyEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(policyName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.custom(
+                    ImmutableMap.of("rule", "value"),
+                    ImmutableSet.of(MetadataObject.Type.TABLE),
+                    null))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build(),
+        false);
 
-    // A metalake WRITE lock covers every tag and metadata object below it. Tag operations are
-    // fenced by the entity store, so none of them may wait for it.
+    // A metalake WRITE lock covers every tag, policy and metadata object below it. Tag operations
+    // are fenced by the entity store, so none of them may wait for it.
     try (TreeLockTestSupport.HeldLock metalakeWriter =
         TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
@@ -1281,8 +1298,20 @@ public class TestTagManager {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> tagManager.getTag(METALAKE, "lock_free_tag"));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listTagsInfo(METALAKE));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter,
           () -> tagManager.alterTag(METALAKE, "lock_free_tag", TagChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              tagManager.addPolicyForTag(
+                  METALAKE, "lock_free_tag", policyName, AllValuesSelector.get()));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listPolicyAssociationsForTag(METALAKE, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> tagManager.removePolicyFromTag(METALAKE, "lock_free_tag", policyName));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter,
           () ->
@@ -1291,9 +1320,15 @@ public class TestTagManager {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> tagManager.listTagsForMetadataObject(METALAKE, tableObject));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> tagManager.getTagForMetadataObject(METALAKE, tableObject, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> tagManager.listMetadataObjectsForTag(METALAKE, "lock_free_tag"));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> tagManager.deleteTag(METALAKE, "lock_free_tag"));
+    } finally {
+      entityStore.delete(
+          NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
     }
   }
 

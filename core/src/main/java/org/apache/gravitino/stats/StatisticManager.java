@@ -141,16 +141,20 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = StatisticEntity.getStatisticType(metadataObject.type());
-      return store
-          .list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
-          .stream()
-          .map(
-              entity -> {
-                String name = entity.name();
-                StatisticValue<?> value = entity.value();
-                return new CustomStatistic(name, value, entity.auditInfo());
-              })
-          .collect(Collectors.toList());
+      return TreeLockUtils.doWithTreeLock(
+          identifier,
+          LockType.READ,
+          () ->
+              store
+                  .list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
+                  .stream()
+                  .map(
+                      entity -> {
+                        String name = entity.name();
+                        StatisticValue<?> value = entity.value();
+                        return new CustomStatistic(name, value, entity.auditInfo());
+                      })
+                  .collect(Collectors.toList()));
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Failed to list statistics for metadata object {} in the metalake {}: {}",
@@ -196,7 +200,14 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
                 .build();
         statisticEntities.add(statistic);
       }
-      store.batchPut(statisticEntities, true);
+      TreeLockUtils.doWithTreeLock(
+          identifier,
+          LockType.WRITE,
+          (Executable<Void, IOException>)
+              () -> {
+                store.batchPut(statisticEntities, true);
+                return null;
+              });
 
     } catch (NoSuchEntityException nse) {
       LOG.warn(
@@ -225,7 +236,9 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
             Pair.of(NameIdentifierUtil.ofStatistic(identifier, statistic), type);
         idents.add(pair);
       }
-      int deleteCount = store.batchDelete(idents, true);
+      int deleteCount =
+          TreeLockUtils.doWithTreeLock(
+              identifier, LockType.WRITE, () -> store.batchDelete(idents, true));
       // If deleteCount is 0, it means that the statistics were not found.
       return deleteCount != 0;
     } catch (NoSuchEntityException nse) {
@@ -283,10 +296,6 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
       List<MetadataObjectStatisticsUpdate> statisticsToUpdate = Lists.newArrayList();
       statisticsToUpdate.add(
           MetadataObjectStatisticsUpdate.of(metadataObject, partitionStatistics));
-      // Unlike table-level statistics, partition statistics keep the tree lock. A partition
-      // statistic storage is pluggable and need not update atomically: the Lance storage deletes
-      // and then appends in two commits, so two concurrent updates of one table could leave
-      // duplicates.
       TreeLockUtils.doWithTreeLock(
           identifier,
           LockType.WRITE,

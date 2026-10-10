@@ -73,6 +73,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -655,6 +656,8 @@ public class TestPolicyManager {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> policyManager.getPolicy(METALAKE, policyName));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.listPolicyInfos(METALAKE));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> policyManager.disablePolicy(METALAKE, policyName));
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter,
@@ -666,6 +669,32 @@ public class TestPolicyManager {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> policyManager.deletePolicy(METALAKE, policyName));
     }
+  }
+
+  @Test
+  public void testChangePolicyEnabledStateReportsPolicyDroppedBeforeUpdate() throws IOException {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    createCustomPolicy(
+        METALAKE,
+        policyName,
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null));
+    EntityStore racingStore = Mockito.spy(entityStore);
+    NoSuchEntityException dropped =
+        new NoSuchEntityException("policy %s was dropped concurrently", policyName);
+    // The policy is still enabled when its state is checked, then dropped before the update.
+    Mockito.doThrow(dropped)
+        .when(racingStore)
+        .update(
+            Mockito.eq(NameIdentifierUtil.ofPolicy(METALAKE, policyName)),
+            Mockito.eq(PolicyEntity.class),
+            Mockito.eq(Entity.EntityType.POLICY),
+            Mockito.any());
+    PolicyManager racingManager = new PolicyManager(new RandomIdGenerator(), racingStore);
+
+    NoSuchPolicyException e =
+        Assertions.assertThrows(
+            NoSuchPolicyException.class, () -> racingManager.disablePolicy(METALAKE, policyName));
+    Assertions.assertSame(dropped, e.getCause());
   }
 
   @Test

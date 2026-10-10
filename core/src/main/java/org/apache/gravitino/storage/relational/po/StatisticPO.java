@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.po;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -92,10 +91,7 @@ public class StatisticPO {
       Long metalakeId,
       Long objectId,
       MetadataObject.Type objectType) {
-    // Sorted by name so that concurrent multi-row upserts of overlapping statistics on one object
-    // take the unique-key row locks in the same order and queue up instead of deadlocking.
     return statisticEntities.stream()
-        .sorted(Comparator.comparing(StatisticEntity::name))
         .map(
             statisticEntity -> {
               try {

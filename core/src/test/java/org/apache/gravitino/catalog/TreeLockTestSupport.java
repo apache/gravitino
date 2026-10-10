@@ -170,7 +170,10 @@ public final class TreeLockTestSupport {
     public static HeldLock acquire(NameIdentifier identifier, LockType lockType) throws Exception {
       HeldLock held = new HeldLock(identifier, lockType);
       held.holder.start();
-      held.acquired.await(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+      if (!held.acquired.await(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+        held.release();
+        throw new AssertionError("Timed out acquiring " + held);
+      }
       if (held.failure != null) {
         throw new AssertionError("Failed to acquire " + held, held.failure);
       }
