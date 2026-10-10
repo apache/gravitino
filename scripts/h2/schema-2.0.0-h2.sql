@@ -680,3 +680,43 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
 ) COMMENT='async Iceberg table cleanup jobs';
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);
+
+CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
+    `task_name` VARCHAR(100) NOT NULL,
+    `task_instance` VARCHAR(100) NOT NULL,
+    `task_data` BLOB,
+    `execution_time` TIMESTAMP(6) NOT NULL,
+    `picked` BOOLEAN NOT NULL,
+    `picked_by` VARCHAR(50),
+    `last_heartbeat` TIMESTAMP(6),
+    `version` BIGINT NOT NULL,
+    `consecutive_failures` INT,
+    `last_success` TIMESTAMP(6),
+    `last_failure` TIMESTAMP(6),
+    PRIMARY KEY (`task_name`, `task_instance`)
+);
+CREATE INDEX IF NOT EXISTS `scheduled_tasks_execution_time_idx` ON `scheduled_tasks`(`execution_time`);
+CREATE INDEX IF NOT EXISTS `scheduled_tasks_last_heartbeat_idx` ON `scheduled_tasks`(`last_heartbeat`);
+
+CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
+    `id` BIGINT AUTO_INCREMENT NOT NULL,
+    `job_id` BIGINT,
+    `table_id` BIGINT NOT NULL,
+    `policy_id` BIGINT NOT NULL,
+    `before_snapshot_id` BIGINT,
+    `after_snapshot_id` BIGINT,
+    `finished_at` BIGINT,
+    PRIMARY KEY (`id`)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tmj_job_id` ON `table_maintenance_job`(`job_id`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_table_policy_finished` ON `table_maintenance_job`(`table_id`, `policy_id`, `finished_at`);
+
+CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
+    `id` BIGINT AUTO_INCREMENT NOT NULL,
+    `table_id` BIGINT NOT NULL,
+    `policy_id` BIGINT NOT NULL,
+    `snapshot_id` BIGINT NOT NULL,
+    `metrics_value` CLOB NOT NULL,
+    PRIMARY KEY (`id`)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);

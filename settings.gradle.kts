@@ -131,5 +131,6 @@ include(
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
   ":maintenance:optimizer",
-  ":maintenance:jobs"
+  ":maintenance:jobs",
+  ":maintenance:tms"
 )

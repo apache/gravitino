@@ -180,6 +180,7 @@ concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
 aspectj = "1.9.24"
 ql-expression = "4.0.3"
+db-scheduler = "14.1.0"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
@@ -306,6 +307,7 @@ trino-cli= { group = "io.trino", name = "trino-cli", version.ref = "trino" }
 trino-client= { group = "io.trino", name = "trino-client", version.ref = "trino" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
+db-scheduler = { group = "com.github.kagkarlsson", name = "db-scheduler", version.ref = "db-scheduler" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-clickhouse = { group = "org.testcontainers", name = "clickhouse", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
