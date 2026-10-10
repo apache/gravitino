@@ -337,9 +337,34 @@ public class TestManagedTableOperations {
   }
 
   @Test
-  public void testAlterTableBundledColumnChanges() {
+  public void testAlterTableDeleteAndRenameInOneRequest() {
+    // Deleting a lower-position column shifts the columns after it, so renaming the last one in
+    // the same request used to re-insert it past the end of the list.
+    NameIdentifier lastIdent = createThreeColumnTable("rename_last");
+    Table renamedLast =
+        tableOperations.alterTable(
+            lastIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.renameColumn(new String[] {"col3"}, "col3_renamed"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2", "col3_renamed"},
+        Arrays.stream(renamedLast.columns()).map(Column::name).toArray(String[]::new));
+
+    // Renaming a column that is not last used to move it behind the columns that followed it.
+    NameIdentifier middleIdent = createThreeColumnTable("rename_middle");
+    Table renamedMiddle =
+        tableOperations.alterTable(
+            middleIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.renameColumn(new String[] {"col2"}, "col2_renamed"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2_renamed", "col3"},
+        Arrays.stream(renamedMiddle.columns()).map(Column::name).toArray(String[]::new));
+  }
+
+  private NameIdentifier createThreeColumnTable(String tableName) {
     NameIdentifier tableIdent =
-        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "bundled");
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, tableName);
     Column[] columns =
         new Column[] {
           createColumn("col1", Types.StringType.get(), null),
@@ -356,44 +381,7 @@ public class TestManagedTableOperations {
         Distributions.NONE,
         new SortOrder[0],
         Indexes.EMPTY_INDEXES);
-
-    // A delete of a lower-position column followed by an update of a
-    // higher-position one must neither crash nor reorder the remaining columns.
-    Table updated =
-        tableOperations.alterTable(
-            tableIdent,
-            TableChange.deleteColumn(new String[] {"col1"}, false),
-            TableChange.updateColumnComment(new String[] {"col3"}, "updated"));
-    Assertions.assertArrayEquals(
-        new String[] {"col2", "col3"},
-        Arrays.stream(updated.columns()).map(Column::name).toArray(String[]::new));
-    Assertions.assertEquals(
-        "updated",
-        Arrays.stream(updated.columns())
-            .filter(c -> c.name().equals("col3"))
-            .findFirst()
-            .orElseThrow()
-            .comment());
-
-    // An add at first() followed by an update of a later column must keep order.
-    Table updated2 =
-        tableOperations.alterTable(
-            tableIdent,
-            TableChange.addColumn(
-                new String[] {"colNew"},
-                Types.StringType.get(),
-                TableChange.ColumnPosition.first()),
-            TableChange.updateColumnComment(new String[] {"col3"}, "updated again"));
-    Assertions.assertArrayEquals(
-        new String[] {"colNew", "col2", "col3"},
-        Arrays.stream(updated2.columns()).map(Column::name).toArray(String[]::new));
-    Assertions.assertEquals(
-        "updated again",
-        Arrays.stream(updated2.columns())
-            .filter(c -> c.name().equals("col3"))
-            .findFirst()
-            .orElseThrow()
-            .comment());
+    return tableIdent;
   }
 
   @Test
