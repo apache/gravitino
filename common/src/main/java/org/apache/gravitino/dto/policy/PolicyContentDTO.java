@@ -29,10 +29,12 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
 public interface PolicyContentDTO extends PolicyContent {
@@ -103,6 +105,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("maxPartitionNum")
     private Long maxPartitionNum;
 
+    @JsonProperty("rewriteStrategy")
+    private String rewriteStrategy;
+
+    @JsonProperty("sortOrder")
+    private String sortOrder;
+
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
@@ -165,6 +173,26 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Returns the Iceberg rewrite_data_files top-level strategy.
+     *
+     * @return rewrite strategy
+     */
+    public String rewriteStrategy() {
+      return rewriteStrategy == null
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+          : rewriteStrategy;
+    }
+
+    /**
+     * Returns the Iceberg rewrite_data_files top-level sort_order.
+     *
+     * @return sort order expression
+     */
+    public String sortOrder() {
+      return sortOrder == null ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER : sortOrder;
+    }
+
+    /**
      * Returns rewrite options expanded to job.options.* during rule generation.
      *
      * @return rewrite options map
@@ -203,6 +231,8 @@ public interface PolicyContentDTO extends PolicyContent {
           dataFileMseWeight(),
           deleteFileNumberWeight(),
           maxPartitionNum(),
+          rewriteStrategy(),
+          sortOrder(),
           rewriteOptions());
     }
   }
@@ -271,6 +301,106 @@ public interface PolicyContentDTO extends PolicyContent {
 
     private PolicyContent toDomainContent() {
       return PolicyContents.icebergOrphanFileRemoval(olderThanDays(), location(), dryRun());
+    }
+  }
+
+  /** Represents typed row-filter policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class RowFilterContentDTO implements PolicyContentDTO {
+
+    @JsonProperty("expression")
+    @Nullable
+    private String expression;
+
+    // Default constructor for Jackson deserialization only.
+    private RowFilterContentDTO() {}
+
+    /**
+     * Returns the authored row-filter expression.
+     *
+     * @return row-filter expression
+     */
+    @Nullable
+    public String expression() {
+      return expression;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private RowFilterContent toDomainContent() {
+      return PolicyContents.rowFilter(expression);
+    }
+  }
+
+  /** Represents typed column-mask policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class ColumnMaskContentDTO implements PolicyContentDTO {
+
+    @JsonProperty("expression")
+    @Nullable
+    private String expression;
+
+    // Default constructor for Jackson deserialization only.
+    private ColumnMaskContentDTO() {}
+
+    /**
+     * Returns the authored column-mask expression.
+     *
+     * @return column-mask expression
+     */
+    @Nullable
+    public String expression() {
+      return expression;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private ColumnMaskContent toDomainContent() {
+      return PolicyContents.columnMask(expression);
     }
   }
 }

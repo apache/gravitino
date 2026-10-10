@@ -55,6 +55,8 @@ public class PolicyContents {
         IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
         IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS);
   }
 
@@ -74,6 +76,8 @@ public class PolicyContents {
         IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
         rewriteOptions);
   }
 
@@ -95,12 +99,49 @@ public class PolicyContents {
       long deleteFileNumberWeight,
       long maxPartitionNum,
       Map<String, String> rewriteOptions) {
+    return icebergDataCompaction(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+        rewriteOptions);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content with rewrite strategy and sort order.
+   *
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
+   * @param maxPartitionNum maximum partition number selected for compaction
+   * @param rewriteStrategy Iceberg rewrite_data_files top-level strategy ({@code binpack} or {@code
+   *     sort})
+   * @param sortOrder Iceberg rewrite_data_files top-level sort_order (required when strategy is
+   *     {@code sort})
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergDataCompaction(
+      long minDataFileMse,
+      long minDeleteFileNumber,
+      long dataFileMseWeight,
+      long deleteFileNumberWeight,
+      long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions) {
     return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
         dataFileMseWeight,
         deleteFileNumberWeight,
         maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
         rewriteOptions);
   }
 
@@ -125,6 +166,26 @@ public class PolicyContents {
   public static PolicyContent icebergOrphanFileRemoval(
       long olderThanDays, @Nullable String location, boolean dryRun) {
     return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
+  }
+
+  /**
+   * Creates a row-filter policy for tagged tables.
+   *
+   * @param expression row-filter expression
+   * @return validated read-restriction policy content
+   */
+  public static RowFilterContent rowFilter(String expression) {
+    return new RowFilterContent(expression);
+  }
+
+  /**
+   * Creates a column-mask policy for tagged tables or columns.
+   *
+   * @param expression column-mask expression
+   * @return validated read-restriction policy content
+   */
+  public static ColumnMaskContent columnMask(String expression) {
+    return new ColumnMaskContent(expression);
   }
 
   private PolicyContents() {}

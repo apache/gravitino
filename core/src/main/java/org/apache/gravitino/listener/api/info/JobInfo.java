@@ -183,7 +183,7 @@ public final class JobInfo {
 
   /**
    * Returns the resolved job template that was actually submitted for execution, with placeholders
-   * replaced and referenced files downloaded.
+   * replaced. Its executable, scripts, jars, files and archives are the URIs from the template.
    *
    * @return the runtime job template, or null for jobs run before this field was introduced
    */

@@ -34,6 +34,8 @@ public class CompactionJobContext implements JobExecutionContext {
   private final NameIdentifier name;
   private final Map<String, String> jobOptions;
   private final String jobTemplateName;
+  @Getter private final String rewriteStrategy;
+  @Getter private final String sortOrder;
   @Getter private final Column[] columns;
   @Getter private final Transform[] partitioning;
   @Getter private final List<PartitionPath> partitions;
@@ -62,6 +64,12 @@ public class CompactionJobContext implements JobExecutionContext {
         + name
         + ", jobTemplateName='"
         + jobTemplateName
+        + '\''
+        + ", rewriteStrategy='"
+        + rewriteStrategy
+        + '\''
+        + ", sortOrder='"
+        + sortOrder
         + '\''
         + ", jobOptions="
         + jobOptions
