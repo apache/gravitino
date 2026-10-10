@@ -222,8 +222,6 @@ each — it does not write secrets back into policy content:
 | **`updateOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*` |
 | **`jobOptions`**    | nearest policy `jobOptions` (`uri`, `type`, Spark resources…) | `gravitino.maintenance.ircAuth.*`       |
 
-Redact secrets in logs and `runtime_job_template` snapshots.
-
 ### 5.2 Scheduling and commit
 
 db-scheduler runs **three** task kinds in `scheduled_tasks`:
@@ -528,9 +526,6 @@ gravitino.maintenance.ircAuth.authType = oauth2
 gravitino.maintenance.ircAuth.oauth2ServerUri = https://idp/realms/…/protocol/openid-connect/token
 gravitino.maintenance.ircAuth.oauthCredential = client_id:client_secret
 ```
-
-Omit a prefix (or set `authType = none`) when that client needs no auth. Redact secrets in logs and
-`runtime_job_template` snapshots.
 
 ---
 
