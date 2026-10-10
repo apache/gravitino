@@ -256,6 +256,18 @@ public class LanceTableOperations extends ManagedTableOperations {
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
+    boolean hasTableRename =
+        Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.RenameTable);
+    if (hasTableRename) {
+      Preconditions.checkArgument(
+          changes.length == 1 && changes[0] instanceof TableChange.RenameTable,
+          "Lance table rename cannot be combined with other table changes.");
+      Table table = super.loadTable(ident);
+      validateLanceTable(ident, table);
+      // Table renames only move Gravitino metadata; they must not open or mutate the Lance dataset.
+      return super.alterTable(ident, changes);
+    }
+
     // Hydrate an empty stored schema before changing the dataset. Otherwise this method can write
     // the latest lance.version while leaving columns empty, making that incomplete metadata look
     // like a zero-column schema already confirmed at the same version.

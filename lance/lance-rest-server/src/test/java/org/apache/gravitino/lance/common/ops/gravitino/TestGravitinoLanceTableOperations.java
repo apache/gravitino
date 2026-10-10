@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
@@ -34,11 +35,13 @@ import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.TableAlreadyExistsException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
+import org.lance.namespace.model.RenameTableRequest;
 import org.mockito.Mockito;
 
 class TestGravitinoLanceTableOperations {
@@ -188,6 +191,107 @@ class TestGravitinoLanceTableOperations {
     Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
   }
 
+  @Test
+  void testRenameTableMapsSameSchemaRequest() {
+    TableCatalog tableCatalog = tableCatalogWithTable("lance");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    RenameTableRequest request = new RenameTableRequest();
+    request.setNewTableName("renamed_table");
+
+    Assertions.assertNotNull(ops.renameTable("catalog.schema.table", ".", request));
+
+    Mockito.verify(tableCatalog)
+        .alterTable(
+            Mockito.eq(NameIdentifier.of("schema", "table")),
+            Mockito.eq(TableChange.rename("renamed_table")));
+    Mockito.verify(tableCatalog, Mockito.never()).loadTable(Mockito.any(NameIdentifier.class));
+  }
+
+  @Test
+  void testRenameTableMapsNewNamespaceRequest() {
+    TableCatalog tableCatalog = tableCatalogWithTable("lance");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    RenameTableRequest request = new RenameTableRequest();
+    request.setNewTableName("renamed_table");
+    request.setNewNamespaceId(List.of("catalog", "target_schema"));
+
+    Assertions.assertNotNull(ops.renameTable("catalog.schema.table", ".", request));
+
+    Mockito.verify(tableCatalog)
+        .alterTable(
+            Mockito.eq(NameIdentifier.of("schema", "table")),
+            Mockito.eq(TableChange.rename("renamed_table", "target_schema")));
+  }
+
+  @Test
+  void testRenameTableMapsEntityConflictToLanceAlreadyExists() {
+    TableCatalog tableCatalog = tableCatalogWithTable("lance");
+    Mockito.doThrow(
+            new IllegalArgumentException(
+                "Table already exists", new EntityAlreadyExistsException("exists")))
+        .when(tableCatalog)
+        .alterTable(
+            Mockito.eq(NameIdentifier.of("schema", "table")),
+            Mockito.eq(TableChange.rename("existing_table")));
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    RenameTableRequest request = new RenameTableRequest();
+    request.setNewTableName("existing_table");
+
+    Assertions.assertThrows(
+        TableAlreadyExistsException.class,
+        () -> ops.renameTable("catalog.schema.table", ".", request));
+  }
+
+  @Test
+  void testRenameTableRejectsCrossCatalogTargetBeforeMutation() {
+    TableCatalog tableCatalog = tableCatalogWithTable("lance");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    RenameTableRequest request = new RenameTableRequest();
+    request.setNewTableName("renamed_table");
+    request.setNewNamespaceId(List.of("another_catalog", "target_schema"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.renameTable("catalog.schema.table", ".", request));
+
+    Mockito.verify(tableCatalog, Mockito.never())
+        .alterTable(Mockito.any(NameIdentifier.class), Mockito.<TableChange>any());
+  }
+
+  @Test
+  void testRenameTableRejectsNonLanceTableBeforeMutation() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+    Mockito.doThrow(new UnsupportedOperationException("Delta does not support ALTER TABLE"))
+        .when(tableCatalog)
+        .alterTable(
+            Mockito.eq(NameIdentifier.of("schema", "table")),
+            Mockito.eq(TableChange.rename("renamed_table")));
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    RenameTableRequest request = new RenameTableRequest();
+    request.setNewTableName("renamed_table");
+
+    Assertions.assertThrows(
+        InvalidInputException.class, () -> ops.renameTable("catalog.schema.table", ".", request));
+
+    Mockito.verify(tableCatalog, Mockito.never()).loadTable(Mockito.any(NameIdentifier.class));
+  }
+
+  @Test
+  void testRenameTableRejectsMalformedTargetNamespaceBeforeMutation() {
+    TableCatalog tableCatalog = tableCatalogWithTable("lance");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    RenameTableRequest request = new RenameTableRequest();
+    request.setNewTableName("renamed_table");
+    request.setNewNamespaceId(List.of("catalog"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.renameTable("catalog.schema.table", ".", request));
+
+    Mockito.verify(tableCatalog, Mockito.never())
+        .alterTable(Mockito.any(NameIdentifier.class), Mockito.<TableChange>any());
+  }
+
   private static TableCatalog tableCatalogWithTable(String format) {
     Table table = Mockito.mock(Table.class);
     Mockito.when(table.properties())
@@ -202,6 +306,7 @@ class TestGravitinoLanceTableOperations {
     GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
     Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
     Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
+    Mockito.when(wrapper.schemaExists(Mockito.eq(catalog), Mockito.anyString())).thenReturn(true);
     return new GravitinoLanceTableOperations(wrapper);
   }
 }

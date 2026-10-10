@@ -694,6 +694,41 @@ public class TestLanceTableOperations {
     Assertions.assertEquals("9", storedTable.get().properties().get(LANCE_TABLE_VERSION));
   }
 
+  @Test
+  public void testRenameTableDoesNotOpenDatasetOrChangeVersion() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("rename-table").toString();
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance",
+            Table.PROPERTY_EXTERNAL,
+            "true",
+            LANCE_TABLE_VERSION,
+            "8",
+            "custom.property",
+            "preserved");
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(tableEntity(ident, List.of(), properties));
+    stubMutableTable(ident, storedTable);
+
+    Table renamedTable =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () -> lanceTableOps.alterTable(ident, TableChange.rename("renamed_table")));
+
+    Assertions.assertEquals("renamed_table", renamedTable.name());
+    Assertions.assertEquals(location, renamedTable.properties().get(Table.PROPERTY_LOCATION));
+    Assertions.assertEquals("lance", renamedTable.properties().get(Table.PROPERTY_TABLE_FORMAT));
+    Assertions.assertEquals("true", renamedTable.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals("preserved", renamedTable.properties().get("custom.property"));
+    Assertions.assertEquals("8", renamedTable.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals("8", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+  }
+
   @ParameterizedTest(name = "recordedVersion={0}")
   @ValueSource(booleans = {false, true})
   public void testAlterTableHydratesRegisteredSchemaBeforeRecordingVersion(boolean recordedVersion)
