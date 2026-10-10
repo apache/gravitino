@@ -40,10 +40,23 @@ public class TestGravitinoCompactionJobAdapter {
             "sort_order", "",
             "strategy", "binpack",
             "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
-        jobAdapter.jobConfig(mockCompactionJobContext()));
+        jobAdapter.jobConfig(mockCompactionJobContext("binpack", "")));
   }
 
-  private CompactionJobContext mockCompactionJobContext() {
+  @Test
+  public void testSortStrategyAndSortOrder() {
+    GravitinoCompactionJobAdapter jobAdapter = new GravitinoCompactionJobAdapter();
+    Assertions.assertEquals(
+        Map.of(
+            "table_identifier", "db.table",
+            "where_clause", "",
+            "sort_order", "zorder(c1,c2)",
+            "strategy", "sort",
+            "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
+        jobAdapter.jobConfig(mockCompactionJobContext("sort", "zorder(c1,c2)")));
+  }
+
+  private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {
     String jobTemplateName = "compaction-job-template";
     Column[] columns = new Column[0];
     Transform[] partitioning = new Transform[0];
@@ -52,6 +65,8 @@ public class TestGravitinoCompactionJobAdapter {
         NameIdentifier.of("catalog", "db", "table"),
         jobOptions,
         jobTemplateName,
+        rewriteStrategy,
+        sortOrder,
         columns,
         partitioning,
         List.of());

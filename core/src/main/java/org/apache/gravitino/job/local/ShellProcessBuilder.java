@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,16 +33,21 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShellProcessBuilder.class);
 
-  protected ShellProcessBuilder(ShellJobTemplate shellJobTemplate, Map<String, String> configs) {
-    super(shellJobTemplate, configs);
+  protected ShellProcessBuilder(
+      ShellJobTemplate shellJobTemplate, File workingDirectory, Map<String, String> configs) {
+    super(shellJobTemplate, workingDirectory, configs);
   }
 
   @Override
   public Process start() {
     ShellJobTemplate shellJobTemplate = (ShellJobTemplate) jobTemplate;
-    File executableFile = new File(shellJobTemplate.executable());
-    if (!executableFile.canExecute()) {
-      executableFile.setExecutable(true);
+    // A command name is resolved on the PATH by the operating system, it isn't a file in the
+    // working directory.
+    if (!JobResourceUtils.isCommandName(shellJobTemplate.executable())) {
+      File executableFile = new File(shellJobTemplate.executable());
+      if (!executableFile.canExecute()) {
+        executableFile.setExecutable(true);
+      }
     }
 
     List<String> commandList = Lists.newArrayList(shellJobTemplate.executable());

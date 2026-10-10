@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -73,9 +75,11 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
@@ -93,6 +97,75 @@ public class TestTableMetaService extends TestJDBCBackend {
   private List<EntityChangeRecord> listEntityChanges(long lastConsumedId) {
     return SessionUtils.doWithCommitAndFetchResult(
         EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(lastConsumedId, 100));
+  }
+
+  @TestTemplate
+  public void testLegacyTimelineDeleteKeepsLiveVersionsOfSameTable() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_legacy_delete",
+            AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(table, false);
+
+    long tableId =
+        SessionUtils.getWithoutCommit(
+                TableMetaMapper.class,
+                mapper ->
+                    mapper.selectTableByFullQualifiedName(
+                        metalakeName, catalogName, schemaName, "table_legacy_delete"))
+            .getTableId();
+
+    // Soft-delete ONE old version with an expired timeline, leaving the current live version
+    // row (deleted_at = 0) in place.
+    long expired = System.currentTimeMillis() - 10_000;
+    execSql(
+        "UPDATE table_version_info SET deleted_at = "
+            + expired
+            + " WHERE table_id = "
+            + tableId
+            + " AND version = 1");
+    // Seed a second LIVE version row (deleted_at = 0) for the same table: the legacy cleanup
+    // must remove only the expired tombstone, never live rows.
+    execSql(
+        "INSERT INTO table_version_info (table_id, version, deleted_at) VALUES ("
+            + tableId
+            + ", 2, 0)");
+
+    int deleted =
+        TableMetaService.getInstance()
+            .deleteTableVersionByLegacyTimeline(System.currentTimeMillis(), 100);
+
+    Assertions.assertEquals(1, deleted, "only the expired tombstone row is deleted");
+    Assertions.assertEquals(
+        1,
+        queryCount(
+            "SELECT COUNT(*) FROM table_version_info WHERE table_id = "
+                + tableId
+                + " AND deleted_at = 0"),
+        "the live version row must survive");
+  }
+
+  private static void execSql(String sql) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement st = session.getConnection().createStatement()) {
+      st.execute(sql);
+    }
+  }
+
+  private static long queryCount(String sql) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement st = session.getConnection().createStatement();
+        ResultSet rs = st.executeQuery(sql)) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
+    }
   }
 
   @TestTemplate

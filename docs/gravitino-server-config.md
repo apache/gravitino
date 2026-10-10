@@ -279,20 +279,21 @@ PostgreSQL, and the setup procedure for both is in
 
 The driver, user, and password properties are required whenever the URL is not `jdbc:h2`.
 
-| Configuration Item                                 | Description                                                                                                                                                                                                          | Default Value                 |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.entity.store`                           | Entity storage implementation. `relational` is the only supported value.                                                                                                                                             | `relational`                  |
-| `gravitino.entity.store.relational`                | Relational storage implementation. `JDBCBackend` is the only supported value, and it covers H2, MySQL, and PostgreSQL.                                                                                               | `JDBCBackend`                 |
-| `gravitino.entity.store.relational.jdbcUrl`        | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
-| `gravitino.entity.store.relational.jdbcDriver`     | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
-| `gravitino.entity.store.relational.jdbcUser`       | Database username.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.jdbcPassword`   | Database password.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.storagePath`    | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
-| `gravitino.entity.store.relational.maxConnections` | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
-| `gravitino.entity.store.relational.maxWaitMillis`  | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
-| `gravitino.entity.store.maxTransactionSkewTimeMs`  | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
-| `gravitino.entity.store.deleteAfterTimeMs`         | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
-| `gravitino.entity.store.versionRetentionCount`     | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
+| Configuration Item                                     | Description                                                                                                                                                                                                          | Default Value                 |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.entity.store`                               | Entity storage implementation. `relational` is the only supported value.                                                                                                                                             | `relational`                  |
+| `gravitino.entity.store.relational`                    | Relational storage implementation. `JDBCBackend` is the only supported value, and it covers H2, MySQL, and PostgreSQL.                                                                                               | `JDBCBackend`                 |
+| `gravitino.entity.store.relational.jdbcUrl`            | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
+| `gravitino.entity.store.relational.jdbcDriver`         | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
+| `gravitino.entity.store.relational.jdbcUser`           | Database username.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.jdbcPassword`       | Database password.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.storagePath`        | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
+| `gravitino.entity.store.relational.maxConnections`     | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
+| `gravitino.entity.store.relational.maxIdleConnections` | Maximum idle connections retained per server; capped by `maxConnections`. Budget for it on every server, plus any JDBC catalog pools that use the same database instance.                                            | `10`                          |
+| `gravitino.entity.store.relational.maxWaitMillis`      | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
+| `gravitino.entity.store.maxTransactionSkewTimeMs`      | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
+| `gravitino.entity.store.deleteAfterTimeMs`             | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
+| `gravitino.entity.store.versionRetentionCount`         | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
 
 #### Caching
 
@@ -326,9 +327,22 @@ Caches are local to each server, so a metalake modified on one server would othe
 its neighbors. Every server writes its changes to an entity change log table and polls that table
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
+Each poll reads at most `pollBatchSize` records. When a poll returns a full batch, the next poll
+starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
+server can read and apply batches rather than at a fixed `pollBatchSize / pollIntervalSecs`
+records per second. Once a poll returns fewer records than the batch size, or fails, the server
+waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
+on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
+it. Continuous draining deliberately has no minimum delay between batches; a sustained backlog
+can therefore keep the data query running at the rate the database and listeners support. The
+observability-only database-tail query is sampled at most once per `pollIntervalSecs` during a
+full-batch drain; partial and empty polls still sample the tail. Each poll holds its whole batch
+in memory, so raise `pollBatchSize` in moderate steps.
+
 | Configuration Item                              | Description                                                                                                                                         | Default Value       |
 |-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls. Must be positive.                                                                                                | `3`                 |
+| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls once a server has caught up. Must be positive.                                                                    | `3`                 |
+| `gravitino.entityChangeLog.pollBatchSize`       | Maximum number of change log records read per poll. A full batch is followed by another poll right away. Must be positive.                          | `2000`              |
 | `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`. | `2592000` (30 days) |
 | `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                         | `86400` (1 day)     |
 
