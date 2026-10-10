@@ -61,8 +61,8 @@ version, or keep it lower.
 
 Each Spark version / Scala variant ships as its own directory under
 `/connectors` (named `spark-<major>_<scala>`). Across the project Spark 3.3 is
-Scala 2.12 only; Spark 3.4 and later add Scala 2.13; Spark 4.0 and later are Scala 2.13
-only. The exact set baked into an image depends on the Gravitino source branch
+Scala 2.12 only; Spark 3.4 and later add Scala 2.13; Spark 4.0 and later are
+Scala 2.13 only. The exact set baked into an image depends on the Gravitino source branch
 it was built from; list them with:
 
 ```bash
