@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 
+import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -60,6 +61,13 @@ public class TestPostgreSQLDataTypeTransformer {
 
   @Test
   public void testGravitinoExternalTypeToTrinoType() {
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      Assertions.assertEquals(
+          VarcharType.createUnboundedVarcharType(),
+          new PostgreSQLDataTypeTransformer().getTrinoType(Types.ExternalType.of(declaration)),
+          declaration);
+    }
+
     GeneralDataTypeTransformer generalDataTypeTransformer = new PostgreSQLDataTypeTransformer();
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(Types.ExternalType.of("numeric")),

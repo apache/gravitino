@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
@@ -48,6 +49,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -56,6 +58,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -417,6 +420,162 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
+  }
+
+  @Test
+  public void testAddNullableColumnBackfillsNull() throws Exception {
+    String addColumnTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, addColumnTableName);
+    String tableLocation = String.format("%s/%s/%s", tempDirectory, schemaName, addColumnTableName);
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            createColumns(),
+            TABLE_COMMENT,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0]);
+
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      SourcedTransaction transaction =
+          dataset
+              .newTransactionBuilder()
+              .operation(
+                  Append.builder()
+                      .fragments(
+                          createFragmentMetadata(
+                              tableLocation,
+                              List.of(
+                                  new LanceDataValue(1, 100L, "first"),
+                                  new LanceDataValue(2, 200L, "second")),
+                              dataset.getSchema()))
+                      .build())
+              .transactionProperties(Map.of())
+              .build();
+      try (Dataset ignored = transaction.commit()) {
+        // The committed dataset is closed after the historical rows have been written.
+      }
+    }
+
+    Table alteredTable =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                tableIdentifier,
+                TableChange.addColumn(
+                    new String[] {"new_nullable_col"}, Types.StringType.get(), "nullable column"));
+
+    Assertions.assertEquals(4, alteredTable.columns().length);
+    Assertions.assertEquals("new_nullable_col", alteredTable.columns()[3].name());
+    Assertions.assertEquals("nullable column", alteredTable.columns()[3].comment());
+
+    int rowCount = 0;
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build();
+        LanceScanner scanner =
+            dataset.newScan(
+                new ScanOptions.Builder().columns(List.of("new_nullable_col")).build());
+        ArrowReader reader = scanner.scanBatches()) {
+      Field addedStringField = dataset.getSchema().findField("new_nullable_col");
+      Assertions.assertNotNull(addedStringField);
+      Assertions.assertTrue(addedStringField.isNullable());
+      Assertions.assertEquals(new ArrowType.Utf8(), addedStringField.getType());
+
+      while (reader.loadNextBatch()) {
+        VectorSchemaRoot root = reader.getVectorSchemaRoot();
+        VarCharVector stringVector = (VarCharVector) root.getVector("new_nullable_col");
+        for (int i = 0; i < root.getRowCount(); i++) {
+          Assertions.assertTrue(stringVector.isNull(i));
+          rowCount++;
+        }
+      }
+    }
+    Assertions.assertEquals(2, rowCount);
+  }
+
+  @Test
+  void testVersionCheckRefreshKeepsColumnTagsAndComments() {
+    String refreshCatalogName = GravitinoITUtils.genRandomName("lance_version_check_catalog");
+    Catalog refreshCatalog =
+        metalake.createCatalog(
+            refreshCatalogName,
+            Catalog.Type.RELATIONAL,
+            provider,
+            "comment",
+            ImmutableMap.of(LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK"));
+    String refreshSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    String tagName = GravitinoITUtils.genRandomName("lance_version_check_tag");
+    try {
+      refreshCatalog
+          .asSchemas()
+          .createSchema(refreshSchemaName, "comment", createSchemaProperties());
+      NameIdentifier ident =
+          NameIdentifier.of(refreshSchemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+      Map<String, String> properties = createProperties();
+      properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+      properties.put(Table.PROPERTY_LOCATION, tempDirectory + "/" + ident.name());
+      TableCatalog tableCatalog = refreshCatalog.asTableCatalog();
+      Table created =
+          tableCatalog.createTable(
+              ident,
+              new Column[] {
+                Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+                Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment")
+              },
+              TABLE_COMMENT,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0]);
+
+      metalake.createTag(tagName, "comment", Collections.emptyMap());
+      findColumn(tableCatalog.loadTable(ident), LANCE_COL_NAME1)
+          .supportsTags()
+          .associateTags(new String[] {tagName}, null);
+
+      // Change the dataset outside Gravitino: keep column 1, drop column 2 and add column 3. This
+      // writes a new dataset version, so the next load refreshes the columns from the dataset.
+      org.apache.arrow.vector.types.pojo.Schema newSchema =
+          new org.apache.arrow.vector.types.pojo.Schema(
+              Arrays.asList(
+                  Field.nullable(LANCE_COL_NAME1, new ArrowType.Int(32, true)),
+                  Field.nullable(LANCE_COL_NAME3, new ArrowType.Utf8())));
+      try (RootAllocator allocator = new RootAllocator();
+          Dataset ignored =
+              Dataset.write()
+                  .allocator(allocator)
+                  .schema(newSchema)
+                  .uri(created.properties().get(Table.PROPERTY_LOCATION))
+                  .mode(WriteParams.WriteMode.OVERWRITE)
+                  .execute()) {
+        // The new dataset version is written.
+      }
+
+      Table refreshed = tableCatalog.loadTable(ident);
+      Assertions.assertArrayEquals(
+          new String[] {LANCE_COL_NAME1, LANCE_COL_NAME3},
+          Arrays.stream(refreshed.columns()).map(Column::name).toArray(String[]::new));
+
+      // Column 1 keeps its id, so it keeps its tag and its comment.
+      Column column1 = findColumn(refreshed, LANCE_COL_NAME1);
+      Assertions.assertEquals("col_1_comment", column1.comment());
+      Assertions.assertArrayEquals(new String[] {tagName}, column1.supportsTags().listTags());
+      MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(
+          String.join(".", refreshCatalogName, refreshSchemaName, ident.name(), LANCE_COL_NAME1),
+          objects[0].fullName());
+      Assertions.assertEquals(
+          0, findColumn(refreshed, LANCE_COL_NAME3).supportsTags().listTags().length);
+    } finally {
+      metalake.deleteTag(tagName);
+      metalake.dropCatalog(refreshCatalogName, true);
+    }
   }
 
   @Test
@@ -1192,5 +1351,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     } catch (IOException e) {
       LOG.warn("Failed to delete external table directory: {}", externalTableLocation, e);
     }
+  }
+
+  private static Column findColumn(Table table, String columnName) {
+    return Arrays.stream(table.columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
   }
 }

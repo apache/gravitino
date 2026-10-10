@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,7 +43,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
@@ -57,16 +58,9 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericEntity;
-import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
@@ -441,7 +435,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testMetadataOnlyPolicyAlterCreatesCompleteSnapshot() throws IOException {
+  public void testMetadataOnlyPolicyAlterAdvancesOnlyTheOccVersion() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
@@ -460,14 +454,20 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataOnlyUpdate);
 
     PolicyPO updatedPO = getPolicyPO(policy.nameIdentifier());
-    assertEquals(initialPO.getCurrentVersion() + 1, updatedPO.getCurrentVersion().longValue());
-    assertEquals(updatedPO.getCurrentVersion(), updatedPO.getLastVersion());
+    // The audit info is the only thing that changed, and policy_version_info does not store it, so
+    // the alter advances the OCC token alone and writes no snapshot.
+    assertEquals(initialPO.getOccVersion() + 1, updatedPO.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), updatedPO.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), updatedPO.getLastVersion());
+    assertNotEquals(initialPO.getAuditInfo(), updatedPO.getAuditInfo());
+
+    // The row still points at the snapshot it already had, and reads still resolve it.
     assertEquals(updatedPO.getCurrentVersion(), updatedPO.getPolicyVersionPO().getVersion());
     assertEquals(policy.comment(), updatedPO.getPolicyVersionPO().getPolicyComment());
     assertEquals(policy.enabled(), updatedPO.getPolicyVersionPO().isEnabled());
     assertEquals(
         initialPO.getPolicyVersionPO().getContent(), updatedPO.getPolicyVersionPO().getContent());
-    assertEquals(2, listPolicyVersions(policy.id()).size());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate
@@ -483,12 +483,29 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.insertPolicy(policy, false);
     PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
 
+    PolicyEntity metadataUpdate =
+        copyPolicy(
+            policy,
+            policy.name(),
+            policy.comment(),
+            AuditInfo.builder()
+                .withCreator("updated-creator")
+                .withCreateTime(Instant.now())
+                .build());
+    policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataUpdate);
+    PolicyPO afterMetadataUpdate = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getCurrentVersion(), afterMetadataUpdate.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterMetadataUpdate.getLastVersion());
+    assertEquals(initialPO.getOccVersion() + 1, afterMetadataUpdate.getOccVersion().longValue());
+
     PolicyEntity replacement = copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement");
     policyMetaService.insertPolicy(replacement, true);
 
     PolicyPO overwrittenPO = getPolicyPO(replacement.nameIdentifier());
     assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    assertEquals(
+        afterMetadataUpdate.getOccVersion() + 1, overwrittenPO.getOccVersion().longValue());
     assertEquals(2, listPolicyVersions(policy.id()).size());
     assertEquals(
         replacement, policyMetaService.getPolicyByIdentifier(replacement.nameIdentifier()));
@@ -541,7 +558,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   @TestTemplate
   public void testStalePolicyDeleteRollsBackRelationshipCleanup() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
-    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_policy_delete_occ");
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
         createPolicy(
@@ -550,11 +566,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             "policy_delete_occ",
             AUDIT_INFO);
     policyMetaService.insertPolicy(policy, false);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        catalog.nameIdentifier(),
-        catalog.type(),
-        new NameIdentifier[] {policy.nameIdentifier()},
-        new NameIdentifier[0]);
     PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
     policyMetaService.updatePolicy(
         policy.nameIdentifier(),
@@ -563,17 +574,101 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertThrows(
         OptimisticLockException.class,
         () -> policyMetaService.deletePolicy(policy.nameIdentifier(), stalePO));
-    assertEquals(1, countActivePolicyRel(policy.id()));
     assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
     assertEquals(
         2,
         listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
 
     assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
-    assertEquals(0, countActivePolicyRel(policy.id()));
     assertEquals(
         0,
         listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
+  }
+
+  /** Verifies that an audit-only winner fences a stale audit-only update without a new snapshot. */
+  @TestTemplate
+  public void testMetadataOnlyAlterRejectsAStaleUpdate() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_conflict",
+            AUDIT_INFO);
+    service.insertPolicy(policy, false);
+    PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
+    AuditInfo winningAudit =
+        AuditInfo.builder().withCreator("winning-updater").withCreateTime(Instant.now()).build();
+    AuditInfo staleAudit =
+        AuditInfo.builder().withCreator("stale-updater").withCreateTime(Instant.now()).build();
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updatePolicy(
+                policy.nameIdentifier(),
+                entity -> {
+                  PolicyEntity current = (PolicyEntity) entity;
+                  // Commit the winner after the outer update reads, before its CAS executes.
+                  assertDoesNotThrow(
+                      () ->
+                          service.updatePolicy(
+                              current.nameIdentifier(),
+                              winner ->
+                                  copyPolicy(
+                                      (PolicyEntity) winner,
+                                      current.name(),
+                                      current.comment(),
+                                      winningAudit)));
+                  return copyPolicy(current, current.name(), current.comment(), staleAudit);
+                }));
+
+    PolicyEntity stored = service.getPolicyByIdentifier(policy.nameIdentifier());
+    assertEquals(winningAudit, stored.auditInfo());
+    assertEquals(policy.comment(), stored.comment());
+    PolicyPO afterConflict = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getOccVersion() + 1, afterConflict.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), afterConflict.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterConflict.getLastVersion());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
+  }
+
+  @TestTemplate
+  public void testStalePolicyDeleteAfterMetadataOnlyAlter() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_delete_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
+    assertEquals(
+        policy.content(),
+        policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).content());
+
+    AuditInfo updatedAudit =
+        AuditInfo.builder().withCreator("updated-creator").withCreateTime(Instant.now()).build();
+    policyMetaService.updatePolicy(
+        policy.nameIdentifier(),
+        entity ->
+            copyPolicy(
+                (PolicyEntity) entity,
+                ((PolicyEntity) entity).name(),
+                ((PolicyEntity) entity).comment(),
+                updatedAudit));
+
+    PolicyPO afterAlter = getPolicyPO(policy.nameIdentifier());
+    assertEquals(stalePO.getCurrentVersion(), afterAlter.getCurrentVersion());
+    assertEquals(stalePO.getOccVersion() + 1, afterAlter.getOccVersion().longValue());
+    assertThrows(
+        OptimisticLockException.class,
+        () -> policyMetaService.deletePolicy(policy.nameIdentifier(), stalePO));
+    assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate
@@ -834,7 +929,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   @TestTemplate
   public void testDeletePolicyCleansEveryDependentRelation() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
-    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_policy_cascade");
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
         createPolicy(
@@ -843,12 +937,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             "policy_cascade_occ",
             AUDIT_INFO);
     policyMetaService.insertPolicy(policy, false);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        catalog.nameIdentifier(),
-        catalog.type(),
-        new NameIdentifier[] {policy.nameIdentifier()},
-        new NameIdentifier[0]);
-
     TagEntity tag = createAndInsertTagEntity("tag_policy_cascade", "tag comment", METALAKE_NAME);
     backend.updateEntityRelations(
         RelationUpdate.of(
@@ -894,7 +982,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
 
     String policyAsMetadataObject =
         String.format("metadata_object_id = %d AND metadata_object_type = 'POLICY'", policy.id());
-    assertEquals(1, countActivePolicyRel(policy.id()));
     assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
     assertEquals(1, countActiveRows("tag_relation_meta", policyAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", policyAsMetadataObject));
@@ -906,7 +993,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
 
     assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
 
-    assertEquals(0, countActivePolicyRel(policy.id()));
     assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
     assertEquals(0, countActiveRows("tag_relation_meta", policyAsMetadataObject));
     assertEquals(0, countActiveRows("owner_meta", policyAsMetadataObject));
@@ -1002,545 +1088,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
                 NameIdentifierUtil.ofPolicy(METALAKE_NAME + "1", "policy2")));
   }
 
-  @TestTemplate
-  public void testAssociateAndDisassociatePoliciesWithMetadataObject() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-
-    CatalogEntity catalog =
-        createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME),
-            "catalog1",
-            AUDIT_INFO);
-    backend.insert(catalog, false);
-
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name()),
-            "schema1",
-            AUDIT_INFO);
-    backend.insert(schema, false);
-
-    TableEntity table =
-        createTableEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
-            "table1",
-            AUDIT_INFO);
-    backend.insert(table, false);
-
-    // Create policies to associate
-    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
-    PolicyEntity policyEntity1 =
-        PolicyEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("policy1")
-            .withNamespace(NamespaceUtil.ofPolicy(METALAKE_NAME))
-            .withComment("comment")
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withContent(content)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    policyMetaService.insertPolicy(policyEntity1, false);
-
-    PolicyEntity policyEntity2 =
-        PolicyEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("policy2")
-            .withNamespace(NamespaceUtil.ofPolicy(METALAKE_NAME))
-            .withComment("comment")
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withContent(content)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    policyMetaService.insertPolicy(policyEntity2, false);
-
-    PolicyEntity policyEntity3 =
-        PolicyEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("policy3")
-            .withNamespace(NamespaceUtil.ofPolicy(METALAKE_NAME))
-            .withComment("comment")
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withContent(content)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    policyMetaService.insertPolicy(policyEntity3, false);
-
-    // Test associate policies with metadata object
-    NameIdentifier[] policiesToAdd =
-        new NameIdentifier[] {
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1"),
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"),
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy3")
-        };
-
-    List<PolicyEntity> policyEntities =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            catalog.nameIdentifier(), catalog.type(), policiesToAdd, new NameIdentifier[0]);
-    assertEquals(3, policyEntities.size());
-    Assertions.assertTrue(policyEntities.contains(policyEntity1));
-    Assertions.assertTrue(policyEntities.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities.contains(policyEntity3));
-
-    // Test disassociate policies with metadata object
-    NameIdentifier[] policiesToRemove =
-        new NameIdentifier[] {NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1")};
-
-    List<PolicyEntity> policyEntities1 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            catalog.nameIdentifier(), catalog.type(), new NameIdentifier[0], policiesToRemove);
-
-    assertEquals(2, policyEntities1.size());
-    Assertions.assertFalse(policyEntities1.contains(policyEntity1));
-    Assertions.assertTrue(policyEntities1.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities1.contains(policyEntity3));
-
-    // Test no policies to associate and disassociate
-    List<PolicyEntity> policyEntities2 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            catalog.nameIdentifier(), catalog.type(), new NameIdentifier[0], new NameIdentifier[0]);
-    assertEquals(2, policyEntities2.size());
-    Assertions.assertFalse(policyEntities2.contains(policyEntity1));
-    Assertions.assertTrue(policyEntities2.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities2.contains(policyEntity3));
-
-    // Test associate and disassociate same policies with metadata object
-    List<PolicyEntity> policyEntities3 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            catalog.nameIdentifier(), catalog.type(), policiesToRemove, policiesToRemove);
-
-    assertEquals(2, policyEntities3.size());
-    Assertions.assertFalse(policyEntities3.contains(policyEntity1));
-    Assertions.assertTrue(policyEntities3.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities3.contains(policyEntity3));
-
-    // Test associate and disassociate in-existent policies with metadata object
-    NameIdentifier[] policiesToAdd1 =
-        new NameIdentifier[] {
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy4"),
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy5")
-        };
-
-    NameIdentifier[] policiesToRemove1 =
-        new NameIdentifier[] {
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy6"),
-          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy7")
-        };
-
-    List<PolicyEntity> policyEntities4 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            catalog.nameIdentifier(), catalog.type(), policiesToAdd1, policiesToRemove1);
-
-    assertEquals(2, policyEntities4.size());
-    Assertions.assertTrue(policyEntities4.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities4.contains(policyEntity3));
-
-    // Test associate already associated policies with metadata object
-    Assertions.assertThrows(
-        EntityAlreadyExistsException.class,
-        () ->
-            policyMetaService.associatePoliciesWithMetadataObject(
-                catalog.nameIdentifier(), catalog.type(), policiesToAdd, new NameIdentifier[0]));
-
-    // Test disassociate already disassociated policies with metadata object
-    List<PolicyEntity> policyEntities5 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            catalog.nameIdentifier(), catalog.type(), new NameIdentifier[0], policiesToRemove);
-
-    assertEquals(2, policyEntities5.size());
-    Assertions.assertTrue(policyEntities5.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities5.contains(policyEntity3));
-
-    // Test associate and disassociate with invalid metadata object
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            policyMetaService.associatePoliciesWithMetadataObject(
-                NameIdentifier.of(METALAKE_NAME, "non-existent-catalog"),
-                catalog.type(),
-                policiesToAdd,
-                policiesToRemove));
-
-    // Test associate and disassociate to a schema
-    List<PolicyEntity> policyEntities6 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            schema.nameIdentifier(), schema.type(), policiesToAdd, policiesToRemove);
-
-    assertEquals(2, policyEntities6.size());
-    Assertions.assertTrue(policyEntities6.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities6.contains(policyEntity3));
-
-    // Test associate and disassociate to a table
-    List<PolicyEntity> policyEntities7 =
-        policyMetaService.associatePoliciesWithMetadataObject(
-            table.nameIdentifier(), table.type(), policiesToAdd, policiesToRemove);
-
-    assertEquals(2, policyEntities7.size());
-    Assertions.assertTrue(policyEntities7.contains(policyEntity2));
-    Assertions.assertTrue(policyEntities7.contains(policyEntity3));
-  }
-
-  @TestTemplate
-  public void testListPoliciesForMetadataObject() throws IOException {
-    testAssociateAndDisassociatePoliciesWithMetadataObject();
-
-    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
-
-    // Test list policies for catalog
-    List<PolicyEntity> policyEntities =
-        policyMetaService.listPoliciesForMetadataObject(
-            NameIdentifier.of(METALAKE_NAME, "catalog1"), Entity.EntityType.CATALOG);
-    assertEquals(2, policyEntities.size());
-    Assertions.assertTrue(
-        policyEntities.stream().anyMatch(policyEntity -> policyEntity.name().equals("policy2")));
-    Assertions.assertTrue(
-        policyEntities.stream().anyMatch(policyEntity -> policyEntity.name().equals("policy3")));
-
-    // Test list policies for schema
-    List<PolicyEntity> policyEntities1 =
-        policyMetaService.listPoliciesForMetadataObject(
-            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"), Entity.EntityType.SCHEMA);
-
-    assertEquals(2, policyEntities1.size());
-    Assertions.assertTrue(
-        policyEntities1.stream().anyMatch(policyEntity -> policyEntity.name().equals("policy2")));
-    Assertions.assertTrue(
-        policyEntities1.stream().anyMatch(policyEntity -> policyEntity.name().equals("policy3")));
-
-    // Test list policies for table
-    List<PolicyEntity> policyEntities2 =
-        policyMetaService.listPoliciesForMetadataObject(
-            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
-            Entity.EntityType.TABLE);
-
-    assertEquals(2, policyEntities2.size());
-    Assertions.assertTrue(
-        policyEntities2.stream().anyMatch(policyEntity -> policyEntity.name().equals("policy2")));
-    Assertions.assertTrue(
-        policyEntities2.stream().anyMatch(policyEntity -> policyEntity.name().equals("policy3")));
-
-    // Test list policies for non-existent metadata object
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            policyMetaService.listPoliciesForMetadataObject(
-                NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table2"),
-                Entity.EntityType.TABLE));
-  }
-
-  @TestTemplate
-  public void testGetPolicyForMetadataObject() throws IOException {
-    testAssociateAndDisassociatePoliciesWithMetadataObject();
-
-    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
-
-    // Test get policy for catalog
-    PolicyEntity policyEntity =
-        policyMetaService.getPolicyForMetadataObject(
-            NameIdentifier.of(METALAKE_NAME, "catalog1"),
-            Entity.EntityType.CATALOG,
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
-    assertEquals("policy2", policyEntity.name());
-
-    // Test get policy for schema
-    PolicyEntity policyEntity1 =
-        policyMetaService.getPolicyForMetadataObject(
-            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"),
-            Entity.EntityType.SCHEMA,
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy3"));
-    assertEquals("policy3", policyEntity1.name());
-
-    // Test get policy for table
-    PolicyEntity policyEntity2 =
-        policyMetaService.getPolicyForMetadataObject(
-            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
-            Entity.EntityType.TABLE,
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
-    assertEquals("policy2", policyEntity2.name());
-
-    // Test get policy for non-existent metadata object
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            policyMetaService.getPolicyForMetadataObject(
-                NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table2"),
-                Entity.EntityType.TABLE,
-                NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2")));
-
-    // Test get policy for non-existent policy
-    Throwable e =
-        Assertions.assertThrows(
-            NoSuchEntityException.class,
-            () ->
-                policyMetaService.getPolicyForMetadataObject(
-                    NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
-                    Entity.EntityType.TABLE,
-                    NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy4")));
-    Assertions.assertTrue(e.getMessage().contains("No such policy entity: policy4"));
-  }
-
-  @TestTemplate
-  public void testListAssociatedEntitiesForPolicy() throws IOException {
-    testAssociateAndDisassociatePoliciesWithMetadataObject();
-
-    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
-
-    // Test list associated dummy entities for policy2
-    List<GenericEntity> entities =
-        policyMetaService.listAssociatedEntitiesForPolicy(
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
-
-    assertEquals(3, entities.size());
-    Set<Entity.EntityType> actualTypes =
-        entities.stream().map(GenericEntity::type).collect(Collectors.toSet());
-    Assertions.assertTrue(actualTypes.contains(Entity.EntityType.CATALOG));
-    Assertions.assertTrue(actualTypes.contains(Entity.EntityType.SCHEMA));
-    Assertions.assertTrue(actualTypes.contains(Entity.EntityType.TABLE));
-
-    // Test list associated dummy entities for policy3
-    List<GenericEntity> entities1 =
-        policyMetaService.listAssociatedEntitiesForPolicy(
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy3"));
-
-    assertEquals(3, entities1.size());
-    Set<Entity.EntityType> actualTypes1 =
-        entities1.stream().map(GenericEntity::type).collect(Collectors.toSet());
-    Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.CATALOG));
-    Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.SCHEMA));
-    Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.TABLE));
-
-    // Test list associated dummy entities for non-existent policy
-    List<GenericEntity> entities2 =
-        policyMetaService.listAssociatedEntitiesForPolicy(
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy4"));
-    assertEquals(0, entities2.size());
-
-    // Test metadata object non-exist scenario.
-    backend.delete(
-        NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
-        Entity.EntityType.TABLE,
-        false);
-
-    List<GenericEntity> entities3 =
-        policyMetaService.listAssociatedEntitiesForPolicy(
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
-
-    assertEquals(2, entities3.size());
-    Set<Entity.EntityType> actualTypes3 =
-        entities3.stream().map(GenericEntity::type).collect(Collectors.toSet());
-    Assertions.assertTrue(actualTypes3.contains(Entity.EntityType.CATALOG));
-    Assertions.assertTrue(actualTypes3.contains(Entity.EntityType.SCHEMA));
-
-    backend.delete(
-        NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
-
-    List<GenericEntity> entities4 =
-        policyMetaService.listAssociatedEntitiesForPolicy(
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
-
-    assertEquals(1, entities4.size());
-    Set<Entity.EntityType> actualTypes4 =
-        entities4.stream().map(GenericEntity::type).collect(Collectors.toSet());
-    Assertions.assertTrue(actualTypes4.contains(Entity.EntityType.CATALOG));
-
-    backend.delete(NameIdentifier.of(METALAKE_NAME, "catalog1"), Entity.EntityType.CATALOG, false);
-
-    List<GenericEntity> entities5 =
-        policyMetaService.listAssociatedEntitiesForPolicy(
-            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
-
-    assertEquals(0, entities5.size());
-  }
-
-  @TestTemplate
-  public void testDeleteMetadataObjectForPolicy() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-
-    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
-    PolicyEntity policyEntity1 =
-        PolicyEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("policy1")
-            .withNamespace(NamespaceUtil.ofPolicy(METALAKE_NAME))
-            .withComment("comment")
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withContent(content)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    policyMetaService.insertPolicy(policyEntity1, false);
-
-    // 1. Test non-cascade deletion
-    EntitiesToTest entities = createAndAssociateEntities("catalog1", "schema1", policyEntity1);
-    assertEquals(6, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // Test to delete a model
-    ModelMetaService.getInstance().deleteModel(entities.model.nameIdentifier());
-    assertEquals(5, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // Test to drop a table
-    TableMetaService.getInstance().deleteTable(entities.table.nameIdentifier());
-    assertEquals(4, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // Test to drop a topic
-    TopicMetaService.getInstance().deleteTopic(entities.topic.nameIdentifier());
-    assertEquals(3, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // Test to drop a fileset
-    FilesetMetaService.getInstance().deleteFileset(entities.fileset.nameIdentifier());
-    assertEquals(2, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // Test to drop a schema
-    SchemaMetaService.getInstance().deleteSchema(entities.schema.nameIdentifier(), false);
-    assertEquals(1, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // Test to drop a catalog
-    CatalogMetaService.getInstance().deleteCatalog(entities.catalog.nameIdentifier(), false);
-    assertEquals(0, countActivePolicyRel(policyEntity1.id()));
-    assertEquals(6, countAllPolicyRel(policyEntity1.id()));
-
-    // 2. Test cascade deletion for catalog
-    EntitiesToTest entitiesForCascadeCatalog =
-        createAndAssociateEntities("catalog2", "schema2", policyEntity1);
-    CatalogMetaService.getInstance()
-        .deleteCatalog(entitiesForCascadeCatalog.catalog.nameIdentifier(), true);
-    assertEquals(0, countActivePolicyRel(policyEntity1.id()));
-    // 6 from previous test + 6 from this test
-    assertEquals(12, countAllPolicyRel(policyEntity1.id()));
-
-    // 3. Test cascade deletion for schema
-    EntitiesToTest entitiesForCascadeSchema =
-        createAndAssociateEntities("catalog3", "schema3", policyEntity1);
-    SchemaMetaService.getInstance()
-        .deleteSchema(entitiesForCascadeSchema.schema.nameIdentifier(), true);
-    assertEquals(1, countActivePolicyRel(policyEntity1.id()));
-    // 12 from previous tests + 6 from this test
-    assertEquals(18, countAllPolicyRel(policyEntity1.id()));
-  }
-
-  private static class EntitiesToTest {
-    final CatalogEntity catalog;
-    final SchemaEntity schema;
-    final TableEntity table;
-    final TopicEntity topic;
-    final FilesetEntity fileset;
-    final ModelEntity model;
-
-    EntitiesToTest(
-        CatalogEntity catalog,
-        SchemaEntity schema,
-        TableEntity table,
-        TopicEntity topic,
-        FilesetEntity fileset,
-        ModelEntity model) {
-      this.catalog = catalog;
-      this.schema = schema;
-      this.table = table;
-      this.topic = topic;
-      this.fileset = fileset;
-      this.model = model;
-    }
-  }
-
-  private EntitiesToTest createAndAssociateEntities(
-      String catalogName, String schemaName, PolicyEntity policyEntity) throws IOException {
-    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
-    NameIdentifier policyIdent = policyEntity.nameIdentifier();
-
-    // Create entities
-    CatalogEntity catalog =
-        createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME),
-            catalogName,
-            AUDIT_INFO);
-    backend.insert(catalog, false);
-
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name()),
-            schemaName,
-            AUDIT_INFO);
-    backend.insert(schema, false);
-
-    TableEntity table =
-        createTableEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
-            "table1",
-            AUDIT_INFO);
-    backend.insert(table, false);
-
-    TopicEntity topic =
-        createTopicEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
-            "topic1",
-            AUDIT_INFO);
-    backend.insert(topic, false);
-
-    FilesetEntity fileset =
-        createFilesetEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
-            "fileset1",
-            AUDIT_INFO);
-    backend.insert(fileset, false);
-
-    ModelEntity model =
-        createModelEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
-            "model1",
-            "comment",
-            1,
-            null,
-            AUDIT_INFO);
-    backend.insert(model, false);
-
-    // Associate policy with all entities
-    policyMetaService.associatePoliciesWithMetadataObject(
-        catalog.nameIdentifier(),
-        catalog.type(),
-        new NameIdentifier[] {policyIdent},
-        new NameIdentifier[0]);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        schema.nameIdentifier(),
-        schema.type(),
-        new NameIdentifier[] {policyIdent},
-        new NameIdentifier[0]);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        table.nameIdentifier(),
-        table.type(),
-        new NameIdentifier[] {policyIdent},
-        new NameIdentifier[0]);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        topic.nameIdentifier(),
-        topic.type(),
-        new NameIdentifier[] {policyIdent},
-        new NameIdentifier[0]);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        fileset.nameIdentifier(),
-        fileset.type(),
-        new NameIdentifier[] {policyIdent},
-        new NameIdentifier[0]);
-    policyMetaService.associatePoliciesWithMetadataObject(
-        model.nameIdentifier(),
-        model.type(),
-        new NameIdentifier[] {policyIdent},
-        new NameIdentifier[0]);
-
-    return new EntitiesToTest(catalog, schema, table, topic, fileset, model);
-  }
-
   private int countActiveRows(String table, String whereClause) {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
@@ -1554,29 +1101,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         return rs.getInt(1);
       }
       throw new RuntimeException("Doesn't contain data");
-    } catch (SQLException se) {
-      throw new RuntimeException("SQL execution failed", se);
-    }
-  }
-
-  private Integer countActivePolicyRel(Long policyId) {
-    return countActiveRows("policy_relation_meta", "policy_id = " + policyId);
-  }
-
-  private Integer countAllPolicyRel(Long policyId) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement1 = connection.createStatement();
-        ResultSet rs1 =
-            statement1.executeQuery(
-                String.format(
-                    "SELECT count(*) FROM policy_relation_meta WHERE policy_id = %d", policyId))) {
-      if (rs1.next()) {
-        return rs1.getInt(1);
-      } else {
-        throw new RuntimeException("Doesn't contain data");
-      }
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }

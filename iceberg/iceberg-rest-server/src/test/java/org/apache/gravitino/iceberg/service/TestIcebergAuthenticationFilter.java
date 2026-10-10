@@ -146,6 +146,7 @@ public class TestIcebergAuthenticationFilter {
     Assertions.assertEquals(500, errorResponse.code());
     Assertions.assertEquals("ServiceFailureException", errorResponse.type());
     Assertions.assertEquals("Something went wrong", errorResponse.message());
+    Assertions.assertFalse(json.contains("\"stack\""), json);
   }
 
   @Test

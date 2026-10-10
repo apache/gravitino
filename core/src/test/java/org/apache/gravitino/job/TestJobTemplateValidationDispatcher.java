@@ -212,8 +212,8 @@ public class TestJobTemplateValidationDispatcher {
 
   @Test
   public void testGetJob() {
-    validationDispatcher.getJob("metalake1", "job-123");
-    verify(mockDispatcher).getJob("metalake1", "job-123");
+    validationDispatcher.getJob("metalake1", "job-123", false);
+    verify(mockDispatcher).getJob("metalake1", "job-123", false, null, null);
   }
 
   @Test

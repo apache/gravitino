@@ -21,13 +21,18 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
+import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,33 +40,45 @@ import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.Relationship;
+import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
-import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 public class TestSemanticModelOperationDispatcher {
 
   private static final String METALAKE = "metalake";
-  private static final NameIdentifier CATALOG_IDENT = NameIdentifier.of(METALAKE, "catalog");
-  private static final Namespace NAMESPACE = Namespace.of(METALAKE, "catalog", "schema");
+  private static final NameIdentifier METADATA_CATALOG_IDENT =
+      NameIdentifier.of(METALAKE, "metadata_catalog");
+  private static final Namespace NAMESPACE =
+      Namespace.of(METALAKE, "metadata_catalog", "semantic_schema");
   private static final NameIdentifier SCHEMA_IDENT = NameIdentifier.of(NAMESPACE.levels());
   private static final NameIdentifier MODEL_IDENT = NameIdentifier.of(NAMESPACE, "sales_model");
 
   private CatalogManager catalogManager;
   private SchemaDispatcher schemaDispatcher;
+  private InMemoryEntityStore store;
   private SemanticModelOperationDispatcher dispatcher;
 
   @BeforeAll
@@ -77,10 +94,11 @@ public class TestSemanticModelOperationDispatcher {
   public void setUp() throws Exception {
     catalogManager = mock(CatalogManager.class);
     schemaDispatcher = mock(SchemaDispatcher.class);
+    store = new InMemoryEntityStore();
 
     Catalog catalog = mock(Catalog.class);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
-    when(catalogManager.loadCatalog(CATALOG_IDENT)).thenReturn(catalog);
+    when(catalogManager.loadCatalog(METADATA_CATALOG_IDENT)).thenReturn(catalog);
     when(schemaDispatcher.loadSchema(SCHEMA_IDENT)).thenReturn(mock(Schema.class));
     when(schemaDispatcher.schemaExists(SCHEMA_IDENT)).thenReturn(true);
 
@@ -88,97 +106,354 @@ public class TestSemanticModelOperationDispatcher {
         new SemanticModelOperationDispatcher(
             catalogManager,
             schemaDispatcher,
-            mock(EntityStore.class),
-            mock(IdGenerator.class),
+            store,
+            new RandomIdGenerator(),
             mock(SecretManager.class));
   }
 
   @Test
-  public void testFrameworkValidatesParentAndDelegatesToManagedOperations() {
-    UnsupportedOperationException listFailure =
-        assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
-    assertTrue(listFailure.getMessage().startsWith("listSemanticModels:"));
+  public void testCreateThenLoadWithoutCatalogBackedSourceValidation() {
+    SemanticModel created =
+        dispatcher.createSemanticModel(MODEL_IDENT, "Sales", validDefinition(), Map.of());
 
-    UnsupportedOperationException createFailure =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () -> dispatcher.createSemanticModel(MODEL_IDENT, null, definition(), Map.of()));
-    assertTrue(createFailure.getMessage().startsWith("createSemanticModel:"));
-
-    UnsupportedOperationException loadFailure =
-        assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.loadSemanticModel(MODEL_IDENT));
-    assertTrue(loadFailure.getMessage().startsWith("loadSemanticModel:"));
-
-    UnsupportedOperationException alterFailure =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                dispatcher.alterSemanticModel(
-                    MODEL_IDENT, SemanticModelChange.updateComment("updated")));
-    assertTrue(alterFailure.getMessage().startsWith("alterSemanticModel:"));
-
-    UnsupportedOperationException dropFailure =
-        assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.dropSemanticModel(MODEL_IDENT));
-    assertTrue(dropFailure.getMessage().startsWith("dropSemanticModel:"));
-
-    verify(schemaDispatcher, times(2)).loadSchema(SCHEMA_IDENT);
-    verify(schemaDispatcher, times(3)).schemaExists(SCHEMA_IDENT);
+    assertEquals("sales_model", created.name());
+    assertEquals(2, created.definition().datasets().length);
+    assertEquals(DEFAULT_VERSION, created.properties().get(PROPERTY_OSSIE_VERSION));
+    assertSame(created, dispatcher.loadSemanticModel(MODEL_IDENT));
   }
 
   @Test
-  public void testMissingSchemaPreservesTypedResults() {
-    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
-        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
-    when(schemaDispatcher.schemaExists(SCHEMA_IDENT)).thenReturn(false);
+  public void testCreatePreservesExplicitOssieVersion() {
+    SemanticModel created =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT,
+            "Sales",
+            validDefinition(),
+            Map.of(PROPERTY_OSSIE_VERSION, "future-version"));
 
-    assertThrows(NoSuchSchemaException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
+    assertEquals("future-version", created.properties().get(PROPERTY_OSSIE_VERSION));
+  }
+
+  @Test
+  public void testCreateRejectsBlankOssieVersionBeforeCatalogLookup() {
     assertThrows(
-        NoSuchSchemaException.class,
-        () -> dispatcher.createSemanticModel(MODEL_IDENT, null, definition(), Map.of()));
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createSemanticModel(
+                MODEL_IDENT, null, validDefinition(), Map.of(PROPERTY_OSSIE_VERSION, " ")));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testCreateRejectsReservedPropertiesExtensionWithoutPersisting() {
+    IllegalSemanticModelException exception =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () ->
+                dispatcher.createSemanticModel(
+                    MODEL_IDENT, "Sales", definitionWithReservedExtension(), Map.of()));
+
+    assertTrue(exception.getMessage().contains("reserved for Gravitino properties"));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+  }
+
+  @Test
+  public void testReplaceRejectsReservedPropertiesExtensionWithoutPersistingOtherChanges() {
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT, "Original", validDefinition(), Map.of("owner", "sales"));
+
+    IllegalSemanticModelException exception =
+        assertThrows(
+            IllegalSemanticModelException.class,
+            () ->
+                dispatcher.alterSemanticModel(
+                    MODEL_IDENT,
+                    SemanticModelChange.updateComment("Must not persist"),
+                    SemanticModelChange.setProperty("owner", "changed"),
+                    SemanticModelChange.replaceDefinition(definitionWithReservedExtension())));
+
+    assertTrue(exception.getMessage().contains("reserved for Gravitino properties"));
+    SemanticModel loaded = dispatcher.loadSemanticModel(MODEL_IDENT);
+    assertEquals(original.comment(), loaded.comment());
+    assertEquals(original.properties(), loaded.properties());
+    assertEquals(original.definition(), loaded.definition());
+  }
+
+  @Test
+  public void testAlterRejectsBlankOssieVersionBeforeCatalogLookup() {
     assertThrows(
-        NoSuchSemanticModelException.class, () -> dispatcher.loadSemanticModel(MODEL_IDENT));
-    assertThrows(
-        NoSuchSemanticModelException.class,
+        IllegalArgumentException.class,
         () ->
             dispatcher.alterSemanticModel(
-                MODEL_IDENT, SemanticModelChange.updateComment("updated")));
-    assertFalse(dispatcher.dropSemanticModel(MODEL_IDENT));
+                MODEL_IDENT, SemanticModelChange.setProperty(PROPERTY_OSSIE_VERSION, " ")));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testAlterCanRemoveOssieVersion() {
+    dispatcher.createSemanticModel(
+        MODEL_IDENT, "Sales", validDefinition(), Map.of(PROPERTY_OSSIE_VERSION, "future-version"));
+
+    SemanticModel altered =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT, SemanticModelChange.removeProperty(PROPERTY_OSSIE_VERSION));
+
+    assertFalse(altered.properties().containsKey(PROPERTY_OSSIE_VERSION));
+  }
+
+  @Test
+  public void testSchemaFailureRemainsTyped() {
+    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
+        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
+    assertThrows(
+        NoSuchSchemaException.class,
+        () -> dispatcher.createSemanticModel(MODEL_IDENT, null, validDefinition(), Map.of()));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
   }
 
   @Test
   public void testNonRelationalCatalogIsRejectedBeforeSchemaLookup() {
     Catalog catalog = mock(Catalog.class);
     when(catalog.type()).thenReturn(Catalog.Type.FILESET);
-    when(catalogManager.loadCatalog(CATALOG_IDENT)).thenReturn(catalog);
+    when(catalogManager.loadCatalog(METADATA_CATALOG_IDENT)).thenReturn(catalog);
 
-    UnsupportedOperationException failure =
-        assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
-
-    assertTrue(failure.getMessage().contains("does not support Semantic Model operations"));
+    assertThrows(
+        UnsupportedOperationException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
     verify(schemaDispatcher, never()).loadSchema(SCHEMA_IDENT);
   }
 
   @Test
-  public void testInvalidInputsAreRejectedBeforeCatalogLookup() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> dispatcher.createSemanticModel(MODEL_IDENT, null, null, Map.of()));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> dispatcher.createSemanticModel(MODEL_IDENT, null, definition(), null));
-    verify(catalogManager, never()).loadCatalog(CATALOG_IDENT);
+  public void testListAlterAndDropLifecycleWithDefinitionValidation() {
+    dispatcher.createSemanticModel(MODEL_IDENT, "Original", validDefinition(), Map.of());
+
+    SemanticModel propertyUpdated =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT, SemanticModelChange.setProperty("owner", "analytics"));
+    SemanticModel renamed =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT,
+            SemanticModelChange.rename("renamed_sales_model"),
+            SemanticModelChange.updateComment("Updated"));
+    NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, renamed.name());
+    assertEquals(
+        Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION),
+        propertyUpdated.properties());
+    assertEquals("Updated", renamed.comment());
+
+    SemanticModel replaced =
+        dispatcher.alterSemanticModel(
+            renamedIdent, SemanticModelChange.replaceDefinition(validDefinition()));
+    assertEquals(2, replaced.definition().datasets().length);
+    assertArrayEquals(
+        new NameIdentifier[] {renamedIdent}, dispatcher.listSemanticModels(NAMESPACE));
+    assertTrue(dispatcher.dropSemanticModel(renamedIdent));
+    assertFalse(dispatcher.dropSemanticModel(renamedIdent));
   }
 
-  private static SemanticModelDefinition definition() {
-    Dataset dataset =
-        Dataset.builder()
-            .withName("orders")
-            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+  @Test
+  public void testRejectedDefinitionReplacementDoesNotPersistOtherChanges() {
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT, "Original", validDefinition(), Map.of("owner", "sales"));
+
+    SemanticModelDefinition invalidReplacement =
+        SemanticModelDefinition.builder()
+            .withDatasets(
+                new Dataset[] {
+                  dataset("duplicate", "orders", null, null),
+                  dataset("duplicate", "customers", null, null)
+                })
+            .withRelationships(new Relationship[0])
             .build();
-    return SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build();
+
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                MODEL_IDENT,
+                SemanticModelChange.rename("must_not_persist"),
+                SemanticModelChange.updateComment("Must not persist"),
+                SemanticModelChange.setProperty("owner", "changed"),
+                SemanticModelChange.replaceDefinition(invalidReplacement)));
+
+    SemanticModel loaded = dispatcher.loadSemanticModel(MODEL_IDENT);
+    assertEquals(original.name(), loaded.name());
+    assertEquals(original.comment(), loaded.comment());
+    assertEquals(original.properties(), loaded.properties());
+    assertEquals(original.definition(), loaded.definition());
+    assertFalse(dispatcher.semanticModelExists(NameIdentifier.of(NAMESPACE, "must_not_persist")));
+  }
+
+  @Test
+  public void testLifecycleMissingParentAndInvalidChangeSemantics() {
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () -> dispatcher.alterSemanticModel(MODEL_IDENT, (SemanticModelChange[]) null));
+    assertThrows(
+        IllegalSemanticModelException.class, () -> dispatcher.alterSemanticModel(MODEL_IDENT));
+
+    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
+        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
+    assertThrows(NoSuchSchemaException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
+    when(schemaDispatcher.schemaExists(SCHEMA_IDENT)).thenReturn(false);
+    assertThrows(
+        NoSuchSemanticModelException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                MODEL_IDENT, SemanticModelChange.updateComment("Missing")));
+    assertFalse(dispatcher.dropSemanticModel(MODEL_IDENT));
+  }
+
+  @Test
+  public void testNullDefinitionIsRejectedByValidator() {
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () -> dispatcher.createSemanticModel(MODEL_IDENT, null, null, Map.of()));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+  }
+
+  @Test
+  public void testNullPropertiesAreRejectedBeforeCatalogLookup() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.createSemanticModel(MODEL_IDENT, null, validDefinition(), null));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @ParameterizedTest
+  @EnumSource(OssieFormat.class)
+  public void testOssieExportImportRoundTrip(OssieFormat format) {
+    CustomExtension ordinary =
+        CustomExtension.builder()
+            .withVendorName("GRAVITINO")
+            .withData("{\"_apache_gravitino_interchange\":1}")
+            .build();
+    SemanticModelDefinition baseDefinition = validDefinition();
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder()
+            .withDatasets(baseDefinition.datasets())
+            .withRelationships(baseDefinition.relationships())
+            .withCustomExtensions(new CustomExtension[] {ordinary})
+            .build();
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT,
+            "Sales",
+            definition,
+            Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, "future-version"));
+
+    OssieDocument document = dispatcher.exportOssieDocument(MODEL_IDENT, format);
+    assertEquals(format, document.format());
+    assertThrows(
+        SemanticModelAlreadyExistsException.class,
+        () -> dispatcher.importOssieDocument(NAMESPACE, document));
+    assertSame(original, dispatcher.loadSemanticModel(MODEL_IDENT));
+
+    assertTrue(dispatcher.dropSemanticModel(MODEL_IDENT));
+    SemanticModel imported = dispatcher.importOssieDocument(NAMESPACE, document);
+    assertEquals(original.name(), imported.name());
+    assertEquals(original.comment(), imported.comment());
+    assertEquals(original.definition(), imported.definition());
+    assertEquals(original.properties(), imported.properties());
+    assertSame(imported, dispatcher.loadSemanticModel(MODEL_IDENT));
+  }
+
+  @Test
+  public void testOssieImportReusesDefinitionValidationWithoutPersisting() {
+    OssieDocument invalid =
+        OssieDocument.yaml(
+            """
+            version: 0.2.0.dev0
+            name: sales_model
+            datasets:
+              - name: orders
+                source: sales.mart.orders
+            relationships:
+              - name: orders_to_missing
+                from: orders
+                to: missing
+                from_columns: [customer_id]
+                to_columns: [customer_id]
+            """);
+
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () -> dispatcher.importOssieDocument(NAMESPACE, invalid));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+  }
+
+  @Test
+  public void testOssieImportRejectsWrongFormatBeforeCatalogLookup() {
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () ->
+            dispatcher.importOssieDocument(
+                NAMESPACE, OssieDocument.json(ossieDocument().content())));
+    verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
+  }
+
+  @Test
+  public void testOssieOperationsPreserveMissingObjectErrors() {
+    assertThrows(
+        NoSuchSemanticModelException.class,
+        () -> dispatcher.exportOssieDocument(MODEL_IDENT, OssieFormat.YAML));
+    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
+        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
+    assertThrows(
+        NoSuchSchemaException.class,
+        () -> dispatcher.importOssieDocument(NAMESPACE, ossieDocument()));
+  }
+
+  private static OssieDocument ossieDocument() {
+    return OssieDocument.yaml(
+        """
+        version: 0.2.0.dev0
+        name: sales_model
+        datasets:
+          - name: orders
+            source: sales.mart.orders
+        """);
+  }
+
+  private static SemanticModelDefinition validDefinition() {
+    Dataset orders =
+        dataset("orders", "orders", new String[] {"order_id"}, new String[][] {{"customer_id"}});
+    Dataset customers =
+        dataset("customers", "customers", new String[] {"customer_id"}, new String[0][]);
+    Relationship relationship =
+        Relationship.builder()
+            .withName("orders_to_customers")
+            .withFrom("orders")
+            .withTo("customers")
+            .withFromColumns(new String[] {"customer_id"})
+            .withToColumns(new String[] {"customer_id"})
+            .build();
+    return SemanticModelDefinition.builder()
+        .withDatasets(new Dataset[] {orders, customers})
+        .withRelationships(new Relationship[] {relationship})
+        .build();
+  }
+
+  private static SemanticModelDefinition definitionWithReservedExtension() {
+    CustomExtension extension =
+        CustomExtension.builder()
+            .withVendorName(GRAVITINO_PROPERTIES_VENDOR)
+            .withData("not JSON")
+            .build();
+    return SemanticModelDefinition.builder()
+        .withDatasets(validDefinition().datasets())
+        .withCustomExtensions(new CustomExtension[] {extension})
+        .build();
+  }
+
+  private static Dataset dataset(
+      String name, String source, String[] primaryKey, String[][] uniqueKeys) {
+    return Dataset.builder()
+        .withName(name)
+        .withSource(NameIdentifier.of("sales", "mart", source))
+        .withPrimaryKey(primaryKey)
+        .withUniqueKeys(uniqueKeys)
+        .build();
   }
 }

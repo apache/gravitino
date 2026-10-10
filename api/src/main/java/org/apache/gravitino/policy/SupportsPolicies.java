@@ -19,8 +19,6 @@
 package org.apache.gravitino.policy;
 
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 
 /**
  * Interface for policy operations on a metadata object.
@@ -39,33 +37,4 @@ public interface SupportsPolicies {
    * @return The policies that apply to the metadata object.
    */
   Policy[] listPolicyInfos();
-
-  /**
-   * Get an applicable policy by its name for the metadata object.
-   *
-   * @param name The name of the policy.
-   * @return The policy.
-   * @throws NoSuchPolicyException If the policy does not apply to the object.
-   */
-  Policy getPolicy(String name) throws NoSuchPolicyException;
-
-  /**
-   * Associate policies to the specific object. The policiesToAdd will be applied to the object and
-   * the policiesToRemove will be removed from the object. Note that:
-   *
-   * <ol>
-   *   <li>Adding or removing policies that are not existed will be ignored.
-   *   <li>If the same name policy is in both policiesToAdd and policiesToRemove, it will be
-   *       ignored.
-   *   <li>If the policy is already applied to the object, it will throw {@link
-   *       PolicyAlreadyAssociatedException}
-   * </ol>
-   *
-   * @param policiesToAdd The policies to be added to the object.
-   * @param policiesToRemove The policies to remove.
-   * @return The list of applied policies.
-   * @throws PolicyAlreadyAssociatedException If the policy is already applied to the object.
-   */
-  String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException;
 }

@@ -70,6 +70,26 @@ public class TestConfigEntry {
         new ConfigBuilder("gravitino.test.boolean").booleanConf().createWithDefault(true);
     boolean value2 = testConf2.readFrom(configMap);
     Assertions.assertTrue(value2);
+
+    // A present-but-blank value must not bypass the default: typed converters map blank to null,
+    // and before the fix readFrom returned that null instead of the configured default.
+    configMap.put("gravitino.test.int.blank", "   ");
+    ConfigEntry<Integer> blankIntConf =
+        new ConfigBuilder("gravitino.test.int.blank")
+            .doc("test")
+            .version("1.0")
+            .intConf()
+            .createWithDefault(10);
+    Assertions.assertEquals(10, blankIntConf.readFrom(configMap));
+
+    configMap.put("gravitino.test.long.blank", " ");
+    ConfigEntry<Long> blankLongConf =
+        new ConfigBuilder("gravitino.test.long.blank")
+            .doc("test")
+            .version("1.0")
+            .longConf()
+            .createWithDefault(20L);
+    Assertions.assertEquals(20L, blankLongConf.readFrom(configMap));
   }
 
   @Test

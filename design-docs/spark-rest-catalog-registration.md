@@ -66,10 +66,11 @@ spark.sql.catalog.iceberg_prod.warehouse=iceberg_prod
 
 ## Proposal
 
-Two new pieces — a **catalog-listing endpoint** on the Iceberg REST server and a single Spark
-plugin, `GravitinoLakehouseRESTDiscoveryPlugin`, that consumes it — plus one **ordering rule** that
-makes the interaction with `GravitinoSparkPlugin` deterministic. Each lakehouse format plugs into
-the plugin as a provider; V1 ships Iceberg.
+The Spark plugin `GravitinoLakehouseRESTDiscoveryPlugin` and a catalog-listing endpoint for
+formats that need one, plus one **ordering rule**, make the interaction with
+`GravitinoSparkPlugin` deterministic. Each lakehouse format plugs into the plugin as a provider.
+Lance is the first supported provider; an Iceberg provider and its catalog-listing endpoint remain
+future work.
 
 ### Catalog-listing endpoint
 
@@ -109,16 +110,16 @@ hand-write them. Which catalogs are registered, and under what Spark name, is de
 `CatalogRegistrationPolicy`.
 
 ```text
-spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin
+spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin
 ```
 
-The plugin is format-agnostic. Each lakehouse format is a **provider** — Iceberg in V1, Lance later
-(see [Lance support](#lance-support)) — carrying its own engine runtime and config prefix
-(`icebergREST.*`, `lanceREST.*`). A provider is active only when its `uri` is set, so the URI
-doubles as the per-format switch and no `enable*` flag is needed; if a `uri` is set but its provider
-is not on the classpath, the plugin fails fast. Dependency isolation is preserved — a user who needs
-only Iceberg puts only the Iceberg provider on the classpath — while `spark.plugins` lists one
-plugin and there is a single ordering rule.
+The plugin is format-agnostic. Each lakehouse format is a **provider** — Lance is supported now and
+Iceberg is planned separately (see [Lance support](#lance-support)) — carrying its own engine
+runtime and config prefix (`icebergREST.*`, `lanceREST.*`). A provider is active only when its `uri`
+is set, so the URI doubles as the per-format switch and no `enable*` flag is needed; if a `uri` is
+set but its provider is not on the classpath, the plugin fails fast. Dependency isolation is
+preserved — a user who needs only Lance puts only the Lance provider on the classpath — while
+`spark.plugins` lists one plugin and there is a single ordering rule.
 
 The registration policy and user-configuration precedence below are shared by every provider; the
 listing client, generated entries, and credential handling are provider-specific.
@@ -236,7 +237,7 @@ reach Spark is intentionally left to the two existing Iceberg REST paths:
 When both plugins are configured, `GravitinoLakehouseRESTDiscoveryPlugin` **must be listed first**:
 
 ```text
-spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin,\
+spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin,\
               org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin
 ```
 
@@ -257,7 +258,7 @@ which would now fire once per REST-registered catalog and read as an error.
 2. Add to Spark configuration:
 
    ```text
-   spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin
+   spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin
    spark.sql.gravitino.icebergREST.uri=http://127.0.0.1:9001/iceberg/
    ```
 
@@ -293,9 +294,9 @@ enforcement point for authorization and audit.
 
 ## Lance support
 
-A design sketch, not part of V1. Lance plugs into the same plugin as a second provider, reusing the
-registration policy, the ordering rule, and the user-configuration precedence, and differing only in
-discovery and the generated entries.
+Lance is the first provider in the plugin. It reuses the registration policy, the ordering rule, and
+the user-configuration precedence, and differs from future providers only in discovery and the
+generated entries.
 
 **Discovery needs no new API.** The Lance Namespace protocol's root list,
 `GET {lance-rest-base}/v1/namespace/list`, already returns the `lakehouse-generic` catalogs from
@@ -311,9 +312,8 @@ model is identical to Iceberg: point the plugin at a REST server, get its catalo
 Gravitino splits that into two systems (Gravitino lists them, the REST server serves them) plus the
 unstated assumption that the names line up, and makes Lance discovery behave differently from
 Iceberg. That mismatch stays invisible until a name does not line up, which fails at query time
-rather than at configuration time. Discovery therefore stays server-authoritative; Gravitino's
-per-principal authorization, the one thing this path would have reused, is instead added on the
-Lance server (see below).
+rather than at configuration time. Discovery therefore stays server-authoritative and does not
+depend on Gravitino's per-principal authorization filtering for the root namespace list.
 
 **The Lance provider.** It uses the `spark.sql.gravitino.lanceREST.*` prefix, mirroring the Iceberg
 keys (`uri`, `catalogProperties.<key>`), and lists catalogs with
@@ -343,10 +343,11 @@ delivers it per table in `DescribeTableResponse.storageOptions`, resolved from t
 table's `lance.storage.*` properties. The plugin generates nothing either way; unlike Iceberg
 vending, secrets in catalog properties reach the client, with no vending equivalent today.
 
-One gap must close before Lance ships: the root list is authenticated but not
-authorization-filtered, so every authenticated caller sees all catalog names. Filtering it with
-`MetadataAuthzHelper`, as the Iceberg server already does for namespace listing, is a prerequisite —
-not a follow-up.
+The root list requires authentication but is not authorization-filtered: every authenticated caller
+that can access the Lance REST service can discover all catalog names served by that endpoint. This
+is an intentional discovery contract, not a prerequisite for Lance support. Table and namespace
+operations continue to enforce their existing authorization rules. Per-principal filtering of the
+root list may be added later if catalog-name visibility needs to be restricted.
 
 ---
 

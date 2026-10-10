@@ -17,7 +17,9 @@
 
 from typing import Dict
 
+from gravitino.api.credential.aws_secret_key_credential import AwsSecretKeyCredential
 from gravitino.api.credential.credential import Credential
+from gravitino.api.credential.dlf_secret_key_credential import DlfSecretKeyCredential
 from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
@@ -53,6 +55,10 @@ class CredentialFactory:
             == AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE
         ):
             credential = AzureAccountKeyCredential(credential_info, expire_time_in_ms)
+        elif credential_type == AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE:
+            credential = AwsSecretKeyCredential(credential_info, expire_time_in_ms)
+        elif credential_type == DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE:
+            credential = DlfSecretKeyCredential(credential_info, expire_time_in_ms)
         else:
             raise NotImplementedError(
                 f"Credential type {credential_type} is not supported"

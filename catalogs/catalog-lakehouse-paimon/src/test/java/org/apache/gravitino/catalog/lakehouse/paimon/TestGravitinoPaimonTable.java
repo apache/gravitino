@@ -313,7 +313,7 @@ public class TestGravitinoPaimonTable {
     for (int i = 0; i < indexes.length; i++) {
       Assertions.assertEquals(indexes[i].name(), table.index()[i].name());
       Assertions.assertEquals(indexes[i].type(), table.index()[i].type());
-      Assertions.assertEquals(indexes[i].fieldNames(), table.index()[i].fieldNames());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), table.index()[i].fieldNames());
     }
 
     Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);

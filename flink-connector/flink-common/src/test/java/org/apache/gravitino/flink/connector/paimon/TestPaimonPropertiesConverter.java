@@ -78,6 +78,33 @@ public class TestPaimonPropertiesConverter {
   }
 
   @Test
+  public void testToPaimonDlfCatalog() {
+    Map<String, String> catalogProperties =
+        ImmutableMap.<String, String>builder()
+            .put(PaimonConstants.WAREHOUSE, localWarehouse)
+            .put(PaimonConstants.CATALOG_BACKEND, "rest")
+            .put(PaimonConstants.URI, "https://dlf.aliyuncs.com")
+            .put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak")
+            .put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk")
+            .put(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN, "dlf-token")
+            .build();
+    Map<String, String> flinkCatalogProperties =
+        CONVERTER.toFlinkCatalogProperties(catalogProperties);
+    Assertions.assertEquals(
+        GravitinoPaimonCatalogFactoryOptions.IDENTIFIER, flinkCatalogProperties.get("type"));
+    Assertions.assertEquals(localWarehouse, flinkCatalogProperties.get(PaimonConstants.WAREHOUSE));
+    Assertions.assertEquals("rest", flinkCatalogProperties.get(PaimonConstants.METASTORE));
+    Assertions.assertEquals(
+        "https://dlf.aliyuncs.com", flinkCatalogProperties.get(PaimonConstants.URI));
+    Assertions.assertEquals(
+        "dlf-ak", flinkCatalogProperties.get(PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "dlf-sk", flinkCatalogProperties.get(PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET));
+    Assertions.assertEquals(
+        "dlf-token", flinkCatalogProperties.get(PaimonConstants.PAIMON_DLF_SECURITY_TOKEN));
+  }
+
+  @Test
   public void testToGravitinoCatalogProperties() {
     String testUser = "testUser";
     String testPassword = "testPassword";

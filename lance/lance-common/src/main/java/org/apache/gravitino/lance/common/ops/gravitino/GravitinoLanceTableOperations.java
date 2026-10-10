@@ -50,6 +50,7 @@ import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
@@ -129,7 +130,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Table table;
     try {
-      table = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -277,7 +278,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
     Table t;
     try {
-      t = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+      t = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -323,7 +324,16 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
-    return namespaceWrapper.asTableCatalog(catalog).tableExists(tableIdentifier);
+    try {
+      return LancePropertiesUtils.isLanceTableFormat(
+          namespaceWrapper
+              .asTableCatalog(catalog)
+              .loadTable(tableIdentifier)
+              .properties()
+              .get(Table.PROPERTY_TABLE_FORMAT));
+    } catch (NoSuchTableException e) {
+      return false;
+    }
   }
 
   @Override
@@ -340,7 +350,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Table table;
     try {
-      table = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -378,6 +388,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     }
     TableChange[] changes = handler.buildGravitinoTableChange(request);
 
+    loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     Table table = namespaceWrapper.asTableCatalog(catalog).alterTable(tableIdentifier, changes);
 
     return handler.handle(table, request);
@@ -387,6 +398,17 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   private static <REQUEST, RESPONSE> GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> getHandler(
       Class<?> requestClass) {
     return (GravitinoLanceTableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
+  }
+
+  private Table loadAndValidateLanceTable(
+      Catalog catalog, NameIdentifier tableIdentifier, String tableId) {
+    Table table = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+    if (!LancePropertiesUtils.isLanceTableFormat(
+        table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
+      throw new InvalidInputException(
+          "Table is not a Lance table: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
+    }
+    return table;
   }
 
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {

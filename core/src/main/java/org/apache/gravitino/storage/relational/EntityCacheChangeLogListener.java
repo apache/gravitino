@@ -21,9 +21,11 @@ package org.apache.gravitino.storage.relational;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,57 +63,157 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheChangeLogListener.class);
 
-  private final EntityCache cache;
+  /**
+   * The two invalidation entry points this listener needs from the cache it keeps coherent. The
+   * entity store hands in its own implementation so that it observes every invalidation, including
+   * the ones replayed from other nodes (see {@code RelationalEntityStore#batchGet}).
+   */
+  public interface Target {
+    /**
+     * Invalidates the cache entry of the given entity, see {@link EntityCache#invalidate}.
+     *
+     * @param ident the identifier of the changed entity
+     * @param type the type of the changed entity
+     */
+    void invalidate(NameIdentifier ident, EntityType type);
+
+    /** Clears the whole cache, see {@link EntityCache#clear()}. */
+    void clear();
+  }
+
+  private final Target target;
+  private final EntityChangeLogMetricsSource metrics;
 
   /**
-   * Creates a listener that invalidates the given entity store cache.
+   * Creates a listener that invalidates the given entity store cache directly. Metrics from this
+   * constructor are local to the listener and are not exported by the server metrics system.
    *
    * @param cache the per-node entity store cache to keep coherent
    */
   public EntityCacheChangeLogListener(EntityCache cache) {
+    this(asTarget(cache), new EntityChangeLogMetricsSource());
+  }
+
+  /**
+   * Creates a listener that invalidates the given entity store cache directly, with metrics shared
+   * with the poller.
+   *
+   * @param cache the per-node entity store cache to keep coherent
+   * @param metrics process-local change log metrics
+   */
+  public EntityCacheChangeLogListener(EntityCache cache, EntityChangeLogMetricsSource metrics) {
+    this(asTarget(cache), metrics);
+  }
+
+  /**
+   * Creates a listener that invalidates through the given target. Metrics from this constructor are
+   * local to the listener and are not exported by the server metrics system.
+   *
+   * @param target the invalidation entry points of the per-node cache to keep coherent
+   */
+  public EntityCacheChangeLogListener(Target target) {
+    this(target, new EntityChangeLogMetricsSource());
+  }
+
+  /**
+   * Creates a listener that invalidates through the given target, with metrics shared with the
+   * poller.
+   *
+   * @param target the invalidation entry points of the per-node cache to keep coherent
+   * @param metrics process-local change log metrics
+   */
+  public EntityCacheChangeLogListener(Target target, EntityChangeLogMetricsSource metrics) {
+    Preconditions.checkArgument(target != null, "target cannot be null");
+    this.target = target;
+    this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
+  }
+
+  private static Target asTarget(EntityCache cache) {
     Preconditions.checkArgument(cache != null, "cache cannot be null");
-    this.cache = cache;
+    return new Target() {
+      @Override
+      public void invalidate(NameIdentifier ident, EntityType type) {
+        cache.invalidate(ident, type);
+      }
+
+      @Override
+      public void clear() {
+        cache.clear();
+      }
+    };
   }
 
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
+    long startNanos = System.nanoTime();
+    int applied = 0;
+    int skipped = 0;
     for (EntityChangeRecord change : changes) {
       EntityType type = entityType(change);
       NameIdentifier ident = identifier(change);
       if (type == null || ident == null) {
         // Already logged by the parsing helpers. A row that names no entity cannot invalidate
         // anything, so skipping it leaves no stale entry behind.
+        skipped++;
         continue;
       }
 
       try {
-        LOG.debug("Invalidating entity cache due to entity change log: {} ({})", ident, type);
-        cache.invalidate(ident, type);
+        LOG.debug(
+            "entityChangeLog invalidate changeId={} entityType={} operateType={} ident={} fullName={}",
+            change.getId(),
+            type,
+            change.getOperateType(),
+            ident,
+            change.getFullName());
+        target.invalidate(ident, type);
+        applied++;
+        metrics.recordsApplied(1);
       } catch (RuntimeException e) {
+        metrics.invalidationFailed();
         // Dropping a single invalidation would leave this node serving that entity stale until it
         // expires. Clearing the whole cache is the safe superset, and it also covers the rest of
         // this batch, so there is nothing left to replay.
         LOG.error(
-            "Failed to invalidate {} ({}) from the entity change log, clearing the local entity "
-                + "cache to stay coherent",
-            ident,
+            "entityChangeLog targeted invalidation failed changeId={} entityType={} "
+                + "operateType={} ident={} fullName={}; clearing full local entity cache",
+            change.getId(),
             type,
+            change.getOperateType(),
+            ident,
+            change.getFullName(),
             e);
-        cache.clear();
+        target.clear();
+        metrics.fallbackCleared();
+        LOG.debug(
+            "entityChangeLog invalidate batch count={} applied={} skipped={} fallbackClear=true durationMs={}",
+            changes.size(),
+            applied,
+            skipped,
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
         return;
       }
     }
+    LOG.debug(
+        "entityChangeLog invalidate batch count={} applied={} skipped={} fallbackClear=false durationMs={}",
+        changes.size(),
+        applied,
+        skipped,
+        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
   }
 
   private EntityType entityType(EntityChangeRecord change) {
     if (change.getEntityType() == null) {
-      LOG.warn("Invalid entity type in entity change log: null");
+      LOG.warn("entityChangeLog malformed changeId={} field=entityType value=null", change.getId());
       return null;
     }
     try {
       return EntityType.valueOf(change.getEntityType().toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
-      LOG.warn("Unknown entity type in entity change log: {}", change.getEntityType());
+      LOG.warn(
+          "entityChangeLog malformed changeId={} field=entityType value={}",
+          change.getId(),
+          change.getEntityType());
       return null;
     }
   }
@@ -119,13 +221,20 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
   private NameIdentifier identifier(EntityChangeRecord change) {
     String fullName = change.getFullName();
     if (fullName == null || fullName.isEmpty()) {
-      LOG.warn("Invalid full name in entity change log: {}", fullName);
+      LOG.warn(
+          "entityChangeLog malformed changeId={} field=fullName value={}",
+          change.getId(),
+          fullName);
       return null;
     }
     try {
       return EntityChangeLogNameIdentifierCodec.decode(fullName);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Undecodable full name in entity change log: {}", fullName, e);
+      LOG.warn(
+          "entityChangeLog malformed changeId={} field=fullName value={}",
+          change.getId(),
+          fullName,
+          e);
       return null;
     }
   }
