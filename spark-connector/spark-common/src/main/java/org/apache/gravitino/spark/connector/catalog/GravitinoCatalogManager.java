@@ -172,7 +172,7 @@ public class GravitinoCatalogManager {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
     // The removal listener runs on cacheExecutor and may finish after close() returns, so close
-    // clients here. Expired entries not yet evicted are skipped by asMap() and left to the listener.
+    // clients here. asMap() skips expired entries not yet evicted; the listener closes those.
     clients.asMap().forEach(GravitinoCatalogManager::closeClient);
     clients.invalidateAll();
     gravitinoCatalogs.invalidateAll();
