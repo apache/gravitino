@@ -209,7 +209,7 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
 
 | Field           | Type      | Default | Description                                                                                                                                                                                                                                                                    |
 | --------------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `olderThanDays` | `long`    | 3       | Only remove orphan files older than this many days. See [5.2.4](#524-why-olderthandays-defaults-to-3) for the rationale.                                                                                                                                                       |
+| `olderThanDays` | `long`    | 3       | Only remove orphan files older than this many days; must be at least 1. See [5.2.4](#524-why-olderthandays-defaults-to-3) for the rationale.                                                                                                                                   |
 | `location`      | `String`  | null    | Custom location to scan. When specified, **only** this location is scanned instead of the table's default location. Must be validated against the table's own location - see [Section 6.1](#61-location-validation). If null, the table's registered storage location is used. |
 | `dryRun`        | `boolean` | false   | Preview-only mode - list orphan files without deleting                                                                                                                                                                                                                         |
 
@@ -232,13 +232,11 @@ A 3-day window is long enough to cover:
 - Retried or paused jobs that resume hours or days later
 - Clock skew between the storage system and the job runtime
 
-**To remove all orphan files regardless of age**, set `olderThanDays` to `0`.
-The adapter then passes the current timestamp as `older_than`, so every
-unreferenced file is eligible for deletion.
-
-**This is unsafe while any writer is active** and should only be used when
-all writes to the table are known to be stopped - for example, during a
-maintenance window or when reclaiming storage from a decommissioned table.
+**Explicit cutoffs must be at least 24 hours old.** Iceberg's Spark SQL
+procedure enforces this minimum, including for dry runs. The planned policy
+must require `olderThanDays >= 1`; `olderThanDays: 0` is not supported.
+The three-day default remains the recommended starting point for protecting
+in-flight writes. Use a longer interval if writers can run longer than that.
 Run with `dryRun: true` first to review the file list.
 
 #### 5.2.5 Example Policy Creation
@@ -362,10 +360,11 @@ public class GravitinoOrphanFileRemovalJobAdapter
                 + "." + ctx.nameIdentifier().name());
 
         // Convert olderThanDays → absolute timestamp
-        // olderThanDays == 0 means "now", i.e. remove all orphan files
+        // Iceberg requires explicit cutoffs to be at least 24 hours old.
         Map<String, String> opts = ctx.jobOptions();
         long days = Long.parseLong(
                 opts.getOrDefault("olderThanDays", "3"));
+        Preconditions.checkArgument(days >= 1, "olderThanDays must be at least 1");
         String ts = Instant.now()
                 .minus(Duration.ofDays(days))
                 .toString()
@@ -529,9 +528,9 @@ The `older_than` threshold should be set conservatively. Files from in-flight
 writes or concurrent operations may not yet be referenced by a committed
 snapshot. A minimum of 3 days is recommended.
 
-Setting `olderThanDays` to `0` removes all orphan files regardless of age.
-This is only safe when no writer is active against the table - see
-[Section 5.2.4](#524-why-olderthandays-defaults-to-3).
+The Spark procedure rejects explicit cutoffs less than 24 hours old, even
+for dry runs. `olderThanDays` must be at least `1`; zero-day cleanup is not
+supported. See [Section 5.2.4](#524-why-olderthandays-defaults-to-3).
 
 ---
 
@@ -591,10 +590,9 @@ combined into a single PR.
    somewhere (e.g., job output metadata) for review before actual deletion?
 4. ~~**PR granularity**~~ - Resolved: single PR for policy + strategy +
    adapter layers since total code is expected to be under 1000 lines.
-5. ~~**`older_than` minimum**~~ - Resolved: no hard minimum is enforced.
-   `olderThanDays: 0` is a deliberate escape hatch for reclaiming storage
-   when no writer is active. See
-   [Section 5.2.4](#524-why-olderthandays-defaults-to-3).
+5. ~~**`older_than` minimum**~~ - Resolved: the Spark SQL procedure enforces
+   a 24-hour minimum for explicit cutoffs. The policy must reject
+   `olderThanDays < 1`. See [Section 5.2.4](#524-why-olderthandays-defaults-to-3).
 6. **Minimum run interval** - Out of scope. A uniform minimum-interval
    mechanism will be defined across all four system built-in policies.
 

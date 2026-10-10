@@ -416,6 +416,14 @@ public class JobOperations {
           String metalake,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.RUN_JOB)
           JobRunRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleJobException(
+          OperationType.RUN,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received request to run job {} in metalake: {}", request.getJobTemplateName(), metalake);
 

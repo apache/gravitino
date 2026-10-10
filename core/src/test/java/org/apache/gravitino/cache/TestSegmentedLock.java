@@ -383,6 +383,28 @@ public class TestSegmentedLock {
   }
 
   @Test
+  @Timeout(5)
+  void testGlobalClearingFromSegmentOperationFailsWithoutPoisoningLock() {
+    SegmentedLock lock = new SegmentedLock(4);
+    AtomicBoolean globalActionRan = new AtomicBoolean(false);
+
+    lock.withLock(
+        "key",
+        () -> {
+          IllegalStateException exception =
+              assertThrows(
+                  IllegalStateException.class,
+                  () -> lock.withGlobalLock(() -> globalActionRan.set(true)));
+          assertTrue(exception.getMessage().contains("segment lock"));
+          assertFalse(lock.isClearing());
+        });
+
+    assertFalse(globalActionRan.get());
+    assertDoesNotThrow(() -> lock.withGlobalLock(() -> globalActionRan.set(true)));
+    assertTrue(globalActionRan.get());
+  }
+
+  @Test
   @Timeout(30)
   void testGlobalClearingWaitsForInFlightOperations() throws InterruptedException {
     SegmentedLock lock = new SegmentedLock(4);

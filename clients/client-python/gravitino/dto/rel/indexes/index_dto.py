@@ -70,10 +70,13 @@ class IndexDTO(Index):
             self._index_type is other.type()
             and self._name == other.name()
             and self._field_names == other.field_names()
+            and self._properties == other.properties()
         )
 
     def __hash__(self) -> int:
-        initial_hash = hash((self._index_type, self._name))
+        initial_hash = hash(
+            (self._index_type, self._name, frozenset(self._properties.items()))
+        )
         return reduce(
             lambda result, field_name: 31 * result + hash(tuple(field_name)),
             self._field_names,

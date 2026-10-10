@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -16,23 +16,14 @@
 # under the License.
 
 from gravitino.constants.error import ErrorConstants
-from gravitino.dto.responses.error_response import ErrorResponse
-from gravitino.exceptions.base import CatalogNotInUseException, NotFoundException
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
+from gravitino.exceptions.base import CatalogNotInUseException
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class SecretErrorHandler(RestErrorHandler):
-    def handle(self, error_response: ErrorResponse):
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-
-        if code == ErrorConstants.NOT_FOUND_CODE:
-            raise NotFoundException(error_message)
-
-        if code == ErrorConstants.NOT_IN_USE_CODE:
-            raise CatalogNotInUseException(error_message)
-
-        super().handle(error_response)
+class SecretErrorHandler(CodeMappingErrorHandler):
+    _code_exception_map = {
+        ErrorConstants.NOT_IN_USE_CODE: CatalogNotInUseException,
+    }
 
 
 SECRET_ERROR_HANDLER = SecretErrorHandler()

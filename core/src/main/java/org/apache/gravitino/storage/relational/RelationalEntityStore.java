@@ -120,7 +120,9 @@ public class RelationalEntityStore
     }
     this.entityChangeLogPoller =
         new EntityChangeLogPoller(
-            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS), changeLogMetrics);
+            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
+            config.get(Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE),
+            changeLogMetrics);
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
@@ -286,8 +288,8 @@ public class RelationalEntityStore
           () -> {
             if (cacheInvalidationEpoch.get() == epochBeforeRead) {
               cache.put(entity);
-              // A whole-cache clear can run while this key lock is held. If it happened during
-              // put, remove the value we may have written after the clear.
+              // Invalidation of another key or an ancestor can advance the epoch while this key
+              // lock is held. Remove the value if that happened during the put.
               if (cacheInvalidationEpoch.get() != epochBeforeRead) {
                 cache.invalidate(entity.nameIdentifier(), entity.type());
               }

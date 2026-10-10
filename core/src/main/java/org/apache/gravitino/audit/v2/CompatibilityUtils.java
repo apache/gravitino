@@ -55,6 +55,7 @@ public class CompatibilityUtils {
           .put(OperationType.LOAD_TABLE, Operation.LOAD_TABLE)
           .put(OperationType.LOAD_TABLE_CREDENTIAL, Operation.LOAD_TABLE_CREDENTIAL)
           .put(OperationType.PLAN_TABLE_SCAN, Operation.PLAN_TABLE_SCAN)
+          .put(OperationType.FETCH_SCAN_TASKS, Operation.FETCH_SCAN_TASKS)
           .put(OperationType.LIST_TABLE, Operation.LIST_TABLE)
           .put(OperationType.ALTER_TABLE, Operation.ALTER_TABLE)
           .put(OperationType.RENAME_TABLE, Operation.RENAME_TABLE)

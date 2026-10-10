@@ -496,6 +496,64 @@ class TestPolicyOperationUrlEncoding(unittest.TestCase):
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
 
+    def test_list_policies_for_tag_encodes_tag_name(self):
+        client = _make_mock_client({"associations": [{"policy": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_policies_for_tag(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertEqual('[{"policy": {}}]', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn("details=true", url)
+        self.assertNotIn("../../", url)
+
+    def test_associate_policy_with_tag_encodes_names_and_sends_selector(self):
+        client = _make_mock_client(
+            {
+                "code": 0,
+                "policy": _QUERY_INJECTION,
+                "tag": _PATH_TRAVERSAL,
+                "selector": {"type": "ALL_VALUES"},
+            }
+        )
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.associate_policy_with_tag(
+                _PATH_TRAVERSAL,
+                _QUERY_INJECTION,
+                {"type": "ALL_VALUES"},
+            )
+        )
+        url = _called_url(client.post)
+        self.assertIn('"selector": {"type": "ALL_VALUES"}', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertEqual(
+            {"selector": {"type": "ALL_VALUES"}},
+            client.post.call_args.kwargs["json"],
+        )
+
+    def test_disassociate_policy_from_tag_handles_no_content_response(self):
+        client = _make_mock_client({})
+        client.delete.return_value.status_code = 204
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.disassociate_policy_from_tag(_PATH_TRAVERSAL, _QUERY_INJECTION)
+        )
+        url = _called_url(client.delete)
+        self.assertIn('"removed": true', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+
+    def test_list_tags_for_policy_encodes_policy_name(self):
+        client = _make_mock_client({"associations": [{"tag": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_tags_for_policy(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertEqual('[{"tag": {}}]', result)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertIn("details=true", url)
+        self.assertNotIn("?admin=true", url)
+
 
 class TestStatisticOperationUrlEncoding(unittest.TestCase):
     def test_list_of_statistics_encodes_metadata_fullname(self):
