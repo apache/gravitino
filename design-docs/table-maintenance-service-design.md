@@ -197,17 +197,32 @@ Example content:
 Automated maintenance should set at least one of `onCommit` or `crontab` (orphan-cleanup:
 **`crontab` only**).
 
-Client auth is cluster-static in `gravitino.conf`: **one** Gravitino identity
-(`gravitino.maintenance.gravitinoAuth.*`) and **one** Iceberg REST client auth
-(`gravitino.maintenance.ircAuth.*`). At `runJob`, the control plane builds two bags — non-sensitive
-props plus an auth overlay:
+#### 5.1.2 Sensitive credentials
 
-| Runtime bag         | Non-sensitive (examples)                                      | Auth overlay                                |
-| ------------------- | ------------------------------------------------------------- | ------------------------------------------- |
-| **`updateOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*`     |
-| **`jobOptions`**    | nearest policy `jobOptions` (`uri`, `type`, Spark resources…) | `gravitino.maintenance.ircAuth.*`           |
+Policy content is versioned, edited through Policy APIs, and readable with `VIEW_POLICY`.
+**Secrets must not live there.** Put credential-shaped keys in `jobOptions` /
+`rewriteOptions` and create/alter **rejects** them. Non-sensitive Spark / IRC client props
+(`uri`, `type`, memory, …) stay on the nearest policy; auth is cluster-static in
+`gravitino.conf` (values may be SecretManager references). Conf keys: §7.4.
 
-It also uses `gravitinoAuth.*` for expand / submit / RBAC.
+TMS talks to **two** backends with **two** identities, so there are two prefixes:
+
+| Prefix                                 | Who uses it                                              |
+| -------------------------------------- | -------------------------------------------------------- |
+| `gravitino.maintenance.gravitinoAuth.` | Control plane (expand / submit / RBAC) and Jobs that call **Gravitino** |
+| `gravitino.maintenance.ircAuth.`       | Spark Jobs that call **Iceberg REST**                    |
+
+They are not interchangeable: one principal for metalake APIs, one for IRC.
+
+At `runJob`, the control plane builds the Job template’s two bags and **overlays** auth onto
+each — it does not write secrets back into policy content:
+
+| Runtime bag         | Non-sensitive (examples)                                      | Auth overlay                            |
+| ------------------- | ------------------------------------------------------------- | --------------------------------------- |
+| **`updateOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*` |
+| **`jobOptions`**    | nearest policy `jobOptions` (`uri`, `type`, Spark resources…) | `gravitino.maintenance.ircAuth.*`       |
+
+Redact secrets in logs and `runtime_job_template` snapshots.
 
 ### 5.2 Scheduling and commit
 
