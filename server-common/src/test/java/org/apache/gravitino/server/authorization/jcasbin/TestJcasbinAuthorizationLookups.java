@@ -104,7 +104,10 @@ public class TestJcasbinAuthorizationLookups {
       Assertions.assertEquals(
           Optional.of(100L), lookups.resolveMetadataId(canonical, "ml1", context));
     }
-    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    // Each distinct spelling resolves capabilities and the physical table name once.
+    verify(catalogs, times(4)).doWithCatalog(any(), any());
+    verify(catalog, times(2)).capability();
+    verify(catalog, times(2)).ops();
     Assertions.assertEquals(
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", canonical),
         metadataIdCache.lastKey);

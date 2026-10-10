@@ -105,6 +105,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("maxPartitionNum")
     private Long maxPartitionNum;
 
+    @JsonProperty("rewriteStrategy")
+    private String rewriteStrategy;
+
+    @JsonProperty("sortOrder")
+    private String sortOrder;
+
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
@@ -167,6 +173,26 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Returns the Iceberg rewrite_data_files top-level strategy.
+     *
+     * @return rewrite strategy
+     */
+    public String rewriteStrategy() {
+      return rewriteStrategy == null
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+          : rewriteStrategy;
+    }
+
+    /**
+     * Returns the Iceberg rewrite_data_files top-level sort_order.
+     *
+     * @return sort order expression
+     */
+    public String sortOrder() {
+      return sortOrder == null ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER : sortOrder;
+    }
+
+    /**
      * Returns rewrite options expanded to job.options.* during rule generation.
      *
      * @return rewrite options map
@@ -205,6 +231,8 @@ public interface PolicyContentDTO extends PolicyContent {
           dataFileMseWeight(),
           deleteFileNumberWeight(),
           maxPartitionNum(),
+          rewriteStrategy(),
+          sortOrder(),
           rewriteOptions());
     }
   }

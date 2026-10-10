@@ -336,12 +336,15 @@ public class TestJcasbinMetadataIdCacheNormalization {
     put(table, 100L);
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
-    // The loader reuses the normalized name, so even a shared miss resolves capabilities once.
-    verify(catalogs, times(1)).doWithCatalog(any(), any());
-    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
-    verify(catalogs, times(1)).doWithCatalog(any(), any());
-    assertEquals(Optional.of(100L), resolve(table));
+    // Normalization resolves capabilities and the physical table name once each.
+    // The loader and repeated lookups reuse that result within the same request.
     verify(catalogs, times(2)).doWithCatalog(any(), any());
+    assertEquals(Optional.of(100L), lookups.resolveMetadataId(table, METALAKE, context));
+    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    assertEquals(Optional.of(100L), resolve(table));
+    verify(catalogs, times(4)).doWithCatalog(any(), any());
+    verify(catalog, times(2)).capability();
+    verify(catalog, times(2)).ops();
     verify(store, times(1)).get(any(), any(), any());
     doThrow(new NoSuchCatalogException("Missing catalog"))
         .when(catalogs)
@@ -450,7 +453,7 @@ public class TestJcasbinMetadataIdCacheNormalization {
     assertEquals(
         Optional.of(100L),
         lookups.resolveMetadataId(table, METALAKE, new AuthorizationRequestContext()));
-    verify(catalogs, times(2)).doWithCatalog(any(), any());
+    verify(catalogs, times(3)).doWithCatalog(any(), any());
     verify(store, times(1)).get(any(), any(), any());
   }
 
@@ -475,7 +478,7 @@ public class TestJcasbinMetadataIdCacheNormalization {
     assertEquals(Optional.of(200L), lookups.resolveMetadataId(healthy, METALAKE, context));
     assertEquals(Optional.of(300L), lookups.resolveMetadataId(catalogObject, METALAKE, context));
     verify(catalogs, times(1)).doWithCatalog(eq(NameIdentifier.of(METALAKE, "cat")), any());
-    verify(catalogs, times(1)).doWithCatalog(eq(NameIdentifier.of(METALAKE, "healthy")), any());
+    verify(catalogs, times(2)).doWithCatalog(eq(NameIdentifier.of(METALAKE, "healthy")), any());
   }
 
   @Test
