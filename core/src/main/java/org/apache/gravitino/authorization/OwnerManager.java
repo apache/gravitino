@@ -44,8 +44,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * OwnerManager is used for manage the owner of metadata object. The user and group don't have an
- * owner. Because the post hook will call the methods. We shouldn't add the lock of the metadata
- * object. Otherwise, it will cause deadlock.
+ * owner. It takes no tree lock: the entity store keeps one live owner per object and fences the
+ * object and the owner principal inside the owner write, which also lets the post hooks of create
+ * operations call it without lock ordering concerns.
  */
 public class OwnerManager implements OwnerDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
