@@ -29,6 +29,28 @@ install it in your local.
 pip install apache-gravitino
 ```
 
+The base installation provides the Gravitino metadata client. For GVFS with local `file://` paths
+and no remote backend, install only the shared GVFS dependencies:
+
+```shell
+pip install "apache-gravitino[gvfs]"
+```
+
+For a remote storage backend, install its extra, for example:
+
+```shell
+pip install "apache-gravitino[hdfs]"
+pip install "apache-gravitino[s3]"
+pip install "apache-gravitino[gcs]"
+pip install "apache-gravitino[oss]"
+pip install "apache-gravitino[azure]"
+```
+
+To preserve the previous installation profile that included all GVFS backends, install
+`apache-gravitino[storage]`. Ray Data applications that only use Gravitino for metadata can install
+the base Gravitino client alongside their Ray Data dependencies without installing these storage
+extras.
+
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
@@ -47,7 +69,7 @@ contains the following code snippets:
 
 1. Install HDFS Python client.
 2. Create a HDFS client to connect HDFS and to do some test operations.
-3. Install Gravitino Python client.
+3. Install the Gravitino Python client with HDFS support: `pip install "apache-gravitino[hdfs]"`.
 4. Initialize Gravitino admin client and create a Gravitino metalake.
 5. Initialize Gravitino client and list metalakes.
 6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is

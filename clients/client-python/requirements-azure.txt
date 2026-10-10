@@ -15,18 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
-include requirements.txt
-include requirements-dev.txt
-include requirements-gvfs.txt
-include requirements-hdfs.txt
-include requirements-lance.txt
-include requirements-s3.txt
-include requirements-gcs.txt
-include requirements-oss.txt
-include requirements-azure.txt
-include README.md
-include LICENSE
-include NOTICE
-include gravitino/version.ini
-graft licenses
+adlfs==2026.2.0
