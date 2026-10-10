@@ -24,14 +24,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.policy.ReadRestrictionContent;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Comparison;
+import org.apache.gravitino.policy.expression.CanonicalExpression.ComparisonOperator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.GroupMembership;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Literal;
 import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralArray;
 import org.apache.gravitino.policy.expression.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Logical;
+import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalExpression;
+import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalOperator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.SessionUser;
 import org.apache.gravitino.policy.expression.RestrictedRegoProgram.ColumnMask;
 import org.apache.gravitino.policy.expression.RestrictedRegoProgram.FilterBranch;
@@ -42,7 +44,6 @@ import org.apache.gravitino.policy.expression.RestrictedRegoProgram.RowFilter;
 /** Parses and validates complete programs in the {@code restricted-rego-v1} source dialect. */
 public final class RestrictedRegoExpressionParserFacade {
 
-  private static final int MAX_SOURCE_BYTES = 16 * 1024;
   private static final int MAX_SOURCE_DEPTH = 8;
   private static final int MAX_AST_NODES = 256;
   private static final int MAX_STRING_BYTES = 4 * 1024;
@@ -61,9 +62,10 @@ public final class RestrictedRegoExpressionParserFacade {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(source), "restricted-rego-v1 program cannot be blank");
     Preconditions.checkArgument(
-        source.getBytes(StandardCharsets.UTF_8).length <= MAX_SOURCE_BYTES,
+        source.getBytes(StandardCharsets.UTF_8).length
+            <= ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES,
         "restricted-rego-v1 source must not exceed %s UTF-8 bytes",
-        MAX_SOURCE_BYTES);
+        ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES);
 
     RestrictedRegoProgram program = new SourceParser(source).parseProgram();
     validateProgram(program);
@@ -121,6 +123,10 @@ public final class RestrictedRegoExpressionParserFacade {
           lowered.depth() <= MAX_SOURCE_DEPTH,
           "lowered row-filter depth must not exceed %s",
           MAX_SOURCE_DEPTH);
+      Preconditions.checkArgument(
+          countNodes(lowered) <= MAX_AST_NODES,
+          "lowered row-filter AST must not exceed %s nodes",
+          MAX_AST_NODES);
     }
   }
 
@@ -150,9 +156,9 @@ public final class RestrictedRegoExpressionParserFacade {
     if (expression instanceof Not) {
       return 1 + countNodes(((Not) expression).operand());
     }
-    if (expression instanceof Logical) {
+    if (expression instanceof LogicalExpression) {
       int count = 1;
-      for (CanonicalExpression child : ((Logical) expression).operands()) {
+      for (CanonicalExpression child : ((LogicalExpression) expression).operands()) {
         count += countNodes(child);
       }
       return count;
@@ -250,7 +256,7 @@ public final class RestrictedRegoExpressionParserFacade {
       while (match(TokenType.OR)) {
         operands.add(parseAndExpression());
       }
-      return operands.size() == 1 ? operands.get(0) : new Logical(Operator.OR, operands);
+      return LogicalExpression.of(LogicalOperator.OR, operands);
     }
 
     private CanonicalExpression parseAndExpression() {
@@ -259,7 +265,7 @@ public final class RestrictedRegoExpressionParserFacade {
       while (match(TokenType.AND)) {
         operands.add(parseNotExpression());
       }
-      return operands.size() == 1 ? operands.get(0) : new Logical(Operator.AND, operands);
+      return LogicalExpression.of(LogicalOperator.AND, operands);
     }
 
     private CanonicalExpression parseNotExpression() {
@@ -281,7 +287,7 @@ public final class RestrictedRegoExpressionParserFacade {
         return left;
       }
 
-      Operator operator = Operator.fromSourceToken(advance().text);
+      ComparisonOperator operator = ComparisonOperator.fromSourceToken(advance().text);
       CanonicalExpression right = parsePrimary();
       if (isComparisonOperator(current.type)) {
         throw error("chained comparisons are not supported");

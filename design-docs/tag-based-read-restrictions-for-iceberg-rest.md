@@ -359,12 +359,12 @@ Save-time validation applies these limits before canonicalization:
 
 - source length: 16 KiB of UTF-8;
 - operation depth: 8;
-- AST nodes: 256;
+- source AST nodes: 256;
 - decoded string literal: 4 KiB of UTF-8; and
 - array elements: 256.
 
-The resolved predicate also has maximum operation depth 8. Canonicalization cannot make an
-oversized expression valid.
+The lowered row-filter predicate also has maximum operation depth 8 and maximum AST nodes 256.
+Canonicalization cannot make an oversized expression valid.
 
 Operation depth counts AST operation nodes. A consecutive associative `and` or `or` chain is one
 n-ary logical node, and parentheses do not add depth. Conditional row filters are also lowered and

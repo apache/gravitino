@@ -23,9 +23,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Logical;
+import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalExpression;
+import org.apache.gravitino.policy.expression.CanonicalExpression.LogicalOperator;
 import org.apache.gravitino.policy.expression.CanonicalExpression.Not;
-import org.apache.gravitino.policy.expression.CanonicalExpression.Operator;
 
 /** A parsed, unresolved program in the {@code restricted-rego-v1} source dialect. */
 public interface RestrictedRegoProgram {
@@ -233,14 +233,14 @@ public interface RestrictedRegoProgram {
         List<CanonicalExpression> selected = new ArrayList<>(precedingBranchMisses);
         selected.add(branch.condition());
         selected.add(branch.result());
-        disjuncts.add(new Logical(Operator.AND, selected));
+        disjuncts.add(LogicalExpression.of(LogicalOperator.AND, selected));
         precedingBranchMisses.add(new Not(branch.condition()));
       }
 
       List<CanonicalExpression> fallbackOperands = new ArrayList<>(precedingBranchMisses);
       fallbackOperands.add(fallback);
-      disjuncts.add(new Logical(Operator.AND, fallbackOperands));
-      CanonicalExpression lowered = new Logical(Operator.OR, disjuncts);
+      disjuncts.add(LogicalExpression.of(LogicalOperator.AND, fallbackOperands));
+      CanonicalExpression lowered = LogicalExpression.of(LogicalOperator.OR, disjuncts);
       lowered.validate();
       return lowered;
     }

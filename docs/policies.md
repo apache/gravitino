@@ -47,6 +47,51 @@ The row-filter and column-mask policy types can be created and associated with t
 does not enforce them yet. Until enforcement is available, these policy types do not restrict data
 access.
 
+### Read-Restriction Expressions
+
+Row-filter and column-mask expressions use `restricted-rego-v1`, a small, fail-closed Rego-like
+syntax owned by Gravitino. Each expression is one complete rule, not an arbitrary Rego module. A
+row filter starts with `filter :=` and produces a Boolean predicate. A column mask starts with
+`mask := action("...")` and produces an allowlisted masking action.
+
+For example:
+
+```text
+filter := col("region") == "US" if is_group_member("auditors")
+else := col("owner") == session_user()
+
+mask := action("show-last-4") if is_group_member("support")
+else := action("replace-with-null")
+```
+
+Conditional branches are evaluated from left to right. The first true condition selects its result,
+and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
+must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.
+
+The syntax supports these constructs:
+
+- `col("name")`, `session_user()`, and `is_group_member("group")`;
+- JSON string literals, exact decimal numbers, `true`, `false`, `null`, and homogeneous non-null
+  literal arrays;
+- comparisons `==`, `!=`, `<`, `<=`, `>`, `>=`, and `in`; and
+- Boolean operators `and`, `or`, and `not`.
+
+Column-mask actions are `mask-alphanum`, `mask-to-fixed-value`, `replace-with-null`, `show-first-4`,
+`show-last-4`, `truncate-to-year`, `truncate-to-month`, `sha-256-global`, and
+`sha-256-query-local`.
+
+Validation applies these limits when a policy is created or its content is updated:
+
+- 16 KiB of UTF-8 source;
+- operation depth 8 for the source and lowered row-filter predicate;
+- 256 nodes for the source AST and lowered row-filter predicate;
+- 4 KiB of UTF-8 for each decoded string literal; and
+- 256 elements in a literal array.
+
+Bare identifiers, arbitrary functions, comments, packages, imports, variables, chained
+comparisons, nested arrays, and a conditional rule without a final `else` are rejected. Read paths
+do not re-parse stored policy expressions.
+
 A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
 it does not interpret their names or values. Built-in types have a defined content shape. See
 [Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules and

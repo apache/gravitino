@@ -43,39 +43,38 @@ public interface CanonicalExpression {
   void validate() throws IllegalArgumentException;
 
   /**
-   * Returns the source operation depth defined by {@code restricted-rego-v1}.
+   * Returns the operation depth defined by {@code restricted-rego-v1}.
    *
-   * @return expression depth
+   * <p>Value leaves such as a column, string, or number have depth 0. Atomic predicates such as a
+   * comparison, Boolean literal, or group-membership check have depth 1. Negation and a logical
+   * expression add one to their deepest operand. A consecutive n-ary logical chain counts as one
+   * operation, so {@code true and false and true} has depth 2.
+   *
+   * @return expression operation depth
    */
   int depth();
 
-  /** Operators supported by {@code restricted-rego-v1}. */
-  enum Operator {
+  /** Comparison operators supported by {@code restricted-rego-v1}. */
+  enum ComparisonOperator {
     /** Equality comparison. */
-    EQ("eq"),
+    EQ("=="),
     /** Inequality comparison. */
-    NEQ("neq"),
+    NEQ("!="),
     /** Less-than comparison. */
-    LT("lt"),
+    LT("<"),
     /** Less-than-or-equal comparison. */
-    LTE("lte"),
+    LTE("<="),
     /** Greater-than comparison. */
-    GT("gt"),
+    GT(">"),
     /** Greater-than-or-equal comparison. */
-    GTE("gte"),
+    GTE(">="),
     /** Literal-array membership comparison. */
-    IN("in"),
-    /** Boolean conjunction. */
-    AND("and"),
-    /** Boolean disjunction. */
-    OR("or"),
-    /** Boolean negation. */
-    NOT("not");
+    IN("in");
 
-    private final String canonicalName;
+    private final String sourceToken;
 
-    Operator(String canonicalName) {
-      this.canonicalName = canonicalName;
+    ComparisonOperator(String sourceToken) {
+      this.sourceToken = sourceToken;
     }
 
     /**
@@ -84,7 +83,7 @@ public interface CanonicalExpression {
      * @param token source operator token
      * @return parsed operator
      */
-    public static Operator fromSourceToken(String token) {
+    public static ComparisonOperator fromSourceToken(String token) {
       Preconditions.checkArgument(token != null && !token.isEmpty(), "operator cannot be empty");
       switch (token) {
         case "==":
@@ -107,12 +106,35 @@ public interface CanonicalExpression {
     }
 
     /**
-     * Returns the canonical operator name used by the resolved model.
+     * Returns the token used in restricted Rego source.
      *
-     * @return canonical operator name
+     * @return source token
      */
-    public String canonicalName() {
-      return canonicalName;
+    public String sourceToken() {
+      return sourceToken;
+    }
+  }
+
+  /** N-ary logical operators supported by {@code restricted-rego-v1}. */
+  enum LogicalOperator {
+    /** Boolean conjunction. */
+    AND("and"),
+    /** Boolean disjunction. */
+    OR("or");
+
+    private final String sourceToken;
+
+    LogicalOperator(String sourceToken) {
+      this.sourceToken = sourceToken;
+    }
+
+    /**
+     * Returns the token used in restricted Rego source.
+     *
+     * @return source token
+     */
+    public String sourceToken() {
+      return sourceToken;
     }
   }
 
@@ -130,11 +152,11 @@ public interface CanonicalExpression {
 
   /** A binary comparison operation. */
   final class Comparison implements CanonicalExpression {
-    private final Operator operator;
+    private final ComparisonOperator operator;
     private final CanonicalExpression left;
     private final CanonicalExpression right;
 
-    Comparison(Operator operator, CanonicalExpression left, CanonicalExpression right) {
+    Comparison(ComparisonOperator operator, CanonicalExpression left, CanonicalExpression right) {
       this.operator = operator;
       this.left = left;
       this.right = right;
@@ -145,7 +167,7 @@ public interface CanonicalExpression {
      *
      * @return comparison operator
      */
-    public Operator operator() {
+    public ComparisonOperator operator() {
       return operator;
     }
 
@@ -169,14 +191,17 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          ExpressionValidation.isComparisonOperator(operator),
-          "comparison requires a comparison operator");
+      Preconditions.checkArgument(operator != null, "comparison operator cannot be null");
       Preconditions.checkArgument(
           left != null && right != null, "comparison operands cannot be null");
       left.validate();
       right.validate();
-      ExpressionValidation.validateComparison(operator, left, right);
+      try {
+        ExpressionValidation.validateComparison(operator, left, right);
+      } catch (IllegalArgumentException exception) {
+        throw new IllegalArgumentException(
+            exception.getMessage() + "; offending comparison: " + this, exception);
+      }
     }
 
     @Override
@@ -253,22 +278,39 @@ public interface CanonicalExpression {
   }
 
   /** An n-ary Boolean conjunction or disjunction. */
-  final class Logical implements CanonicalExpression {
-    private final Operator operator;
+  final class LogicalExpression implements CanonicalExpression {
+    private final LogicalOperator operator;
     private final List<CanonicalExpression> operands;
 
-    Logical(Operator operator, List<CanonicalExpression> operands) {
+    LogicalExpression(LogicalOperator operator, List<CanonicalExpression> operands) {
       this.operator = operator;
       this.operands =
           operands == null ? null : Collections.unmodifiableList(new ArrayList<>(operands));
     }
 
+    static CanonicalExpression of(LogicalOperator operator, List<CanonicalExpression> operands) {
+      if (operands == null) {
+        return new LogicalExpression(operator, null);
+      }
+
+      List<CanonicalExpression> flattened = new ArrayList<>();
+      for (CanonicalExpression operand : operands) {
+        if (operand instanceof LogicalExpression
+            && ((LogicalExpression) operand).operator() == operator) {
+          flattened.addAll(((LogicalExpression) operand).operands());
+        } else {
+          flattened.add(operand);
+        }
+      }
+      return flattened.size() == 1 ? flattened.get(0) : new LogicalExpression(operator, flattened);
+    }
+
     /**
      * Returns the logical operator.
      *
-     * @return {@link Operator#AND} or {@link Operator#OR}
+     * @return logical operator
      */
-    public Operator operator() {
+    public LogicalOperator operator() {
       return operator;
     }
 
@@ -283,21 +325,19 @@ public interface CanonicalExpression {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          operator == Operator.AND || operator == Operator.OR,
-          "logical expression requires AND or OR");
+      Preconditions.checkArgument(operator != null, "logical expression operator cannot be null");
       Preconditions.checkArgument(
           operands != null && operands.size() >= 2,
           "%s requires at least two operands",
-          operator.canonicalName());
+          operator.sourceToken());
       for (CanonicalExpression child : operands) {
         Preconditions.checkArgument(
-            child != null, "%s operand cannot be null", operator.canonicalName());
+            child != null, "%s operand cannot be null", operator.sourceToken());
         child.validate();
         Preconditions.checkArgument(
             ExpressionValidation.isPredicate(child),
             "%s operands must be boolean predicates",
-            operator.canonicalName());
+            operator.sourceToken());
       }
     }
 
@@ -316,10 +356,10 @@ public interface CanonicalExpression {
 
     @Override
     public boolean equals(Object other) {
-      if (!(other instanceof Logical)) {
+      if (!(other instanceof LogicalExpression)) {
         return false;
       }
-      Logical that = (Logical) other;
+      LogicalExpression that = (LogicalExpression) other;
       return operator == that.operator && Objects.equals(operands, that.operands);
     }
 
@@ -330,7 +370,7 @@ public interface CanonicalExpression {
 
     @Override
     public String toString() {
-      return "Logical{" + "operator=" + operator + ", operands=" + operands + '}';
+      return "LogicalExpression{" + "operator=" + operator + ", operands=" + operands + '}';
     }
   }
 
@@ -642,156 +682,5 @@ public interface CanonicalExpression {
     public String toString() {
       return "LiteralArray{" + "elementType=" + elementType + ", values=" + values + '}';
     }
-  }
-}
-
-final class ExpressionValidation {
-  private ExpressionValidation() {}
-
-  static boolean isPredicate(CanonicalExpression expression) {
-    if (expression instanceof CanonicalExpression.Comparison
-        || expression instanceof CanonicalExpression.Not
-        || expression instanceof CanonicalExpression.Logical
-        || expression instanceof CanonicalExpression.GroupMembership) {
-      return true;
-    }
-    return expression instanceof CanonicalExpression.Literal
-        && ((CanonicalExpression.Literal) expression).literalType()
-            == CanonicalExpression.LiteralType.BOOLEAN;
-  }
-
-  static boolean isContextOnly(CanonicalExpression expression) {
-    if (expression instanceof CanonicalExpression.Column) {
-      return false;
-    }
-    if (expression instanceof CanonicalExpression.Comparison) {
-      CanonicalExpression.Comparison comparison = (CanonicalExpression.Comparison) expression;
-      return isContextOnly(comparison.left()) && isContextOnly(comparison.right());
-    }
-    if (expression instanceof CanonicalExpression.Not) {
-      return isContextOnly(((CanonicalExpression.Not) expression).operand());
-    }
-    if (expression instanceof CanonicalExpression.Logical) {
-      for (CanonicalExpression child : ((CanonicalExpression.Logical) expression).operands()) {
-        if (!isContextOnly(child)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  static boolean isComparisonOperator(CanonicalExpression.Operator operator) {
-    return operator == CanonicalExpression.Operator.EQ
-        || operator == CanonicalExpression.Operator.NEQ
-        || operator == CanonicalExpression.Operator.LT
-        || operator == CanonicalExpression.Operator.LTE
-        || operator == CanonicalExpression.Operator.GT
-        || operator == CanonicalExpression.Operator.GTE
-        || operator == CanonicalExpression.Operator.IN;
-  }
-
-  static void validateComparison(
-      CanonicalExpression.Operator operator, CanonicalExpression left, CanonicalExpression right) {
-    if (operator == CanonicalExpression.Operator.IN) {
-      Preconditions.checkArgument(
-          right instanceof CanonicalExpression.LiteralArray,
-          "right operand of in must be a literal array");
-      Preconditions.checkArgument(
-          left instanceof CanonicalExpression.Column
-              || left instanceof CanonicalExpression.SessionUser,
-          "left operand of in must be col(...) or session_user()");
-      if (left instanceof CanonicalExpression.SessionUser) {
-        CanonicalExpression.LiteralArray array = (CanonicalExpression.LiteralArray) right;
-        Preconditions.checkArgument(
-            array.elementType() == CanonicalExpression.LiteralType.STRING,
-            "session_user() can only be tested against a string array");
-      }
-      return;
-    }
-
-    Preconditions.checkArgument(
-        !(left instanceof CanonicalExpression.LiteralArray)
-            && !(right instanceof CanonicalExpression.LiteralArray),
-        "%s does not support array operands",
-        operator.canonicalName());
-
-    boolean equality =
-        operator == CanonicalExpression.Operator.EQ || operator == CanonicalExpression.Operator.NEQ;
-    if (isColumnLiteralPair(left, right)) {
-      CanonicalExpression.Literal literal =
-          left instanceof CanonicalExpression.Literal
-              ? (CanonicalExpression.Literal) left
-              : (CanonicalExpression.Literal) right;
-      Preconditions.checkArgument(
-          literal.literalType() != CanonicalExpression.LiteralType.NULL || equality,
-          "null supports only == and !=");
-      Preconditions.checkArgument(
-          literal.literalType() != CanonicalExpression.LiteralType.BOOLEAN || equality,
-          "boolean literal supports only == and !=");
-      return;
-    }
-
-    if (isColumnSessionUserPair(left, right)) {
-      Preconditions.checkArgument(equality, "session_user() supports only == and !=");
-      return;
-    }
-
-    if (isSessionUserStringPair(left, right)) {
-      Preconditions.checkArgument(equality, "session_user() supports only == and !=");
-      return;
-    }
-
-    throw new IllegalArgumentException(
-        String.format(
-            "Unsupported operands for %s in restricted-rego-v1", operator.canonicalName()));
-  }
-
-  static void validateUnicodeScalars(String value, String description) {
-    for (int index = 0; index < value.length(); index++) {
-      char current = value.charAt(index);
-      if (Character.isHighSurrogate(current)) {
-        Preconditions.checkArgument(
-            index + 1 < value.length() && Character.isLowSurrogate(value.charAt(index + 1)),
-            "%s cannot contain an isolated surrogate",
-            description);
-        index++;
-      } else {
-        Preconditions.checkArgument(
-            !Character.isLowSurrogate(current),
-            "%s cannot contain an isolated surrogate",
-            description);
-      }
-    }
-  }
-
-  private static boolean isColumnLiteralPair(CanonicalExpression left, CanonicalExpression right) {
-    return (left instanceof CanonicalExpression.Column
-            && right instanceof CanonicalExpression.Literal)
-        || (right instanceof CanonicalExpression.Column
-            && left instanceof CanonicalExpression.Literal);
-  }
-
-  private static boolean isColumnSessionUserPair(
-      CanonicalExpression left, CanonicalExpression right) {
-    return (left instanceof CanonicalExpression.Column
-            && right instanceof CanonicalExpression.SessionUser)
-        || (right instanceof CanonicalExpression.Column
-            && left instanceof CanonicalExpression.SessionUser);
-  }
-
-  private static boolean isSessionUserStringPair(
-      CanonicalExpression left, CanonicalExpression right) {
-    if (left instanceof CanonicalExpression.SessionUser
-        && right instanceof CanonicalExpression.Literal) {
-      return ((CanonicalExpression.Literal) right).literalType()
-          == CanonicalExpression.LiteralType.STRING;
-    }
-    if (right instanceof CanonicalExpression.SessionUser
-        && left instanceof CanonicalExpression.Literal) {
-      return ((CanonicalExpression.Literal) left).literalType()
-          == CanonicalExpression.LiteralType.STRING;
-    }
-    return false;
   }
 }
