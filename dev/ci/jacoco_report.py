@@ -42,6 +42,12 @@ import sys
 import xml.etree.ElementTree as ET
 import urllib.parse
 
+_CI_DIR = os.path.dirname(os.path.abspath(__file__))
+if _CI_DIR not in sys.path:
+    sys.path.insert(0, _CI_DIR)
+
+from coverage_comment import COMMENT_MARKER, commit_line
+
 
 def parse_counters(element):
     """Extract coverage counters from a JaCoCo XML element."""
@@ -251,7 +257,9 @@ def generate_report(overall, modules, source_files, changed_java_files,
     )
 
     # Hidden marker for comment update detection
-    lines.append("<!-- coverage-report -->")
+    lines.append(COMMENT_MARKER)
+    if head_sha:
+        lines.append(commit_line(head_sha))
 
     # Header table (same style as madrapps/jacoco-report)
     lines.append("### Code Coverage Report")
