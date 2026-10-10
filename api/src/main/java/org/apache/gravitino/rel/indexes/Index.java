@@ -149,5 +149,21 @@ public interface Index {
      * Vector similarity data skipping index for approximate nearest-neighbor search in ClickHouse.
      */
     DATA_SKIPPING_VECTOR_SIMILARITY,
+
+    /**
+     * Legacy Annoy data skipping index. ClickHouse supported it in earlier releases but replaced it
+     * with {@code vector_similarity} in v24.8 and removed support in v25.5. This type exists only
+     * so that the ClickHouse catalog can preserve the metadata of pre-existing tables; it is never
+     * generated as DDL.
+     */
+    DATA_SKIPPING_ANNOY,
+
+    /**
+     * Legacy USearch data skipping index. ClickHouse supported it in earlier releases but replaced
+     * it with {@code vector_similarity} in v24.8 and removed support in v25.5. This type exists
+     * only so that the ClickHouse catalog can preserve the metadata of pre-existing tables; it is
+     * never generated as DDL.
+     */
+    DATA_SKIPPING_USEARCH,
   }
 }
