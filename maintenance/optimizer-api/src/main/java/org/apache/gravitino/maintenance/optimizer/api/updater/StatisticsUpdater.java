@@ -40,6 +40,18 @@ public interface StatisticsUpdater extends Provider {
       NameIdentifier tableIdentifier, List<StatisticEntry<?>> tableStatistics);
 
   /**
+   * Atomically merge object-valued table statistics, preserving omitted object keys.
+   * Implementations must publish the entire batch together and serialize concurrent merges.
+   *
+   * @param tableIdentifier catalog/schema/table identifier
+   * @param tableStatistics object-valued statistics to merge
+   */
+  default void mergeTableStatistics(
+      NameIdentifier tableIdentifier, List<StatisticEntry<?>> tableStatistics) {
+    throw new UnsupportedOperationException("Atomic statistics merging is not supported");
+  }
+
+  /**
    * Persist partition statistics.
    *
    * @param tableIdentifier catalog/schema/table identifier

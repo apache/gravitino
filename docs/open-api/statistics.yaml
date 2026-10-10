@@ -167,6 +167,68 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    patch:
+      tags:
+        - statistics
+      summary: Atomically merge object-valued statistics
+      description: >-
+        Shallow-merge the supplied keys into each object-valued statistic, preserving omitted keys.
+        Missing statistics are created. Incoming and existing values must be objects.
+        All measurements in the request are published together. Concurrent merges for a table
+        are serialized by the serving Gravitino instance. Read related values in one GET response.
+        Requires a server supporting this PATCH operation; PUT retains replacement semantics.
+      operationId: mergeStatistics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatisticsUpdateRequest"
+            examples:
+              ManifestStatisticsMerge:
+                value:
+                  updates:
+                    custom-manifest-number-by-spec: { "1": 120 }
+                    custom-avg-manifest-size-by-spec: { "1": 4194304.0 }
+
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          description: Bad Request - The object type or statistic names are invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalStatisticNameException:
+                  $ref: "#/components/examples/IllegalStatisticNameException"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "409":
+          description: Conflict - The specified statistic is unmodifiable
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                UnmodifiableStatisticException:
+                  $ref: "#/components/examples/UnmodifiableStatisticException"
+        "501":
+          description: Not Implemented - The requested statistics operation is not supported
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/statistics/partitions:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"

@@ -47,6 +47,16 @@ public interface StatisticDispatcher extends Closeable {
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics);
 
   /**
+   * Atomically shallow-merge object-valued statistics for a metadata object.
+   *
+   * @param metalake the metalake name
+   * @param metadataObject the metadata object
+   * @param statistics object values containing keys to merge
+   */
+  void mergeStatistics(
+      String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics);
+
+  /**
    * Drop statistics for a given metadata object in a metalake.
    *
    * @param metalake the name of the metalake

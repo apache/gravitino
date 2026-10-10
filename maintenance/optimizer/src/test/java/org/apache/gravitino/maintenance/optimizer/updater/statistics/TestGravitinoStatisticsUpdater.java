@@ -40,6 +40,36 @@ import org.mockito.Mockito;
 class TestGravitinoStatisticsUpdater {
 
   @Test
+  @SuppressWarnings("unchecked")
+  void testObjectStatisticsUseOneMergeRequest() {
+    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
+    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
+    updater.setGravitinoClientForTest(client);
+    Map<String, StatisticValue<?>> statistics =
+        Map.of(
+            "custom-count-by-group",
+            StatisticValues.objectValue(Map.of("west", StatisticValues.longValue(12L))),
+            "custom-average-size-by-group",
+            StatisticValues.objectValue(Map.of("west", StatisticValues.doubleValue(1024D))));
+    updater.mergeTableStatistics(
+        NameIdentifier.of("catalog", "db", "table"),
+        List.of(
+            new StatisticEntryImpl<>(
+                "custom-count-by-group", statistics.get("custom-count-by-group")),
+            new StatisticEntryImpl<>(
+                "custom-average-size-by-group", statistics.get("custom-average-size-by-group"))));
+    ArgumentCaptor<Map<String, StatisticValue<?>>> captor = ArgumentCaptor.forClass(Map.class);
+    Mockito.verify(
+            client
+                .loadCatalog("catalog")
+                .asTableCatalog()
+                .loadTable(NameIdentifier.of("db", "table"))
+                .supportsStatistics())
+        .mergeStatistics(captor.capture());
+    Assertions.assertEquals(statistics, captor.getValue());
+  }
+
+  @Test
   void testUpdateTableStatisticsWithoutInitializeFails() {
     GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
     IllegalStateException exception =

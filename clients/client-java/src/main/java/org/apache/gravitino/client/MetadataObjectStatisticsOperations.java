@@ -92,6 +92,26 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
   }
 
   @Override
+  public void mergeStatistics(Map<String, StatisticValue<?>> statistics)
+      throws UnmodifiableStatisticException, IllegalStatisticNameException {
+    Preconditions.checkArgument(
+        statistics != null && !statistics.isEmpty(), "Statistics map must not be null or empty");
+
+    StatisticsUpdateRequest request = StatisticsUpdateRequest.builder().updates(statistics).build();
+    request.validate();
+
+    BaseResponse resp =
+        restClient.patch(
+            statisticsRequestPath,
+            request,
+            BaseResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.statisticsErrorHandler());
+
+    resp.validate();
+  }
+
+  @Override
   public boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException {
     Preconditions.checkArgument(
         statistics != null && !statistics.isEmpty(), "Statistics list must not be null or empty");

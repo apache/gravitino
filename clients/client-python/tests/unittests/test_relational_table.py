@@ -29,6 +29,7 @@ from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partitions import Partitions
+from gravitino.api.stats.statistic_values import StatisticValues
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_column import GenericColumn
@@ -37,6 +38,7 @@ from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
 )
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
@@ -205,6 +207,38 @@ class TestRelationalTable(unittest.TestCase):
             )
         )
 
+    def test_merge_statistics_sends_one_patch_with_both_measurements(self) -> None:
+        stats = {
+            "custom-manifest-number-by-spec": StatisticValues.object_value(
+                {"1": StatisticValues.long_value(120)}
+            ),
+            "custom-avg-manifest-size-by-spec": StatisticValues.object_value(
+                {"1": StatisticValues.double_value(4096.0)}
+            ),
+        }
+        response = self._get_mock_http_resp(BaseResponse(0).to_json())
+        with patch.object(
+            self.rest_client, "_make_request", return_value=(True, response)
+        ) as request:
+            self.relational_table.supports_statistics().merge_statistics(stats)
+        request.assert_called_once()
+        http_request = request.call_args.args[1]
+        self.assertEqual("PATCH", http_request.get_method())
+        self.assertEqual(
+            "http://localhost:8090/api/metalakes/metalake_demo/objects/table/"
+            "test_catalog.test_schema.example_table/statistics",
+            http_request.full_url,
+        )
+        self.assertEqual(
+            {
+                "updates": {
+                    "custom-manifest-number-by-spec": {"1": 120},
+                    "custom-avg-manifest-size-by-spec": {"1": 4096.0},
+                }
+            },
+            json.loads(http_request.data),
+        )
+
     def test_extends_supports_statistics_class(self) -> None:
         table_dto = TableDTO.from_json(TestRelationalTable.TABLE_DTO_JSON_STRING)
         namespace = Namespace.of("metalake_demo", "test_catalog", "test_schema")
@@ -217,7 +251,12 @@ class TestRelationalTable(unittest.TestCase):
                 SupportsStatistics,
             )
         )
-        expected_methods = ["list_statistics", "update_statistics", "drop_statistics"]
+        expected_methods = [
+            "list_statistics",
+            "update_statistics",
+            "merge_statistics",
+            "drop_statistics",
+        ]
 
         self.assertTrue(
             all(
