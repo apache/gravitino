@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import importlib
+
 from gravitino.api.catalog import Catalog
 from gravitino.api.schema import Schema
 from gravitino.api.file.fileset import Fileset
@@ -25,7 +27,28 @@ from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.name_identifier import NameIdentifier
-from gravitino.filesystem import gvfs
+
+
+def __getattr__(name):
+    """Load the optional GVFS module only when a caller requests it."""
+    if name != "gvfs":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    try:
+        gvfs = importlib.import_module("gravitino.filesystem.gvfs")
+    except ModuleNotFoundError as error:
+        if error.name not in {"fsspec", "cachetools", "readerwriterlock"}:
+            raise
+        raise ImportError(
+            "GVFS support requires optional filesystem dependencies. "
+            "Install `apache-gravitino[gvfs]` for local files, a backend extra "
+            "such as `apache-gravitino[hdfs]`, or `apache-gravitino[storage]` "
+            "for all backends."
+        ) from error
+
+    globals()[name] = gvfs
+    return gvfs
+
 
 __all__ = [
     "Catalog",
