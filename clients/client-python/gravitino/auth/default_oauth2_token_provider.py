@@ -15,24 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import time
-import json
 import base64
+import json
+import time
 from typing import Optional
+from urllib.parse import quote_plus
+
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
-from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.dto.requests.oauth2_client_credential_request import (
     OAuth2ClientCredentialRequest,
 )
+from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
     IllegalArgumentException,
 )
 from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLER
-from gravitino.auth.oauth2_client_authentication_method import (
-    OAuth2ClientAuthenticationMethod,
-)
-from urllib.parse import quote_plus
 
 CLIENT_CREDENTIALS = "client_credentials"
 CREDENTIAL_SPLITTER = ":"
@@ -125,12 +126,9 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
             encoded_client_secret = quote_plus(client_secret, safe="")
             credentials = f"{encoded_client_id}:{encoded_client_secret}"
 
-            encoded_credentials = base64.b64encode(
-                credentials.encode("utf-8")
-            ).decode("utf-8")
-
-
-
+            encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode(
+                "utf-8"
+            )
 
             headers["Authorization"] = f"Basic {encoded_credentials}"
 

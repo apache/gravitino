@@ -20,13 +20,13 @@ from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.exceptions.base import (
     BadRequestException,
     IllegalArgumentException,
     UnauthorizedException,
-)
-from gravitino.auth.oauth2_client_authentication_method import (
-    OAuth2ClientAuthenticationMethod,
 )
 from tests.unittests.auth import mock_base
 
@@ -123,7 +123,6 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         return_value=mock_base.mock_authentication_with_basic_jwt(),
     )
     def test_client_secret_basic_authentication(self, mock_post_form):
-
         token_provider = DefaultOAuth2TokenProvider(
             uri=f"http://127.0.0.1:{OAUTH_PORT}",
             credential="clientId:clientSecret",
@@ -138,7 +137,6 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         _, kwargs = mock_post_form.call_args
         self.assertIsNone(kwargs["data"].client_id)
         self.assertIsNone(kwargs["data"].client_secret)
-
 
         self.assertEqual(
             kwargs["headers"]["Authorization"],
