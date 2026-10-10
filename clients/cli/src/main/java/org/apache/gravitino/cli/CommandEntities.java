@@ -50,6 +50,8 @@ public class CommandEntities {
   public static final String ROLE = "role";
   /** Represents the Model entity. */
   public static final String MODEL = "model";
+  /** Represents the Function entity. */
+  public static final String FUNCTION = "function";
 
   private static final HashSet<String> VALID_ENTITIES = new HashSet<>();
 
@@ -66,6 +68,7 @@ public class CommandEntities {
     VALID_ENTITIES.add(TOPIC);
     VALID_ENTITIES.add(FILESET);
     VALID_ENTITIES.add(ROLE);
+    VALID_ENTITIES.add(FUNCTION);
   }
 
   /**
