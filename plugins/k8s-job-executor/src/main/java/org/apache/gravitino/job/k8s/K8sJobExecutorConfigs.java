@@ -175,7 +175,7 @@ public class K8sJobExecutorConfigs {
         CONTEXT);
     Preconditions.checkArgument(
         masterUrl != null || (caCertFile == null && tokenFile == null),
-        "%s and %s can only be set together with %s",
+        "%s and %s can only be set when %s is set",
         CA_CERT_FILE,
         TOKEN_FILE,
         MASTER_URL);

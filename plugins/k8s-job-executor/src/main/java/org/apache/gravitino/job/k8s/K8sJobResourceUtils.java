@@ -87,7 +87,8 @@ public final class K8sJobResourceUtils {
    * @return true if the resource carries the job id label of the job
    */
   public static boolean isOfJob(HasMetadata resource, long jobId) {
-    Map<String, String> labels = resource.getMetadata().getLabels();
+    Map<String, String> labels =
+        resource.getMetadata() == null ? null : resource.getMetadata().getLabels();
     return labels != null && String.valueOf(jobId).equals(labels.get(LABEL_JOB_ID));
   }
 
@@ -98,7 +99,8 @@ public final class K8sJobResourceUtils {
    * @return true if the cancel annotation is set
    */
   public static boolean isCancelRequested(HasMetadata resource) {
-    Map<String, String> annotations = resource.getMetadata().getAnnotations();
+    Map<String, String> annotations =
+        resource.getMetadata() == null ? null : resource.getMetadata().getAnnotations();
     return annotations != null && "true".equals(annotations.get(ANNOTATION_CANCEL_REQUESTED));
   }
 }

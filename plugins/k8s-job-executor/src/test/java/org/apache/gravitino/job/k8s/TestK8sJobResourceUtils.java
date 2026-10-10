@@ -51,6 +51,7 @@ public class TestK8sJobResourceUtils {
     Assertions.assertFalse(
         K8sJobResourceUtils.isOfJob(
             new ConfigMapBuilder().withNewMetadata().endMetadata().build(), 42L));
+    Assertions.assertFalse(K8sJobResourceUtils.isOfJob(new ConfigMap(), 42L));
   }
 
   @Test
@@ -58,6 +59,7 @@ public class TestK8sJobResourceUtils {
     Assertions.assertFalse(
         K8sJobResourceUtils.isCancelRequested(
             new ConfigMapBuilder().withNewMetadata().endMetadata().build()));
+    Assertions.assertFalse(K8sJobResourceUtils.isCancelRequested(new ConfigMap()));
     Assertions.assertFalse(K8sJobResourceUtils.isCancelRequested(annotated("false")));
     Assertions.assertTrue(K8sJobResourceUtils.isCancelRequested(annotated("true")));
   }

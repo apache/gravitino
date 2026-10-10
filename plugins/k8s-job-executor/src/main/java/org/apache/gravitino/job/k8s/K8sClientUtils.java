@@ -67,7 +67,9 @@ public final class K8sClientUtils {
           } else if (token == null) {
             throw new IllegalStateException("The token file " + tokenFile + " is empty");
           } else {
-            // The file is being rewritten, keep the token until the new one is there.
+            // The file is being rewritten, keep the token until the new one is there. Remember
+            // this version of the file, so that it is neither read nor reported again.
+            lastModified = modified;
             LOG.warn("The token file {} is empty, keeping the token read before", tokenFile);
           }
         }
