@@ -42,9 +42,9 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
@@ -74,13 +74,13 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelAlreadyExistsResponse"
         "502":
           $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/ossie:
@@ -134,7 +134,7 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelAlreadyExistsResponse"
@@ -144,7 +144,7 @@ paths:
             application/x-yaml, or text/yaml
         "502":
           $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}:
@@ -169,9 +169,9 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelNotFoundResponse"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     put:
@@ -202,13 +202,13 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelNotFoundResponse"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelAlterConflictResponse"
         "502":
           $ref: "#/components/responses/SemanticModelConnectionFailedResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
@@ -237,11 +237,11 @@ paths:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
                 NoSuchCatalogException:
                   $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
         "409":
           $ref: "#/components/responses/SemanticModelOptimisticLockResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ossie:
@@ -259,7 +259,7 @@ paths:
         Exports the specified Semantic Model as a standalone Apache Ossie YAML or JSON document.
         The response is downloadable document content rather than the native Gravitino response
         envelope. The format query parameter selects the representation independently of the
-        Accept header, and its value is case-insensitive.
+        Accept header.
       operationId: exportOssieDocument
       parameters:
         - name: format
@@ -281,9 +281,9 @@ paths:
           $ref: "#/components/responses/SemanticModelForbiddenResponse"
         "404":
           $ref: "#/components/responses/SemanticModelNotFoundResponse"
-        "405":
+        "501":
           $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
@@ -898,7 +898,7 @@ components:
         comment:
           type: string
           nullable: true
-          description: The comment, or null when no comment is set
+          description: The comment; the property is omitted when no comment is set
         definition:
           $ref: "#/components/schemas/SemanticModelDefinition"
         properties:
@@ -1139,7 +1139,9 @@ components:
       description: Returns a standalone Apache Ossie document in the requested format
       headers:
         Content-Disposition:
-          description: Attachment filename ending in .ossie.yaml or .ossie.json
+          description: >-
+            Attachment filename derived from the Semantic Model name, with characters outside
+            A-Za-z0-9._- replaced by underscores, ending in .ossie.yaml or .ossie.json
           schema:
             type: string
             example: attachment; filename="sales_model.ossie.yaml"
@@ -1210,7 +1212,7 @@ components:
               $ref: "#/components/examples/NoSuchSemanticModelException"
 
     SemanticModelUnsupportedCatalogResponse:
-      description: Method Not Allowed - Semantic Models are supported only by relational catalogs
+      description: Not Implemented - Semantic Models are supported only by relational catalogs
       content:
         application/vnd.gravitino.v1+json:
           schema:
