@@ -24,7 +24,7 @@ The connector is published as a version-specific runtime JAR for each supported 
 ## Prerequisites
 
 * Scala 2.12 (Flink 1.19 and 1.20 only; Flink 2.x removed the Scala APIs)
-* Flink 1.19, 1.20, or 2.1
+* Flink 1.19, 1.20, 2.1, or 2.2
 * JDK 8, 11 or 17 for Flink 1.x; JDK 17 for Flink 2.x
 
 On Flink 2.x, the Hive catalog is not supported: `flink-connector-hive` has not published a
@@ -41,6 +41,7 @@ catalogs are supported on Flink 2.x.
 | 1.19          | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 | 2.1           | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
 
 Do not mix runtime JARs from different Flink minor versions in the same Flink deployment.
 

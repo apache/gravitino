@@ -46,6 +46,8 @@ jobs:
             -x :flink-connector:flink-runtime-1.20:build \
             -x :flink-connector:flink-2.1:build \
             -x :flink-connector:flink-runtime-2.1:build \
+            -x :flink-connector:flink-2.2:build \
+            -x :flink-connector:flink-runtime-2.2:build \
             -x :spark-connector:spark-3.5:build -x :spark-connector:spark-4.0:build \
             -x :spark-connector:spark-runtime-3.5:build -x :spark-connector:spark-runtime-4.0:build \
             -x :mcp-server:build -x :lineage:build \
