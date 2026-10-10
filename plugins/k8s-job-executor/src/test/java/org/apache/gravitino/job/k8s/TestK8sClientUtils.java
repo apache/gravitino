@@ -108,32 +108,68 @@ public class TestK8sClientUtils {
   }
 
   @Test
-  public void testKubeconfigWithoutUsableContext() throws IOException {
-    // Without a usable context the client would silently fall back to the API server of the
-    // cluster Gravitino itself runs in.
-    String noCurrentContext = KUBECONFIG.replace("current-context: dev\n", "");
-    String noClusterInContext =
-        KUBECONFIG.replace("context: {cluster: dev, user: admin}", "context: {user: admin}");
-    String undefinedCluster =
-        KUBECONFIG.replace("context: {cluster: dev, user: admin}", "context: {cluster: nope}");
-    for (String content : new String[] {noCurrentContext, noClusterInContext, undefinedCluster}) {
+  public void testKubeconfigWithoutUsableCluster() throws IOException {
+    // Without a context that selects a cluster with a server, the client would silently fall
+    // back to the API server of the cluster Gravitino itself runs in.
+    String devContext = "context: {cluster: dev, user: admin}";
+    String devCluster = "- name: dev\n  cluster: {server: 'https://dev:6443'}\n";
+    String[] unusable = {
+      // No current context.
+      KUBECONFIG.replace("current-context: dev\n", ""),
+      // The current context doesn't exist.
+      KUBECONFIG.replace("current-context: dev\n", "current-context: staging\n"),
+      // The context has no content, or no cluster.
+      KUBECONFIG.replace("  " + devContext + "\n", ""),
+      KUBECONFIG.replace(devContext, "context: {user: admin}"),
+      // The cluster of the context isn't defined.
+      KUBECONFIG.replace(devContext, "context: {cluster: nope}"),
+      // The cluster is defined without content, with null or empty content, or a blank server.
+      KUBECONFIG.replace(devCluster, "- name: dev\n"),
+      KUBECONFIG.replace(devCluster, "- name: dev\n  cluster: null\n"),
+      KUBECONFIG.replace(devCluster, "- name: dev\n  cluster: {}\n"),
+      KUBECONFIG.replace(devCluster, "- name: dev\n  cluster: {server: ' '}\n"),
+      // Not a kubeconfig at all.
+      "- just\n- a list\n",
+    };
+    for (String content : unusable) {
+      Assertions.assertNotEquals(KUBECONFIG, content);
       Path kubeconfig =
           Files.write(dir.resolve("config"), content.getBytes(StandardCharsets.UTF_8));
       Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
       map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
-      IllegalArgumentException e =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)),
-              content);
-      Assertions.assertTrue(e.getMessage().contains("no usable context"), e.getMessage());
-
-      // Naming a usable context fixes it.
-      map.put(K8sJobExecutorConfigs.CONTEXT, "prod");
-      Assertions.assertEquals(
-          "https://prod:6443/",
-          K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)),
+          content);
     }
+
+    // Naming a usable context works, whatever the current context is.
+    Path kubeconfig =
+        Files.write(
+            dir.resolve("config"),
+            KUBECONFIG.replace(devCluster, "- name: dev\n").getBytes(StandardCharsets.UTF_8));
+    Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+    map.put(K8sJobExecutorConfigs.CONTEXT, "prod");
+    Assertions.assertEquals(
+        "https://prod:6443/",
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+  }
+
+  @Test
+  public void testKubeconfigSelectingDefaultServer() throws IOException {
+    // A kubeconfig may well select the default API server of the client.
+    Path kubeconfig =
+        Files.write(
+            dir.resolve("config"),
+            KUBECONFIG
+                .replace("https://dev:6443", "https://kubernetes.default.svc")
+                .getBytes(StandardCharsets.UTF_8));
+    Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+    Assertions.assertEquals(
+        "https://kubernetes.default.svc/",
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
   }
 
   @Test

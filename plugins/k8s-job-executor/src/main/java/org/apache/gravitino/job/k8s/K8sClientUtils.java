@@ -19,7 +19,6 @@
 package org.apache.gravitino.job.k8s;
 
 import com.google.common.base.Preconditions;
-import io.fabric8.kubernetes.api.model.NamedContext;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -34,10 +33,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +54,8 @@ public final class K8sClientUtils {
     private FileTime lastModified;
 
     private String token;
+
+    private boolean readFailureLogged;
 
     FileTokenProvider(Path tokenFile) {
       this.tokenFile = tokenFile;
@@ -83,9 +83,15 @@ public final class K8sClientUtils {
         if (token == null) {
           throw new UncheckedIOException("Failed to read the token file " + tokenFile, e);
         }
-        // For example, the file is being replaced, keep the token until the new one is there.
-        LOG.warn("Failed to read the token file {}, keeping the token read before", tokenFile, e);
+        // For example, the file is being replaced, keep the token until the new one is there. It
+        // is checked again on every request, so only the first failure in a row is reported.
+        if (!readFailureLogged) {
+          LOG.warn("Failed to read the token file {}, keeping the token read before", tokenFile, e);
+          readFailureLogged = true;
+        }
+        return token;
       }
+      readFailureLogged = false;
       return token;
     }
   }
@@ -139,20 +145,17 @@ public final class K8sClientUtils {
     Config config;
     if (configs.kubeconfig() != null) {
       checkFileExists(configs.kubeconfig(), K8sJobExecutorConfigs.KUBECONFIG);
-      File kubeconfig = new File(configs.kubeconfig());
-      config = Config.fromKubeconfig(configs.context(), kubeconfig);
-      // Without a context whose cluster is defined, the client keeps its default API server,
-      // the one of the cluster Gravitino runs in, and would silently run the jobs there.
-      NamedContext context = config.getCurrentContext();
+      String server = getKubeconfigServer(configs);
+      config = Config.fromKubeconfig(configs.context(), new File(configs.kubeconfig()));
+      // The client reads the file itself, so make sure it ended up with the server found above,
+      // whatever it does with a kubeconfig that is malformed or changed in between.
       Preconditions.checkArgument(
-          context != null
-              && context.getContext() != null
-              && getClusterNames(kubeconfig).contains(context.getContext().getCluster()),
-          "The kubeconfig %s set by %s has no usable context: set its current-context or %s, and"
-              + " make sure the cluster of the context is defined",
+          normalizeServer(server).equals(normalizeServer(config.getMasterUrl())),
+          "The kubeconfig %s set by %s selects the server %s, but the client would use %s",
           configs.kubeconfig(),
           K8sJobExecutorConfigs.KUBECONFIG,
-          K8sJobExecutorConfigs.CONTEXT);
+          server,
+          config.getMasterUrl());
     } else {
       config = Config.autoConfigure(configs.context());
     }
@@ -170,30 +173,96 @@ public final class K8sClientUtils {
     return config;
   }
 
-  /** Returns the names of the clusters that the kubeconfig file defines. */
-  @SuppressWarnings("unchecked")
-  private static Set<String> getClusterNames(File kubeconfig) {
-    Map<String, Object> content;
+  /**
+   * Returns the API server of the cluster that the kubeconfig selects, and fails if it selects
+   * none. Otherwise the client keeps its default API server, the one of the cluster Gravitino runs
+   * in, and would silently run the jobs there. The default API server itself isn't rejected, as a
+   * kubeconfig may well select it.
+   */
+  private static String getKubeconfigServer(K8sJobExecutorConfigs configs) {
+    Map<String, Object> kubeconfig;
     try {
-      content =
-          Serialization.unmarshal(
-              new String(Files.readAllBytes(kubeconfig.toPath()), StandardCharsets.UTF_8),
-              Map.class);
+      kubeconfig =
+          getMap(
+              Serialization.unmarshal(
+                  new String(
+                      Files.readAllBytes(Paths.get(configs.kubeconfig())), StandardCharsets.UTF_8),
+                  Map.class));
     } catch (IOException e) {
-      throw new UncheckedIOException("Failed to read the kubeconfig " + kubeconfig, e);
+      throw new UncheckedIOException("Failed to read the kubeconfig " + configs.kubeconfig(), e);
+    } catch (RuntimeException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The kubeconfig %s set by %s can't be parsed",
+              configs.kubeconfig(), K8sJobExecutorConfigs.KUBECONFIG),
+          e);
     }
 
-    Set<String> names = new HashSet<>();
-    Object clusters = content == null ? null : content.get("clusters");
-    if (clusters instanceof List) {
-      for (Object cluster : (List<Object>) clusters) {
-        if (cluster instanceof Map
-            && ((Map<String, Object>) cluster).get("name") instanceof String) {
-          names.add((String) ((Map<String, Object>) cluster).get("name"));
-        }
+    Object contextName =
+        configs.context() != null
+            ? configs.context()
+            : kubeconfig == null ? null : kubeconfig.get("current-context");
+    Preconditions.checkArgument(
+        contextName instanceof String && StringUtils.isNotBlank((String) contextName),
+        "The kubeconfig %s set by %s has no current context, set its current-context or %s",
+        configs.kubeconfig(),
+        K8sJobExecutorConfigs.KUBECONFIG,
+        K8sJobExecutorConfigs.CONTEXT);
+
+    Map<String, Object> context = getNamedEntry(kubeconfig, "contexts", contextName, "context");
+    Preconditions.checkArgument(
+        context != null,
+        "The context %s doesn't exist in the kubeconfig %s set by %s",
+        contextName,
+        configs.kubeconfig(),
+        K8sJobExecutorConfigs.KUBECONFIG);
+
+    Object clusterName = context.get("cluster");
+    Map<String, Object> cluster = getNamedEntry(kubeconfig, "clusters", clusterName, "cluster");
+    Object server = cluster == null ? null : cluster.get("server");
+    Preconditions.checkArgument(
+        server instanceof String && StringUtils.isNotBlank((String) server),
+        "The cluster %s of the context %s has no server in the kubeconfig %s set by %s",
+        clusterName,
+        contextName,
+        configs.kubeconfig(),
+        K8sJobExecutorConfigs.KUBECONFIG);
+    return (String) server;
+  }
+
+  /** Returns the URL of an API server in the form the client keeps it, to compare two of them. */
+  private static String normalizeServer(String server) {
+    String url = server.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+    return url.endsWith("/") ? url : url + "/";
+  }
+
+  /**
+   * Returns the content of the entry with the given name in a list of the kubeconfig, for example
+   * the {@code cluster} of the entry named {@code dev} in {@code clusters}.
+   */
+  @Nullable
+  private static Map<String, Object> getNamedEntry(
+      @Nullable Map<String, Object> kubeconfig, String list, Object name, String content) {
+    Object entries = kubeconfig == null ? null : kubeconfig.get(list);
+    if (!(entries instanceof List) || name == null) {
+      return null;
+    }
+    for (Object entry : (List<?>) entries) {
+      Map<String, Object> fields = getMap(entry);
+      if (fields != null && name.equals(fields.get("name"))) {
+        return getMap(fields.get(content));
       }
     }
-    return names;
+    return null;
+  }
+
+  @Nullable
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> getMap(Object value) {
+    return value instanceof Map ? (Map<String, Object>) value : null;
   }
 
   private static void checkFileExists(String path, String key) {
