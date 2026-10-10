@@ -353,6 +353,11 @@ final class ClickHouseTableSqlUtils {
   }
 
   static Transform[] parsePartitioning(@Nullable String partitionKey) {
+    return parsePartitioning(partitionKey, Collections.emptyList());
+  }
+
+  static Transform[] parsePartitioning(
+      @Nullable String partitionKey, List<String> partitionColumns) {
     if (StringUtils.isBlank(partitionKey)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -369,7 +374,7 @@ final class ClickHouseTableSqlUtils {
       if (StringUtils.isBlank(expression)) {
         continue;
       }
-      Transform transform = parsePartitionExpression(expression);
+      Transform transform = parsePartitionExpression(expression, partitionColumns);
       if (transform == null) {
         // A single unsupported native expression means the whole partition key cannot be
         // represented as structured transforms.
@@ -501,30 +506,32 @@ final class ClickHouseTableSqlUtils {
   }
 
   @Nullable
-  private static Transform parsePartitionExpression(String expression) {
+  private static Transform parsePartitionExpression(
+      String expression, List<String> partitionColumns) {
     String trimmedExpression = StringUtils.trim(expression);
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toYearMatcher.group(1));
+      String identifier = resolvePartitionIdentifier(toYearMatcher.group(1), partitionColumns);
       return identifier == null ? null : Transforms.year(identifier);
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toYYYYMMMatcher.group(1));
+      String identifier = resolvePartitionIdentifier(toYYYYMMMatcher.group(1), partitionColumns);
       return identifier == null ? null : Transforms.month(identifier);
     }
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toDateMatcher.group(1));
+      String identifier = resolvePartitionIdentifier(toDateMatcher.group(1), partitionColumns);
       return identifier == null ? null : Transforms.day(identifier);
     }
 
     Matcher toStartOfWeekMatcher = TO_START_OF_WEEK_PATTERN.matcher(trimmedExpression);
     if (toStartOfWeekMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfWeekMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfWeekMatcher.group(1), partitionColumns);
       return identifier == null
           ? null
           : Transforms.apply("toStartOfWeek", new Expression[] {NamedReference.field(identifier)});
@@ -532,7 +539,8 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toStartOfMonthMatcher = TO_START_OF_MONTH_PATTERN.matcher(trimmedExpression);
     if (toStartOfMonthMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfMonthMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfMonthMatcher.group(1), partitionColumns);
       return identifier == null
           ? null
           : Transforms.apply("toStartOfMonth", new Expression[] {NamedReference.field(identifier)});
@@ -540,7 +548,8 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toStartOfQuarterMatcher = TO_START_OF_QUARTER_PATTERN.matcher(trimmedExpression);
     if (toStartOfQuarterMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfQuarterMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfQuarterMatcher.group(1), partitionColumns);
       return identifier == null
           ? null
           : Transforms.apply(
@@ -549,24 +558,25 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toStartOfYearMatcher = TO_START_OF_YEAR_PATTERN.matcher(trimmedExpression);
     if (toStartOfYearMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfYearMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfYearMatcher.group(1), partitionColumns);
       return identifier == null
           ? null
           : Transforms.apply("toStartOfYear", new Expression[] {NamedReference.field(identifier)});
     }
 
-    String identifier = extractPartitionIdentifier(trimmedExpression);
+    String identifier = extractSimpleIdentifier(trimmedExpression);
     return identifier == null ? null : Transforms.identity(identifier);
   }
 
   /**
-   * Extracts a partition column name from an expression. A backtick-quoted identifier (which may
+   * Extracts a simple column name from an expression. A backtick-quoted identifier (which may
    * contain special characters such as {@code -}) is always treated as a column name. Otherwise the
    * expression must match the strict column-name pattern. Returns {@code null} for arbitrary
    * expressions such as {@code f(x)} that cannot be represented as a single column reference.
    */
   @Nullable
-  private static String extractPartitionIdentifier(String expression) {
+  private static String extractSimpleIdentifier(String expression) {
     String trimmed = StringUtils.trim(expression);
     if (StringUtils.startsWith(trimmed, "`")
         && StringUtils.endsWith(trimmed, "`")
@@ -575,6 +585,21 @@ final class ClickHouseTableSqlUtils {
       return StringUtils.isNotBlank(inner) ? inner : null;
     }
     return isStrictIdentifier(trimmed) ? trimmed : null;
+  }
+
+  /**
+   * Resolves the partition column for a known granularity function. When the inner expression is
+   * too complex to resolve as a simple column name and exactly one column participates in the
+   * partition, that column is used as a fallback.
+   */
+  @Nullable
+  private static String resolvePartitionIdentifier(
+      String expression, List<String> partitionColumns) {
+    String identifier = extractSimpleIdentifier(expression);
+    if (identifier != null) {
+      return identifier;
+    }
+    return partitionColumns.size() == 1 ? partitionColumns.get(0) : null;
   }
 
   private static String normalizePartitionKey(String partitionKey) {

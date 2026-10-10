@@ -940,7 +940,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SystemTableMetadata systemTableMetadata =
           getSystemTableMetadata(connection, databaseName, tableName);
       String partitionKey = getPartitionKey(connection, databaseName, tableName);
-      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey));
+      List<String> partitionColumns = getPartitionColumns(connection, databaseName, tableName);
+      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey, partitionColumns));
       jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
@@ -1100,7 +1101,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
-    return parsePartitioning(getPartitionKey(connection, databaseName, tableName));
+    return parsePartitioning(
+        getPartitionKey(connection, databaseName, tableName),
+        getPartitionColumns(connection, databaseName, tableName));
   }
 
   @VisibleForTesting
@@ -1120,6 +1123,25 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return null;
+  }
+
+  @VisibleForTesting
+  List<String> getPartitionColumns(Connection connection, String databaseName, String tableName)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT name FROM system.columns WHERE database = ? AND table = ? "
+                + "AND is_in_partition_key = 1 ORDER BY position")) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        List<String> columns = new ArrayList<>();
+        while (resultSet.next()) {
+          columns.add(resultSet.getString("name"));
+        }
+        return columns;
+      }
+    }
   }
 
   @Override
@@ -1762,6 +1784,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   Transform[] parsePartitioning(@Nullable String partitionKey) {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
+  }
+
+  @VisibleForTesting
+  Transform[] parsePartitioning(@Nullable String partitionKey, List<String> partitionColumns) {
+    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey, partitionColumns);
   }
 
   // Parses "key1 = val1, key2 = val2" from a SETTINGS clause. Keys are prefixed with

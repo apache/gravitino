@@ -800,6 +800,7 @@ public class TestClickHouseTableOperationsUnit {
     Mockito.doReturn(Map.of()).when(ops).getDefaultKinds(connection, "db", "t");
     Mockito.doReturn(List.of()).when(ops).getIndexes(connection, "db", "t");
     Mockito.doReturn("").when(ops).getPartitionKey(connection, "db", "t");
+    Mockito.doReturn(List.of()).when(ops).getPartitionColumns(connection, "db", "t");
     Mockito.doReturn(Map.of(TableConstants.ENGINE, "MergeTree"))
         .when(ops)
         .getTableProperties(connection, "t");
