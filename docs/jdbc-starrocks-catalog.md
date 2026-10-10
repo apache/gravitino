@@ -26,9 +26,12 @@ Gravitino saves some system information in table comments, like
 
 - Gravitino catalog corresponds to the StarRocks instance.
 - Supports metadata management of StarRocks (3.3.x).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 ### Catalog Properties
+
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
 
 Pass to a StarRocks data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
@@ -40,15 +43,16 @@ more details.
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the StarRocks catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                         | Default value | Required | Since Version   |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                 | (none)        | Yes      | 1.0.0           |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                            | (none)        | Yes      | 1.0.0           |
-| `jdbc-user`             | The JDBC user name.                                                                                                                                                 | (none)        | Yes      | 1.0.0           |
-| `jdbc-password`         | The JDBC password.                                                                                                                                                  | (none)        | Yes      | 1.0.0           |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                      | `2`           | No       | 1.0.0           |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                     | `10`          | No       | 1.0.0           |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                   | `30000`       | No       | 1.1.0           |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                      | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                 | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No       |
 
 Before using the StarRocks Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-starrocks/libs` directory.
 Gravitino doesn't package the JDBC driver for StarRocks due to licensing issues.
@@ -80,10 +84,10 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
@@ -101,14 +105,14 @@ As StarRocks can't get thr properties after set, So now we do not support set Sc
 ### Schema Operations
 
 Refer to
-[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+[Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
 ### Table Capabilities
 
 - Gravitino's table concept corresponds to the StarRocks table.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 #### Table Column Types
 
@@ -131,7 +135,7 @@ Refer to
 
 
 StarRocks doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 1.0.0.
+The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./tables-and-views.md#unparsed-type)** that represents an unresolvable data type.
 
 :::note
 Gravitino cannot load StarRocks `array`, `map` and `struct` type correctly, because StarRocks doesn't support these types in JDBC.

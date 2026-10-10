@@ -14,6 +14,7 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 ### JDBC Types
 
 * MYSQL
+* POSTGRESQL
 
 ## Getting Started
 
@@ -25,11 +26,13 @@ Place the following JAR files in the lib directory of your Flink installation:
 - The Gravitino Flink connector runtime JAR that matches your Flink minor version
 - JDBC driver
 
-| Flink version | Flink JDBC connector version | Gravitino runtime artifact |
-|---------------|------------------------------|----------------------------|
-| 1.18          | `3.2.0-1.18`                 | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| Flink version | Flink JDBC connector version | Gravitino runtime artifact                                             |
+|---------------|------------------------------|------------------------------------------------------------------------|
 | 1.19          | `3.3.0-1.19`                 | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `3.3.0-1.20`                 | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+| 2.1           | `4.1.0-2.1`                  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+
+Starting with Flink 2.1, `flink-connector-jdbc` is split into per-database artifacts: place `flink-connector-jdbc-core-4.1.0-2.1.jar`, `flink-connector-jdbc-mysql-4.1.0-2.1.jar`, and `flink-connector-jdbc-postgres-4.1.0-2.1.jar` together in the classpath instead of a single combined JAR.
 
 Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.default-database` property with the value of the default database name.
 
@@ -37,6 +40,8 @@ Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.defau
 ```text
 flink.bypass.default-database=db  
 ```
+
+For a PostgreSQL catalog, if `flink.bypass.default-database` is not set, it falls back to the catalog's `jdbc-database` property. This distinction matters for PostgreSQL because a Flink "database" corresponds to a PostgreSQL schema, not the PostgreSQL database itself; the JDBC connection always targets `jdbc-database` (or the `flink.bypass.default-database` override), while `SHOW TABLES FROM <schema>` and table scans address tables within that database using the schema name.
 
 ### SQL Example
 
@@ -127,9 +132,10 @@ SELECT * FROM jdbc_table_a;
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 
-| Gravitino catalog property name | Flink JDBC connector configuration | Description                    | Since Version    |
-|:--------------------------------|------------------------------------|--------------------------------|------------------|
-| `jdbc-url`                      | `base-url`                         | JDBC URL for MYSQL             | 0.9.0-incubating |
-| `username`                      | `username`                         | Username of MySQL account      | 0.9.0-incubating |
-| `password`                      | `password`                         | Password of the account        | 0.9.0-incubating |
-| `flink.bypass.default-database` | `default-database`                 | Default database to connect to | 0.9.0-incubating |
+| Gravitino catalog property name | Flink JDBC connector configuration | Description                                                                                 |
+|:--------------------------------|:-----------------------------------|:--------------------------------------------------------------------------------------------|
+| `jdbc-url`                      | `base-url`                         | JDBC URL for the catalog                                                                    |
+| `username`                      | `username`                         | Username of the account                                                                     |
+| `password`                      | `password`                         | Password of the account                                                                     |
+| `flink.bypass.default-database` | `default-database`                 | Default database to connect to. For PostgreSQL, falls back to `jdbc-database` when not set. |
+| `jdbc-database`                 | (see above)                        | Required for PostgreSQL catalogs; the PostgreSQL database the catalog connects to.          |

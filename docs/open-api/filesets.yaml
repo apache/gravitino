@@ -79,7 +79,7 @@ paths:
         - fileset
       summary: Get fileset
       operationId: loadFileset
-      description: Returns the specified fileset object
+      description: Returns the specified fileset object.
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"
@@ -346,6 +346,22 @@ components:
           default: {}
           additionalProperties:
               type: string
+        secretBindings:
+          type: object
+          description: >
+            Optional map of property key to write-through binding. Persisted value
+            becomes a URN.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretBinding"
+        secretReferences:
+          type: object
+          description: >
+            Optional map of property key to secret locator. Server builds and
+            persists the URN. Must not overlap with secretBindings.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretReference"
 
     FilesetUpdatesRequest:
       type: object
@@ -363,6 +379,8 @@ components:
         - $ref: "#/components/schemas/SetFilesetPropertyRequest"
         - $ref: "#/components/schemas/UpdateFilesetCommentRequest"
         - $ref: "#/components/schemas/RemoveFilesetPropertyRequest"
+        - $ref: "#/components/schemas/SetFilesetSecretBindingRequest"
+        - $ref: "#/components/schemas/SetFilesetSecretReferenceRequest"
       discriminator:
         propertyName: "@type"
         mapping:
@@ -370,6 +388,8 @@ components:
           setProperty: "#/components/schemas/SetFilesetPropertyRequest"
           updateComment: "#/components/schemas/UpdateFilesetCommentRequest"
           removeProperty: "#/components/schemas/RemoveFilesetPropertyRequest"
+          setSecretBinding: "#/components/schemas/SetFilesetSecretBindingRequest"
+          setSecretReference: "#/components/schemas/SetFilesetSecretReferenceRequest"
 
     RenameFilesetRequest:
       type: object
@@ -450,6 +470,69 @@ components:
       example: {
         "@type": "removeProperty",
         "property": "key1"
+      }
+
+    SetFilesetSecretBindingRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+        - plaintext
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - setSecretBinding
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        plaintext:
+          type: string
+          description: Plaintext secret to write through
+          format: password
+      example: {
+        "@type": "setSecretBinding",
+        "property": "password",
+        "provider": "env",
+        "plaintext": "secret-value"
+      }
+
+    SetFilesetSecretReferenceRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - setSecretReference
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        attributes:
+          type: object
+          description: Provider-specific locator keys (empty object if none)
+          additionalProperties:
+            type: string
+          default: {}
+      example: {
+        "@type": "setSecretReference",
+        "property": "password",
+        "provider": "vault",
+        "attributes": {
+          "path": "secret/data/my-password"
+        }
       }
 
     RemoveFilesetCommentRequest:

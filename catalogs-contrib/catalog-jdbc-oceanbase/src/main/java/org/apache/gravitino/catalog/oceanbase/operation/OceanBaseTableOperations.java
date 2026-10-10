@@ -77,7 +77,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
           "Currently we do not support Partitioning in oceanbase");
     }
 
-    if (!Distributions.NONE.equals(distribution)) {
+    if (!Distributions.isNone(distribution)) {
       throw new UnsupportedOperationException("OceanBase does not support distribution");
     }
 
@@ -211,19 +211,22 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
-    try (Connection connection = getConnection(databaseName)) {
-      for (TableChange change : changes) {
-        String sql = generateAlterTableSql(databaseName, tableName, change);
-        if (StringUtils.isEmpty(sql)) {
-          LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-          continue;
-        }
-        JdbcConnectorUtils.executeUpdate(connection, sql);
+    for (TableChange change : changes) {
+      // Generate each statement before borrowing the connection that executes it, as the
+      // generator may load the table through another connection. Each change is generated after
+      // the previous one is applied, so it sees the updated table.
+      String sql = generateAlterTableSql(databaseName, tableName, change);
+      if (StringUtils.isEmpty(sql)) {
+        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+        continue;
       }
-      LOG.info("Alter table {} from database {}", tableName, databaseName);
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
+      try (Connection connection = getConnection(databaseName)) {
+        JdbcConnectorUtils.executeUpdate(connection, sql);
+      } catch (final SQLException se) {
+        throw this.exceptionMapper.toGravitinoException(se);
+      }
     }
+    LOG.info("Alter table {} from database {}", tableName, databaseName);
   }
 
   @Override

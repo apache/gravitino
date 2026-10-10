@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
@@ -222,6 +224,83 @@ public interface EntityStore extends Closeable {
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
   /**
+   * The only post-delete action an implementation that cannot run it before commit accepts.
+   *
+   * <p>Compared by reference, so a caller that supplies its own action reaches an implementation
+   * that honors the contract or gets told that this one cannot.
+   */
+  Consumer<? extends Entity> NO_POST_DELETE_ACTION = ignored -> {};
+
+  /**
+   * Returns the shared no-op post-delete action.
+   *
+   * @param <E> the entity type
+   * @return an action that does nothing
+   */
+  @SuppressWarnings("unchecked")
+  static <E extends Entity & HasIdentifier> Consumer<E> noPostDeleteAction() {
+    return (Consumer<E>) NO_POST_DELETE_ACTION;
+  }
+
+  /**
+   * Deletes an entity and returns the snapshot chosen by the delete operation.
+   *
+   * <p>The default implementation is intended for stores that serialize operations through {@link
+   * #executeInTransaction(Executable)}. Stores that can read and delete with one native
+   * compare-and-set should override this method so the returned snapshot is exactly the one that
+   * was deleted.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity
+   * @param clazz the concrete entity class
+   * @param <E> the entity type
+   * @return the deleted entity, or empty when it did not exist
+   * @throws IOException if the delete operation fails
+   */
+  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident, EntityType entityType, Class<E> clazz) throws IOException {
+    return deleteAndGet(ident, entityType, clazz, noPostDeleteAction());
+  }
+
+  /**
+   * Deletes an entity, runs an action against the deleted snapshot, and returns that snapshot.
+   *
+   * <p>A transactional store should run the action after its delete has won but before committing.
+   * This lets callers couple non-database cleanup to the metadata transaction: an action failure
+   * can still roll the metadata delete back.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity
+   * @param clazz the concrete entity class
+   * @param postDeleteAction the action to run after deletion but before commit when supported
+   * @param <E> the entity type
+   * @return the deleted entity, or empty when it did not exist
+   * @throws IOException if the delete operation fails
+   */
+  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident, EntityType entityType, Class<E> clazz, Consumer<E> postDeleteAction)
+      throws IOException {
+    if (postDeleteAction != NO_POST_DELETE_ACTION) {
+      // This implementation can only run the action once the delete is committed, which is the
+      // opposite of what the contract promises. Refusing is better than silently leaving the
+      // caller with a committed delete and a failed cleanup.
+      throw new UnsupportedOperationException(
+          "This store cannot run a post-delete action while the delete can still be rolled back");
+    }
+
+    try {
+      E entity = get(ident, entityType, clazz);
+      if (!delete(ident, entityType)) {
+        return Optional.empty();
+      }
+      postDeleteAction.accept(entity);
+      return Optional.of(entity);
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    }
+  }
+
+  /**
    * Batch delete entities from the underlying storage by the specified list of {@link
    * org.apache.gravitino.NameIdentifier} and {@link EntityType}.
    *
@@ -267,15 +346,5 @@ public interface EntityStore extends Closeable {
    */
   default SupportsRelationOperations relationOperations() {
     throw new UnsupportedOperationException("relation operations are not supported");
-  }
-
-  /**
-   * Get the extra external id operations that are supported by the entity store.
-   *
-   * @return the external id operations that are supported by the entity store
-   * @throws UnsupportedOperationException if the extra operations are not supported
-   */
-  default SupportsExternalIdOperations externalIdOperations() {
-    throw new UnsupportedOperationException("external id operations are not supported");
   }
 }

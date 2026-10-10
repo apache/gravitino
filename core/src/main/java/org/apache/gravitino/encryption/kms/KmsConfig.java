@@ -31,14 +31,14 @@ import org.apache.gravitino.Config;
 final class KmsConfig {
 
   static final String KMS_CONFIG_PREFIX = "gravitino.kms.";
-  static final String KMS_SOURCES = KMS_CONFIG_PREFIX + "sources";
+  static final String KMS_PROVIDERS = KMS_CONFIG_PREFIX + "providers";
 
-  private static final String SOURCES = "sources";
-  private static final String SOURCE_PREFIX = "source.";
-  private static final String API = "api";
-  private static final Pattern SOURCE_NAME_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
+  private static final String PROVIDERS = "providers";
+  private static final String PROVIDER_PREFIX = "provider.";
+  private static final String CLASS_NAME = "className";
+  private static final Pattern PROVIDER_NAME_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
 
-  private final Map<String, SourceConfig> sources;
+  private final Map<String, ProviderConfig> providers;
 
   KmsConfig(Config config) {
     if (config == null) {
@@ -46,94 +46,88 @@ final class KmsConfig {
     }
 
     Map<String, String> values = config.getConfigsWithPrefix(KMS_CONFIG_PREFIX);
-    List<String> configuredSources = parseSources(values.get(SOURCES));
-    this.sources = parseSourceConfigs(values, configuredSources);
+    List<String> configuredProviders = parseProviders(values.get(PROVIDERS));
+    this.providers = parseProviderConfigs(values, configuredProviders);
   }
 
-  Map<String, SourceConfig> sources() {
-    return sources;
+  Map<String, ProviderConfig> providers() {
+    return providers;
   }
 
-  private static List<String> parseSources(String value) {
+  private static List<String> parseProviders(String value) {
     if (value == null || value.trim().isEmpty()) {
       return Collections.emptyList();
     }
 
-    List<String> sources = new ArrayList<>();
-    Set<String> uniqueSources = new LinkedHashSet<>();
+    List<String> providers = new ArrayList<>();
+    Set<String> uniqueProviders = new LinkedHashSet<>();
     for (String item : value.split(",", -1)) {
-      String source = item.trim();
-      if (!SOURCE_NAME_PATTERN.matcher(source).matches()) {
+      String provider = item.trim();
+      if (!PROVIDER_NAME_PATTERN.matcher(provider).matches()) {
         throw new KmsConfigurationException(
-            "Invalid KMS source name '%s' in %s", source, KMS_SOURCES);
+            "Invalid KMS provider name '%s' in %s", provider, KMS_PROVIDERS);
       }
-      if (!uniqueSources.add(source)) {
-        throw new KmsConfigurationException("Duplicate KMS source '%s' in %s", source, KMS_SOURCES);
+      if (!uniqueProviders.add(provider)) {
+        throw new KmsConfigurationException(
+            "Duplicate KMS provider '%s' in %s", provider, KMS_PROVIDERS);
       }
-      sources.add(source);
+      providers.add(provider);
     }
-    return Collections.unmodifiableList(sources);
+    return Collections.unmodifiableList(providers);
   }
 
-  private static Map<String, SourceConfig> parseSourceConfigs(
-      Map<String, String> values, List<String> configuredSources) {
-    Map<String, Map<String, String>> propertiesBySource = new LinkedHashMap<>();
-    for (String source : configuredSources) {
-      propertiesBySource.put(source, new LinkedHashMap<>());
+  private static Map<String, ProviderConfig> parseProviderConfigs(
+      Map<String, String> values, List<String> configuredProviders) {
+    Map<String, Map<String, String>> propertiesByProvider = new LinkedHashMap<>();
+    for (String provider : configuredProviders) {
+      propertiesByProvider.put(provider, new LinkedHashMap<>());
     }
 
     for (Map.Entry<String, String> entry : values.entrySet()) {
       String key = entry.getKey();
-      if (SOURCES.equals(key)) {
+      if (PROVIDERS.equals(key)) {
         continue;
       }
-      if (!key.startsWith(SOURCE_PREFIX)) {
+      if (!key.startsWith(PROVIDER_PREFIX)) {
         throw invalidConfigurationKey(key);
       }
 
-      String sourceAndProperty = key.substring(SOURCE_PREFIX.length());
-      int separator = sourceAndProperty.indexOf('.');
-      if (separator <= 0 || separator == sourceAndProperty.length() - 1) {
+      String providerAndProperty = key.substring(PROVIDER_PREFIX.length());
+      int separator = providerAndProperty.indexOf('.');
+      if (separator <= 0 || separator == providerAndProperty.length() - 1) {
         throw invalidConfigurationKey(key);
       }
 
-      String source = sourceAndProperty.substring(0, separator);
-      if (!SOURCE_NAME_PATTERN.matcher(source).matches()) {
+      String provider = providerAndProperty.substring(0, separator);
+      if (!PROVIDER_NAME_PATTERN.matcher(provider).matches()) {
         throw invalidConfigurationKey(key);
       }
 
-      Map<String, String> properties = propertiesBySource.get(source);
+      Map<String, String> properties = propertiesByProvider.get(provider);
       if (properties == null) {
         throw new KmsConfigurationException(
-            "KMS configuration references unlisted source '%s'", source);
+            "KMS configuration references unlisted provider '%s'", provider);
       }
 
-      String property = sourceAndProperty.substring(separator + 1);
+      String property = providerAndProperty.substring(separator + 1);
       properties.put(property, entry.getValue());
     }
 
-    Map<String, SourceConfig> sourceConfigs = new LinkedHashMap<>();
+    Map<String, ProviderConfig> providerConfigs = new LinkedHashMap<>();
 
-    for (String source : configuredSources) {
-      String apiKey = SOURCE_PREFIX + source + "." + API;
-      Map<String, String> properties = propertiesBySource.get(source);
-      String apiValue = properties.remove(API);
-      if (apiValue == null || apiValue.trim().isEmpty()) {
+    for (String provider : configuredProviders) {
+      String classNameKey = PROVIDER_PREFIX + provider + "." + CLASS_NAME;
+      Map<String, String> properties = propertiesByProvider.get(provider);
+      String className = properties.remove(CLASS_NAME);
+      if (className == null || className.trim().isEmpty()) {
         throw new KmsConfigurationException(
-            "KMS API property '%s%s' cannot be blank", KMS_CONFIG_PREFIX, apiKey);
-      }
-      String api;
-      try {
-        api = KmsApiIdentifiers.requireValid(apiValue);
-      } catch (IllegalArgumentException e) {
-        throw new KmsConfigurationException(
-            e, "Invalid KMS API property '%s%s': %s", KMS_CONFIG_PREFIX, apiKey, e.getMessage());
+            "KMS className property '%s%s' cannot be blank", KMS_CONFIG_PREFIX, classNameKey);
       }
 
-      sourceConfigs.put(source, new SourceConfig(api, properties));
+      providerConfigs.put(provider, new ProviderConfig(className.trim(), properties));
     }
 
-    return Collections.unmodifiableMap(sourceConfigs);
+    return Collections.unmodifiableMap(providerConfigs);
   }
 
   private static KmsConfigurationException invalidConfigurationKey(String key) {
@@ -141,17 +135,17 @@ final class KmsConfig {
         "Invalid KMS configuration key '%s%s'", KMS_CONFIG_PREFIX, key);
   }
 
-  static final class SourceConfig {
-    private final String api;
+  static final class ProviderConfig {
+    private final String className;
     private final Map<String, String> properties;
 
-    private SourceConfig(String api, Map<String, String> properties) {
-      this.api = api;
+    private ProviderConfig(String className, Map<String, String> properties) {
+      this.className = className;
       this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
     }
 
-    String api() {
-      return api;
+    String className() {
+      return className;
     }
 
     Map<String, String> properties() {

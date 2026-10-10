@@ -284,6 +284,10 @@ Use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
 
+- apache/gravitino-ci:kerberos-hive-0.1.7
+  - Exclude the installation archives from the final image layers to reduce the image size.
+    For more information, see [PR](https://github.com/apache/gravitino/pull/12731)
+
 - apache/gravitino-ci:kerberos-hive-0.1.6
   - Change username from `datastrato` to `gravitino`.
     For more information, see [PR](https://github.com/apache/gravitino/pull/7040)
@@ -314,7 +318,7 @@ Changelog
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
-    - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](../dev/docker/kerberos-hive)
+    - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](https://github.com/apache/gravitino/tree/main/dev/docker/kerberos-hive)
 
 ## Hive Image
 

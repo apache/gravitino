@@ -42,6 +42,8 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -49,6 +51,9 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
  * Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
@@ -56,7 +61,7 @@ import org.apache.gravitino.rest.RESTUtils;
  * metalake.
  */
 class FilesetCatalog extends BaseSchemaCatalog
-    implements org.apache.gravitino.file.FilesetCatalog, SupportsCredentials {
+    implements org.apache.gravitino.file.FilesetCatalog, SupportsCredentials, SupportsSecrets {
 
   FilesetCatalog(
       Namespace namespace,
@@ -145,6 +150,42 @@ class FilesetCatalog extends BaseSchemaCatalog
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    return createMultipleLocationFileset(
+        ident,
+        comment,
+        type,
+        storageLocations,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  /**
+   * Create a fileset metadata with multiple storage locations in the catalog.
+   *
+   * @param ident A fileset identifier.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocations The location names and storage locations of the fileset.
+   * @param properties The properties of the fileset.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created fileset metadata
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FilesetAlreadyExistsException If the fileset already exists.
+   */
+  @Override
+  public Fileset createMultipleLocationFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      Map<String, String> storageLocations,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
     checkFilesetNameIdentifier(ident);
 
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
@@ -155,6 +196,8 @@ class FilesetCatalog extends BaseSchemaCatalog
             .type(type)
             .storageLocations(storageLocations)
             .properties(properties)
+            .secretBindings(SecretBindingDTO.fromSecretBindings(secretBindings))
+            .secretReferences(SecretReferenceDTO.fromSecretReferences(secretReferences))
             .build();
     req.validate();
 
@@ -277,6 +320,16 @@ class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Credential[] getCredentials() {
     return objectCredentialOperations.getCredentials();
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @VisibleForTesting

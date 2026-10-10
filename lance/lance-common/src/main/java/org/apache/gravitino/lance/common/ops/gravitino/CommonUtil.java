@@ -23,7 +23,7 @@ import java.util.Locale;
 import org.lance.namespace.errors.InvalidInputException;
 
 /** Utility methods used by Gravitino Lance namespace operations. */
-class CommonUtil {
+public class CommonUtil {
 
   private CommonUtil() {}
 
@@ -31,8 +31,34 @@ class CommonUtil {
     return Throwables.getStackTraceAsString(new RuntimeException("Captured stacktrace"));
   }
 
-  static String normalizeToken(String value) {
-    return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+  /**
+   * Normalizes a request token the way every mode and behavior parameter is read, so that callers
+   * deciding something from a token compare it exactly as the operation that acts on it will.
+   *
+   * <p>Authorization relies on this: a mode that reaches the operation as {@code OVERWRITE} has to
+   * be recognized as an overwrite while the request is being authorized, whatever spacing or case
+   * the client sent. A single-word token is not split on internal capitals, so {@code OverWrite}
+   * stays {@code OVERWRITE}.
+   *
+   * <p>{@code ExistOk} is the only multi-word token in the Lance mode vocabulary. The PascalCase
+   * form and the underscore-free form are accepted as {@code EXIST_OK}, matching snake_case {@code
+   * exist_ok}.
+   *
+   * @param value the raw token, may be null
+   * @return the trimmed, upper-cased token, with {@code ExistOk} mapped to {@code EXIST_OK}, or an
+   *     empty string when the value is null
+   */
+  public static String normalizeToken(String value) {
+    if (value == null) {
+      return "";
+    }
+    String normalized = value.trim().toUpperCase(Locale.ROOT);
+    // Only ExistOk is multi-word. Splitting every capital would turn OverWrite into OVER_WRITE
+    // and authorization would no longer recognize an overwrite.
+    if ("EXISTOK".equals(normalized)) {
+      return "EXIST_OK";
+    }
+    return normalized;
   }
 
   static <E extends Enum<E>> E parseEnumToken(

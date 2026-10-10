@@ -222,7 +222,7 @@ paths:
       tags:
         - tag
       summary: Associate tags with metadata object
-      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, VIEW, FILESET, TOPIC, COLUMN, MODEL, FUNCTION
+      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, VIEW, SEMANTIC_MODEL, FILESET, TOPIC, COLUMN, MODEL, FUNCTION
       operationId: associateTags
       requestBody:
         content:
@@ -232,6 +232,12 @@ paths:
             examples:
               TagAssociate:
                 $ref: "#/components/examples/TagAssociate"
+          application/vnd.gravitino.v2+json:
+            schema:
+              $ref: "#/components/requests/TagValuesAssociateRequest"
+            examples:
+              TagValuesAssociate:
+                $ref: "#/components/examples/TagValuesAssociate"
       responses:
         "200":
           description: Returns the list of tag names associated with the specified metadata object
@@ -242,10 +248,31 @@ paths:
               examples:
                 NameListResponse:
                   $ref: "#/components/examples/NameListResponse"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "400":
+          description: Bad Request - The request body is malformed or violates tag association validation rules
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: Not Found - The specified metalake does not exist
           content:
             application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+            application/vnd.gravitino.v2+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -260,8 +287,21 @@ paths:
               examples:
                 TagAlreadyAssociatedException:
                   $ref: "#/components/examples/TagAlreadyAssociatedException"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TagAlreadyAssociatedException:
+                  $ref: "#/components/examples/TagAlreadyAssociatedException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          description: A server-side problem that might not be addressable from the client side
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
 
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
@@ -313,6 +353,8 @@ paths:
         - tag
       summary: list metadata objects for tag
       operationId: listTagObjects
+      parameters:
+        - $ref: "#/components/parameters/tagValue"
       responses:
         "200":
           description: Returns the list of metadata objects associated with specified tag
@@ -338,6 +380,94 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
+  /metalakes/{metalake}/tags/{tag}/policies:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+    get:
+      tags:
+        - tag
+      summary: List policies associated with a tag
+      operationId: listPoliciesForTag
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns policy names or detailed policy-tag associations
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/responses/PolicyForTagAssociationListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or tag does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/tags/{tag}/policies/{policy}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+    post:
+      tags:
+        - tag
+      summary: Associate a policy with a tag
+      operationId: addPolicyForTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/PolicyTagAddRequest"
+      responses:
+        "200":
+          description: Returns the created policy-tag association
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/PolicyTagAssociationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake, tag, or policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: Conflict - The policy is already associated with the tag
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+    delete:
+      tags:
+        - tag
+      summary: Remove a policy association from a tag
+      operationId: removePolicyFromTag
+      responses:
+        "204":
+          description: The policy-tag association was removed
+        "404":
+          description: Not Found - The specified metalake, tag, or policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
 components:
   parameters:
     details:
@@ -348,6 +478,15 @@ components:
       schema:
         type: boolean
         default: false
+
+    tagValue:
+      name: value
+      in: query
+      description: Exact assignment value used to filter objects associated with the tag
+      required: false
+      schema:
+        type: string
+        maxLength: 256
 
   schemas:
 
@@ -377,6 +516,20 @@ components:
           type: boolean
           description: Whether the tag is inherited from the parent metadata object
           nullable: true
+        allowedValues:
+          type: array
+          description: Allowed assignment values. Null means any value is allowed, an empty array means the tag can only be assigned without a value.
+          nullable: true
+          items:
+            type: string
+            maxLength: 256
+        assignmentValues:
+          type: array
+          description: Assignment values in the current metadata object context. Null means no assignment context, an empty array means assigned without a value.
+          nullable: true
+          items:
+            type: string
+            maxLength: 256
 
     MetadataObject:
       type: object
@@ -393,6 +546,7 @@ components:
             - "SCHEMA"
             - "TABLE"
             - "VIEW"
+            - "SEMANTIC_MODEL"
             - "FILESET"
             - "TOPIC"
             - "MODEL"
@@ -401,6 +555,14 @@ components:
 
 
   requests:
+
+    PolicyTagAddRequest:
+      type: object
+      required:
+        - selector
+      properties:
+        selector:
+          $ref: "./policies.yaml#/components/schemas/PolicyAssociationSelector"
 
     TagCreateRequest:
       type: object
@@ -421,6 +583,13 @@ components:
           default: { }
           additionalProperties:
             type: string
+        allowedValues:
+          type: array
+          description: Allowed assignment values. Null means any value is allowed, an empty array means the tag can only be assigned without a value.
+          nullable: true
+          items:
+            type: string
+            maxLength: 256
 
     TagUpdatesRequest:
       type: object
@@ -539,7 +708,79 @@ components:
           description: The tags to remove
           nullable: true
 
+    TagValuesAssociateRequest:
+      type: object
+      properties:
+        tagsToAdd:
+          type: array
+          items:
+            $ref: "#/components/requests/TagValue"
+          description: The tag values to add
+          nullable: true
+        tagsToRemove:
+          type: array
+          items:
+            $ref: "#/components/requests/TagValue"
+          description: The tag values to remove
+          nullable: true
+
+    TagValue:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The tag name
+        value:
+          type: string
+          description: The optional assignment value
+          nullable: true
+          maxLength: 256
+
   responses:
+    PolicyForTagAssociationListResponse:
+      type: object
+      required:
+        - code
+        - associations
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        associations:
+          type: array
+          items:
+            type: object
+            required:
+              - policy
+              - selector
+            properties:
+              policy:
+                $ref: "./policies.yaml#/components/schemas/Policy"
+              selector:
+                $ref: "./policies.yaml#/components/schemas/PolicyAssociationSelector"
+
+    PolicyTagAssociationResponse:
+      type: object
+      required:
+        - code
+        - policy
+        - tag
+        - selector
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        policy:
+          type: string
+        tag:
+          type: string
+        selector:
+          $ref: "./policies.yaml#/components/schemas/PolicyAssociationSelector"
+
     TagListResponse:
       type: object
       properties:
@@ -628,13 +869,25 @@ components:
         "properties": {
           "key1": "value1",
           "key2": "value2"
-        }
+        },
+        "allowedValues": ["finance", "engineering"]
       }
 
     TagAssociate:
       value: {
         "tagsToAdd": ["my_tag1", "my_tag2"],
         "tagsToRemove": ["my_tag3"]
+      }
+
+    TagValuesAssociate:
+      value: {
+        "tagsToAdd": [
+          {"name": "my_tag1", "value": "finance"},
+          {"name": "my_tag2"}
+        ],
+        "tagsToRemove": [
+          {"name": "my_tag3", "value": "engineering"}
+        ]
       }
 
     TagResponse:

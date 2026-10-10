@@ -19,19 +19,25 @@ from __future__ import annotations
 
 from typing import Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.model.model import Model
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag import Tag
 from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.model_dto import ModelDTO
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericModel(Model, SupportsTags):
+class GenericModel(Model, SupportsTags, SupportsSecrets):
     _model_dto: ModelDTO
     """The model DTO object."""
 
@@ -44,6 +50,9 @@ class GenericModel(Model, SupportsTags):
             model_full_name, MetadataObject.Type.MODEL
         )
         self._model_tag_operations = MetadataObjectTagOperations(
+            model_ns.level(0), model_object, rest_client
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             model_ns.level(0), model_object, rest_client
         )
 
@@ -80,6 +89,13 @@ class GenericModel(Model, SupportsTags):
     def get_tag(self, name: str) -> Tag:
         return self._model_tag_operations.get_tag(name)
 
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._model_tag_operations.assign_tags(tags_to_add, tags_to_remove)
+
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
@@ -87,3 +103,12 @@ class GenericModel(Model, SupportsTags):
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> dict:
+        return self._object_secret_operations.get_secrets()
+
+    def supports_roles(self) -> SupportsRoles:
+        raise UnsupportedOperationException("Not supported yet.")

@@ -57,11 +57,9 @@ class ErrorResponse(BaseResponse):
         )
 
     def format_error_message(self) -> str:
-        return (
-            f"{self._message}\n" + "\n".join(self._stack)
-            if self._stack is not None
-            else ""
-        )
+        if self._stack is None:
+            return self._message
+        return f"{self._message}\n" + "\n".join(self._stack)
 
     @classmethod
     def generate_error_response(

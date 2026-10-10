@@ -21,15 +21,20 @@ package org.apache.gravitino.hook;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,26 +48,33 @@ public class TestTagHookDispatcher {
   // Save the original ownerDispatcher before each test and restore it in tearDown so we do not
   // leak null state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
+  private GravitinoAuthorizer mockAuthorizer;
+  private GravitinoAuthorizer savedAuthorizer;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(TagDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
+    mockAuthorizer = mock(GravitinoAuthorizer.class);
+    savedAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(mockAuthorizer);
     hookDispatcher = new TagHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(savedAuthorizer);
   }
 
   @Test
   public void testCreateTagThrowsWhenSetOwnerFails() {
     Tag mockTag = mock(Tag.class);
-    when(mockDispatcher.createTag(any(), any(), any(), any())).thenReturn(mockTag);
+    when(mockDispatcher.createTag(any(), any(), any(), any(), any())).thenReturn(mockTag);
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -75,6 +87,61 @@ public class TestTagHookDispatcher {
                 hookDispatcher.createTag(
                     "test_metalake", "test_tag", "comment", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
-    verify(mockDispatcher).createTag(any(), any(), any(), any());
+    verify(mockDispatcher).createTag(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  public void testDeleteTagInvalidatesNameIdMapping() {
+    when(mockDispatcher.deleteTag("test_metalake", "test_tag")).thenReturn(true);
+
+    Assertions.assertTrue(hookDispatcher.deleteTag("test_metalake", "test_tag"));
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange(
+            "test_metalake",
+            NameIdentifierUtil.ofTag("test_metalake", "test_tag"),
+            Entity.EntityType.TAG);
+  }
+
+  @Test
+  public void testDeleteMissingTagDoesNotInvalidateNameIdMapping() {
+    when(mockDispatcher.deleteTag("test_metalake", "test_tag")).thenReturn(false);
+
+    Assertions.assertFalse(hookDispatcher.deleteTag("test_metalake", "test_tag"));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
+  @Test
+  public void testRenameTagInvalidatesOldNameIdMapping() {
+    TagChange[] changes = {TagChange.updateComment("new comment"), TagChange.rename("new_tag")};
+    Tag mockTag = mock(Tag.class);
+    when(mockDispatcher.alterTag("test_metalake", "test_tag", changes)).thenReturn(mockTag);
+
+    Assertions.assertSame(mockTag, hookDispatcher.alterTag("test_metalake", "test_tag", changes));
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange(
+            "test_metalake",
+            NameIdentifierUtil.ofTag("test_metalake", "test_tag"),
+            Entity.EntityType.TAG);
+  }
+
+  @Test
+  public void testAlterTagWithoutRenameDoesNotInvalidateNameIdMapping() {
+    TagChange[] changes = {TagChange.updateComment("new comment")};
+    when(mockDispatcher.alterTag("test_metalake", "test_tag", changes)).thenReturn(mock(Tag.class));
+
+    hookDispatcher.alterTag("test_metalake", "test_tag", changes);
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
+  @Test
+  public void testFailedRenameTagDoesNotInvalidateNameIdMapping() {
+    TagChange[] changes = {TagChange.rename("new_tag")};
+    when(mockDispatcher.alterTag("test_metalake", "test_tag", changes))
+        .thenThrow(new RuntimeException("Alter failed"));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> hookDispatcher.alterTag("test_metalake", "test_tag", changes));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
   }
 }

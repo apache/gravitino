@@ -31,6 +31,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -42,6 +43,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -61,6 +63,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestAccessControlManagerForPermissions {
@@ -176,7 +182,8 @@ public class TestAccessControlManagerForPermissions {
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    Mockito.when(catalog.name()).thenReturn(CATALOG);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     Mockito.when(catalogManager.listCatalogs(Mockito.any()))
         .thenReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "catalog")});
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
@@ -193,6 +200,116 @@ public class TestAccessControlManagerForPermissions {
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
+    }
+  }
+
+  @Test
+  public void testRoleDisappearingDuringGrantIsReportedAsIllegalRole() throws IOException {
+    EntityStore failingStore = Mockito.mock(EntityStore.class);
+    RoleManager roleManager = Mockito.mock(RoleManager.class);
+    Mockito.when(roleManager.getRole(METALAKE, roleEntity.name())).thenReturn(roleEntity);
+    NoSuchRoleException missing = new NoSuchRoleException("Role was deleted during grant");
+    Mockito.doThrow(missing).when(failingStore).update(any(), any(), any(), any());
+    PermissionManager manager = new PermissionManager(failingStore, roleManager);
+
+    IllegalRoleException userFailure =
+        Assertions.assertThrows(
+            IllegalRoleException.class,
+            () -> manager.grantRolesToUser(METALAKE, List.of(roleEntity.name()), USER));
+    Assertions.assertSame(missing, userFailure.getCause());
+    IllegalRoleException groupFailure =
+        Assertions.assertThrows(
+            IllegalRoleException.class,
+            () -> manager.grantRolesToGroup(METALAKE, List.of(roleEntity.name()), GROUP));
+    Assertions.assertSame(missing, groupFailure.getCause());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testMembershipUpdateCarriesObservedRolesForward(boolean group, boolean grant)
+      throws IOException {
+    try (EntityStore store = new TestMemoryEntityStore.InMemoryEntityStore()) {
+      store.initialize(config);
+      RoleEntity retained = membershipRole(10L, "retained");
+      RoleEntity target = membershipRole(20L, "target");
+      putMembershipPrincipal(store, group, List.of(retained, target));
+      RoleManager roles = Mockito.mock(RoleManager.class);
+      Mockito.when(roles.getRole(METALAKE, target.name())).thenReturn(target);
+      // "retained" has been deleted and recreated under the same name. The updater must never
+      // resolve an existing membership by name, so the replacement cannot inherit the grant and
+      // the update costs no lookup per existing role.
+      Mockito.when(roles.getRole(METALAKE, retained.name()))
+          .thenReturn(membershipRole(11L, retained.name()));
+      PermissionManager manager = new PermissionManager(store, roles);
+      reset(authorizationPlugin);
+
+      changeMembership(manager, group, grant, List.of(target.name()));
+
+      Entity updated = membershipPrincipal(store, group);
+      List<String> names =
+          group ? ((GroupEntity) updated).roleNames() : ((UserEntity) updated).roleNames();
+      List<Long> ids = group ? ((GroupEntity) updated).roleIds() : ((UserEntity) updated).roleIds();
+      // Granting an already-held role is a no-op, revoking it drops only that pair.
+      Assertions.assertEquals(
+          grant ? List.of(retained.name(), target.name()) : List.of(retained.name()), names);
+      Assertions.assertEquals(
+          grant ? List.of(retained.id(), target.id()) : List.of(retained.id()), ids);
+      Mockito.verify(roles, Mockito.never()).getRole(METALAKE, retained.name());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMembershipUpdateRequiresPairedRoleIds(boolean missingIds) throws IOException {
+    try (EntityStore store = new TestMemoryEntityStore.InMemoryEntityStore()) {
+      store.initialize(config);
+      // Role IDs are optional entity fields, but a name alone cannot prove membership identity.
+      UserEntity observed =
+          UserEntity.builder()
+              .withId(100L)
+              .withName(USER)
+              .withNamespace(AuthorizationUtils.ofUserNamespace(METALAKE))
+              .withRoleNames(List.of("retained"))
+              .withRoleIds(missingIds ? null : List.of(10L, 11L))
+              .withAuditInfo(auditInfo)
+              .build();
+      store.put(observed, false);
+      RoleManager roles = Mockito.mock(RoleManager.class);
+      RoleEntity target = membershipRole(20L, "target");
+      Mockito.when(roles.getRole(METALAKE, target.name())).thenReturn(target);
+      PermissionManager manager = new PermissionManager(store, roles);
+      reset(authorizationPlugin);
+      Assertions.assertThrows(
+          IllegalRoleException.class,
+          () -> manager.grantRolesToUser(METALAKE, List.of(target.name()), USER));
+      Assertions.assertSame(observed, membershipPrincipal(store, false));
+      Mockito.verifyNoInteractions(authorizationPlugin);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRevokeOldRoleDoesNotRemoveReplacementName(boolean group) throws IOException {
+    try (EntityStore store = new TestMemoryEntityStore.InMemoryEntityStore()) {
+      store.initialize(config);
+      RoleEntity old = membershipRole(10L, "recreated");
+      RoleEntity replacement = membershipRole(11L, old.name());
+      RoleEntity removed = membershipRole(20L, "removed");
+      putMembershipPrincipal(store, group, List.of(replacement, removed));
+      RoleManager roles = Mockito.mock(RoleManager.class);
+      // The request resolves the old ID, then a concurrent operation grants the replacement
+      // before the principal snapshot is read. Revoking the old ID must preserve the new pair.
+      Mockito.when(roles.getRole(METALAKE, old.name())).thenReturn(old);
+      Mockito.when(roles.getRole(METALAKE, removed.name())).thenReturn(removed);
+      PermissionManager manager = new PermissionManager(store, roles);
+      changeMembership(manager, group, false, List.of(old.name(), removed.name(), removed.name()));
+      Entity updated = membershipPrincipal(store, group);
+      Assertions.assertEquals(
+          List.of(replacement.name()),
+          group ? ((GroupEntity) updated).roleNames() : ((UserEntity) updated).roleNames());
+      Assertions.assertEquals(
+          List.of(replacement.id()),
+          group ? ((GroupEntity) updated).roleIds() : ((UserEntity) updated).roleIds());
     }
   }
 
@@ -335,6 +452,73 @@ public class TestAccessControlManagerForPermissions {
         () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, notExist));
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"METALAKE", "CATALOG", "SCHEMA"})
+  void testSemanticModelPrivilegeUpdatesStayLocal(String scope) throws IOException {
+    MetadataObject.Type type = MetadataObject.Type.valueOf(scope);
+    String fullName =
+        type == MetadataObject.Type.METALAKE
+            ? METALAKE
+            : type == MetadataObject.Type.CATALOG ? CATALOG : CATALOG + "." + SCHEMA;
+    MetadataObject object = MetadataObjects.parse(fullName, type);
+    String name = "semantic_updates_" + scope;
+    entityStore.put(
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(List.of())
+            .build(),
+        false);
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    Privilege semantic = Privileges.UseSemanticModel.allow();
+    Privilege table = Privileges.SelectTable.allow();
+    SecurableObject tableObject = SecurableObjects.parse(fullName, type, List.of(table));
+    SecurableObject semanticObject = SecurableObjects.parse(fullName, type, List.of(semantic));
+    SecurableObject mixed = SecurableObjects.parse(fullName, type, List.of(semantic, table));
+    reset(authorizationPlugin);
+    Role semanticRole =
+        manager.grantPrivilegesToRole(
+            METALAKE, name, object, Set.of(semantic, Privileges.CreateSemanticModel.allow()));
+    Assertions.assertEquals(
+        Set.of(semantic, Privileges.CreateSemanticModel.allow()),
+        Set.copyOf(semanticRole.securableObjects().get(0).privileges()));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(table));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    manager.grantPrivilegesToRole(
+        METALAKE, name, object, Set.of(Privileges.ModifySemanticModel.allow()));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(table));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(mixed));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    SecurableObject modifiedTable =
+        SecurableObjects.parse(fullName, type, List.of(Privileges.ModifyTable.allow()));
+    manager.overridePrivilegesInRole(
+        METALAKE,
+        name,
+        List.of(
+            SecurableObjects.parse(
+                fullName, type, List.of(semantic, Privileges.ModifyTable.allow()))));
+    assertConnectorChange(RoleChange.updateSecurableObject(name, tableObject, modifiedTable));
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(semanticObject));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, modifiedTable));
+    manager.overridePrivilegesInRole(METALAKE, name, List.of());
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(semanticObject));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(semantic, table));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic, table));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
+  }
+
   @Test
   public void testGrantPrivilegeToRole() {
     reset(authorizationPlugin);
@@ -463,5 +647,86 @@ public class TestAccessControlManagerForPermissions {
         () ->
             accessControlManager.overridePrivilegesInRole(
                 METALAKE, notExist, Lists.newArrayList()));
+  }
+
+  private RoleEntity membershipRole(long id, String name) {
+    return RoleEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+        .withProperties(Maps.newHashMap())
+        .withSecurableObjects(roleEntity.securableObjects())
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private void putMembershipPrincipal(EntityStore store, boolean group, List<RoleEntity> roles)
+      throws IOException {
+    List<String> names = roles.stream().map(RoleEntity::name).toList();
+    List<Long> ids = roles.stream().map(RoleEntity::id).toList();
+    if (group) {
+      store.put(
+          GroupEntity.builder()
+              .withId(100L)
+              .withName(GROUP)
+              .withNamespace(AuthorizationUtils.ofGroupNamespace(METALAKE))
+              .withRoleNames(names)
+              .withRoleIds(ids)
+              .withAuditInfo(auditInfo)
+              .build(),
+          false);
+    } else {
+      store.put(
+          UserEntity.builder()
+              .withId(100L)
+              .withName(USER)
+              .withNamespace(AuthorizationUtils.ofUserNamespace(METALAKE))
+              .withRoleNames(names)
+              .withRoleIds(ids)
+              .withAuditInfo(auditInfo)
+              .build(),
+          false);
+    }
+  }
+
+  private Entity membershipPrincipal(EntityStore store, boolean group) throws IOException {
+    return group
+        ? store.get(
+            AuthorizationUtils.ofGroup(METALAKE, GROUP), Entity.EntityType.GROUP, GroupEntity.class)
+        : store.get(
+            AuthorizationUtils.ofUser(METALAKE, USER), Entity.EntityType.USER, UserEntity.class);
+  }
+
+  private void changeMembership(
+      PermissionManager manager, boolean group, boolean grant, List<String> roles) {
+    if (group) {
+      if (grant) {
+        manager.grantRolesToGroup(METALAKE, roles, GROUP);
+      } else {
+        manager.revokeRolesFromGroup(METALAKE, roles, GROUP);
+      }
+    } else if (grant) {
+      manager.grantRolesToUser(METALAKE, roles, USER);
+    } else {
+      manager.revokeRolesFromUser(METALAKE, roles, USER);
+    }
+  }
+
+  private void assertConnectorChange(RoleChange expected) {
+    ArgumentCaptor<Role> role = ArgumentCaptor.forClass(Role.class);
+    ArgumentCaptor<RoleChange> change = ArgumentCaptor.forClass(RoleChange.class);
+    verify(authorizationPlugin).onRoleUpdated(role.capture(), change.capture());
+    Assertions.assertEquals(expected, change.getValue());
+    role.getValue()
+        .securableObjects()
+        .forEach(
+            object ->
+                object
+                    .privileges()
+                    .forEach(
+                        privilege ->
+                            Assertions.assertFalse(
+                                privilege.name().name().endsWith("SEMANTIC_MODEL"))));
+    reset(authorizationPlugin);
   }
 }

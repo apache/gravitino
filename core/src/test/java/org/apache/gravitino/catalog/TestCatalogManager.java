@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_HIDDEN_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY3;
@@ -37,34 +38,60 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogDropAware;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretProvider;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -73,6 +100,7 @@ import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -83,6 +111,46 @@ import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 public class TestCatalogManager {
+
+  /** Test-only external-reference provider. */
+  public static class TestReferenceSecretsProvider implements SecretProvider {
+
+    private String providerName;
+
+    @Override
+    public void initialize(String name, Map<String, String> providerConfig) {
+      providerName = name;
+    }
+
+    @Override
+    public String type() {
+      return "test-reference";
+    }
+
+    @Override
+    public SecretUrn writeSecret(String plaintext, Map<String, String> attributes) {
+      throw new UnsupportedOperationException("write-through is not supported");
+    }
+
+    @Override
+    public String readSecret(SecretUrn urn) {
+      return "resolved-" + urn.identifierSegments().get(0);
+    }
+
+    @Override
+    public void deleteSecret(SecretUrn urn) {}
+
+    @Override
+    public SecretUrn buildReferenceUrn(String propertyKey, Map<String, String> attributes) {
+      return SecretUrn.parse(
+          String.format(
+              "%s%s:%s:%s",
+              SecretConstants.URN_PREFIX, providerName, attributes.get("path"), propertyKey));
+    }
+
+    @Override
+    public void close() {}
+  }
 
   private static CatalogManager catalogManager;
 
@@ -113,7 +181,8 @@ public class TestCatalogManager {
 
     entityStore.put(metalakeEntity, true);
 
-    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    catalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator(), new SecretManager(config));
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     catalogManager = Mockito.spy(catalogManager);
   }
@@ -123,6 +192,9 @@ public class TestCatalogManager {
   void reset() throws IOException {
     ((InMemoryEntityStore) entityStore).clear();
     entityStore.put(metalakeEntity, true);
+    // The shared CatalogManager is created once in @BeforeAll, so its cache would otherwise keep
+    // entries created by previously executed test methods and make tests order-dependent.
+    catalogManager.getCatalogCache().invalidateAll();
   }
 
   @AfterAll
@@ -213,6 +285,62 @@ public class TestCatalogManager {
             IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change5));
     Assertions.assertTrue(
         e3.getMessage().contains("Property key6-1 is immutable"), e3.getMessage());
+    reset();
+  }
+
+  @Test
+  void testAlterCatalogRejectsMaskedHiddenProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "masked_hidden");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put(PROPERTY_HIDDEN_KEY, "secret")
+            .put("mock", "mock")
+            .build();
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident,
+                    CatalogChange.setProperty(
+                        PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)));
+
+    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
+    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    Assertions.assertEquals("secret", entity.getProperties().get(PROPERTY_HIDDEN_KEY));
+    reset();
+  }
+
+  @Test
+  void testCreateCatalogRejectsMaskedHiddenProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "masked_create");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put(PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)
+            .put("mock", "mock")
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
     reset();
   }
 
@@ -390,6 +518,41 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCreateCatalogReturnsNoSuchMetalakeWhenParentDisappears() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    NoSuchEntityException missingMetalake =
+        new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.METALAKE.name().toLowerCase(),
+            metalake);
+    Mockito.doThrow(missingMetalake).when(store).put(any(CatalogEntity.class), eq(false));
+
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of(metalake, "concurrent_parent_drop");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+
+    try {
+      NoSuchMetalakeException exception =
+          Assertions.assertThrows(
+              NoSuchMetalakeException.class,
+              () ->
+                  manager.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+      Assertions.assertSame(missingMetalake, exception.getCause());
+      Mockito.verify(store, Mockito.never()).delete(ident, EntityType.CATALOG, true);
+    } finally {
+      manager.close();
+      store.close();
+    }
+  }
+
+  @Test
   public void testCreateCatalogValidatesBackendConnection() {
     Map<String, String> okProps =
         Maps.newHashMap(
@@ -564,6 +727,9 @@ public class TestCatalogManager {
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
     Catalog catalog = catalogManager.loadCatalog(ident);
+    Assertions.assertFalse(
+        catalog instanceof BaseCatalog,
+        "loadCatalog must not expose a live catalog after its lease is released");
     Assertions.assertEquals("test21", catalog.name());
     Assertions.assertEquals("comment", catalog.comment());
     testProperties(props, catalog.properties());
@@ -650,10 +816,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
-    CatalogEntity originalEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", originalEntity, true);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     CatalogManager.CatalogWrapper staleWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
@@ -662,8 +826,11 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper freshWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
     BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
-    Mockito.doReturn("cache_race_test_renamed").when(freshCatalog).name();
+    Catalog freshCatalogInfo = Mockito.mock(Catalog.class);
+    Mockito.doReturn("cache_race_test_renamed").when(freshCatalogInfo).name();
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
+    Mockito.doReturn(true).when(freshWrapper).tryAcquire();
+    Mockito.doReturn(freshCatalogInfo).when(freshWrapper).doWithCatalog(any());
 
     AtomicBoolean staleInserted = new AtomicBoolean(false);
     Answer<CatalogManager.CatalogWrapper> insertStaleWrapper =
@@ -793,7 +960,8 @@ public class TestCatalogManager {
   @Test
   void testCloseUnregistersCatalogChangeLogListener() {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
 
     EntityChangeLogListener registeredListener = store.listener.get();
     Assertions.assertNotNull(registeredListener);
@@ -804,12 +972,26 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCloseCompletesWhenChangeLogUnregistrationFails() {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.throwOnUnregister = true;
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+
+    Assertions.assertDoesNotThrow(manager::close);
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> manager.loadCatalogAndWrap(NameIdentifier.of("metalake", "catalog")));
+  }
+
+  @Test
   void testDropCatalogDoesNotMarkLocalMutationWhenStoreReturnsFalse() throws Exception {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
     store.initialize(config);
     store.put(metalakeEntity, true);
 
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "delete_returns_false");
     Map<String, String> props =
         ImmutableMap.of(
@@ -847,12 +1029,33 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testDropCatalogReturnsFalseWhenConcurrentDeleteWins() throws Exception {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of("metalake", "concurrently_deleted");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    store.throwMissingCatalogForSchemaList = true;
+
+    Assertions.assertFalse(manager.dropCatalog(ident, true));
+    Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+    manager.close();
+  }
+
+  @Test
   void testFailedCreateCatalogCleanupMarksLocalMutation() throws Exception {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
     store.initialize(config);
     store.put(metalakeEntity, true);
 
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "failed_create_cleanup");
 
     // A creation that fails validation (key1 is required but missing) stores the entity and then
@@ -930,12 +1133,10 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     SchemaEntity importedSchemaEntity =
         SchemaEntity.builder()
@@ -958,7 +1159,7 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -967,6 +1168,7 @@ public class TestCatalogManager {
         .doReturn(importedSchema)
         .when(wrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
 
     // Imported schema (no StringIdentifier in external catalog properties) should not block drop.
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
@@ -978,6 +1180,8 @@ public class TestCatalogManager {
     private final AtomicReference<EntityChangeLogListener> unregisteredListener =
         new AtomicReference<>();
     private boolean returnFalseForCatalogDelete;
+    private boolean throwMissingCatalogForSchemaList;
+    private boolean throwOnUnregister;
 
     @Override
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
@@ -989,6 +1193,20 @@ public class TestCatalogManager {
     }
 
     @Override
+    public <E extends Entity & HasIdentifier> List<E> list(
+        Namespace namespace, Class<E> cl, EntityType entityType) throws IOException {
+      // Mirrors the relational store: listing the schemas of a catalog that another server has
+      // already deleted resolves the parent catalog id first and reports the catalog as missing.
+      if (throwMissingCatalogForSchemaList && entityType == EntityType.SCHEMA) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.CATALOG.name().toLowerCase(),
+            namespace.level(namespace.length() - 1));
+      }
+      return super.list(namespace, cl, entityType);
+    }
+
+    @Override
     public void registerEntityChangeLogListener(EntityChangeLogListener listener) {
       this.listener.set(listener);
     }
@@ -996,6 +1214,9 @@ public class TestCatalogManager {
     @Override
     public void unregisterEntityChangeLogListener(EntityChangeLogListener listener) {
       this.unregisteredListener.set(listener);
+      if (throwOnUnregister) {
+        throw new RuntimeException("Failed to unregister listener");
+      }
     }
   }
 
@@ -1014,12 +1235,10 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
@@ -1037,7 +1256,7 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1045,6 +1264,7 @@ public class TestCatalogManager {
         .doThrow(new NoSuchSchemaException("Schema not found"))
         .when(wrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
 
     // Schema disappearing between listSchemas and loadSchema should not block drop.
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
@@ -1065,12 +1285,10 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
@@ -1088,7 +1306,7 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1096,6 +1314,7 @@ public class TestCatalogManager {
         .doThrow(new RuntimeException("Failed connect"))
         .when(wrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
 
     // Unexpected errors during schema classification should propagate (fail-closed).
     RuntimeException ex =
@@ -1117,8 +1336,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
     String comment = "comment";
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -1135,13 +1354,14 @@ public class TestCatalogManager {
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doThrow(new RuntimeException("Failed connect"))
         .when(catalogWrapper)
         .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, catalogWrapper);
     Assertions.assertTrue(catalogManager.dropCatalog(ident, true));
   }
 
@@ -1159,20 +1379,29 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", entity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     CatalogManager.CatalogWrapper catalogWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
-    Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+    CatalogOperations operations =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
+              return function.apply(operations);
+            })
+        .when(catalogWrapper)
+        .doWithCatalogOps(any());
 
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
     boolean dropped = catalogManager.dropCatalog(ident);
@@ -1180,6 +1409,7 @@ public class TestCatalogManager {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Mockito.verify((CatalogDropAware) operations).onCatalogDropped();
   }
 
   @Test
@@ -1196,11 +1426,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", entity, true);
 
     CatalogManager.CatalogWrapper closedWrapper = catalogManager.loadCatalogAndWrap(ident);
     closedWrapper.close();
@@ -1217,20 +1444,23 @@ public class TestCatalogManager {
   void testLoadCatalogAndWrapDoesNotInvalidateConcurrentlyReloadedWrapper() {
     NameIdentifier ident = NameIdentifier.of("metalake", "concurrent_cache_reload_test");
 
-    CatalogManager.CatalogWrapper closedWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    CatalogManager.CatalogWrapper retiredWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
     CatalogManager.CatalogWrapper freshWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
+    // The retired wrapper reports its state only after another thread has already reloaded a fresh
+    // wrapper into the cache, so the stale-entry eviction must not clobber that fresh wrapper.
     Mockito.doAnswer(
             invocation -> {
               catalogManager.getCatalogCache().put(ident, freshWrapper);
-              return null;
+              return true;
             })
-        .when(closedWrapper)
-        .catalog();
+        .when(retiredWrapper)
+        .isRetired();
 
     try {
-      catalogManager.getCatalogCache().put(ident, closedWrapper);
+      catalogManager.getCatalogCache().put(ident, retiredWrapper);
 
       CatalogManager.CatalogWrapper loadedWrapper = catalogManager.loadCatalogAndWrap(ident);
 
@@ -1285,46 +1515,193 @@ public class TestCatalogManager {
     catalogManager.disableCatalog(ident);
     CatalogEntity disabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals("false", disabled.getProperties().get(Catalog.PROPERTY_IN_USE));
+    Assertions.assertThrows(
+        CatalogNotInUseException.class, () -> catalogManager.testConnection(ident));
 
     catalogManager.enableCatalog(ident);
     CatalogEntity enabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals("true", enabled.getProperties().get(Catalog.PROPERTY_IN_USE));
-
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> catalogManager.testConnection(ident));
   }
 
   @Test
-  public void testCatalogCacheRemoveListener() {
+  void testExistingCatalogConnectionHoldsCatalogReadLock() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "connection_lock_test");
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CountDownLatch connectionStarted = new CountDownLatch(1);
+    CountDownLatch releaseConnection = new CountDownLatch(1);
+    CountDownLatch writerStarted = new CountDownLatch(1);
+    CountDownLatch writeLockAcquired = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    Mockito.doAnswer(invocation -> new CatalogLease(wrapper))
+        .when(catalogManager)
+        .acquireCatalogLease(ident);
+    Mockito.doReturn(catalog).when(wrapper).catalog();
+    Mockito.doAnswer(
+            invocation -> {
+              connectionStarted.countDown();
+              Assertions.assertTrue(releaseConnection.await(5, TimeUnit.SECONDS));
+              return null;
+            })
+        .when(wrapper)
+        .doWithCatalogOps(any());
+
+    Future<?> connectionFuture = executor.submit(() -> catalogManager.testConnection(ident));
+    Future<?> writerFuture = null;
+    try {
+      Assertions.assertTrue(connectionStarted.await(5, TimeUnit.SECONDS));
+      writerFuture =
+          executor.submit(
+              () -> {
+                writerStarted.countDown();
+                TreeLockUtils.doWithTreeLock(
+                    ident,
+                    LockType.WRITE,
+                    () -> {
+                      writeLockAcquired.countDown();
+                      return null;
+                    });
+              });
+      Assertions.assertTrue(writerStarted.await(5, TimeUnit.SECONDS));
+      Assertions.assertFalse(writeLockAcquired.await(200, TimeUnit.MILLISECONDS));
+
+      releaseConnection.countDown();
+      connectionFuture.get(5, TimeUnit.SECONDS);
+      writerFuture.get(5, TimeUnit.SECONDS);
+      Assertions.assertEquals(0, writeLockAcquired.getCount());
+    } finally {
+      releaseConnection.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void testExistingCatalogConnectionWithProposedChanges() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "connection_changes_test");
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("provider", "test")
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value3")
+            .put("removable", "stored")
+            .build();
+    catalogManager.createCatalog(
+        ident, Catalog.Type.RELATIONAL, provider, "stored comment", properties);
+    CatalogEntity storedBefore = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    CatalogManager.CatalogWrapper cachedBefore =
+        catalogManager.getCatalogCache().getIfPresent(ident);
+
+    CatalogManager.CatalogWrapper temporaryWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
+    CatalogOperations temporaryOperations = Mockito.mock(CatalogOperations.class);
+    AtomicReference<CatalogEntity> effectiveEntity = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              effectiveEntity.set(invocation.getArgument(0));
+              return temporaryWrapper;
+            })
+        .when(catalogManager)
+        .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogOperations, Object> operation = invocation.getArgument(0);
+              return operation.apply(temporaryOperations);
+            })
+        .when(temporaryWrapper)
+        .doWithCatalogOps(any());
+
+    NameIdentifier renamedIdent = NameIdentifier.of("metalake", "connection_changes_renamed");
+    try {
+      catalogManager.testConnection(
+          ident,
+          CatalogChange.rename(renamedIdent.name()),
+          CatalogChange.updateComment("temporary comment"),
+          CatalogChange.setProperty(PROPERTY_KEY2, "temporary value"),
+          CatalogChange.removeProperty("removable"));
+
+      CatalogEntity effective = effectiveEntity.get();
+      Assertions.assertNotNull(effective);
+      Assertions.assertEquals(renamedIdent.name(), effective.name());
+      Assertions.assertEquals("temporary comment", effective.getComment());
+      Assertions.assertEquals("temporary value", effective.getProperties().get(PROPERTY_KEY2));
+      Assertions.assertFalse(effective.getProperties().containsKey("removable"));
+      Mockito.verify(temporaryOperations).testConnection(renamedIdent);
+      Mockito.verify(temporaryWrapper).close();
+
+      CatalogEntity storedAfter = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      Assertions.assertEquals(storedBefore.name(), storedAfter.name());
+      Assertions.assertEquals(storedBefore.getComment(), storedAfter.getComment());
+      Assertions.assertEquals(storedBefore.getProperties(), storedAfter.getProperties());
+      Assertions.assertFalse(entityStore.exists(renamedIdent, EntityType.CATALOG));
+      Assertions.assertSame(cachedBefore, catalogManager.getCatalogCache().getIfPresent(ident));
+
+      Mockito.doThrow(new IOException("probe failed"))
+          .when(temporaryOperations)
+          .testConnection(any(NameIdentifier.class));
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  catalogManager.testConnection(
+                      ident, CatalogChange.setProperty(PROPERTY_KEY2, "another value")));
+      Assertions.assertInstanceOf(IOException.class, failure.getCause());
+      Mockito.verify(temporaryWrapper, Mockito.times(2)).close();
+    } finally {
+      Mockito.doCallRealMethod()
+          .when(catalogManager)
+          .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+    }
+  }
+
+  @Test
+  public void testCatalogCacheRemoveListener() throws IOException {
     NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
     Map<String, String> props =
         ImmutableMap.of(
             PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
 
-    // Create a catalog
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    // Use a dedicated CatalogManager (and entity store) instead of the shared static one: the
+    // shared instance keeps cache entries and cache removal listeners registered by other test
+    // methods, which would make the assertions below depend on the test execution order.
+    EntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
 
-    // Load the catalog to add it to the cache
-    catalogManager.loadCatalog(ident);
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+      // Create a catalog
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
-    // Add a listener to track removed catalogs
-    Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
-    catalogManager.addCatalogCacheRemoveListener(removedCatalogs::add);
+      // Load the catalog to add it to the cache
+      manager.loadCatalog(ident);
+      Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Invalidate the cache to trigger the removal listener
-    catalogManager.getCatalogCache().invalidate(ident);
+      // Add a listener to track removed catalogs
+      Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
+      manager.addCatalogCacheRemoveListener(removedCatalogs::add);
 
-    // Wait for the async eviction to complete
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () -> {
-              Assertions.assertTrue(
-                  removedCatalogs.contains(ident),
-                  "Listener should be notified of catalog removal");
-              Assertions.assertEquals(
-                  1, removedCatalogs.size(), "Only one catalog should be removed");
-            });
+      // Invalidate the cache to trigger the removal listener
+      manager.getCatalogCache().invalidate(ident);
+
+      // Wait for the async eviction to complete
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                Assertions.assertTrue(
+                    removedCatalogs.contains(ident),
+                    "Listener should be notified of catalog removal");
+                Assertions.assertEquals(
+                    1, removedCatalogs.size(), "Only one catalog should be removed");
+              });
+    } finally {
+      store.close();
+    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
@@ -1333,6 +1710,209 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+    Assertions.assertFalse(
+        testProps.containsKey(ID_KEY),
+        "`gravitino.identifier` is reserved+hidden and should be omitted from responses");
+  }
+
+  @Test
+  void testSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_ok");
+      Catalog catalog =
+          manager.createCatalog(
+              ident,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "comment",
+              catalogProps(),
+              Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
+              Map.of());
+      Assertions.assertEquals(
+          HiddenPropertyMaskUtils.MASKED_VALUE, catalog.properties().get(PROPERTY_KEY4));
+      String urn =
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+
+      manager.alterCatalog(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
+      Assertions.assertFalse(
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .containsKey(PROPERTY_KEY4));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testConnectionChangesDoNotMutateSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(
+                new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets))) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_connection_test");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "stored-secret")),
+          Map.of());
+      CatalogEntity stored = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String storedUrn = stored.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+      SecretUrn proposedUrn = writeThroughUrn("catalog", stored.id(), PROPERTY_KEY2);
+
+      CatalogManager.CatalogWrapper temporaryWrapper =
+          Mockito.mock(CatalogManager.CatalogWrapper.class);
+      AtomicReference<CatalogEntity> effectiveEntity = new AtomicReference<>();
+      Mockito.doAnswer(
+              invocation -> {
+                effectiveEntity.set(invocation.getArgument(0));
+                return temporaryWrapper;
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+      Mockito.doReturn(null).when(temporaryWrapper).doWithCatalogOps(any());
+
+      manager.testConnection(
+          ident,
+          CatalogChange.setSecretBinding(
+              PROPERTY_KEY4, new SecretBinding("memory", "temporary-secret")),
+          CatalogChange.setSecretBinding(
+              PROPERTY_KEY2, new SecretBinding("memory", "temporary-new-secret")));
+      Assertions.assertEquals(
+          "temporary-secret", effectiveEntity.get().getProperties().get(PROPERTY_KEY4));
+      Assertions.assertEquals(
+          "temporary-new-secret", effectiveEntity.get().getProperties().get(PROPERTY_KEY2));
+      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(proposedUrn));
+
+      manager.testConnection(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
+      Assertions.assertFalse(effectiveEntity.get().getProperties().containsKey(PROPERTY_KEY4));
+      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+
+      manager.testConnection(
+          ident,
+          CatalogChange.setSecretReference(
+              PROPERTY_KEY4, new SecretReference("reference", Map.of("path", "external-secret"))));
+      String referenceUrn = effectiveEntity.get().getProperties().get(PROPERTY_KEY4);
+      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, referenceUrn));
+      Assertions.assertEquals(
+          "resolved-external-secret",
+          secrets.toPlaintextProperties(effectiveEntity.get().getProperties()).get(PROPERTY_KEY4));
+      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> manager.testConnection(ident, CatalogChange.setProperty(PROPERTY_KEY4, storedUrn)));
+      CatalogEntity storedAfter = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      Assertions.assertEquals(stored.getProperties(), storedAfter.getProperties());
+      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+      Mockito.verify(manager, Mockito.times(4)).acquireCatalogLease(ident);
+      Mockito.verify(temporaryWrapper, Mockito.times(3)).close();
+    }
+  }
+
+  @Test
+  void testSecretRollback() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      IdGenerator ids = new AtomicLong(4242L)::getAndIncrement;
+      CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_fail");
+      Mockito.doThrow(new RuntimeException("init failed"))
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), any());
+      SecretUrn urn = writeThroughUrn("catalog", 4242L, PROPERTY_KEY4);
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      manager.close();
+    }
+  }
+
+  @Test
+  void testSecretNoMetalake() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(
+                config, entityStore, new AtomicLong(4343L)::getAndIncrement, secrets)) {
+      NameIdentifier ident = NameIdentifier.of("missing_metalake", "secret_catalog");
+      SecretUrn urn = writeThroughUrn("catalog", 4343L, PROPERTY_KEY4);
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  private static Map<String, String> catalogProps() {
+    return ImmutableMap.of(
+        "provider",
+        "test",
+        PROPERTY_KEY1,
+        "value1",
+        PROPERTY_KEY2,
+        "value2",
+        PROPERTY_KEY5_PREFIX + "1",
+        "value3");
+  }
+
+  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
+    return SecretUrn.buildWriteThrough(
+        "memory",
+        Map.of(
+            SecretConstants.ATTR_ENTITY_TYPE, entityType,
+            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+            SecretConstants.ATTR_PROPERTY_KEY, key));
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,reference");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "reference."
+            + SecretProviderRegistry.CLASS_NAME,
+        TestReferenceSecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 }

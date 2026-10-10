@@ -73,6 +73,7 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
@@ -245,6 +246,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> credentialErrorHandler() {
     return CredentialErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to secret property operations.
+   *
+   * @return A Consumer representing the secret error handler.
+   */
+  public static Consumer<ErrorResponse> secretErrorHandler() {
+    return SecretErrorHandler.INSTANCE;
   }
 
   /**
@@ -561,6 +571,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.CONNECTION_FAILED_CODE:
           throw new ConnectionFailedException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
@@ -1036,6 +1049,39 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to secret property operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class SecretErrorHandler extends RestErrorHandler {
+
+    private static final SecretErrorHandler INSTANCE = new SecretErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Error handler specific to Tag operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class TagErrorHandler extends RestErrorHandler {
@@ -1066,6 +1112,10 @@ public class ErrorHandlers {
               .getType()
               .equals(TagAlreadyAssociatedException.class.getSimpleName())) {
             throw new TagAlreadyAssociatedException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(PolicyAlreadyAssociatedException.class.getSimpleName())) {
+            throw new PolicyAlreadyAssociatedException(errorMessage);
           } else {
             throw new AlreadyExistsException(errorMessage);
           }
@@ -1374,6 +1424,9 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE) {
+        throw new OptimisticLockException("%s", formatErrorMessage(errorResponse));
+      }
       if (errorResponse.getCode() == ErrorConstants.CONNECTION_FAILED_CODE) {
         throw new ConnectionFailedException("%s", formatErrorMessage(errorResponse));
       }

@@ -227,12 +227,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(
-            fileset.properties(),
+        self.assert_properties_equal(
             {
                 Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
                 **self.fileset_properties,
             },
+            fileset.properties(),
         )
         self.assertEqual(fileset.storage_location(), f"file:{self.fileset_location}")
 
@@ -241,8 +241,8 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(
-            fileset.properties(), self.multiple_locations_fileset_properties
+        self.assert_properties_equal(
+            self.multiple_locations_fileset_properties, fileset.properties()
         )
         self.assertEqual(
             fileset.storage_location(),
@@ -283,12 +283,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.name(), self.fileset_name)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(
-            fileset.properties(),
+        self.assert_properties_equal(
             {
                 Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
                 **self.fileset_properties,
             },
+            fileset.properties(),
         )
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
 

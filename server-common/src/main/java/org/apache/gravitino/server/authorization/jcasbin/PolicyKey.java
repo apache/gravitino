@@ -38,7 +38,8 @@ final class PolicyKey {
     this.metadataType = metadataType;
     this.metadataId = metadataId;
     this.privilege = privilege;
-    this.hash = Objects.hash(metadataType, metadataId, privilege);
+    this.hash =
+        31 * (31 * metadataType.hashCode() + Long.hashCode(metadataId)) + privilege.hashCode();
   }
 
   String privilege() {

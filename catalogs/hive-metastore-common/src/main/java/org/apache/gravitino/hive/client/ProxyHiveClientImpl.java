@@ -27,6 +27,7 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -66,7 +67,7 @@ public class ProxyHiveClientImpl implements InvocationHandler {
               new ProxyHiveClientImpl(client, ugi));
 
     } catch (IOException | InterruptedException ex) {
-      throw new RuntimeException("Failed to create Kerberos Hive client", ex);
+      throw ExceptionMessages.wrap("Failed to create Kerberos Hive client", ex);
     }
   }
 

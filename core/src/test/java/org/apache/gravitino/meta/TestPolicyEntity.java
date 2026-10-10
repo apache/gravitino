@@ -155,4 +155,35 @@ public class TestPolicyEntity {
                 .withAuditInfo(auditInfo)
                 .build());
   }
+
+  @Test
+  public void testReadRestrictionPolicyContentTypes() {
+    PolicyContent rowFilter = PolicyContents.rowFilter("filter := true");
+    PolicyContent columnMask = PolicyContents.columnMask("mask := action(\"replace-with-null\")");
+
+    Assertions.assertDoesNotThrow(
+        () -> readRestrictionPolicy(Policy.BuiltInType.ROW_FILTER, rowFilter));
+    Assertions.assertDoesNotThrow(
+        () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, columnMask));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> readRestrictionPolicy(Policy.BuiltInType.ROW_FILTER, columnMask));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, rowFilter));
+  }
+
+  private static PolicyEntity readRestrictionPolicy(
+      Policy.BuiltInType type, PolicyContent content) {
+    return PolicyEntity.builder()
+        .withId(1L)
+        .withName("read-restriction")
+        .withNamespace(Namespace.of("m1", "c1", "s1"))
+        .withPolicyType(type)
+        .withEnabled(true)
+        .withContent(content)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
 }

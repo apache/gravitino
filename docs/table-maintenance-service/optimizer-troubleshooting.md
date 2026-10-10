@@ -1,110 +1,70 @@
 ---
-title: "Optimizer Troubleshooting"
+title: "Troubleshooting"
 slug: "/table-maintenance-service/troubleshooting"
-keyword: "table maintenance, optimizer, troubleshooting, spark, strategy"
+keywords:
+  - table maintenance
+  - troubleshooting
+  - spark
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## `Invalid --type`
+## Overview
 
-Use kebab-case values such as `update-statistics`, not `update_statistics`.
+Failures fall into three groups, matching where they occur in the workflow. Command and argument errors surface immediately. Evaluation problems produce no output rather than an error, which is what makes them confusing. Execution failures happen inside Spark, so the real message is in the staging log rather than the API response.
 
-## `--statistics-payload and --file-path cannot be used together`
+Staging logs live under `/tmp/gravitino/jobs/staging/job-runs/{job_id}/`, controlled by `gravitino.job.stagingDir`. Read `error.log` for failures and `output.log` for results.
 
-For `local-stats-calculator`, use exactly one of them.
+## Command and Argument Errors
 
-## `requires one of --statistics-payload or --file-path`
+These come back from the CLI immediately and name the problem.
 
-When `--calculator-name local-stats-calculator` is used, one input source is required.
+**`Invalid --type`** — command names are kebab-case. Use `update-statistics`, not `update_statistics`.
 
-## `--partition-path must be a JSON array`
+**`--statistics-payload and --file-path cannot be used together`** — `local-stats-calculator` takes exactly one input source.
 
-Use a JSON array format, for example:
+**`requires one of --statistics-payload or --file-path`** — the same rule from the other side. With `--calculator-name local-stats-calculator`, one of the two is mandatory.
+
+**`--partition-path must be a JSON array`** — even for a single partition, pass an array:
 
 ```text
 [{"dt":"2026-01-01"}]
 ```
 
-## Job Status Appears Stale (`queued` or `started` for a Long Time)
+**`Specified optimizer config file does not exist`** — check the `--conf-path` value and the file's permissions.
 
-Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
-
-`/tmp/gravitino/jobs/staging/<metalake>/<job-template-name>/<job-id>/error.log`.
-
-For local verification, reduce `gravitino.job.statusPullIntervalInMs` (for example `10000`) and
-restart Gravitino so REST status can refresh faster.
-
-## `No identifiers matched strategy name ...`
-
-`--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
-
-## Dry-Run Returns No `DRY-RUN` or `SUBMIT` Lines
-
-This usually means trigger conditions are not met. For compaction, verify
-`custom-data-file-mse` and `custom-delete-file-number` in table statistics/metrics are large
-enough to satisfy policy rules.
-
-## `monitor-metrics` Returns `evaluation=false` Unexpectedly
-
-Check both rule names and metric samples:
-
-1. Query current metrics first with `list-table-metrics` (and `--partition-path` for partition scope).
-2. Use the exact metric names returned by your environment in
-   `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`.
-3. Ensure `--action-time` is inside the range where both before and after samples exist.
-
-## `No StrategyHandler class configured for strategy type ...`
-
-Add strategy handler mapping to optimizer config, for example:
+**`No StrategyHandler class configured for strategy type ...`** — the strategy handler mapping is missing from the CLI configuration:
 
 ```properties
 gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
 ```
 
-If you already use the packaged default optimizer config, this mapping may already exist.
+The packaged default configuration already contains this, so seeing it usually means a hand-written config file.
 
-## Spark Job Fails with `hdfs://localhost:9000` or Filesystem Errors
+## Evaluation Produces Nothing
 
-Set local filesystem explicitly in Spark config:
+These are the hard ones, because success and "the policy decided not to act" look identical.
+
+**`No identifiers matched strategy name ...`** — `--strategy-name` takes the policy name, for example `iceberg_compaction_default`. It does not take the policy type `system_iceberg_compaction` or the strategy type `iceberg-data-compaction`, despite being called strategy name.
+
+**A dry run prints no `DRY-RUN` or `SUBMIT` lines** — the trigger conditions were not met. For compaction, check that `custom-data-file-mse` and `custom-delete-file-number` in the table's statistics are large enough to satisfy the policy rules. A table with too few small files is the usual cause, and the fix is more data rather than more configuration.
+
+**`monitor-metrics` returns `evaluation=false` unexpectedly** — check the rule names and the sample window together:
+
+1. Query the current metrics with `list-table-metrics`, adding `--partition-path` for partition scope.
+2. Use the exact metric names your environment returns in `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`. Names that look close enough are not.
+3. Make sure `--action-time` falls inside a range where both a before and an after sample exist.
+
+## Job Execution Failures
+
+**Status stays `queued` or `started` for a long time** — REST status is polled, not pushed, and `gravitino.job.statusPullIntervalInMs` defaults to five minutes. Lower it to `10000` and restart the server for local work. If the status is genuinely stuck rather than lagging, read `error.log` in the staging directory.
+
+**Spark fails with `hdfs://localhost:9000` or other filesystem errors** — Spark is defaulting to HDFS on a machine that has none:
 
 ```properties
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-## Rewrite Fails on Multi-level Partition (`identity + day(...)`)
-
-In release `1.2.0`, rewrite may fail for partition filters combining identity and day transform
-(for example `PARTITIONED BY (p, days(ts))`) with error:
-
-```text
-Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter
-```
-
-How to verify:
-
-1. Check job run status by rewrite job id under
-   `/api/metalakes/<metalake>/jobs/runs/<job-id>`.
-2. Check staging log:
-   `/tmp/gravitino/jobs/staging/<metalake>/builtin-iceberg-rewrite-data-files/<job-id>/error.log`.
-
-Workaround:
-
-- Use identity-only partition compaction path for release `1.2.0`.
-- Keep this failure case as a reproducible regression test for later fix validation.
-
-Observed compatibility matrix in release `1.2.0` (rewrite path):
-
-- PASS: `p`, `p, c2` (identity-only partition transforms)
-- FAIL: `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`,
-  `p, truncate(1, c2)`, `p, bucket(8, id)`
-
-## `submit-update-stats-job` Fails with JDBC Metrics Errors
-
-When `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, ensure the JDBC driver is
-available to Spark runtime classpath. Typical failures include `ClassNotFoundException` for driver
-class or `No suitable driver`.
-
-Example in `--spark-conf`:
+**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing:
 
 ```json
 {
@@ -112,13 +72,43 @@ Example in `--spark-conf`:
 }
 ```
 
-## `Specified optimizer config file does not exist`
+**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino endpoint needs `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options` for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in `spark-conf` for any built-in job that reads the table. See [Configuration](./optimizer-configuration.md).
 
-Check your `--conf-path` and file permissions.
+**Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
+Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
+classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark
+runtime is absent. The templates configure Iceberg classes but leave `jars` empty, and
+`gravitino-jobs` does not bundle `iceberg-spark-runtime`. A stock Spark install is not enough.
+Put a version-matched Iceberg Spark runtime on the job classpath, for example:
+
+```json
+{
+  "spark.jars": "/path/to/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
+}
+```
+
+Use the Spark, Scala, and Iceberg versions that match your cluster. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+
+**Rewrite fails on a multi-level partition** — in release `1.2.0`, rewriting a table partitioned by an identity transform combined with a time transform, such as `PARTITIONED BY (p, days(ts))`, fails with:
+
+```text
+Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter
+```
+
+Confirm it by checking the job run at `/api/metalakes/{metalake}/jobs/runs/{job_id}` and reading `error.log` under `builtin-iceberg-rewrite-data-files`. The only workaround is to compact identity-partitioned tables and leave the rest alone.
+
+Observed in `1.2.0`:
+
+| Partitioning                                                                  | Rewrite |
+|-------------------------------------------------------------------------------|---------|
+| `p`, `p, c2`                                                                    | Works   |
+| `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`                  | Fails   |
+| `p, truncate(1, c2)`, `p, bucket(8, id)`                                        | Fails   |
 
 ## Related
 
-- [Table Maintenance Service (Optimizer)](./optimizer.md)
-- [Optimizer Configuration](./optimizer-configuration.md)
-- [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
-- [Optimizer CLI Reference](./optimizer-cli-reference.md)
+- [Table Maintenance Service](./optimizer.md)
+- [Configuration](./optimizer-configuration.md)
+- [Quick Start](./optimizer.md#walkthrough)
+- [CLI Reference](./optimizer-configuration.md)

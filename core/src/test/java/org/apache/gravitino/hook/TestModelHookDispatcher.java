@@ -22,21 +22,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,40 +52,48 @@ import org.mockito.ArgumentCaptor;
 
 public class TestModelHookDispatcher {
 
-  private ModelHookDispatcher hookDispatcher;
+  private ModelDispatcher hookDispatcher;
   private ModelDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
-  private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  private BaseCatalog<?> mockCatalog;
   // Save the originals before each test and restore them in tearDown so we do not leak null
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
   private CatalogManager savedCatalogManager;
+  private GravitinoAuthorizer mockAuthorizer;
+  private GravitinoAuthorizer savedAuthorizer;
 
   @BeforeEach
   public void setUp() throws Exception {
     mockDispatcher = mock(ModelDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockCatalogManager = mock(CatalogManager.class);
-    mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
-    when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
-    when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    mockCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+    when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Read the catalogManager field directly via reflection because the public accessor
     // Preconditions-checks for non-null, which would fail when GravitinoEnv has not been
     // initialized for this test class.
     savedCatalogManager =
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
-    hookDispatcher = new ModelHookDispatcher(mockDispatcher);
+    mockAuthorizer = mock(GravitinoAuthorizer.class);
+    savedAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(mockAuthorizer);
+    hookDispatcher =
+        new ModelNormalizeDispatcher(new ModelHookDispatcher(mockDispatcher), mockCatalogManager);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(savedAuthorizer);
   }
 
   @Test
@@ -103,7 +118,7 @@ public class TestModelHookDispatcher {
 
   @Test
   public void testRegisterModelSetsOwnerWithNormalizedIdentifier() throws Exception {
-    when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident =
         NameIdentifier.of("test_metalake", "test_catalog", "TEST_SCHEMA", "MY_MODEL");
@@ -120,16 +135,11 @@ public class TestModelHookDispatcher {
         "my_model",
         captor.getValue().name(),
         "Model name passed to setOwner must be lowercased by Capability.Scope.MODEL normalization");
-    // MODEL scope is intentionally excluded from CapabilityHelpers.applyCapabilities(Namespace,
-    // Scope, Capability), so the schema component in the namespace is NOT lowercased -- the
-    // captured parent reflects exactly what ModelNormalizeDispatcher would also pass to the
-    // manager. This assertion locks that behavior in.
     Assertions.assertEquals(
-        "test_catalog.TEST_SCHEMA",
+        "test_catalog.test_schema",
         captor.getValue().parent(),
-        "Model parent must keep its schema component as-is: Capability.Scope.MODEL is excluded"
-            + " from namespace normalization in CapabilityHelpers; if this changes, ownership"
-            + " attachment will diverge from what ModelNormalizeDispatcher passes to the manager");
+        "Model parent passed to setOwner must be lowercased by Capability.Scope.SCHEMA"
+            + " normalization");
   }
 
   @Test
@@ -164,6 +174,66 @@ public class TestModelHookDispatcher {
         "5-arg registerModel must build parent as <catalog>.<schema> (level(1).level(2)), not"
             + " level(0) or the model name; this regression test guards the previous bug where"
             + " ident.name() was used as the metalake arg");
+  }
+
+  @Test
+  public void testDeleteModelInvalidatesNormalizedNameIdMapping() {
+    when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    NameIdentifier normalizedIdent =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "my_model");
+    when(mockDispatcher.deleteModel(normalizedIdent)).thenReturn(true);
+
+    Assertions.assertTrue(
+        hookDispatcher.deleteModel(
+            NameIdentifier.of("test_metalake", "test_catalog", "TEST_SCHEMA", "MY_MODEL")));
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange("test_metalake", normalizedIdent, Entity.EntityType.MODEL);
+  }
+
+  @Test
+  public void testDeleteMissingModelDoesNotInvalidateNameIdMapping() {
+    NameIdentifier ident =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_model");
+    when(mockDispatcher.deleteModel(ident)).thenReturn(false);
+
+    Assertions.assertFalse(hookDispatcher.deleteModel(ident));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
+  @Test
+  public void testRenameModelInvalidatesOldNameIdMapping() {
+    NameIdentifier ident =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_model");
+    ModelChange[] changes = {ModelChange.updateComment("new comment"), ModelChange.rename("new")};
+    Model mockModel = mock(Model.class);
+    when(mockDispatcher.alterModel(eq(ident), any(ModelChange[].class))).thenReturn(mockModel);
+
+    Assertions.assertSame(mockModel, hookDispatcher.alterModel(ident, changes));
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange("test_metalake", ident, Entity.EntityType.MODEL);
+  }
+
+  @Test
+  public void testAlterModelWithoutRenameDoesNotInvalidateNameIdMapping() {
+    NameIdentifier ident =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_model");
+    when(mockDispatcher.alterModel(eq(ident), any(ModelChange[].class)))
+        .thenReturn(mock(Model.class));
+
+    hookDispatcher.alterModel(ident, ModelChange.updateComment("new comment"));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
+  @Test
+  public void testFailedRenameModelDoesNotInvalidateNameIdMapping() {
+    NameIdentifier ident =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_model");
+    when(mockDispatcher.alterModel(eq(ident), any(ModelChange[].class)))
+        .thenThrow(new RuntimeException("Alter failed"));
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> hookDispatcher.alterModel(ident, ModelChange.rename("new")));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
   }
 
   private static class CaseInsensitiveCapability implements Capability {

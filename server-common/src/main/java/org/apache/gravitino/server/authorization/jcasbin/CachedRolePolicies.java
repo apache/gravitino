@@ -20,7 +20,9 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Cached, indexed privileges of a single role. The {@code updatedAt} timestamp corresponds to the
@@ -36,9 +38,37 @@ final class CachedRolePolicies {
   private final long updatedAt;
   private final Map<PolicyKey, Effect> index;
 
+  private final boolean complete;
+  private final Set<String> deniedPrivileges;
+
   CachedRolePolicies(long updatedAt, Map<PolicyKey, Effect> index) {
+    this(updatedAt, index, true, Collections.emptySet());
+  }
+
+  CachedRolePolicies(
+      long updatedAt,
+      Map<PolicyKey, Effect> index,
+      boolean complete,
+      Set<String> unresolvedDenies) {
     this.updatedAt = updatedAt;
     this.index = Collections.unmodifiableMap(new HashMap<>(index));
+    this.complete = complete;
+    Set<String> denies = new HashSet<>(unresolvedDenies);
+    index.forEach(
+        (key, effect) -> {
+          if (effect == Effect.DENY) {
+            denies.add(key.privilege());
+          }
+        });
+    this.deniedPrivileges = Collections.unmodifiableSet(denies);
+  }
+
+  boolean isComplete() {
+    return complete;
+  }
+
+  Set<String> getDeniedPrivileges() {
+    return deniedPrivileges;
   }
 
   long getUpdatedAt() {

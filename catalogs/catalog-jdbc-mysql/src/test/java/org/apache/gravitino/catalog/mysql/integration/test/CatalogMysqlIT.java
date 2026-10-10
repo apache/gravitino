@@ -201,6 +201,36 @@ public class CatalogMysqlIT extends BaseIT {
     return loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
+  @Test
+  void testExistingCatalogConnectionWithUnreachableEndpoint() throws SQLException {
+    String unreachableCatalogName = GravitinoITUtils.genRandomName("mysql_unreachable_catalog");
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://127.0.0.1:1/?useSSL=false&connectTimeout=1000");
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
+
+    metalake.createCatalog(
+        unreachableCatalogName,
+        Catalog.Type.RELATIONAL,
+        provider,
+        "unreachable MySQL catalog",
+        catalogProperties);
+    try {
+      assertThrows(
+          ConnectionFailedException.class, () -> metalake.testConnection(unreachableCatalogName));
+    } finally {
+      metalake.dropCatalog(unreachableCatalogName, true);
+    }
+  }
+
   private void createSchema(Catalog catalog, String schemaName) {
     Map<String, String> prop = Maps.newHashMap();
 
@@ -650,6 +680,35 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testLoadHighPrecisionDecimalTable() {
+    mysqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "decimal_38 DECIMAL(38,30), "
+                + "decimal_39 DECIMAL(39,30), "
+                + "decimal_65 DECIMAL(65,30), "
+                + "decimal_65_unsigned DECIMAL(65,30) UNSIGNED, "
+                + "decimal_10_unsigned DECIMAL(10,2) UNSIGNED, "
+                + "decimal_38_unsigned DECIMAL(38,30) UNSIGNED, "
+                + "decimal_39_unsigned DECIMAL(39,30) UNSIGNED)",
+            schemaName, tableName));
+
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Column[] columns = loadedTable.columns();
+    Assertions.assertEquals(7, columns.length);
+    Assertions.assertEquals(Types.DecimalType.of(38, 30), columns[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("decimal(39,30)"), columns[1].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("decimal(65,30)"), columns[2].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("decimal(65,30) unsigned"), columns[3].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), columns[4].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(38, 30), columns[5].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("decimal(39,30) unsigned"), columns[6].dataType());
+  }
+
+  @Test
   void testColumnTypeConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_type_converter");
@@ -684,6 +743,10 @@ public class CatalogMysqlIT extends BaseIT {
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
             + "  binary_col binary,\n"
+            + "  binary_col_16 binary(16),\n"
+            + "  varbinary_col varbinary(100),\n"
+            + "  enum_col enum('a','b','c'),\n"
+            + "  set_col set('x','y','z'),\n"
             + "  blob_col blob,\n"
             + "  bit_col_8 bit(8),\n"
             + "  bit_col bit\n"
@@ -767,8 +830,20 @@ public class CatalogMysqlIT extends BaseIT {
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
           break;
+        case "binary_col_16":
+          Assertions.assertEquals(Types.ExternalType.of("binary(16)"), column.dataType());
+          break;
+        case "varbinary_col":
+          Assertions.assertEquals(Types.ExternalType.of("varbinary(100)"), column.dataType());
+          break;
+        case "enum_col":
+          Assertions.assertEquals(Types.ExternalType.of("enum('a','b','c')"), column.dataType());
+          break;
+        case "set_col":
+          Assertions.assertEquals(Types.ExternalType.of("set('x','y','z')"), column.dataType());
+          break;
         case "bit_col_8":
-          Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          Assertions.assertEquals(Types.ExternalType.of("bit(8)"), column.dataType());
           break;
         case "bit_col":
           Assertions.assertEquals(Types.BooleanType.get(), column.dataType());
@@ -1441,7 +1516,9 @@ public class CatalogMysqlIT extends BaseIT {
             UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
     Assertions.assertTrue(
-        exception.getMessage().contains("Doesn't support setting schema comment: comment"));
+        exception
+            .getMessage()
+            .contains("Schema " + testSchemaName + ": catalog does not support schema comments"));
 
     // test null comment
     String testSchemaName2 = "test2";

@@ -21,17 +21,22 @@ package org.apache.gravitino.hook;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -46,20 +51,27 @@ public class TestJobHookDispatcher {
   // Save the original ownerDispatcher before each test and restore it in tearDown so we do not
   // leak null state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
+  private GravitinoAuthorizer mockAuthorizer;
+  private GravitinoAuthorizer savedAuthorizer;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(JobOperationDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
+    mockAuthorizer = mock(GravitinoAuthorizer.class);
+    savedAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(mockAuthorizer);
     hookDispatcher = new JobHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(savedAuthorizer);
   }
 
   @Test
@@ -102,5 +114,65 @@ public class TestJobHookDispatcher {
             () -> hookDispatcher.runJob("test_metalake", "test_template", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).runJob(any(), any(), any());
+  }
+
+  @Test
+  public void testDeleteJobTemplateInvalidatesNameIdMapping() {
+    when(mockDispatcher.deleteJobTemplate("test_metalake", "test_template")).thenReturn(true);
+
+    Assertions.assertTrue(hookDispatcher.deleteJobTemplate("test_metalake", "test_template"));
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange(
+            "test_metalake",
+            NameIdentifierUtil.ofJobTemplate("test_metalake", "test_template"),
+            Entity.EntityType.JOB_TEMPLATE);
+  }
+
+  @Test
+  public void testDeleteMissingJobTemplateDoesNotInvalidateNameIdMapping() {
+    when(mockDispatcher.deleteJobTemplate("test_metalake", "test_template")).thenReturn(false);
+
+    Assertions.assertFalse(hookDispatcher.deleteJobTemplate("test_metalake", "test_template"));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
+  @Test
+  public void testRenameJobTemplateInvalidatesOldNameIdMapping() {
+    JobTemplateChange[] changes = {
+      JobTemplateChange.updateComment("new comment"), JobTemplateChange.rename("new_template")
+    };
+    JobTemplateEntity mockTemplate = mock(JobTemplateEntity.class);
+    when(mockDispatcher.alterJobTemplate("test_metalake", "test_template", changes))
+        .thenReturn(mockTemplate);
+
+    Assertions.assertSame(
+        mockTemplate, hookDispatcher.alterJobTemplate("test_metalake", "test_template", changes));
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange(
+            "test_metalake",
+            NameIdentifierUtil.ofJobTemplate("test_metalake", "test_template"),
+            Entity.EntityType.JOB_TEMPLATE);
+  }
+
+  @Test
+  public void testAlterJobTemplateWithoutRenameDoesNotInvalidateNameIdMapping() {
+    JobTemplateChange[] changes = {JobTemplateChange.updateComment("new comment")};
+    when(mockDispatcher.alterJobTemplate("test_metalake", "test_template", changes))
+        .thenReturn(mock(JobTemplateEntity.class));
+
+    hookDispatcher.alterJobTemplate("test_metalake", "test_template", changes);
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
+  }
+
+  @Test
+  public void testFailedRenameJobTemplateDoesNotInvalidateNameIdMapping() {
+    JobTemplateChange[] changes = {JobTemplateChange.rename("new_template")};
+    when(mockDispatcher.alterJobTemplate("test_metalake", "test_template", changes))
+        .thenThrow(new RuntimeException("Alter failed"));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> hookDispatcher.alterJobTemplate("test_metalake", "test_template", changes));
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
   }
 }

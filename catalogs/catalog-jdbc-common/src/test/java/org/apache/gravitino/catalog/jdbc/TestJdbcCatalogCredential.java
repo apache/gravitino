@@ -31,6 +31,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.meta.AuditInfo;
@@ -203,7 +204,7 @@ public class TestJdbcCatalogCredential {
   }
 
   @Test
-  void testJdbcCatalogPropertiesHidesCredentials() {
+  void testJdbcCatalogPropertiesMasksCredentials() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -229,8 +230,9 @@ public class TestJdbcCatalogCredential {
 
     // GravitinoEnv is not initialized in unit tests, so backfill is disabled by default.
     Map<String, String> publicProps = jdbcCatalog.properties();
-    Assertions.assertFalse(publicProps.containsKey(JdbcConfig.USERNAME.getKey()));
-    Assertions.assertFalse(publicProps.containsKey(JdbcConfig.PASSWORD.getKey()));
+    Assertions.assertEquals("test-user", publicProps.get(JdbcConfig.USERNAME.getKey()));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, publicProps.get(JdbcConfig.PASSWORD.getKey()));
 
     // propertiesWithCredentialProviders must still see the raw credentials
     Map<String, String> credProps = jdbcCatalog.propertiesWithCredentialProviders();
@@ -275,11 +277,10 @@ public class TestJdbcCatalogCredential {
   }
 
   @Test
-  void testJdbcCatalogExplicitCredentialProvidersNotOverridden() {
+  void testJdbcCatalogExplicitCredentialProvidersStillGetsJdbc() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    // Test that explicit credential-providers setting is not overridden
     Map<String, String> explicitProps = Maps.newHashMap();
     explicitProps.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
     explicitProps.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
@@ -302,8 +303,8 @@ public class TestJdbcCatalogCredential {
     explicitCatalog.withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
     Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
-    // Should keep explicit credential providers, not override
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    Assertions.assertEquals("custom-provider", credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains("custom-provider"));
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
   }
 }

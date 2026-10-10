@@ -57,11 +57,6 @@ public interface FunctionMetaMapper {
   @InsertProvider(type = FunctionMetaSQLProviderFactory.class, method = "insertFunctionMeta")
   void insertFunctionMeta(@Param("functionMeta") FunctionPO functionPO);
 
-  @InsertProvider(
-      type = FunctionMetaSQLProviderFactory.class,
-      method = "insertFunctionMetaOnDuplicateKeyUpdate")
-  void insertFunctionMetaOnDuplicateKeyUpdate(@Param("functionMeta") FunctionPO functionPO);
-
   @Results({
     @Result(property = "functionId", column = "function_id", id = true),
     @Result(property = "functionName", column = "function_name"),
@@ -142,16 +137,61 @@ public interface FunctionMetaMapper {
   FunctionPO selectFunctionMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
 
+  /**
+   * Selects and exclusively locks an active function by its natural key without joining a version
+   * row.
+   *
+   * @param schemaId the schema ID
+   * @param functionName the function name
+   * @return the locked function root, or {@code null} when it does not exist
+   */
+  @SelectProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "selectFunctionMetaBySchemaIdAndNameForUpdate")
+  FunctionPO selectFunctionMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
+
+  /**
+   * Selects and exclusively locks an active function metadata row.
+   *
+   * @param functionId the function ID
+   * @return the active function metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "selectFunctionMetaByIdForUpdate")
+  FunctionPO selectFunctionMetaByIdForUpdate(@Param("functionId") Long functionId);
+
+  /**
+   * Checks whether a soft-deleted function still owns the requested primary key.
+   *
+   * @param functionId the function ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select(
+      "SELECT COUNT(*) FROM "
+          + TABLE_NAME
+          + " WHERE function_id = #{functionId} AND deleted_at > 0")
+  int countDeletedFunctionMetasById(@Param("functionId") Long functionId);
+
   @SelectProvider(
       type = FunctionMetaSQLProviderFactory.class,
       method = "selectFunctionIdBySchemaIdAndFunctionName")
   Long selectFunctionIdBySchemaIdAndFunctionName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
 
+  /**
+   * Soft-deletes a function only if its version has not changed since the caller read it.
+   *
+   * @param functionId the function ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of deleted rows; zero means the function changed or disappeared
+   */
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,
       method = "softDeleteFunctionMetaByFunctionId")
-  Integer softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId);
+  Integer softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion);
 
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,

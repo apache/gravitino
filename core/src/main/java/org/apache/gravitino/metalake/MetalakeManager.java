@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -37,6 +38,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
@@ -69,6 +72,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
 
+  private final CatalogManager catalogManager;
+
   @Override
   public void close() {
     // do nothing
@@ -81,8 +86,24 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
    * @param idGenerator The IdGenerator to use for generating Metalake identifiers.
    */
   public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
+    this(store, idGenerator, null);
+  }
+
+  /**
+   * Constructs a MetalakeManager instance.
+   *
+   * @param store The EntityStore to use for managing Metalakes.
+   * @param idGenerator The IdGenerator to use for generating Metalake identifiers.
+   * @param catalogManager Used on force-drop to drop child catalogs via {@link
+   *     CatalogManager#dropCatalog} (schema/fileset secrets cleaned on that path, including {@code
+   *     FilesetCatalogOperations.dropSchema}); may be null in tests that do not exercise force-drop
+   *     with catalogs.
+   */
+  public MetalakeManager(
+      EntityStore store, IdGenerator idGenerator, CatalogManager catalogManager) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.catalogManager = catalogManager;
 
     // preload all metalakes and put them into cache, this is useful when user load schema/table
     // directly without list/get metalake first.
@@ -215,10 +236,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     Map<String, String> newProps =
         metalakeEntity.properties() == null
             ? new HashMap<>()
-            : new HashMap<>(metalakeEntity.properties());
-    newProps
-        .entrySet()
-        .removeIf(e -> metalakeEntity.propertiesMetadata().isHiddenProperty(e.getKey()));
+            : HiddenPropertyMaskUtils.maskHiddenProperties(
+                metalakeEntity.properties(), metalakeEntity.propertiesMetadata());
     newProps.putIfAbsent(
         PROPERTY_IN_USE,
         metalakeEntity.propertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
@@ -340,35 +359,145 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   @Override
   public boolean dropMetalake(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, MetalakeInUseException {
-    return TreeLockUtils.doWithRootTreeLock(
-        LockType.WRITE,
-        () -> {
-          try {
-            boolean inUse = metalakeInUse(store, ident);
-            if (inUse && !force) {
-              throw new MetalakeInUseException(
-                  "Metalake %s is in use, please disable it first or use force option", ident);
+    // Mirror CatalogManager.dropCatalog → ops.dropSchema: force-drop children through the real
+    // drop path so FilesetCatalogOperations / CatalogManager clean write-through secrets (and
+    // managed storage). Do this before the metalake root lock to avoid nesting tree locks.
+    boolean temporarilyEnabled = false;
+    if (force) {
+      temporarilyEnabled = dropCatalogsUnderMetalake(ident);
+    }
+
+    try {
+      return TreeLockUtils.doWithRootTreeLock(
+          LockType.WRITE,
+          () -> {
+            try {
+              boolean inUse = metalakeInUse(store, ident);
+              if (inUse && !force) {
+                throw new MetalakeInUseException(
+                    "Metalake %s is in use, please disable it first or use force option", ident);
+              }
+
+              List<CatalogEntity> catalogEntities =
+                  store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
+              if (!catalogEntities.isEmpty() && !force) {
+                throw new NonEmptyMetalakeException(
+                    "Metalake %s has catalogs, please drop them first or use force option", ident);
+              }
+
+              return store.delete(ident, EntityType.METALAKE, true);
+            } catch (NoSuchMetalakeException | NoSuchEntityException e) {
+              // Another server may have completed the drop after the initial existence check.
+              // Dropping an already-removed metalake remains an idempotent false result.
+              return false;
+
+            } catch (IOException e) {
+              throw new RuntimeException(e);
             }
+          });
+    } catch (RuntimeException e) {
+      // Phase 1 briefly re-enabled a user-disabled metalake to clean up its catalogs. If the
+      // metalake delete above then fails, the metalake still exists, so restore its disabled
+      // state rather than leaving the user's disable silently undone.
+      restoreDisabledState(ident, temporarilyEnabled);
+      throw e;
+    }
+  }
 
-            List<CatalogEntity> catalogEntities =
-                store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
-            if (!catalogEntities.isEmpty() && !force) {
-              throw new NonEmptyMetalakeException(
-                  "Metalake %s has catalogs, please drop them first or use force option", ident);
-            }
+  /**
+   * Force-drop child catalogs via {@link CatalogManager#dropCatalog} so schema/fileset secrets are
+   * cleaned on the same path as a normal catalog force-drop ({@code ops.dropSchema} →
+   * FilesetCatalogOperations, then catalog secrets in CatalogManager).
+   *
+   * <p>Callers typically {@code disableMetalake} before force-drop. {@link
+   * CatalogManager#dropCatalog} requires catalog {@code metalake-in-use=true}, so a disabled
+   * metalake is briefly re-enabled for child cleanup. If the cleanup fails it is re-disabled here
+   * (best effort); if the cleanup succeeds this returns whether the metalake was temporarily
+   * enabled, so {@code dropMetalake} can re-disable it should the metalake delete then fail. Either
+   * way a user-disabled metalake does not stay enabled after a failed force drop.
+   *
+   * @param metalakeIdent the metalake whose child catalogs are force-dropped
+   * @return {@code true} if this temporarily enabled a user-disabled metalake, so the caller must
+   *     restore the disabled state if the subsequent metalake delete fails
+   */
+  private boolean dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
+    if (catalogManager == null) {
+      return false;
+    }
+    // True once this call has flipped the metalake to in-use. Set under the metalake write lock
+    // right after the store update (before the non-atomic catalog-status update), so a failure in
+    // either the enable itself or the later drops re-disables a metalake this operation enabled,
+    // while a concurrent enable leaves it false so we never re-disable one we did not enable.
+    AtomicBoolean weEnabled = new AtomicBoolean(false);
+    try {
+      try {
+        enableMetalakeIfDisabled(metalakeIdent, weEnabled);
+        List<CatalogEntity> catalogs =
+            store.list(Namespace.of(metalakeIdent.name()), CatalogEntity.class, EntityType.CATALOG);
+        for (CatalogEntity catalog : catalogs) {
+          catalogManager.dropCatalog(
+              NameIdentifier.of(metalakeIdent.name(), catalog.name()), true /* force */);
+        }
+        // Report whether we enabled the metalake so the caller can re-disable it if the metalake
+        // delete that follows fails.
+        return weEnabled.get();
+      } catch (NoSuchMetalakeException e) {
+        // Metalake is already gone; dropMetalake will return false. Nothing to restore.
+        throw e;
+      } catch (IOException | RuntimeException e) {
+        restoreDisabledState(metalakeIdent, weEnabled.get());
+        throw e;
+      }
+    } catch (NoSuchMetalakeException e) {
+      // Metalake is already gone; dropMetalake will return false.
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
-            return store.delete(ident, EntityType.METALAKE, true);
-          } catch (NoSuchMetalakeException e) {
-            return false;
-
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        });
+  /**
+   * Best effort: undo a temporary enable this force drop performed, so a failed force drop keeps a
+   * user-disabled metalake disabled. Only re-disables when {@code weEnabled} is true, i.e. this
+   * operation is the one that enabled the metalake, so it never overwrites a concurrent user's
+   * enable.
+   */
+  private void restoreDisabledState(NameIdentifier metalakeIdent, boolean weEnabled) {
+    if (!weEnabled) {
+      return;
+    }
+    try {
+      disableMetalake(metalakeIdent);
+    } catch (Exception restoreFailure) {
+      LOG.warn(
+          "Failed to restore the disabled state of metalake {} after a failed force drop; "
+              + "the metalake may remain enabled",
+          metalakeIdent,
+          restoreFailure);
+    }
   }
 
   @Override
   public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    enableMetalakeIfDisabled(ident, new AtomicBoolean());
+  }
+
+  /**
+   * Enables the metalake only if it is currently disabled, deciding and writing atomically under
+   * the metalake write lock.
+   *
+   * <p>{@code enabledByUs} is set to true the moment this call flips the metalake to in-use, before
+   * the non-atomic catalog-status update. A force-drop caller reads it to decide whether it must
+   * re-disable the metalake on failure: keying that on this flag (rather than a prior {@code
+   * metalakeInUse} read) means a concurrent enable cannot make the caller claim, and later undo, an
+   * enable it did not perform, and a failure partway through the enable still leaves the caller
+   * able to re-disable.
+   *
+   * @param ident the metalake to enable
+   * @param enabledByUs set to true iff this call performed the disabled to in-use flip
+   */
+  private void enableMetalakeIfDisabled(NameIdentifier ident, AtomicBoolean enabledByUs)
+      throws NoSuchMetalakeException {
     TreeLockUtils.doWithTreeLock(
         ident,
         LockType.WRITE,
@@ -395,6 +524,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
                   return builder.build();
                 });
+            enabledByUs.set(true);
 
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction. If any catalog property update fails, the metalake is already

@@ -72,15 +72,20 @@ public class FunctionRegisterRequest implements RESTRequest {
         "\"definitions\" field is required and cannot be empty");
 
     // Validate each definition has appropriate return type/columns based on function type
-    for (FunctionDefinitionDTO definition : definitions) {
+    for (int i = 0; i < definitions.length; i++) {
+      FunctionDefinitionDTO definition = definitions[i];
+      String definitionPath = "definitions[" + i + "]";
+      FunctionDataTypeValidator.validateDefinition(definition, definitionPath);
       if (functionType == FunctionType.TABLE) {
         Preconditions.checkArgument(
             definition.getReturnColumns() != null && definition.getReturnColumns().length > 0,
-            "\"returnColumns\" is required in each definition for TABLE function type");
+            "\"%s.returnColumns\" is required for TABLE function type",
+            definitionPath);
       } else if (functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE) {
         Preconditions.checkArgument(
             definition.getReturnType() != null,
-            "\"returnType\" is required in each definition for SCALAR or AGGREGATE function type");
+            "\"%s.returnType\" is required for SCALAR or AGGREGATE function type",
+            definitionPath);
       } else {
         throw new IllegalArgumentException("Unsupported function type: " + functionType);
       }

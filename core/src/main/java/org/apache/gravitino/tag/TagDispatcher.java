@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.tag;
 
+import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 
 /**
  * {@code TagDispatcher} interface provides functionalities for managing tags within a metalake. It
@@ -67,6 +71,25 @@ public interface TagDispatcher {
   Tag createTag(String metalake, String name, String comment, Map<String, String> properties);
 
   /**
+   * Create a new tag in the specified metalake with an assignment value constraint.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @param comment A comment for the new tag.
+   * @param properties The properties of the tag.
+   * @param valueConstraint The assignment value constraint of the tag.
+   * @return The created tag.
+   */
+  default Tag createTag(
+      String metalake,
+      String name,
+      String comment,
+      Map<String, String> properties,
+      TagValueConstraint valueConstraint) {
+    return createTag(metalake, name, comment, properties);
+  }
+
+  /**
    * Alter an existing tag in the specified metalake
    *
    * @param metalake The name of the metalake.
@@ -97,6 +120,69 @@ public interface TagDispatcher {
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
 
   /**
+   * List policy names directly associated with the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The directly associated policy names.
+   */
+  default String[] listPoliciesForTag(String metalake, String name) {
+    return Arrays.stream(listPolicyAssociationsForTag(metalake, name))
+        .map(association -> association.targetEntity().name())
+        .toArray(String[]::new);
+  }
+
+  /**
+   * List policy associations, including selectors, for the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The policy-to-tag associations.
+   */
+  default RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    throw new UnsupportedOperationException("Listing policy associations is not supported");
+  }
+
+  /**
+   * Add one policy association for a tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param tagName The name of the tag.
+   * @param policyName The name of the policy.
+   * @param selector The non-null policy association selector.
+   */
+  default void addPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
+  }
+
+  /**
+   * Remove one policy association from a tag.
+   *
+   * <p>Removing a missing association is an idempotent no-op. The policy and tag must still exist.
+   *
+   * @param metalake The name of the metalake.
+   * @param tagName The name of the tag.
+   * @param policyName The name of the policy.
+   */
+  default void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    throw new UnsupportedOperationException("Removing a policy from a tag is not supported");
+  }
+
+  /**
+   * List all metadata objects associated with the specified tag and exact assignment value.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @param value The exact assignment value to match, or null to return all objects for the tag.
+   * @return The array of metadata objects associated with the specified tag and value.
+   */
+  default MetadataObject[] listMetadataObjectsForTag(
+      String metalake, String name, @Nullable String value) {
+    return listMetadataObjectsForTag(metalake, name);
+  }
+
+  /**
    * List all tag names associated with the specified metadata object.
    *
    * @param metalake The name of the metalake
@@ -125,6 +211,32 @@ public interface TagDispatcher {
    */
   String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove);
+
+  /**
+   * Associate or disassociate tag values with the specified metadata object.
+   *
+   * @param metalake The name of the metalake.
+   * @param metadataObject The metadata object to update tags for.
+   * @param tagsToAdd Tag values to associate with the object.
+   * @param tagsToRemove Tag values to disassociate from the object.
+   * @return An array of updated tag names.
+   */
+  default String[] associateTagValuesForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove) {
+    String[] tagNamesToAdd =
+        tagsToAdd == null
+            ? null
+            : Arrays.stream(tagsToAdd).map(TagValue::name).toArray(String[]::new);
+    String[] tagNamesToRemove =
+        tagsToRemove == null
+            ? null
+            : Arrays.stream(tagsToRemove).map(TagValue::name).toArray(String[]::new);
+    return associateTagsForMetadataObject(
+        metalake, metadataObject, tagNamesToAdd, tagNamesToRemove);
+  }
 
   /**
    * Retrieve a specific tag associated with the specified metadata object.

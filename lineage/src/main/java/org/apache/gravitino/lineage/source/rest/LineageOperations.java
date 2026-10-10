@@ -32,6 +32,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +43,7 @@ import org.slf4j.LoggerFactory;
 public class LineageOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(LineageOperations.class);
-  private LineageDispatcher lineageDispatcher;
+  private final LineageDispatcher lineageDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -53,16 +56,25 @@ public class LineageOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "post-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "post-lineage", absolute = true)
-  public Response postLineage(OpenLineage.RunEvent event) {
-    LOG.info(
-        "Open lineage event, run id:{}, job name:{}",
-        org.apache.gravitino.lineage.Utils.getRunID(event),
-        org.apache.gravitino.lineage.Utils.getJobName(event));
+  @AuthorizationExpression(expression = AuthorizationExpressionConstants.CAN_ACCESS_METADATA)
+  public Response postLineage(
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.LINEAGE)
+          OpenLineage.RunEvent event) {
+    try {
+      LineageEventValidator.validate(event);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Invalid lineage event", e);
+      return Utils.illegalArguments(e.getMessage(), e);
+    }
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            LOG.info(
+                "Open lineage event, run id:{}, job name:{}",
+                org.apache.gravitino.lineage.Utils.getRunID(event),
+                org.apache.gravitino.lineage.Utils.getJobName(event));
             if (lineageDispatcher.dispatchLineageEvent(event)) {
               return Utils.created();
             } else {

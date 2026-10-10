@@ -74,18 +74,15 @@ public class TagMetaSQLProviderFactory {
     return getProvider().insertTagMeta(tagPO);
   }
 
-  public static String insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO) {
-    return getProvider().insertTagMetaOnDuplicateKeyUpdate(tagPO);
-  }
-
   public static String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
     return getProvider().updateTagMeta(newTagPO, oldTagPO);
   }
 
-  public static String softDeleteTagMetaByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
-    return getProvider().softDeleteTagMetaByMetalakeAndTagName(metalakeName, tagName);
+  /** Delegates a version-checked tag soft delete. */
+  public static String softDeleteTagMetaByIdAndVersion(
+      @Param("tagId") Long tagId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTagMetaByIdAndVersion(tagId, currentVersion);
   }
 
   public static String softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -102,8 +99,24 @@ public class TagMetaSQLProviderFactory {
     return getProvider().selectTagMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  /** Delegates an exclusive-lock tag query by natural key. */
+  public static String selectTagMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("name") String name) {
+    return getProvider().selectTagMetaByMetalakeIdAndNameForUpdate(metalakeId, name);
+  }
+
   public static String selectTagByTagId(@Param("tagId") Long tagId) {
     return getProvider().selectTagByTagId(tagId);
+  }
+
+  /** Delegates an exclusive-lock tag query. */
+  public static String selectTagByTagIdForUpdate(@Param("tagId") Long tagId) {
+    return getProvider().selectTagByTagIdForUpdate(tagId);
+  }
+
+  /** Delegates a locking read of several tags. */
+  public static String listTagPOsByTagIdsForUpdate(@Param("tagIds") List<Long> tagIds) {
+    return getProvider().listTagPOsByTagIdsForUpdate(tagIds);
   }
 
   public static String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {

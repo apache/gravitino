@@ -18,13 +18,19 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.gravitino.Catalog;
+import org.apache.commons.dbcp2.DelegatingConnection;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
@@ -33,6 +39,7 @@ import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -40,23 +47,28 @@ import org.junit.jupiter.api.Test;
 public class TestJdbcCatalogOperations {
 
   @Test
-  public void testTestConnection() {
+  public void testExistingCatalogConnectionFailure() {
+    SQLException cause = new SQLException("connection refused");
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public List<String> listDatabases() {
+            throw new GravitinoRuntimeException(cause, cause.getMessage());
+          }
+        };
+
     try (JdbcCatalogOperations catalogOperations =
         new JdbcCatalogOperations(
             new SqliteExceptionConverter(),
             new SqliteTypeConverter(),
-            new SqliteDatabaseOperations("/illegal/path"),
+            databaseOperations,
             new SqliteTableOperations(),
             new SqliteColumnDefaultValueConverter())) {
-      Assertions.assertThrows(
-          GravitinoRuntimeException.class,
-          () ->
-              catalogOperations.testConnection(
-                  NameIdentifier.of("metalake", "catalog"),
-                  Catalog.Type.RELATIONAL,
-                  "sqlite",
-                  "comment",
-                  ImmutableMap.of()));
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertSame(cause, exception.getCause());
     }
   }
 
@@ -77,6 +89,90 @@ public class TestJdbcCatalogOperations {
   }
 
   @Test
+  public void testConfigMaxIdle() throws SQLException {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "16");
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "12");
+
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      Assertions.assertEquals(16, dataSource.getMaxTotal());
+      Assertions.assertEquals(12, dataSource.getMaxIdle());
+    }
+
+    properties.remove(JdbcConfig.POOL_MAX_IDLE.getKey());
+    properties.put("maxIdle", "7");
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      Assertions.assertEquals(7, dataSource.getMaxIdle());
+    }
+
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "12");
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      Assertions.assertEquals(12, dataSource.getMaxIdle());
+    }
+
+    properties.remove(JdbcConfig.POOL_MAX_IDLE.getKey());
+    properties.put("maxIdle", "-1");
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      Assertions.assertEquals(-1, dataSource.getMaxIdle());
+      Assertions.assertEquals(2, dataSource.getMinIdle());
+    }
+
+    // An idle limit below the minimum pool size also caps minIdle.
+    properties.remove("maxIdle");
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "1");
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      Assertions.assertEquals(1, dataSource.getMaxIdle());
+      Assertions.assertEquals(1, dataSource.getMinIdle());
+    }
+  }
+
+  @Test
+  public void testRetainsConnectionsAcrossReadBursts() throws SQLException {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "16");
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "12");
+
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+      dataSource.setAccessToUnderlyingConnectionAllowed(true);
+      Set<Connection> physicalConnections = Collections.newSetFromMap(new IdentityHashMap<>());
+      for (int round = 0; round < 5; round++) {
+        List<Connection> borrowed = new ArrayList<>();
+        try {
+          for (int i = 0; i < 12; i++) {
+            Connection connection = dataSource.getConnection();
+            borrowed.add(connection);
+            physicalConnections.add(((DelegatingConnection<?>) connection).getInnermostDelegate());
+            try (Statement statement = connection.createStatement()) {
+              statement.execute("SELECT 1");
+            }
+          }
+        } finally {
+          for (Connection connection : borrowed) {
+            connection.close();
+          }
+        }
+        Assertions.assertEquals(12, dataSource.getNumIdle());
+      }
+      Assertions.assertFalse(physicalConnections.contains(null));
+      Assertions.assertEquals(12, physicalConnections.size());
+    }
+  }
+
+  @Test
   public void testCloseDoesNotThrow() {
     JdbcCatalogOperations catalogOperations =
         new JdbcCatalogOperations(
@@ -87,5 +183,37 @@ public class TestJdbcCatalogOperations {
             new SqliteColumnDefaultValueConverter());
 
     Assertions.assertDoesNotThrow(catalogOperations::close);
+  }
+
+  @Test
+  public void testResolveTableNameDelegatesToTableOperationAndPreservesNamespace() {
+    // A backend TableOperation that maps the normalized name to a differently-cased stored name.
+    SqliteTableOperations resolvingTableOps =
+        new SqliteTableOperations() {
+          @Override
+          public String resolveTableName(String databaseName, String normalizedName) {
+            Assertions.assertEquals("db", databaseName);
+            return "PHYSICAL_NAME".equals(normalizedName) ? "physical_Name" : normalizedName;
+          }
+        };
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/illegal/path"),
+            resolvingTableOps,
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "db", "PHYSICAL_NAME");
+
+      NameIdentifier resolved = catalogOperations.resolveTableName(normalized);
+
+      // Delegates the leaf name to TableOperation and keeps the original namespace.
+      Assertions.assertEquals("physical_Name", resolved.name());
+      Assertions.assertEquals(normalized.namespace(), resolved.namespace());
+
+      // When the backend returns the name unchanged, the same normalized identifier is returned.
+      NameIdentifier unchanged = NameIdentifier.of("metalake", "catalog", "db", "ALREADY_PHYSICAL");
+      Assertions.assertSame(unchanged, catalogOperations.resolveTableName(unchanged));
+    }
   }
 }

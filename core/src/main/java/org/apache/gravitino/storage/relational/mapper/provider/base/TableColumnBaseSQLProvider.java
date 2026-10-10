@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -77,24 +78,24 @@ public class TableColumnBaseSQLProvider {
   public String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE table_id = #{tableId} AND deleted_at = 0";
   }
 
   public String softDeleteColumnsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteColumnsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -102,8 +103,8 @@ public class TableColumnBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -121,18 +122,23 @@ public class TableColumnBaseSQLProvider {
 
   public String selectColumnIdByTableIdAndName(
       @Param("tableId") Long tableId, @Param("columnName") String name) {
-    return "SELECT"
-        + "   CASE"
-        + "     WHEN column_op_type = 3 THEN NULL"
-        + "     ELSE column_id"
-        + "   END"
-        + " FROM "
+    // Match the name against each column's latest row only. A column keeps its id when it is
+    // renamed, so its older rows still carry the old name; those must not resolve. A dropped column
+    // has a DELETE row as its latest row. Dropping and re-adding a column with the same name in one
+    // change gives two column ids with rows at the same version, and only the live one matches.
+    // The latest rows are found with one pass over the table's rows, so the cost does not grow with
+    // how often a column was rewritten.
+    return "SELECT c.column_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " WHERE table_id = #{tableId} AND column_name = #{columnName} AND deleted_at = 0"
-        // Update a column will generate two records with the same version, one with op_type = 2
-        // (update) and another with op_type = 3 (delete). We should not return NULL if both records
-        // exist with the same version, otherwise the caller will think the column does not exist.
-        + " ORDER BY table_version DESC, column_op_type ASC, id DESC LIMIT 1";
+        + " c JOIN ("
+        + " SELECT column_id, MAX(table_version) AS max_version FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE table_id = #{tableId} AND deleted_at = 0 GROUP BY column_id) latest"
+        + " ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
+        + " WHERE c.table_id = #{tableId} AND c.column_name = #{columnName}"
+        + " AND c.deleted_at = 0 AND c.column_op_type <> "
+        + ColumnPO.ColumnOpType.DELETE.value()
+        + " ORDER BY c.table_version DESC, c.id DESC LIMIT 1";
   }
 
   public String selectColumnPOById(@Param("columnId") Long columnId) {

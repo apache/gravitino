@@ -29,7 +29,7 @@ import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
-public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
+public abstract class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
 
   protected String pgUrl;
   protected String pgUsername;

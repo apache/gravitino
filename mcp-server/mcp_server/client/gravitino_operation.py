@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from mcp_server.client.catalog_operation import CatalogOperation
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.model_operation import ModelOperation
 from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.policy_operation import PolicyOperation
@@ -28,6 +29,7 @@ from mcp_server.client.statistic_operation import StatisticOperation
 from mcp_server.client.table_operation import TableOperation
 from mcp_server.client.tag_operation import TagOperation
 from mcp_server.client.topic_operation import TopicOperation
+from mcp_server.client.view_operation import ViewOperation
 
 
 class GravitinoOperation(ABC):
@@ -141,5 +143,25 @@ class GravitinoOperation(ABC):
 
         Returns:
             PartitionOperation: Interface for performing partition-level operations
+        """
+        pass
+
+    @abstractmethod
+    def as_view_operation(self) -> ViewOperation:
+        """
+        Access the view operation interface of this Gravitino operation.
+
+        Returns:
+            ViewOperation: Interface for performing view-level operations
+        """
+        pass
+
+    @abstractmethod
+    def as_metalake_operation(self) -> MetalakeOperation:
+        """
+        Access the metalake operation interface of this Gravitino operation.
+
+        Returns:
+            MetalakeOperation: Interface for metalake-level operations
         """
         pass

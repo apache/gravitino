@@ -73,6 +73,15 @@ public interface TableMetaMapper {
       @Param("schemaName") String schemaName,
       @Param("tableName") String tableName);
 
+  /**
+   * Selects and exclusively locks an active table metadata row.
+   *
+   * @param tableId the table ID
+   * @return the active table metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaByIdForUpdate")
+  TablePO selectTableMetaByIdForUpdate(@Param("tableId") Long tableId);
+
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 
@@ -87,10 +96,18 @@ public interface TableMetaMapper {
       @Param("oldTableMeta") TablePO oldTablePO,
       @Param("newSchemaId") Long newSchemaId);
 
+  /**
+   * Soft-deletes a table only if its version has not changed since the caller read it.
+   *
+   * @param tableId the table ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of deleted rows; zero means the table changed or disappeared
+   */
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "softDeleteTableMetasByTableId")
-  Integer softDeleteTableMetasByTableId(@Param("tableId") Long tableId);
+  Integer softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

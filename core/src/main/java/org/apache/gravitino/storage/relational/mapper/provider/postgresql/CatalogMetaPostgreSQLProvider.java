@@ -20,25 +20,41 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.CatalogMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   @Override
-  public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+  public String selectCatalogMetaByIdForShare(Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " FOR SHARE";
   }
 
   @Override
-  public String softDeleteCatalogMetasByMetalakeId(Long metalakeId) {
+  public String softDeleteCatalogMetasByCatalogId(Long catalogId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE catalog_id = #{catalogId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String softDeleteCatalogMetasWithVersion(List<CatalogPO> catalogPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   @Override
@@ -79,8 +95,18 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " catalog_comment = #{catalogMeta.catalogComment},"
         + " properties = #{catalogMeta.properties},"
         + " audit_info = #{catalogMeta.auditInfo},"
-        + " current_version = #{catalogMeta.currentVersion},"
-        + " last_version = #{catalogMeta.lastVersion},"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. The column has to be written as <table>.<column> here: on this side of
+        // ON CONFLICT a bare name could mean either the stored row or the rejected one, and
+        // PostgreSQL refuses it as ambiguous. The table-qualified name is the stored row, and
+        // PostgreSQL computes every assignment from it.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 
@@ -101,17 +127,7 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " last_version = #{newCatalogMeta.lastVersion},"
         + " deleted_at = #{newCatalogMeta.deletedAt}"
         + " WHERE catalog_id = #{oldCatalogMeta.catalogId}"
-        + " AND catalog_name = #{oldCatalogMeta.catalogName}"
-        + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
-        + " AND type = #{oldCatalogMeta.type}"
-        + " AND provider = #{oldCatalogMeta.provider}"
-        + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
-        + "   OR (CAST(catalog_comment AS VARCHAR) IS NULL AND "
-        + "   CAST(#{oldCatalogMeta.catalogComment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldCatalogMeta.properties}"
-        + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
-        + " AND last_version = #{oldCatalogMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 }

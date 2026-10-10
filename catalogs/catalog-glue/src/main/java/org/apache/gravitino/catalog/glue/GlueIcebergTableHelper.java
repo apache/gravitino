@@ -143,6 +143,15 @@ final class GlueIcebergTableHelper {
    * @throws IllegalArgumentException if {@code aws-region} or {@code warehouse} is not configured
    */
   static Catalog createGlueCatalog(Map<String, String> config) {
+    Map<String, String> icebergProps = buildIcebergCatalogProperties(config);
+
+    GlueCatalog glueCatalog = new GlueCatalog();
+    glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
+    LOG.info("Initialized Iceberg GlueCatalog for region {}", config.get(GlueConstants.AWS_REGION));
+    return glueCatalog;
+  }
+
+  static Map<String, String> buildIcebergCatalogProperties(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
     Preconditions.checkArgument(region != null, "AWS region is required for Iceberg Glue catalog");
 
@@ -164,11 +173,14 @@ final class GlueIcebergTableHelper {
 
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    if (accessKey != null && secretKey != null) {
+    boolean hasCredential = GlueClientProvider.hasAwsStaticCredentials(accessKey, secretKey);
+    if (hasCredential) {
       icebergProps.put(
           CLIENT_CREDENTIALS_PROVIDER, GravitinoGlueCredentialsProvider.class.getName());
       icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID, accessKey);
       icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_SECRET_ACCESS_KEY, secretKey);
+      icebergProps.put(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID, accessKey);
+      icebergProps.put(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY, secretKey);
     }
 
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
@@ -176,17 +188,8 @@ final class GlueIcebergTableHelper {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
 
-    if (accessKey != null && secretKey != null) {
-      icebergProps.put(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID, accessKey);
-      icebergProps.put(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY, secretKey);
-    }
-
     icebergProps.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
-
-    GlueCatalog glueCatalog = new GlueCatalog();
-    glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
-    LOG.info("Initialized Iceberg GlueCatalog for region {}", region);
-    return glueCatalog;
+    return icebergProps;
   }
 
   /**

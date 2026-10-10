@@ -34,6 +34,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * Note on list operations: names returned by list methods (e.g. {@link #listFilesets(Namespace)})
@@ -82,10 +84,18 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
       String comment,
       Fileset.Type type,
       Map<String, String> storageLocations,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     return dispatcher.createMultipleLocationFileset(
-        normalizeNameIdentifier(ident), comment, type, storageLocations, properties);
+        normalizeNameIdentifier(ident),
+        comment,
+        type,
+        storageLocations,
+        properties,
+        secretBindings,
+        secretReferences);
   }
 
   @Override

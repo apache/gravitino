@@ -81,7 +81,7 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
@@ -141,6 +141,16 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return TypeUtils.toGravitinoType(logicalType);
   }
 
+  /**
+   * Converts a Gravitino type to a Flink type, allowing catalog-specific native type mappings.
+   *
+   * @param type the Gravitino type
+   * @return the corresponding Flink data type
+   */
+  protected DataType toFlinkType(Type type) {
+    return TypeUtils.toFlinkType(type);
+  }
+
   @Override
   public void open() throws CatalogException {
     realCatalog().open();
@@ -161,8 +171,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseNotExistException, CatalogException {
     try {
       Schema schema = catalog().asSchemas().loadSchema(databaseName);
+      Map<String, String> schemaProperties =
+          PropertyUtils.propertiesWithSecrets(schema.properties(), schema::supportsSecrets);
       Map<String, String> properties =
-          schemaAndTablePropertiesConverter.toFlinkDatabaseProperties(schema.properties());
+          schemaAndTablePropertiesConverter.toFlinkDatabaseProperties(schemaProperties);
       return new CatalogDatabaseImpl(properties, schema.comment());
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), databaseName);
@@ -271,10 +283,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (NoSuchTableException e) {
       // Fall through to check views.
     } catch (ForbiddenException e) {
-      // Flink/Calcite speculatively probes tables during multi-part identifier resolution.
-      // Treat authorization failure as table-not-exist to allow Calcite to fall back to
-      // alternative resolution paths (e.g., treating the name as a schema).
-      throw new TableNotExistException(catalogName(), tablePath, e);
+      throw new CatalogException(e);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -294,7 +303,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         return true;
       }
     } catch (ForbiddenException e) {
-      return false;
+      throw new CatalogException(e);
     } catch (Exception e) {
       throw new CatalogException(e);
     }
@@ -542,11 +551,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
         throw new CatalogException(e);
       }
     } else {
-      catalog()
-          .asTableCatalog()
-          .alterTable(identifier, getGravitinoTableChanges(existingTable, newTable));
-      // Invalidate native catalog cache after successful alter
-      invalidateTable(tablePath);
+      TableChange[] changes = getGravitinoTableChanges(existingTable, newTable);
+      if (alterGravitinoTable(identifier, changes)) {
+        // Invalidate native catalog cache after successful alter
+        invalidateTable(tablePath);
+      }
     }
   }
 
@@ -596,9 +605,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
         throw new CatalogException(e);
       }
     } else {
-      catalog().asTableCatalog().alterTable(identifier, getGravitinoTableChanges(tableChanges));
-      // Invalidate native catalog cache after successful alter
-      invalidateTable(tablePath);
+      TableChange[] changes = getGravitinoTableChanges(tableChanges);
+      if (alterGravitinoTable(identifier, changes)) {
+        // Invalidate native catalog cache after successful alter
+        invalidateTable(tablePath);
+      }
     }
   }
 
@@ -795,10 +806,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
     org.apache.flink.table.api.Schema.Builder builder = buildSchemaFromColumns(table.columns());
     Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
     flinkPrimaryKey.ifPresent(builder::primaryKey);
+    Map<String, String> tableProperties =
+        PropertyUtils.propertiesWithSecrets(table.properties(), table::supportsSecrets);
     Map<String, String> flinkTableProperties =
         new HashMap<>(
             schemaAndTablePropertiesConverter.toFlinkTableProperties(
-                catalogOptions, table.properties(), tablePath));
+                catalogOptions, tableProperties, tablePath));
     flinkTableProperties.putAll(fromGravitinoDistribution(table.distribution()));
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     CatalogTable baseTable =
@@ -828,7 +841,18 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return table;
   }
 
-  protected CatalogTable newCatalogTable(
+  /**
+   * Create a {@link CatalogTable} using this catalog's Flink version's constructor and behavior.
+   * Public so version-independent test/integration-test code can build fixtures without knowing
+   * which Flink minor is active.
+   *
+   * @param schema table schema
+   * @param comment table comment
+   * @param partitionKeys partition column names
+   * @param options table options
+   * @return a version-compatible catalog table
+   */
+  public CatalogTable newCatalogTable(
       org.apache.flink.table.api.Schema schema,
       String comment,
       List<String> partitionKeys,
@@ -836,11 +860,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return catalogCompat().createCatalogTable(schema, comment, partitionKeys, options);
   }
 
-  protected CatalogCompat catalogCompat() {
-    // Versioned catalog entry classes override this hook when the Flink minor has a different
-    // catalog/table API path.
-    return DefaultCatalogCompat.INSTANCE;
-  }
+  // Every concrete, version-specific catalog entry class overrides this hook because the
+  // catalog/table API differs per Flink minor; there is no version-agnostic default.
+  protected abstract CatalogCompat catalogCompat();
 
   private static Optional<List<String>> getFlinkPrimaryKey(Table table) {
     List<Index> primaryKeyList =
@@ -936,6 +958,28 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throw new IllegalArgumentException(
           String.format("Not support ModifyColumn : %s", change.getClass()));
     }
+  }
+
+  /**
+   * Applies the given table changes to the underlying Gravitino table, skipping the call when there
+   * is nothing to change.
+   *
+   * <p>When {@code changes} is empty the resolved table already matches the existing one (for
+   * example, re-applying the same options or a comment-only alter with an unchanged comment).
+   * Gravitino's {@code TableUpdatesRequest.validate} rejects an empty update list with "updates
+   * must not be empty", so a no-op alter must be skipped rather than forwarded.
+   *
+   * @param identifier the identifier of the table to alter
+   * @param changes the Gravitino table changes to apply
+   * @return {@code true} if the alter was forwarded to Gravitino, {@code false} if it was skipped
+   *     because there was nothing to change
+   */
+  private boolean alterGravitinoTable(NameIdentifier identifier, TableChange[] changes) {
+    if (changes.length == 0) {
+      return false;
+    }
+    catalog().asTableCatalog().alterTable(identifier, changes);
+    return true;
   }
 
   @VisibleForTesting
@@ -1052,11 +1096,13 @@ public abstract class BaseCatalog extends AbstractCatalog {
                             "View '%s' in catalog '%s' has no SQL representation for dialects %s",
                             view.name(), catalogName(), dialects)));
 
-    Map<String, String> properties =
-        view.properties() != null
-            ? Collections.unmodifiableMap(view.properties())
-            : Collections.emptyMap();
+    Map<String, String> properties = viewPropertiesWithSecrets(view);
     return CatalogView.of(builder.build(), view.comment(), sql, sql, properties);
+  }
+
+  private static Map<String, String> viewPropertiesWithSecrets(View view) {
+    return Collections.unmodifiableMap(
+        PropertyUtils.propertiesWithSecrets(view.properties(), view::supportsSecrets));
   }
 
   @VisibleForTesting
@@ -1132,12 +1178,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
    * @param columns the Gravitino column definitions
    * @return a Flink schema builder populated with the given columns
    */
-  protected static org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(
-      Column[] columns) {
+  protected org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(Column[] columns) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
     for (Column column : columns) {
-      DataType flinkType = TypeUtils.toFlinkType(column.dataType());
+      DataType flinkType = toFlinkType(column.dataType());
       builder
           .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
           .withComment(column.comment());

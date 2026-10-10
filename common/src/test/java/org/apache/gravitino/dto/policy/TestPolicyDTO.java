@@ -119,6 +119,8 @@ public class TestPolicyDTO {
             .withDataFileMseWeight(2L)
             .withDeleteFileNumberWeight(150L)
             .withMaxPartitionNum(99L)
+            .withRewriteStrategy("sort")
+            .withSortOrder("zorder(c1,c2)")
             .withRewriteOptions(
                 ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
             .build();
@@ -169,6 +171,10 @@ public class TestPolicyDTO {
     Assertions.assertEquals(
         IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM, contentDTO.maxPartitionNum());
     Assertions.assertTrue(contentDTO.rewriteOptions().isEmpty());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY, contentDTO.rewriteStrategy());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
 }

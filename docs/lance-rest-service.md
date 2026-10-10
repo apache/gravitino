@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-The Lance REST service provides a RESTful interface for managing Lance datasets through HTTP endpoints. Introduced in Gravitino version 1.1.0, this service enables seamless interaction with Lance datasets for data operations and metadata management.
+The Lance REST service provides a RESTful interface for managing Lance datasets through HTTP endpoints. It enables seamless interaction with Lance datasets for data operations and metadata management.
 
 The service implements the [Lance REST API specification](https://docs.lancedb.com/api-reference/introduction). For detailed specification documentation, see the [official Lance REST documentation](https://lance.org/format/namespace/rest/catalog-spec/).
 
@@ -43,7 +43,7 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 │    Service       │ 
 └────────┬────────┘
          │ 
-         ▼ Gravitino Client API
+         ▼ Gravitino internal API or HTTP client
 ┌─────────────────┐
 │ Gravitino Server │ 
 │(Metadata Backend)│
@@ -57,31 +57,30 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 ```
 
 **Key Features:**
-- Full compliance with Lance REST API specification
+- Support for the Lance REST operations listed below
 - Can run standalone or integrated with Gravitino server
 - Support for namespace and table management
-- Index creation and management capabilities (Index operations are not supported in version 1.1.0)
 - Metadata stored in Gravitino for unified governance
 
 ## Supported Operations
 
-The Lance REST service provides comprehensive support for namespace management, table management, and index operations. The table below lists all supported operations:
+The Lance REST service provides comprehensive support for namespace management and table management. Index operations are not supported yet. The table below lists all supported operations:
 
-| Operation         | Description                                                                                                                                                                        | HTTP Method | Endpoint Pattern                      | Since Version |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|---------------------------------------|---------------|
-| CreateNamespace   | Create a new Lance namespace                                                                                                                                                       | POST        | `/lance/v1/namespace/{id}/create`     | 1.1.0         |
-| ListNamespaces    | List all namespaces under a parent namespace                                                                                                                                       | GET         | `/lance/v1/namespace/{parent}/list`   | 1.1.0         |
-| DescribeNamespace | Retrieve detailed information about a specific namespace                                                                                                                           | POST        | `/lance/v1/namespace/{id}/describe`   | 1.1.0         |
-| DropNamespace     | Delete a namespace                                                                                                                                                                 | POST        | `/lance/v1/namespace/{id}/drop`       | 1.1.0         |
-| NamespaceExists   | Check whether a namespace exists                                                                                                                                                   | POST        | `/lance/v1/namespace/{id}/exists`     | 1.1.0         |
-| ListTables        | List all tables in a namespace                                                                                                                                                     | GET         | `/lance/v1/namespace/{id}/table/list` | 1.1.0         |
-| CreateTable       | Create a new table in a namespace                                                                                                                                                  | POST        | `/lance/v1/table/{id}/create`         | 1.1.0         |
-| DescribeTable     | Describe an existing Lance table                                                                                                                                                   | POST        | `/lance/v1/table/{id}/describe`       | 1.1.0         |
-| DropTable         | Delete a table including both metadata and data                                                                                                                                    | POST        | `/lance/v1/table/{id}/drop`           | 1.1.0         |
-| TableExists       | Check whether a table exists                                                                                                                                                       | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
-| RegisterTable     | Register an existing Lance table to a namespace                                                                                                                                    | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
-| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
-| DeclareTable      | Declare a table and store the metadata without touching lance table data.                                                                                                           | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
+| Operation         | Description                                                               | HTTP Method | Endpoint Pattern                      |
+| ----------------- | ------------------------------------------------------------------------- | ----------- | ------------------------------------- |
+| CreateNamespace   | Create a new Lance namespace                                              | POST        | `/lance/v1/namespace/{id}/create`     |
+| ListNamespaces    | List all namespaces under a parent namespace                              | GET         | `/lance/v1/namespace/{parent}/list`   |
+| DescribeNamespace | Retrieve detailed information about a specific namespace                  | POST        | `/lance/v1/namespace/{id}/describe`   |
+| DropNamespace     | Delete a namespace                                                        | POST        | `/lance/v1/namespace/{id}/drop`       |
+| NamespaceExists   | Check whether a namespace exists                                          | POST        | `/lance/v1/namespace/{id}/exists`     |
+| ListTables        | List all tables in a namespace                                            | GET         | `/lance/v1/namespace/{id}/table/list` |
+| CreateTable       | Create a new table in a namespace                                         | POST        | `/lance/v1/table/{id}/create`         |
+| DescribeTable     | Describe an existing Lance table                                          | POST        | `/lance/v1/table/{id}/describe`       |
+| DropTable         | Delete a table including both metadata and data                           | POST        | `/lance/v1/table/{id}/drop`           |
+| TableExists       | Check whether a table exists                                              | POST        | `/lance/v1/table/{id}/exists`         |
+| RegisterTable     | Register an existing Lance table to a namespace                           | POST        | `/lance/v1/table/{id}/register`       |
+| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)         | POST        | `/lance/v1/table/{id}/deregister`     |
+| DeclareTable      | Declare a table and store the metadata without touching lance table data. | POST        | `/lance/v1/table/{id}/declare`        |
 
 More details, refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
@@ -89,8 +88,9 @@ More details, refer to the [Lance REST API specification](https://lance.org/form
 
 Some operations have specific behaviors and modes. Below are important details to consider:
 
-Mode values are parsed case-insensitively. The examples below use lowercase values as the
-REST-style canonical form.
+Mode values are parsed case-insensitively. The underscore-free PascalCase spelling `ExistOk`
+is accepted as `exist_ok`. The examples below use lowercase snake_case as the REST-style
+canonical form.
 
 #### Namespace Operations
 
@@ -100,17 +100,24 @@ REST-style canonical form.
 - `overwrite`: Replaces existing namespace
 
 **DropNamespace** behavior:
-- Recursively deletes all child namespaces and tables
-- Deletes both metadata and Lance data files
-- Operation is irreversible
+- Defaults to `behavior=restrict`; non-empty namespaces cannot be dropped in this mode
+- `behavior=cascade` removes child metadata recursively
+- Cascading a schema drop uses table drop semantics: external Lance datasets are preserved
+- Use `DropTable` explicitly to delete a table's data; namespace deletion is not a storage purge
 
 #### Table Operations
 
 **RegisterTable vs CreateTable**:
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
-- **CreateTable**: Creates new Lance table with schema and write metadata files
+- **CreateTable**: Creates an empty Lance dataset using the schema from the Arrow IPC stream
 :::note
-The `version` field of `CreateTable` response is always null, which stands for the latest version. 
+The current `CreateTable` implementation accepts schema-only Arrow streams, including zero-row
+batches. A stream containing rows returns HTTP `406` before any metadata or dataset changes,
+including for `overwrite`. Write records through a Lance client or engine after creation.
+
+The `version` field of `CreateTable` reports the stored Lance dataset version when available.
+`DescribeTable` currently returns the latest metadata even when a historical `version` is requested;
+versioned metadata reads are not implemented.
 :::
 
 **DropTable vs DeregisterTable**:
@@ -124,15 +131,35 @@ The `version` field of `CreateTable` response is always null, which stands for t
 
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
-| Configuration Property                    | Description                                                                  | Default Value           | Required | Since Version |
-|-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      | 0.2.0         |
-| `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      | 1.1.0         |
-| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       | 1.1.0         |
-| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       | 1.1.0         |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (only `gravitino` is supported)                   | gravitino               | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      | 1.1.0         |
+| Configuration Property                    | Description                                                                  | Default Value           | Required |
+| ----------------------------------------- | ---------------------------------------------------------------------------- | ----------------------- | -------- |
+| `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      |
+| `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      |
+| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
+| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include server-side stack traces in `detail`. Set this to `false` in new deployments | true | No |
+| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
+| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
+| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
+
+**Authentication to the Gravitino Server**
+
+In standalone mode, the Lance REST service makes HTTP requests to the Gravitino server using
+its configured service credentials. Configure the auth type to match the Gravitino server.
+Auxiliary mode uses internal APIs and preserves the authenticated caller instead; the simple
+user name below is only the fallback for requests accepted as anonymous.
+
+| Configuration Property                             | Description                                                                        | Default Value       | Required          |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------- | ----------------- |
+| `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`            | No                |
+| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                 | `lance-rest-server` | No                |
+| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                  | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                        | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                | (none)              | Yes, for `oauth2` |
+| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                | (none)              | Yes, for `oauth2` |
+
+These settings control outbound authentication in standalone mode. They do not configure inbound
+authentication to Lance REST. See [Authentication and authorization](#authentication-and-authorization).
 
 **Example Configuration:**
 
@@ -141,9 +168,11 @@ gravitino.auxService.names = lance-rest
 gravitino.lance-rest.httpPort = 9101
 gravitino.lance-rest.host = 0.0.0.0
 gravitino.lance-rest.namespace-backend = gravitino
-gravitino.lance-rest.gravitino-uri = http://localhost:8090
 gravitino.lance-rest.gravitino-metalake = my_metalake
 ```
+
+In auxiliary mode, `gravitino.lance-rest.gravitino-uri` is not required because the Lance
+REST service uses Gravitino's internal API.
 
 ### Run Standalone
 
@@ -155,16 +184,18 @@ To run Lance REST service independently without Gravitino server (You need to st
 
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration Property                    | Description                 | Default Value         | Required | Since Version |
-|-------------------------------------------|-----------------------------|-----------------------|----------|---------------|
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend  | gravitino             | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI        | http://localhost:8090 | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name     | (none)                | Yes      | 1.1.0         |
-| `gravitino.lance-rest.httpPort`           | Service port number         | 9101                  | No       | 1.1.0         |
-| `gravitino.lance-rest.host`               | Service hostname            | 0.0.0.0               | No       | 1.1.0         |
+| Configuration Property                    | Description                | Default Value         | Required |
+| ----------------------------------------- | -------------------------- | --------------------- | -------- |
+| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend | gravitino             | Yes      |
+| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI       | http://localhost:8090 | Yes      |
+| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name    | (none)                | Yes      |
+| `gravitino.lance-rest.httpPort`           | Service port number        | 9101                  | No       |
+| `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true | No |
 
 :::tip
-In most cases, you only need to configure `gravitino.lance-rest.gravitino-metalake` and other properties can use their default values.
+In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,
+`gravitino.lance-rest.gravitino-uri`, and other properties can use their default values.
 :::
 
 
@@ -179,23 +210,34 @@ docker run -d --name lance-rest-service -p 9101:9101 \
   apache/gravitino-lance-rest:latest
 ```
 
-Access the service at `http://localhost:9101`.
+Access the service at `http://localhost:9101/lance`.
 
 **Environment Variables:**
 
-| Environment Variable                 | Configuration Property                    | Required | Default Value           | Since Version |
-|--------------------------------------|-------------------------------------------|----------|-------------------------|---------------|
-| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`  | Yes      | `gravitino`             | 1.1.0         |
-| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino-metalake` | Yes      | (none)                  | 1.1.0         |
-| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`      | Yes      | `http://localhost:8090` | 1.1.0         |
-| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`               | No       | `0.0.0.0`               | 1.1.0         |
-| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`           | No       | `9101`                  | 1.1.0         |
+| Environment Variable                 | Configuration Property                    | Required | Default Value           |
+| ------------------------------------ | ----------------------------------------- | -------- | ----------------------- |
+| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`  | Yes      | `gravitino`             |
+| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino-metalake` | Yes      | (none)                  |
+| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`      | Yes      | `http://localhost:8090` |
+| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`               | No       | `0.0.0.0`               |
+| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`           | No       | `9101`                  |
 
 :::tip Configuration Tips
 - **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
 - **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost` in the Docker instance.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
+
+## Health Checks
+
+The Lance REST service exposes `/lance/health/live`, `/lance/health/ready`, and
+`/lance/health` on its own port. Root aliases `/health/live`, `/health/ready`, `/health`,
+and `/health.html` are also available. Readiness checks whether the namespace wrapper
+is initialized.
+
+After an observed `OutOfMemoryError`, all these endpoints return HTTP 503 with a
+`jvm` failure until restart, even if the wrapper remains initialized. See
+[health and readiness](health-and-readiness.md) for response details and detection scope.
 
 ## Usage Guidelines
 
@@ -239,8 +281,137 @@ URL encoded:        lance_catalog%24schema%24table01
 - Supports only **two levels of namespaces** before tables
 - Tables **cannot** be nested deeper than schema level  
 - Parent catalog must be created in Gravitino before using Lance REST API
-- Namespace deletion is recursive and irreversible
+- Namespace deletion defaults to `restrict`; use `cascade` to remove child metadata
 :::
+
+## Authentication and authorization
+
+### Authentication and deployment modes
+
+Lance REST uses Gravitino's `gravitino.authenticators` configuration for incoming requests in
+both auxiliary and standalone mode. See [Authentication](./security/how-to-authenticate.md) for
+configuring the authenticators and their credentials. Health check endpoints bypass authentication.
+Authentication errors use the Lance JSON error format; unsupported credentials return HTTP `401`.
+In standalone mode, backend authentication and authorization failures retain HTTP `401` and `403`
+respectively. Authentication/authorization failures do not include internal stack traces in `detail`.
+Unexpected failures return HTTP `500` with a generic message; the server logs retain the exception
+for diagnosis.
+
+| Mode                               | Identity used for Gravitino metadata operations                                                                                                               | Metadata authorization                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Auxiliary (running with Gravitino) | Authenticated caller, including active roles; anonymous requests fall back to `gravitino.lance-rest.gravitino-simple.user-name` (default `lance-rest-server`) | Enabled by `gravitino.authorization.enable=true` with a configured metalake                                                            |
+| Standalone                         | Configured service credentials (`gravitino.lance-rest.gravitino-auth-type` and its simple/OAuth2 settings)                                                    | No Lance REST per-user metadata authorization; the remote Gravitino server checks the service identity if its authorization is enabled |
+
+The auxiliary fallback applies only after authentication accepts an anonymous request. It does
+not recover a rejected authentication attempt. Authenticated callers keep their own privileges,
+active roles, ownership and audit identity; they do not inherit the service user's privileges.
+The fallback service user itself needs the privileges required by the requested operation.
+Setting `gravitino.lance-rest.gravitino-simple.user-name` explicitly is optional in auxiliary mode;
+configure it only to override the default anonymous fallback identity, `lance-rest-server`.
+
+With `simple` authentication, a Basic header supplies a user name without validating a password,
+and a request without credentials is accepted as anonymous. Some malformed Basic credentials
+also resolve to anonymous. Use an authenticator that validates credentials when caller identity
+must be verified; `simple` is not password authentication.
+
+Standalone authenticates incoming requests, but does not forward their identities or active roles
+to its Gravitino backend. All callers use the configured backend service identity. Standalone
+per-user authorization and scoped temporary credential vending are outside the supported scope. The
+backend service identity needs privileges for all underlying Gravitino calls, including existence
+checks performed before mutations (for example, catalog access before creating a namespace).
+
+### Enable auxiliary metadata authorization
+
+Configure `${GRAVITINO_HOME}/conf/gravitino.conf`:
+
+```properties
+gravitino.auxService.names = lance-rest
+gravitino.lance-rest.gravitino-metalake = my_metalake
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = adminUser
+# Development example: simple accepts the supplied user name without password validation.
+gravitino.authenticators = simple
+```
+
+Create the metalake, add users, and grant roles through the Gravitino API as described in
+[Access Control](./security/access-control.md). The Lance service exposes this configured metalake:
+a one-level namespace identifies a catalog, a two-level namespace identifies a schema, and a
+three-level table identifier identifies a table.
+
+Requests may set `X-Gravitino-Active-Roles` to `ALL` (also the default when omitted), `NONE`, or
+a comma-separated list of assigned role names. This selection reaches both operation checks
+and listing filters. Malformed selections return `400`; selecting an unassigned role is forbidden.
+Ownership is independent of role selection, so `NONE` does not remove ownership privileges.
+
+### Required privileges
+
+The following rules use the same Gravitino privileges and ownership rules as
+[Iceberg REST authorization](./iceberg-rest-service.md). Privileges can be inherited from
+ancestor scopes as described in Access Control. Service administrators and metalake owners
+can operate throughout the metalake; catalog owners can operate within their catalogs.
+Schema owners additionally need `USE_CATALOG`, and table owners need `USE_CATALOG` and
+`USE_SCHEMA`. The ownership alternatives below include these ancestor owners.
+
+| Namespace operation                                                                                  | Required privileges or ownership                                       |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `ListNamespaces` at root                                                                             | Membership in the metalake; returns only accessible catalogs           |
+| `ListNamespaces` under a catalog; `DescribeNamespace` for a catalog; `NamespaceExists` for a catalog | `USE_CATALOG`, or ownership                                            |
+| `ListNamespaces` under a schema; `DescribeNamespace` for a schema; `ListTables`                      | `USE_CATALOG` and `USE_SCHEMA`, or ownership                           |
+| `NamespaceExists` for a schema                                                                       | `USE_CATALOG` and either `USE_SCHEMA` or `CREATE_SCHEMA`, or ownership |
+| `CreateNamespace` for a catalog (`create`, `exist_ok`)                                               | `CREATE_CATALOG` on the metalake, or metalake ownership                |
+| `CreateNamespace` for a schema (`create`, `exist_ok`)                                                | `USE_CATALOG` and `CREATE_SCHEMA`, or catalog/metalake ownership       |
+| `CreateNamespace` (`overwrite`); `DropNamespace`                                                     | Ownership of the namespace or an ancestor                              |
+
+| Table operation                                                                  | Required privileges or ownership                                                                         |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DescribeTable`                                                                  | `USE_CATALOG`, `USE_SCHEMA`, and either `SELECT_TABLE` or `MODIFY_TABLE`, or ownership                   |
+| `TableExists`                                                                    | Same as `DescribeTable`, or `USE_CATALOG`, `USE_SCHEMA`, and either `PROBE_TABLE_LIKE` or `CREATE_TABLE` |
+| `CreateTable` (`create`, `exist_ok`); `RegisterTable` (`create`); `DeclareTable` | `USE_CATALOG`, `USE_SCHEMA`, and `CREATE_TABLE`, or schema/ancestor ownership                            |
+| `CreateTable` or `RegisterTable` (`overwrite`); `AlterColumns`; `DropColumns`    | `USE_CATALOG`, `USE_SCHEMA`, and `MODIFY_TABLE`, or ownership                                            |
+| `DropTable`; `DeregisterTable`                                                   | Ownership of the table or an ancestor                                                                    |
+
+`CREATE_TABLE` and `PROBE_TABLE_LIKE` authorize `TableExists` without authorizing
+`DescribeTable`. `CREATE_TABLE` alone does not authorize overwrite requests. The `DropTable`
+and `DeregisterTable` endpoints require ownership rather than `MODIFY_TABLE`. Similarly, namespace creation privileges do not authorize
+overwriting or dropping another owner's namespace. Successful creation assigns ownership to
+the effective caller.
+
+### Listings and concealed objects
+
+Namespace listings omit inaccessible catalogs and schemas. Table listings omit tables for which
+the caller has neither ownership nor `SELECT_TABLE`/`MODIFY_TABLE`. Filtering happens before
+pagination; hidden entries do not consume page slots. Access to the parent is checked separately.
+
+When a caller lacks an endpoint's required privileges, the request returns `403`, whether or not
+the target exists, without returning its stored metadata or location. An authorized caller can
+distinguish an existing object from a missing one (`404`). Concealment therefore does not mean that every
+inaccessible object returns `404`.
+
+Authorization governs metadata requests; engines access Lance data files directly. Responses can
+include configured storage credentials: namespace descriptions resolve secret properties, and
+table descriptions, creation and declaration responses return effective `storage_options` from
+catalog defaults and table overrides. These are shared configured credentials, not temporary
+credentials restricted to the caller's table privileges. Access to data files depends on the
+permissions of those credentials. Per-user, scoped credential vending is not implemented.
+
+### Authorization differences between deployment modes
+
+:::warning
+Lance REST metadata authorization is currently supported only in **auxiliary mode**.
+**Standalone mode is not recommended**: its authorization decisions can differ from auxiliary
+mode and may produce unexpected results, even for the same user and privileges. Use auxiliary
+mode for deployments that require Lance REST authorization.
+:::
+
+Auxiliary mode applies the Lance endpoint authorization rules and listing filters described above.
+Standalone mode does not apply this authorization pipeline. Instead, the remote Gravitino server
+checks each underlying REST call using its own rules and the backend identity described above.
+These checks do not provide equivalent Lance REST authorization: an operation allowed in one mode
+may be denied in the other, and ownership requirements and metadata visibility can also differ.
+Forwarding the caller's identity alone does not eliminate these differences.
+
+Alignment of the authorization behavior is tracked in
+[#13089](https://github.com/apache/gravitino/issues/13089).
 
 ## Examples
 

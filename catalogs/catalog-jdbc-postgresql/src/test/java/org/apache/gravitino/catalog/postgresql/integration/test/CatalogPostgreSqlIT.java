@@ -79,6 +79,7 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -186,6 +187,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
     return loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
   private void createSchema(String schemaName) {
 
     Schema createdSchema =
@@ -273,7 +279,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
   @Test
   void testCreateTableWithArrayType() {
     String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
-    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), true), "col_4_comment");
     Column[] columns = new Column[] {col};
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -1625,6 +1631,55 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals(Types.ExternalType.of("bit"), loadedTable.columns()[0].dataType());
+  }
+
+  @Test
+  void testNumericScaleOutsidePrecision() {
+    Assumptions.assumeTrue(
+        postgreImageName == PGImageName.VERSION_15 || postgreImageName == PGImageName.VERSION_16);
+    String tableName = GravitinoITUtils.genRandomName("test_numeric_scale");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (negative numeric(2,-3), fractional numeric(3,5));",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(
+        Types.ExternalType.of("numeric(2,-3)"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("numeric(3,5)"), loadedTable.columns()[1].dataType());
+  }
+
+  @Test
+  void testWideNumericTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_wide_numeric_type");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (wide numeric(39,0), supported numeric(38,0));",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(
+        Types.ExternalType.of("numeric(39,0)"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(38, 0), loadedTable.columns()[1].dataType());
+  }
+
+  @Test
+  void testUnconstrainedNumericAndArrayTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_numeric_array_type");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (numeric_col numeric, numeric_col_2 numeric(10,2), array_col integer[]);",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    // An unconstrained numeric holds values whose precision and scale vary per row
+    Assertions.assertEquals(Types.ExternalType.of("numeric"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), loadedTable.columns()[1].dataType());
+    // PostgreSQL array elements are always nullable
+    Assertions.assertEquals(
+        Types.ListType.of(Types.IntegerType.get(), true), loadedTable.columns()[2].dataType());
   }
 
   @Test

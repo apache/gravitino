@@ -40,7 +40,7 @@ public interface TagMetadataObjectRelMapper {
   @SelectProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "getTagPOsByMetadataObjectAndTagName")
-  TagPO getTagPOsByMetadataObjectAndTagName(
+  List<TagPO> getTagPOsByMetadataObjectAndTagName(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("tagName") String tagName);
@@ -50,6 +50,14 @@ public interface TagMetadataObjectRelMapper {
       method = "listTagMetadataObjectRelsByMetalakeAndTagName")
   List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+
+  @SelectProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "listTagMetadataObjectRelsByMetalakeAndTagNameAndValue")
+  List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagName") String tagName,
+      @Param("tagValue") String tagValue);
 
   @InsertProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
@@ -66,9 +74,28 @@ public interface TagMetadataObjectRelMapper {
 
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject")
+  void batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "softDeleteTagMetadataObjectRelsByMetalakeAndTagName")
   Integer softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+
+  /**
+   * Soft-deletes all active metadata-object assignments for a tag.
+   *
+   * @param tagId The tag ID.
+   * @return The number of affected rows.
+   */
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByTagId")
+  Integer softDeleteTagMetadataObjectRelsByTagId(@Param("tagId") Long tagId);
 
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
@@ -80,6 +107,13 @@ public interface TagMetadataObjectRelMapper {
       method = "softDeleteTagMetadataObjectRelsByMetadataObject")
   void softDeleteTagMetadataObjectRelsByMetadataObject(
       @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByMetadataObjects")
+  void softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 
   @UpdateProvider(

@@ -42,6 +42,7 @@ import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.ViewDTO;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -61,10 +62,14 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.verify.VerificationTimes;
 
 public class TestSupportTags extends TestBase {
 
@@ -639,6 +644,23 @@ public class TestSupportTags extends TestBase {
 
     String[] actualTags = supportsTags.associateTags(tagsToAdd, tagsToRemove);
     Assertions.assertArrayEquals(tagsToAdd, actualTags);
+
+    TagValue[] tagValuesToAdd =
+        new TagValue[] {TagValue.noValue("tag1"), TagValue.of("tag2", "finance")};
+    TagValue[] tagValuesToRemove = new TagValue[] {TagValue.of("tag3", "risk")};
+    TagValuesAssociateRequest valueRequest =
+        new TagValuesAssociateRequest(tagValuesToAdd, tagValuesToRemove);
+    buildMockResource(Method.POST, path, valueRequest, resp, SC_OK);
+
+    String[] actualValueTags = supportsTags.associateTags(tagValuesToAdd, tagValuesToRemove);
+    Assertions.assertArrayEquals(tagsToAdd, actualValueTags);
+    mockServer.verify(
+        HttpRequest.request(path)
+            .withMethod(Method.POST.name())
+            .withHeader(HttpHeaders.ACCEPT, "application/vnd.gravitino.v2+json")
+            .withHeader(HttpHeaders.CONTENT_TYPE, "application/vnd.gravitino.v2+json")
+            .withBody(MAPPER.writeValueAsString(valueRequest)),
+        VerificationTimes.once());
 
     // Test throw internal error
     ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");

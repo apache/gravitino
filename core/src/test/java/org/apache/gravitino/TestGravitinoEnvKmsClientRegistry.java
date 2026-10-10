@@ -35,7 +35,7 @@ public class TestGravitinoEnvKmsClientRegistry {
     FieldUtils.writeField(env, "kmsClientRegistry", registry, true);
 
     Assertions.assertSame(registry, env.kmsClientRegistry());
-    KmsReference reference = new KmsReference("aws-kms", "missing", "key");
+    KmsReference reference = new KmsReference("missing", "key");
     Assertions.assertThrows(IllegalArgumentException.class, () -> registry.getClient(reference));
 
     env.shutdown();
@@ -54,8 +54,7 @@ public class TestGravitinoEnvKmsClientRegistry {
 
     Assertions.assertSame(registry, env.kmsClientRegistry());
     Assertions.assertThrows(
-        IllegalStateException.class,
-        () -> registry.getClient(new KmsReference("aws-kms", "missing", "key")));
+        IllegalStateException.class, () -> registry.getClient(new KmsReference("missing", "key")));
   }
 
   private static final class TestGravitinoEnv extends GravitinoEnv {}

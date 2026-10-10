@@ -18,7 +18,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
           filters: |
@@ -81,7 +83,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - name: Check required command
         run: |
@@ -93,11 +95,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          # libssl1.1 is not in the runner's apt sources, so the .deb is fetched directly.
+          deb=libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          for host in archive.ubuntu.com nz2.archive.ubuntu.com security.ubuntu.com; do
+            wget --tries=3 --timeout=30 -O "$deb" "https://$host/ubuntu/pool/main/o/openssl/$deb" && break
+            rm -f "$deb"
+          done
+          [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
+          sudo dpkg -i "$deb"
 
       - name: Run contrib catalog tests
         id: contribCatalogTest
+        env:
+          GRAVITINO_CLICKHOUSE_TEST_IMAGE: clickhouse:25.8.14.17
         run: |
           CHANGED_CONTRIB_MODULES="${{ needs.changes.outputs.changed_catalogs_contrib_modules }}"
 

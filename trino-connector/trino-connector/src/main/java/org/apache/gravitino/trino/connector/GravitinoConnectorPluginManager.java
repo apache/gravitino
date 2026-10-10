@@ -22,6 +22,7 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.TRINO_PLUGIN_
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.resolver.ArtifactResolver;
 import io.trino.spi.Plugin;
 import io.trino.spi.TrinoException;
@@ -39,20 +40,28 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.sonatype.aether.artifact.Artifact;
 
 /** This class is mange the internal connector plugin and help to create the connector. */
 public class GravitinoConnectorPluginManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorPluginManager.class);
+  private static final Logger LOG = Logger.get(GravitinoConnectorPluginManager.class);
 
   /** The app class loader name. */
   public static final String APP_CLASS_LOADER_NAME = "app";
 
   private static final String PLUGIN_NAME_PREFIX = "gravitino-";
   private static final String PLUGIN_CLASSLOADER_CLASS_NAME = "io.trino.server.PluginClassLoader";
+  static final List<String> PARENT_FIRST_PACKAGES =
+      List.of(
+          "io.trino.spi.",
+          "com.fasterxml.jackson.annotation.",
+          "io.airlift.slice.",
+          "io.airlift.log.",
+          "org.openjdk.jol.",
+          "io.opentelemetry.api.",
+          "io.opentelemetry.context.",
+          "io.starburst.ai.model.");
 
   private static volatile GravitinoConnectorPluginManager instance;
 
@@ -136,7 +145,7 @@ public class GravitinoConnectorPluginManager {
           .forEach(
               file -> {
                 loadPlugin(pluginDir, file.getName());
-                LOG.info("Load plugin {}/{} successful", pluginDir, file.getName());
+                LOG.info("Load plugin %s/%s successful", pluginDir, file.getName());
               });
     } catch (Exception e) {
       throw new TrinoException(
@@ -149,7 +158,7 @@ public class GravitinoConnectorPluginManager {
     File directory = new File(dirName);
     File[] pluginFiles = directory.listFiles();
     if (pluginFiles == null || pluginFiles.length == 0) {
-      LOG.warn("Cannot load plugin {} from empty directory {}", pluginName, dirName);
+      LOG.warn("Cannot load plugin %s from empty directory %s", pluginName, dirName);
       return;
     }
     List<URL> files =
@@ -175,29 +184,19 @@ public class GravitinoConnectorPluginManager {
       String classLoaderName = PLUGIN_NAME_PREFIX + pluginName;
       // Load Trino SPI package and other dependencies refer to io.trino.server.PluginClassLoader
       Object pluginClassLoader =
-          constructor.newInstance(
-              classLoaderName,
-              urls,
-              appClassloader,
-              List.of(
-                  "io.trino.spi.",
-                  "com.fasterxml.jackson.annotation.",
-                  "io.airlift.slice.",
-                  "org.openjdk.jol.",
-                  "io.opentelemetry.api.",
-                  "io.opentelemetry.context."));
+          constructor.newInstance(classLoaderName, urls, appClassloader, PARENT_FIRST_PACKAGES);
 
       ServiceLoader<Plugin> serviceLoader =
           ServiceLoader.load(Plugin.class, (ClassLoader) pluginClassLoader);
       List<Plugin> pluginList = ImmutableList.copyOf(serviceLoader);
       if (pluginList.isEmpty()) {
-        LOG.warn("The {} plugin directory does not contain a connector SPI interface", pluginName);
+        LOG.warn("The %s plugin directory does not contain a connector SPI interface", pluginName);
         return;
       }
       Plugin plugin = pluginList.get(0);
       if (plugin.getConnectorFactories() == null
           || !plugin.getConnectorFactories().iterator().hasNext()) {
-        LOG.warn("The {} plugin does not contain any ConnectorFactories", pluginName);
+        LOG.warn("The %s plugin does not contain any ConnectorFactories", pluginName);
         return;
       }
       connectorPlugins.put(pluginName, pluginList.get(0));
@@ -235,7 +234,7 @@ public class GravitinoConnectorPluginManager {
               try {
                 loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
               } catch (Exception e) {
-                LOG.error("Fatal error in load plugin by {}", v, e);
+                LOG.error(e, "Fatal error in load plugin by %s", v);
               }
             });
   }
@@ -292,7 +291,7 @@ public class GravitinoConnectorPluginManager {
           new ThreadContextClassLoader(plugin.getClass().getClassLoader())) {
         ConnectorFactory connectorFactory = plugin.getConnectorFactories().iterator().next();
         Connector connector = connectorFactory.create(connectorName, config, context);
-        LOG.info("create connector {} with config {} successful", connectorName, config);
+        LOG.info("create connector %s with config %s successful", connectorName, config);
         return connector;
       }
     } catch (Exception e) {

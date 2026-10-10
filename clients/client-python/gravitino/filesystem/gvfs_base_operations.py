@@ -22,6 +22,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
 from typing import Dict, Tuple, Optional, List
+from urllib.error import URLError
 from urllib.parse import urlparse
 
 from cachetools import TTLCache, LRUCache
@@ -40,7 +41,10 @@ from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
+    NoSuchCredentialException,
     NoSuchLocationNameException,
+    NotFoundException,
+    RESTException,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_storage_handler import get_storage_handler_by_path
@@ -56,6 +60,16 @@ logger = logging.getLogger(__name__)
 PROTOCOL_NAME = "gvfs"
 
 TIME_WITHOUT_EXPIRATION = sys.maxsize
+
+# Maps Gravitino credentialInfo / catalog property keys to Python GVFS option names.
+_CREDENTIAL_INFO_TO_GVFS_KEYS = {
+    "s3-access-key-id": GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY,
+    "s3-secret-access-key": GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY,
+    "oss-access-key-id": GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY,
+    "oss-secret-access-key": GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY,
+    "azure-storage-account-name": GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME,
+    "azure-storage-account-key": GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY,
+}
 
 
 class FileSystemCacheKey:
@@ -495,21 +509,35 @@ class BaseGVFSOperations(ABC):
 
     def _merge_fileset_properties(
         self,
-        catalog: FilesetCatalog,
-        schema: Schema,
-        fileset: Fileset,
+        fileset_ident: NameIdentifier,
         actual_location: str,
     ) -> Dict[str, str]:
-        """Merge properties from catalog, schema, fileset, options, and user-defined configs.
-        :param catalog: The fileset catalog
-        :param schema: The schema
-        :param fileset: The fileset
+        """Merge properties from catalog, schema, fileset, options, and configs.
+
+        Combines default load*.properties() with get_secrets() for non-credential
+        secrets, and static catalog get_credentials().credential_info()
+        (expire_time_in_ms == 0 only) for cloud/JDBC credential fields. Typed path
+        credentials remain available via get_credentials on the fileset when
+        credential vending is enabled.
+
+        :param fileset_ident: The fileset identifier
         :param actual_location: The actual storage location
         :return: Merged properties dictionary
         """
+        catalog_name = fileset_ident.namespace().level(1)
+        schema_name = fileset_ident.namespace().level(2)
+        catalog = self._get_gravitino_client().load_catalog(catalog_name)
+        schema = catalog.as_schemas().load_schema(schema_name)
+        fileset = catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(schema_name, fileset_ident.name())
+        )
         fileset_props = dict(catalog.properties() or {})
+        fileset_props.update(catalog.get_secrets())
+        self._merge_static_catalog_credentials(fileset_props, catalog)
         fileset_props.update(schema.properties() or {})
+        fileset_props.update(schema.get_secrets())
         fileset_props.update(fileset.properties() or {})
+        fileset_props.update(fileset.get_secrets())
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location
@@ -517,6 +545,67 @@ class BaseGVFSOperations(ABC):
         user_defined_configs = self._get_user_defined_configs(actual_location)
         fileset_props.update(user_defined_configs)
         return fileset_props
+
+    def _merge_static_catalog_credentials(
+        self, fileset_props: Dict[str, str], catalog
+    ) -> None:
+        """Overlay static catalog credential_info into fileset_props.
+
+        Called when a filesystem is created, so results are not cached here — rotated
+        keys are picked up on the next filesystem build.
+        """
+        loaded = self._load_static_catalog_credential_info(catalog)
+        if loaded:
+            fileset_props.update(loaded)
+
+    @staticmethod
+    def _load_static_catalog_credential_info(catalog) -> Optional[Dict[str, str]]:
+        """Load expire==0 credential_info and map keys to GVFS option names.
+
+        Returns an empty dict when credentials are unsupported or absent.
+        Returns None on transient REST failure.
+        """
+        static_info: Dict[str, str] = {}
+        try:
+            supports_credentials = catalog.support_credentials()
+            for credential in supports_credentials.get_credentials() or []:
+                if credential is None:
+                    continue
+                if credential.expire_time_in_ms() != 0:
+                    continue
+                info = credential.credential_info() or {}
+                for key, value in info.items():
+                    if value is None:
+                        continue
+                    static_info[key] = value
+                    gvfs_key = _CREDENTIAL_INFO_TO_GVFS_KEYS.get(key)
+                    if gvfs_key:
+                        static_info[gvfs_key] = value
+        except (
+            AttributeError,
+            NotImplementedError,
+            TypeError,
+            NotFoundException,
+            NoSuchCredentialException,
+        ) as exc:
+            logger.debug(
+                "Catalog does not support credential recovery via get_credentials: %s",
+                exc,
+            )
+        except RESTException as exc:
+            logger.warning(
+                "Failed to load static credentials via get_credentials; continuing without them: %s",
+                exc,
+            )
+            return None
+        except URLError as exc:
+            # Transport failures (e.g. connection refused) are not wrapped as RESTException.
+            logger.warning(
+                "Failed to load static credentials via get_credentials; continuing without them: %s",
+                exc,
+            )
+            return None
+        return static_info
 
     def _get_actual_filesystem_by_location_name(
         self, fileset_ident: NameIdentifier, location_name: str
@@ -530,13 +619,6 @@ class BaseGVFSOperations(ABC):
         :param location_name: The location name, None means the default location
         :return: The actual filesystem
         """
-        catalog_ident: NameIdentifier = NameIdentifier.of(
-            self._metalake, fileset_ident.namespace().level(1)
-        )
-        catalog = self._get_fileset_catalog(catalog_ident)
-        schema = self._get_fileset_schema(
-            NameIdentifier.parse(str(fileset_ident.namespace()))
-        )
         fileset = self._get_fileset(fileset_ident)
 
         # Determine target location name
@@ -553,9 +635,7 @@ class BaseGVFSOperations(ABC):
                 f"Cannot find the location: {target_location_name} in fileset: {fileset_ident}"
             )
 
-        fileset_props = self._merge_fileset_properties(
-            catalog, schema, fileset, actual_location
-        )
+        fileset_props = self._merge_fileset_properties(fileset_ident, actual_location)
 
         # Set caller context for credential vending
         if location_name:

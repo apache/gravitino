@@ -59,6 +59,16 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  /** Returns SQL that selects and locks an active group by ID. */
+  public static String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForUpdate(groupId);
+  }
+
+  /** Returns SQL that selects an active group by ID and locks it for shared access. */
+  public static String selectGroupMetaByIdForShare(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForShare(groupId);
+  }
+
   public static String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
@@ -72,8 +82,9 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().insertGroupMetaOnDuplicateKeyUpdate(groupPO);
   }
 
-  public static String softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId) {
-    return getProvider().softDeleteGroupMetaByGroupId(groupId);
+  public static String softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteGroupMetaByGroupId(groupId, currentVersion);
   }
 
   public static String softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -97,6 +108,17 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().listExtendedGroupPOsByMetalakeId(metalakeId);
   }
 
+  public static String countGroupMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return getProvider().countGroupMetasByMetalakeName(metalakeName);
+  }
+
+  public static String listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return getProvider().listExtendedGroupPOsByMetalakeNamePaginated(metalakeName, offset, limit);
+  }
+
   public static String deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
@@ -109,10 +131,5 @@ public class GroupMetaSQLProviderFactory {
   public static String getGroupUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
     return getProvider().getGroupUpdatedAt(metalakeName, groupName);
-  }
-
-  public static String selectGroupMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
-    return getProvider().selectGroupMetaByMetalakeNameAndExternalId(metalakeName, externalId);
   }
 }

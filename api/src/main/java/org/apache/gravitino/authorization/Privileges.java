@@ -32,6 +32,13 @@ public class Privileges {
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE);
+  private static final Set<MetadataObject.Type> TABLE_LIKE_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW);
 
   private static final Set<MetadataObject.Type> MODEL_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
@@ -64,6 +71,18 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.VIEW);
 
+  /** Types that may carry secret properties or support credential vending. */
+  private static final Set<MetadataObject.Type> SECRET_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL);
+
   private static final Set<MetadataObject.Type> FUNCTION_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE,
@@ -71,11 +90,19 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.FUNCTION);
 
+  private static final Set<MetadataObject.Type> SEMANTIC_MODEL_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.SEMANTIC_MODEL);
+
   /**
    * Object types that {@link ManageGrants} can be bound to.
    *
    * <p>Binding at a parent level implicitly covers all children — for example, a grant on a SCHEMA
-   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, and MODEL inside it.
+   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, MODEL, FUNCTION, and
+   * SEMANTIC_MODEL inside it.
    */
   private static final Set<MetadataObject.Type> MANAGE_GRANTS_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
@@ -87,7 +114,8 @@ public class Privileges {
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.FILESET,
           MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION);
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   /**
    * Returns the Privilege with allow condition from the string representation.
@@ -127,6 +155,8 @@ public class Privileges {
         return ModifyTable.allow();
       case SELECT_TABLE:
         return SelectTable.allow();
+      case PROBE_TABLE_LIKE:
+        return ProbeTableLike.allow();
 
         // Fileset
       case CREATE_FILESET:
@@ -175,12 +205,24 @@ public class Privileges {
         return CreateTag.allow();
       case APPLY_TAG:
         return ApplyTag.allow();
+      case VIEW_TAG:
+        return ViewTag.allow();
 
         // Policy
       case APPLY_POLICY:
         return ApplyPolicy.allow();
+      case VIEW_POLICY:
+        return ViewPolicy.allow();
       case CREATE_POLICY:
         return CreatePolicy.allow();
+
+        // Secrets
+      case VIEW_SECRET_PROVIDERS:
+        return ViewSecretProviders.allow();
+      case USE_SECRETS:
+        return UseSecrets.allow();
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return IncludeCredentialSecrets.allow();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -205,6 +247,14 @@ public class Privileges {
         return ExecuteFunction.allow();
       case MODIFY_FUNCTION:
         return ModifyFunction.allow();
+
+        // Semantic model
+      case CREATE_SEMANTIC_MODEL:
+        return CreateSemanticModel.allow();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.allow();
+      case MODIFY_SEMANTIC_MODEL:
+        return ModifySemanticModel.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -249,6 +299,8 @@ public class Privileges {
         return ModifyTable.deny();
       case SELECT_TABLE:
         return SelectTable.deny();
+      case PROBE_TABLE_LIKE:
+        return ProbeTableLike.deny();
 
         // Fileset
       case CREATE_FILESET:
@@ -297,12 +349,24 @@ public class Privileges {
         return CreateTag.deny();
       case APPLY_TAG:
         return ApplyTag.deny();
+      case VIEW_TAG:
+        return ViewTag.deny();
 
         // Policy
       case APPLY_POLICY:
         return ApplyPolicy.deny();
+      case VIEW_POLICY:
+        return ViewPolicy.deny();
       case CREATE_POLICY:
         return CreatePolicy.deny();
+
+        // Secrets
+      case VIEW_SECRET_PROVIDERS:
+        return ViewSecretProviders.deny();
+      case USE_SECRETS:
+        return UseSecrets.deny();
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return IncludeCredentialSecrets.deny();
 
         // Job template
       case REGISTER_JOB_TEMPLATE:
@@ -327,6 +391,14 @@ public class Privileges {
         return ExecuteFunction.deny();
       case MODIFY_FUNCTION:
         return ModifyFunction.deny();
+
+        // Semantic model
+      case CREATE_SEMANTIC_MODEL:
+        return CreateSemanticModel.deny();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.deny();
+      case MODIFY_SEMANTIC_MODEL:
+        return ModifySemanticModel.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -595,6 +667,37 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return TABLE_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to probe whether a table-like object exists. */
+  public static class ProbeTableLike extends GenericPrivilege<ProbeTableLike> {
+    private static final ProbeTableLike ALLOW_INSTANCE =
+        new ProbeTableLike(Condition.ALLOW, Name.PROBE_TABLE_LIKE);
+    private static final ProbeTableLike DENY_INSTANCE =
+        new ProbeTableLike(Condition.DENY, Name.PROBE_TABLE_LIKE);
+
+    private ProbeTableLike(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ProbeTableLike allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ProbeTableLike deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return TABLE_LIKE_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -1141,6 +1244,36 @@ public class Privileges {
     }
   }
 
+  /** The privilege to view tag metadata and associations. */
+  public static final class ViewTag extends GenericPrivilege<ViewTag> {
+
+    private static final ViewTag ALLOW_INSTANCE = new ViewTag(Condition.ALLOW, Name.VIEW_TAG);
+    private static final ViewTag DENY_INSTANCE = new ViewTag(Condition.DENY, Name.VIEW_TAG);
+
+    private ViewTag(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewTag allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewTag deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.TAG;
+    }
+  }
+
   /** The privilege to create a tag */
   public static class CreatePolicy extends GenericPrivilege<CreatePolicy> {
     private static final CreatePolicy ALLOW_INSTANCE =
@@ -1241,6 +1374,150 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to view policy metadata, content, and associations. */
+  public static final class ViewPolicy extends GenericPrivilege<ViewPolicy> {
+
+    private static final ViewPolicy ALLOW_INSTANCE =
+        new ViewPolicy(Condition.ALLOW, Name.VIEW_POLICY);
+    private static final ViewPolicy DENY_INSTANCE =
+        new ViewPolicy(Condition.DENY, Name.VIEW_POLICY);
+
+    private ViewPolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewPolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewPolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to list configured secrets providers. */
+  public static final class ViewSecretProviders extends GenericPrivilege<ViewSecretProviders> {
+
+    private static final ViewSecretProviders ALLOW_INSTANCE =
+        new ViewSecretProviders(Condition.ALLOW, Name.VIEW_SECRET_PROVIDERS);
+    private static final ViewSecretProviders DENY_INSTANCE =
+        new ViewSecretProviders(Condition.DENY, Name.VIEW_SECRET_PROVIDERS);
+
+    private ViewSecretProviders(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewSecretProviders allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewSecretProviders deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /**
+   * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecrets},
+   * cloud access-key pairs are omitted from the result.
+   *
+   * <p>Intended for connectors that recover JDBC and similar secrets via {@code getSecrets}, and
+   * recover cloud access keys via {@code getCredentials} (which requires no privilege). Callers
+   * that are not the metalake owner and lack this privilege receive an empty {@code getSecrets}
+   * result rather than a forbidden error, once they can already access the metadata object.
+   */
+  public static final class UseSecrets extends GenericPrivilege<UseSecrets> {
+
+    private static final UseSecrets ALLOW_INSTANCE =
+        new UseSecrets(Condition.ALLOW, Name.USE_SECRETS);
+    private static final UseSecrets DENY_INSTANCE =
+        new UseSecrets(Condition.DENY, Name.USE_SECRETS);
+
+    private UseSecrets(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseSecrets allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseSecrets deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SECRET_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /**
+   * When held together with {@link UseSecrets}, includes cloud access-key pairs and other
+   * credential secrets in the {@code getSecrets} result.
+   *
+   * <p>Does not authorize {@code getSecrets} or {@code getCredentials} by itself. Metalake owners
+   * and holders of both privileges receive the full secrets map; holders of only {@link UseSecrets}
+   * get cloud access-key pairs omitted.
+   */
+  public static final class IncludeCredentialSecrets
+      extends GenericPrivilege<IncludeCredentialSecrets> {
+
+    private static final IncludeCredentialSecrets ALLOW_INSTANCE =
+        new IncludeCredentialSecrets(Condition.ALLOW, Name.INCLUDE_CREDENTIAL_SECRETS);
+    private static final IncludeCredentialSecrets DENY_INSTANCE =
+        new IncludeCredentialSecrets(Condition.DENY, Name.INCLUDE_CREDENTIAL_SECRETS);
+
+    private IncludeCredentialSecrets(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static IncludeCredentialSecrets allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static IncludeCredentialSecrets deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SECRET_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -1458,6 +1735,99 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return FUNCTION_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a semantic model. */
+  public static class CreateSemanticModel extends GenericPrivilege<CreateSemanticModel> {
+    private static final CreateSemanticModel ALLOW_INSTANCE =
+        new CreateSemanticModel(Condition.ALLOW, Name.CREATE_SEMANTIC_MODEL);
+    private static final CreateSemanticModel DENY_INSTANCE =
+        new CreateSemanticModel(Condition.DENY, Name.CREATE_SEMANTIC_MODEL);
+
+    private CreateSemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateSemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateSemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to discover a semantic model and load its definition. */
+  public static class UseSemanticModel extends GenericPrivilege<UseSemanticModel> {
+    private static final UseSemanticModel ALLOW_INSTANCE =
+        new UseSemanticModel(Condition.ALLOW, Name.USE_SEMANTIC_MODEL);
+    private static final UseSemanticModel DENY_INSTANCE =
+        new UseSemanticModel(Condition.DENY, Name.USE_SEMANTIC_MODEL);
+
+    private UseSemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseSemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseSemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SEMANTIC_MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to rename a semantic model or alter its definition and metadata. */
+  public static class ModifySemanticModel extends GenericPrivilege<ModifySemanticModel> {
+    private static final ModifySemanticModel ALLOW_INSTANCE =
+        new ModifySemanticModel(Condition.ALLOW, Name.MODIFY_SEMANTIC_MODEL);
+    private static final ModifySemanticModel DENY_INSTANCE =
+        new ModifySemanticModel(Condition.DENY, Name.MODIFY_SEMANTIC_MODEL);
+
+    private ModifySemanticModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ModifySemanticModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ModifySemanticModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SEMANTIC_MODEL_SUPPORTED_TYPES.contains(type);
     }
   }
 }

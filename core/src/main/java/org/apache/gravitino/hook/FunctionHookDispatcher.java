@@ -19,15 +19,14 @@
 
 package org.apache.gravitino.hook;
 
+import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.FunctionDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -45,9 +44,19 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public class FunctionHookDispatcher implements FunctionDispatcher {
   private final FunctionDispatcher dispatcher;
+  private final Supplier<OwnerDispatcher> ownerDispatcher;
 
-  public FunctionHookDispatcher(FunctionDispatcher dispatcher) {
+  /**
+   * Creates a function hook dispatcher.
+   *
+   * @param dispatcher the underlying function dispatcher
+   * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
+   *     disabled
+   */
+  public FunctionHookDispatcher(
+      FunctionDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   @Override
@@ -82,18 +91,11 @@ public class FunctionHookDispatcher implements FunctionDispatcher {
         dispatcher.registerFunction(ident, comment, functionType, deterministic, definitions);
 
     // Set the creator as the owner of the function.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the function name (and its schema namespace)
-      // based on catalog capabilities, so the entity is stored under the normalized identifier.
-      // Apply the same normalization here so the owner is attached to the same identifier the
-      // manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.FUNCTION, GravitinoEnv.getInstance().catalogManager());
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.FUNCTION),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.FUNCTION),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
@@ -108,6 +110,13 @@ public class FunctionHookDispatcher implements FunctionDispatcher {
 
   @Override
   public boolean dropFunction(NameIdentifier ident) {
-    return dispatcher.dropFunction(ident);
+    boolean dropped = dispatcher.dropFunction(ident);
+    if (dropped) {
+      // Function privileges are managed by Gravitino. Catalog authorization plugins such as
+      // Ranger HadoopSQL do not support FUNCTION metadata objects, so only invalidate the built-in
+      // authorizer's name-to-ID mapping here.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.FUNCTION);
+    }
+    return dropped;
   }
 }

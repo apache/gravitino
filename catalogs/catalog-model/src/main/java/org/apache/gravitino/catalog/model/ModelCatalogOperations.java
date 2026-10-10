@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -55,6 +54,7 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -79,13 +79,9 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   public void close() throws IOException {}
 
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    // No-op for model catalog.
+  public void testConnection(NameIdentifier catalogIdent) {
+    throw new UnsupportedOperationException(
+        "Model catalogs do not define an external catalog-level connection probe");
   }
 
   @Override
@@ -106,7 +102,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to list models under namespace " + namespace, ioe);
+      throw ExceptionMessages.wrap("Failed to list models under namespace " + namespace, ioe);
     }
   }
 
@@ -121,7 +117,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to get model " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to get model " + ident, ioe);
     }
   }
 
@@ -151,7 +147,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     try {
       store.put(model, false /* overwrite */);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to register model " + ident, e);
+      throw ExceptionMessages.wrap("Failed to register model " + ident, e);
     } catch (EntityAlreadyExistsException e) {
       throw new ModelAlreadyExistsException(e, "Model %s already exists", ident);
     } catch (NoSuchEntityException e) {
@@ -168,7 +164,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     try {
       return store.delete(ident, Entity.EntityType.MODEL);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to delete model " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to delete model " + ident, ioe);
     }
   }
 
@@ -185,7 +181,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to list model versions for model " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to list model versions for model " + ident, ioe);
     }
   }
 
@@ -202,7 +198,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to list model version infos for model " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to list model version infos for model " + ident, ioe);
     }
   }
 
@@ -259,7 +255,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     try {
       store.put(modelVersion, false /* overwrite */);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to link model version " + ident, e);
+      throw ExceptionMessages.wrap("Failed to link model version " + ident, e);
     } catch (EntityAlreadyExistsException e) {
       throw new ModelVersionAliasesAlreadyExistException(
           e, "Model version alias already exists in %s", ident);
@@ -311,7 +307,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         throw new NoSuchModelException("Model %s does not exist", ident);
       }
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to alter model " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to alter model " + ident, ioe);
     }
 
     try {
@@ -325,12 +321,12 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       return toModelImpl(updatedModelEntity);
 
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load model " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to load model " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchModelException(nsee, "Model %s does not exist", ident);
     } catch (EntityAlreadyExistsException eaee) {
       // This is happened when renaming a model to an existing model name.
-      throw new RuntimeException("Model already exist " + ident.name(), eaee);
+      throw ExceptionMessages.wrap("Model already exist " + ident.name(), eaee);
     }
   }
 
@@ -421,7 +417,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         throw new NoSuchModelVersionException("Model version %s does not exist", ident);
       }
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to alter model version " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to alter model version " + ident, ioe);
     }
 
     try {
@@ -435,7 +431,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       return toModelVersionImpl(updatedModelVersionEntity);
 
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load model version " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to load model version " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchModelVersionException(nsee, "Model Version %s does not exist", ident);
     }
@@ -551,7 +547,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelVersionException(e, "Model version %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to get model version " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to get model version " + ident, ioe);
     }
   }
 
@@ -602,7 +598,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     try {
       return store.delete(ident, Entity.EntityType.MODEL_VERSION);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to delete model version " + ident, ioe);
+      throw ExceptionMessages.wrap("Failed to delete model version " + ident, ioe);
     }
   }
 

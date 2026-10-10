@@ -43,15 +43,18 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.server.web.Utils;
@@ -144,6 +147,11 @@ public class ExceptionHandlers {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
   }
 
+  public static Response handleSecretException(
+      OperationType op, String metadataObjectName, Exception e) {
+    return SecretExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
+  }
+
   public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
@@ -152,6 +160,20 @@ public class ExceptionHandlers {
   public static Response handleFunctionException(
       OperationType op, String function, String schema, Exception e) {
     return FunctionExceptionHandler.INSTANCE.handle(op, function, schema, e);
+  }
+
+  /**
+   * Handles an exception raised by a Semantic Model REST operation.
+   *
+   * @param op The operation type.
+   * @param semanticModel The Semantic Model name, or an empty string for a list operation.
+   * @param schema The parent schema name.
+   * @param e The exception to handle.
+   * @return The mapped REST response.
+   */
+  public static Response handleSemanticModelException(
+      OperationType op, String semanticModel, String schema, Exception e) {
+    return SemanticModelExceptionHandler.INSTANCE.handle(op, semanticModel, schema, e);
   }
 
   public static Response handleJobTemplateException(
@@ -165,30 +187,17 @@ public class ExceptionHandlers {
   }
 
   public static Response handleTestConnectionException(Exception e) {
-    ErrorResponse response;
-    if (e instanceof IllegalArgumentException) {
-      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+    return handleTestConnectionException(e, true);
+  }
 
-    } else if (e instanceof ConnectionFailedException) {
-      response = ErrorResponse.connectionFailed(e.getMessage(), e);
-
-    } else if (e instanceof NotFoundException) {
-      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof AlreadyExistsException) {
-      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof NotInUseException) {
-      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else {
-      return Utils.internalError(e.getMessage(), e);
-    }
-
-    return Response.status(Response.Status.OK)
-        .entity(response)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+  /**
+   * Handles an existing catalog connection test failure without exposing its stack trace.
+   *
+   * @param e the connection test failure
+   * @return an HTTP 200 response containing the application error
+   */
+  public static Response handleExistingCatalogTestConnectionException(Exception e) {
+    return handleTestConnectionException(e, false);
   }
 
   public static Response handleOwnerException(
@@ -209,6 +218,38 @@ public class ExceptionHandlers {
   public static Response handlePartitionStatsException(
       OperationType type, String name, String parent, Exception e) {
     return PartitionStatsExceptionHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
+  private static Response handleTestConnectionException(Exception e, boolean includeStack) {
+    Throwable throwable = includeStack ? e : null;
+    ErrorResponse response;
+    if (e instanceof IllegalArgumentException) {
+      response = ErrorResponse.illegalArguments(e.getMessage(), throwable);
+
+    } else if (e instanceof ConnectionFailedException) {
+      response = ErrorResponse.connectionFailed(e.getMessage(), throwable);
+
+    } else if (e instanceof UnsupportedOperationException) {
+      response = ErrorResponse.unsupportedOperation(e.getMessage(), throwable);
+
+    } else if (e instanceof NotFoundException) {
+      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof AlreadyExistsException) {
+      response =
+          ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof NotInUseException) {
+      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else {
+      return Utils.internalError(e.getMessage(), throwable);
+    }
+
+    return Response.status(Response.Status.OK)
+        .entity(response)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -748,6 +789,34 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class SecretExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new SecretExceptionHandler();
+
+    private static String getSecretErrorMsg(String parent, String reason) {
+      return String.format("Failed to get secrets under object [%s], reason [%s]", parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String secret, String parent, Exception e) {
+      String errorMsg = getSecretErrorMsg(parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, secret, parent, e);
+      }
+    }
+  }
+
   private static class TagExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new TagExceptionHandler();
@@ -775,6 +844,9 @@ public class ExceptionHandlers {
         return Utils.alreadyExists(errorMsg, e);
 
       } else if (e instanceof TagAlreadyAssociatedException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof PolicyAlreadyAssociatedException) {
         return Utils.alreadyExists(errorMsg, e);
 
       } else if (e instanceof NotInUseException) {
@@ -933,6 +1005,49 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class SemanticModelExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new SemanticModelExceptionHandler();
+
+    private static String getSemanticModelErrorMsg(
+        String semanticModel, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate Semantic Model(s)%s operation [%s] under schema [%s], reason [%s]",
+          semanticModel, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String semanticModel, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(semanticModel) ? "" : " [" + semanticModel + "]";
+      String errorMsg = getSemanticModelErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof SemanticModelAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ConnectionFailedException) {
+        return Utils.connectionFailed(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, semanticModel, schema, e);
+      }
+    }
+  }
+
   private static class JobTemplateExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new JobTemplateExceptionHandler();
@@ -971,6 +1086,9 @@ public class ExceptionHandlers {
       } else if (e instanceof ForbiddenException) {
         return Utils.forbidden(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
       } else {
         return super.handle(op, jobTemplate, parent, e);
       }
@@ -1006,6 +1124,9 @@ public class ExceptionHandlers {
       } else if (e instanceof ForbiddenException) {
         return Utils.forbidden(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
       } else {
         return super.handle(op, jobTemplate, parent, e);
       }
@@ -1034,6 +1155,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UnmodifiableStatisticException) {
+        return Utils.operationConflict(errorMsg, e);
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
@@ -1066,6 +1190,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UnmodifiableStatisticException) {
+        return Utils.operationConflict(errorMsg, e);
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
@@ -1103,6 +1230,23 @@ public class ExceptionHandlers {
         // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
         LOG.warn(errorMsg, e);
         return Utils.connectionFailed(errorMsg, e);
+      }
+
+      if (e instanceof OptimisticLockException) {
+        LOG.warn(errorMsg, e);
+        return Utils.optimisticLockConflict(errorMsg, e);
+      }
+
+      // Classify domain-specific UnsupportedOperationException subclasses before the generic
+      // capability fallback below.
+      if (e instanceof UnmodifiableStatisticException) {
+        LOG.warn(errorMsg, e);
+        return Utils.operationConflict(errorMsg, e);
+      }
+
+      if (e instanceof UnsupportedOperationException) {
+        LOG.warn(errorMsg, e);
+        return Utils.unsupportedOperation(errorMsg, e);
       }
 
       LOG.error(errorMsg, e);

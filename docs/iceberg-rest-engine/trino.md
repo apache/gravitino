@@ -293,7 +293,8 @@ is reached, which surfaces as a 403 rather than as a storage error.
 Requires Trino 481 or later.
 
 `iceberg.rest-catalog.security` has no Basic value, so Trino cannot be configured to authenticate to
-a REST catalog with a username and password. Gravitino's IRC does accept HTTP Basic, so the way
+a REST catalog with a username and password. Gravitino's IRC does accept HTTP Basic against
+[local users and groups](../security/local-users-and-groups.md), so the way
 across is to construct the header yourself and have Trino attach it to every REST catalog request.
 Trino 481 added `iceberg.rest-catalog.http-headers`
 ([trinodb/trino#24236](https://github.com/trinodb/trino/issues/24236)) for sending arbitrary headers,

@@ -73,14 +73,19 @@ import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.FilesetUtil;
@@ -155,6 +160,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   private final boolean enableCredentialVending;
 
   private final boolean autoCreateLocation;
+
   /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
   public static class FileSystemCacheKey {
     private final String scheme;
@@ -726,7 +732,7 @@ public abstract class BaseGVFSOperations implements Closeable {
           filesetIdent);
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-      Map<String, String> allProperties = getAllProperties(filesetIdent, fileset.properties());
+      Map<String, String> allProperties = getAllProperties(filesetIdent);
       allProperties.putAll(
           FilesetUtil.getUserDefinedFileSystemConfigs(
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
@@ -961,21 +967,90 @@ public abstract class BaseGVFSOperations implements Closeable {
     return cacheBuilder.build();
   }
 
-  private Map<String, String> getAllProperties(
-      NameIdentifier filesetIdent, Map<String, String> filesetProperties) {
-    Map<String, String> allProperties = new HashMap<>();
-    Catalog catalog =
-        (Catalog)
-            getFilesetCatalog(
-                NameIdentifier.of(
-                    filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
-    allProperties.putAll(catalog.properties());
+  @VisibleForTesting
+  Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
+    String catalogName = filesetIdent.namespace().level(1);
+    String schemaName = filesetIdent.namespace().level(2);
+    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
+    Fileset fileset =
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
 
-    Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
-    allProperties.putAll(schema.properties());
-    allProperties.putAll(filesetProperties);
-    allProperties.putAll(extractNonDefaultConfig(conf));
-    return allProperties;
+    Map<String, String> all = new HashMap<>();
+    putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
+    putStaticCatalogCredentialInfo(all, catalog);
+    putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
+    putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
+    all.putAll(extractNonDefaultConfig(conf));
+    return all;
+  }
+
+  private static void putPropsAndSecrets(
+      Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
+    if (props != null) {
+      target.putAll(CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(props));
+    }
+    if (secrets != null) {
+      target.putAll(secrets.getSecrets());
+    }
+  }
+
+  /**
+   * Merges static ({@code expireTimeInMs == 0}) {@link Credential#credentialInfo()} from catalog
+   * {@code getCredentials} into GVFS configuration. Invoked when a filesystem is created, so
+   * results are not cached here — rotated keys are picked up on the next filesystem build. Expiring
+   * credentials are skipped; path token vending uses a separate fileset path.
+   */
+  private void putStaticCatalogCredentialInfo(Map<String, String> target, Catalog catalog) {
+    if (catalog == null) {
+      return;
+    }
+    Map<String, String> loaded = loadStaticCatalogCredentialInfo(catalog);
+    if (loaded != null && !loaded.isEmpty()) {
+      target.putAll(loaded);
+    }
+  }
+
+  /**
+   * Loads static catalog credential info.
+   *
+   * @return a map of static credential info (may be empty), or {@code null} if loading failed
+   *     transiently
+   */
+  @Nullable
+  private static Map<String, String> loadStaticCatalogCredentialInfo(Catalog catalog) {
+    Map<String, String> staticInfo = new HashMap<>();
+    try {
+      SupportsCredentials supportsCredentials = catalog.supportsCredentials();
+      if (supportsCredentials == null) {
+        return staticInfo;
+      }
+      Credential[] credentials = supportsCredentials.getCredentials();
+      if (credentials == null) {
+        return staticInfo;
+      }
+      for (Credential credential : credentials) {
+        if (credential == null
+            || credential.expireTimeInMs() != 0
+            || credential.credentialInfo() == null) {
+          continue;
+        }
+        staticInfo.putAll(credential.credentialInfo());
+      }
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      LOG.debug(
+          "Catalog {} does not support credential recovery via getCredentials: {}",
+          catalog.name(),
+          e.toString());
+    } catch (RESTException e) {
+      LOG.warn(
+          "Failed to load static credentials for catalog {} via getCredentials; continuing without"
+              + " them: {}",
+          catalog.name(),
+          e.toString());
+      return null;
+    }
+    return staticInfo;
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {

@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.List;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -31,15 +32,19 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
@@ -80,7 +85,9 @@ public class IdpUserOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpUserResponse(
-                  userGroupManager.addUser(request.getUser(), request.getPassword()).toDTO()));
+                  userGroupManager
+                      .addUser(request.getUser(), request.getPassword(), request.enabledOrDefault())
+                      .toDTO()));
         },
         "user",
         IdpOperationType.ADD,
@@ -90,19 +97,46 @@ public class IdpUserOperations {
   @PUT
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "change-idp-user-password", absolute = true)
-  public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
+  @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-idp-user", absolute = true)
+  public Response updateUser(@PathParam("user") String user, UpdateUserRequest request) {
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
           request.validate();
-          userGroupManager.changePassword(user, request.getPassword());
+          enforceSelfPasswordUpdateRules(user, request);
+          if (request.getPassword() != null) {
+            userGroupManager.changePassword(user, request.getPassword());
+          }
+          if (request.getEnabled() != null) {
+            userGroupManager.updateEnabled(user, request.getEnabled());
+          }
           return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
         },
         "user",
         IdpOperationType.UPDATE,
         user);
+  }
+
+  /**
+   * Non-service-admins may only change their own password and cannot update {@code enabled}.
+   *
+   * @param user the path username being updated
+   * @param request the update request
+   */
+  private static void enforceSelfPasswordUpdateRules(String user, UpdateUserRequest request) {
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+      return;
+    }
+    if (!user.equals(currentUser)) {
+      throw new ForbiddenException(
+          "Only service admins can update another user's password or enabled flag");
+    }
+    if (request.getEnabled() != null) {
+      throw new ForbiddenException("Only service admins can update the enabled flag");
+    }
   }
 
   @DELETE

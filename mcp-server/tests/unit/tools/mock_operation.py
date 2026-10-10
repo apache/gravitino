@@ -27,12 +27,14 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.statistic_operation import StatisticOperation
+from mcp_server.client.view_operation import ViewOperation
 
 
 class MockOperation(GravitinoOperation):
-    def __init__(self, metalake, uri, authorization=""):
+    def __init__(self, metalake, uri, authorization="", *, auth=None):
         pass
 
     def as_table_operation(self) -> TableOperation:
@@ -67,6 +69,17 @@ class MockOperation(GravitinoOperation):
 
     def as_partition_operation(self) -> PartitionOperation:
         return MockPartitionOperation()
+
+    def as_view_operation(self) -> ViewOperation:
+        return MockViewOperation()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return MockMetalakeOperation()
+
+
+class MockMetalakeOperation(MetalakeOperation):
+    async def get_list_of_metalakes(self) -> str:
+        return "mock_metalakes"
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -212,32 +225,23 @@ class MockFilesetOperation(FilesetOperation):
 
 
 class MockPolicyOperation(PolicyOperation):
-    async def associate_policy_with_metadata(
-        self,
-        metadata_full_name: str,
-        metadata_type: str,
-        policies_to_add: list,
-        policies_to_remove: list,
+    async def list_policies_for_tag(self, tag_name: str) -> str:
+        return f"list_policies_for_tag: {tag_name}"
+
+    async def associate_policy_with_tag(
+        self, tag_name: str, policy_name: str, selector: dict
     ) -> str:
         return (
-            f"associate_policy_with_metadata: {metadata_full_name}, {metadata_type}, "
-            f"{policies_to_add}, {policies_to_remove}"
+            f"associate_policy_with_tag: {tag_name}, {policy_name}, {selector}"
         )
 
-    async def get_policy_for_metadata(
-        self, metadata_full_name: str, metadata_type: str, policy_name: str
+    async def disassociate_policy_from_tag(
+        self, tag_name: str, policy_name: str
     ) -> str:
-        return f"get_policy_for_metadata: {metadata_full_name}, {metadata_type}, {policy_name}"
+        return f"disassociate_policy_from_tag: {tag_name}, {policy_name}"
 
-    async def list_policies_for_metadata(
-        self, metadata_full_name: str, metadata_type: str
-    ) -> str:
-        return (
-            f"list_policies_for_metadata: {metadata_full_name}, {metadata_type}"
-        )
-
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        return f"list_metadata_by_policy: {policy_name}"
+    async def list_tags_for_policy(self, policy_name: str) -> str:
+        return f"list_tags_for_policy: {policy_name}"
 
     async def get_list_of_policies(self) -> str:
         return "mock_policies"
@@ -425,14 +429,13 @@ class MockJobOperation(JobOperation):
 
 class MockStatisticOperation(StatisticOperation):
     async def list_of_statistics(
-        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+        self, metadata_type: str, metadata_fullname: str
     ) -> str:
-        return f"mock_statistics: {metalake_name}, {metadata_type}, {metadata_fullname}"
+        return f"mock_statistics: {metadata_type}, {metadata_fullname}"
 
     # pylint: disable=R0917
     async def list_statistic_for_partition(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -441,7 +444,7 @@ class MockStatisticOperation(StatisticOperation):
         to_inclusive: bool = False,
     ) -> str:
         return (
-            f"mock_statistics_for_partition: {metalake_name}, {metadata_type}, {metadata_fullname},"
+            f"mock_statistics_for_partition: {metadata_type}, {metadata_fullname},"
             f" {from_partition_name}, {to_partition_name}, {from_inclusive}, {to_inclusive}"
         )
 
@@ -470,3 +473,13 @@ class MockPartitionOperation(PartitionOperation):
             f"mock_partition: {catalog_name}, {schema_name}, {table_name}, "
             f"{partition_name}"
         )
+
+
+class MockViewOperation(ViewOperation):
+    async def list_of_views(self, catalog_name: str, schema_name: str) -> str:
+        return f"mock_views: {catalog_name}, {schema_name}"
+
+    async def load_view(
+        self, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        return f"mock_view: {catalog_name}, {schema_name}, {view_name}"

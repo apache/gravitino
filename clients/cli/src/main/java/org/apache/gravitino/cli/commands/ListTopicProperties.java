@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -81,7 +80,6 @@ public class ListTopicProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    Map<String, String> properties = gTopic.properties();
-    printProperties(properties);
+    printProperties(propertiesWithSecrets(gTopic.properties(), gTopic.supportsSecrets()));
   }
 }

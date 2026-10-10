@@ -27,6 +27,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -231,7 +232,7 @@ public interface Fileset extends Auditable {
    *     location and the value is the storage location path.
    */
   default Map<String, String> storageLocations() {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("Fileset does not support storageLocations.");
   }
 
   /**
@@ -271,5 +272,14 @@ public interface Fileset extends Auditable {
    */
   default SupportsCredentials supportsCredentials() {
     throw new UnsupportedOperationException("Fileset does not support credential operations.");
+  }
+
+  /**
+   * @return The {@link SupportsSecrets} if the fileset supports secret property operations.
+   * @throws UnsupportedOperationException If the fileset does not support secret property
+   *     operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("Fileset does not support secret property operations.");
   }
 }

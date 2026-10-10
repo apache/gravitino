@@ -39,7 +39,9 @@ public class JdbcConfig extends Config {
 
   public static final ConfigEntry<String> JDBC_DATABASE =
       new ConfigBuilder("jdbc-database")
-          .doc("The database of the jdbc connection")
+          .doc(
+              "The database of the JDBC connection. PostgreSQL requires a nonblank "
+                  + "value here or a database in jdbc-url; other JDBC providers do not require it.")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -85,6 +87,18 @@ public class JdbcConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
+  /**
+   * The maximum number of idle connections a catalog pool retains. The default matches the DBCP
+   * default that catalog pools used before this setting existed.
+   */
+  public static final ConfigEntry<Integer> POOL_MAX_IDLE =
+      new ConfigBuilder("jdbc.pool.max-idle")
+          .doc("The maximum number of idle connections retained in the pool")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(8);
+
   public static final ConfigEntry<Boolean> TEST_ON_BORROW =
       new ConfigBuilder("jdbc.pool.test-on-borrow")
           .doc("Whether to test the connection on borrow")
@@ -122,6 +136,15 @@ public class JdbcConfig extends Config {
 
   public int getPoolMaxSize() {
     return get(POOL_MAX_SIZE);
+  }
+
+  /**
+   * Returns the effective idle-connection limit, capped by the maximum pool size.
+   *
+   * @return the maximum number of idle connections to retain
+   */
+  public int getPoolMaxIdle() {
+    return Math.min(get(POOL_MAX_IDLE), getPoolMaxSize());
   }
 
   public String getJdbcDatabase() {

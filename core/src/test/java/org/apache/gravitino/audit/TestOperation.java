@@ -30,6 +30,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -108,6 +110,18 @@ import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
@@ -124,12 +138,14 @@ import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.apache.gravitino.listener.api.info.FilesetInfo;
 import org.apache.gravitino.listener.api.info.MetalakeInfo;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
+import org.apache.gravitino.listener.api.info.SemanticModelInfo;
 import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.listener.api.info.TopicInfo;
 import org.apache.gravitino.listener.api.info.ViewInfo;
 import org.apache.gravitino.listener.api.info.partitions.IdentityPartitionInfo;
 import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -147,6 +163,9 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.SemanticModelChange;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -183,6 +202,10 @@ public class TestOperation {
 
   private ViewInfo viewInfo;
 
+  private NameIdentifier semanticModelIdentifier;
+
+  private SemanticModelInfo semanticModelInfo;
+
   private NameIdentifier partitionIdentifier;
 
   private PartitionInfo partitionInfo;
@@ -210,6 +233,9 @@ public class TestOperation {
 
     this.viewIdentifier = mockViewIdentifier();
     this.viewInfo = mockViewInfo();
+
+    this.semanticModelIdentifier = mockSemanticModelIdentifier();
+    this.semanticModelInfo = mockSemanticModelInfo();
 
     this.filesetIdentifier = mockFilesetIdentifier();
     this.filesetInfo = mockFilesetInfo();
@@ -275,6 +301,18 @@ public class TestOperation {
         new CreateViewFailureEvent(USER, viewIdentifier, new Exception(), viewInfo);
     Assertions.assertEquals(
         AuditLog.Operation.CREATE_VIEW, AuditLog.Operation.fromEvent(createViewFailureEvent));
+
+    Event createSemanticModelEvent =
+        new CreateSemanticModelEvent(USER, semanticModelIdentifier, semanticModelInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.CREATE_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(createSemanticModelEvent));
+    Event createSemanticModelFailureEvent =
+        new CreateSemanticModelFailureEvent(
+            USER, semanticModelIdentifier, new Exception(), semanticModelInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.CREATE_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(createSemanticModelFailureEvent));
   }
 
   @Test
@@ -343,6 +381,25 @@ public class TestOperation {
         new AlterViewFailureEvent(USER, viewIdentifier, new Exception(), new ViewChange[] {});
     Assertions.assertEquals(
         AuditLog.Operation.ALTER_VIEW, AuditLog.Operation.fromEvent(alterViewFailureEvent));
+
+    Event alterSemanticModelEvent =
+        new AlterSemanticModelEvent(
+            USER,
+            semanticModelIdentifier,
+            new SemanticModelChange[] {SemanticModelChange.setProperty("key", "value")},
+            semanticModelInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.ALTER_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(alterSemanticModelEvent));
+    Event alterSemanticModelFailureEvent =
+        new AlterSemanticModelFailureEvent(
+            USER,
+            semanticModelIdentifier,
+            new Exception(),
+            new SemanticModelChange[] {SemanticModelChange.setProperty("key", "value")});
+    Assertions.assertEquals(
+        AuditLog.Operation.ALTER_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(alterSemanticModelFailureEvent));
   }
 
   @Test
@@ -398,6 +455,16 @@ public class TestOperation {
     Event dropViewFailureEvent = new DropViewFailureEvent(USER, viewIdentifier, new Exception());
     Assertions.assertEquals(
         AuditLog.Operation.DROP_VIEW, AuditLog.Operation.fromEvent(dropViewFailureEvent));
+
+    Event dropSemanticModelEvent = new DropSemanticModelEvent(USER, semanticModelIdentifier, true);
+    Assertions.assertEquals(
+        AuditLog.Operation.DROP_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(dropSemanticModelEvent));
+    Event dropSemanticModelFailureEvent =
+        new DropSemanticModelFailureEvent(USER, semanticModelIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.DROP_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(dropSemanticModelFailureEvent));
   }
 
   @Test
@@ -481,6 +548,16 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.LIST_VIEW, AuditLog.Operation.fromEvent(listViewFailureEvent));
 
+    Event listSemanticModelEvent = new ListSemanticModelEvent(USER, viewNamespace, 0);
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(listSemanticModelEvent));
+    Event listSemanticModelFailureEvent =
+        new ListSemanticModelFailureEvent(USER, viewNamespace, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(listSemanticModelFailureEvent));
+
     Event listFilesetEvent = new ListFilesetEvent(USER, namespace, 0);
     Assertions.assertEquals(
         AuditLog.Operation.LIST_FILESET, AuditLog.Operation.fromEvent(listFilesetEvent));
@@ -551,6 +628,17 @@ public class TestOperation {
     Event loadViewFailureEvent = new LoadViewFailureEvent(USER, viewIdentifier, new Exception());
     Assertions.assertEquals(
         AuditLog.Operation.LOAD_VIEW, AuditLog.Operation.fromEvent(loadViewFailureEvent));
+
+    Event loadSemanticModelEvent =
+        new LoadSemanticModelEvent(USER, semanticModelIdentifier, semanticModelInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.LOAD_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(loadSemanticModelEvent));
+    Event loadSemanticModelFailureEvent =
+        new LoadSemanticModelFailureEvent(USER, semanticModelIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.LOAD_SEMANTIC_MODEL,
+        AuditLog.Operation.fromEvent(loadSemanticModelFailureEvent));
   }
 
   @Test
@@ -605,6 +693,67 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.AUTHORIZATION_DENIAL,
         AuditLog.Operation.fromEvent(authzDenialNullIdentifier));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testPolicyTagOperation() {
+    Event addEvent =
+        new AddPolicyForTagEvent(USER, "metalake", "tag", "policy", AllValuesSelector.get());
+    Event addFailureEvent =
+        new AddPolicyForTagFailureEvent(
+            USER,
+            "metalake",
+            "tag",
+            "policy",
+            AllValuesSelector.get(),
+            new Exception("add failed"));
+    Event removeEvent = new RemovePolicyFromTagEvent(USER, "metalake", "tag", "policy");
+    Event removeFailureEvent =
+        new RemovePolicyFromTagFailureEvent(
+            USER, "metalake", "tag", "policy", new Exception("remove failed"));
+
+    Assertions.assertEquals(
+        AuditLog.Operation.ADD_POLICY_FOR_TAG, AuditLog.Operation.fromEvent(addEvent));
+    Assertions.assertEquals(
+        AuditLog.Operation.ADD_POLICY_FOR_TAG, AuditLog.Operation.fromEvent(addFailureEvent));
+    Assertions.assertEquals(
+        AuditLog.Operation.REMOVE_POLICY_FROM_TAG, AuditLog.Operation.fromEvent(removeEvent));
+    Assertions.assertEquals(
+        AuditLog.Operation.REMOVE_POLICY_FROM_TAG,
+        AuditLog.Operation.fromEvent(removeFailureEvent));
+
+    // The deprecated v1 schema records the tag identifier but has no custom-info field for policy
+    // or selector details. The v2 formatter covers those relation-specific fields.
+    SimpleFormatter formatter = new SimpleFormatter();
+    SimpleAuditLog addLog = formatter.format(addEvent);
+    SimpleAuditLog removeLog = formatter.format(removeEvent);
+    Assertions.assertEquals(AuditLog.Operation.ADD_POLICY_FOR_TAG, addLog.operation());
+    Assertions.assertEquals(AuditLog.Operation.REMOVE_POLICY_FROM_TAG, removeLog.operation());
+    Assertions.assertEquals("metalake.system.tag.tag", addLog.identifier());
+    Assertions.assertEquals("metalake.system.tag.tag", removeLog.identifier());
+  }
+
+  /**
+   * {@code Operation.fromEvent} dispatches on event class, and the extras support added a second
+   * constructor to each table event. Pins that events built through the new constructor are still
+   * classified as their operation rather than falling through to {@code UNKNOWN}.
+   */
+  @Test
+  public void testCreateTableWithAuditExtrasKeepsCreateTableOperation() {
+    Event success =
+        new CreateTableEvent(
+            USER, tableIdentifier, tableInfo, ImmutableMap.of("audit.reason", "policy-applied"));
+    Event failure =
+        new CreateTableFailureEvent(
+            USER,
+            tableIdentifier,
+            new Exception("create failed"),
+            tableInfo,
+            ImmutableMap.of("audit.reason", "validation-failed"));
+
+    Assertions.assertEquals(AuditLog.Operation.CREATE_TABLE, AuditLog.Operation.fromEvent(success));
+    Assertions.assertEquals(AuditLog.Operation.CREATE_TABLE, AuditLog.Operation.fromEvent(failure));
   }
 
   @Test
@@ -738,6 +887,24 @@ public class TestOperation {
         },
         "dc",
         "ds",
+        ImmutableMap.of("a", "b"),
+        null);
+  }
+
+  private NameIdentifier mockSemanticModelIdentifier() {
+    return NameIdentifier.of("metalake", "catalog", "schema", "sales_model");
+  }
+
+  private SemanticModelInfo mockSemanticModelInfo() {
+    Dataset dataset =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .build();
+    return new SemanticModelInfo(
+        "sales_model",
+        "comment",
+        SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build(),
         ImmutableMap.of("a", "b"),
         null);
   }

@@ -27,7 +27,10 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +72,7 @@ public final class IdpRESTUtils {
 
   public static Response handleException(
       String resourceType, IdpOperationType op, String name, Exception e) {
+    ServerHealth.getInstance().recordFailure(e);
     String errorMsg =
         String.format(
             "Failed to operate built-in IdP %s [%s] operation [%s], reason [%s]",
@@ -103,10 +107,11 @@ public final class IdpRESTUtils {
 
   public static Response unsupportedOperation(String message, Throwable throwable) {
     return json(
-        Response.Status.METHOD_NOT_ALLOWED, ErrorResponse.unsupportedOperation(message, throwable));
+        Response.Status.NOT_IMPLEMENTED, ErrorResponse.unsupportedOperation(message, throwable));
   }
 
   public static Response internalError(String message, Throwable throwable) {
+    ServerHealth.getInstance().recordFailure(throwable);
     return json(
         Response.Status.INTERNAL_SERVER_ERROR, ErrorResponse.internalError(message, throwable));
   }
@@ -115,13 +120,21 @@ public final class IdpRESTUtils {
     if (e instanceof IllegalArgumentException) {
       return illegalArguments(errorMsg, e);
     }
+    if (e instanceof ForbiddenException) {
+      return forbidden(errorMsg, e);
+    }
     if (e instanceof NotFoundException) {
       return notFound(errorMsg, e);
     }
     if (e instanceof AlreadyExistsException) {
       return alreadyExists(errorMsg, e);
     }
-    if (e instanceof IllegalStateException || e instanceof UnsupportedOperationException) {
+    if (e instanceof NonEmptyEntityException) {
+      return json(
+          Response.Status.CONFLICT,
+          ErrorResponse.nonEmpty(e.getClass().getSimpleName(), errorMsg, e));
+    }
+    if (e instanceof UnsupportedOperationException) {
       return unsupportedOperation(errorMsg, e);
     }
     return internalError(errorMsg, e);

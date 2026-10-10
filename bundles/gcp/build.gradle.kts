@@ -43,6 +43,10 @@ dependencies {
   compileOnly(libs.hadoop3.gcs)
   compileOnly(libs.google.auth.http)
 
+  testImplementation(libs.google.auth.http)
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
+  testImplementation(libs.hadoop3.gcs)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)

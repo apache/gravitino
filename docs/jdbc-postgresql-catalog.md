@@ -27,32 +27,36 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](./tables-and-views.md#table-column-default-value). and [auto-increment](./tables-and-views.md#table-column-auto-increment).
 
 ### Catalog Properties
+
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
 
 Any property that isn't defined by Gravitino can pass to PostgreSQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 When using Gravitino with Trino, pass the Trino PostgreSQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
 
-If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
+If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the PostgreSQL catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                       | Default value | Required | Since Version |
-|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`. | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`           | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                           | (none)        | Yes      | 0.3.0         |
-| `jdbc-database`         | The database of the JDBC connection. Configure it with the same value as the database in the `jdbc-url`. For example `pg_database`.                               | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`             | The JDBC user name.                                                                                                                                               | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`         | The JDBC password.                                                                                                                                                | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                    | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                   | `10`          | No       | 0.3.0         |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                 | `30000`       | No       | 1.1.0         |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required                       |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------------|
+| `jdbc-url`              | A valid PostgreSQL JDBC URL, for example `jdbc:postgresql://localhost:5432/pg_database?sslmode=require`. If the URL omits the database, set `jdbc-database`.                             | (none)        | Yes                            |
+| `jdbc-driver`           | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                                                  | (none)        | Yes                            |
+| `jdbc-database`         | The database of the JDBC connection. Derived from `jdbc-url` when omitted. An explicit value must be nonblank and match the URL database when both are provided.                         | (none)        | Only if absent from `jdbc-url` |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes                            |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes                            |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No                             |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No                             |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No                             |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No                             |
 
 :::caution
 Download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
-Explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error may occur if the values in both aren't consistent.
+When `jdbc-database` is omitted, the catalog derives it from `jdbc-url`. Catalog creation rejects invalid PostgreSQL URLs, even when `jdbc-database` is set, and fails if neither provides a nonblank database name. When both `jdbc-database` and the URL specify a database, their names must match; catalog creation rejects conflicting values.
 :::
 :::info
 In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema corresponds to the Gravitino schema.
@@ -60,10 +64,10 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
@@ -81,7 +85,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -90,7 +94,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Supports index.
-- Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Support [column default value](./tables-and-views.md#table-column-default-value) and [auto-increment](./tables-and-views.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
 ### Table Column Types
@@ -117,7 +121,27 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
+
+An unconstrained `Numeric` column, that is one declared without precision and scale, accepts values of up to
+131072 digits before and 16383 digits after the decimal point, and its precision and scale vary per row.
+Gravitino `Decimal` caps precision at 38 and is fixed per column, so such a column is mapped to the External
+Type `numeric` instead. A `Numeric(p, s)` column maps to `Decimal(p, s)` when `p` is at most 38
+and `s` is between 0 and `p`. Other constrained declarations, such as `numeric(39,0)`,
+`numeric(2,-3)`, and `numeric(3,5)`, map to External Types preserving their precision and scale.
+A `Numeric(p)` column follows the same rules with scale 0.
+
+The Spark JDBC, Trino PostgreSQL, and Flink connectors map these External Types to strings
+(`StringType`, unbounded `VARCHAR`, and `STRING`, respectively), using the fallback added in
+[PR #13042](https://github.com/apache/gravitino/pull/13042). This keeps schema type conversion
+from failing, but does not expose native decimal semantics in those engines. Consumers needing
+numeric operations must choose an explicit conversion compatible with their data and engine;
+Gravitino does not clamp precision or round scale to fit `Decimal`. Supported `Numeric(p, s)`
+columns continue to map to native decimal types.
+
+PostgreSQL array elements always accept NULL and cannot be declared otherwise, so an `Array` column is always
+mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and
+produces an ordinary array whose elements accept NULL.
 :::
 
 ### Table Column Auto-Increment

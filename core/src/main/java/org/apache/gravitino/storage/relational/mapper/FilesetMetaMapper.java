@@ -73,6 +73,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",
@@ -95,6 +96,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",
@@ -122,6 +124,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",
@@ -150,6 +153,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",
@@ -175,6 +179,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",
@@ -187,6 +192,19 @@ public interface FilesetMetaMapper {
   @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "selectFilesetMetaById")
   FilesetPO selectFilesetMetaById(@Param("filesetId") Long filesetId);
 
+  /**
+   * Selects an active fileset metadata row by schema and name in the current transaction.
+   *
+   * @param schemaId the schema ID
+   * @param filesetName the fileset name
+   * @return the active fileset metadata, or {@code null} when it does not exist
+   */
+  @SelectProvider(
+      type = FilesetMetaSQLProviderFactory.class,
+      method = "selectFilesetMetaBySchemaIdAndNameForUpdate")
+  FilesetPO selectFilesetMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("filesetName") String filesetName);
+
   @Results({
     @Result(property = "filesetId", column = "fileset_id", id = true),
     @Result(property = "filesetName", column = "fileset_name"),
@@ -197,6 +215,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",
@@ -218,11 +237,6 @@ public interface FilesetMetaMapper {
   @InsertProvider(type = FilesetMetaSQLProviderFactory.class, method = "insertFilesetMeta")
   void insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO);
 
-  @InsertProvider(
-      type = FilesetMetaSQLProviderFactory.class,
-      method = "insertFilesetMetaOnDuplicateKeyUpdate")
-  void insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO);
-
   @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "updateFilesetMeta")
   Integer updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
@@ -243,10 +257,18 @@ public interface FilesetMetaMapper {
       method = "softDeleteFilesetMetasBySchemaIds")
   Integer softDeleteFilesetMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
+  /**
+   * Soft-deletes a fileset only if its OCC version has not changed since the caller read it.
+   *
+   * @param filesetId the fileset ID
+   * @param occVersion the OCC version observed by the caller
+   * @return the number of deleted rows; zero means the fileset changed or disappeared
+   */
   @UpdateProvider(
       type = FilesetMetaSQLProviderFactory.class,
       method = "softDeleteFilesetMetasByFilesetId")
-  Integer softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId);
+  Integer softDeleteFilesetMetasByFilesetId(
+      @Param("filesetId") Long filesetId, @Param("occVersion") Long occVersion);
 
   @DeleteProvider(
       type = FilesetMetaSQLProviderFactory.class,
@@ -264,6 +286,7 @@ public interface FilesetMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "occVersion", column = "occ_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(
         property = "filesetVersionPOs",

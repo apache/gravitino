@@ -219,7 +219,7 @@ paths:
         - $ref: "#/components/parameters/details"
       responses:
         "200":
-          description: Returns the list of policy objects associated with specified metadata object if {details} is true, otherwise returns the list of policy name
+          description: Returns policies derived from the effective tags of the specified metadata object; details=true returns policy objects, otherwise policy names
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -245,122 +245,37 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-    post:
-      tags:
-        - policy
-      summary: Associate policies with metadata object
-      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
-      operationId: associatePoliciesForObject
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PoliciesAssociateRequest"
-            examples:
-              PolicyAssociate:
-                $ref: "#/components/examples/PolicyAssociate"
-      responses:
-        "200":
-          description: Returns the list of policy names associated with the specified metadata object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
-              examples:
-                NameListResponse:
-                  $ref: "#/components/examples/NameListResponse"
-        "404":
-          description: Not Found - The specified metalake does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-        "409":
-          description: Conflict - The target policy already associated with the specified metadata object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                PolicyAlreadyAssociatedException:
-                  $ref: "#/components/examples/PolicyAlreadyAssociatedException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
-  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}:
+
+  /metalakes/{metalake}/policies/{policy}/tags:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
       - $ref: "./openapi.yaml#/components/parameters/policy"
     get:
       tags:
         - policy
-      summary: Get policy for metadata object
-      operationId: getPolicyForObject
+      summary: List tags associated with a policy
+      operationId: listTagsForPolicy
       parameters:
         - $ref: "#/components/parameters/details"
       responses:
         "200":
-          description: Returns the policy object associated with specified metadata object
+          description: Returns tag names or detailed policy-tag associations
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/schemas/PolicyResponse"
-              examples:
-                PolicyResponse:
-                  $ref: "#/components/examples/PolicyResponse"
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/TagForPolicyAssociationListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
-          description: Not Found - The specified metalake does not exist or the specified policy is not associated with the specified metadata object
+          description: Not Found - The specified metalake or policy does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchPolicyException:
-                  $ref: "#/components/examples/NoSuchPolicyException"
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-
-  /metalakes/{metalake}/policies/{policy}/objects:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/policy"
-    get:
-      tags:
-        - policy
-      summary: list metadata objects for policy
-      operationId: listMetadataObjectsForPolicy
-      responses:
-        "200":
-          description: Returns the list of metadata objects associated with specified policy
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "#/components/schemas/MetadataObjectListResponse"
-              examples:
-                PolicyResponse:
-                  $ref: "#/components/examples/MetadataObjectListResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The specified policy does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchPolicyException:
-                  $ref: "#/components/examples/NoSuchPolicyException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -378,6 +293,224 @@ components:
 
   schemas:
 
+    PolicyAssociationSelector:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: The selector type used to match tag assignments
+          enum: ["ALL_VALUES", "TAG_VALUE"]
+        value:
+          type: string
+          description: The assignment value required by a TAG_VALUE selector
+          nullable: true
+          maxLength: 256
+
+    TagForPolicyAssociation:
+      type: object
+      required:
+        - tag
+        - selector
+      properties:
+        tag:
+          $ref: "./tags.yaml#/components/schemas/Tag"
+        selector:
+          $ref: "#/components/schemas/PolicyAssociationSelector"
+
+    TagForPolicyAssociationListResponse:
+      type: object
+      required:
+        - code
+        - associations
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        associations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagForPolicyAssociation"
+
+    IcebergCompactionContent:
+      type: object
+      description: Built-in Iceberg compaction thresholds, scoring weights, and job options.
+      properties:
+        minDataFileMse:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 405323966463344
+        minDeleteFileNumber:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 1
+        dataFileMseWeight:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 1
+        deleteFileNumberWeight:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 100
+        maxPartitionNum:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 50
+        rewriteOptions:
+          type: object
+          default: {}
+          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
+          additionalProperties:
+            type: string
+            minLength: 1
+
+    IcebergCompactionPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    IcebergCompactionPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    IcebergOrphanFileRemovalContent:
+      type: object
+      description: Table-level orphan cleanup options. Scheduling is configured separately.
+      properties:
+        olderThanDays:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 36500
+          default: 3
+          description: Minimum age of orphan files in days, including for dry runs.
+        location:
+          type: string
+          nullable: true
+          description: Optional scan location within the target table's storage root.
+        dryRun:
+          type: boolean
+          default: false
+          description: List candidates without deleting them.
+
+    IcebergOrphanFileRemovalPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            content:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    IcebergOrphanFileRemovalPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            content:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    RowFilterContent:
+      type: object
+      description: Expression content for a built-in row-filter policy.
+      required:
+        - expression
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          pattern: '[\s\S]*\S[\s\S]*'
+          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+
+    ColumnMaskContent:
+      type: object
+      description: Expression content for a built-in column-mask policy.
+      required:
+        - expression
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          pattern: '[\s\S]*\S[\s\S]*'
+          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+
+    RowFilterPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            content:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    RowFilterPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            content:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    ColumnMaskPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            content:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
+    ColumnMaskPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            content:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
     PolicyContentBase:
       type: object
       description: A base content structure for policies
@@ -390,7 +523,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL" ]
+            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "VIEW", "FUNCTION" ]
         properties:
           type: object
           description: A map of string-to-string properties for the policy content.
@@ -441,7 +574,8 @@ components:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         inherited:
           type: boolean
-          description: Whether the policy is inherited from the parent metadata object
+          description: Whether the policy is selected only from ancestor metadata objects, either
+            through inherited tags or legacy direct policy associations
           nullable: true
 
     CustomPolicy:
@@ -452,6 +586,10 @@ components:
           required:
             - content
           properties:
+            policyType:
+              type: string
+              not:
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -460,10 +598,18 @@ components:
       description: A basic policy without content
       oneOf:
         - $ref: '#/components/schemas/CustomPolicy'
+        - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
+        - $ref: '#/components/schemas/IcebergCompactionPolicy'
+        - $ref: '#/components/schemas/RowFilterPolicy'
+        - $ref: '#/components/schemas/ColumnMaskPolicy'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicy'
+          system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
+          system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicy'
+          system_row_filter: '#/components/schemas/RowFilterPolicy'
+          system_column_mask: '#/components/schemas/ColumnMaskPolicy'
 
     PolicyListResponse:
       type: object
@@ -497,6 +643,8 @@ components:
             - "FILESET"
             - "TOPIC"
             - "MODEL"
+            - "VIEW"
+            - "FUNCTION"
             - "COLUMN"
 
     PolicyCreateRequestBase:
@@ -529,6 +677,10 @@ components:
           required:
             - content
           properties:
+            policyType:
+              type: string
+              not:
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -537,10 +689,18 @@ components:
       type: object
       oneOf:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+        - $ref: '#/components/schemas/RowFilterPolicyCreateRequest'
+        - $ref: '#/components/schemas/ColumnMaskPolicyCreateRequest'
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
+          system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+          system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+          system_row_filter: '#/components/schemas/RowFilterPolicyCreateRequest'
+          system_column_mask: '#/components/schemas/ColumnMaskPolicyCreateRequest'
 
 
     PolicyUpdatesRequest:
@@ -608,7 +768,7 @@ components:
         "newComment": "This is my new policy comment"
       }
 
-    UpdatePolicyContentRequest:
+    UpdatePolicyContentRequestBase:
       type: object
       required:
         - "@type"
@@ -617,20 +777,83 @@ components:
       properties:
         "@type":
           type: string
-          enum:
-            - updateContent
+          enum: [updateContent]
         policyType:
           type: string
-          description: The type of the policy
-        newContent:
-          type: object
-          description: The new content of the policy, its structure depends on the 'policyType'.
-          oneOf:
-              - $ref: '#/components/schemas/CustomPolicyContent'
-          discriminator:
-            propertyName: policyType
-            mapping:
-              custom: '#/components/schemas/CustomPolicyContent'
+          description: The type of the policy.
+
+    UpdateCustomPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              not:
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
+            newContent:
+              $ref: '#/components/schemas/CustomPolicyContent'
+
+    UpdateIcebergCompactionPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            newContent:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    UpdateIcebergOrphanFileRemovalPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            newContent:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    UpdateRowFilterPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            newContent:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    UpdateColumnMaskPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            newContent:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
+    UpdatePolicyContentRequest:
+      description: Selects typed content using the sibling policyType field, matching REST deserialization.
+      oneOf:
+        - $ref: '#/components/schemas/UpdateCustomPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
+      discriminator:
+        propertyName: policyType
+        mapping:
+          custom: '#/components/schemas/UpdateCustomPolicyContentRequest'
+          system_iceberg_compaction: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
+          system_iceberg_orphan_file_removal: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+          system_row_filter: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
+          system_column_mask: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
       example: {
         "@type": "updateContent",
         "policyType": "custom",
@@ -654,21 +877,6 @@ components:
         }
       }
 
-    PoliciesAssociateRequest:
-      type: object
-      properties:
-        policiesToAdd:
-          type: array
-          items:
-            type: string
-          description: The policies to add
-          nullable: true
-        policiesToRemove:
-          type: array
-          items:
-            type: string
-          description: The policies to remove
-          nullable: true
 
     PolicyResponse:
       type: object
@@ -681,21 +889,6 @@ components:
             - 0
         policy:
           $ref: "#/components/schemas/Policy"
-
-    MetadataObjectListResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        metadataObjects:
-          type: array
-          description: A list of metadata objects
-          items:
-            $ref: "#/components/schemas/MetadataObject"
 
   examples:
     NameListResponse:
@@ -762,12 +955,6 @@ components:
         }
       }
 
-    PolicyAssociate:
-      value: {
-        "policiesToAdd": ["my_policy1", "my_policy2"],
-        "policiesToRemove": ["my_policy3"]
-      }
-
     PolicyResponse:
       value: {
         "code": 0,
@@ -800,25 +987,6 @@ components:
         }
       }
 
-    MetadataObjectListResponse:
-      value: {
-        "code": 0,
-        "metadataObjects": [
-          {
-            "type": "CATALOG",
-            "fullName":"my_catalog",
-          },
-          {
-            "type": "SCHEMA",
-            "fullName":"my_catalog.my_schema",
-          },
-          {
-            "type": "TABLE",
-            "fullName":"my_catalog.my_schema.my_table",
-          }
-        ]
-      }
-
     PolicyAlreadyExistsException:
       value: {
         "code": 1004,
@@ -826,17 +994,6 @@ components:
         "message": "Failed to operate policy(s) [my_policy] operation [CREATE], reason [PolicyAlreadyExistsException]",
         "stack": [
           "org.apache.gravitino.exceptions.PolicyAlreadyExistsException: Gag my_policy already exists",
-          "..."
-        ]
-      }
-
-    PolicyAlreadyAssociatedException:
-      value: {
-        "code": 1004,
-        "type": "PolicyAlreadyAssociatedException",
-        "message": "Failed to operate policy(s) [my_policy] operation [ASSOCIATE] under metalake [my_test_metalake], reason [PolicyAlreadyAssociatedException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException: Policy my_policy already associated",
           "..."
         ]
       }

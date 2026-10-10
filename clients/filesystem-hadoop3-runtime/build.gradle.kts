@@ -43,6 +43,12 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
+  // Strip shaded slf4j-api brought in by :clients:client-java-runtime — Hadoop classpaths
+  // usually ship slf4j 1.7.x, and bundling 2.x here breaks that binding at runtime.
+  exclude("org/slf4j/**")
+  exclude("META-INF/maven/org.slf4j/**")
+  exclude("META-INF/services/org.slf4j.spi.SLF4JServiceProvider")
+
   // Relocate dependencies to avoid conflicts
   relocate("com.google", "org.apache.gravitino.shaded.com.google") {
     // Do not relocate com.google.cloud.hadoop classes — they come from the external

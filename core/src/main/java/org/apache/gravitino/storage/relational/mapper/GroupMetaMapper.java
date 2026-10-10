@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
@@ -53,6 +54,21 @@ public interface GroupMetaMapper {
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
+  /** Returns and locks an active group by ID for the current transaction. */
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaByIdForUpdate")
+  GroupPO selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId);
+
+  /**
+   * Returns an active group by ID and holds its lock for the current transaction.
+   *
+   * <p>The lock is shared on MySQL/PostgreSQL and exclusive on H2.
+   *
+   * @return the active group, or null if it does not exist
+   */
+  @Nullable
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaByIdForShare")
+  GroupPO selectGroupMetaByIdForShare(@Param("groupId") Long groupId);
+
   @SelectProvider(
       type = GroupMetaSQLProviderFactory.class,
       method = "listExtendedGroupPOsByMetalakeIdAndNames")
@@ -67,6 +83,19 @@ public interface GroupMetaMapper {
       method = "listExtendedGroupPOsByMetalakeId")
   List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "countGroupMetasByMetalakeName")
+  Long countGroupMetasByMetalakeName(@Param("metalakeName") String metalakeName);
+
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "listExtendedGroupPOsByMetalakeNamePaginated")
+  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit);
+
   @InsertProvider(type = GroupMetaSQLProviderFactory.class, method = "insertGroupMeta")
   void insertGroupMeta(@Param("groupMeta") GroupPO groupPO);
 
@@ -75,8 +104,14 @@ public interface GroupMetaMapper {
       method = "insertGroupMetaOnDuplicateKeyUpdate")
   void insertGroupMetaOnDuplicateKeyUpdate(@Param("groupMeta") GroupPO groupPO);
 
+  /**
+   * Soft-deletes an active group only when its OCC version still matches.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "softDeleteGroupMetaByGroupId")
-  void softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId);
+  Integer softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = GroupMetaSQLProviderFactory.class,
@@ -102,10 +137,4 @@ public interface GroupMetaMapper {
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "getGroupUpdatedAt")
   GroupUpdatedAt getGroupUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("groupName") String groupName);
-
-  @SelectProvider(
-      type = GroupMetaSQLProviderFactory.class,
-      method = "selectGroupMetaByMetalakeNameAndExternalId")
-  GroupPO selectGroupMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
 }

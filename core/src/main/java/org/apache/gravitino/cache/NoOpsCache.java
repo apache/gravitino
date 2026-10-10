@@ -19,17 +19,15 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
 
 /** A cache implementation that does not cache anything. */
 public class NoOpsCache extends BaseEntityCache {
-  private final SegmentedLock opLock = new SegmentedLock(1);
   /**
    * Constructs a new {@link BaseEntityCache} instance.
    *
@@ -40,6 +38,13 @@ public class NoOpsCache extends BaseEntityCache {
   }
 
   /** {@inheritDoc} */
+  @Override
+  public Coherence coherence() {
+    return Coherence.NONE;
+  }
+
+  /** {@inheritDoc} */
+  @Deprecated
   @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
     // do nothing
@@ -57,25 +62,22 @@ public class NoOpsCache extends BaseEntityCache {
     return 0;
   }
 
-  /** {@inheritDoc} */
+  /** {@inheritDoc} Runs the action directly because this cache holds no state to lock. */
   @Override
   public <E extends Exception> void withCacheLock(EntityCacheKey key, ThrowingRunnable<E> action)
       throws E {
-    opLock.withLockAndThrow(key, action);
+    Preconditions.checkArgument(key != null, "Key cannot be null");
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+    action.run();
   }
 
-  /** {@inheritDoc} */
+  /** {@inheritDoc} Runs the action directly because this cache holds no state to lock. */
   @Override
   public <T, E extends Exception> T withCacheLock(EntityCacheKey key, ThrowingSupplier<T, E> action)
       throws E {
-    return opLock.withLockAndThrow(key, action);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <T, E extends Exception> T withMultipleKeyCacheLock(
-      List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E {
-    return opLock.withMultipleKeyLockAndThrow(keys, action);
+    Preconditions.checkArgument(key != null, "Key cannot be null");
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+    return action.get();
   }
 
   /** {@inheritDoc} */
@@ -99,53 +101,13 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Entity & HasIdentifier> void put(E entity) {
+  protected <E extends Entity & HasIdentifier> void doPut(E entity) {
     // do nothing
   }
 
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
-    // do nothing
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
-    return Optional.empty();
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean invalidate(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean invalidateRelationEntry(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean contains(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> void put(
-      NameIdentifier ident,
-      Entity.EntityType type,
-      SupportsRelationOperations.Type relType,
-      List<E> entities) {
     // do nothing
   }
 }

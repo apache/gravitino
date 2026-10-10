@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.CLUSTER_META_PREFIX;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.extractClusterFromComment;
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.hasClusterMetadata;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.stripClusterMetadata;
 
 import java.util.HashMap;
@@ -254,6 +255,30 @@ class TestClickHouseTableOperationsCluster {
   }
 
   @Test
+  void testGenerateRenameTableSqlWithoutClusterMetadata() {
+    String sql = ops.buildRenameSql("old-table", "new table", false, null);
+
+    Assertions.assertEquals("RENAME TABLE `old-table` TO `new table`", sql);
+  }
+
+  @Test
+  void testGenerateRenameTableSqlWithClusterMetadata() {
+    String sql = ops.buildRenameSql("old-table", "new table", true, "ck-cluster");
+
+    Assertions.assertEquals("RENAME TABLE `old-table` TO `new table` ON CLUSTER `ck-cluster`", sql);
+  }
+
+  @Test
+  void testGenerateRenameTableSqlRejectsBlankClusterMetadata() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.buildRenameSql("orders", "renamed_orders", true, " "));
+
+    Assertions.assertTrue(exception.getMessage().contains("missing a cluster name"));
+  }
+
+  @Test
   void testGenerateDropTableSqlOnClusterWithoutClusterName() {
     // on-cluster=true but no cluster-name → fall back to plain DROP TABLE
     Map<String, String> props = new HashMap<>();
@@ -362,6 +387,13 @@ class TestClickHouseTableOperationsCluster {
     String stored = ClickHouseClusterUtils.embedClusterInComment(null, "ck_cluster");
     Assertions.assertEquals("ck_cluster", extractClusterFromComment(stored));
     Assertions.assertEquals("", stripClusterMetadata(stored));
+  }
+
+  @Test
+  void testClusterMetadataPresenceDistinguishesAbsentAndBlankMarker() {
+    Assertions.assertFalse(hasClusterMetadata("plain comment"));
+    Assertions.assertTrue(hasClusterMetadata("comment" + CLUSTER_META_PREFIX));
+    Assertions.assertEquals("", extractClusterFromComment("comment" + CLUSTER_META_PREFIX));
   }
 
   /** ALTER TABLE with ON CLUSTER=true should include ON CLUSTER in SQL. */
@@ -826,6 +858,11 @@ class TestClickHouseTableOperationsCluster {
 
     String buildDropSql(String tableName, Map<String, String> properties) {
       return generateDropTableSql(tableName, properties);
+    }
+
+    String buildRenameSql(
+        String oldTableName, String newTableName, boolean hasClusterMetadata, String clusterName) {
+      return generateRenameTableSql(oldTableName, newTableName, hasClusterMetadata, clusterName);
     }
   }
 

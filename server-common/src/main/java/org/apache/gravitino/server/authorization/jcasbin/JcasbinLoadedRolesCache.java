@@ -25,18 +25,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.cache.GravitinoCache;
 
 /**
- * A {@link GravitinoCache} of {@code roleId -> }{@link CachedRolePolicies}, the per-role privilege
- * index consulted on the authorization hot path.
- *
- * <p>Each cache value owns both the version sentinel and the role's complete privilege index.
- * Eviction therefore discards the entire role-policy snapshot atomically. On the next request,
- * {@link JcasbinAuthorizer} observes the cache miss, reloads the role, and rebuilds the index.
- *
- * <p>Unlike {@link org.apache.gravitino.cache.CaffeineGravitinoCache} this cache is <b>access</b>
- * based ({@code expireAfterAccess}): the index of a role that keeps being authorized against stays
- * hot instead of being reloaded from the DB every TTL. Correctness never relies on the TTL — {@link
- * JcasbinAuthorizer} version-validates each entry against {@code role_meta.updated_at} on every
- * read, so eviction by TTL, size, or explicit invalidation only frees memory and forces a rebuild.
+ * Bounded cache of immutable role policy indexes and their versions. Eviction releases only the
+ * shared reference; in-flight requests retain their own complete policy view. Write-based TTL
+ * bounds retry of metadata references that have changed without changing the role version.
  */
 class JcasbinLoadedRolesCache implements GravitinoCache<Long, CachedRolePolicies> {
 
@@ -45,7 +36,7 @@ class JcasbinLoadedRolesCache implements GravitinoCache<Long, CachedRolePolicies
   JcasbinLoadedRolesCache(long ttlMs, long maxSize) {
     this.cache =
         Caffeine.newBuilder()
-            .expireAfterAccess(ttlMs, TimeUnit.MILLISECONDS)
+            .expireAfterWrite(ttlMs, TimeUnit.MILLISECONDS)
             .maximumSize(maxSize)
             .build();
   }

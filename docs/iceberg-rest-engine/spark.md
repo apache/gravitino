@@ -80,7 +80,7 @@ instance profile, in which case the explicit credential lines can be omitted.
 
 ### Basic Authentication
 
-If Gravitino uses [built-in IDP](../security/how-to-use-built-in-idp.md) Basic authentication,
+If Gravitino uses [local users and groups](../security/local-users-and-groups.md) for Basic authentication,
 add the auth properties to `$SPARK_HOME/conf/spark-defaults.conf`:
 
 ```properties

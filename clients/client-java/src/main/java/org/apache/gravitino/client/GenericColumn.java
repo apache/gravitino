@@ -29,6 +29,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic column. */
 public class GenericColumn implements Column, SupportsTags {
@@ -75,6 +76,11 @@ public class GenericColumn implements Column, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove)
       throws TagAlreadyAssociatedException {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 

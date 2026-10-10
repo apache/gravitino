@@ -21,13 +21,14 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.StatisticBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 
 public class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
   @Override
   protected String softDeleteSQL() {
-    return " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+    return " SET deleted_at = " + DatabaseTimeSQL.POSTGRESQL;
   }
 
   @Override

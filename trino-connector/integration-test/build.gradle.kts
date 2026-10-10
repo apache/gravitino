@@ -34,6 +34,7 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
@@ -66,6 +67,7 @@ dependencies {
   testImplementation(libs.httpclient5)
   testImplementation(libs.jline.terminal)
   testImplementation(libs.jodd.core)
+  testImplementation(libs.bundles.jwt)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
@@ -77,12 +79,13 @@ dependencies {
   testImplementation(libs.trino.client) {
     exclude("jakarta.annotation")
   }
+  testImplementation(libs.trino.jdbc)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.register("setupDependencies") {
-  dependsOn(":trino-connector:trino-connector-435-439:copyLibs")
+  dependsOn(":bundles:aws-bundle:jar", ":bundles:iceberg-aws-bundle:jar")
   dependsOn(":trino-connector:trino-connector-440-445:copyLibs")
   dependsOn(":trino-connector:trino-connector-446-451:copyLibs")
   dependsOn(":trino-connector:trino-connector-452-468:copyLibs")

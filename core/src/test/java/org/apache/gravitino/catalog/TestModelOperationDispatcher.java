@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
@@ -65,16 +66,16 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     modelOperationDispatcher =
-        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
   }
 
   @Test
   public void testRegisterAndGetModel() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -84,13 +85,13 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Model model = modelOperationDispatcher.registerModel(modelIdent, "comment", props);
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals("comment", model.comment());
-    Assertions.assertEquals(props, model.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, model.properties().get(k)));
     Assertions.assertFalse(model.properties().containsKey(ID_KEY));
 
     Model registeredModel = modelOperationDispatcher.getModel(modelIdent);
     Assertions.assertEquals(modelName, registeredModel.name());
     Assertions.assertEquals("comment", registeredModel.comment());
-    Assertions.assertEquals(props, registeredModel.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, registeredModel.properties().get(k)));
     Assertions.assertFalse(registeredModel.properties().containsKey(ID_KEY));
 
     // Test register model with illegal property
@@ -105,7 +106,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testRegisterAndListModels() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName1 = randomModelName();
@@ -129,7 +130,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testRegisterAndDeleteModel() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -151,7 +152,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndGetModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -170,7 +171,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, linkedModelVersion.uris());
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
-    Assertions.assertEquals(props, linkedModelVersion.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, linkedModelVersion.properties().get(k)));
     Assertions.assertFalse(linkedModelVersion.properties().containsKey(ID_KEY));
 
     // Test get model version with alias
@@ -202,7 +203,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndListModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -230,7 +231,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndListModelVersionInfos() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -250,14 +251,14 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, versions[0].uris());
     Assertions.assertArrayEquals(aliases, versions[0].aliases());
     Assertions.assertEquals("comment", versions[0].comment());
-    Assertions.assertEquals(props, versions[0].properties());
+    assertPropertiesContain(props, versions[0].properties());
   }
 
   @Test
   public void testLinkAndDeleteModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -294,7 +295,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndGetModelVersionUriWithoutDefaultUriName() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -313,7 +314,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, linkedModelVersion.uris());
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
-    Assertions.assertEquals(props, linkedModelVersion.properties());
+    props.forEach((k, v) -> Assertions.assertEquals(v, linkedModelVersion.properties().get(k)));
     Assertions.assertFalse(linkedModelVersion.properties().containsKey(ID_KEY));
 
     // get uri with uri name
@@ -363,7 +364,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndGetModelVersionUriWithDefaultUriName() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     // set default uri name to "n1" at model level
     Map<String, String> modelProps =
@@ -387,7 +388,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, version1.uris());
     Assertions.assertArrayEquals(aliases, version1.aliases());
     Assertions.assertEquals("comment", version1.comment());
-    Assertions.assertEquals(versionPropsWithoutDefaultUriName, version1.properties());
+    versionPropsWithoutDefaultUriName.forEach(
+        (k, v) -> Assertions.assertEquals(v, version1.properties().get(k)));
     Assertions.assertFalse(version1.properties().containsKey(ID_KEY));
 
     // get uri with uri name
@@ -420,7 +422,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(uris, version2.uris());
     Assertions.assertArrayEquals(new String[] {"alias3"}, version2.aliases());
     Assertions.assertEquals("comment", version2.comment());
-    Assertions.assertEquals(versionPropsWithDefaultUriName, version2.properties());
+    versionPropsWithDefaultUriName.forEach(
+        (k, v) -> Assertions.assertEquals(v, version2.properties().get(k)));
     Assertions.assertFalse(version2.properties().containsKey(ID_KEY));
 
     // get uri with uri name
@@ -477,7 +480,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange[] addProperty = new ModelChange[] {ModelChange.setProperty("k3", "v3")};
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, addProperty);
@@ -485,7 +488,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
-    Assertions.assertEquals(
+    assertPropertiesContain(
         ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"), alteredModel.properties());
   }
 
@@ -506,7 +509,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange[] updateProperty = new ModelChange[] {ModelChange.setProperty("k1", "v3")};
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, updateProperty);
@@ -514,7 +517,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
-    Assertions.assertEquals(ImmutableMap.of("k1", "v3", "k2", "v2"), alteredModel.properties());
+    assertPropertiesContain(ImmutableMap.of("k1", "v3", "k2", "v2"), alteredModel.properties());
   }
 
   @Test
@@ -534,7 +537,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange[] removeProperty = new ModelChange[] {ModelChange.removeProperty("k1")};
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, removeProperty);
@@ -542,7 +545,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
-    Assertions.assertEquals(ImmutableMap.of("k2", "v2"), alteredModel.properties());
+    assertPropertiesContain(ImmutableMap.of("k2", "v2"), alteredModel.properties());
   }
 
   @Test
@@ -565,7 +568,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate registered model
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(modelComment, model.comment());
-    Assertions.assertEquals(props, model.properties());
+    assertPropertiesContain(props, model.properties());
 
     ModelChange change = ModelChange.updateComment(newModelComment);
     Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, change);
@@ -573,7 +576,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // validate updated model
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(newModelComment, alteredModel.comment());
-    Assertions.assertEquals(props, alteredModel.properties());
+    assertPropertiesContain(props, alteredModel.properties());
   }
 
   @Test
@@ -647,7 +650,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -688,7 +691,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -725,7 +728,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -763,7 +766,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
-    Assertions.assertEquals(newProps, alteredModelVersion.properties());
+    assertPropertiesContain(newProps, alteredModelVersion.properties());
   }
 
   @Test
@@ -1286,5 +1289,77 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
   private String randomModelName() {
     return "model_" + UUID.randomUUID().toString().replace("-", "");
+  }
+
+  private static void assertPropertiesContain(
+      Map<String, String> expectedUserProps, Map<String, String> actual) {
+    expectedUserProps.forEach((k, v) -> Assertions.assertEquals(v, actual.get(k)));
+    Assertions.assertFalse(actual.containsKey(ID_KEY));
+  }
+
+  @Test
+  public void testRegisterModelRunsConcurrentlyWithRegisterModelOfAnotherModel() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_1");
+    createSchemaForLockTest(schemaIdent);
+
+    // Another in-flight create holds the WRITE lock on its own model node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog, "schema_model_lock_1", "other_model"),
+            LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate,
+          () ->
+              registerModelForLockTest(
+                  NameIdentifier.of(metalake, catalog, "schema_model_lock_1", "model1")));
+    }
+  }
+
+  @Test
+  public void testRegisterModelWaitsForRegisterModelOfSameName() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_2");
+    createSchemaForLockTest(schemaIdent);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_model_lock_2", "model1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> registerModelForLockTest(ident));
+  }
+
+  @Test
+  public void testRegisterModelWaitsForSchemaWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_3");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter,
+        () ->
+            registerModelForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_model_lock_3", "model1")));
+  }
+
+  @Test
+  public void testRegisterModelWaitsForCatalogWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_4");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter,
+        () ->
+            registerModelForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_model_lock_4", "model1")));
+  }
+
+  private static void createSchemaForLockTest(NameIdentifier schemaIdent) {
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+  }
+
+  private static Model registerModelForLockTest(NameIdentifier ident) {
+    return modelOperationDispatcher.registerModel(
+        ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
   }
 }

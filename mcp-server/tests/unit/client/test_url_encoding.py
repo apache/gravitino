@@ -31,6 +31,9 @@ from mcp_server.client.plain.plain_rest_client_fileset_operation import (
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
 )
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
+)
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
@@ -54,6 +57,9 @@ from mcp_server.client.plain.plain_rest_client_tag_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_topic_operation import (
     PlainRESTClientTopicOperation,
+)
+from mcp_server.client.plain.plain_rest_client_view_operation import (
+    PlainRESTClientViewOperation,
 )
 
 
@@ -91,6 +97,36 @@ _ENCODED_QUERY_INJECTION = "name%3Fadmin%3Dtrue%23"
 _ENCODED_SLASH = "cat%2Fschema"
 
 METALAKE = "my_metalake"
+
+
+class TestMetalakeOperation(unittest.TestCase):
+    """The one operation that is not scoped to a metalake.
+
+    Everything else in the test suite reaches list_metalakes through
+    MockOperation, so without this the real endpoint path and the response key
+    the server actually returns are never executed.
+    """
+
+    def test_lists_metalakes_from_the_top_level_endpoint(self):
+        client = _make_mock_client(
+            {"metalakes": [{"name": "ml_a"}, {"name": "ml_b"}]}
+        )
+        op = PlainRESTClientMetalakeOperation(client)
+
+        result = asyncio.run(op.get_list_of_metalakes())
+
+        # Not under /api/metalakes/{metalake}/... - it must not be scoped.
+        self.assertEqual(_called_url(client.get), "/api/metalakes")
+        self.assertIn("ml_a", result)
+        self.assertIn("ml_b", result)
+
+    def test_returns_the_default_when_the_response_has_no_metalakes_key(self):
+        """Guards the response key: a typo here would silently return nothing
+        rather than failing, and every mock-based test would still pass."""
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientMetalakeOperation(client)
+
+        self.assertEqual(asyncio.run(op.get_list_of_metalakes()), "[]")
 
 
 class TestCatalogOperationUrlEncoding(unittest.TestCase):
@@ -460,35 +496,62 @@ class TestPolicyOperationUrlEncoding(unittest.TestCase):
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
 
-    def test_associate_policy_encodes_metadata_full_name_and_type(self):
-        client = _make_mock_client({"names": []})
+    def test_list_policies_for_tag_encodes_tag_name(self):
+        client = _make_mock_client({"associations": [{"policy": {}}]})
         op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(
-            op.associate_policy_with_metadata(_QUERY_INJECTION, _SLASH, [], [])
-        )
-        url = _called_url(client.post)
-        self.assertIn(_ENCODED_QUERY_INJECTION, url)
-        self.assertIn(_ENCODED_SLASH, url)
-        self.assertNotIn("?admin=true", url)
-
-    def test_get_policy_for_metadata_encodes_policy_name(self):
-        client = _make_mock_client({"policy": {}})
-        op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(
-            op.get_policy_for_metadata(
-                "meta.full.name", "table", _PATH_TRAVERSAL
-            )
-        )
+        result = asyncio.run(op.list_policies_for_tag(_PATH_TRAVERSAL))
         url = _called_url(client.get)
+        self.assertEqual('[{"policy": {}}]', result)
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn("details=true", url)
         self.assertNotIn("../../", url)
 
-    def test_list_metadata_by_policy_encodes_policy_name(self):
-        client = _make_mock_client({"metadataObjects": []})
+    def test_associate_policy_with_tag_encodes_names_and_sends_selector(self):
+        client = _make_mock_client(
+            {
+                "code": 0,
+                "policy": _QUERY_INJECTION,
+                "tag": _PATH_TRAVERSAL,
+                "selector": {"type": "ALL_VALUES"},
+            }
+        )
         op = PlainRESTClientPolicyOperation(METALAKE, client)
-        asyncio.run(op.list_metadata_by_policy(_QUERY_INJECTION))
-        url = _called_url(client.get)
+        result = asyncio.run(
+            op.associate_policy_with_tag(
+                _PATH_TRAVERSAL,
+                _QUERY_INJECTION,
+                {"type": "ALL_VALUES"},
+            )
+        )
+        url = _called_url(client.post)
+        self.assertIn('"selector": {"type": "ALL_VALUES"}', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertEqual(
+            {"selector": {"type": "ALL_VALUES"}},
+            client.post.call_args.kwargs["json"],
+        )
+
+    def test_disassociate_policy_from_tag_handles_no_content_response(self):
+        client = _make_mock_client({})
+        client.delete.return_value.status_code = 204
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.disassociate_policy_from_tag(_PATH_TRAVERSAL, _QUERY_INJECTION)
+        )
+        url = _called_url(client.delete)
+        self.assertIn('"removed": true', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+
+    def test_list_tags_for_policy_encodes_policy_name(self):
+        client = _make_mock_client({"associations": [{"tag": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_tags_for_policy(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertEqual('[{"tag": {}}]', result)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertIn("details=true", url)
         self.assertNotIn("?admin=true", url)
 
 
@@ -496,7 +559,7 @@ class TestStatisticOperationUrlEncoding(unittest.TestCase):
     def test_list_of_statistics_encodes_metadata_fullname(self):
         client = _make_mock_client({"statistics": []})
         op = PlainRESTClientStatisticOperation(METALAKE, client)
-        asyncio.run(op.list_of_statistics(METALAKE, "table", _PATH_TRAVERSAL))
+        asyncio.run(op.list_of_statistics("table", _PATH_TRAVERSAL))
         url = _called_url(client.get)
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
@@ -507,7 +570,6 @@ class TestStatisticOperationUrlEncoding(unittest.TestCase):
         op = PlainRESTClientStatisticOperation(METALAKE, client)
         asyncio.run(
             op.list_statistic_for_partition(
-                METALAKE,
                 "table",
                 "catalog.schema.table",
                 from_partition_name=_QUERY_INJECTION,
@@ -545,6 +607,24 @@ class TestPartitionOperationUrlEncoding(unittest.TestCase):
         asyncio.run(
             op.get_partition("catalog", "schema", "table", _QUERY_INJECTION)
         )
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestViewOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_views_encodes_schema_name(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.list_of_views("catalog", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_view_encodes_view_name(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.load_view("catalog", "schema", _QUERY_INJECTION))
         url = _called_url(client.get)
         self.assertIn(_ENCODED_QUERY_INJECTION, url)
         self.assertNotIn("?admin=true", url)

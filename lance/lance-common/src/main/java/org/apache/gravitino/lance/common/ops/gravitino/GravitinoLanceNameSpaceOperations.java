@@ -37,15 +37,18 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.LanceNamespaceException;
@@ -60,7 +63,6 @@ import org.lance.namespace.model.ListTablesResponse;
 public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperations {
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
-  private final GravitinoClient client;
 
   // lance-namespace 0.4.5 switched mode/behavior fields to plain strings in request models.
   // Keep local enums as normalized internal states for type-safe branching.
@@ -82,7 +84,6 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
   public GravitinoLanceNameSpaceOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
-    this.client = namespaceWrapper.getClient();
   }
 
   @Override
@@ -92,22 +93,35 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
+    // Unauthorized entries are removed before the page is cut, so pagination stays consistent with
+    // what the caller is allowed to see.
+    LanceMetadataFilter metadataFilter = namespaceWrapper.metadataFilter();
     List<String> namespaces;
     switch (nsId.levels()) {
       case 0:
         namespaces =
-            Arrays.stream(client.listCatalogsInfo())
-                .filter(namespaceWrapper::isLakehouseCatalog)
-                .map(Catalog::name)
-                .collect(Collectors.toList());
+            metadataFilter.filterCatalogs(
+                Arrays.stream(namespaceWrapper.listCatalogsInfo())
+                    .filter(namespaceWrapper::isLakehouseCatalog)
+                    .map(Catalog::name)
+                    .collect(Collectors.toList()));
         break;
 
       case 1:
-        Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
-        namespaces = Lists.newArrayList(catalog.asSchemas().listSchemas());
+        String catalogName = nsId.levelAtListPos(0);
+        Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+        namespaces =
+            metadataFilter.filterSchemas(
+                catalogName, Lists.newArrayList(namespaceWrapper.listSchemas(catalog)));
         break;
 
       case 2:
+        // A schema has no child namespaces, only tables, so the result is always empty. The
+        // identifier still has to be validated, otherwise a nonexistent path would be reported
+        // as an existing but empty namespace.
+        Catalog schemaCatalog =
+            namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
+        validateSchemaExists(schemaCatalog, nsId.levelAtListPos(1));
         namespaces = Lists.newArrayList();
         break;
 
@@ -116,6 +130,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
             "Expected at most 2-level namespace but got: " + namespaceId);
     }
 
+    namespaces = Lists.newArrayList(namespaces);
     Collections.sort(namespaces);
     PageUtil.Page page =
         PageUtil.splitPage(namespaces, pageToken, PageUtil.normalizePageSize(limit));
@@ -138,12 +153,13 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     switch (nsId.levels()) {
       case 1:
-        Optional.ofNullable(catalog.properties()).ifPresent(properties::putAll);
+        Optional.ofNullable(namespaceWrapper.propsWithSecrets(catalog))
+            .ifPresent(properties::putAll);
         break;
       case 2:
         String schemaName = nsId.levelAtListPos(1);
-        Schema schema = catalog.asSchemas().loadSchema(schemaName);
-        Optional.ofNullable(schema.properties()).ifPresent(properties::putAll);
+        Optional.ofNullable(namespaceWrapper.schemaPropsWithSecrets(catalog, schemaName))
+            .ifPresent(properties::putAll);
         break;
       default:
         throw new IllegalArgumentException(
@@ -217,11 +233,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     if (nsId.levels() == 2) {
-      String schemaName = nsId.levelAtListPos(1);
-      if (!catalog.asSchemas().schemaExists(schemaName)) {
-        throw new NamespaceNotFoundException(
-            "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
-      }
+      validateSchemaExists(catalog, nsId.levelAtListPos(1));
+    }
+  }
+
+  private void validateSchemaExists(Catalog catalog, String schemaName) {
+    if (!namespaceWrapper.schemaExists(catalog, schemaName)) {
+      throw new NamespaceNotFoundException(
+          "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
     }
   }
 
@@ -231,11 +250,11 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     Catalog catalog;
     try {
-      catalog = client.loadCatalog(catalogName);
+      catalog = namespaceWrapper.loadCatalog(catalogName);
     } catch (NoSuchCatalogException e) {
       // Catalog does not exist, create it
       Catalog createdCatalog =
-          client.createCatalog(
+          namespaceWrapper.createCatalog(
               catalogName,
               Catalog.Type.RELATIONAL,
               "lakehouse-generic",
@@ -269,11 +288,11 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         CatalogChange[] changes =
             buildChanges(
                 properties,
-                removeInUseProperty(catalog.properties()),
+                filterInternalProperties(catalog.properties()),
                 CatalogChange::setProperty,
                 CatalogChange::removeProperty,
                 CatalogChange[]::new);
-        Catalog alteredCatalog = client.alterCatalog(catalogName, changes);
+        Catalog alteredCatalog = namespaceWrapper.alterCatalog(catalogName, changes);
         Optional.ofNullable(alteredCatalog.properties()).ifPresent(response::setProperties);
         return response;
       default:
@@ -281,9 +300,18 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     }
   }
 
-  private Map<String, String> removeInUseProperty(Map<String, String> properties) {
+  /**
+   * Drop server-managed properties from the overwrite baseline so we do not emit removeProperty for
+   * reserved keys such as {@code in-use} or {@code gravitino.identifier} (returned as a masked
+   * placeholder in API responses).
+   */
+  private Map<String, String> filterInternalProperties(Map<String, String> properties) {
+    if (properties == null) {
+      return Collections.emptyMap();
+    }
     return properties.entrySet().stream()
         .filter(e -> !e.getKey().equalsIgnoreCase(Catalog.PROPERTY_IN_USE))
+        .filter(e -> !StringIdentifier.ID_KEY.equals(e.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
@@ -294,10 +322,11 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     Schema schema;
     try {
-      schema = loadedCatalog.asSchemas().loadSchema(schemaName);
+      schema = namespaceWrapper.loadSchema(loadedCatalog, schemaName);
     } catch (NoSuchSchemaException e) {
       // Schema does not exist, create it
-      Schema createdSchema = loadedCatalog.asSchemas().createSchema(schemaName, null, properties);
+      Schema createdSchema =
+          namespaceWrapper.createSchema(loadedCatalog, schemaName, null, properties);
       response.setProperties(
           createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
       return response;
@@ -318,11 +347,11 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         SchemaChange[] changes =
             buildChanges(
                 properties,
-                schema.properties(),
+                filterInternalProperties(schema.properties()),
                 SchemaChange::setProperty,
                 SchemaChange::removeProperty,
                 SchemaChange[]::new);
-        Schema alteredSchema = loadedCatalog.asSchemas().alterSchema(schemaName, changes);
+        Schema alteredSchema = namespaceWrapper.alterSchema(loadedCatalog, schemaName, changes);
         Optional.ofNullable(alteredSchema.properties()).ifPresent(response::setProperties);
         return response;
       default:
@@ -333,7 +362,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
   private DropNamespaceResponse dropCatalog(
       String catalogName, DropMode mode, DropBehavior behavior) {
     try {
-      boolean dropped = client.dropCatalog(catalogName, behavior == DropBehavior.CASCADE);
+      boolean dropped = namespaceWrapper.dropCatalog(catalogName, behavior == DropBehavior.CASCADE);
       if (dropped) {
         return new DropNamespaceResponse();
       } else {
@@ -351,6 +380,11 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
           String.format("Catalog %s is not empty", catalogName),
           CommonUtil.formatCurrentStackTrace(),
           catalogName);
+    } catch (NonEmptyEntityException e) {
+      throw new InvalidInputException(
+          String.format("Catalog %s is not empty", catalogName),
+          CommonUtil.formatCurrentStackTrace(),
+          catalogName);
     } catch (CatalogInUseException e) {
       throw new InvalidInputException(
           String.format("Catalog %s is in use", catalogName),
@@ -363,10 +397,10 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
       String catalogName, String schemaName, DropMode mode, DropBehavior behavior) {
     try {
       boolean dropped =
-          client
-              .loadCatalog(catalogName)
-              .asSchemas()
-              .dropSchema(schemaName, behavior == DropBehavior.CASCADE);
+          namespaceWrapper.dropSchema(
+              namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName),
+              schemaName,
+              behavior == DropBehavior.CASCADE);
       if (dropped) {
         return new DropNamespaceResponse();
       } else {
@@ -441,11 +475,17 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
     String schemaName = nsId.levelAtListPos(1);
-    List<String> tables =
-        Arrays.stream(catalog.asTableCatalog().listTables(Namespace.of(schemaName)))
-            .map(ident -> ident.name())
-            .sorted()
+    // Unauthorized entries are removed before the page is cut, so pagination stays consistent with
+    // what the caller is allowed to see.
+    LanceMetadataFilter metadataFilter = namespaceWrapper.metadataFilter();
+    List<String> tableNames =
+        Arrays.stream(namespaceWrapper.asTableCatalog(catalog).listTables(Namespace.of(schemaName)))
+            .map(NameIdentifier::name)
             .collect(Collectors.toList());
+
+    List<String> tables =
+        Lists.newArrayList(metadataFilter.filterTables(catalogName, schemaName, tableNames));
+    Collections.sort(tables);
 
     PageUtil.Page page = PageUtil.splitPage(tables, pageToken, PageUtil.normalizePageSize(limit));
     ListTablesResponse response = new ListTablesResponse();

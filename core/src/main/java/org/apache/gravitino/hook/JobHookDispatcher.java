@@ -19,11 +19,13 @@
 package org.apache.gravitino.hook;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.InUseException;
@@ -55,7 +57,7 @@ public class JobHookDispatcher implements JobOperationDispatcher {
     jobOperationDispatcher.registerJobTemplate(metalake, jobTemplateEntity);
 
     // Set the creator as the owner of the job template.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           metalake,
@@ -74,14 +76,30 @@ public class JobHookDispatcher implements JobOperationDispatcher {
 
   @Override
   public boolean deleteJobTemplate(String metalake, String jobTemplateName) throws InUseException {
-    return jobOperationDispatcher.deleteJobTemplate(metalake, jobTemplateName);
+    boolean deleted = jobOperationDispatcher.deleteJobTemplate(metalake, jobTemplateName);
+    if (deleted) {
+      // A job template registered later under the same name gets a new id, so drop the cached
+      // mapping.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
+          Entity.EntityType.JOB_TEMPLATE);
+    }
+    return deleted;
   }
 
   @Override
   public JobTemplateEntity alterJobTemplate(
       String metalake, String jobTemplateName, JobTemplateChange... changes)
       throws NoSuchJobTemplateException, IllegalArgumentException {
-    return jobOperationDispatcher.alterJobTemplate(metalake, jobTemplateName, changes);
+    JobTemplateEntity alteredJobTemplate =
+        jobOperationDispatcher.alterJobTemplate(metalake, jobTemplateName, changes);
+    if (Arrays.stream(changes)
+        .anyMatch(change -> change instanceof JobTemplateChange.RenameJobTemplate)) {
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName),
+          Entity.EntityType.JOB_TEMPLATE);
+    }
+    return alteredJobTemplate;
   }
 
   @Override
@@ -91,8 +109,10 @@ public class JobHookDispatcher implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
-    return jobOperationDispatcher.getJob(metalake, jobId);
+  public JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException {
+    return jobOperationDispatcher.getJob(metalake, jobId, includeOutput, maxLines, maxBytes);
   }
 
   @Override
@@ -101,7 +121,7 @@ public class JobHookDispatcher implements JobOperationDispatcher {
     JobEntity jobEntity = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
 
     // Set the creator as the owner of the job.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           metalake,

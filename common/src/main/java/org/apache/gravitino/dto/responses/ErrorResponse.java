@@ -203,11 +203,21 @@ public class ErrorResponse extends BaseResponse {
    * @return The new instance.
    */
   public static ErrorResponse internalError(String message, Throwable throwable) {
+    return internalError(RuntimeException.class.getSimpleName(), message, throwable);
+  }
+
+  /**
+   * Creates an internal error response with an explicit error type.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error, if available.
+   * @return The new error response.
+   */
+  public static ErrorResponse internalError(
+      String type, String message, @Nullable Throwable throwable) {
     return new ErrorResponse(
-        ErrorConstants.INTERNAL_ERROR_CODE,
-        RuntimeException.class.getSimpleName(),
-        message,
-        getStackTrace(throwable));
+        ErrorConstants.INTERNAL_ERROR_CODE, type, message, getStackTrace(throwable));
   }
 
   /**
@@ -232,6 +242,20 @@ public class ErrorResponse extends BaseResponse {
   public static ErrorResponse alreadyExists(String type, String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.ALREADY_EXISTS_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new optimistic-lock conflict error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse optimisticLockConflict(
+      String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, type, message, getStackTrace(throwable));
   }
 
   /**

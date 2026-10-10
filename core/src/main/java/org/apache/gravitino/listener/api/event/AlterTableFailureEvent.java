@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.rel.TableChange;
@@ -41,7 +42,25 @@ public final class AlterTableFailureEvent extends TableFailureEvent {
    */
   public AlterTableFailureEvent(
       String user, NameIdentifier identifier, Exception exception, TableChange[] tableChanges) {
-    super(user, identifier, exception);
+    this(user, identifier, exception, tableChanges, null);
+  }
+
+  /**
+   * Constructs an {@code AlterTableFailureEvent} with optional audit extras.
+   *
+   * @param user The user who initiated the table alteration operation.
+   * @param identifier The identifier of the table that was attempted to be altered.
+   * @param exception The exception that was thrown during the table alteration operation.
+   * @param tableChanges The changes that were attempted on the table.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  public AlterTableFailureEvent(
+      String user,
+      NameIdentifier identifier,
+      Exception exception,
+      TableChange[] tableChanges,
+      Map<String, String> customInfo) {
+    super(user, identifier, exception, customInfo);
     this.tableChanges = tableChanges.clone();
   }
 

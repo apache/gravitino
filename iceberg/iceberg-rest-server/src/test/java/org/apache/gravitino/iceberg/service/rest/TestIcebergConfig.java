@@ -25,7 +25,9 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.iceberg.rest.responses.ConfigResponse;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -107,6 +109,23 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @Test
+  public void testConfigUnacceptableAcceptReturns406() {
+    // Gravitino media types are for /api/*, not Iceberg REST. Content negotiation must return
+    // 406 (and the Iceberg error body code must match), not a misleading 500.
+    try (Response resp =
+        target(IcebergRestTestUtil.CONFIG_PATH)
+            .register(IcebergObjectMapperProvider.class)
+            .request()
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.NOT_ACCEPTABLE.getStatusCode(), resp.getStatus());
+      ErrorResponse error = resp.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(406, error.code());
+      Assertions.assertEquals("NotAcceptableException", error.type());
+    }
+  }
+
+  @Test
   public void testConfigEndpointsContainViewOperations() {
     String warehouseName = IcebergRestTestUtil.PREFIX;
     Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
@@ -124,6 +143,29 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertTrue(
         hasViewListEndpoint,
         "Config response should contain view list endpoint for catalog that supports views");
+  }
+
+  @Test
+  public void testConfigEndpointsContainScanPlanForNonRESTBackend() {
+    // Gravitino plans scans locally for non-REST backends (memory, hive, jdbc), so the scan plan
+    // endpoint must be advertised.
+    String warehouseName = IcebergRestTestUtil.PREFIX;
+    Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
+    Response resp =
+        getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/plan"));
+    Assertions.assertTrue(
+        hasScanPlanEndpoint,
+        "Config response must advertise scan plan endpoint for non-REST backend catalogs");
   }
 
   @Test

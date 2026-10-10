@@ -17,10 +17,12 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import Dict, Optional
 
 from dataclasses_json import config
 
 from gravitino.api.file.fileset_change import FilesetChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
 
 
@@ -162,3 +164,64 @@ class FilesetUpdateRequest:
 
         def fileset_change(self):
             return FilesetChange.remove_comment()
+
+    @dataclass
+    class SetFilesetSecretBindingRequest(FilesetUpdateRequestBase):
+        """Represents a request to bind a write-through secret for a fileset property."""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+        _provider: Optional[str] = field(metadata=config(field_name="provider"))
+        _plaintext: Optional[str] = field(metadata=config(field_name="plaintext"))
+
+        def __init__(self, fileset_property: str, provider: str, plaintext: str):
+            super().__init__("setSecretBinding")
+            self._property = fileset_property
+            self._provider = provider
+            self._plaintext = plaintext
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required and cannot be empty')
+            if not self._provider:
+                raise ValueError('"provider" field is required and cannot be empty')
+            if self._plaintext is None:
+                raise ValueError('"plaintext" field is required and cannot be null')
+
+        def fileset_change(self):
+            return FilesetChange.set_secret_binding(
+                self._property,
+                SecretBinding(self._provider, self._plaintext),
+            )
+
+    @dataclass
+    class SetFilesetSecretReferenceRequest(FilesetUpdateRequestBase):
+        """Represents a request to bind an external secret reference for a fileset property."""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+        _provider: Optional[str] = field(metadata=config(field_name="provider"))
+        _attributes: Optional[Dict[str, str]] = field(
+            metadata=config(field_name="attributes")
+        )
+
+        def __init__(
+            self,
+            fileset_property: str,
+            provider: str,
+            attributes: Optional[Dict[str, str]] = None,
+        ):
+            super().__init__("setSecretReference")
+            self._property = fileset_property
+            self._provider = provider
+            self._attributes = attributes
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required and cannot be empty')
+            if not self._provider:
+                raise ValueError('"provider" field is required and cannot be empty')
+
+        def fileset_change(self):
+            return FilesetChange.set_secret_reference(
+                self._property,
+                SecretReference(self._provider, self._attributes or {}),
+            )

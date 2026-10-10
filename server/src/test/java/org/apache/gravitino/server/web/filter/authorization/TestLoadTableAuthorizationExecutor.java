@@ -20,17 +20,31 @@
 package org.apache.gravitino.server.web.filter.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestLoadTableAuthorizationExecutor {
   private static final String PRIMARY_EXPRESSION =
@@ -63,6 +77,48 @@ public class TestLoadTableAuthorizationExecutor {
     assertEquals(PRIMARY_EXPRESSION, expression(executor));
   }
 
+  @Test
+  public void testExistenceProbeUsesInternalTableDispatcher() throws Exception {
+    Method method = TestOperations.class.getMethod("loadTable", String.class);
+    NameIdentifier tableIdentifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    LoadTableAuthorizationExecutor executor =
+        new LoadTableAuthorizationExecutor(
+            method.getParameters(),
+            new Object[] {"SELECT_TABLE"},
+            PRIMARY_EXPRESSION,
+            Map.of(Entity.EntityType.TABLE, tableIdentifier),
+            Collections.emptyMap(),
+            Optional.empty(),
+            SECONDARY_EXPRESSION,
+            ExpressionCondition.NEVER,
+            AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION);
+
+    AuthorizationExpressionEvaluator primaryEvaluator =
+        mock(AuthorizationExpressionEvaluator.class);
+    AuthorizationExpressionEvaluator existenceEvaluator =
+        mock(AuthorizationExpressionEvaluator.class);
+    when(primaryEvaluator.evaluate(
+            anyMap(), anyMap(), any(AuthorizationRequestContext.class), any()))
+        .thenReturn(false);
+    when(existenceEvaluator.evaluate(
+            anyMap(), anyMap(), any(AuthorizationRequestContext.class), any()))
+        .thenReturn(true);
+    executor.authorizationExpressionEvaluator = primaryEvaluator;
+    FieldUtils.writeField(executor, "allowCheckExistenceEvaluator", existenceEvaluator, true);
+
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    TableDispatcher internalTableDispatcher = mock(TableDispatcher.class);
+    when(env.internalTableDispatcher()).thenReturn(internalTableDispatcher);
+    when(internalTableDispatcher.tableExists(tableIdentifier)).thenReturn(false);
+
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      assertTrue(executor.execute(new AuthorizationRequestContext()));
+    }
+
+    verify(internalTableDispatcher).tableExists(tableIdentifier);
+  }
+
   private static LoadTableAuthorizationExecutor createExecutor(
       String privileges, ExpressionCondition condition) throws Exception {
     Method method = TestOperations.class.getMethod("loadTable", String.class);
@@ -74,7 +130,8 @@ public class TestLoadTableAuthorizationExecutor {
         Collections.emptyMap(),
         Optional.empty(),
         SECONDARY_EXPRESSION,
-        condition);
+        condition,
+        "");
   }
 
   private static String expression(LoadTableAuthorizationExecutor executor) throws Exception {

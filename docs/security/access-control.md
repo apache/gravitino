@@ -73,6 +73,21 @@ Everything Gravitino manages is an object with a type and a name. The name is th
 below the metalake, so a table is `{catalog}.{schema}.{table}`, and requests identify an object by
 both type and name, since the same name can exist at more than one type.
 
+##### Local names containing one or more dots {#names-containing-dots}
+
+::::caution
+When authorization is enabled, Gravitino cannot authorize a federated object whose local name
+contains one or more dots (`.`), because dots separate the components of a qualified metadata object name.
+Loading such an object returns `400 Bad Request`. If a connector returns one of these objects in a
+list, Gravitino rejects the entire list request with `400 Bad Request` and identifies the unsupported
+name instead of returning a partial result. Consequently, one object with a dotted name can prevent
+all sibling objects from appearing in list APIs.
+
+Rename or recreate the object in the source system with a name that does not contain dots before
+using it with authorization. When authorization is disabled, existing source objects whose names
+are supported by the connector can still be listed and loaded.
+::::
+
 Access to an object is controlled by privileges, granted through roles, and by ownership. Ownership
 behaves like a privilege that arrives with the object rather than one you grant, and it carries the
 administrative rights, altering, dropping, and transferring, that no privilege name covers.
@@ -88,7 +103,8 @@ Metalake (top level)
 │       ├── Topic
 │       ├── Fileset
 │       ├── Model
-│       └── Function
+│       ├── Function
+│       └── Semantic Model
 ├── Tag
 ├── Policy
 ├── Job Template
@@ -126,7 +142,7 @@ catalog, or schema, never to a table. Whoever creates a role owns it, and can al
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
 it, and it can be transferred at any time. It applies to metalakes, catalogs, schemas, tables, views,
-topics, filesets, models, functions, roles, tags, policies, job templates, and jobs.
+topics, filesets, models, semantic models, functions, roles, tags, policies, job templates, and jobs.
 
 ### Resolution
 
@@ -144,8 +160,9 @@ Note the third case. Granting `SELECT_TABLE` on a schema covers every table in t
 its own it authorizes nothing, because the traversal privileges are still missing.
 
 A failed check returns `403 Forbidden`. Some read paths return `404 Not Found` instead, so that a
-caller cannot infer the existence of an object they are not entitled to see. List operations do not
-fail; they return only the entries the caller is entitled to see.
+caller cannot infer the existence of an object they are not entitled to see. List operations
+normally do not fail; they return only the entries the caller is entitled to see. An object whose
+name contains a dot is an exception, as described in [Names containing dots](#names-containing-dots).
 
 #### Allow and Deny
 
@@ -165,32 +182,39 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 
 ### Data Object Privileges
 
-| Privilege            | Grantable On                        | What It Allows                                                     |
-|----------------------|-------------------------------------|--------------------------------------------------------------------|
-| `CREATE_CATALOG`     | Metalake                            | Create catalogs                                                    |
-| `USE_CATALOG`        | Metalake, Catalog                   | Use any catalog in scope, and reach the objects inside it          |
-| `CREATE_SCHEMA`      | Metalake, Catalog, Schema           | Create schemas or nested schemas in scope                          |
-| `USE_SCHEMA`         | Metalake, Catalog, Schema           | Use any schema in scope, and reach the objects inside it           |
-| `CREATE_TABLE`       | Metalake, Catalog, Schema           | Create tables in any schema in scope                               |
-| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table    | Read any table in scope                                            |
-| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table    | Read and write to, and alter the schema of, any table in scope     |
-| `CREATE_VIEW`        | Metalake, Catalog, Schema           | Create views in any schema in scope                                |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View     | Read any view in scope                                             |
-| `CREATE_TOPIC`       | Metalake, Catalog, Schema           | Create topics in any schema in scope                               |
-| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic    | Consume from any topic in scope                                    |
-| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic    | Consume from, produce to, and alter any topic in scope             |
-| `CREATE_FILESET`     | Metalake, Catalog, Schema           | Create filesets in any schema in scope                             |
-| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset  | Read any fileset in scope                                          |
-| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset  | Read, write, and alter any fileset in scope                        |
-| `REGISTER_MODEL`     | Metalake, Catalog, Schema           | Register models in any schema in scope                             |
-| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model    | Link versions to any model in scope                                |
-| `USE_MODEL`          | Metalake, Catalog, Schema, Model    | Read the metadata of, and download versions of, any model in scope |
-| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema           | Register functions in any schema in scope                          |
-| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function | Read the metadata of, and execute, any function in scope           |
-| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function | Alter or drop any function in scope                                |
+| Privilege            | Grantable On                                                                | What It Allows                                                       |
+|----------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `CREATE_CATALOG`     | Metalake                                                                    | Create catalogs                                                      |
+| `USE_CATALOG`        | Metalake, Catalog                                                           | Use any catalog in scope, and reach the objects inside it            |
+| `CREATE_SCHEMA`      | Metalake, Catalog, Schema                                                   | Create schemas or nested schemas in scope                            |
+| `USE_SCHEMA`         | Metalake, Catalog, Schema                                                   | Use any schema in scope, and reach the objects inside it             |
+| `CREATE_TABLE`       | Metalake, Catalog, Schema                                                   | Create tables in any schema in scope                                 |
+| `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View                                      | Probe whether a table-like object exists without reading its data    |
+| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read any table in scope                                              |
+| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read and write to, and alter the schema of, any table in scope       |
+| `CREATE_VIEW`        | Metalake, Catalog, Schema                                                   | Create views in any schema in scope                                  |
+| `SELECT_VIEW`        | Metalake, Catalog, Schema, View                                             | Read view metadata in scope                                          |
+| `CREATE_TOPIC`       | Metalake, Catalog, Schema                                                   | Create topics in any schema in scope                                 |
+| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic                                            | Consume from any topic in scope                                      |
+| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic                                            | Consume from, produce to, and alter any topic in scope               |
+| `CREATE_FILESET`     | Metalake, Catalog, Schema                                                   | Create filesets in any schema in scope                               |
+| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset                                          | Read any fileset in scope                                            |
+| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset                                          | Read, write, and alter any fileset in scope                          |
+| `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
+| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
+| `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`) |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in the `getSecrets` result |
+| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
+| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
+| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
+| `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
+| `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
+| `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
-Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata, and the same pairing
-holds for views, topics, and filesets.
+Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
+have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
+view metadata, while altering or dropping a view is owner-only.
 
 `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated aliases for `REGISTER_MODEL` and
 `LINK_MODEL_VERSION`. They resolve to identical authorization, so existing grants keep working, but
@@ -203,11 +227,14 @@ they will be removed in a future release. Use the current names in new roles.
 | `MANAGE_USERS`          | Metalake                                                                | Add and remove users                               |
 | `MANAGE_GROUPS`         | Metalake                                                                | Add and remove groups                              |
 | `CREATE_ROLE`           | Metalake                                                                | Create roles                                       |
-| `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grant and revoke privileges on any object in scope |
+| `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function, Semantic Model | Grant and revoke privileges on any object in scope |
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
+| `VIEW_TAG`              | Metalake, Tag                                                           | Read tag metadata                                  |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
-| `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `VIEW_POLICY`           | Metalake, Policy                                                        | Read policy metadata                               |
+| `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
+| `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
 | `RUN_JOB`               | Metalake                                                                | Run jobs                                           |
@@ -218,12 +245,17 @@ object and its descendants.
 
 `APPLY_TAG`, `APPLY_POLICY`, and `USE_JOB_TEMPLATE` scope differently from every other privilege on
 this page. The object they bind to is the instrument the holder may use, not the object the operation
-acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder attach that one policy
-and no other, while granting it on the metalake lets them attach any policy in the metalake.
+acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder associate that
+policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it on the metalake
+covers any policy in that metalake.
 
-Attaching a tag or a policy is checked twice: the holder needs `APPLY_TAG` or `APPLY_POLICY` for the
-tag or policy in question, and separately needs access to the metadata object being tagged. A user
-cannot tag an object they could not otherwise reach.
+Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
+Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
+`APPLY_TAG` on the tag. Ownership can satisfy either check.
+
+Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
+`APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
+List results include only tags and policies the caller can read.
 
 ### Required Privileges
 
@@ -234,45 +266,245 @@ Three rules apply throughout, so they are not repeated below:
 - Reaching an object inside a catalog and a schema also requires `USE_CATALOG` and `USE_SCHEMA`.
 - A privilege counts whether it is held on the object itself or on any ancestor.
 
-List operations never fail. They return the entries the caller is entitled to see, which for a
-metalake owner is all of them.
+List operations first require access to their parent scope. After that gateway check succeeds, they
+return only the entries the caller is entitled to see, which for a metalake owner is all of them.
 
 #### Data Objects
 
-| Object   | Create              | Load                                 | Alter             | Drop  |
-|----------|---------------------|--------------------------------------|-------------------|-------|
-| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                        | Owner             | Owner |
-| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                         | Owner             | Owner |
-| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`     | `MODIFY_TABLE`    | Owner |
-| View     | `CREATE_VIEW`       | `SELECT_VIEW`                        | Owner             | Owner |
-| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`   | `PRODUCE_TOPIC`   | Owner |
-| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`    | `WRITE_FILESET`   | Owner |
-| Model    | `REGISTER_MODEL`    | `USE_MODEL`                          | Owner             | Owner |
+| Object   | Create              | Load                                    | Alter             | Drop  |
+|----------|---------------------|-----------------------------------------|-------------------|-------|
+| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                           | Owner             | Owner |
+| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                            | Owner             | Owner |
+| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`        | `MODIFY_TABLE`    | Owner |
+| View     | `CREATE_VIEW`       | `SELECT_VIEW`                           | Owner             | Owner |
+| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`      | `PRODUCE_TOPIC`   | Owner |
+| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
+| Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
+| Semantic Model | `CREATE_SEMANTIC_MODEL` | `USE_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
+
+Testing a catalog connection follows the catalog row. Testing a catalog before it is created takes
+`CREATE_CATALOG`. Testing an existing catalog with its stored configuration takes `USE_CATALOG`, the
+same as loading it. Testing an existing catalog with proposed changes that are not saved takes
+ownership, the same as altering it, because the caller chooses what the server connects to.
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
-alter or delete. Fetching a credential takes whatever loading the object takes.
+alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
+`USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
+holds `INCLUDE_CREDENTIAL_SECRETS`. Vend credentials (`getCredentials`) requires no dedicated
+privilege beyond being able to load the object. Callers who can load the object but lack
+`USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
 
-Renaming a table or view into a different schema is the one operation needing a privilege on a second
-object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on the target schema.
+The View row applies to metadata operations through both the native Gravitino REST API and the
+Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and
+then filters individual views by ownership or `SELECT_VIEW`. Creating a view makes the caller its
+owner, which is the path used for later alter and drop operations.
+
+These checks authorize View metadata operations only. They do not grant access to referenced tables
+or authorize SQL execution. The current Iceberg engine path uses invoker semantics, so the caller
+still needs access to the underlying data. The View API has no explicit `INVOKER`/`DEFINER` option,
+and Gravitino does not implement `DEFINER` execution or a new engine integration as part of this
+authorization behavior.
+
+The native View rename operation changes only the name within the existing schema and remains
+owner-only; it does not accept a target schema.
 
 #### Metalake Objects
 
-| Object       | Create                  | Read                                   | Alter or delete | Use                                       |
-|--------------|-------------------------|----------------------------------------|-----------------|-------------------------------------------|
-| Metalake     | Service administrator   | Membership                             | Owner           |                                           |
-| User         | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                           |
-| Group        | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                           |
-| Role         | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`          |
-| Tag          | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object |
-| Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
-| Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
-| Job          |                         | Owner                                  | Owner           |                                           |
+| Object           | Create                  | Read                                   | Alter or delete | Use                                                |
+|------------------|-------------------------|----------------------------------------|-----------------|----------------------------------------------------|
+| Metalake         | Service administrator   | Membership                             | Owner           |                                                    |
+| User             | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                                    |
+| Group            | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                                    |
+| Role             | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`                   |
+| Tag              | `CREATE_TAG`            | `VIEW_TAG` or `APPLY_TAG`              | Owner           | Assign: `APPLY_TAG` and access to the object       |
+| Policy           | `CREATE_POLICY`         | `VIEW_POLICY` or `APPLY_POLICY`        | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
+| Job template     | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE`        |
+| Job              |                         | Owner                                  | Owner           |                                                    |
+| Secret providers |                         | Owner or `VIEW_SECRET_PROVIDERS`       |                 |                                                    |
+
+The secrets-provider registry is process-global server configuration; the metalake path only scopes
+authorization. Listing providers does not return secret material.
+
+Bulk access-control APIs use the same privileges as the matching single-entity operations. Most
+bulk operations are authorized once before processing the request. Role removal is authorized per
+item because each role can be removed by the metalake owner or by the owner of that role. Bulk
+requests report item-level failures in `errors`.
+
+| API                                                 | Required privilege                                 |
+|-----------------------------------------------------|----------------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`          |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`         |
+| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`           |
+| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role    |
+| `GET /api/metalakes/{metalake}/secrets/providers`   | `OWNER` of the metalake or `VIEW_SECRET_PROVIDERS` |
+
+For example, add users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "users": [
+    {"name": "analyst"},
+    {"name": "developer", "externalId": "developer@example.com", "enabled": true}
+  ]
+}'
+```
+
+Remove users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analyst", "developer"]
+}'
+```
+
+For example, add groups in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "groups": [
+    {"name": "analysts"},
+    {"name": "developers", "externalId": "developers@example.com"}
+  ]
+}'
+```
+
+Remove groups in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analysts", "developers"]
+}'
+```
+
+For example, add roles in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/roles/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "roles": [
+    {"name": "analyst", "properties": {}, "securableObjects": []},
+    {"name": "developer", "properties": {}, "securableObjects": []}
+  ]
+}'
+```
+
+Remove roles in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/roles/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analyst", "developer"]
+}'
+```
 
 Granting or revoking a privilege on an object takes `MANAGE_GRANTS` on that object or an ancestor.
 Granting or revoking a role, and overriding a role's privileges, takes `MANAGE_GRANTS` on the
 metalake. Setting an owner takes ownership.
+
+## Narrowing Access with Active Roles
+
+By default, a request is evaluated against every role the caller holds. The `X-Gravitino-Active-Roles`
+header narrows that set for the request that carries it, so a workload runs with only the roles it
+needs instead of every role its user has been granted.
+
+```text
+X-Gravitino-Active-Roles: analyst,reader
+```
+
+| Value               | Meaning                                             |
+|---------------------|-----------------------------------------------------|
+| `analyst`           | Activate one named role                             |
+| `analyst,reader`    | Activate several; access is the union of just these |
+| `ALL`               | Activate every role the caller holds                |
+| `NONE`              | Activate no role                                    |
+| *(absent or empty)* | Same as `ALL`                                       |
+
+Role names are matched exactly, and `ALL` and `NONE` are recognized only in upper case, so `all` is
+read as the name of a role. Surrounding whitespace is trimmed and repeated names collapse.
+
+### What Narrowing Changes
+
+Narrowing only ever subtracts. The server validates the declaration against the roles the caller
+actually holds, so the header can never widen access, and a caller that omits it is evaluated exactly
+as before.
+
+- **`DENY` stays global.** A deny carried by any role the caller holds still applies even when that
+  role is not active, so narrowing cannot be used to escape a denial.
+- **Ownership is untouched.** Access that comes from owning an object is granted to the owner
+  directly rather than through a role, so an owner keeps it even under `NONE`.
+- **Every decision in the request is narrowed**, not only direct checks. List results are filtered
+  against the active set, and so are the privileges behind credential vending: an Iceberg caller
+  whose active roles no longer carry `MODIFY_TABLE` is vended a read-only storage credential in place
+  of a writable one.
+
+### Errors
+
+| Condition                                                          | Response          |
+|--------------------------------------------------------------------|-------------------|
+| An empty entry, such as the trailing comma in `analyst,`           | `400 Bad Request` |
+| `ALL` or `NONE` combined with anything else, such as `ALL,analyst` | `400 Bad Request` |
+| A well-formed value naming a role the caller does not hold         | `403 Forbidden`   |
+
+A role that does not exist and a role the caller was never granted both return `403`, so the response
+cannot be used to discover which role names exist. An unheld role is rejected rather than ignored,
+which surfaces a typo immediately instead of silently reducing access.
+
+### Sending the Header
+
+Apache Spark forwards any `header.*` catalog property to the Iceberg REST catalog:
+
+```properties
+spark.sql.catalog.{catalog}.header.X-Gravitino-Active-Roles = analyst
+```
+
+Trino 481 and later forwards headers configured on the catalog:
+
+```properties
+iceberg.rest-catalog.http-headers = X-Gravitino-Active-Roles: analyst
+```
+
+Both are catalog-level and static, so the same value applies to every user and session using that
+catalog. The Java client sets the header per client instance:
+
+```java
+GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withHeaders(ImmutableMap.of("X-Gravitino-Active-Roles", "analyst"))
+    .build();
+```
+
+### Scope
+
+Narrowing applies where Gravitino enforces authorization itself: the native REST API and the Iceberg
+REST catalog. Catalogs that push enforcement down to an external system evaluate against the mapped
+user and groups and never see the declaration, so the header has no effect there. See
+[Authorization Pushdown](authorization-pushdown.md).
 
 ## Server Configuration
 
@@ -514,10 +746,10 @@ schemas, see the [Gravitino REST API](https://gravitino.apache.org/docs/latest/a
 Users, groups, and roles share one shape. Substitute `users`, `groups`, or `roles` for
 `{collection}`, and the user, group, or role name for `{name}`:
 
-| Operation | Method   | Path                  |
-|-----------|----------|-----------------------|
-| Create    | `POST`   | `/{collection}`       |
-| List      | `GET`    | `/{collection}`       |
+| Operation | Method   | Path                   |
+|-----------|----------|------------------------|
+| Create    | `POST`   | `/{collection}`        |
+| List      | `GET`    | `/{collection}`        |
 | Get       | `GET`    | `/{collection}/{name}` |
 | Delete    | `DELETE` | `/{collection}/{name}` |
 
@@ -525,15 +757,15 @@ Add `?details=true` to a list path to get full objects instead of names.
 
 The rest are one of a kind:
 
-| Operation                          | Method       | Path                                                            |
-|------------------------------------|--------------|-----------------------------------------------------------------|
-| Grant privileges to a role         | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/grant`   |
-| Revoke privileges from a role      | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/revoke`  |
-| Replace a role's privileges        | `PUT`        | `/permissions/roles/{role}/`                                    |
-| Grant roles to a user or group     | `PUT`        | `/permissions/{collection}/{name}/grant`                        |
-| Revoke roles from a user or group  | `PUT`        | `/permissions/{collection}/{name}/revoke`                       |
-| List the roles bound to an object  | `GET`        | `/objects/{object_type}/{object_name}/roles`                    |
-| Get or set an object's owner       | `GET`, `PUT` | `/owners/{object_type}/{object_name}`                           |
+| Operation                         | Method       | Path                                                           |
+|-----------------------------------|--------------|----------------------------------------------------------------|
+| Grant privileges to a role        | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/grant`  |
+| Revoke privileges from a role     | `PUT`        | `/permissions/roles/{role}/{object_type}/{object_name}/revoke` |
+| Replace a role's privileges       | `PUT`        | `/permissions/roles/{role}/`                                   |
+| Grant roles to a user or group    | `PUT`        | `/permissions/{collection}/{name}/grant`                       |
+| Revoke roles from a user or group | `PUT`        | `/permissions/{collection}/{name}/revoke`                      |
+| List the roles bound to an object | `GET`        | `/objects/{object_type}/{object_name}/roles`                   |
+| Get or set an object's owner      | `GET`, `PUT` | `/owners/{object_type}/{object_name}`                          |
 
 Replacing a role's privileges is destructive: afterwards the role holds exactly what the request body
 contains, and any object absent from it is dropped.
@@ -587,5 +819,4 @@ client.setOwner(schema, "analyst", Owner.Type.USER);
 - [Authorization Pushdown](authorization-pushdown.md), for pushing enforcement down to the underlying
   data source or to an external system such as Apache Ranger
 - [How to Authenticate](how-to-authenticate.md), for establishing who the caller is
-- [How to Use the Built-in IdP](how-to-use-built-in-idp.md)
-- [Security](security.md)
+- [Local users and groups](local-users-and-groups.md)

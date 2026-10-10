@@ -42,6 +42,10 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
+  /** Lists all active schemas in a metalake. */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByMetalakeId")
+  List<SchemaPO> listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "listSchemaPOsByFullQualifiedName")
@@ -82,6 +86,28 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
 
+  /**
+   * Returns one when an active table, view, fileset, function, model, or topic exists in the
+   * schema, and {@code null} otherwise.
+   *
+   * <p>Only a literal is selected because callers need an existence answer, not complete child
+   * metadata. The final limit also lets the database stop as soon as it finds the first child.
+   */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectActiveChildBySchemaId")
+  Integer selectActiveChildBySchemaId(@Param("schemaId") Long schemaId);
+
+  /** Selects and locks an active schema by ID for the current transaction. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdForUpdate")
+  SchemaPO selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId);
+
+  /** Selects and share-locks an active schema by ID for the current transaction. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdForShare")
+  SchemaPO selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId);
+
   @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "insertSchemaMeta")
   void insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO);
 
@@ -107,15 +133,28 @@ public interface SchemaMetaMapper {
       method = "softDeleteSchemaMetasBySchemaIds")
   Integer softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
+  /**
+   * Soft-deletes a schema, but only while it still carries the given version.
+   *
+   * @param schemaId the ID of the schema to delete
+   * @param currentVersion the version the caller read before deciding to delete
+   * @return 1 when the schema was deleted, 0 when it changed or is already gone
+   */
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByMetalakeId")
-  Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteSchemaMetaBySchemaIdAndVersion")
+  Integer softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
 
+  /**
+   * Soft-deletes schemas whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByCatalogId")
-  Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
+      method = "softDeleteSchemaMetasWithVersion")
+  Integer softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs);
 
   @DeleteProvider(
       type = SchemaMetaSQLProviderFactory.class,

@@ -87,12 +87,12 @@ class TestCatalog(MetalakeTestMixin, IntegrationTestEnv):
     def test_create_catalog(self):
         catalog = self.create_catalog(self.catalog_name)
         self.assertEqual(catalog.name(), self.catalog_name)
-        self.assertEqual(
-            catalog.properties(),
+        self.assert_properties_equal(
             {
                 self.catalog_location_prop: "/tmp/test_schema",
                 self.catalog_in_use_prop: "true",
             },
+            catalog.properties(),
         )
 
     def test_failed_create_catalog(self):
@@ -133,6 +133,26 @@ class TestCatalog(MetalakeTestMixin, IntegrationTestEnv):
         )
         self.catalog_name = self.catalog_name + "_new"
 
+    def test_alter_catalog_remove_property(self):
+        self.create_catalog(self.catalog_name)
+
+        property_key = "catalog_remove_property_key"
+        property_value = "catalog_remove_property_value"
+
+        # Set a custom property first so that there is something to remove.
+        catalog = self.gravitino_client.alter_catalog(
+            self.catalog_name,
+            CatalogChange.set_property(property_key, property_value),
+        )
+        self.assertEqual(property_value, catalog.properties().get(property_key))
+
+        # Remove the property and assert it is gone from the catalog.
+        catalog = self.gravitino_client.alter_catalog(
+            self.catalog_name,
+            CatalogChange.remove_property(property_key),
+        )
+        self.assertNotIn(property_key, catalog.properties())
+
     def test_drop_catalog(self):
         self.create_catalog(self.catalog_name)
         self.gravitino_client.disable_catalog(self.catalog_name)
@@ -149,12 +169,12 @@ class TestCatalog(MetalakeTestMixin, IntegrationTestEnv):
         self.assertIsNotNone(catalog)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(catalog.comment(), self.catalog_comment)
-        self.assertEqual(
-            catalog.properties(),
+        self.assert_properties_equal(
             {
                 self.catalog_location_prop: "/tmp/test_schema",
                 self.catalog_in_use_prop: "true",
             },
+            catalog.properties(),
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")
 

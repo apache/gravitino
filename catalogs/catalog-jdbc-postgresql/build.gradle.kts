@@ -28,6 +28,7 @@ dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
+  compileOnly(libs.postgresql.driver)
 
   implementation(project(":catalogs:catalog-jdbc-common")) {
     exclude(group = "*")
@@ -48,6 +49,7 @@ dependencies {
   testImplementation(project(":server-common"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.commons.dbcp2)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mysql.driver)

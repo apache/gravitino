@@ -17,6 +17,7 @@
 
 import json
 import unittest
+from datetime import datetime
 from http.client import HTTPResponse
 from typing import cast
 from unittest.mock import Mock, patch
@@ -177,7 +178,7 @@ class TestRelationalTable(unittest.TestCase):
     def test_get_audit_info(self):
         audit_info = self.relational_table.audit_info()
         self.assertEqual(audit_info.creator(), "Apache Gravitino")
-        self.assertEqual(audit_info.create_time(), "2025-10-10T00:00:00")
+        self.assertEqual(audit_info.create_time(), datetime(2025, 10, 10))
 
     def test_get_properties(self):
         properties = self.relational_table.properties()

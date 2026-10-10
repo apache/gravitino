@@ -20,21 +20,27 @@
 package org.apache.gravitino.authorization;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -54,9 +60,11 @@ import org.apache.gravitino.utils.PrincipalUtils;
  *   <li>per-request role loading happens at most once via {@link #loadRole(Runnable)}.
  * </ul>
  *
- * <p>Instances are not intended to outlive a request and are not reusable across threads beyond the
- * request handling thread; the internal maps are {@link ConcurrentHashMap} purely to tolerate any
- * incidental fan-out (e.g. async listeners) within the same request scope.
+ * <p>Instances must not outlive a request or be reused across principals, active-role selections or
+ * metalakes. Entry authorization and list filtering of one read-only request may share an instance:
+ * list workers receive it explicitly, which is why the internal maps are {@link ConcurrentHashMap}.
+ * Role selection must be fixed before workers start, and a mutation must not reuse decisions made
+ * before it.
  */
 public class AuthorizationRequestContext {
 
@@ -69,17 +77,18 @@ public class AuthorizationRequestContext {
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
 
-  /**
-   * Immutable IDs of the direct and group-inherited roles held by the current principal. Populated
-   * once by the role-loading path and reused by all authorization probes in this request.
-   */
-  private volatile Set<Long> effectiveRoleIds = Collections.emptySet();
-
   /** Per-request user identity cache. Key: {@code metalake::userName}. */
   private final Map<String, Optional<UserUpdatedAt>> userInfoCache = new ConcurrentHashMap<>();
 
   /** Per-request group identity cache. Key: {@code metalake::groupName}. */
   private final Map<String, Optional<GroupUpdatedAt>> groupInfoCache = new ConcurrentHashMap<>();
+
+  /** Per-request raw-name → canonical metadata object cache. */
+  private final Map<String, MetadataObject> normalizedMetadataObjects = new ConcurrentHashMap<>();
+
+  /** Serializes normalization per catalog and retains capability failures for this request. */
+  private final Map<NameIdentifier, CatalogNormalizationState> catalogNormalizationStates =
+      new ConcurrentHashMap<>();
 
   /** Per-request name→id cache. Deduplicates resolveMetadataId within a single request. */
   private final Map<String, Long> metadataIdCache = new ConcurrentHashMap<>();
@@ -95,6 +104,57 @@ public class AuthorizationRequestContext {
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
   private volatile String originalAuthorizationExpression;
+
+  /**
+   * Ids of the roles bound to the caller when this request loaded role policies. The authorizer
+   * uses them to detect whether one of these roles lost its policies after the load.
+   */
+  private volatile List<Long> boundRoleIds = Collections.emptyList();
+
+  /**
+   * Authorizer-defined generation of the in-memory role policies this request last validated its
+   * bound roles against. A role cleared after this generation must be reloaded before the request
+   * evaluates it again.
+   */
+  private final AtomicLong rolePolicyGeneration = new AtomicLong();
+
+  /** Roles whose entities could not be read during this request's initial role load. */
+  private volatile Set<Long> unreadableRoleIds = Collections.emptySet();
+
+  /** Immutable role-policy view owned by this request's authorizer. */
+  @Nullable private volatile RolePolicyView rolePolicyView;
+
+  /**
+   * An authorizer-defined view of the caller's immutable role policies. Implementations must pin
+   * their policy data independently of shared cache eviction.
+   */
+  public interface RolePolicyView {
+    /**
+     * Returns the policy generation most recently validated for this view.
+     *
+     * @return the authorizer's generation
+     */
+    long generation();
+  }
+
+  /**
+   * Returns this request's immutable role-policy view, or null before role loading.
+   *
+   * @return the policy view
+   */
+  @Nullable
+  public RolePolicyView getRolePolicyView() {
+    return rolePolicyView;
+  }
+
+  /**
+   * Publishes a complete immutable role-policy view to all workers in this request.
+   *
+   * @param view the authorizer's policy view
+   */
+  public void setRolePolicyView(RolePolicyView view) {
+    rolePolicyView = Objects.requireNonNull(view, "Role policy view must not be null");
+  }
 
   /**
    * The roles the caller has declared active for this request (role assumption). Read from the
@@ -173,29 +233,6 @@ public class AuthorizationRequestContext {
   }
 
   /**
-   * Returns the direct and group-inherited role IDs held by the current principal.
-   *
-   * @return an immutable role ID set, or an empty set before roles are loaded
-   */
-  public Set<Long> getEffectiveRoleIds() {
-    return effectiveRoleIds;
-  }
-
-  /**
-   * Stores an immutable snapshot of the direct and group-inherited role IDs held by the current
-   * principal.
-   *
-   * @param effectiveRoleIds role IDs resolved for this request
-   */
-  public void setEffectiveRoleIds(Set<Long> effectiveRoleIds) {
-    Objects.requireNonNull(effectiveRoleIds, "effectiveRoleIds must not be null");
-    this.effectiveRoleIds =
-        effectiveRoleIds.isEmpty()
-            ? Collections.emptySet()
-            : Collections.unmodifiableSet(new LinkedHashSet<>(effectiveRoleIds));
-  }
-
-  /**
    * Per-request {@link UserUpdatedAt} dedup. Loader may return {@link Optional#empty()} to cache
    * the "user not found" outcome and avoid repeated DB lookups within a single request.
    */
@@ -214,6 +251,56 @@ public class AuthorizationRequestContext {
     return groupInfoCache.computeIfAbsent(
         key,
         k -> Objects.requireNonNull(loader.apply(k), "Group info loader must not return null"));
+  }
+
+  /**
+   * Normalizes each raw metadata name at most once per request.
+   *
+   * <p>The key must include the metalake, object type and raw name. Successful results are a
+   * request-local snapshot; failures are not cached, so a later lookup may retry. A fresh request
+   * must resolve current catalog rules again. This map must not be shared across mutations.
+   *
+   * @param key the raw metadata object's cache key
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, Function<String, MetadataObject> loader) {
+    return normalizedMetadataObjects.computeIfAbsent(
+        key,
+        k -> Objects.requireNonNull(loader.apply(k), "Normalization loader must not return null"));
+  }
+
+  /**
+   * Normalizes a raw name while remembering capability failures for its catalog in this request.
+   *
+   * <p>Catalog lookups are serialized so concurrent objects cannot retry a failed initialization.
+   * Missing catalogs are not memoized; a fresh request can retry any capability failure.
+   *
+   * @param key the raw metadata object's cache key
+   * @param catalogIdentifier the containing catalog, including its metalake
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   * @throws RuntimeException if normalization failed for this catalog
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, NameIdentifier catalogIdentifier, Function<String, MetadataObject> loader) {
+    CatalogNormalizationState state =
+        catalogNormalizationStates.computeIfAbsent(
+            catalogIdentifier, ignored -> new CatalogNormalizationState());
+    synchronized (state) {
+      if (state.failure != null) {
+        throw state.failure;
+      }
+      try {
+        return computeNormalizedMetadataObjectIfAbsent(key, loader);
+      } catch (NotFoundException e) {
+        throw e;
+      } catch (RuntimeException e) {
+        state.failure = e;
+        throw e;
+      }
+    }
   }
 
   /** Per-request name→id dedup. Loader must return a non-null id or throw. */
@@ -263,6 +350,66 @@ public class AuthorizationRequestContext {
   }
 
   /**
+   * Returns the ids of the roles bound to the caller when this request loaded role policies.
+   *
+   * @return the bound role ids; empty when no role has been loaded yet
+   */
+  public List<Long> getBoundRoleIds() {
+    return boundRoleIds;
+  }
+
+  /**
+   * Records the ids of the roles bound to the caller by this request's role load.
+   *
+   * @param boundRoleIds the bound role ids; must not be {@code null}
+   */
+  public void setBoundRoleIds(List<Long> boundRoleIds) {
+    this.boundRoleIds =
+        Collections.unmodifiableList(
+            new ArrayList<>(Objects.requireNonNull(boundRoleIds, "boundRoleIds must not be null")));
+  }
+
+  /**
+   * Returns the role policy generation this request last validated its bound roles against.
+   *
+   * @return the role policy generation
+   */
+  public long getRolePolicyGeneration() {
+    return rolePolicyGeneration.get();
+  }
+
+  /**
+   * Advances the role policy generation this request validated its bound roles against. Concurrent
+   * workers cannot move the recorded generation backwards.
+   *
+   * @param rolePolicyGeneration the role policy generation
+   */
+  public void setRolePolicyGeneration(long rolePolicyGeneration) {
+    this.rolePolicyGeneration.accumulateAndGet(rolePolicyGeneration, Math::max);
+  }
+
+  /**
+   * Returns the roles whose entities could not be read during the initial role load.
+   *
+   * @return the unreadable role ids; empty when all role entities were readable
+   */
+  public Set<Long> getUnreadableRoleIds() {
+    return unreadableRoleIds;
+  }
+
+  /**
+   * Records unreadable roles during the initial load so every check of this request fails closed.
+   *
+   * @param unreadableRoleIds the unreadable role ids; must not be {@code null}
+   */
+  public void setUnreadableRoleIds(Set<Long> unreadableRoleIds) {
+    this.unreadableRoleIds =
+        Collections.unmodifiableSet(
+            new HashSet<>(
+                Objects.requireNonNull(unreadableRoleIds, "unreadableRoleIds must not be null")));
+  }
+
+  /**
    * Returns the roles declared active for this request. Never {@code null}; defaults to {@link
    * ActiveRoles#all()}.
    *
@@ -295,5 +442,9 @@ public class AuthorizationRequestContext {
     private final String metalake;
     private final MetadataObject metadataObject;
     private final Privilege.Name privilege;
+  }
+
+  private static class CatalogNormalizationState {
+    @Nullable private RuntimeException failure;
   }
 }
