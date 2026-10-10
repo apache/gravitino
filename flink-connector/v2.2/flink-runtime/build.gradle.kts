@@ -31,7 +31,7 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink22.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-// Flink 2.x removed the Scala APIs entirely, so unlike the 1.x modules there is no scala suffix.
+// The connector uses Flink's Java APIs and does not need Scala-version-specific artifacts.
 val artifactName = "gravitino-${project.name}"
 val baseName = "${rootProject.name}-flink-connector-runtime-$flinkMajorVersion"
 
@@ -76,6 +76,7 @@ shadowJarTask.configure {
 tasks.test {
   useJUnitPlatform()
   dependsOn(shadowJarTask)
+  inputs.file(shadowJarTask.flatMap { it.archiveFile })
   doFirst {
     systemProperty("shadowJarPath", shadowJarTask.get().archiveFile.get().asFile.absolutePath)
   }

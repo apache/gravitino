@@ -100,7 +100,8 @@ if (scalaVersion == "2.12") {
   project(":flink-connector:flink-runtime-1.20").projectDir =
     file("flink-connector/v1.20/flink-runtime")
 }
-// Flink 2.x removed the Scala APIs entirely, so the Flink 2.x modules are not gated by scalaVersion.
+// These connectors use Flink Java APIs, so they do not need scalaVersion gating.
+// Flink internals still use Scala.
 include("flink-connector:flink-2.1", "flink-connector:flink-runtime-2.1")
 project(":flink-connector:flink-2.1").projectDir = file("flink-connector/v2.1/flink")
 project(":flink-connector:flink-runtime-2.1").projectDir =

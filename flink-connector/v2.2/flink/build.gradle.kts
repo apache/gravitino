@@ -56,7 +56,8 @@ val flinkVersion: String = libs.versions.flink22.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4flink22.get()
 val paimonVersion: String = libs.versions.paimon4flink22.get()
-// Flink 2.x removed the Scala APIs entirely, so unlike the 1.x modules there is no scala suffix.
+// This connector uses Flink Java APIs, so its artifacts need no Scala-version suffix.
+// Flink internals still use Scala.
 val artifactName = "${rootProject.name}-flink-$flinkMajorVersion"
 
 dependencies {
