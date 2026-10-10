@@ -40,12 +40,12 @@ jobs:
             -x :web-v2:web:build -x :web-v2:integration-test:build \
             -x :clients:client-python:build \
             -x :flink-connector:flink-common:build \
-            -x :flink-connector:flink-1.18:build \
-            -x :flink-connector:flink-runtime-1.18:build \
             -x :flink-connector:flink-1.19:build \
             -x :flink-connector:flink-runtime-1.19:build \
             -x :flink-connector:flink-1.20:build \
             -x :flink-connector:flink-runtime-1.20:build \
+            -x :flink-connector:flink-2.1:build \
+            -x :flink-connector:flink-runtime-2.1:build \
             -x :spark-connector:spark-3.5:build -x :spark-connector:spark-4.0:build \
             -x :spark-connector:spark-runtime-3.5:build -x :spark-connector:spark-runtime-4.0:build \
             -x :mcp-server:build -x :lineage:build \

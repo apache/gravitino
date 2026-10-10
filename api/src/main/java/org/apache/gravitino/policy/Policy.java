@@ -42,10 +42,18 @@ public interface Policy extends Auditable {
     ICEBERG_COMPACTION(
         BUILT_IN_TYPE_PREFIX + "iceberg_compaction", IcebergDataCompactionContent.class),
 
-    /**
-     * Custom policy type. "custom" is a fixed string that indicates the policy is a non-built-in
-     * type.
-     */
+    /** Iceberg orphan file cleanup policy. */
+    ICEBERG_ORPHAN_FILE_REMOVAL(
+        BUILT_IN_TYPE_PREFIX + "iceberg_orphan_file_removal",
+        IcebergOrphanFileRemovalContent.class),
+
+    /** Built-in policy type for filtering rows of tagged tables. */
+    ROW_FILTER(BUILT_IN_TYPE_PREFIX + "row_filter", RowFilterContent.class),
+
+    /** Built-in policy type for masking columns of tagged tables or tagged columns. */
+    COLUMN_MASK(BUILT_IN_TYPE_PREFIX + "column_mask", ColumnMaskContent.class),
+
+    /** Non-built-in policies use the fixed wire value {@code custom}. */
     CUSTOM("custom", PolicyContents.CustomContent.class);
 
     private final String policyType;

@@ -21,9 +21,11 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -73,22 +75,23 @@ public class TestIcebergExpireSnapshotsJob {
     IcebergExpireSnapshotsJob job = new IcebergExpireSnapshotsJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(11, template.arguments().size());
-
-    // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--older-than"));
-    assertTrue(template.arguments().contains("{{older_than}}"));
-    assertTrue(template.arguments().contains("--retain-last"));
-    assertTrue(template.arguments().contains("{{retain_last}}"));
-    // --stream-results is a boolean flag, value is the template variable itself
-    assertTrue(template.arguments().contains("{{stream_results}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    // Only the catalog and the table are required; the other options default to empty values,
+    // which the job treats as unset, and stream results defaults to false.
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--older-than",
+            "{{older_than:-}}",
+            "--retain-last",
+            "{{retain_last:-}}",
+            "--stream-results",
+            "{{stream_results:-false}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
@@ -130,7 +133,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v1", version);
+    assertEquals("v2", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -473,5 +476,28 @@ public class TestIcebergExpireSnapshotsJob {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("--spark-conf"));
     }
+  }
+
+  @Test
+  public void testParseStreamResults() {
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults(null));
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults(""));
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults("false"));
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults(" FALSE "));
+    assertTrue(IcebergExpireSnapshotsJob.parseStreamResults("true"));
+    assertTrue(IcebergExpireSnapshotsJob.parseStreamResults("True"));
+    assertThrows(
+        IllegalArgumentException.class, () -> IcebergExpireSnapshotsJob.parseStreamResults("yes"));
+
+    // The template renders "--stream-results false" by default, which must not enable streaming,
+    // while a bare "--stream-results" on the command line still does.
+    assertFalse(
+        IcebergExpireSnapshotsJob.parseStreamResults(
+            IcebergJobUtils.parseArguments(new String[] {"--stream-results", "false"})
+                .get("stream-results")));
+    assertTrue(
+        IcebergExpireSnapshotsJob.parseStreamResults(
+            IcebergJobUtils.parseArguments(new String[] {"--stream-results"})
+                .get("stream-results")));
   }
 }

@@ -38,9 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
-import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -132,9 +130,8 @@ public class ModelMetaService {
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
-    String modelFullName =
-        EntityChangeLogNameIdentifierCodec.encode(
-            NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()));
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name());
 
     // Delete the model row first, and only when its concurrency version still matches the value
     // read above. If another writer changed the model, stop before removing any related data.
@@ -142,18 +139,8 @@ public class ModelMetaService {
       SessionUtils.doMultipleWithCommit(
           () -> deleteModelWithVersion(ident, modelPO),
           () -> deleteModelDependents(modelPO),
-          () -> {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.MODEL.name(),
-                        modelFullName,
-                        OperateType.DROP));
-            EntityChangeLogDiagnostics.logAppended(
-                metalakeName, Entity.EntityType.MODEL.name(), OperateType.DROP, modelFullName);
-          });
+          () ->
+              EntityChangeLogWriter.append(modelIdent, Entity.EntityType.MODEL, OperateType.DROP));
     } catch (NoSuchEntityException e) {
       // Another writer dropped the model between the read above and this transaction. A drop that
       // finds nothing to drop is reported the same way as the read above reports it, so that a
@@ -338,10 +325,8 @@ public class ModelMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String oldFullName =
-        EntityChangeLogNameIdentifierCodec.encode(
-            NameIdentifierUtil.ofModel(
-                metalakeName, catalogName, schemaName, oldModelEntity.name()));
+    NameIdentifier oldModelIdent =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, oldModelEntity.name());
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
     try {
@@ -368,16 +353,8 @@ public class ModelMetaService {
               },
               () -> {
                 if (isRenamed) {
-                  SessionUtils.doWithoutCommit(
-                      EntityChangeLogMapper.class,
-                      mapper ->
-                          mapper.insertEntityChange(
-                              metalakeName,
-                              Entity.EntityType.MODEL.name(),
-                              oldFullName,
-                              OperateType.ALTER));
-                  EntityChangeLogDiagnostics.logAppended(
-                      metalakeName, Entity.EntityType.MODEL.name(), OperateType.ALTER, oldFullName);
+                  EntityChangeLogWriter.append(
+                      oldModelIdent, Entity.EntityType.MODEL, OperateType.ALTER);
                 }
               });
     } catch (RuntimeException re) {

@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -16,45 +16,32 @@
 # under the License.
 
 from gravitino.constants.error import ErrorConstants
-from gravitino.dto.responses.error_response import ErrorResponse
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
-    ConnectionFailedException,
-    CatalogInUseException,
-    NoSuchMetalakeException,
-    NoSuchCatalogException,
     CatalogAlreadyExistsException,
+    CatalogInUseException,
     CatalogNotInUseException,
+    ConnectionFailedException,
+    NoSuchCatalogException,
+    NoSuchMetalakeException,
 )
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class CatalogErrorHandler(RestErrorHandler):
-    def handle(self, error_response: ErrorResponse):
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-        exception_type = error_response.type()
-
-        if code == ErrorConstants.CONNECTION_FAILED_CODE:
-            raise ConnectionFailedException(error_message)
-
-        if code == ErrorConstants.NOT_FOUND_CODE:
-            if exception_type == NoSuchMetalakeException.__name__:
-                raise NoSuchMetalakeException(error_message)
-            if exception_type == NoSuchCatalogException.__name__:
-                raise NoSuchCatalogException(error_message)
-
-        if code == ErrorConstants.ALREADY_EXISTS_CODE:
-            raise CatalogAlreadyExistsException(error_message)
-
-        if code == ErrorConstants.IN_USE_CODE:
-            if exception_type == CatalogInUseException.__name__:
-                raise CatalogInUseException(error_message)
-
-        if code == ErrorConstants.NOT_IN_USE_CODE:
-            if exception_type == CatalogNotInUseException.__name__:
-                raise CatalogNotInUseException(error_message)
-
-        super().handle(error_response)
+class CatalogErrorHandler(CodeMappingErrorHandler):
+    _code_exception_map = {
+        ErrorConstants.CONNECTION_FAILED_CODE: ConnectionFailedException,
+        ErrorConstants.NOT_FOUND_CODE: {
+            NoSuchMetalakeException.__name__: NoSuchMetalakeException,
+            NoSuchCatalogException.__name__: NoSuchCatalogException,
+        },
+        ErrorConstants.ALREADY_EXISTS_CODE: CatalogAlreadyExistsException,
+        ErrorConstants.IN_USE_CODE: {
+            CatalogInUseException.__name__: CatalogInUseException
+        },
+        ErrorConstants.NOT_IN_USE_CODE: {
+            CatalogNotInUseException.__name__: CatalogNotInUseException
+        },
+    }
 
 
 CATALOG_ERROR_HANDLER = CatalogErrorHandler()
