@@ -151,7 +151,10 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, properties, auditInfo, securableObjects, namespace);
+    // securableObjects are compared as an unordered collection in equals, so their
+    // hash contribution must not depend on element order either.
+    int hash = Objects.hash(id, name, properties, auditInfo, namespace);
+    return 31 * hash + CollectionUtils.unorderedHashCode(securableObjects);
   }
 
   /**

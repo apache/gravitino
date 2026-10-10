@@ -23,11 +23,6 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATAL
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
-import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.hive.ClientPropertiesMetadata;
@@ -128,11 +123,6 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   DEFAULT_LIST_ALL_TABLES,
                   false /* hidden */,
                   false /* reserved */))
-          .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
-          .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES)
           .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 

@@ -50,8 +50,9 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
 
   private final String sparkSubmit;
 
-  protected SparkProcessBuilder(SparkJobTemplate sparkJobTemplate, Map<String, String> configs) {
-    super(sparkJobTemplate, configs);
+  protected SparkProcessBuilder(
+      SparkJobTemplate sparkJobTemplate, File workingDirectory, Map<String, String> configs) {
+    super(sparkJobTemplate, workingDirectory, configs);
     this.sparkSubmit = resolveSparkSubmit(configs);
   }
 
@@ -140,8 +141,8 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     builder.directory(workingDirectory);
     builder.environment().putAll(sparkJobTemplate.environments());
 
-    File outputFile = new File(workingDirectory, "output.log");
-    File errorFile = new File(workingDirectory, "error.log");
+    File outputFile = new File(workingDirectory, STDOUT_FILE_NAME);
+    File errorFile = new File(workingDirectory, STDERR_FILE_NAME);
 
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);

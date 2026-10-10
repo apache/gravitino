@@ -169,7 +169,12 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
+    // roleNames/roleIds are compared as unordered collections in equals, so their
+    // hash contribution must not depend on element order either.
+    int hash = Objects.hash(id, name, namespace, auditInfo);
+    hash = 31 * hash + CollectionUtils.unorderedHashCode(roleNames);
+    hash = 31 * hash + CollectionUtils.unorderedHashCode(roleIds);
+    return hash;
   }
 
   public static Builder builder() {

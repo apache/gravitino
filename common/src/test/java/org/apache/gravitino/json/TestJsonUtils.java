@@ -522,6 +522,22 @@ public class TestJsonUtils {
     String textJson = JsonUtils.objectMapper().writeValueAsString(textIndex);
     Assertions.assertTrue(textJson.contains("\"indexType\":\"DATA_SKIPPING_TEXT\""));
     Assertions.assertEquals(textIndex, objectMapper.readValue(textJson, IndexDTO.class));
+
+    Index vectorIndex =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY)
+            .withName("idx_vector")
+            .withFieldNames(new String[][] {{"embedding"}})
+            .withProperties(
+                Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"))
+            .build();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(vectorIndex);
+    expected =
+        "{\"indexType\":\"DATA_SKIPPING_VECTOR_SIMILARITY\",\"name\":\"idx_vector\","
+            + "\"fieldNames\":[[\"embedding\"]],\"properties\":{\"dimensions\":\"3\","
+            + "\"distance_function\":\"L2Distance\",\"type\":\"hnsw\"}}";
+    Assertions.assertEquals(expected, jsonValue);
+    Assertions.assertEquals(vectorIndex, objectMapper.readValue(jsonValue, IndexDTO.class));
   }
 
   @Test

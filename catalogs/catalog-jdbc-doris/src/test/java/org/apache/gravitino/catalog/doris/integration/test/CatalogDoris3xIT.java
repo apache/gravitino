@@ -310,6 +310,520 @@ public class CatalogDoris3xIT extends BaseIT {
   }
 
   @Test
+  void testAlterColumnTypePreservesDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_preserves_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String distributionColumnName = "dist_key";
+    String valueColumnName = "agg_value";
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "%s INT NOT NULL DEFAULT \"7\", "
+                + "%s BIGINT NOT NULL, "
+                + "%s BIGINT SUM DEFAULT \"0\""
+                + ") AGGREGATE KEY(%s, %s) "
+                + "DISTRIBUTED BY HASH(%s) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName,
+            colName1,
+            distributionColumnName,
+            valueColumnName,
+            colName1,
+            distributionColumnName,
+            distributionColumnName);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    Column originalColumn = findColumn(tc.loadTable(tid), colName1);
+    assertEquals(Types.IntegerType.get(), originalColumn.dataType());
+    assertEquals(Literals.integerLiteral(7), originalColumn.defaultValue());
+
+    tc.alterTable(tid, TableChange.updateColumnType(new String[] {colName1}, Types.LongType.get()));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), colName1);
+              assertEquals(Types.LongType.get(), updatedColumn.dataType());
+              assertEquals(Literals.longLiteral(7L), updatedColumn.defaultValue());
+            });
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (%s, %s) VALUES (101, 0)",
+              tableName, distributionColumnName, valueColumnName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT %s FROM %s WHERE %s = 101",
+                  colName1, tableName, distributionColumnName))) {
+        assertTrue(resultSet.next());
+        assertEquals(7L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  void testAlterColumnTypePreservesQuotedAndBackslashDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_special_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String logicalDefault = "owner's \"value\"\\\\path";
+    String sqlDefault = "owner's \\\"value\\\"" + "\\\\\\\\" + "path";
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "col_pk BIGINT NOT NULL, "
+                + "col_data VARCHAR(32) NOT NULL DEFAULT \"%s\") "
+                + "DUPLICATE KEY(col_pk) "
+                + "DISTRIBUTED BY HASH(col_pk) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName, sqlDefault);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(32)),
+        findColumn(tc.loadTable(tid), "col_data").defaultValue());
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {"col_data"}, Types.VarCharType.of(64)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), "col_data");
+              assertEquals(Types.VarCharType.of(64), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of(logicalDefault, Types.VarCharType.of(64)),
+                  updatedColumn.defaultValue());
+            });
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (1)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 1", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  void testAlterColumnTypePreservesBackslashOnlyDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_backslash_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String logicalDefault = "owner's\\value";
+    String sqlDefault = "\"" + logicalDefault.replace("\\", "\\\\") + "\"";
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "col_pk BIGINT NOT NULL, "
+                + "col_data VARCHAR(32) NOT NULL DEFAULT %s) "
+                + "DUPLICATE KEY(col_pk) "
+                + "DISTRIBUTED BY HASH(col_pk) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName, sqlDefault);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(32)),
+        findColumn(tc.loadTable(tid), "col_data").defaultValue());
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {"col_data"}, Types.VarCharType.of(64)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), "col_data");
+              assertEquals(Types.VarCharType.of(64), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of(logicalDefault, Types.VarCharType.of(64)),
+                  updatedColumn.defaultValue());
+            });
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (1)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 1", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  void testAlterColumnTypePreservesAdjacentBackslashQuoteDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_adjacent_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String logicalDefault = "prefix" + "\\" + "\"" + "suffix";
+    String sqlDefault = "\"" + logicalDefault.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "col_pk BIGINT NOT NULL, "
+                + "col_data VARCHAR(32) NOT NULL DEFAULT %s) "
+                + "DUPLICATE KEY(col_pk) "
+                + "DISTRIBUTED BY HASH(col_pk) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName, sqlDefault);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(32)),
+        findColumn(tc.loadTable(tid), "col_data").defaultValue());
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {"col_data"}, Types.VarCharType.of(64)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), "col_data");
+              assertEquals(Types.VarCharType.of(64), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of(logicalDefault, Types.VarCharType.of(64)),
+                  updatedColumn.defaultValue());
+            });
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (1)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 1", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  void testAddColumnPreservesDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_add_column_preserves_default"));
+    String defaultedColumnName = "defaulted_col";
+    String nullableDefaultColumnName = "nullable_default_col";
+    String requestedDefaultValue = "owner's a\"\"b \"value\"\\path";
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    tc.alterTable(
+        tid,
+        TableChange.addColumn(
+            new String[] {defaultedColumnName},
+            Types.VarCharType.of(255),
+            "defaulted column",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            false,
+            Literals.of(requestedDefaultValue, Types.VarCharType.of(255))));
+
+    String diagnosticQualifiedTableName = schemaName + "." + tid.name();
+    String[] rawDefaults = new String[3];
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(
+                          jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+                  Statement statement = connection.createStatement();
+                  ResultSet columns =
+                      connection
+                          .getMetaData()
+                          .getColumns(schemaName, null, tid.name(), defaultedColumnName)) {
+                String jdbcColumnDefault = null;
+                while (columns.next()) {
+                  if (defaultedColumnName.equals(columns.getString("COLUMN_NAME"))) {
+                    jdbcColumnDefault = columns.getString("COLUMN_DEF");
+                    break;
+                  }
+                }
+                assertNotNull(jdbcColumnDefault, "JDBC COLUMN_DEF was not returned");
+                rawDefaults[0] = jdbcColumnDefault;
+
+                try (ResultSet showColumns =
+                    statement.executeQuery(
+                        "SHOW FULL COLUMNS FROM " + diagnosticQualifiedTableName)) {
+                  while (showColumns.next()) {
+                    if (defaultedColumnName.equals(showColumns.getString("Field"))) {
+                      rawDefaults[1] = showColumns.getString("Default");
+                      break;
+                    }
+                  }
+                }
+                assertNotNull(
+                    rawDefaults[1], "SHOW FULL COLUMNS did not return the string default");
+
+                String infoSchemaQuery =
+                    String.format(
+                        "SELECT COLUMN_DEFAULT FROM information_schema.columns "
+                            + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' "
+                            + "AND COLUMN_NAME = '%s'",
+                        schemaName, tid.name(), defaultedColumnName);
+                try (ResultSet infoSchema = statement.executeQuery(infoSchemaQuery)) {
+                  assertTrue(infoSchema.next(), "information_schema.columns row was not returned");
+                  rawDefaults[2] = infoSchema.getString("COLUMN_DEFAULT");
+                }
+              }
+            });
+
+    String metadataDiagnostic =
+        String.format(
+            "JDBC COLUMN_DEF=[%s], SHOW FULL COLUMNS Default=[%s], "
+                + "information_schema.COLUMN_DEFAULT=[%s]",
+            rawDefaults[0], rawDefaults[1], rawDefaults[2]);
+    DorisContainer.LOG.info("Doris default metadata diagnostic: {}", metadataDiagnostic);
+    String[] insertedDefaultValue = new String[1];
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (%s, %s) VALUES (102, 'data')",
+              diagnosticQualifiedTableName, colName1, colName2));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT %s FROM %s WHERE %s = 102",
+                  defaultedColumnName, diagnosticQualifiedTableName, colName1))) {
+        assertTrue(resultSet.next());
+        insertedDefaultValue[0] = resultSet.getString(1);
+        assertFalse(resultSet.next());
+      }
+    }
+    assertEquals(
+        requestedDefaultValue,
+        insertedDefaultValue[0],
+        metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn = findColumn(tc.loadTable(tid), defaultedColumnName);
+              assertEquals(Types.VarCharType.of(255), addedColumn.dataType());
+              assertFalse(addedColumn.nullable());
+              assertEquals("defaulted column", addedColumn.comment());
+              assertEquals(
+                  Literals.of(requestedDefaultValue, Types.VarCharType.of(255)),
+                  addedColumn.defaultValue(),
+                  metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
+            });
+
+    tc.alterTable(
+        tid,
+        TableChange.addColumn(
+            new String[] {nullableDefaultColumnName},
+            Types.IntegerType.get(),
+            "nullable default column",
+            TableChange.ColumnPosition.defaultPos(),
+            true,
+            false,
+            Literals.integerLiteral(9)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn = findColumn(tc.loadTable(tid), nullableDefaultColumnName);
+              assertEquals(Types.IntegerType.get(), addedColumn.dataType());
+              assertTrue(addedColumn.nullable());
+              assertEquals("nullable default column", addedColumn.comment());
+              assertEquals(Literals.integerLiteral(9), addedColumn.defaultValue());
+            });
+
+    String qualifiedTableName = String.format("`%s`.`%s`", schemaName, tid.name());
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (`%s`, `%s`) VALUES (101, 'data')",
+              qualifiedTableName, colName1, colName2));
+
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT `%s`, `%s` FROM %s WHERE `%s` = 101",
+                  defaultedColumnName, nullableDefaultColumnName, qualifiedTableName, colName1))) {
+        assertTrue(resultSet.next());
+        assertEquals(requestedDefaultValue, resultSet.getString(1));
+        assertEquals(9, resultSet.getInt(2));
+        assertFalse(resultSet.wasNull());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  void testAddColumnBackslashDefaultWithLimitedDorisPrivileges() throws SQLException {
+    TableCatalog rootTableCatalog = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_add_column_limited_privileges"));
+    String defaultedColumnName = "defaulted_col";
+    String requestedDefaultValue = "owner's a\"\"b \"value\"\\path";
+    String userName = GravitinoITUtils.genRandomName("doris_add_column_user").replace('-', '_');
+    String userPassword = userName + "_test_password";
+    String limitedCatalogName = GravitinoITUtils.genRandomName("doris_limited_catalog");
+    Catalog limitedCatalog = null;
+    boolean userCreated = false;
+
+    rootTableCatalog.createTable(
+        tableIdentifier,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    try {
+      try (Connection connection =
+              DriverManager.getConnection(
+                  jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+          Statement statement = connection.createStatement()) {
+        statement.execute(
+            String.format("CREATE USER '%s'@'%%' IDENTIFIED BY '%s'", userName, userPassword));
+        userCreated = true;
+        statement.execute(
+            String.format(
+                "GRANT SELECT_PRIV, ALTER_PRIV ON `%s`.* TO '%s'@'%%'", schemaName, userName));
+      }
+
+      Map<String, String> limitedCatalogProperties = Maps.newHashMap();
+      limitedCatalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+      limitedCatalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), DRIVER_CLASS_NAME);
+      limitedCatalogProperties.put(JdbcConfig.USERNAME.getKey(), userName);
+      limitedCatalogProperties.put(JdbcConfig.PASSWORD.getKey(), userPassword);
+      limitedCatalog =
+          metalake.createCatalog(
+              limitedCatalogName,
+              Catalog.Type.RELATIONAL,
+              PROVIDER,
+              "Doris catalog with limited table privileges",
+              limitedCatalogProperties);
+
+      limitedCatalog
+          .asTableCatalog()
+          .alterTable(
+              tableIdentifier,
+              TableChange.addColumn(
+                  new String[] {defaultedColumnName},
+                  Types.VarCharType.of(255),
+                  Literals.of(requestedDefaultValue, Types.VarCharType.of(255))));
+
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () ->
+                  assertEquals(
+                      Literals.of(requestedDefaultValue, Types.VarCharType.of(255)),
+                      findColumn(rootTableCatalog.loadTable(tableIdentifier), defaultedColumnName)
+                          .defaultValue()));
+
+      String qualifiedTableName = String.format("`%s`.`%s`", schemaName, tableIdentifier.name());
+      try (Connection connection =
+              DriverManager.getConnection(
+                  jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+          Statement statement = connection.createStatement()) {
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO %s (`%s`, `%s`) VALUES (301, 'limited')",
+                qualifiedTableName, colName1, colName2));
+        try (ResultSet resultSet =
+            statement.executeQuery(
+                String.format(
+                    "SELECT `%s` FROM %s WHERE `%s` = 301",
+                    defaultedColumnName, qualifiedTableName, colName1))) {
+          assertTrue(resultSet.next());
+          assertEquals(requestedDefaultValue, resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    } finally {
+      try {
+        if (limitedCatalog != null) {
+          metalake.dropCatalog(limitedCatalogName, true);
+        }
+      } finally {
+        if (userCreated) {
+          try (Connection connection =
+                  DriverManager.getConnection(
+                      jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+              Statement statement = connection.createStatement()) {
+            statement.execute(String.format("DROP USER '%s'@'%%'", userName));
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   void testDeleteMissingIndexIfExists() {
     TableCatalog tc = catalog.asTableCatalog();
     NameIdentifier tid =

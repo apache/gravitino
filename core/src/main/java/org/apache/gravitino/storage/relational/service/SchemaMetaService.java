@@ -55,9 +55,12 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -297,6 +300,10 @@ public class SchemaMetaService {
                   mapper -> mapper.softDeleteTableMetasBySchemaIds(schemaIds.get())),
           () ->
               SessionUtils.doWithoutCommit(
+                  TableVersionMapper.class,
+                  mapper -> mapper.softDeleteTableVersionsBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
                   TableColumnMapper.class,
                   mapper -> mapper.softDeleteColumnsBySchemaIds(schemaIds.get())),
           () ->
@@ -354,7 +361,15 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewVersionInfoMapper.class,
-                  mapper -> mapper.softDeleteViewVersionsBySchemaIds(schemaIds.get())));
+                  mapper -> mapper.softDeleteViewVersionsBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelMetaMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelMetasBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelVersionInfoMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelVersionsBySchemaIds(schemaIds.get())));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -519,7 +534,30 @@ public class SchemaMetaService {
     SessionUtils.doMultipleWithCommit(transactionOperations);
   }
 
-  private void lockSchemaForEntityWrite(
+  /**
+   * Takes a shared lock on the parent catalog row before a cross-schema child move.
+   *
+   * <p>A cascade schema delete holds an exclusive catalog lock before any schema lock. Taking the
+   * same shared catalog lock here first ensures that a cross-schema child move blocks the cascade
+   * delete until both schema locks are acquired, and a cascade delete blocks new cross-schema moves
+   * until it finishes. Without this catalog fence, a move that holds schema A could deadlock
+   * against a cascade that holds the catalog and is waiting for schema A.
+   */
+  void lockCatalogForEntityWrite(NameIdentifier entityIdentifier, Long catalogId, Long metalakeId) {
+    String catalogName = entityIdentifier.namespace().level(1);
+    OccWriteSupport.lockParentForChildWrite(
+        catalogName,
+        Entity.EntityType.CATALOG,
+        () ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaByIdForShare(catalogId)),
+        null,
+        current ->
+            Objects.equals(current.getCatalogName(), catalogName)
+                && Objects.equals(current.getMetalakeId(), metalakeId));
+  }
+
+  void lockSchemaForEntityWrite(
       NameIdentifier entityIdentifier,
       Long observedSchemaId,
       Long observedCatalogId,

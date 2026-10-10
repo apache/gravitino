@@ -231,6 +231,7 @@
    ./dev/release/release-util.sh
 
    Apache Iceberg
+   ./spark-connector/spark-common/src/main/java/org/apache/gravitino/spark/connector/SparkTransformConverter.java
    ./api/src/main/java/org/apache/gravitino/exceptions/RESTException.java
    ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/CachedClientPool.java
    ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/HiveClientPool.java
@@ -259,6 +260,9 @@
    Apache Paimon
    ./catalogs/catalog-lakehouse-paimon/src/main/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
    ./catalogs/catalog-lakehouse-paimon/src/test/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/PaimonViewTestCatalogHelper.java
+
+   Apache Doris
+   ./catalogs/catalog-common/src/main/java/org/apache/gravitino/catalog/glue/GravitinoGlueCredentialsProvider.java
 
    Lance Namespace (https://github.com/lance-format/lance-namespace-impls)
    ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/JsonArrowSchemaConverter.java

@@ -680,6 +680,35 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testLoadHighPrecisionDecimalTable() {
+    mysqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "decimal_38 DECIMAL(38,30), "
+                + "decimal_39 DECIMAL(39,30), "
+                + "decimal_65 DECIMAL(65,30), "
+                + "decimal_65_unsigned DECIMAL(65,30) UNSIGNED, "
+                + "decimal_10_unsigned DECIMAL(10,2) UNSIGNED, "
+                + "decimal_38_unsigned DECIMAL(38,30) UNSIGNED, "
+                + "decimal_39_unsigned DECIMAL(39,30) UNSIGNED)",
+            schemaName, tableName));
+
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Column[] columns = loadedTable.columns();
+    Assertions.assertEquals(7, columns.length);
+    Assertions.assertEquals(Types.DecimalType.of(38, 30), columns[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("decimal(39,30)"), columns[1].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("decimal(65,30)"), columns[2].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("decimal(65,30) unsigned"), columns[3].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), columns[4].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(38, 30), columns[5].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("decimal(39,30) unsigned"), columns[6].dataType());
+  }
+
+  @Test
   void testColumnTypeConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_type_converter");
@@ -1487,7 +1516,9 @@ public class CatalogMysqlIT extends BaseIT {
             UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
     Assertions.assertTrue(
-        exception.getMessage().contains("Doesn't support setting schema comment: comment"));
+        exception
+            .getMessage()
+            .contains("Schema " + testSchemaName + ": catalog does not support schema comments"));
 
     // test null comment
     String testSchemaName2 = "test2";

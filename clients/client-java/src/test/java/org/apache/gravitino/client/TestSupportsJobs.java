@@ -338,6 +338,41 @@ public class TestSupportsJobs extends TestBase {
   }
 
   @Test
+  public void testGetJobWithOutput() throws JsonProcessingException {
+    String jobId = "job-1";
+    String jobTemplateName = "shell-job-template";
+    List<String> stdout = Lists.newArrayList("line1", "line2");
+    List<String> stderr = Lists.newArrayList("err1");
+    JobDTO expectedJob = newJobDTO(jobId, jobTemplateName, stdout, stderr);
+    JobResponse resp = new JobResponse(expectedJob);
+
+    buildMockResource(
+        Method.GET,
+        jobRunsPath() + "/" + jobId,
+        ImmutableMap.of("includeOutput", "true"),
+        null,
+        resp,
+        HttpStatus.SC_OK);
+
+    JobHandle actualHandle = metalake.getJob(jobId, true);
+    compare(expectedJob, actualHandle);
+    Assertions.assertEquals(stdout, actualHandle.stdout());
+    Assertions.assertEquals(stderr, actualHandle.stderr());
+
+    // Test throw NoSuchJobException
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(NoSuchJobException.class.getSimpleName(), "mock error");
+    buildMockResource(
+        Method.GET,
+        jobRunsPath() + "/" + jobId,
+        ImmutableMap.of("includeOutput", "true"),
+        null,
+        errorResp,
+        HttpStatus.SC_NOT_FOUND);
+    Assertions.assertThrows(NoSuchJobException.class, () -> metalake.getJob(jobId, true));
+  }
+
+  @Test
   public void testRunJob() throws JsonProcessingException {
     String jobTemplateName = "shell-job-template";
     String jobId = "job-1";
@@ -459,6 +494,24 @@ public class TestSupportsJobs extends TestBase {
         now,
         startedAt,
         finishedAt,
-        runtimeJobTemplate);
+        runtimeJobTemplate,
+        null,
+        null);
+  }
+
+  private JobDTO newJobDTO(
+      String jobId, String templateName, List<String> stdout, List<String> stderr) {
+    Instant now = Instant.now();
+    return new JobDTO(
+        jobId,
+        templateName,
+        JobHandle.Status.SUCCEEDED,
+        AuditDTO.builder().withCreator("test").withCreateTime(now).build(),
+        now,
+        now,
+        now,
+        null,
+        stdout,
+        stderr);
   }
 }

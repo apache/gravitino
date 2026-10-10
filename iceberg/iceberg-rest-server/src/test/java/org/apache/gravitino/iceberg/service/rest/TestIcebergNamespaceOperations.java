@@ -198,8 +198,9 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergDropNamespaceFailureEvent);
 
-    // jersery route failed
-    verifyDropNamespaceFail(500, Namespace.of(""));
+    // Empty namespace encodes to a path Jersey cannot bind for DELETE → 405 Method Not Allowed
+    // (previously mis-mapped to 500 by IcebergExceptionMapper).
+    verifyDropNamespaceFail(405, Namespace.of(""));
 
     verifyCreateNamespaceSucc(Namespace.of("drop_foo3", "a"));
     verifyDropNamespaceFail(404, Namespace.of("drop_foo3", "b"));

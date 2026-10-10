@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import unittest
+from unittest.mock import Mock, patch
 
 from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.client.gravitino_client_config import GravitinoClientConfig
@@ -25,6 +26,22 @@ from tests.unittests import mock_base
 @mock_base.mock_data
 class TestMetalake(unittest.TestCase):
     # pylint: disable=W0212
+    def test_gravitino_client_close_delegates_without_request(self, *mock_methods):
+        auth_data_provider = Mock()
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name="test",
+            check_version=False,
+            auth_data_provider=auth_data_provider,
+        )
+
+        with patch("gravitino.utils.http_client.build_opener") as build_opener:
+            gravitino_client.close()
+            gravitino_client.close()
+
+        auth_data_provider.close.assert_called_once_with()
+        build_opener.assert_not_called()
+
     def test_gravitino_client_headers(self, *mock_methods):
         expected_headers = {
             "k1": "v1",

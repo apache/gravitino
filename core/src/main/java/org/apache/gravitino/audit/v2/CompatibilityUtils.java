@@ -55,6 +55,7 @@ public class CompatibilityUtils {
           .put(OperationType.LOAD_TABLE, Operation.LOAD_TABLE)
           .put(OperationType.LOAD_TABLE_CREDENTIAL, Operation.LOAD_TABLE_CREDENTIAL)
           .put(OperationType.PLAN_TABLE_SCAN, Operation.PLAN_TABLE_SCAN)
+          .put(OperationType.FETCH_SCAN_TASKS, Operation.FETCH_SCAN_TASKS)
           .put(OperationType.LIST_TABLE, Operation.LIST_TABLE)
           .put(OperationType.ALTER_TABLE, Operation.ALTER_TABLE)
           .put(OperationType.RENAME_TABLE, Operation.RENAME_TABLE)
@@ -194,6 +195,11 @@ public class CompatibilityUtils {
           .put(
               OperationType.GET_POLICY_FOR_METADATA_OBJECT,
               Operation.GET_POLICY_FOR_METADATA_OBJECT)
+          .put(OperationType.CREATE_SEMANTIC_MODEL, Operation.CREATE_SEMANTIC_MODEL)
+          .put(OperationType.ALTER_SEMANTIC_MODEL, Operation.ALTER_SEMANTIC_MODEL)
+          .put(OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL)
+          .put(OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL)
+          .put(OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL)
           .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)
           .put(OperationType.GET_FUNCTION, Operation.GET_FUNCTION)
           .put(OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION)

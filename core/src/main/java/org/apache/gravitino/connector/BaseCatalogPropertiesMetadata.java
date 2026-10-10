@@ -29,9 +29,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.cloud.storage.CloudPropertiesMetadata;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
@@ -102,21 +105,37 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   true /* hidden */)),
           PropertyEntry::getName);
 
+  /**
+   * Cloud credential keys merged into every catalog. A catalog that already declares a key wins.
+   */
+  private static final Map<String, PropertyEntry<?>> CLOUD_PROPERTY_ENTRIES =
+      CloudPropertiesMetadata.ALL_PROPERTY_ENTRIES;
+
   @Override
   public Map<String, PropertyEntry<?>> propertyEntries() {
     if (propertyEntries == null) {
       synchronized (this) {
         if (propertyEntries == null) {
-          // Reuse BasePropertiesMetadata (specific + BASIC + CredentialConfig), then add
-          // catalog-only entries.
+          // Reuse BasePropertiesMetadata (specific + BASIC + CredentialConfig), then add shared
+          // cloud credential keys and catalog-only entries.
           Map<String, PropertyEntry<?>> base = buildBasePropertyEntries();
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
           builder.putAll(base);
+          // Track keys already placed so a later collision reports "Property metadata already
+          // exists" instead of Guava's "Multiple entries with same key" from builder.build().
+          Set<String> placed = new HashSet<>(base.keySet());
+
+          CLOUD_PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                if (placed.add(name)) {
+                  builder.put(name, entry);
+                }
+              });
 
           BASIC_CATALOG_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 Preconditions.checkArgument(
-                    !base.containsKey(name), "Property metadata already exists: " + name);
+                    placed.add(name), "Property metadata already exists: " + name);
                 builder.put(name, entry);
               });
           propertyEntries = builder.build();

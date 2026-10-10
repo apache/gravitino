@@ -19,12 +19,16 @@
 package org.apache.gravitino.storage.relational;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -45,7 +49,12 @@ public class TestEntityCacheCrossNodeInvalidation extends TestJDBCBackend {
   // A large poll interval so the background scheduler never fires during the test; the test drives
   // node B's poll explicitly via pollChanges().
   private EntityChangeLogPoller newIdlePoller(CaffeineEntityCache nodeBCache) {
-    EntityChangeLogPoller poller = new EntityChangeLogPoller(3600);
+    return newIdlePoller(nodeBCache, Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+  }
+
+  private EntityChangeLogPoller newIdlePoller(CaffeineEntityCache nodeBCache, int batchSize) {
+    EntityChangeLogPoller poller =
+        new EntityChangeLogPoller(3600, batchSize, new EntityChangeLogMetricsSource());
     poller.registerListener(new EntityCacheChangeLogListener(nodeBCache));
     // start() seeds the cursor with the current DB tail, modelling a node whose cache is already
     // warm: only changes written after this point are replayed.
@@ -83,6 +92,56 @@ public class TestEntityCacheCrossNodeInvalidation extends TestJDBCBackend {
     } finally {
       nodeBPoller.close();
     }
+  }
+
+  @TestTemplate
+  void testBacklogLargerThanOneBatchReachesEveryDistinctEntityOnNodeB() throws IOException {
+    createParentEntities(METALAKE, CATALOG, SCHEMA, AUDIT_INFO);
+    Namespace namespace = Namespace.of(METALAKE, CATALOG, SCHEMA);
+    List<TableEntity> tables = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      TableEntity table =
+          createTableEntity(
+              RandomIdGenerator.INSTANCE.nextId(), namespace, "backlog_table" + i, AUDIT_INFO);
+      backend.insert(table, false);
+      tables.add(table);
+    }
+
+    // Node B has cached every table.
+    CaffeineEntityCache nodeBCache = new CaffeineEntityCache(new Config() {});
+    tables.forEach(nodeBCache::put);
+
+    EntityChangeLogPoller nodeBPoller = newIdlePoller(nodeBCache, 2);
+    try {
+      // Node A renames every table, leaving five change rows: more than two batches of two.
+      for (TableEntity table : tables) {
+        backend.update(
+            table.nameIdentifier(),
+            EntityType.TABLE,
+            entity ->
+                createTableEntity(table.id(), namespace, table.name() + "_renamed", AUDIT_INFO));
+      }
+
+      // A poll reads one bounded batch and reports that more rows may be waiting.
+      Assertions.assertTrue(nodeBPoller.pollChanges());
+      Assertions.assertEquals(3, countCached(nodeBCache, tables));
+
+      // The scheduler polls again immediately while batches are full, until one is partial.
+      int polls = 1;
+      while (nodeBPoller.pollChanges()) {
+        polls++;
+        Assertions.assertTrue(polls < 10, "the backlog should drain in a bounded number of polls");
+      }
+      Assertions.assertEquals(0, countCached(nodeBCache, tables));
+    } finally {
+      nodeBPoller.close();
+    }
+  }
+
+  private static long countCached(CaffeineEntityCache cache, List<TableEntity> tables) {
+    return tables.stream()
+        .filter(table -> cache.contains(table.nameIdentifier(), EntityType.TABLE))
+        .count();
   }
 
   @TestTemplate

@@ -18,20 +18,21 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum, unique
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 
 class Index(ABC):
     """The Index interface defines methods for implementing table index columns.
 
-    Supported index types and operations depend on the catalog.
+    Catalogs may provide generic key and connector-specific index types; supported operations
+    depend on the catalog.
     """
 
     @unique
     class IndexType(str, Enum):
         """The enum IndexType defines the type of the index.
 
-        Supported index types depend on the catalog.
+        Catalogs may support generic key types and connector-specific index types.
         """
 
         PRIMARY_KEY = "PRIMARY_KEY"
@@ -52,6 +53,9 @@ class Index(ABC):
 
         DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
         """ClickHouse full-text data-skipping index loaded from native table metadata."""
+
+        DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
+        """ClickHouse vector similarity data skipping index."""
 
     @abstractmethod
     def type(self) -> IndexType:
@@ -83,6 +87,6 @@ class Index(ABC):
         """
         pass  # pragma: no cover
 
-    def properties(self) -> Dict[str, str]:
-        """Returns optional index properties, empty for legacy implementations."""
+    def properties(self) -> dict[str, str]:
+        """Returns optional index properties, empty when none are defined."""
         return {}

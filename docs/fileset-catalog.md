@@ -50,10 +50,10 @@ the Fileset catalog has the following properties:
 Refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
 Sensitive catalog properties such as cloud access keys are hidden from the default load catalog
-response. Retrieve secret-manager-backed properties (including keys stored as secret URNs) via
-`getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The
-[credential vending API](security/credential-vending.md) remains available for typed credential
-delivery.
+response. Recover credential fields via the [credential vending API](security/credential-vending.md)
+(`getCredentials`). Other non-credential secrets (secret-manager URNs, declared `hidden`
+properties, undeclared sensitive-named keys) use `getSecrets` /
+`GET .../objects/{type}/{fullName}/secrets`.
 
 ### HDFS Fileset
 

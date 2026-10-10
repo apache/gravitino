@@ -41,6 +41,7 @@ components:
             - "data_skipping_ngrambfv1"
             - "data_skipping_tokenbfv1"
             - "data_skipping_text"
+            - "data_skipping_vector_similarity"
         name:
           type: string
           description: The name of the index

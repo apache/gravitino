@@ -54,8 +54,8 @@ public interface Index {
   }
 
   /**
-   * Identifies an index type in the Gravitino table model. The index types and operations supported
-   * by a catalog implementation may vary.
+   * Identifies an index type in the Gravitino table model. Catalogs may support generic key types
+   * and connector-specific index types, and supported operations may vary by catalog.
    */
   enum IndexType {
     /**
@@ -147,5 +147,10 @@ public interface Index {
 
     /** Full-text data skipping index in ClickHouse. */
     DATA_SKIPPING_TEXT,
+
+    /**
+     * Vector similarity data skipping index for approximate nearest-neighbor search in ClickHouse.
+     */
+    DATA_SKIPPING_VECTOR_SIMILARITY,
   }
 }
