@@ -91,6 +91,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   // it.
   private String driverVersion;
   private volatile boolean driverVersionCached;
+  // Even a failed attempt must prevent a fallback borrow while load holds its connection.
+  // cacheDriverVersion retries failures using the connection held by a later load.
+  private volatile boolean driverVersionAttempted;
 
   @Override
   public void initialize(
@@ -100,6 +103,9 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
     this.dataSource = dataSource;
+    driverVersion = null;
+    driverVersionCached = false;
+    driverVersionAttempted = false;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
     this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
@@ -812,12 +818,13 @@ public abstract class JdbcTableOperations implements TableOperation {
    *
    * <p>The version is cached once read. {@link #load} caches it from the connection it holds before
    * parsing columns (see {@link #cacheDriverVersion}), so this method borrows a connection only
-   * when nothing has cached it yet.
+   * before the first version-read attempt. Failed reads return null until a later load retries
+   * using its own connection, avoiding a nested borrow during column parsing.
    *
    * @return the driver version string, or null if not available
    */
   protected String getMySQLDriverVersion() {
-    if (driverVersionCached || dataSource == null) {
+    if (driverVersionCached || driverVersionAttempted || dataSource == null) {
       return driverVersion;
     }
     try (Connection connection = dataSource.getConnection()) {
@@ -844,9 +851,11 @@ public abstract class JdbcTableOperations implements TableOperation {
       driverVersion = connection.getMetaData().getDriverVersion();
       driverVersionCached = true;
     } catch (SQLException e) {
-      // Not cached, so a later call retries: without the version, MySQL datetime precision may be
-      // computed from an inaccurate column size.
+      // A later load retries on its held connection; column parsing must not retry by borrowing
+      // another connection. Until recovery, preserve the existing null-version precision fallback.
       LOG.debug("Failed to get driver version", e);
+    } finally {
+      driverVersionAttempted = true;
     }
   }
 

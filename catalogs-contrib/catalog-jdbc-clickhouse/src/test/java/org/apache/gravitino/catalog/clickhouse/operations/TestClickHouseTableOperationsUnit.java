@@ -794,6 +794,7 @@ public class TestClickHouseTableOperationsUnit {
 
     JdbcTable table = ops.load("db", "t");
 
+    Mockito.verify(metadata).getDriverVersion();
     Assertions.assertEquals(1, table.columns().length);
     Assertions.assertEquals("MergeTree", table.properties().get(TableConstants.ENGINE));
     Assertions.assertEquals("", table.properties().get(TableConstants.PARTITION_KEY));

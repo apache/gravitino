@@ -20,8 +20,11 @@ package org.apache.gravitino.catalog.jdbc.operation;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -30,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.io.FileUtils;
@@ -260,6 +264,156 @@ public class TestJdbcOperationsConnectionUsage {
 
     Assertions.assertEquals(1, connections.totalBorrows());
     Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  public void testLoadWithNullVersionUsesOneCountedConnection() throws SQLException {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    List<String> versions = new ArrayList<>();
+    JdbcTableOperations operations = countedLoadOperations(connections, versions);
+
+    JdbcTable table = operations.load(DATABASE, TABLE);
+
+    Assertions.assertEquals(2, table.columns().length);
+    Assertions.assertEquals(Arrays.asList(null, null), versions);
+    Assertions.assertEquals(1, connections.totalBorrows());
+    Assertions.assertEquals(1, connections.peakBorrowed());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  public void testFailedVersionReadDoesNotBorrowDuringLoadAndRetriesOnNextLoad()
+      throws SQLException {
+    AtomicInteger reads = new AtomicInteger();
+    DatabaseMetaData metadata =
+        metadata(
+            () -> {
+              if (reads.incrementAndGet() == 1) {
+                throw new SQLException("version unavailable");
+              }
+              return "driver-1";
+            });
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource(metadata);
+    List<String> versions = new ArrayList<>();
+    JdbcTableOperations operations = countedLoadOperations(connections, versions);
+
+    Assertions.assertEquals(2, operations.load(DATABASE, TABLE).columns().length);
+    Assertions.assertEquals(Arrays.asList(null, null), versions);
+    Assertions.assertEquals(1, connections.totalBorrows());
+    Assertions.assertEquals(2, operations.load(DATABASE, TABLE).columns().length);
+
+    Assertions.assertEquals(Arrays.asList(null, null, "driver-1", "driver-1"), versions);
+    Assertions.assertEquals(2, reads.get());
+    Assertions.assertEquals(2, connections.totalBorrows());
+    Assertions.assertEquals(1, connections.peakBorrowed());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  public void testDriverVersionFallbackBorrowsOnceAndCachesNull() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    JdbcTableOperations operations = new SqliteTableOperations();
+    initialize(operations, connections.dataSource());
+
+    Assertions.assertNull(operations.getMySQLDriverVersion());
+    Assertions.assertNull(operations.getMySQLDriverVersion());
+
+    Assertions.assertEquals(1, connections.totalBorrows());
+    Assertions.assertEquals(1, connections.peakBorrowed());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  public void testInitializeClearsPreviouslyCachedVersion() throws SQLException {
+    JdbcTableOperations operations = new SqliteTableOperations();
+    initialize(operations, new ConnectionCountingDataSource().dataSource());
+    Assertions.assertNull(operations.getMySQLDriverVersion());
+    DatabaseMetaData metadata = metadata(() -> "new-driver");
+    ConnectionCountingDataSource replacement = new ConnectionCountingDataSource(metadata);
+
+    initialize(operations, replacement.dataSource());
+
+    Assertions.assertEquals("new-driver", operations.getMySQLDriverVersion());
+    Assertions.assertEquals(1, replacement.totalBorrows());
+    Assertions.assertEquals(0, replacement.borrowed());
+  }
+
+  private static JdbcTableOperations countedLoadOperations(
+      ConnectionCountingDataSource connections, List<String> versions) {
+    JdbcTableOperations operations =
+        new SqliteTableOperations() {
+          @Override
+          protected ResultSet getTable(Connection connection, String databaseName, String tableName)
+              throws SQLException {
+            return resultSet(Collections.singletonList(Map.of("TABLE_NAME", tableName)));
+          }
+
+          @Override
+          protected ResultSet getColumns(
+              Connection connection, String databaseName, String tableName) throws SQLException {
+            return resultSet(
+                Arrays.asList(
+                    Map.of("TABLE_NAME", tableName, "COLUMN_NAME", "id", "TYPE_NAME", "TEXT"),
+                    Map.of(
+                        "TABLE_NAME", tableName, "COLUMN_NAME", "created", "TYPE_NAME", "TEXT")));
+          }
+
+          @Override
+          protected List<Index> getIndexes(
+              Connection connection, String databaseName, String tableName) {
+            return Collections.emptyList();
+          }
+
+          @Override
+          public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+            Assertions.assertEquals(1, connections.borrowed());
+            versions.add(getMySQLDriverVersion());
+            return null;
+          }
+        };
+    initialize(operations, connections.dataSource());
+    return operations;
+  }
+
+  private interface VersionReader {
+    String read() throws SQLException;
+  }
+
+  private static DatabaseMetaData metadata(VersionReader reader) {
+    return (DatabaseMetaData)
+        Proxy.newProxyInstance(
+            DatabaseMetaData.class.getClassLoader(),
+            new Class<?>[] {DatabaseMetaData.class},
+            (proxy, method, args) -> {
+              if ("getDriverVersion".equals(method.getName())) {
+                return reader.read();
+              }
+              throw new UnsupportedOperationException(method.getName());
+            });
+  }
+
+  private static ResultSet resultSet(List<Map<String, String>> rows) {
+    AtomicInteger position = new AtomicInteger(-1);
+    return (ResultSet)
+        Proxy.newProxyInstance(
+            ResultSet.class.getClassLoader(),
+            new Class<?>[] {ResultSet.class},
+            (proxy, method, args) -> {
+              switch (method.getName()) {
+                case "next":
+                  return position.incrementAndGet() < rows.size();
+                case "close":
+                  return null;
+                case "getString":
+                  return rows.get(position.get()).get(args[0]);
+                case "getInt":
+                  return 0;
+                case "getBoolean":
+                  return false;
+                default:
+                  throw new UnsupportedOperationException(method.getName());
+              }
+            });
   }
 
   // Like the MySQL generator loading the original table, borrows a connection while generating.

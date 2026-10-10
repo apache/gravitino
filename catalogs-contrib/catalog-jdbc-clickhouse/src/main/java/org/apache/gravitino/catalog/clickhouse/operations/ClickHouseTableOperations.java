@@ -881,6 +881,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     try (Connection connection = getConnection(databaseName)) {
+      cacheDriverVersion(connection);
       ResultSet tables = getTable(connection, databaseName, tableName);
       JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
 

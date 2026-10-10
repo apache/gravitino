@@ -35,6 +35,8 @@ import javax.sql.DataSource;
  */
 public class ConnectionCountingDataSource {
 
+  private final DatabaseMetaData metadata;
+
   private final AtomicInteger borrowed = new AtomicInteger();
   private final AtomicInteger peakBorrowed = new AtomicInteger();
   private final AtomicInteger totalBorrows = new AtomicInteger();
@@ -50,6 +52,20 @@ public class ConnectionCountingDataSource {
                 }
                 return objectMethod(proxy, method.getName(), args, "DataSource");
               });
+
+  /** Creates a counting data source whose driver reports a null version. */
+  public ConnectionCountingDataSource() {
+    this(metaData());
+  }
+
+  /**
+   * Creates a counting data source with the supplied JDBC metadata.
+   *
+   * @param metadata the metadata returned by each borrowed connection
+   */
+  public ConnectionCountingDataSource(DatabaseMetaData metadata) {
+    this.metadata = metadata;
+  }
 
   /** Returns the data source to pass to the operations under test. */
   public DataSource dataSource() {
@@ -97,7 +113,7 @@ public class ConnectionCountingDataSource {
                 case "createStatement":
                   return statement();
                 case "getMetaData":
-                  return metaData();
+                  return metadata;
                 default:
                   return objectMethod(proxy, method.getName(), args, "Connection");
               }
