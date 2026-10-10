@@ -25,7 +25,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Pre-event before loading a Semantic Model. */
 @DeveloperApi
-public class LoadSemanticModelPreEvent extends SemanticModelPreEvent {
+public final class LoadSemanticModelPreEvent extends SemanticModelPreEvent {
 
   /**
    * Constructs an instance of {@code LoadSemanticModelPreEvent}.

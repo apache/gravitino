@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -58,11 +60,13 @@ import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.mockito.MockedStatic;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestSemanticModelEvent {
@@ -380,6 +384,59 @@ public class TestSemanticModelEvent {
   @Test
   void testAlterEmptyChangesPreservesValidationAndFailureEvent() {
     assertInvalidAlterChangesEmitFailure(new SemanticModelChange[0]);
+  }
+
+  @Test
+  void testNullListResultReportsUnknownCount() {
+    SemanticModelDispatcher underlying = mock(SemanticModelDispatcher.class);
+    when(underlying.listSemanticModels(NAMESPACE)).thenReturn(null);
+    DummyEventListener listener = new DummyEventListener();
+    SemanticModelEventDispatcher eventDispatcher =
+        new SemanticModelEventDispatcher(new EventBus(Arrays.asList(listener)), underlying);
+
+    Assertions.assertNull(eventDispatcher.listSemanticModels(NAMESPACE));
+    ListSemanticModelEvent event =
+        Assertions.assertInstanceOf(ListSemanticModelEvent.class, listener.popPostEvent());
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
+  void testSuccessEventsRetainInitiatingUser() {
+    assertEventsRetainInitiatingUser(false);
+  }
+
+  @Test
+  void testFailureEventsRetainInitiatingUser() {
+    assertEventsRetainInitiatingUser(true);
+  }
+
+  private void assertEventsRetainInitiatingUser(boolean fail) {
+    NameIdentifier identifier = NameIdentifier.of(NAMESPACE, "model");
+    for (Consumer<SemanticModelEventDispatcher> operation :
+        Arrays.<Consumer<SemanticModelEventDispatcher>>asList(
+            d -> d.listSemanticModels(NAMESPACE),
+            d -> d.loadSemanticModel(identifier),
+            d -> d.createSemanticModel(identifier, "comment", definition(), ImmutableMap.of()),
+            d -> d.alterSemanticModel(identifier, SemanticModelChange.setProperty("a", "b")),
+            d -> d.dropSemanticModel(identifier))) {
+      DummyEventListener listener = new DummyEventListener();
+      SemanticModelEventDispatcher eventDispatcher =
+          new SemanticModelEventDispatcher(
+              new EventBus(Arrays.asList(listener)),
+              fail ? mockExceptionSemanticModelDispatcher() : mockSemanticModelDispatcher());
+      try (MockedStatic<PrincipalUtils> principal = mockStatic(PrincipalUtils.class)) {
+        principal.when(PrincipalUtils::getCurrentUserName).thenReturn("initiator", "changed_user");
+        if (fail) {
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> operation.accept(eventDispatcher));
+        } else {
+          operation.accept(eventDispatcher);
+        }
+        Assertions.assertEquals("initiator", listener.popPreEvent().user());
+        Assertions.assertEquals("initiator", listener.popPostEvent().user());
+        principal.verify(PrincipalUtils::getCurrentUserName);
+      }
+    }
   }
 
   private void assertInvalidAlterChangesEmitFailure(SemanticModelChange[] changes) {

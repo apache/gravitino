@@ -26,7 +26,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Pre-event before listing the Semantic Models in a namespace. */
 @DeveloperApi
-public class ListSemanticModelPreEvent extends SemanticModelPreEvent {
+public final class ListSemanticModelPreEvent extends SemanticModelPreEvent {
   private final Namespace namespace;
 
   /**

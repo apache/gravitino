@@ -27,7 +27,7 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 
 /** Pre-event before altering a Semantic Model. */
 @DeveloperApi
-public class AlterSemanticModelPreEvent extends SemanticModelPreEvent {
+public final class AlterSemanticModelPreEvent extends SemanticModelPreEvent {
   @Nullable private final SemanticModelChange[] semanticModelChanges;
 
   /**

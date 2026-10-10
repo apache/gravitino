@@ -26,7 +26,7 @@ import org.apache.gravitino.listener.api.info.SemanticModelInfo;
 
 /** Pre-event before creating a Semantic Model. */
 @DeveloperApi
-public class CreateSemanticModelPreEvent extends SemanticModelPreEvent {
+public final class CreateSemanticModelPreEvent extends SemanticModelPreEvent {
   private final SemanticModelInfo createSemanticModelRequest;
 
   /**

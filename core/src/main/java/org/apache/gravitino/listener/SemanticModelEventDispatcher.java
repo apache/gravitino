@@ -73,36 +73,31 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
 
   @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
-    eventBus.dispatchEvent(
-        new ListSemanticModelPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListSemanticModelPreEvent(user, namespace));
     try {
       NameIdentifier[] identifiers = dispatcher.listSemanticModels(namespace);
       eventBus.dispatchEvent(
           new ListSemanticModelEvent(
-              PrincipalUtils.getCurrentUserName(),
-              namespace,
-              identifiers != null ? identifiers.length : -1));
+              user, namespace, identifiers != null ? identifiers.length : -1));
       return identifiers;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new ListSemanticModelFailureEvent(PrincipalUtils.getCurrentUserName(), namespace, e));
+      eventBus.dispatchEvent(new ListSemanticModelFailureEvent(user, namespace, e));
       throw e;
     }
   }
 
   @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
-    eventBus.dispatchEvent(
-        new LoadSemanticModelPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new LoadSemanticModelPreEvent(user, ident));
     try {
       SemanticModel semanticModel = dispatcher.loadSemanticModel(ident);
       eventBus.dispatchEvent(
-          new LoadSemanticModelEvent(
-              PrincipalUtils.getCurrentUserName(), ident, new SemanticModelInfo(semanticModel)));
+          new LoadSemanticModelEvent(user, ident, new SemanticModelInfo(semanticModel)));
       return semanticModel;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new LoadSemanticModelFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      eventBus.dispatchEvent(new LoadSemanticModelFailureEvent(user, ident, e));
       throw e;
     }
   }
@@ -120,21 +115,18 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       Map<String, String> properties)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
+    String user = PrincipalUtils.getCurrentUserName();
     SemanticModelInfo createRequest =
         new SemanticModelInfo(ident.name(), comment, definition, properties, null);
-    eventBus.dispatchEvent(
-        new CreateSemanticModelPreEvent(PrincipalUtils.getCurrentUserName(), ident, createRequest));
+    eventBus.dispatchEvent(new CreateSemanticModelPreEvent(user, ident, createRequest));
     try {
       SemanticModel semanticModel =
           dispatcher.createSemanticModel(ident, comment, definition, properties);
       eventBus.dispatchEvent(
-          new CreateSemanticModelEvent(
-              PrincipalUtils.getCurrentUserName(), ident, new SemanticModelInfo(semanticModel)));
+          new CreateSemanticModelEvent(user, ident, new SemanticModelInfo(semanticModel)));
       return semanticModel;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new CreateSemanticModelFailureEvent(
-              PrincipalUtils.getCurrentUserName(), ident, e, createRequest));
+      eventBus.dispatchEvent(new CreateSemanticModelFailureEvent(user, ident, e, createRequest));
       throw e;
     }
   }
@@ -143,37 +135,29 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    eventBus.dispatchEvent(
-        new AlterSemanticModelPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new AlterSemanticModelPreEvent(user, ident, changes));
     try {
       SemanticModel semanticModel = dispatcher.alterSemanticModel(ident, changes);
       eventBus.dispatchEvent(
-          new AlterSemanticModelEvent(
-              PrincipalUtils.getCurrentUserName(),
-              ident,
-              changes,
-              new SemanticModelInfo(semanticModel)));
+          new AlterSemanticModelEvent(user, ident, changes, new SemanticModelInfo(semanticModel)));
       return semanticModel;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new AlterSemanticModelFailureEvent(
-              PrincipalUtils.getCurrentUserName(), ident, e, changes));
+      eventBus.dispatchEvent(new AlterSemanticModelFailureEvent(user, ident, e, changes));
       throw e;
     }
   }
 
   @Override
   public boolean dropSemanticModel(NameIdentifier ident) {
-    eventBus.dispatchEvent(
-        new DropSemanticModelPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new DropSemanticModelPreEvent(user, ident));
     try {
       boolean existed = dispatcher.dropSemanticModel(ident);
-      eventBus.dispatchEvent(
-          new DropSemanticModelEvent(PrincipalUtils.getCurrentUserName(), ident, existed));
+      eventBus.dispatchEvent(new DropSemanticModelEvent(user, ident, existed));
       return existed;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new DropSemanticModelFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      eventBus.dispatchEvent(new DropSemanticModelFailureEvent(user, ident, e));
       throw e;
     }
   }

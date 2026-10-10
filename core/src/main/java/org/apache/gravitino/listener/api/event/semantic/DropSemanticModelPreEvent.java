@@ -25,7 +25,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Pre-event before dropping a Semantic Model. */
 @DeveloperApi
-public class DropSemanticModelPreEvent extends SemanticModelPreEvent {
+public final class DropSemanticModelPreEvent extends SemanticModelPreEvent {
 
   /**
    * Constructs an instance of {@code DropSemanticModelPreEvent}.

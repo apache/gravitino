@@ -384,13 +384,19 @@ public class TestOperation {
 
     Event alterSemanticModelEvent =
         new AlterSemanticModelEvent(
-            USER, semanticModelIdentifier, new SemanticModelChange[] {}, semanticModelInfo);
+            USER,
+            semanticModelIdentifier,
+            new SemanticModelChange[] {SemanticModelChange.setProperty("key", "value")},
+            semanticModelInfo);
     Assertions.assertEquals(
         AuditLog.Operation.ALTER_SEMANTIC_MODEL,
         AuditLog.Operation.fromEvent(alterSemanticModelEvent));
     Event alterSemanticModelFailureEvent =
         new AlterSemanticModelFailureEvent(
-            USER, semanticModelIdentifier, new Exception(), new SemanticModelChange[] {});
+            USER,
+            semanticModelIdentifier,
+            new Exception(),
+            new SemanticModelChange[] {SemanticModelChange.setProperty("key", "value")});
     Assertions.assertEquals(
         AuditLog.Operation.ALTER_SEMANTIC_MODEL,
         AuditLog.Operation.fromEvent(alterSemanticModelFailureEvent));
