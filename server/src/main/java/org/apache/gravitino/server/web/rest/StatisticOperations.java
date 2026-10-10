@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -148,48 +149,32 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
-    if (request == null) {
-      return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE,
-          "",
-          fullName,
-          new IllegalArgumentException("Request body cannot be null"));
-    }
+    return writeStatistics(metalake, type, fullName, request, WriteMode.REPLACE);
+  }
 
-    String statisticNames = getStatisticNames(request);
-    try {
-      LOG.info(
-          "Received update statistics request for object full name: {} type: {} in the metalake {}",
-          fullName,
-          type,
-          metalake);
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            request.validate();
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            if (object.type() != MetadataObject.Type.TABLE) {
-              throw new IllegalArgumentException(
-                  "Update statistics is only supported for tables now.");
-            }
-
-            Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
-            for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
-              validateStatisticName(entry.getKey());
-              statisticMaps.put(entry.getKey(), entry.getValue());
-            }
-
-            MetadataObjectUtil.checkMetadataObject(metalake, object);
-
-            statisticDispatcher.updateStatistics(metalake, object, statisticMaps);
-            return Utils.ok(new BaseResponse(0));
-          });
-    } catch (Exception e) {
-      return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, statisticNames, fullName, e);
-    }
+  /**
+   * Atomically merges object-valued table statistics.
+   *
+   * @param metalake metalake name
+   * @param type metadata object type
+   * @param fullName metadata object name
+   * @param request keys to merge
+   * @return the update response
+   */
+  @PATCH
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "merge-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "merge-stats", absolute = true)
+  @AuthorizationExpression(
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.TABLE)
+  public Response mergeStatistics(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      StatisticsUpdateRequest request) {
+    return writeStatistics(metalake, type, fullName, request, WriteMode.MERGE);
   }
 
   @POST
@@ -494,6 +479,61 @@ public class StatisticOperations {
     }
   }
 
+  private Response writeStatistics(
+      String metalake,
+      String type,
+      String fullName,
+      StatisticsUpdateRequest request,
+      WriteMode mode) {
+    if (request == null) {
+      return ExceptionHandlers.handleStatisticException(
+          OperationType.UPDATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String statisticNames = getStatisticNames(request);
+    try {
+      LOG.info(
+          "Received {} statistics request for object full name: {} type: {} in the metalake {}",
+          mode == WriteMode.MERGE ? "merge" : "update",
+          fullName,
+          type,
+          metalake);
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            MetadataObject object =
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            if (object.type() != MetadataObject.Type.TABLE) {
+              throw new IllegalArgumentException(
+                  "Update statistics is only supported for tables now.");
+            }
+
+            Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
+            for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
+              validateStatisticName(entry.getKey());
+              statisticMaps.put(entry.getKey(), entry.getValue());
+            }
+
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
+
+            if (mode == WriteMode.MERGE) {
+              statisticDispatcher.mergeStatistics(metalake, object, statisticMaps);
+            } else {
+              statisticDispatcher.updateStatistics(metalake, object, statisticMaps);
+            }
+            return Utils.ok(new BaseResponse(0));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleStatisticException(
+          OperationType.UPDATE, statisticNames, fullName, e);
+    }
+  }
+
   private static String getStatisticNames(StatisticsUpdateRequest request) {
     if (request.getUpdates() == null) {
       return "";
@@ -546,5 +586,10 @@ public class StatisticOperations {
         request.getDrops().stream()
             .map(PartitionStatisticsDropDTO::partitionName)
             .collect(Collectors.toList()));
+  }
+
+  private enum WriteMode {
+    REPLACE,
+    MERGE
   }
 }

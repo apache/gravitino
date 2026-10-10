@@ -25,6 +25,7 @@ from gravitino.api.rel.types.types import Types
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class TestSupportsStatistics(unittest.TestCase):
@@ -108,6 +109,12 @@ class TestSupportsStatistics(unittest.TestCase):
 
         stat_val = ConcreteStatisticValue()
         instance.update_statistics({"test_stat": stat_val})
+        self.assertEqual(1, len(instance.list_statistics()))
+
+        with self.assertRaisesRegex(
+            UnsupportedOperationException, "Atomic statistics merging is not supported"
+        ):
+            instance.merge_statistics({"test_stat": stat_val})
         self.assertEqual(1, len(instance.list_statistics()))
 
         result = instance.drop_statistics(["test_stat"])
