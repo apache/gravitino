@@ -67,6 +67,11 @@ const ViewDetailsPage = dynamic(() => import('./entitiesContent/ViewDetailsPage'
   ssr: false
 })
 
+const SemanticModelDetailsPage = dynamic(() => import('./entitiesContent/SemanticModelDetailsPage'), {
+  loading: () => <Loading height={'200px'} />,
+  ssr: false
+})
+
 const RightContent = () => {
   const searchParams = useSearchParams()
 
@@ -76,10 +81,12 @@ const RightContent = () => {
   const schema = searchParams.get('schema')
   const functionName = searchParams.get('function')
   const viewName = searchParams.get('view')
+  const semanticModelName = searchParams.get('semanticModel')
 
   const entity =
     functionName ||
     viewName ||
+    semanticModelName ||
     searchParams.get('table') ||
     searchParams.get('fileset') ||
     searchParams.get('topic') ||
@@ -101,6 +108,9 @@ const RightContent = () => {
       }
       if (viewName) {
         return <ViewDetailsPage />
+      }
+      if (semanticModelName) {
+        return <SemanticModelDetailsPage />
       }
       switch (catalogType) {
         case 'relational':
