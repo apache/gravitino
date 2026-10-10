@@ -99,11 +99,8 @@ public class GravitinoCatalogManager {
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC,
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT)))
             .executor(cacheExecutor)
-            // A removed client still owns an HTTP connection pool, so every removal closes it,
-            // whether it came from eviction or from close(). Caffeine dispatches this listener on
-            // the given executor (the common pool in production), which may run it after close()
-            // has returned; CachedClient#close is idempotent, so the drain in close() and this
-            // listener cannot close a client twice.
+            // A removed client still owns an HTTP connection pool, so every removal closes it.
+            // CachedClient#close is a no-op if the drain in close() got there first.
             .<GravitinoIdentity, CachedClient>removalListener(
                 (identity, client, cause) -> closeClient(identity, client))
             .build();
@@ -143,7 +140,8 @@ public class GravitinoCatalogManager {
    * @param sparkConf the application Spark configuration
    * @param applicationUser the user the Spark application runs as, recorded for diagnostics only
    * @param clientBuilder builds a Gravitino client for a given identity
-   * @param cacheExecutor the executor Caffeine uses to dispatch the client cache's removal listener
+   * @param cacheExecutor the executor for the client cache's asynchronous work, including the
+   *     removal listener
    * @return the created GravitinoCatalogManager
    */
   @VisibleForTesting
@@ -173,8 +171,7 @@ public class GravitinoCatalogManager {
   public void close() {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
-    // Close on this thread so that no client the drain sees outlives close(). A client the drain
-    // missed is closed by the removal listener if the invalidation below still sees it.
+    // Caffeine dispatches the removal listener asynchronously, so shutdown closes explicitly.
     clients.asMap().forEach(GravitinoCatalogManager::closeClient);
     clients.invalidateAll();
     gravitinoCatalogs.invalidateAll();

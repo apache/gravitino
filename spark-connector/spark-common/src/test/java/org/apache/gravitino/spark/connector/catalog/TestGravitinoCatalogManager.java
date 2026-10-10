@@ -136,10 +136,8 @@ public class TestGravitinoCatalogManager {
   @Test
   void testCloseClosesEveryCachedClient() {
     SparkConf sparkConf = tokenConf();
-    // Run the client cache's removal listener on the calling thread. close() first drains and
-    // closes every cached client, then invalidateAll() fires the removal listener for each of the
-    // same entries; with a same-thread executor both happen before close() returns, so the
-    // close-once contract is observable with no wait. A broken CAS would close a client twice here.
+    // With the removal listener run inline, the drain and the listener both try to close every
+    // client before close() returns.
     GravitinoCatalogManager manager = createManager(sparkConf, Runnable::run);
 
     for (String user : new String[] {"alice", "bob", "carol"}) {
@@ -153,8 +151,7 @@ public class TestGravitinoCatalogManager {
     assertEquals(
         List.of(1, 1, 1),
         clientFactory.closeCounts(),
-        "close() must close each cached client exactly once, though the drain and the removal"
-            + " listener both try");
+        "each cached client must be closed exactly once");
   }
 
   @Test
