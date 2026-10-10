@@ -31,16 +31,20 @@ import net.ltgt.gradle.errorprone.errorprone
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.publish.maven.tasks.GenerateMavenPom
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
+import org.w3c.dom.Element
+import org.w3c.dom.Node
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Locale
 import java.util.zip.ZipFile
+import javax.xml.parsers.DocumentBuilderFactory
 
 Locale.setDefault(Locale.US)
 
@@ -873,6 +877,43 @@ subprojects {
     shadowJar.configure {
       dependsOn(bundledLegalFiles)
       transform(LegalFilesTransformer(bundledLegalFiles.get().outputArchive.get().asFile))
+    }
+
+    // A module that declares a `shadedDependencies` configuration packages those inputs into its
+    // shaded jar, so they must not be republished as dependencies: consumers resolving the
+    // coordinate would otherwise download unshaded copies of the classes the jar already contains.
+    // See https://github.com/apache/gravitino/issues/13171
+    afterEvaluate {
+      if (configurations.findByName("shadedDependencies") == null) {
+        return@afterEvaluate
+      }
+      val generatePom = tasks.named<GenerateMavenPom>("generatePomFileForMavenJavaPublication")
+      val verifyShadedRuntimePom = tasks.register("verifyShadedRuntimePom") {
+        group = "verification"
+        description = "Fails when a self-contained shaded artifact republishes bundled inputs."
+        val pom = generatePom.map { it.destination }
+        dependsOn(generatePom)
+        doLast {
+          val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pom.get())
+          val published = document.getElementsByTagName("dependency")
+          check(published.length == 0) {
+            val coordinates =
+              (0 until published.length).joinToString { index ->
+                val element = published.item(index) as Element
+                val children = (0 until element.childNodes.length).map { element.childNodes.item(it) }
+                fun childText(name: String) =
+                  children
+                    .firstOrNull { it.nodeType == Node.ELEMENT_NODE && it.nodeName == name }
+                    ?.textContent
+                "${childText("groupId")}:${childText("artifactId")}"
+              }
+            "${project.path} publishes dependencies its jar already contains: $coordinates"
+          }
+        }
+      }
+      tasks.named("check") {
+        dependsOn(verifyShadedRuntimePom)
+      }
     }
   }
   if (project.path == ":clients:cli") {
