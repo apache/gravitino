@@ -135,6 +135,20 @@ public class TestGravitinoCatalogManager {
   }
 
   @Test
+  void testCatalogLoadFailureIncludesNameAndPreservesCause() {
+    GravitinoCatalogManager manager = createManager(new SparkConf(false));
+    GravitinoClient client = manager.getClient(manager.currentIdentity());
+    RuntimeException cause = new RuntimeException("Gravitino server unreachable");
+    when(client.loadCatalog(CATALOG_NAME)).thenThrow(cause);
+
+    RuntimeException failure =
+        assertThrows(RuntimeException.class, () -> manager.getGravitinoCatalogInfo(CATALOG_NAME));
+
+    assertEquals("Failed to load catalog " + CATALOG_NAME, failure.getMessage());
+    assertSame(cause, failure.getCause());
+  }
+
+  @Test
   void testCatalogDescriptorsAreNotStoredInCompleteCatalogCache() {
     SparkConf sparkConf = new SparkConf(false);
     GravitinoCatalogManager manager = createManager(sparkConf);
