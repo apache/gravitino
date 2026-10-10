@@ -20,11 +20,14 @@ package org.apache.gravitino.server.web;
 
 import com.google.common.collect.Maps;
 import java.lang.reflect.Parameter;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MediaType;
@@ -37,15 +40,44 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Utils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
   private static final String REMOTE_USER = "gravitino";
+
+  // Matches gravitino.auxService.names / AuxiliaryServiceManager's registration key.
+  private static final String ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
+  // Keys below are read from AuxiliaryServiceManager.getAuxServiceConfig, which already strips
+  // the gravitino.iceberg-rest. (or deprecated gravitino.auxService.iceberg-rest.) prefix, so
+  // they must NOT be re-prefixed here.
+  // The provider name used by the Iceberg REST server itself; see
+  // IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER and DynamicIcebergConfigProvider. The
+  // shared server utilities do not depend on Iceberg implementation modules.
+  private static final String ICEBERG_CATALOG_CONFIG_PROVIDER_KEY = "catalog-config-provider";
+  private static final String ICEBERG_DYNAMIC_CONFIG_PROVIDER_NAME = "dynamic-config-provider";
+  // The post-strip key used by the Iceberg REST server itself; see
+  // IcebergConstants.GRAVITINO_METALAKE and DynamicIcebergConfigProvider.
+  private static final String ICEBERG_SERVED_METALAKE_KEY = "gravitino-metalake";
+  // Overrides the listener-derived endpoint; see docs/iceberg-rest-service.md.
+  private static final String ICEBERG_ADVERTISED_URI_KEY = "advertised-uri";
+  private static final String ICEBERG_HOST_KEY = "host";
+  private static final String ICEBERG_HTTP_PORT_KEY = "httpPort";
+  private static final String ICEBERG_HTTPS_PORT_KEY = "httpsPort";
+  private static final String ICEBERG_ENABLE_HTTPS_KEY = "enableHttps";
+  // Match IcebergConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT/HTTPS_PORT. JettyServerConfig's
+  // defaults belong to the Gravitino server (8090/8433), not the Iceberg REST server.
+  private static final int ICEBERG_DEFAULT_HTTP_PORT = 9001;
+  private static final int ICEBERG_DEFAULT_HTTPS_PORT = 9433;
+  private static final String ICEBERG_DEFAULT_HOST = "0.0.0.0";
 
   private Utils() {}
 
@@ -339,5 +371,134 @@ public class Utils {
       pathParams.put("p_" + pathParam.value(), args[i]);
     }
     return pathParams;
+  }
+
+  /**
+   * Resolves the Iceberg REST service URI from the supplied service registration and configuration.
+   *
+   * <p>A valid advertised URI takes precedence over the listener configuration. Otherwise, the URI
+   * uses the configured host, protocol and port, with Iceberg REST defaults for omitted values. A
+   * wildcard listener host is replaced with {@code requestHost}, assuming both services share a
+   * host. Reverse proxies or split deployments should configure {@code advertised-uri} explicitly.
+   *
+   * @param serviceManager the auxiliary service manager used to check service registration
+   * @param serviceConfig the effective Iceberg REST service configuration returned by {@link
+   *     AuxiliaryServiceManager#getAuxServiceConfig}, with the service prefix stripped
+   * @param metalake the requested metalake, or null/blank to skip the metalake check
+   * @param requestHost the hostname from the current request, used for wildcard listener hosts
+   * @return the service URI, or null if the service is not registered, does not use the dynamic
+   *     catalog config provider, or serves a different metalake
+   * @throws IllegalStateException if the advertised URI is invalid
+   */
+  @Nullable
+  public static String resolveIcebergRestServiceUri(
+      AuxiliaryServiceManager serviceManager,
+      Map<String, String> serviceConfig,
+      @Nullable String metalake,
+      String requestHost) {
+    if (!serviceManager.isAuxServiceRegistered(ICEBERG_REST_SERVICE_NAME)) {
+      return null;
+    }
+
+    String provider = serviceConfig.getOrDefault(ICEBERG_CATALOG_CONFIG_PROVIDER_KEY, "");
+    if (!ICEBERG_DYNAMIC_CONFIG_PROVIDER_NAME.equals(provider)) {
+      // Only the dynamic catalog config provider maps Iceberg REST catalog names onto Gravitino
+      // catalogs; the default static provider serves statically-declared catalogs unrelated to
+      // Gravitino catalog names, so routing at it would 404 on every request.
+      LOG.debug(
+          "Iceberg REST service does not use the dynamic catalog config provider "
+              + "(catalog-config-provider={}); not reporting its endpoint for auto-discovery.",
+          provider);
+      return null;
+    }
+
+    String servedMetalake = serviceConfig.getOrDefault(ICEBERG_SERVED_METALAKE_KEY, "");
+    if (StringUtils.isNotBlank(metalake)
+        && StringUtils.isNotBlank(servedMetalake)
+        && !servedMetalake.equals(metalake)) {
+      // The Iceberg REST server serves exactly one metalake. Routing a different metalake's
+      // catalogs at it would 404 on every request, so report it as unavailable instead.
+      LOG.debug(
+          "Iceberg REST service serves metalake {}, not the requested metalake {}; not "
+              + "reporting its endpoint for auto-discovery.",
+          servedMetalake,
+          metalake);
+      return null;
+    }
+
+    String advertisedUri = StringUtils.trimToNull(serviceConfig.get(ICEBERG_ADVERTISED_URI_KEY));
+    if (advertisedUri != null) {
+      return checkIcebergRestAdvertisedUri(advertisedUri);
+    }
+
+    String host = serviceConfig.getOrDefault(ICEBERG_HOST_KEY, ICEBERG_DEFAULT_HOST);
+    if (isWildcardHost(host)) {
+      host = requestHost;
+    }
+    boolean enableHttps =
+        Boolean.parseBoolean(serviceConfig.getOrDefault(ICEBERG_ENABLE_HTTPS_KEY, "false"));
+    String scheme = enableHttps ? "https" : "http";
+    int port =
+        parseIcebergRestPort(
+            serviceConfig,
+            enableHttps ? ICEBERG_HTTPS_PORT_KEY : ICEBERG_HTTP_PORT_KEY,
+            enableHttps ? ICEBERG_DEFAULT_HTTPS_PORT : ICEBERG_DEFAULT_HTTP_PORT);
+    return String.format("%s://%s:%d/iceberg", scheme, bracketIfIPv6(host), port);
+  }
+
+  private static String checkIcebergRestAdvertisedUri(String value) {
+    boolean valid;
+    try {
+      URI uri = new URI(value);
+      // URI accepts any non-negative integer as a port; -1 means no explicit port.
+      int port = uri.getPort();
+      valid =
+          StringUtils.equalsAnyIgnoreCase(uri.getScheme(), "http", "https")
+              && StringUtils.isNotBlank(uri.getHost())
+              && (port == -1 || (port >= 1 && port <= 65535))
+              && uri.getQuery() == null
+              && uri.getFragment() == null;
+    } catch (URISyntaxException e) {
+      valid = false;
+    }
+    if (!valid) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid Iceberg REST service %s '%s': expected an absolute http(s) URI with a "
+                  + "host, a port in 1-65535 if present, and no query or fragment",
+              ICEBERG_ADVERTISED_URI_KEY, value));
+    }
+    return value;
+  }
+
+  // An IPv6 literal host (e.g. "::1", from an explicit config value or from
+  // HttpServletRequest#getServerName()) must be bracketed to form a valid URI authority;
+  // otherwise its colons are parsed as the port separator. A hostname or IPv4 address never
+  // contains a colon, so this only ever fires for IPv6.
+  private static String bracketIfIPv6(String host) {
+    if (host.contains(":") && !host.startsWith("[")) {
+      return "[" + host + "]";
+    }
+    return host;
+  }
+
+  private static int parseIcebergRestPort(Map<String, String> config, String key, int defaultPort) {
+    String value = config.getOrDefault(key, "");
+    if (StringUtils.isBlank(value)) {
+      return defaultPort;
+    }
+    try {
+      return Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      return defaultPort;
+    }
+  }
+
+  private static boolean isWildcardHost(String host) {
+    return StringUtils.isBlank(host)
+        || "0.0.0.0".equals(host)
+        || "::".equals(host)
+        || "[::]".equals(host)
+        || "0:0:0:0:0:0:0:0".equals(host);
   }
 }
