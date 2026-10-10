@@ -117,6 +117,39 @@ class TestIndexSerdes(unittest.TestCase):
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
 
+    def test_text_index_properties_round_trip(self):
+        index_json = {
+            "indexType": "DATA_SKIPPING_TEXT",
+            "name": "idx_text",
+            "fieldNames": [["body"]],
+            "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+        }
+
+        index = IndexSerdes.deserialize(index_json)
+        self.assertIs(index.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(index.properties(), index_json["properties"])
+        self.assertEqual(IndexSerdes.serialize(index), index_json)
+
+    def test_legacy_index_without_properties(self):
+        class LegacyIndex(Index):
+            def type(self):
+                return Index.IndexType.PRIMARY_KEY
+
+            def name(self):
+                return "PRIMARY"
+
+            def field_names(self):
+                return [["id"]]
+
+        self.assertEqual(
+            IndexSerdes.serialize(LegacyIndex()),
+            {
+                "indexType": "PRIMARY_KEY",
+                "name": "PRIMARY",
+                "fieldNames": [["id"]],
+            },
+        )
+
     def test_vector_similarity_index_properties_round_trip(self):
         json_string = """
         {
