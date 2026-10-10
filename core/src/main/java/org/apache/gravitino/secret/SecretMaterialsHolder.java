@@ -23,11 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Mutable holder so {@code store.update} lambdas can record written secrets for rollback and
- * replaced write-through URNs for post-commit deletion.
+ * Mutable holder for the secrets an alter wrote, rolled back if the alter fails, and the replaced
+ * write-through URNs, deleted after it commits.
  *
- * <p>Used by catalog, schema, and fileset alter paths that prepare secrets inside {@code
- * store.update} and roll back on failure.
+ * <p>Returned by the {@code SecretAlterChanges.prepare*Changes} methods and used by the catalog,
+ * schema and fileset alter paths.
  */
 public final class SecretMaterialsHolder {
   private static final Logger LOG = LoggerFactory.getLogger(SecretMaterialsHolder.class);

@@ -323,8 +323,7 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Deletes the given secrets. Callers use this after an alter commits to remove write-through
-   * secrets the committed entity no longer references; failures are logged per-URN.
+   * Deletes the given secrets, best effort: each failure is logged and not rethrown.
    *
    * @param secretUrns URNs of the secrets to delete
    */
