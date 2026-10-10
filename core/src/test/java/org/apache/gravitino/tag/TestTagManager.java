@@ -49,6 +49,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -111,6 +112,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -1256,6 +1258,48 @@ public class TestTagManager {
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
+    }
+  }
+
+  @Test
+  public void testConcurrentCreateTagHasOneWinner() throws Exception {
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(8, () -> tagManager.createTag(METALAKE, "race_tag", null, null));
+
+    Assertions.assertEquals(1, outcomes.stream().filter(o -> o instanceof Tag).count());
+    outcomes.stream()
+        .filter(o -> !(o instanceof Tag))
+        .forEach(o -> Assertions.assertInstanceOf(TagAlreadyExistsException.class, o));
+    Assertions.assertEquals("race_tag", tagManager.getTag(METALAKE, "race_tag").name());
+  }
+
+  @Test
+  public void testConcurrentDeleteTagAndAssociateLeavesNoAssignment() throws Exception {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    for (int i = 0; i < 10; i++) {
+      String tagName = "race_delete_tag_" + i;
+      tagManager.createTag(METALAKE, tagName, null, null);
+
+      List<Object> outcomes =
+          RaceTestUtils.runTogether(
+              Arrays.asList(
+                  () -> tagManager.deleteTag(METALAKE, tagName),
+                  () ->
+                      tagManager.associateTagsForMetadataObject(
+                          METALAKE, tableObject, new String[] {tagName}, null)));
+
+      Assertions.assertEquals(Boolean.TRUE, outcomes.get(0));
+      Object associate = outcomes.get(1);
+      Assertions.assertTrue(
+          associate instanceof String[] || associate instanceof NotFoundException,
+          "Unexpected associate outcome: " + associate);
+      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, tagName));
+      Assertions.assertFalse(
+          Arrays.asList(tagManager.listTagsForMetadataObject(METALAKE, tableObject))
+              .contains(tagName));
     }
   }
 

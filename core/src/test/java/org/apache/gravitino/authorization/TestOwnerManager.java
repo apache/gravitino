@@ -44,7 +44,9 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -74,6 +76,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -333,6 +336,47 @@ public class TestOwnerManager {
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+    }
+  }
+
+  @Test
+  @Order(6)
+  public void testConcurrentSetOwnerKeepsOneOwner() throws Exception {
+    String catalogName = "catalog_owner_race";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    entityStore.put(
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    MetadataObject catalogObject =
+        MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
+
+    for (int i = 0; i < 10; i++) {
+      List<Object> outcomes =
+          RaceTestUtils.runTogether(
+              Arrays.asList(
+                  () -> {
+                    ownerManager.setOwner(METALAKE, catalogObject, USER, Owner.Type.USER);
+                    return null;
+                  },
+                  () -> {
+                    ownerManager.setOwner(METALAKE, catalogObject, GROUP, Owner.Type.GROUP);
+                    return null;
+                  }));
+
+      outcomes.forEach(Assertions::assertNull);
+      // getOwner fails if more than one live owner row exists for the object.
+      Owner owner = ownerManager.getOwner(METALAKE, catalogObject).get();
+      Assertions.assertTrue(
+          (USER.equals(owner.name()) && owner.type() == Owner.Type.USER)
+              || (GROUP.equals(owner.name()) && owner.type() == Owner.Type.GROUP),
+          "Unexpected owner " + owner.name());
     }
   }
 }

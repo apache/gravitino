@@ -50,6 +50,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -96,6 +97,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -631,6 +633,22 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject));
     Assertions.assertEquals(
         0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
+  }
+
+  @Test
+  public void testConcurrentCreatePolicyHasOneWinner() throws Exception {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(8, () -> createCustomPolicy(METALAKE, policyName, content));
+
+    Assertions.assertEquals(1, outcomes.stream().filter(o -> o instanceof PolicyEntity).count());
+    outcomes.stream()
+        .filter(o -> !(o instanceof PolicyEntity))
+        .forEach(o -> Assertions.assertInstanceOf(PolicyAlreadyExistsException.class, o));
+    Assertions.assertEquals(policyName, policyManager.getPolicy(METALAKE, policyName).name());
   }
 
   private PolicyEntity createCustomPolicy(
