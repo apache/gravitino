@@ -20,6 +20,9 @@ from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.exceptions.base import (
     BadRequestException,
@@ -136,4 +139,63 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         self.assertEqual(
             token_provider.get_token_data().decode("utf-8"),
             AuthConstants.AUTHORIZATION_BEARER_HEADER + new_access_token,
+        )
+
+    @patch(
+        "gravitino.utils.http_client.HTTPClient.post_form",
+        return_value=mock_base.mock_authentication_with_basic_jwt(),
+    )
+    def test_client_secret_basic_authentication(self, mock_post_form):
+        token_provider = DefaultOAuth2TokenProvider(
+            uri=f"http://127.0.0.1:{OAUTH_PORT}",
+            credential="clientId:clientSecret",
+            path="oauth/token",
+            scope="test",
+            authentication_method=(
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+            ),
+        )
+
+        self.assertTrue(token_provider.has_token_data())
+        _, kwargs = mock_post_form.call_args
+        self.assertIsNone(kwargs["data"].client_id)
+        self.assertIsNone(kwargs["data"].client_secret)
+
+        self.assertEqual(
+            kwargs["headers"]["Authorization"],
+            "Basic Y2xpZW50SWQ6Y2xpZW50U2VjcmV0",
+        )
+
+    def test_client_secret_basic_requires_client_id(self):
+        with self.assertRaises(IllegalArgumentException):
+            DefaultOAuth2TokenProvider(
+                uri=f"http://127.0.0.1:{OAUTH_PORT}",
+                credential=":clientSecret",
+                path="oauth/token",
+                scope="test",
+                authentication_method=(
+                    OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+                ),
+            )
+
+    @patch(
+        "gravitino.utils.http_client.HTTPClient.post_form",
+        return_value=mock_base.mock_authentication_with_basic_jwt(),
+    )
+    def test_client_secret_basic_encodes_reserved_characters(self, mock_post_form):
+        DefaultOAuth2TokenProvider(
+            uri=f"http://127.0.0.1:{OAUTH_PORT}",
+            credential="client@id:s ecret:/+?",
+            path="oauth/token",
+            scope="test",
+            authentication_method=(
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+            ),
+        )
+
+        _, kwargs = mock_post_form.call_args
+
+        self.assertEqual(
+            kwargs["headers"]["Authorization"],
+            "Basic Y2xpZW50JTQwaWQ6cytlY3JldCUzQSUyRiUyQiUzRg==",
         )

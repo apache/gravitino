@@ -25,10 +25,15 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.dto.responses.OAuth2TokenResponse;
 import org.apache.gravitino.json.JsonUtils;
@@ -60,17 +65,30 @@ class OAuth2ClientUtil {
       Map<String, String> headers,
       String credential,
       String scope,
-      String path) {
-    Map<String, String> request =
-        clientCredentialsRequest(
-            credential, scope != null ? ImmutableList.of(scope) : ImmutableList.of());
+      String path,
+      OAuth2ClientAuthenticationMethod authenticationMethod) {
+    List<String> scopes = scope != null ? ImmutableList.of(scope) : ImmutableList.of();
+
+    Pair<Map<String, String>, Map<String, String>> request =
+        clientCredentialsRequest(credential, scopes, authenticationMethod);
 
     OAuth2TokenResponse response =
         client.postForm(
-            path, request, OAuth2TokenResponse.class, headers, ErrorHandlers.oauthErrorHandler());
+            path,
+            request.getLeft(),
+            OAuth2TokenResponse.class,
+            mergeHeaders(headers, request.getRight()),
+            ErrorHandlers.oauthErrorHandler());
     response.validate();
 
     return response;
+  }
+
+  private static Map<String, String> mergeHeaders(
+      Map<String, String> original, Map<String, String> additional) {
+    Map<String, String> headers = new HashMap<>(original);
+    headers.putAll(additional);
+    return headers;
   }
 
   private static Pair<String, String> parseCredential(String credential) {
@@ -89,10 +107,49 @@ class OAuth2ClientUtil {
     }
   }
 
-  private static Map<String, String> clientCredentialsRequest(
-      String credential, List<String> scopes) {
+  private static Pair<Map<String, String>, Map<String, String>> clientCredentialsRequest(
+      String credential,
+      List<String> scopes,
+      OAuth2ClientAuthenticationMethod authenticationMethod) {
     Pair<String, String> credentialPair = parseCredential(credential);
-    return clientCredentialsRequest(credentialPair.getLeft(), credentialPair.getRight(), scopes);
+
+    if (authenticationMethod == OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(credentialPair.getLeft()),
+          "Client ID is required for client_secret_basic authentication");
+
+      String encodedClientId;
+      String encodedClientSecret;
+
+      try {
+        encodedClientId =
+            URLEncoder.encode(credentialPair.getLeft(), StandardCharsets.UTF_8.name());
+        encodedClientSecret =
+            URLEncoder.encode(credentialPair.getRight(), StandardCharsets.UTF_8.name());
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException("UTF-8 encoding is unavailable", e);
+      }
+
+      String encoded =
+          Base64.getEncoder()
+              .encodeToString(
+                  (encodedClientId + ":" + encodedClientSecret).getBytes(StandardCharsets.UTF_8));
+
+      Map<String, String> requestHeaders = new HashMap<>();
+      requestHeaders.put("Authorization", "Basic " + encoded);
+
+      Map<String, String> formData =
+          ImmutableMap.<String, String>builder()
+              .put(GRANT_TYPE, CLIENT_CREDENTIALS)
+              .put(SCOPE, toScope(scopes))
+              .build();
+
+      return Pair.of(formData, requestHeaders);
+    }
+
+    return Pair.of(
+        clientCredentialsRequest(credentialPair.getLeft(), credentialPair.getRight(), scopes),
+        ImmutableMap.of());
   }
 
   private static Map<String, String> clientCredentialsRequest(
