@@ -72,26 +72,14 @@ message if the driver is absent.
 
 ### Driver Version Compatibility
 
-The MySQL catalog includes driver version compatibility checks for datetime precision calculation:
-
-- **MySQL Connector/J versions >= 8.0.16**: Full support for datetime precision calculation
-- **MySQL Connector/J versions < 8.0.16**: Limited support - datetime precision calculation returns `null` with a warning log
-
-This limitation affects the following datetime types:
-- `TIME(p)` - time precision
-- `TIMESTAMP(p)` - timestamp precision  
-- `DATETIME(p)` - datetime precision
-
-When using an unsupported driver version, the system will:
-1. Continue to work normally with default precision (0)
-2. Log a warning message indicating the driver version limitation
-3. Return `null` for precision calculations to avoid incorrect results
+The fractional seconds precision of `TIME(p)`, `DATETIME(p)` and `TIMESTAMP(p)` columns is derived from the
+JDBC metadata, whose `COLUMN_SIZE` is only accurate with MySQL Connector/J 8.0.16 or later. With an older
+driver the catalog logs a warning and falls back to `information_schema.columns` for the precision.
 
 **Example warning log:**
 ```
-WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, 
-columnSize may not be accurate for precision calculation. 
-Returning null for TIMESTAMP type precision. Driver version: mysql-connector-java-8.0.11
+WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, columnSize may not be accurate
+for precision calculation. Falling back to information_schema for the TIMESTAMP precision.
 ```
 
 **Recommended driver versions:**
