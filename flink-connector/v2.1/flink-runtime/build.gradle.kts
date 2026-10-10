@@ -31,7 +31,8 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink21.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-// Flink 2.x removed the Scala APIs entirely, so unlike the 1.x modules there is no scala suffix.
+// This connector uses Flink Java APIs, so its artifacts need no Scala-version suffix.
+// Flink internals still use Scala.
 val artifactName = "gravitino-${project.name}"
 val baseName = "${rootProject.name}-flink-connector-runtime-$flinkMajorVersion"
 

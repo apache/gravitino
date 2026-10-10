@@ -31,8 +31,14 @@ Place the following JAR files in the lib directory of your Flink installation:
 | 1.19          | `3.3.0-1.19`                 | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `3.3.0-1.20`                 | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 | 2.1           | `4.1.0-2.1`                  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | `4.1.0-2.2`                  | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
 
-Starting with Flink 2.1, `flink-connector-jdbc` is split into per-database artifacts: place `flink-connector-jdbc-core-4.1.0-2.1.jar`, `flink-connector-jdbc-mysql-4.1.0-2.1.jar`, and `flink-connector-jdbc-postgres-4.1.0-2.1.jar` together in the classpath instead of a single combined JAR.
+For Flink 2.x, `flink-connector-jdbc` is split into core and per-database artifacts. Place all three JARs from the matching row in the classpath instead of a single combined JAR:
+
+| Flink version | Core artifact                          | MySQL artifact                          | PostgreSQL artifact                        |
+|---------------|----------------------------------------|-----------------------------------------|--------------------------------------------|
+| 2.1           | `flink-connector-jdbc-core-4.1.0-2.1.jar` | `flink-connector-jdbc-mysql-4.1.0-2.1.jar` | `flink-connector-jdbc-postgres-4.1.0-2.1.jar` |
+| 2.2           | `flink-connector-jdbc-core-4.1.0-2.2.jar` | `flink-connector-jdbc-mysql-4.1.0-2.2.jar` | `flink-connector-jdbc-postgres-4.1.0-2.2.jar` |
 
 Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.default-database` property with the value of the default database name.
 

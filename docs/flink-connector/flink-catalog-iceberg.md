@@ -45,6 +45,7 @@ Flink clients use a different Iceberg version than the Gravitino server (1.11.0)
 | 1.19          | 2.12  | 1.10.2          | `iceberg-flink-runtime-1.19-1.10.2.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | 2.12  | 1.11.0          | `iceberg-flink-runtime-1.20-1.11.0.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 | 2.1           | n/a   | 1.11.0          | `iceberg-flink-runtime-2.1-1.11.0.jar`  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | n/a   | 1.12.0          | `iceberg-flink-runtime-2.2-1.12.0.jar`  | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
 
 Replace `${gravitino-version}` with your Gravitino release version.
 
