@@ -209,7 +209,7 @@ public class TestJcasbinAuthorizer {
 
   /**
    * Recreated per test in {@link #createAuthorizer()} so each case starts with empty enforcer state
-   * and a fresh cache; the previous static instance leaked g-rows and cache entries across cases.
+   * and a fresh cache; a shared instance would leak role policies and cache entries across cases.
    */
   private JcasbinAuthorizer jcasbinAuthorizer;
 
@@ -375,7 +375,7 @@ public class TestJcasbinAuthorizer {
 
   @BeforeEach
   public void createAuthorizer() throws Exception {
-    // Build a fresh authorizer per test so enforcer g-rows and version-validated cache state can
+    // Build a fresh authorizer per test so enforcer policies and version-validated cache state can
     // never bleed across cases regardless of the JUnit execution order.
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
@@ -461,8 +461,8 @@ public class TestJcasbinAuthorizer {
     assertTrue(doAuthorize(currentPrincipal));
 
     // Test role cache.
-    // When the user's role changes to one with no privileges, the prune step removes
-    // the stale role's g-rows from the enforcer, so authorization fails immediately.
+    // When the user's role changes to one with no privileges, the request's role set no longer
+    // contains the old role, so authorization fails immediately.
     Long newRoleId = -1L;
     RoleEntity tempNewRole = getRoleEntity(newRoleId, "tempNewRole", ImmutableList.of());
     when(entityStore.get(
@@ -477,7 +477,7 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(new RoleUpdatedAt(newRoleId, "tempNewRole", roleVersion2)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
-    // tempNewRole has no privileges; prune step removes stale allowRole g-row, so authz fails.
+    // tempNewRole has no privileges and the request no longer holds allowRole, so authz fails.
     assertFalse(doAuthorize(currentPrincipal));
 
     // After clearing the role policy cache, the next authorize forces a reload.
@@ -966,8 +966,8 @@ public class TestJcasbinAuthorizer {
         jcasbinAuthorizer.authorize(
             currentPrincipal, METALAKE, metalakeObject(), USE_CATALOG, requestContext));
 
-    // TTL expiry or size eviction runs the removal listener, which clears the role's p-rows but
-    // keeps the user's g-row. The request will not run its one-time role load again.
+    // TTL expiry or size eviction runs the removal listener, which clears the role's p-rows while
+    // the request still holds the role id. The request will not run its one-time role load again.
     getLoadedRolesCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
     assertTrue(
         getAllowEnforcer(jcasbinAuthorizer)
@@ -2261,8 +2261,8 @@ public class TestJcasbinAuthorizer {
     // User is removed from the group at the IdP level -- next token has no groups.
     UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
 
-    // The prune step detects that the group-inherited role is no longer valid
-    // (group not in token → role not in desiredRoleIds) and removes the stale g-rows.
+    // The group is no longer in the token, so the request's role set excludes the
+    // group-inherited role.
     // Access is denied immediately without waiting for cache TTL expiry.
     assertFalse(doAuthorize(noGroupPrincipal));
 

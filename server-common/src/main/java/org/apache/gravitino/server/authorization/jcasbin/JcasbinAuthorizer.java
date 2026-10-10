@@ -125,7 +125,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Field index of {@code sub} (the role/user/group id) in a jcasbin {@code p} policy row. See the
-   * {@code policy_definition} in {@code jcasbin_model.conf}: {@code p = sub, metadataType,
+   * {@code policy_definition} in {@code jcasbin_request_model.conf}: {@code p = sub, metadataType,
    * metadataId, act, eft}.
    */
   private static final int POLICY_SUBJECT_FIELD_INDEX = 0;
@@ -985,7 +985,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         String privilege,
         AuthorizationRequestContext requestContext) {
       // Step 4: JCasbin enforce (pure in-memory) — except OWNER, which is resolved via the
-      // owner cache rather than g-rows.
+      // owner cache rather than role policies.
       if (AuthConstants.OWNER.equals(privilege)) {
         // Cold-path: resolveOwnerId loads from DB when neither the per-request nor the shared
         // Caffeine cache has the entry, ensuring the first OWNER check doesn't spuriously deny.
