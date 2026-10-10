@@ -176,7 +176,12 @@ paths:
           required: true
           schema:
             type: string
-          description: The sub path to the file or directory
+          description: >-
+            The sub path to the file or directory within the selected storage location.
+            Leading and trailing whitespace is trimmed. An empty path or `/` refers to
+            that location, and a leading slash is relative to it. Complete `..` path
+            segments, backslashes, and NUL characters (U+0000) are not allowed.
+            The normalized path must remain within the selected storage location.
         - name: location_name
           in: query
           required: false
@@ -187,6 +192,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FileLocationResponse"
+        "400":
+          $ref: "#/components/responses/InvalidSubPathErrorResponse"
         "404":
           description: Not Found - The target fileset does not exist
           content:
@@ -225,7 +232,12 @@ paths:
           schema:
             type: string
             default: "/"
-          description: The sub path within the fileset to list files and directories from
+          description: >-
+            The sub path within the selected storage location to list files and directories
+            from. Leading and trailing whitespace is trimmed. An empty path or `/` refers
+            to that location, and a leading slash is relative to it. Complete `..` path
+            segments, backslashes, and NUL characters (U+0000) are not allowed.
+            The normalized path must remain within the selected storage location.
         - name: location_name
           in: query
           required: false
@@ -235,6 +247,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FileInfoListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidSubPathErrorResponse"
         "404":
           description: Not Found – the target fileset or subPath or locationName does not exist
           content:
@@ -550,6 +564,17 @@ components:
       }
 
   responses:
+    InvalidSubPathErrorResponse:
+      description: The sub path does not satisfy the fileset path requirements.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1001
+            type: IllegalArgumentException
+            message: subPath must not contain parent directory segments
+
     FilesetResponse:
       description: The response of fileset object
       content:
