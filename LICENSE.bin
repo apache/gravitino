@@ -222,6 +222,7 @@
    Jackson Core
    Jackson Databind
    Jackson Data Mapper
+   Jackson Dataformat YAML
    Jackson Datatype Guava
    Jackson Datatype JDK8
    Jackson Datatype Joda
@@ -356,6 +357,7 @@
    jmxutils
    SQLite JDBC
    SnakeYAML
+   SnakeYAML Engine
    StAX API
    Tomcat Jasper Compiler
    Apache Xerces Java
@@ -406,6 +408,9 @@
    IPAddress
    Aliyun SDK OSS
    QLExpress
+   Fabric8 Kubernetes Client
+   Fabric8 Kubernetes Model
+   Fabric8 zjsonpatch
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
