@@ -194,8 +194,15 @@ class GravitinoMetalake(
         entity_list.validate()
         return [identifier.name() for identifier in entity_list.identifiers()]
 
-    def list_catalogs_info(self) -> List[Catalog]:
+    def list_catalogs_info(self, include_properties: bool = True) -> List[Catalog]:
         """List all the catalogs with their information under this metalake.
+
+        Args:
+            include_properties: Whether to resolve catalog properties. Defaults to True.
+                False returns lightweight descriptors without initializing server-side
+                catalog wrappers. Their properties are an empty map, including no
+                in-use property; name, type, provider, comment, and audit information
+                remain populated. Load a catalog to retrieve its full information.
 
         Raises:
             NoSuchMetalakeException if the metalake with specified namespace does not exist.
@@ -203,7 +210,10 @@ class GravitinoMetalake(
         Returns:
             A list of Catalog under the specified namespace.
         """
-        params = {"details": "true"}
+        params = {
+            "details": "true",
+            "includeProperties": str(include_properties).lower(),
+        }
         url = f"api/metalakes/{encode_string(self.name())}/catalogs"
         response = self.rest_client.get(
             url, params=params, error_handler=CATALOG_ERROR_HANDLER

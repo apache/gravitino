@@ -222,10 +222,10 @@ dropped = client.drop_catalog("sales", force=False)
 
 Detailed catalog listing includes resolved properties by default. To retrieve lightweight catalog
 descriptors without resolving properties or initializing server-side catalog wrappers, use
-`details=true&includeProperties=false` in REST or `listCatalogsInfo(false)` in Java. Descriptors retain
+`details=true&includeProperties=false` in REST, `listCatalogsInfo(false)` in Java, or
+`list_catalogs_info(include_properties=False)` in Python. Descriptors retain
 the name, type, provider, comment, and audit information, but their properties are an empty map,
 including no `in-use` property. Load a catalog to retrieve its complete information when needed.
-The Python client currently supports only listing with properties.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -256,6 +256,7 @@ Catalog[] catalogDescriptors = client.listCatalogsInfo(false);
 ```python
 catalog_names = client.list_catalogs()
 catalogs = client.list_catalogs_info()
+catalog_descriptors = client.list_catalogs_info(include_properties=False)
 ```
 
 </TabItem>
