@@ -121,6 +121,41 @@ public class AuthorizationRequestContext {
   /** Roles whose entities could not be read during this request's initial role load. */
   private volatile Set<Long> unreadableRoleIds = Collections.emptySet();
 
+  /** Immutable role-policy view owned by this request's authorizer. */
+  @Nullable private volatile RolePolicyView rolePolicyView;
+
+  /**
+   * An authorizer-defined view of the caller's immutable role policies. Implementations must pin
+   * their policy data independently of shared cache eviction.
+   */
+  public interface RolePolicyView {
+    /**
+     * Returns the policy generation most recently validated for this view.
+     *
+     * @return the authorizer's generation
+     */
+    long generation();
+  }
+
+  /**
+   * Returns this request's immutable role-policy view, or null before role loading.
+   *
+   * @return the policy view
+   */
+  @Nullable
+  public RolePolicyView getRolePolicyView() {
+    return rolePolicyView;
+  }
+
+  /**
+   * Publishes a complete immutable role-policy view to all workers in this request.
+   *
+   * @param view the authorizer's policy view
+   */
+  public void setRolePolicyView(RolePolicyView view) {
+    rolePolicyView = Objects.requireNonNull(view, "Role policy view must not be null");
+  }
+
   /**
    * The roles the caller has declared active for this request (role assumption). Read from the
    * current {@link UserPrincipal}; defaults to {@link ActiveRoles#all()} (no narrowing) when the

@@ -56,6 +56,7 @@ httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
 commons-configuration2 = "2.10.1"
+commons-codec = "1.17.1"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
@@ -174,7 +175,6 @@ openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
 jmh = "1.37"
-jcasbin = "1.99.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
@@ -271,6 +271,7 @@ micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.r
 
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-codec = { group = "commons-codec", name = "commons-codec", version.ref = "commons-codec" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
@@ -379,7 +380,6 @@ flinkjdbc21-postgres = {group='org.apache.flink',name='flink-connector-jdbc-post
 flinkHive21 = {group='org.apache.flink',name='flink-connector-hive_2.12', version.ref='flinkHive21'}
 openlineageSqlJava21 = {group='io.openlineage',name='openlineage-sql-java', version.ref='openlineageSqlJava21'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
-jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
 ql-expression = { group='com.alibaba', name='qlexpress4', version.ref="ql-expression" }

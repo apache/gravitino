@@ -19,42 +19,35 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-/**
- * A role's securable objects resolved into concrete jcasbin {@code p} rows, together with the
- * objects that could not be resolved to a metadata id.
- *
- * <p>Separating resolution from application lets {@code JcasbinAuthorizer} keep every DB round-trip
- * outside the lock that serializes enforcer mutations, and lets it tell a fully loaded role apart
- * from a partially loaded one — only the former may be recorded as loaded.
- */
+/** A role resolved outside the publication lock, including unresolved deny summaries. */
 final class ResolvedRolePolicies {
-
-  private final List<String[]> allowRows;
-  private final List<String[]> denyRows;
+  private final Map<PolicyKey, Effect> index;
   private final List<String> unresolvedObjects;
+  private final Set<String> unresolvedDenies;
 
   ResolvedRolePolicies(
-      List<String[]> allowRows, List<String[]> denyRows, List<String> unresolvedObjects) {
-    this.allowRows = allowRows;
-    this.denyRows = denyRows;
+      Map<PolicyKey, Effect> index, List<String> unresolvedObjects, Set<String> unresolvedDenies) {
+    this.index = index;
     this.unresolvedObjects = unresolvedObjects;
+    this.unresolvedDenies = unresolvedDenies;
   }
 
-  List<String[]> getAllowRows() {
-    return allowRows;
+  Map<PolicyKey, Effect> getIndex() {
+    return index;
   }
 
-  List<String[]> getDenyRows() {
-    return denyRows;
+  Set<String> getUnresolvedDenies() {
+    return unresolvedDenies;
   }
 
-  /** Descriptions of the securable objects whose metadata id could not be resolved. */
+  /** Descriptions of objects whose metadata IDs could not be resolved. */
   List<String> getUnresolvedObjects() {
     return unresolvedObjects;
   }
 
-  /** True when every securable object of the role was resolved and turned into policy rows. */
   boolean isComplete() {
     return unresolvedObjects.isEmpty();
   }

@@ -18,8 +18,7 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,9 +35,11 @@ public class TestJcasbinLoadedRolesCache {
     // never expires. That is what turns a lost policy load into a permanent authorization failure:
     // each denied request renews the very entry that tells the version check to skip the reload.
     long ttlMs = 150L;
-    List<Long> cleaned = new ArrayList<>();
-    JcasbinLoadedRolesCache cache = new JcasbinLoadedRolesCache(ttlMs, 100L, cleaned::add);
-    cache.put(ROLE_ID, 1L);
+    JcasbinLoadedRolesCache cache = new JcasbinLoadedRolesCache(ttlMs, 100L);
+    CachedRolePolicies pinned =
+        new CachedRolePolicies(
+            1L, Collections.singletonMap(new PolicyKey("TABLE", 99L, "SELECT_TABLE"), Effect.DENY));
+    cache.put(ROLE_ID, pinned);
 
     // Read the entry far more often than the TTL, the way a hot role is probed in production.
     long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ttlMs * 4);
@@ -52,8 +53,8 @@ public class TestJcasbinLoadedRolesCache {
         "repeated reads must not keep the entry alive past its TTL");
     // size() runs Caffeine's maintenance, which delivers any pending removal notification.
     cache.size();
-    Assertions.assertTrue(
-        cleaned.contains(ROLE_ID), "expiring the entry must clear the role's policies");
+    Assertions.assertEquals(
+        Effect.DENY, pinned.getIndex().get(new PolicyKey("TABLE", 99L, "SELECT_TABLE")));
     cache.close();
   }
 
@@ -61,19 +62,21 @@ public class TestJcasbinLoadedRolesCache {
   public void testReplacingAnEntryDoesNotClearPolicies() {
     // A refresh writes the new version over the old one. Treating that as a removal would delete
     // the policies the refresh just loaded.
-    List<Long> cleaned = new ArrayList<>();
-    JcasbinLoadedRolesCache cache = new JcasbinLoadedRolesCache(60_000L, 100L, cleaned::add);
+    JcasbinLoadedRolesCache cache = new JcasbinLoadedRolesCache(60_000L, 100L);
 
-    cache.put(ROLE_ID, 1L);
-    cache.put(ROLE_ID, 2L);
+    CachedRolePolicies pinned =
+        new CachedRolePolicies(
+            1L, Collections.singletonMap(new PolicyKey("TABLE", 99L, "SELECT_TABLE"), Effect.DENY));
+    cache.put(ROLE_ID, pinned);
+    cache.put(ROLE_ID, new CachedRolePolicies(2L, Collections.emptyMap()));
     cache.size();
 
-    Assertions.assertTrue(cleaned.isEmpty(), "replacing a value must not clear the role policies");
-    Assertions.assertEquals(2L, cache.getIfPresent(ROLE_ID).orElse(null));
+    Assertions.assertEquals(2L, cache.getIfPresent(ROLE_ID).get().getUpdatedAt());
 
     cache.invalidate(ROLE_ID);
-    Assertions.assertTrue(
-        cleaned.contains(ROLE_ID), "explicit invalidation must clear the role policies");
+    Assertions.assertFalse(cache.getIfPresent(ROLE_ID).isPresent());
+    Assertions.assertEquals(
+        Effect.DENY, pinned.getIndex().get(new PolicyKey("TABLE", 99L, "SELECT_TABLE")));
     cache.close();
   }
 }

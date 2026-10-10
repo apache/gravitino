@@ -485,7 +485,7 @@ log4j2Properties: {}
   ## Delete archives older than this age. Defaults to logMaxAge.
   # rollingAppenderStrategyDeleteIfLastModifiedAge: "${logMaxAge}"
 
-  ## JCasbin logger
+  ## Authorization logger (legacy configuration key)
   # jcasbinLoggerLevel: warn
 
   ## Configure root logger

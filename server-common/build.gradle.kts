@@ -46,11 +46,6 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
-  implementation(libs.jcasbin) {
-    exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
-    exclude(group = "org.slf4j", module = "slf4j-api")
-    exclude(group = "com.google.errorprone", module = "error_prone_annotations")
-  }
   implementation(libs.ognl)
   implementation(libs.prometheus.servlet)
   implementation(libs.nimbus.jose.jwt)

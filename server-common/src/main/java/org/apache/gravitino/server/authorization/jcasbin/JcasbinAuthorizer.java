@@ -17,11 +17,8 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,10 +35,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -52,7 +48,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -79,14 +74,11 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.casbin.jcasbin.main.Enforcer;
-import org.casbin.jcasbin.main.SyncedEnforcer;
-import org.casbin.jcasbin.model.Model;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Jcasbin implementation of {@link GravitinoAuthorizer}.
+ * The indexed implementation of {@link GravitinoAuthorizer}.
  *
  * <h2>Cache architecture</h2>
  *
@@ -115,34 +107,23 @@ import org.slf4j.LoggerFactory;
  * contracts they rely on (most notably that {@code entity_change_log.full_name} is the pre-mutation
  * name).
  *
- * <p>JCasbin enforcer state ({@link #allowEnforcer}/{@link #denyEnforcer}) is kept in sync with
- * {@link #loadedRoles} via the removal listener inside {@link JcasbinLoadedRolesCache} — evicting a
- * role id also deletes that role's policies from both enforcers. A request that loaded the role
- * before such an eviction reloads it before its next check; see {@link
- * #evaluateWithLoadedRolePolicies}.
+ * <p>Role indexes are immutable. Each request merges them once into an effective allow/deny view,
+ * so object checks do constant-time lookups without role graph traversal. Ordinary cache eviction
+ * cannot remove a request's denies. Explicit invalidation and new policy publication refresh the
+ * view before a new decision. Previously memoized decisions retain their request-scoped results.
  */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
   /**
-   * Field index of {@code sub} (the role/user/group id) in a jcasbin {@code p} policy row. See the
-   * {@code policy_definition} in {@code jcasbin_model.conf}: {@code p = sub, metadataType,
-   * metadataId, act, eft}.
-   */
-  private static final int POLICY_SUBJECT_FIELD_INDEX = 0;
-
-  /** Field index of {@code act} (the privilege) in a jcasbin {@code p} policy row. */
-  private static final int POLICY_ACTION_FIELD_INDEX = 3;
-
-  /**
    * How long to wait before retrying a role whose last policy load was incomplete, i.e. at least
-   * one of its securable objects could not be resolved to a metadata id. Such a role is
-   * deliberately not recorded in {@link #loadedRoles} (see {@link #versionCheckAndLoadRoles}), so
-   * without this backoff every request carrying the role would re-read the role entity and re-probe
-   * the missing object. A role can stay unresolvable indefinitely — for example when it still
-   * references a dropped table — so the retry has to be throttled rather than left to the version
-   * check, whose {@code role_meta.updated_at} sentinel never moves in that case.
+   * one of its securable objects could not be resolved to a metadata id. Such a role is recorded
+   * with its completeness flag in {@link #loadedRoles}; without this backoff every request carrying
+   * the role would re-read the role entity and re-probe the missing object. A role can stay
+   * unresolvable indefinitely — for example when it still references a dropped table — so the retry
+   * has to be throttled rather than left to the version check, whose {@code role_meta.updated_at}
+   * sentinel never moves in that case.
    */
   private static final long PARTIAL_ROLE_LOAD_RETRY_MS = 10_000L;
 
@@ -153,33 +134,20 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private static final int MAX_ROLE_POLICY_RELOADS = 3;
 
-  /**
-   * Guards every access to the in-memory JCasbin enforcer state. Policy reload mutates that state
-   * with a clear-then-add sequence, which must be atomic not only against other writers but also
-   * against authorization reads; otherwise a concurrent {@code enforce()} can observe the temporary
-   * empty policy set and deny a request that should be allowed.
-   *
-   * <p>Writers include {@link #invalidateRolePolicies}, {@link #replaceRolePolicies}, {@link
-   * #bindUserRoles}, stale grouping-row pruning, and the {@link JcasbinLoadedRolesCache} removal
-   * listener. Readers include all {@code enforce()}, grouping, and policy-inspection calls. The
-   * lock only guards in-memory enforcer access: metadata ids are resolved before write-lock
-   * acquisition (see {@link #resolveRolePolicies}), so no DB round-trip runs inside the critical
-   * section.
-   */
+  /** Serializes publication and invalidation; database and metadata lookups stay outside it. */
   private final ReentrantReadWriteLock rolePolicyLock = new ReentrantReadWriteLock();
 
   /**
    * Source of role policy generations. Advanced under the write lock of {@link #rolePolicyLock}
-   * whenever a role's policies are cleared without being replaced in the same critical section.
+   * whenever a role index is published or explicitly invalidated.
    */
   private final AtomicLong rolePolicyGenerationCounter = new AtomicLong();
 
   /**
-   * roleId -> generation of the most recent clear of that role's policies. A request records the
-   * generation before it loads its roles; a bound role whose clear generation is newer has lost
-   * policies the request relies on and must be reloaded before the request evaluates it again. The
-   * map is bounded by {@link #maxRoleClearGenerations}; see {@link #prunedRoleClearGeneration} for
-   * how pruned entries stay safe.
+   * roleId -> generation of its most recent publication or invalidation. An older request view must
+   * refresh before evaluating new decisions for a changed role. Ordinary cache eviction does not
+   * change policy generations. The map is bounded by {@link #maxRoleClearGenerations}; see {@link
+   * #prunedRoleClearGeneration} for how pruned entries stay safe.
    */
   private final Map<Long, Long> roleClearGenerations = new ConcurrentHashMap<>();
 
@@ -197,19 +165,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private volatile long prunedRoleClearGeneration;
 
-  /**
-   * The role whose marker {@link #replaceRolePolicies} is removing, or {@code null}. Guarded by the
-   * write lock of {@link #rolePolicyLock}. The synchronous removal callback clears that role's old
-   * policies, but the replacement is installed in the same critical section, so no request can
-   * observe the role without policies and the clear is not recorded as a generation.
-   */
-  @Nullable private Long roleBeingReplaced;
+  /** In-flight loaders retain publication state even if the shared cache evicts the role. */
+  private static final class RoleLoadState {
+    private int readers;
+    @Nullable private CachedRolePolicies policies;
+    private long invalidatedAt;
+  }
 
-  /** Jcasbin enforcer is used for metadata authorization. */
-  private Enforcer allowEnforcer;
-
-  /** Jcasbin deny enforcer is used for metadata authorization. */
-  private Enforcer denyEnforcer;
+  private final Map<Long, RoleLoadState> loadingRoles = new HashMap<>();
 
   /** allow internal authorizer */
   private InternalAuthorizer allowInternalAuthorizer;
@@ -231,16 +194,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private GravitinoCache<String, CachedGroupRoleRels> groupRoleCache;
 
-  /**
-   * loadedRoles: roleId -> updated_at. If the DB updated_at is newer, evict and reload policies.
-   */
-  private GravitinoCache<Long, Long> loadedRoles;
+  /** roleId -> immutable policy index, version, completeness and denied-privilege summary. */
+  private GravitinoCache<Long, CachedRolePolicies> loadedRoles;
 
   /**
-   * partialRoleLoadBackoff: roleId -> marker present while a role whose last load was incomplete
-   * must not be retried. Policy replacement writes this marker under {@link #rolePolicyLock}, so a
-   * delayed loaded-role removal callback can also use its presence to recognize a newer partial
-   * policy state. See {@link #PARTIAL_ROLE_LOAD_RETRY_MS}.
+   * Retry throttle for incomplete snapshots. It never represents policy completeness, and it cannot
+   * suppress reloading an evicted index or a newer role version.
    */
   private GravitinoCache<Long, Boolean> partialRoleLoadBackoff;
 
@@ -280,16 +239,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     long ttlMs = TimeUnit.SECONDS.toMillis(cacheExpirationSecs);
     maxRoleClearGenerations = roleCacheSize;
 
-    // Initialize enforcers before caches that reference them in removal listeners
-    allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer, true, false);
-    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer, false, true);
-
-    // loadedRoles: roleId -> updated_at.
-    // When evicted, we must clean up the corresponding JCasbin policies.
-    loadedRoles =
-        new JcasbinLoadedRolesCache(ttlMs, roleCacheSize, this::clearRolePoliciesOnCacheRemoval);
+    allowInternalAuthorizer = new InternalAuthorizer(true, false);
+    denyInternalAuthorizer = new InternalAuthorizer(false, true);
+    loadedRoles = new JcasbinLoadedRolesCache(ttlMs, roleCacheSize);
     partialRoleLoadBackoff =
         new CaffeineGravitinoCache<>(Math.min(PARTIAL_ROLE_LOAD_RETRY_MS, ttlMs), roleCacheSize);
 
@@ -307,18 +259,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       ((SupportsEntityChangeLog) entityStore).registerEntityChangeLogListener(changePoller);
     }
     changePoller.start();
-  }
-
-  private Model getModel(String modelFilePath) {
-    Model model = new Model();
-    try (InputStream modelStream = JcasbinAuthorizer.class.getResourceAsStream(modelFilePath)) {
-      Preconditions.checkArgument(modelStream != null, "Jcasbin model file not found");
-      String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
-      model.loadModelFromText(modelData);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    return model;
   }
 
   // ---------------------------------------------------------------------------
@@ -471,53 +411,30 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       Set<Privilege.Name> privileges,
       AuthorizationRequestContext requestContext) {
-    Optional<UserUpdatedAt> userInfoOpt =
-        loadUserInfo(metalake, principal.getName(), requestContext);
-    if (!userInfoOpt.isPresent()) {
-      // An unknown user holds no roles and therefore no deny policies.
-      return false;
-    }
-    UserUpdatedAt userInfo = userInfoOpt.get();
-    long userId = userInfo.getUserId();
-    // Bind the user's (direct + group-inherited) roles into the enforcers so the in-memory scan
-    // below sees every policy the user can carry. Idempotent within a request.
-    loadRolePrivilege(metalake, principal.getName(), userId, userInfo, requestContext);
+    try {
+      Optional<UserUpdatedAt> userInfoOpt =
+          loadUserInfo(metalake, principal.getName(), requestContext);
+      if (!userInfoOpt.isPresent()) {
+        // An unknown user holds no roles and therefore no deny policies.
+        return false;
+      }
+      UserUpdatedAt userInfo = userInfoOpt.get();
+      long userId = userInfo.getUserId();
+      // Resolve the direct and current IdP-group roles into a request-local policy view.
+      loadRolePrivilege(metalake, principal.getName(), userId, userInfo, requestContext);
 
-    Set<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toSet());
-    String userIdStr = String.valueOf(userId);
-    // A missing answer means the user's roles kept losing their policies; report a deny so the
-    // caller falls back to per-object checks instead of short-circuiting on incomplete policies.
-    return evaluateWithLoadedRolePolicies(
-            metalake,
-            requestContext,
-            () -> {
-              // This is an existence query, not a per-object check: it answers "does any deny on
-              // these privileges exist for the user's roles, at any scope?" The standard enforce
-              // path needs a concrete metadataId, so reusing it would mean iterating every listed
-              // object and defeat the short-circuit. Filtering the deny enforcer's policies by role
-              // keeps the scan bounded by the user's role/policy count, never by the number of
-              // listed objects. The match is intentionally scope-agnostic (no metadataType filter):
-              // a parent-scope deny hides the whole subtree and an object-scope deny hides one
-              // object, and both must disable the short-circuit.
-              for (String roleId : denyEnforcer.getRolesForUser(userIdStr)) {
-                // getFilteredNamedPolicy returns every "p" row (p = sub, metadataType, metadataId,
-                // act, eft) whose field at POLICY_SUBJECT_FIELD_INDEX (sub) equals roleId, i.e. all
-                // rules carried by this role. denyEnforcer is a dedicated enforcer that is only
-                // ever loaded with privileges whose condition is DENY (see resolveRolePolicies), so
-                // every row here represents a deny regardless of its stored eft string. Each
-                // returned row is the list of those five fields, so we read field
-                // POLICY_ACTION_FIELD_INDEX (act) to compare the denied privilege.
-                for (List<String> policy :
-                    denyEnforcer.getFilteredNamedPolicy("p", POLICY_SUBJECT_FIELD_INDEX, roleId)) {
-                  if (policy.size() > POLICY_ACTION_FIELD_INDEX
-                      && privilegeNames.contains(policy.get(POLICY_ACTION_FIELD_INDEX))) {
-                    return true;
-                  }
-                }
-              }
-              return false;
-            })
-        .orElse(true);
+      Set<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toSet());
+      return evaluateWithLoadedRolePolicies(
+              metalake, requestContext, view -> view.hasDeny(privilegeNames))
+          .orElse(true);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Cannot establish deny policies for user {} in {}; disabling list shortcut",
+          principal.getName(),
+          metalake,
+          e);
+      return true;
+    }
   }
 
   @Override
@@ -570,7 +487,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         }
 
         for (String groupname : currentPrincipalGroupNames()) {
-          List<Long> groupRoleIds = loadGroupRoles(metalake, groupname, userId, requestContext);
+          List<Long> groupRoleIds = loadGroupRoles(metalake, groupname, requestContext);
           if (groupRoleIds.contains(resolvedRoleId)) {
             return true;
           }
@@ -862,12 +779,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private class InternalAuthorizer {
 
-    Enforcer enforcer;
-
     /**
      * When {@code true}, evaluation considers only the request's active roles instead of every role
      * the caller holds. Enabled for the allow authorizer so role assumption can drop allows; the
-     * deny authorizer leaves it {@code false} so denies always apply. See {@link #enforceNarrowed}.
+     * deny authorizer leaves it {@code false} so denies always apply.
      */
     private final boolean narrowByActiveRoles;
 
@@ -879,9 +794,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
      */
     private final boolean unstablePolicyResult;
 
-    public InternalAuthorizer(
-        Enforcer enforcer, boolean narrowByActiveRoles, boolean unstablePolicyResult) {
-      this.enforcer = enforcer;
+    public InternalAuthorizer(boolean narrowByActiveRoles, boolean unstablePolicyResult) {
       this.narrowByActiveRoles = narrowByActiveRoles;
       this.unstablePolicyResult = unstablePolicyResult;
     }
@@ -902,8 +815,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObject metadataObject,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      // OWNER does not consult JCasbin policies — it short-circuits to the owner cache in
-      // authorizeByJcasbin. Skip the fat prefetch and role-binding work when no non-OWNER
+      // OWNER uses the owner cache independently of indexed role privileges. Skip the fat
+      // prefetch and role loading when no non-OWNER
       // privilege has been evaluated yet in this request.
       boolean ownerOnly =
           AuthConstants.OWNER.equals(privilege)
@@ -927,13 +840,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         userInfo = userInfoOpt.get();
         userId = userInfo.getUserId();
       } catch (Exception e) {
-        LOG.debug("Cannot get entity ID", e);
-        return false;
+        LOG.warn("Cannot read authorization subject {} in {}", username, metalake, e);
+        return unstablePolicyResult;
       }
 
       if (!ownerOnly) {
-        // Steps 1b→3: version-validated role loading (skipped for OWNER-only requests since
-        // the enforcer is not consulted on the OWNER short-circuit).
+        // Version-validate role indexes for non-OWNER checks.
         loadRolePrivilege(metalake, username, userId, userInfo, requestContext);
       }
 
@@ -961,7 +873,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     /**
      * Resolves the metadata id for a single object via the cache-backed lookups and delegates to
-     * {@link #authorizeByJcasbin}. A missing object is treated as "not authorized".
+     * {@link #authorizeByPolicyIndex}. A missing object is treated as "not authorized".
      */
     private boolean authorizeObject(
         long userId,
@@ -980,18 +892,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (!metadataId.isPresent()) {
         return false;
       }
-      return authorizeByJcasbin(
+      return authorizeByPolicyIndex(
           userId, metalake, metadataObject, metadataId.get(), privilege, requestContext);
     }
 
-    private boolean authorizeByJcasbin(
+    private boolean authorizeByPolicyIndex(
         long userId,
         String metalake,
         MetadataObject metadataObject,
         Long metadataId,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      // Step 4: JCasbin enforce (pure in-memory) — except OWNER, which is resolved via the
+      // Step 4: Indexed policy lookup (pure in-memory) — except OWNER, which is resolved via the
       // owner cache rather than g-rows.
       if (AuthConstants.OWNER.equals(privilege)) {
         // Cold-path: resolveOwnerId loads from DB when neither the per-request nor the shared
@@ -1002,86 +914,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             owner, PrincipalUtils.getCurrentPrincipal(), metalake, requestContext);
       }
 
-      String metadataType = String.valueOf(metadataObject.type());
-      String metadataIdStr = String.valueOf(metadataId);
-
-      // Role assumption: if the caller activated only a subset of their roles, check this allow
-      // against just those roles (enforceNarrowed). ALL or an absent header falls through to the
-      // normal check over every role the caller holds.
-      ActiveRoles activeRoles = requestContext.getActiveRoles();
-      boolean allowed =
+      PolicyKey key = new PolicyKey(metadataObject.type().name(), metadataId, privilege);
+      boolean result =
           evaluateWithLoadedRolePolicies(
-                  metalake,
-                  requestContext,
-                  () -> {
-                    if (narrowByActiveRoles && !activeRoles.isAll()) {
-                      return enforceNarrowed(
-                          userId,
-                          metadataType,
-                          metadataIdStr,
-                          privilege,
-                          activeRoles,
-                          requestContext);
-                    }
-                    return enforcer.enforce(
-                        String.valueOf(userId), metadataType, metadataIdStr, privilege);
-                  })
+                  metalake, requestContext, view -> view.evaluate(key, narrowByActiveRoles))
               .orElse(unstablePolicyResult);
-
-      if (narrowByActiveRoles && !allowed) {
-        diagnoseDenial(userId, metadataType, metadataIdStr, privilege);
-      }
-      return allowed;
-    }
-
-    /**
-     * Enforces one object/privilege against only the active roles the caller actually holds, so
-     * narrowing can never grant access the caller lacks. {@link ActiveRoles#none()} activates no
-     * role and denies every role-derived privilege.
-     *
-     * <p>Deny stays global: denyEnforcer is checked over the caller's full role union first, so a
-     * deny on any held role still applies even when that role is inactive.
-     */
-    private boolean enforceNarrowed(
-        long userId,
-        String metadataType,
-        String metadataIdStr,
-        String privilege,
-        ActiveRoles activeRoles,
-        AuthorizationRequestContext requestContext) {
-      String userIdStr = String.valueOf(userId);
-      if (denyEnforcer.enforce(userIdStr, metadataType, metadataIdStr, privilege)) {
-        return false;
-      }
-      if (activeRoles.isNone()) {
-        return false;
-      }
-      for (String roleId : activeRoleIds(userId, activeRoles, requestContext)) {
-        if (enforcer.enforce(roleId, metadataType, metadataIdStr, privilege)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    /**
-     * Returns the ids of the caller's roles whose names are in the active set. Only roles the
-     * caller actually holds are considered, so naming a role the caller lacks activates nothing.
-     */
-    private Set<String> activeRoleIds(
-        long userId, ActiveRoles activeRoles, AuthorizationRequestContext requestContext) {
-      Map<Long, RoleUpdatedAt> roleVersions = requestContext.getPrefetchedRoleVersions();
-      if (roleVersions == null || roleVersions.isEmpty()) {
-        return Collections.emptySet();
-      }
-      Set<String> activeNames = activeRoles.roleNames();
-      Set<String> result = new HashSet<>();
-      for (String roleId : enforcer.getRolesForUser(String.valueOf(userId))) {
-        RoleUpdatedAt roleInfo = roleVersions.get(Long.parseLong(roleId));
-        if (roleInfo != null && activeNames.contains(roleInfo.getRoleName())) {
-          result.add(roleId);
-        }
-      }
+      LOG.debug("Indexed privilege check for user {} on {}: {}", userId, key, result);
       return result;
     }
   }
@@ -1108,9 +946,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /**
    * Fat-JOIN prefetch: collapses {@link #loadUserInfo}, per-group {@link #loadGroupInfo}, the
    * per-user/per-group role-list lookups inside {@link #loadUserRoles} / {@link #loadGroupRoles},
-   * AND the role-version probe inside {@link #versionCheckAndLoadRoles} into a single SQL round
-   * trip. After this returns, the following caches are primed and the rest of the authorize hot
-   * path needs zero DB round trips when the cached role policies are still current:
+   * AND the role-version probe inside {@link #loadRequestPolicies} into a single SQL round trip.
+   * After this returns, the following caches are primed and the rest of the authorize hot path
+   * needs zero DB round trips when the cached role policies are still current:
    *
    * <ul>
    *   <li>{@code requestContext.userInfoCache} — user version sentinel.
@@ -1121,7 +959,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *       version-validated cache hit.
    *   <li>{@code groupRoleCache} (process-wide) — same idea per group.
    *   <li>{@code requestContext.prefetchedRoleVersions} — roleId → {@link RoleUpdatedAt} map
-   *       consumed by {@link #versionCheckAndLoadRoles} to skip its dedicated probe.
+   *       consumed by {@link #loadRequestPolicies} to skip its dedicated probe.
    * </ul>
    *
    * <p>The fat prefetch runs at most once per request, gated by {@code prefetchedRoleVersions}.
@@ -1279,55 +1117,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           // version-validated path as users (group_meta.updated_at as the staleness sentinel).
           List<Long> groupInheritedRoleIds = new ArrayList<>();
           for (String groupname : currentPrincipalGroupNames()) {
-            groupInheritedRoleIds.addAll(
-                loadGroupRoles(metalake, groupname, userId, requestContext));
+            groupInheritedRoleIds.addAll(loadGroupRoles(metalake, groupname, requestContext));
           }
 
-          // Prune stale g-rows: any role currently bound but no longer in the desired
-          // set (e.g. user removed from a group at the IdP, or role unassigned).
-          Set<String> desiredRoleIds = new HashSet<>();
-          for (Long id : userDirectRoleIds) {
-            desiredRoleIds.add(String.valueOf(id));
-          }
-          for (Long id : groupInheritedRoleIds) {
-            desiredRoleIds.add(String.valueOf(id));
-          }
-          String userIdStr = String.valueOf(userId);
-          List<String> staleRoleIds = new ArrayList<>();
-          rolePolicyLock.readLock().lock();
-          try {
-            Set<String> currentRoleIds = new HashSet<>(allowEnforcer.getRolesForUser(userIdStr));
-            currentRoleIds.addAll(denyEnforcer.getRolesForUser(userIdStr));
-            for (String currentRole : currentRoleIds) {
-              if (!desiredRoleIds.contains(currentRole)) {
-                staleRoleIds.add(currentRole);
-              }
-            }
-          } finally {
-            rolePolicyLock.readLock().unlock();
-          }
-          if (!staleRoleIds.isEmpty()) {
-            rolePolicyLock.writeLock().lock();
-            try {
-              for (String currentRole : staleRoleIds) {
-                allowEnforcer.deleteRoleForUser(userIdStr, currentRole);
-                denyEnforcer.deleteRoleForUser(userIdStr, currentRole);
-              }
-            } finally {
-              rolePolicyLock.writeLock().unlock();
-            }
-          }
-
-          // Step 3: batch version-check all role IDs (direct + group-inherited),
-          // load stale ones (1 query for the version probe).
-          List<Long> allRoleIds = new ArrayList<>(userDirectRoleIds);
+          Set<Long> allRoleIds = new LinkedHashSet<>(userDirectRoleIds);
           allRoleIds.addAll(groupInheritedRoleIds);
-          if (!allRoleIds.isEmpty()) {
-            requestContext.setUnreadableRoleIds(
-                versionCheckAndLoadRoles(metalake, allRoleIds, requestContext));
-          }
-          requestContext.setBoundRoleIds(allRoleIds);
-          requestContext.setRolePolicyGeneration(rolePolicyGeneration);
+          requestContext.setBoundRoleIds(new ArrayList<>(allRoleIds));
+          loadRequestPolicies(metalake, requestContext, rolePolicyGeneration);
         });
   }
 
@@ -1342,7 +1138,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // Cache is still valid. The user id check prevents reusing roles after deleting and
       // recreating the same username with a new entity id.
       CachedUserRoleRels cached = cachedOpt.get();
-      bindUserRoles(userId, cached.getRoleIds());
       return cached.getRoleIds();
     }
 
@@ -1353,7 +1148,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     userRoleCache.put(
         userCacheKey, new CachedUserRoleRels(userId, userInfo.getUpdatedAt(), roleIds));
-    bindUserRoles(userId, roleIds);
     return roleIds;
   }
 
@@ -1376,12 +1170,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * Version-validated group-role load, mirroring {@link #loadUserRoles}. A cached snapshot is valid
    * only when it belongs to the current group id and is at least as fresh as {@code
    * group_meta.updated_at}; the group id check prevents reusing stale roles after a
-   * delete-and-create of the same group name. In both cases the resulting role IDs are bound to the
-   * user's jcasbin g-rows so that the enforcer sees inherited privileges. Groups missing from the
-   * DB return an empty list.
+   * delete-and-create of the same group name. The resulting IDs belong only to the current request;
+   * no shared user/group role graph is mutated. Missing groups return an empty list.
    */
   private List<Long> loadGroupRoles(
-      String metalake, String groupname, long userId, AuthorizationRequestContext requestContext) {
+      String metalake, String groupname, AuthorizationRequestContext requestContext) {
     Optional<GroupUpdatedAt> groupInfoOpt = loadGroupInfo(metalake, groupname, requestContext);
     if (!groupInfoOpt.isPresent()) {
       return new ArrayList<>();
@@ -1394,7 +1187,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (cachedOpt.isPresent()) {
       CachedGroupRoleRels cached = cachedOpt.get();
       if (cached.getGroupId() == groupId && cached.getUpdatedAt() >= groupInfo.getUpdatedAt()) {
-        bindUserRoles(userId, cached.getRoleIds());
         return cached.getRoleIds();
       }
     }
@@ -1405,7 +1197,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     groupRoleCache.put(
         groupCacheKey, new CachedGroupRoleRels(groupId, groupInfo.getUpdatedAt(), roleIds));
-    bindUserRoles(userId, roleIds);
     return roleIds;
   }
 
@@ -1429,200 +1220,199 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return groups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
   }
 
-  /**
-   * Reloads every role in {@code roleIds} whose loaded version is missing or older than the DB.
-   *
-   * @return ids of stale roles whose entity could not be read, so their policies were not reloaded.
-   *     A role that no longer exists is not included: having no policies is correct for it.
-   */
-  private Set<Long> versionCheckAndLoadRoles(
-      String metalake, List<Long> roleIds, AuthorizationRequestContext requestContext) {
-    List<Long> uniqueRoleIds = roleIds.stream().distinct().collect(Collectors.toList());
-
-    Map<Long, RoleUpdatedAt> prefetched = requestContext.getPrefetchedRoleVersions();
-    List<RoleUpdatedAt> roleVersions = new ArrayList<>(uniqueRoleIds.size());
-    List<Long> missingRoleIds = new ArrayList<>();
-    for (Long rid : uniqueRoleIds) {
-      RoleUpdatedAt rv = prefetched == null ? null : prefetched.get(rid);
-      if (rv != null) {
-        roleVersions.add(rv);
-      } else {
-        missingRoleIds.add(rid);
-      }
-    }
-    if (!missingRoleIds.isEmpty()) {
-      roleVersions.addAll(
-          SessionUtils.getWithoutCommit(
-              RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(missingRoleIds)));
-    }
-
-    // Any roleId asked about but not returned has been deleted in the DB; clear its policies so
-    // a stale grouping row in the enforcer can't keep granting privileges before the next
-    // userRoleCache reload prunes the g-row itself.
-    Set<Long> existingRoleIds = new HashSet<>(roleVersions.size());
-    for (RoleUpdatedAt rv : roleVersions) {
-      existingRoleIds.add(rv.getRoleId());
-    }
-    for (Long roleId : uniqueRoleIds) {
-      if (!existingRoleIds.contains(roleId)) {
-        invalidateRolePolicies(roleId);
-      }
-    }
-
-    List<RoleUpdatedAt> staleRoleVersions = new ArrayList<>();
-    for (RoleUpdatedAt rv : roleVersions) {
-      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(rv.getRoleId());
-      if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= rv.getUpdatedAt()) {
-        continue;
-      }
-      // A role missing from loadedRoles because its last load was incomplete would otherwise be
-      // retried on every single request. Its partially loaded policies stay in the enforcer, so
-      // the privileges that did resolve keep working while the backoff is in effect.
-      if (!cachedUpdatedAt.isPresent()
-          && partialRoleLoadBackoff.getIfPresent(rv.getRoleId()).isPresent()) {
-        continue;
-      }
-      staleRoleVersions.add(rv);
-    }
-
-    if (staleRoleVersions.isEmpty()) {
-      return Collections.emptySet();
-    }
-
-    Set<Long> unreadableRoleIds = new HashSet<>();
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    List<NameIdentifier> roleIdents =
-        staleRoleVersions.stream()
-            .map(rv -> NameIdentifierUtil.ofRole(metalake, rv.getRoleName()))
-            .collect(Collectors.toList());
-    List<RoleEntity> roleEntities;
-    try {
-      roleEntities = entityStore.batchGet(roleIdents, Entity.EntityType.ROLE, RoleEntity.class);
-    } catch (Exception e) {
-      LOG.warn("Failed to batch load stale role policies for roleIds {}", staleRoleVersions, e);
-      roleEntities = new ArrayList<>();
-    }
-    if (roleEntities == null) {
-      roleEntities = new ArrayList<>();
-    }
-    // Some EntityStore implementations don't support batchGet for ROLE and return empty;
-    // fall back to per-role get so policies still load.
-    if (roleEntities.isEmpty()) {
-      roleEntities = new ArrayList<>(staleRoleVersions.size());
-      for (RoleUpdatedAt rv : staleRoleVersions) {
-        try {
-          roleEntities.add(
-              entityStore.get(
-                  NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
-                  Entity.EntityType.ROLE,
-                  RoleEntity.class));
-        } catch (NoSuchEntityException e) {
-          LOG.debug("Role {} was dropped before its policies could be loaded", rv.getRoleId(), e);
-        } catch (Exception e) {
-          LOG.warn("Failed to load role policies for roleId {}", rv.getRoleId(), e);
-          unreadableRoleIds.add(rv.getRoleId());
-        }
-      }
-    }
-
-    Map<Long, RoleUpdatedAt> staleRoleVersionById =
-        staleRoleVersions.stream().collect(Collectors.toMap(RoleUpdatedAt::getRoleId, rv -> rv));
-    for (RoleEntity roleEntity : roleEntities) {
-      if (roleEntity == null) {
-        continue;
-      }
-      RoleUpdatedAt rv = staleRoleVersionById.get(roleEntity.id());
-      if (rv == null) {
-        continue;
-      }
-      long roleId = rv.getRoleId();
-      long dbUpdatedAt = rv.getUpdatedAt();
-
-      // Resolve every securable object to a metadata id before touching the enforcers, so the
-      // critical section below stays free of DB round-trips.
-      Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(roleEntity, requestContext);
-      if (!resolution.isPresent()) {
-        unreadableRoleIds.add(roleId);
-        continue;
-      }
-      ResolvedRolePolicies resolved = resolution.get();
-
-      if (!replaceRolePolicies(roleId, dbUpdatedAt, resolved)) {
-        // Another request completed this version (or a newer one) while this request was resolving
-        // metadata ids. Its policies and marker are authoritative, even if this request's older
-        // resolution result was partial.
-        continue;
-      }
-
-      if (!resolved.isComplete()) {
-        LOG.warn(
-            "Loaded role {} ({}) with {} of {} securable objects; unresolved objects: {}. "
-                + "The role is not marked as loaded and will be retried in at most {} ms.",
-            roleId,
-            rv.getRoleName(),
-            roleEntity.securableObjects().size() - resolved.getUnresolvedObjects().size(),
-            roleEntity.securableObjects().size(),
-            resolved.getUnresolvedObjects(),
-            PARTIAL_ROLE_LOAD_RETRY_MS);
-      }
-    }
-    return unreadableRoleIds;
-  }
-
-  /**
-   * Replaces a role's policies if no concurrent loader has already installed the same or a newer
-   * role version.
-   *
-   * <p>Resolution happens outside {@link #rolePolicyLock}, so two requests can reach this method
-   * with different results for the same role version. The version check must therefore be repeated
-   * under the mutation lock. Otherwise, a late partial result can clear a complete result and leave
-   * the complete loader's marker behind.
-   *
-   * @return {@code true} if {@code resolved} was applied, or {@code false} if a same-or-newer
-   *     complete load was already present
-   */
-  private boolean replaceRolePolicies(
-      long roleId, long dbUpdatedAt, ResolvedRolePolicies resolved) {
+  private void loadRequestPolicies(
+      String metalake, AuthorizationRequestContext context, long generation) {
+    List<Long> ids = context.getBoundRoleIds().stream().distinct().collect(Collectors.toList());
+    Map<Long, RoleLoadState> states = new HashMap<>();
     rolePolicyLock.writeLock().lock();
     try {
-      Optional<Long> latestLoadedAt = loadedRoles.getIfPresent(roleId);
-      if (latestLoadedAt.isPresent() && latestLoadedAt.get() >= dbUpdatedAt) {
-        partialRoleLoadBackoff.invalidate(roleId);
-        return false;
+      for (long id : ids) {
+        RoleLoadState state = loadingRoles.computeIfAbsent(id, key -> new RoleLoadState());
+        state.readers++;
+        CachedRolePolicies cached = loadedRoles.getIfPresent(id).orElse(null);
+        if (cached != null
+            && (state.policies == null
+                || cached.getUpdatedAt() > state.policies.getUpdatedAt()
+                || (cached.getUpdatedAt() == state.policies.getUpdatedAt()
+                    && cached.isComplete()))) {
+          state.policies = cached;
+        }
+        states.put(id, state);
       }
-
-      // Refresh only permission policies. deleteRole would also remove the current user's freshly
-      // bound grouping links. If a marker exists, its synchronous removal callback clears the old
-      // policies. With no marker, rows can still remain from a previous partial load and must be
-      // cleared explicitly.
-      roleBeingReplaced = roleId;
-      try {
-        loadedRoles.invalidate(roleId);
-      } finally {
-        roleBeingReplaced = null;
-      }
-      if (!latestLoadedAt.isPresent()) {
-        clearRolePoliciesWithoutLock(roleId);
-      }
-      applyRolePolicies(resolved);
-
-      // Only record the role as loaded when the enforcer actually received everything the role
-      // grants. Marking a partially loaded role as loaded would pin it forever: role_meta's
-      // updated_at does not change, so the version check above would skip the reload on every later
-      // request and the missing privileges would never come back.
-      if (resolved.isComplete()) {
-        loadedRoles.put(roleId, dbUpdatedAt);
-        partialRoleLoadBackoff.invalidate(roleId);
-      } else {
-        partialRoleLoadBackoff.put(roleId, Boolean.TRUE);
-      }
-      return true;
     } finally {
       rolePolicyLock.writeLock().unlock();
     }
+    Map<Long, CachedRolePolicies> policies = new HashMap<>();
+    Set<Long> unreadable = new HashSet<>();
+    try {
+      Map<Long, RoleUpdatedAt> versions = new HashMap<>();
+      Map<Long, RoleUpdatedAt> prefetched =
+          context.getRolePolicyView() == null ? context.getPrefetchedRoleVersions() : null;
+      List<Long> missing = new ArrayList<>();
+      for (long id : ids) {
+        RoleUpdatedAt version = prefetched == null ? null : prefetched.get(id);
+        if (version == null) {
+          missing.add(id);
+        } else {
+          versions.put(id, version);
+        }
+      }
+      if (!missing.isEmpty()) {
+        for (RoleUpdatedAt version :
+            SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class, mapper -> mapper.batchGetRoleUpdatedAt(missing))) {
+          versions.put(version.getRoleId(), version);
+        }
+      }
+      List<RoleUpdatedAt> stale = new ArrayList<>();
+      for (long id : ids) {
+        RoleUpdatedAt version = versions.get(id);
+        if (version == null) {
+          invalidateRolePolicies(id);
+          continue;
+        }
+        rolePolicyLock.readLock().lock();
+        try {
+          CachedRolePolicies cached = states.get(id).policies;
+          if (cached != null
+              && cached.getUpdatedAt() >= version.getUpdatedAt()
+              && (cached.isComplete() || partialRoleLoadBackoff.getIfPresent(id).isPresent())) {
+            policies.put(id, cached);
+          } else {
+            stale.add(version);
+          }
+        } finally {
+          rolePolicyLock.readLock().unlock();
+        }
+      }
+      if (!stale.isEmpty()) {
+        EntityStore store = GravitinoEnv.getInstance().entityStore();
+        List<NameIdentifier> names =
+            stale.stream()
+                .map(v -> NameIdentifierUtil.ofRole(metalake, v.getRoleName()))
+                .collect(Collectors.toList());
+        List<RoleEntity> entities;
+        try {
+          entities = store.batchGet(names, Entity.EntityType.ROLE, RoleEntity.class);
+        } catch (Exception e) {
+          LOG.warn("Failed to batch load role policies; retrying individually", e);
+          entities = Collections.emptyList();
+        }
+        Map<Long, RoleEntity> byId = new HashMap<>();
+        if (entities != null) {
+          for (RoleEntity entity : entities) {
+            if (entity != null) {
+              byId.put(entity.id(), entity);
+            }
+          }
+        }
+        for (RoleUpdatedAt version : stale) {
+          long id = version.getRoleId();
+          RoleEntity entity = byId.get(id);
+          if (entity == null) {
+            try {
+              entity =
+                  store.get(
+                      NameIdentifierUtil.ofRole(metalake, version.getRoleName()),
+                      Entity.EntityType.ROLE,
+                      RoleEntity.class);
+              if (entity == null || entity.id() != id) {
+                unreadable.add(id);
+                continue;
+              }
+            } catch (NoSuchEntityException e) {
+              invalidateRolePolicies(id);
+              continue;
+            } catch (Exception e) {
+              LOG.warn("Failed to read role {}", id, e);
+              unreadable.add(id);
+              continue;
+            }
+          }
+          Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(entity, context);
+          if (!resolution.isPresent()) {
+            unreadable.add(id);
+            continue;
+          }
+          ResolvedRolePolicies resolved = resolution.get();
+          CachedRolePolicies candidate =
+              new CachedRolePolicies(
+                  version.getUpdatedAt(),
+                  resolved.getIndex(),
+                  resolved.isComplete(),
+                  resolved.getUnresolvedDenies());
+          rolePolicyLock.writeLock().lock();
+          try {
+            RoleLoadState state = states.get(id);
+            CachedRolePolicies latest = state.policies;
+            if (state.invalidatedAt > generation) {
+              unreadable.add(id);
+              continue;
+            }
+            if (latest != null
+                && (latest.getUpdatedAt() > candidate.getUpdatedAt()
+                    || (latest.getUpdatedAt() == candidate.getUpdatedAt()
+                        && latest.isComplete()))) {
+              policies.put(id, latest);
+              continue;
+            }
+            state.policies = candidate;
+            loadedRoles.put(id, candidate);
+            if (candidate.isComplete()) {
+              partialRoleLoadBackoff.invalidate(id);
+            } else {
+              partialRoleLoadBackoff.put(id, Boolean.TRUE);
+            }
+            // A newer snapshot must also refresh other in-flight requests. TTL eviction itself
+            // never changes policy generations because requests pin immutable data.
+            recordRoleClearGeneration(id);
+            policies.put(id, candidate);
+          } finally {
+            rolePolicyLock.writeLock().unlock();
+          }
+        }
+      }
+      if (!unreadable.isEmpty()) {
+        LOG.warn(
+            "Cannot establish complete role reads for {}; new decisions fail closed", unreadable);
+      }
+      RequestRolePolicies view =
+          new RequestRolePolicies(
+              generation, policies, context.getActiveRoles(), versions, unreadable.isEmpty());
+      rolePolicyLock.readLock().lock();
+      try {
+        // Pin the generation only after verifying the indexes selected throughout the load.
+        // Publication can evict any cache entry, but active load states retain authoritative
+        // values. A concurrent replacement/invalidation keeps the earlier generation, forcing
+        // repair before this view can be evaluated. No metadata or database work runs here.
+        boolean current =
+            states.entrySet().stream()
+                .allMatch(entry -> entry.getValue().policies == policies.get(entry.getKey()));
+        if (current) {
+          view.validatedAt(rolePolicyGenerationCounter.get());
+        }
+        context.setUnreadableRoleIds(unreadable);
+        context.setRolePolicyView(view);
+        context.setRolePolicyGeneration(view.generation());
+      } finally {
+        rolePolicyLock.readLock().unlock();
+      }
+
+    } finally {
+      rolePolicyLock.writeLock().lock();
+      try {
+        states.forEach(
+            (id, state) -> {
+              if (--state.readers == 0) {
+                loadingRoles.remove(id);
+              }
+            });
+      } finally {
+        rolePolicyLock.writeLock().unlock();
+      }
+    }
   }
 
-  /** Clears a role's policies and removes its loaded marker as one serialized operation. */
   private void invalidateRolePolicies(long roleId) {
     invalidateRolePolicies(roleId, false);
   }
@@ -1630,73 +1420,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private void invalidateRolePolicies(long roleId, boolean recordEmptyRoleChange) {
     rolePolicyLock.writeLock().lock();
     try {
-      Long previousClearGeneration = roleClearGenerations.get(roleId);
-      // An explicit invalidation is stronger than the retry throttle. Clear it under the same lock
-      // before removing the loaded marker so the removal callback cannot mistake the old partial
-      // state for a newer load and skip policy cleanup.
-      partialRoleLoadBackoff.invalidate(roleId);
-      boolean markerPresent = loadedRoles.getIfPresent(roleId).isPresent();
+      boolean present = loadedRoles.getIfPresent(roleId).isPresent();
       loadedRoles.invalidate(roleId);
-      if (!markerPresent) {
-        // An incomplete load has policies but deliberately has no loadedRoles marker.
-        clearRolePoliciesAndRecordGeneration(roleId);
-      }
-      // A privilege change can grant a previously empty role its first deny policy. Such a role
-      // has no p-row to remove, but in-flight requests must still reload before their next check.
-      if (recordEmptyRoleChange
-          && Objects.equals(previousClearGeneration, roleClearGenerations.get(roleId))) {
+      partialRoleLoadBackoff.invalidate(roleId);
+      RoleLoadState loading = loadingRoles.get(roleId);
+      if (present || recordEmptyRoleChange || (loading != null && loading.policies != null)) {
         recordRoleClearGeneration(roleId);
       }
-    } finally {
-      rolePolicyLock.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Handles a loaded-role cache removal after acquiring the policy mutation lock.
-   *
-   * <p>Caffeine removes the old marker before invoking its listener. While the listener waits for
-   * this lock, a concurrent loader may install a new policy state: either a complete load with a
-   * new loaded marker or a partial load with a retry-backoff marker. In either case this is a stale
-   * removal event and must not clear the newly installed policies.
-   */
-  private void clearRolePoliciesOnCacheRemoval(long roleId) {
-    rolePolicyLock.writeLock().lock();
-    try {
-      if (loadedRoles.getIfPresent(roleId).isPresent()
-          || partialRoleLoadBackoff.getIfPresent(roleId).isPresent()) {
-        LOG.debug(
-            "Skip clearing policies for role {} because it was reloaded after cache removal",
-            roleId);
-        return;
-      }
-      if (Objects.equals(roleBeingReplaced, roleId)) {
-        clearRolePoliciesWithoutLock(roleId);
-      } else {
-        clearRolePoliciesAndRecordGeneration(roleId);
+      if (loading != null) {
+        // Also invalidate loaders of an initially empty role. No stale resolution may publish
+        // after explicit invalidation, even when neither cache nor request had seen policies.
+        loading.policies = null;
+        loading.invalidatedAt = rolePolicyGenerationCounter.incrementAndGet();
       }
     } finally {
       rolePolicyLock.writeLock().unlock();
-    }
-  }
-
-  private boolean clearRolePoliciesWithoutLock(long roleId) {
-    String roleIdStr = String.valueOf(roleId);
-    boolean allowRemoved = allowEnforcer.removeFilteredPolicy(0, roleIdStr);
-    boolean denyRemoved = denyEnforcer.removeFilteredPolicy(0, roleIdStr);
-    return allowRemoved || denyRemoved;
-  }
-
-  /**
-   * Clears a role's policies that are not replaced in the same critical section, and records the
-   * clear so that in-flight requests bound to the role reload it before their next check. Only a
-   * clear that removed policies is recorded: clearing an already empty role changes nothing a
-   * request could have observed, and recording it would make a deleted role look unstable forever.
-   * Must be called under the write lock of {@link #rolePolicyLock}.
-   */
-  private void clearRolePoliciesAndRecordGeneration(long roleId) {
-    if (clearRolePoliciesWithoutLock(roleId)) {
-      recordRoleClearGeneration(roleId);
     }
   }
 
@@ -1718,134 +1456,75 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     prunedRoleClearGeneration = cutoff;
   }
 
-  /**
-   * Evaluates one authorization check after repairing role policies cleared since this request
-   * loaded its roles.
-   *
-   * <p>A request loads its roles once, but each check releases {@link #rolePolicyLock} before the
-   * next one starts. In between, a {@link #loadedRoles} TTL or size eviction, or a privilege change
-   * on one of the roles, may clear that role's policies while the user's grouping row stays. A
-   * later check would then evaluate without the role: it can deny what the role allows, or allow
-   * what the role denies. So before each evaluation this method checks, under the read lock,
-   * whether a bound role was cleared after the request's recorded generation. If so, it reloads the
-   * cleared roles outside the lock, the same way a request's role load does, and checks again.
-   *
-   * <p>Earlier decisions keep their existing request-scoped results. Each new policy evaluation
-   * runs inside one read-locked section without holding the lock across metadata or DB lookups.
-   * Partial role-policy resolution keeps its existing per-object behavior; reliable completeness
-   * tracking for the deny-existence scan is handled separately in issue #13691.
-   *
-   * @return the evaluation result, or empty when the request's roles kept being cleared or could
-   *     not be reloaded; the caller must then fail closed
-   */
+  /** Evaluates a pinned view, repairing explicit policy changes before any new decision. */
   private Optional<Boolean> evaluateWithLoadedRolePolicies(
-      String metalake, AuthorizationRequestContext requestContext, BooleanSupplier evaluation) {
-    if (!requestContext.getUnreadableRoleIds().isEmpty()) {
-      LOG.warn(
-          "Failed to read roles {} during the initial role load; failing closed",
-          requestContext.getUnreadableRoleIds());
-      return Optional.empty();
-    }
+      String metalake,
+      AuthorizationRequestContext context,
+      Function<RequestRolePolicies, Boolean> evaluation) {
     for (int reloads = 0; ; reloads++) {
       rolePolicyLock.readLock().lock();
       try {
-        if (!hasClearedBoundRole(requestContext)) {
-          return Optional.of(evaluation.getAsBoolean());
+        RequestRolePolicies view = (RequestRolePolicies) context.getRolePolicyView();
+        if (view == null || !view.isReadable()) {
+          return Optional.empty();
+        }
+        if (!hasClearedBoundRole(context, view.generation())) {
+          long currentGeneration = rolePolicyGenerationCounter.get();
+          if (view.generation() != currentGeneration) {
+            view.validatedAt(currentGeneration);
+            context.setRolePolicyGeneration(currentGeneration);
+          }
+          return Optional.of(evaluation.apply(view));
         }
       } finally {
         rolePolicyLock.readLock().unlock();
       }
-
       if (reloads == MAX_ROLE_POLICY_RELOADS) {
         LOG.warn(
-            "Policies of roles {} were cleared again after {} reloads within one authorization "
-                + "check; failing closed. Check for frequent privilege changes on these roles or a "
-                + "loaded role cache that is too small on this node.",
-            requestContext.getBoundRoleIds(),
-            MAX_ROLE_POLICY_RELOADS);
+            "Role policies changed during all {} reload attempts for metalake {}; failing closed. "
+                + "Retry the request after role updates settle",
+            MAX_ROLE_POLICY_RELOADS,
+            metalake);
         return Optional.empty();
       }
-
-      long rolePolicyGeneration = rolePolicyGenerationCounter.get();
-      Set<Long> unreadableRoleIds;
-      try {
-        unreadableRoleIds =
-            versionCheckAndLoadRoles(metalake, requestContext.getBoundRoleIds(), requestContext);
-      } catch (RuntimeException e) {
-        LOG.warn(
-            "Failed to reload cleared role policies for roles {}; failing closed",
-            requestContext.getBoundRoleIds(),
-            e);
-        return Optional.empty();
+      synchronized (context) {
+        RequestRolePolicies view = (RequestRolePolicies) context.getRolePolicyView();
+        rolePolicyLock.readLock().lock();
+        boolean changed;
+        try {
+          changed = hasClearedBoundRole(context, view.generation());
+        } finally {
+          rolePolicyLock.readLock().unlock();
+        }
+        if (!changed) {
+          continue;
+        }
+        long generation = rolePolicyGenerationCounter.get();
+        try {
+          loadRequestPolicies(metalake, context, generation);
+        } catch (RuntimeException e) {
+          LOG.warn("Failed to refresh role policies; failing closed", e);
+          return Optional.empty();
+        }
       }
-      // A role whose entity could not be read has lost its policies without a replacement. Its
-      // missing rows prove neither the absence of a deny nor of an allow, so the check cannot be
-      // evaluated. Partially loaded and dropped roles are evaluated as usual: their policy state is
-      // the same one any request would see.
-      if (!unreadableRoleIds.isEmpty()) {
-        LOG.warn(
-            "Failed to read roles {} to reload their cleared policies; failing closed",
-            unreadableRoleIds);
-        return Optional.empty();
-      }
-      requestContext.setRolePolicyGeneration(rolePolicyGeneration);
     }
   }
 
-  /**
-   * Returns whether a role bound by this request was cleared after the request's recorded
-   * generation. Must be called under {@link #rolePolicyLock}.
-   */
-  private boolean hasClearedBoundRole(AuthorizationRequestContext requestContext) {
-    long rolePolicyGeneration = requestContext.getRolePolicyGeneration();
-    List<Long> boundRoleIds = requestContext.getBoundRoleIds();
-    if (!boundRoleIds.isEmpty() && rolePolicyGeneration < prunedRoleClearGeneration) {
-      // A clear of one of these roles may have been pruned from roleClearGenerations.
+  /** Must be called under the policy read lock. The usual unchanged-generation path is O(1). */
+  private boolean hasClearedBoundRole(AuthorizationRequestContext context, long generation) {
+    if (generation == rolePolicyGenerationCounter.get()) {
+      return false;
+    }
+    if (!context.getBoundRoleIds().isEmpty() && generation < prunedRoleClearGeneration) {
       return true;
     }
-    for (Long roleId : boundRoleIds) {
-      Long clearedAt = roleClearGenerations.get(roleId);
-      if (clearedAt != null && clearedAt > rolePolicyGeneration) {
+    for (long id : context.getBoundRoleIds()) {
+      Long changed = roleClearGenerations.get(id);
+      if (changed != null && changed > generation) {
         return true;
       }
     }
     return false;
-  }
-
-  private void bindUserRoles(long userId, List<Long> roleIds) {
-    if (roleIds.isEmpty()) {
-      return;
-    }
-
-    String userIdStr = String.valueOf(userId);
-    List<Long> missingRoleIds = new ArrayList<>();
-    rolePolicyLock.readLock().lock();
-    try {
-      Set<String> allowRoleIds = new HashSet<>(allowEnforcer.getRolesForUser(userIdStr));
-      Set<String> denyRoleIds = new HashSet<>(denyEnforcer.getRolesForUser(userIdStr));
-      for (Long roleId : roleIds) {
-        String roleIdStr = String.valueOf(roleId);
-        if (!allowRoleIds.contains(roleIdStr) || !denyRoleIds.contains(roleIdStr)) {
-          missingRoleIds.add(roleId);
-        }
-      }
-    } finally {
-      rolePolicyLock.readLock().unlock();
-    }
-    if (missingRoleIds.isEmpty()) {
-      return;
-    }
-
-    rolePolicyLock.writeLock().lock();
-    try {
-      for (Long roleId : missingRoleIds) {
-        String roleIdStr = String.valueOf(roleId);
-        allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
-        denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
-      }
-    } finally {
-      rolePolicyLock.writeLock().unlock();
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1853,26 +1532,25 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   // ---------------------------------------------------------------------------
 
   /**
-   * Resolves a role's securable objects into concrete jcasbin {@code p} rows without touching the
-   * enforcers. Every metadata-id lookup — the only part of policy loading that can hit the DB —
-   * happens here, so the caller can apply the result while holding {@link #rolePolicyLock}.
+   * Resolves a role into an index outside the publication lock. Unresolved DENY privileges are
+   * retained in a summary even when their exact object no longer resolves, so incomplete loads
+   * cannot enable the list shortcut.
    *
    * <p>A securable object that cannot be resolved to a metadata id is reported in {@link
    * ResolvedRolePolicies#getUnresolvedObjects()} rather than silently dropped. That normally means
    * the object has been dropped while the role still references it. Transient normalization
    * failures also leave the role incomplete, but require a conservative catalog-scoped guard for
    * DENY privileges. If that guard cannot be installed, returns empty so the caller marks the role
-   * unreadable without publishing any of its policies. The caller records a loaded marker only when
-   * all objects were resolved.
+   * unreadable without publishing any of its policies. Completeness belongs to the cached index,
+   * independently of the retry throttle.
    */
   private Optional<ResolvedRolePolicies> resolveRolePolicies(
       RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-    String roleIdStr = String.valueOf(roleEntity.id());
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
 
-    List<String[]> allowRows = new ArrayList<>();
-    List<String[]> denyRows = new ArrayList<>();
+    Map<PolicyKey, Effect> index = new HashMap<>();
+    Set<String> unresolvedDenies = new HashSet<>();
     List<String> unresolvedObjects = new ArrayList<>();
 
     for (SecurableObject securableObject : securableObjects) {
@@ -1881,31 +1559,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Optional<Long> metadataId = resolution.metadataId();
       if (!metadataId.isPresent()) {
         unresolvedObjects.add(securableObject.type().name() + ":" + securableObject.fullName());
+        for (Privilege privilege : securableObject.privileges()) {
+          if (privilege.condition() == Privilege.Condition.DENY) {
+            unresolvedDenies.add(
+                AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name()).name());
+          }
+        }
         if (resolution.normalizationFailed()
-            && !addUnresolvedDenyPolicies(
-                securableObject, metalake, roleIdStr, requestContext, allowRows, denyRows)) {
+            && !addUnresolvedDenyPolicies(securableObject, metalake, requestContext, index)) {
           return Optional.empty();
         }
         continue;
       }
-      addPolicyRows(
-          roleIdStr,
-          securableObject.type(),
-          metadataId.get(),
-          securableObject.privileges(),
-          allowRows,
-          denyRows);
+      addPolicies(securableObject.type(), metadataId.get(), securableObject.privileges(), index);
     }
-    return Optional.of(new ResolvedRolePolicies(allowRows, denyRows, unresolvedObjects));
+    return Optional.of(new ResolvedRolePolicies(index, unresolvedObjects, unresolvedDenies));
   }
 
   private boolean addUnresolvedDenyPolicies(
       SecurableObject object,
       String metalake,
-      String roleId,
       AuthorizationRequestContext requestContext,
-      List<String[]> allowRows,
-      List<String[]> denyRows) {
+      Map<PolicyKey, Effect> index) {
     List<Privilege> denies =
         object.privileges().stream()
             .filter(privilege -> privilege.condition() == Privilege.Condition.DENY)
@@ -1932,139 +1607,23 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       LOG.warn("Cannot resolve catalog for unresolved deny policy on {}", object.fullName());
       return false;
     }
-    addPolicyRows(
-        roleId, MetadataObject.Type.CATALOG, catalogId.get(), denies, allowRows, denyRows);
+    addPolicies(MetadataObject.Type.CATALOG, catalogId.get(), denies, index);
     return true;
   }
 
-  private static void addPolicyRows(
-      String roleId,
+  private static void addPolicies(
       MetadataObject.Type type,
       long metadataId,
       List<Privilege> privileges,
-      List<String[]> allowRows,
-      List<String[]> denyRows) {
+      Map<PolicyKey, Effect> index) {
     for (Privilege privilege : privileges) {
-      String action =
-          AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
-              .name()
-              .toUpperCase(Locale.ROOT);
-      if (privilege.condition() == Privilege.Condition.DENY) {
-        denyRows.add(
-            new String[] {
-              roleId, type.name(), String.valueOf(metadataId), action, AuthConstants.ALLOW
-            });
-      }
-      allowRows.add(
-          new String[] {
-            roleId,
-            type.name(),
-            String.valueOf(metadataId),
-            action,
-            privilege.condition().name().toLowerCase(Locale.ROOT)
-          });
-    }
-  }
-
-  /**
-   * Writes pre-resolved policy rows into both enforcers. Must be called under {@link
-   * #rolePolicyLock}.
-   */
-  private void applyRolePolicies(ResolvedRolePolicies resolved) {
-    for (String[] row : resolved.getDenyRows()) {
-      denyEnforcer.addPolicy(row);
-    }
-    for (String[] row : resolved.getAllowRows()) {
-      allowEnforcer.addPolicy(row);
-    }
-  }
-
-  /**
-   * Reports the enforcer state behind a denied allow-check, so that a denial caused by missing
-   * policies can be told apart from a denial the caller genuinely earned.
-   *
-   * <p>Escalates to {@code WARN} when it finds a role that {@link #loadedRoles} claims is loaded
-   * but that carries no {@code p} row in the allow enforcer. That combination is the signature of a
-   * lost policy load: the version check consults {@code loadedRoles} alone, so it would keep
-   * skipping the reload for as long as the entry lives.
-   *
-   * <p>Gated on {@code DEBUG} because it scans the enforcer's policy set per bound role and denials
-   * are an ordinary outcome on the request path. Enable {@code DEBUG} for this class on the node
-   * under investigation; the diagnosis itself is then reported at {@code WARN}.
-   */
-  private void diagnoseDenial(
-      long userId, String metadataType, String metadataIdStr, String privilege) {
-    if (!LOG.isDebugEnabled()) {
-      return;
-    }
-    try {
-      String userIdStr = String.valueOf(userId);
-      Map<String, Integer> rolePolicyCounts = new HashMap<>();
-      rolePolicyLock.readLock().lock();
-      try {
-        List<String> boundRoles = allowEnforcer.getRolesForUser(userIdStr);
-        if (boundRoles.isEmpty()) {
-          LOG.debug(
-              "Denied [{}, {}, {}, {}]: no role is bound to the user in the allow enforcer",
-              userIdStr,
-              metadataType,
-              metadataIdStr,
-              privilege);
-          return;
-        }
-
-        for (String roleIdStr : boundRoles) {
-          int policyCount =
-              allowEnforcer
-                  .getFilteredNamedPolicy("p", POLICY_SUBJECT_FIELD_INDEX, roleIdStr)
-                  .size();
-          rolePolicyCounts.put(roleIdStr, policyCount);
-        }
-      } finally {
-        rolePolicyLock.readLock().unlock();
-      }
-
-      List<String> rolesWithoutPolicies = new ArrayList<>();
-      List<String> roleStates = new ArrayList<>(rolePolicyCounts.size());
-      for (Map.Entry<String, Integer> roleState : rolePolicyCounts.entrySet()) {
-        String roleIdStr = roleState.getKey();
-        int policyCount = roleState.getValue();
-        Optional<Long> loadedAt = loadedRoles.getIfPresent(Long.parseLong(roleIdStr));
-        roleStates.add(
-            roleIdStr
-                + "{loadedAt="
-                + (loadedAt.isPresent() ? loadedAt.get() : "absent")
-                + ", allowPolicies="
-                + policyCount
-                + "}");
-        if (loadedAt.isPresent() && policyCount == 0) {
-          rolesWithoutPolicies.add(roleIdStr);
-        }
-      }
-
-      if (rolesWithoutPolicies.isEmpty()) {
-        LOG.debug(
-            "Denied [{}, {}, {}, {}]: role state {}",
-            userIdStr,
-            metadataType,
-            metadataIdStr,
-            privilege,
-            roleStates);
-      } else {
-        LOG.warn(
-            "Denied [{}, {}, {}, {}] while roles {} are recorded as loaded but hold no allow "
-                + "policy. This node's enforcer lost their policies; the version check cannot "
-                + "detect it. Full role state: {}",
-            userIdStr,
-            metadataType,
-            metadataIdStr,
-            privilege,
-            rolesWithoutPolicies,
-            roleStates);
-      }
-    } catch (Exception e) {
-      // A diagnostic must never change the outcome of an authorization check.
-      LOG.debug("Failed to diagnose denial for user {}", userId, e);
+      String action = AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name()).name();
+      Effect effect =
+          privilege.condition() == Privilege.Condition.DENY ? Effect.DENY : Effect.ALLOW;
+      index.merge(
+          new PolicyKey(type.name(), metadataId, action),
+          effect,
+          (old, next) -> old == Effect.DENY ? old : next);
     }
   }
 }

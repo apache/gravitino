@@ -47,6 +47,7 @@ import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationRequestContext {
@@ -546,5 +547,17 @@ public class TestAuthorizationRequestContext {
     assertThrows(UnsupportedOperationException.class, () -> context.getBoundRoleIds().add(4L));
     assertThrows(NullPointerException.class, () -> context.setBoundRoleIds(null));
     assertEquals(7L, context.getRolePolicyGeneration());
+  }
+
+  /** Publishes the immutable policy view and rejects null publication. */
+  @Test
+  public void testRolePolicyViewIsPublishedAndCannotBeNull() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Assertions.assertNull(context.getRolePolicyView());
+    AuthorizationRequestContext.RolePolicyView view = () -> 17L;
+    context.setRolePolicyView(view);
+    Assertions.assertSame(view, context.getRolePolicyView());
+    Assertions.assertEquals(17L, context.getRolePolicyView().generation());
+    Assertions.assertThrows(NullPointerException.class, () -> context.setRolePolicyView(null));
   }
 }

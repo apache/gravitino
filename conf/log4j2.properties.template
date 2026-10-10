@@ -131,8 +131,8 @@ logger.rest.level = warn
 logger.rest.appenderRef.rolling.ref = fileLogger
 logger.rest.additivity = false
 
-# Suppress verbose JCasbin authorization decision logs by default
-logger.jcasbin.name = org.casbin.jcasbin
+# Authorization logger; retain the legacy key for configuration compatibility
+logger.jcasbin.name = org.apache.gravitino.server.authorization.jcasbin
 logger.jcasbin.level = warn
 
 # Configure root logger
