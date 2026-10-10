@@ -64,7 +64,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     }
     // Trino may be explicitly omitted from the build, but its listed files must still exist.
     def skippedSourceRoots = gradle.startParameter.projectProperties['skipTrinoConnector']?.equalsIgnoreCase('true')
-      ? [file('trino-connector/trino-connector/src/main/java').canonicalFile.toPath()] : []
+      ? ['common', 'common-440-479', 'common-440-481', 'common-480-481'].collect { file("trino-connector/${it}/src/main/java").canonicalFile.toPath() } : []
     def requireOwnedSources = { Collection sources ->
       def compiled = sources.findAll { source -> sourceOwners.values().any { it.contains(source) } }
       def unowned = sources.findAll { source ->
@@ -86,11 +86,11 @@ def legalTests = tasks.register('testMavenLegalFiles') {
       // https://github.com/trinodb/trino/tree/435 has only a server dependency NOTICE,
       // which does not apply to these copied classes.
       'Trino': [
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java'
+        'trino-connector/common/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java',
+        'trino-connector/common/src/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java',
+        'trino-connector/common/src/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java',
+        'trino-connector/common/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java',
+        'trino-connector/common-440-481/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java'
       ]
     ].collectEntries { component, paths -> [(component): paths.collect { file(it).canonicalFile }.toSet()] }
     def sourceNoticeFor = { String component, Collection sources ->

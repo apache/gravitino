@@ -17,149 +17,34 @@
  * under the License.
  */
 
-import com.diffplug.gradle.spotless.SpotlessExtension
-import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.internal.hash.ChecksumService
-import org.gradle.kotlin.dsl.support.serviceOf
-
 plugins {
   `java-library`
   `maven-publish`
 }
 
-// This module supports Trino versions 440-445
-val minTrinoVersion = 440
-val maxTrinoVersion = 445
-val otelSemconvVersion = "1.23.1-alpha"
-
-val trinoVersion = providers.gradleProperty("trinoVersion")
-  .map { it.trim().toInt() }
-  .orElse(minTrinoVersion)
-  .get()
-
-// Validate version range
-check(trinoVersion in minTrinoVersion..maxTrinoVersion) {
-  "Module ${project.path} supports Trino versions $minTrinoVersion-$maxTrinoVersion, " +
-    "but trinoVersion=$trinoVersion was specified. " +
-    "Please set '-PtrinoVersion=$minTrinoVersion' (or any version in the supported range)."
-}
-
-java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
-}
-
-dependencies {
-  implementation(project(":catalogs:catalog-common"))
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.airlift.json)
-  implementation(libs.commons.collections4)
-  implementation(libs.commons.lang3)
-  implementation("io.trino:trino-jdbc:$trinoVersion")
-  runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv:$otelSemconvVersion")
-  implementation(libs.airlift.log)
-  implementation(libs.slf4j.jdk14)
-  compileOnly(libs.airlift.resolver)
-  compileOnly("io.trino:trino-spi:$trinoVersion") {
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation(libs.awaitility)
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.mysql.driver)
-  testImplementation("io.trino:trino-memory:$trinoVersion") {
-    exclude("org.antlr")
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation("io.trino:trino-testing:$trinoVersion") {
-    exclude("org.apache.logging.log4j")
-  }
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+// This module supports Trino versions 440-445. Everything shared by the version-segment modules
+// (toolchain, dependencies, Spotless, test wiring, distribution tasks) is configured once in
+// segment.gradle.kts; this file only declares the module's range and source directories.
+extra["minTrinoVersion"] = 440
+extra["maxTrinoVersion"] = 445
+extra["otelSemconvVersion"] = "1.23.1-alpha"
+extra["defaultTrinoVersionIsMin"] = true
 
 sourceSets {
   main {
-    java.srcDirs("../trino-connector/src/main/java")
+    java.srcDirs(
+      "../common/src/main/java",
+      "../common-440-479/src/main/java",
+      "../common-440-481/src/main/java"
+    )
   }
   test {
-    java.srcDirs("../trino-connector/src/test/java")
-    resources.srcDirs("../trino-connector/src/test/resources")
+    java.srcDirs(
+      "../common/src/test/java",
+      "../common-440-481/src/test/java"
+    )
+    resources.srcDirs("../common/src/test/resources")
   }
 }
 
-plugins.withId("com.diffplug.spotless") {
-  configure<SpotlessExtension> {
-    java {
-      // Keep Spotless within this module to avoid cross-project target errors.
-      target(project.fileTree("src") { include("**/*.java") })
-    }
-  }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-  // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
-  options.errorprone.isEnabled.set(false)
-  options.release.set(17)
-}
-
-tasks.withType<Test>().configureEach {
-  extensions
-    .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
-    ?.isEnabled = false
-}
-
-tasks {
-  val copyRuntimeLibs by registering(Copy::class) {
-    dependsOn("jar")
-    from({ configurations.runtimeClasspath.get().filter(File::isFile) })
-    into(layout.buildDirectory.dir("libs"))
-  }
-
-  val distributionDir = rootProject.layout.projectDirectory.dir("distribution/${rootProject.name}-${project.name}")
-
-  val copyLibs by registering(Copy::class) {
-    dependsOn(copyRuntimeLibs, "build")
-    from(layout.buildDirectory.dir("libs"))
-    from(rootProject.layout.projectDirectory.dir("licenses")) {
-      into("licenses")
-    }
-    from(rootProject.file("LICENSE.trino"))
-    from(rootProject.file("NOTICE.trino"))
-    from(rootProject.file("README.md"))
-    into(distributionDir)
-    rename { fileName ->
-      fileName.replace(".trino", "")
-    }
-    outputs.dir(distributionDir)
-  }
-
-  val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn(copyLibs)
-    group = "gravitino distribution"
-    finalizedBy("checksumTrinoConnector")
-    val archiveBase = "${rootProject.name}-${project.name}-$version"
-    into(archiveBase)
-    from(distributionDir)
-    compression = Compression.GZIP
-    archiveFileName.set("$archiveBase.tar.gz")
-    destinationDirectory.set(rootProject.layout.projectDirectory.dir("distribution"))
-  }
-
-  val checksumTrinoConnector by registering {
-    group = "gravitino distribution"
-    dependsOn(assembleTrinoConnector)
-    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
-    val checksumFile = archiveFile.map { archive ->
-      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
-    }
-    inputs.file(archiveFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.get().writeText(
-        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  named("build") {
-    finalizedBy(copyRuntimeLibs)
-  }
-}
+apply(from = "../segment.gradle")

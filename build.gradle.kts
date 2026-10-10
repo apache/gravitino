@@ -405,7 +405,7 @@ allprojects {
         // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
         // integration-test is intentionally excluded from this carve-out: it runs outside
         // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
-        if (!project.path.startsWith(":trino-connector:trino-connector")) {
+        if (project.path != ":trino-connector" && !project.path.startsWith(":trino-connector:trino-connector")) {
           replaceRegex(
             "Use SLF4J Logger instead of other logging frameworks",
             "import\\s+.*\\.(Logger|LoggerFactory);",
@@ -1342,7 +1342,9 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
+    // Frontend integration tests use the default Trino version from docker-compose, whose connector
+    // directory defaults to the matching segment module. Keep this target in sync with that default.
+    dependsOn("trino-connector:trino-connector-473-479:copyLibs")
     group = "gravitino distribution"
   }
 
@@ -1353,7 +1355,10 @@ tasks {
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
       ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
-      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-479:assembleTrinoConnector",
+      ":trino-connector:trino-connector-480:assembleTrinoConnector",
+      ":trino-connector:trino-connector-481:assembleTrinoConnector",
+      ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

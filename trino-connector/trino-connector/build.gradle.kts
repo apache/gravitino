@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
@@ -37,6 +38,29 @@ val trinoVersion = trinoVersionProperty.map { it.trim().toInt() }.get()
 // with that toolchain, so it is disabled here too, matching those modules' own override.
 java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))
+}
+
+// The connector sources live in the shared shape directories next to this module (common/ plus the
+// shape directories it needs at the minimum supported Trino version); this module compiles them
+// against the range-minimum SPI and hosts the shared unit tests.
+sourceSets {
+  main {
+    java.srcDirs("../common/src/main/java", "../common-440-479/src/main/java", "../common-440-481/src/main/java")
+  }
+  test {
+    java.srcDirs("../common/src/test/java", "../common-440-481/src/test/java")
+    resources.srcDirs("../common/src/test/resources")
+  }
+}
+
+plugins.withId("com.diffplug.spotless") {
+  configure<SpotlessExtension> {
+    java {
+      // Keep Spotless within this module; the shared shape trees are formatted by the
+      // trino-connector parent project that owns them.
+      target(project.fileTree("src") { include("**/*.java") })
+    }
+  }
 }
 
 tasks.withType<JavaCompile>().configureEach {
