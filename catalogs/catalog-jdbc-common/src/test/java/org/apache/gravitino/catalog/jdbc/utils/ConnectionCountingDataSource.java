@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.Statement;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,6 +37,7 @@ public class ConnectionCountingDataSource {
 
   private final AtomicInteger borrowed = new AtomicInteger();
   private final AtomicInteger peakBorrowed = new AtomicInteger();
+  private final AtomicInteger totalBorrows = new AtomicInteger();
   private final List<String> executedSql = new CopyOnWriteArrayList<>();
   private final DataSource dataSource =
       (DataSource)
@@ -64,12 +66,18 @@ public class ConnectionCountingDataSource {
     return peakBorrowed.get();
   }
 
+  /** Returns how many connections were borrowed in total. */
+  public int totalBorrows() {
+    return totalBorrows.get();
+  }
+
   /** Returns the update statements executed so far, in order. */
   public List<String> executedSql() {
     return executedSql;
   }
 
   private Connection borrow() {
+    totalBorrows.incrementAndGet();
     peakBorrowed.accumulateAndGet(borrowed.incrementAndGet(), Math::max);
     AtomicBoolean closed = new AtomicBoolean();
     return (Connection)
@@ -88,6 +96,8 @@ public class ConnectionCountingDataSource {
                   return null;
                 case "createStatement":
                   return statement();
+                case "getMetaData":
+                  return metaData();
                 default:
                   return objectMethod(proxy, method.getName(), args, "Connection");
               }
@@ -106,6 +116,20 @@ public class ConnectionCountingDataSource {
       default:
         throw new UnsupportedOperationException(type + "." + name);
     }
+  }
+
+  // Reports a null driver version, which the JDBC contract allows.
+  private static DatabaseMetaData metaData() {
+    return (DatabaseMetaData)
+        Proxy.newProxyInstance(
+            DatabaseMetaData.class.getClassLoader(),
+            new Class<?>[] {DatabaseMetaData.class},
+            (proxy, method, args) -> {
+              if ("getDriverVersion".equals(method.getName())) {
+                return null;
+              }
+              return objectMethod(proxy, method.getName(), args, "DatabaseMetaData");
+            });
   }
 
   private Statement statement() {

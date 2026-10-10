@@ -245,6 +245,23 @@ public class TestJdbcOperationsConnectionUsage {
     }
   }
 
+  @Test
+  public void testNullDriverVersionIsCachedFromTheHeldConnection() throws SQLException {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    JdbcTableOperations operations = new SqliteTableOperations();
+    initialize(operations, connections.dataSource());
+
+    try (Connection held = connections.dataSource().getConnection()) {
+      operations.cacheDriverVersion(held);
+      // A null version is still cached, so later lookups never borrow while one is held.
+      Assertions.assertNull(operations.getMySQLDriverVersion());
+      Assertions.assertNull(operations.getMySQLDriverVersion());
+    }
+
+    Assertions.assertEquals(1, connections.totalBorrows());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
   // Like the MySQL generator loading the original table, borrows a connection while generating.
   private static JdbcTableOperations borrowingGenerator(
       ConnectionCountingDataSource connections,

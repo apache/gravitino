@@ -86,8 +86,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
   // The driver version is fixed for a data source. It is cached so that column parsing in load,
-  // which holds a connection, does not borrow another one to read it.
-  private volatile String driverVersion;
+  // which holds a connection, does not borrow another one to read it. A driver may report a null
+  // version, so a separate flag records that it was read; written after the version, it publishes
+  // it.
+  private String driverVersion;
+  private volatile boolean driverVersionCached;
 
   @Override
   public void initialize(
@@ -814,9 +817,8 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @return the driver version string, or null if not available
    */
   protected String getMySQLDriverVersion() {
-    String version = driverVersion;
-    if (version != null || dataSource == null) {
-      return version;
+    if (driverVersionCached || dataSource == null) {
+      return driverVersion;
     }
     try (Connection connection = dataSource.getConnection()) {
       cacheDriverVersion(connection);
@@ -835,12 +837,15 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @param connection the connection held by the caller
    */
   protected void cacheDriverVersion(Connection connection) {
-    if (driverVersion != null) {
+    if (driverVersionCached) {
       return;
     }
     try {
       driverVersion = connection.getMetaData().getDriverVersion();
+      driverVersionCached = true;
     } catch (SQLException e) {
+      // Not cached, so a later call retries: without the version, MySQL datetime precision may be
+      // computed from an inaccurate column size.
       LOG.debug("Failed to get driver version", e);
     }
   }
