@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -1864,6 +1865,183 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     Assertions.assertFalse(ModelVersionMetaService.getInstance().deleteModelVersion(ident));
   }
 
+  @TestTemplate
+  public void testGetModelVersionByNumberRereadsConcurrentUpdate() throws IOException {
+    assertModelVersionReadRereads(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(version.nameIdentifier())));
+  }
+
+  @TestTemplate
+  public void testGetModelVersionByAliasRereadsConcurrentUpdate() throws IOException {
+    assertModelVersionReadRereads(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(
+                        NameIdentifier.of(version.namespace(), "stable_read_alias"))));
+  }
+
+  @TestTemplate
+  public void testListModelVersionsRereadsConcurrentUpdate() throws IOException {
+    assertModelVersionReadRereads(
+        version ->
+            ModelVersionMetaService.getInstance()
+                .listModelVersionsByNamespace(version.namespace()));
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelRereadsAfterConcurrentVersionChange() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
+    AtomicInteger reads = new AtomicInteger();
+
+    String result =
+        ModelVersionMetaService.getInstance()
+            .readWithStableModel(
+                version.modelIdentifier(),
+                modelPO -> {
+                  if (reads.incrementAndGet() == 1) {
+                    // A writer commits between the version-row and alias-row reads of the first
+                    // attempt, so that attempt may have combined two states.
+                    updateModelVersionUnchecked(
+                        version.nameIdentifier(), current -> copyModelVersion(current, "changed"));
+                    return "torn";
+                  }
+                  return "stable";
+                });
+
+    Assertions.assertEquals("stable", result);
+    Assertions.assertEquals(2, reads.get());
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelRereadsAfterConcurrentModelAlter() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("model_alter_read_alias");
+    AtomicInteger reads = new AtomicInteger();
+
+    String result =
+        ModelVersionMetaService.getInstance()
+            .readWithStableModel(
+                version.modelIdentifier(),
+                modelPO -> {
+                  if (reads.incrementAndGet() == 1) {
+                    // A comment-only alter cannot tear the version rows, but it advances the
+                    // model's aggregate token, so the read is re-run.
+                    updateModelUnchecked(version.modelIdentifier(), "altered model comment");
+                    return "before alter";
+                  }
+                  return "after alter";
+                });
+
+    Assertions.assertEquals("after alter", result);
+    Assertions.assertEquals(2, reads.get());
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelGivesUpWhenModelKeepsChanging() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("busy_read_alias");
+    AtomicInteger reads = new AtomicInteger();
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .readWithStableModel(
+                    version.modelIdentifier(),
+                    modelPO -> {
+                      updateModelVersionUnchecked(
+                          version.nameIdentifier(),
+                          current ->
+                              copyModelVersion(current, "change " + reads.incrementAndGet()));
+                      return null;
+                    }));
+    Assertions.assertEquals(ModelVersionMetaService.MAX_STABLE_READ_ATTEMPTS, reads.get());
+  }
+
+  @TestTemplate
+  public void testReadWithStableModelReportsModelDroppedDuringRead() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("dropped_read_alias");
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .readWithStableModel(
+                    version.modelIdentifier(),
+                    modelPO -> {
+                      Assertions.assertTrue(
+                          ModelMetaService.getInstance().deleteModel(version.modelIdentifier()));
+                      return null;
+                    }));
+  }
+
+  private void assertModelVersionReadRereads(
+      Function<ModelVersionEntity, List<ModelVersionEntity>> read) throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
+    AtomicInteger versionReads = new AtomicInteger();
+    try (MockedStatic<SessionUtils> sessions =
+        Mockito.mockStatic(SessionUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      sessions
+          .when(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      Mockito.eq(ModelVersionMetaMapper.class), Mockito.any()))
+          .thenAnswer(
+              invocation -> {
+                Object rows = invocation.callRealMethod();
+                if (versionReads.incrementAndGet() == 1) {
+                  // Commit after the first version-row query, before its alias query. Without
+                  // the stable-read check the caller would see the old URI and the new alias.
+                  updateModelVersionUnchecked(
+                      version.nameIdentifier(),
+                      current ->
+                          ModelVersionEntity.builder()
+                              .withModelIdentifier(current.modelIdentifier())
+                              .withVersion(current.version())
+                              .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "new_path"))
+                              .withAliases(ImmutableList.of("stable_read_alias", "new_alias"))
+                              .withComment(current.comment())
+                              .withProperties(current.properties())
+                              .withAuditInfo(current.auditInfo())
+                              .build());
+                }
+                return rows;
+              });
+
+      List<ModelVersionEntity> result = read.apply(version);
+      Assertions.assertEquals(1, result.size());
+      Assertions.assertEquals("new_path", result.get(0).uris().get(ModelVersion.URI_NAME_UNKNOWN));
+      Assertions.assertTrue(result.get(0).aliases().contains("new_alias"));
+    }
+  }
+
+  private ModelVersionEntity insertModelWithVersion(String alias) throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path"),
+            ImmutableList.of(alias),
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+    return version;
+  }
+
   private String randomModelName() {
     return "model_" + UUID.randomUUID().toString().replace("-", "");
   }
@@ -1919,6 +2097,24 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
       NameIdentifier identifier, Function<ModelVersionEntity, ModelVersionEntity> updater) {
     try {
       ModelVersionMetaService.getInstance().updateModelVersion(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void updateModelUnchecked(NameIdentifier modelIdent, String comment) {
+    try {
+      Function<ModelEntity, ModelEntity> updater =
+          current ->
+              createModelEntity(
+                  current.id(),
+                  current.namespace(),
+                  current.name(),
+                  comment,
+                  current.latestVersion(),
+                  current.properties(),
+                  current.auditInfo());
+      ModelMetaService.getInstance().updateModel(modelIdent, updater);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
