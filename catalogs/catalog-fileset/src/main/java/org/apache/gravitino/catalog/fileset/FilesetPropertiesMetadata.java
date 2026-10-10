@@ -20,8 +20,10 @@ package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.AUTHENTICATION_PROPERTY_ENTRIES;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.KERBEROS_PROPERTY_ENTRIES;
+import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DELETE_DATA_ON_DROP;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
@@ -73,6 +75,26 @@ public class FilesetPropertiesMetadata extends BasePropertiesMetadata {
                 true /* immutable */,
                 null,
                 false /* hidden */))
+        .put(
+            PROPERTY_DELETE_DATA_ON_DROP,
+            PropertyEntry.booleanPropertyEntry(
+                PROPERTY_DELETE_DATA_ON_DROP,
+                "Whether to delete the storage locations of a managed fileset when it is dropped",
+                false /* required */,
+                false /* immutable */,
+                true /* default value */,
+                false /* hidden */,
+                false /* reserved */))
+        .put(
+            PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED,
+            PropertyEntry.booleanPropertyEntry(
+                PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED,
+                "Whether a managed fileset may be created on a non-empty location that already exists",
+                false /* required */,
+                true /* immutable */,
+                false /* default value */,
+                false /* hidden */,
+                false /* reserved */))
         .putAll(KERBEROS_PROPERTY_ENTRIES)
         .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
         .putAll(CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES);
