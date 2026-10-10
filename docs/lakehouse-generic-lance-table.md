@@ -84,7 +84,8 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 
 **Requirements:**
 - JSON must conform to Apache Arrow [Field specification](https://github.com/apache/arrow-java/blob/ed81e5981a2bee40584b3a411ed755cb4cc5b91f/vector/src/main/java/org/apache/arrow/vector/types/pojo/Field.java#L80C1-L86C68)
-- `name` attribute must match column name exactly
+- `name` attribute is ignored: the column name is authoritative and overrides the name in the JSON,
+  so a column keeps its stored JSON type after a rename
 - `nullable` attribute must match column nullability
 - `children` array:
   - Empty for primitive types
@@ -129,10 +130,14 @@ with the optional `position` and `size` fields or a legacy blob stored as `Binar
 `External(arrow_field_json_str)` so that it keeps its exact definition.
 
 :::note
-Gravitino refreshes stored column types from the Lance dataset only when the dataset changes. Until
-then, blob v2 columns loaded by an earlier Gravitino version still appear as a plain `Struct`, and
-legacy blob columns stored as `External(arrow_field_json_str)` switch to `External("lance.blob.legacy")`
-on the next refresh.
+Column types stored by an earlier Gravitino version are rewritten only when the table schema is
+refreshed from the Lance dataset, which depends on the catalog's
+[schema refresh mode](#schema-refresh). The default `DECLARED_AND_EMPTY` mode never refreshes a
+table that is neither declared nor empty, so such a table keeps its stored types even after the
+dataset version changes; set `lance.schema-refresh-mode` to `VERSION_CHECK` to refresh it on the next
+version change. Until a refresh happens, blob v2 columns still appear as a plain `Struct`, and legacy
+blob columns stored as `External(arrow_field_json_str)` keep that form instead of
+`External("lance.blob.legacy")`.
 :::
 
 ### Table Properties

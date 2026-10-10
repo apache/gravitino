@@ -35,6 +35,7 @@ import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.TimeUnit;
+import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.UnionMode;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -505,10 +506,7 @@ public class TestLanceDataTypeConverter {
                 true,
                 new ArrowType.Union(
                     UnionMode.Sparse,
-                    new int[] {
-                      org.apache.arrow.vector.types.Types.MinorType.LARGEVARBINARY.ordinal(),
-                      org.apache.arrow.vector.types.Types.MinorType.INT.ordinal()
-                    }),
+                    new int[] {MinorType.LARGEVARBINARY.ordinal(), MinorType.INT.ordinal()}),
                 null),
             Arrays.asList(
                 LanceBlobTypes.toArrowField("image", true, LanceBlobTypes.LEGACY_BLOB),
