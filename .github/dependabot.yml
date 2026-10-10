@@ -18,6 +18,11 @@ updates:
     schedule:
       interval: "monthly"
 
+  - package-ecosystem: "npm"
+    directory: "/dev/openapi"
+    schedule:
+      interval: "monthly"
+
   # PYTHON
   - package-ecosystem: "pip"
     directory: "/mcp-server"
