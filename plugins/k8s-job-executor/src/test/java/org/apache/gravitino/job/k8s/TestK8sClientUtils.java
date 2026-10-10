@@ -108,6 +108,62 @@ public class TestK8sClientUtils {
   }
 
   @Test
+  public void testKubeconfigWithoutUsableContext() throws IOException {
+    // Without a usable context the client would silently fall back to the API server of the
+    // cluster Gravitino itself runs in.
+    String noCurrentContext = KUBECONFIG.replace("current-context: dev\n", "");
+    String noClusterInContext =
+        KUBECONFIG.replace("context: {cluster: dev, user: admin}", "context: {user: admin}");
+    String undefinedCluster =
+        KUBECONFIG.replace("context: {cluster: dev, user: admin}", "context: {cluster: nope}");
+    for (String content : new String[] {noCurrentContext, noClusterInContext, undefinedCluster}) {
+      Path kubeconfig =
+          Files.write(dir.resolve("config"), content.getBytes(StandardCharsets.UTF_8));
+      Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+      map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)),
+              content);
+      Assertions.assertTrue(e.getMessage().contains("no usable context"), e.getMessage());
+
+      // Naming a usable context fixes it.
+      map.put(K8sJobExecutorConfigs.CONTEXT, "prod");
+      Assertions.assertEquals(
+          "https://prod:6443/",
+          K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+    }
+  }
+
+  @Test
+  public void testNamespace() throws IOException {
+    // The configured namespace wins over the one of the kubeconfig context.
+    Path kubeconfig =
+        Files.write(
+            dir.resolve("config"),
+            KUBECONFIG
+                .replace(
+                    "{cluster: dev, user: admin}", "{cluster: dev, user: admin, namespace: ctx}")
+                .getBytes(StandardCharsets.UTF_8));
+    Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+    Assertions.assertEquals(
+        "default",
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getNamespace());
+    map.put(K8sJobExecutorConfigs.NAMESPACE, "jobs");
+    Assertions.assertEquals(
+        "jobs", K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getNamespace());
+
+    Map<String, String> masterUrl = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    masterUrl.put(K8sJobExecutorConfigs.MASTER_URL, "https://jobs:6443");
+    masterUrl.put(K8sJobExecutorConfigs.NAMESPACE, "jobs");
+    Assertions.assertEquals(
+        "jobs",
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(masterUrl)).getNamespace());
+  }
+
+  @Test
   public void testTokenRotation() throws IOException {
     Path token = Files.write(dir.resolve("token"), "token-1".getBytes(StandardCharsets.UTF_8));
     K8sClientUtils.FileTokenProvider provider = new K8sClientUtils.FileTokenProvider(token);

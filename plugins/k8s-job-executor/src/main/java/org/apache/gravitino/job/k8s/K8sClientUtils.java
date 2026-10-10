@@ -19,11 +19,13 @@
 package org.apache.gravitino.job.k8s;
 
 import com.google.common.base.Preconditions;
+import io.fabric8.kubernetes.api.model.NamedContext;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.OAuthTokenProvider;
+import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -32,6 +34,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,8 +114,13 @@ public final class K8sClientUtils {
    *       or {@code ~/.kube/config} with the given context, then the in-cluster service account.
    * </ul>
    *
+   * <p>In every case the default namespace of the client is the namespace of the job executor
+   * configurations, rather than the one of the kubeconfig context or of the pod Gravitino runs in.
+   *
    * @param configs the job executor configurations
    * @return the Kubernetes client configuration
+   * @throws IllegalArgumentException if a configured file doesn't exist, or the kubeconfig has no
+   *     usable context
    */
   static Config createClientConfig(K8sJobExecutorConfigs configs) {
     if (configs.masterUrl() != null) {
@@ -122,13 +133,26 @@ public final class K8sClientUtils {
         checkFileExists(configs.tokenFile(), K8sJobExecutorConfigs.TOKEN_FILE);
         builder.withOauthTokenProvider(new FileTokenProvider(Paths.get(configs.tokenFile())));
       }
-      return builder.build();
+      return builder.withNamespace(configs.namespace()).build();
     }
 
     Config config;
     if (configs.kubeconfig() != null) {
       checkFileExists(configs.kubeconfig(), K8sJobExecutorConfigs.KUBECONFIG);
-      config = Config.fromKubeconfig(configs.context(), new File(configs.kubeconfig()));
+      File kubeconfig = new File(configs.kubeconfig());
+      config = Config.fromKubeconfig(configs.context(), kubeconfig);
+      // Without a context whose cluster is defined, the client keeps its default API server,
+      // the one of the cluster Gravitino runs in, and would silently run the jobs there.
+      NamedContext context = config.getCurrentContext();
+      Preconditions.checkArgument(
+          context != null
+              && context.getContext() != null
+              && getClusterNames(kubeconfig).contains(context.getContext().getCluster()),
+          "The kubeconfig %s set by %s has no usable context: set its current-context or %s, and"
+              + " make sure the cluster of the context is defined",
+          configs.kubeconfig(),
+          K8sJobExecutorConfigs.KUBECONFIG,
+          K8sJobExecutorConfigs.CONTEXT);
     } else {
       config = Config.autoConfigure(configs.context());
     }
@@ -142,7 +166,34 @@ public final class K8sClientUtils {
         "The context %s set by %s doesn't exist in the kubeconfig",
         configs.context(),
         K8sJobExecutorConfigs.CONTEXT);
+    config.setNamespace(configs.namespace());
     return config;
+  }
+
+  /** Returns the names of the clusters that the kubeconfig file defines. */
+  @SuppressWarnings("unchecked")
+  private static Set<String> getClusterNames(File kubeconfig) {
+    Map<String, Object> content;
+    try {
+      content =
+          Serialization.unmarshal(
+              new String(Files.readAllBytes(kubeconfig.toPath()), StandardCharsets.UTF_8),
+              Map.class);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to read the kubeconfig " + kubeconfig, e);
+    }
+
+    Set<String> names = new HashSet<>();
+    Object clusters = content == null ? null : content.get("clusters");
+    if (clusters instanceof List) {
+      for (Object cluster : (List<Object>) clusters) {
+        if (cluster instanceof Map
+            && ((Map<String, Object>) cluster).get("name") instanceof String) {
+          names.add((String) ((Map<String, Object>) cluster).get("name"));
+        }
+      }
+    }
+    return names;
   }
 
   private static void checkFileExists(String path, String key) {
