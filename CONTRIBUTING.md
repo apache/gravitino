@@ -137,6 +137,7 @@ Design and documentation are essential to Gravitino’s usability and growth.
 You can contribute by:
 
 * Improving documentation in `docs/`
+* Writing or reviewing design documents in `design-docs/` — start at [How to write a design doc](design-docs/README.md). Format with [Markdown formatting](design-docs/markdown-formatting.md) and run `./gradlew markdownlint`
 * Clarifying APIs and references
 * Reviewing documents for accuracy
 * Submitting mockups or usability suggestions
@@ -218,6 +219,7 @@ Add or update tests in your PR. Test open PRs locally to help maintainers.
 * Include useful comments
 * Keep methods and classes focused
 * Format with Spotless
+* For `design-docs/`, follow [Markdown formatting](design-docs/markdown-formatting.md) and run `./gradlew markdownlint` before opening a design-doc PR
 
 ## 📦 Managing Dependencies
 
