@@ -97,6 +97,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private GravitinoCatalogManager catalogManager;
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+  private boolean enableDorisSupport = false;
 
   /**
    * Creates the plugin from the classes a connector build supplies.
@@ -173,6 +174,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
                 return;
               }
+              if ("jdbc-doris".equalsIgnoreCase(provider) && enableDorisSupport) {
+                if (!bindings.catalogClassNames().containsKey(SparkCatalogKind.DORIS)) {
+                  throw new IllegalArgumentException(
+                      "Specialized Doris Spark support is unavailable in this Spark build");
+                }
+                kind = SparkCatalogKind.DORIS;
+              }
               String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
               if (sparkConf.contains(sparkCatalogConfigName)) {
                 LOG.info(
@@ -239,6 +247,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    this.enableDorisSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, false);
     if (enablePaimonSupport) {
       registerPaimonExtensionsIfSupported();
     }
