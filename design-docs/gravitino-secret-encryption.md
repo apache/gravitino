@@ -316,7 +316,3 @@ Runtime (per secret)
   design); users migrate them at their own pace via `setSecretBinding` / re-create.
 - Nothing in the REST surface, the URN format, or the resolution rules changes; existing clients
   and connectors are unaffected.
-
----
-
-
