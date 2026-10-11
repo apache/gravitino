@@ -88,6 +88,7 @@ public class IcebergPropertiesConstants {
   static final String ICEBERG_IO_IMPL = IcebergConstants.IO_IMPL;
   static final String ICEBERG_S3_ENDPOINT = IcebergConstants.ICEBERG_S3_ENDPOINT;
   static final String ICEBERG_S3_PATH_STYLE_ACCESS = IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS;
+  static final String ICEBERG_S3_PROXY_ENDPOINT = IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT;
   static final String ICEBERG_AWS_S3_REGION = IcebergConstants.AWS_S3_REGION;
   static final String ICEBERG_OSS_ENDPOINT = IcebergConstants.ICEBERG_OSS_ENDPOINT;
 

@@ -155,7 +155,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> S3_PROXY_ENDPOINT =
       new ConfigBuilder(S3Properties.GRAVITINO_S3_PROXY_ENDPOINT)
           .doc("The proxy endpoint for S3 requests, e.g. http://proxy-host:8080")
-          .version(ConfigConstants.VERSION_1_3_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .create();
 

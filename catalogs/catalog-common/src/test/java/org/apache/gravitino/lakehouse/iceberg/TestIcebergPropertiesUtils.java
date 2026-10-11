@@ -175,6 +175,7 @@ public class TestIcebergPropertiesUtils {
     backendName = IcebergPropertiesUtils.getCatalogBackendName(catalogProperties);
     Assertions.assertEquals("memory", backendName);
   }
+
   @Test
   void testS3ProxyEndpointPropertyIsMapped() {
     Map<String, String> gravitinoProps =
