@@ -253,4 +253,53 @@ public class TestOAuth2TokenProvider {
 
     Assertions.assertThrows(IllegalArgumentException.class, builder::build);
   }
+
+  @Test
+  public void testClientSecretBasicEncodesReservedCharacters() throws Exception {
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("client*@id:s ecret:/+?~")
+            .withPath("oauth/token")
+            .withScope("test")
+            .withClientAuthenticationMethod(OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("access-token", "refresh-token", "bearer", 3600, "test", null);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
+
+    String basicAuth = "Basic Y2xpZW50KiU0MGlkOnMrZWNyZXQlM0ElMkYlMkIlM0YlN0U=";
+
+    HttpRequest tokenRequest = HttpRequest.request().withMethod("POST").withPath("/oauth/token");
+    mockServer.clear(tokenRequest);
+
+    HttpResponse mockResponse =
+        HttpResponse.response().withStatusCode(HttpStatus.SC_OK).withBody(respJson);
+
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withHeader("Authorization", basicAuth),
+            Times.exactly(2))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider = builder.build();
+
+    Assertions.assertTrue(provider.hasTokenData());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BEARER_HEADER + "access-token",
+        new String(provider.getTokenData(), StandardCharsets.UTF_8));
+    HttpRequest[] recordedRequests = mockServer.retrieveRecordedRequests(tokenRequest);
+    Assertions.assertEquals(2, recordedRequests.length);
+
+    for (HttpRequest recordedRequest : recordedRequests) {
+      Assertions.assertEquals(basicAuth, recordedRequest.getFirstHeader("Authorization"));
+
+      String requestBody = recordedRequest.getBodyAsString();
+      Assertions.assertFalse(requestBody.contains("client_id"));
+      Assertions.assertFalse(requestBody.contains("client_secret"));
+    }
+  }
 }

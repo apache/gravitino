@@ -185,7 +185,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
     def test_client_secret_basic_encodes_reserved_characters(self, mock_post_form):
         DefaultOAuth2TokenProvider(
             uri=f"http://127.0.0.1:{OAUTH_PORT}",
-            credential="client@id:s ecret:/+?",
+            credential="client*@id:s ecret:/+?~",
             path="oauth/token",
             scope="test",
             authentication_method=(
@@ -197,5 +197,5 @@ class TestOAuth2TokenProvider(unittest.TestCase):
 
         self.assertEqual(
             kwargs["headers"]["Authorization"],
-            "Basic Y2xpZW50JTQwaWQ6cytlY3JldCUzQSUyRiUyQiUzRg==",
+            "Basic Y2xpZW50KiU0MGlkOnMrZWNyZXQlM0ElMkYlMkIlM0YlN0U=",
         )

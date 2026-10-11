@@ -122,8 +122,10 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
                     "client_id must be set when using client_secret_basic authentication"
                 )
 
-            encoded_client_id = quote_plus(client_id, safe="")
-            encoded_client_secret = quote_plus(client_secret, safe="")
+            encoded_client_id = quote_plus(client_id, safe="*").replace("~", "%7E")
+            encoded_client_secret = quote_plus(client_secret, safe="*").replace(
+                "~", "%7E"
+            )
             credentials = f"{encoded_client_id}:{encoded_client_secret}"
 
             encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode(
