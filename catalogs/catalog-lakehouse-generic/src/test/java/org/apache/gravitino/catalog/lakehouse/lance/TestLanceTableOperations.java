@@ -50,6 +50,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -68,6 +69,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
@@ -896,6 +898,78 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(9L, returnedVersion);
     Mockito.verify(dataset).dropColumns(anyList());
     Mockito.verify(dataset).getVersion();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"lance.blob, 2.2", "lance.blob.legacy, 2.1"})
+  public void testCreateDatasetWithBlobColumnRoundTrips(String blobType, String fileFormatVersion) {
+    String location = tempDir.resolve("blob-" + fileFormatVersion).toString();
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get()),
+          Column.of("image", Types.ExternalType.of(blobType))
+        };
+
+    try (Dataset dataset = lanceTableOps.createDataset(location, columns, Map.of())) {
+      Assertions.assertEquals(fileFormatVersion, dataset.getLanceFileFormatVersion());
+    }
+    try (Dataset dataset = lanceTableOps.openDataset(location, Map.of())) {
+      Assertions.assertEquals(
+          Types.ExternalType.of(blobType),
+          LanceDataTypeConverter.CONVERTER.toGravitino(dataset.getSchema().findField("image")));
+    }
+  }
+
+  @Test
+  public void testCreateDatasetRejectsMixedBlobColumns() {
+    Column[] columns =
+        new Column[] {
+          Column.of("image", Types.ExternalType.of("lance.blob")),
+          Column.of("legacy_image", Types.ExternalType.of("lance.blob.legacy"))
+        };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.createDataset(
+                tempDir.resolve("mixed-blob").toString(), columns, Map.of()));
+  }
+
+  @Test
+  public void testAddBlobColumnChecksFileFormatVersion() {
+    String location = tempDir.resolve("add-blob").toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      // A dataset without blob columns uses Lance's default file format version.
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.handleLanceTableChange(
+                    table,
+                    new TableChange[] {
+                      TableChange.addColumn(
+                          new String[] {"image"}, Types.ExternalType.of("lance.blob"))
+                    }));
+    Assertions.assertTrue(exception.getMessage().contains("2.2"), exception.getMessage());
+
+    lanceTableOps.handleLanceTableChange(
+        table,
+        new TableChange[] {
+          TableChange.addColumn(
+              new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
+        });
+    try (Dataset dataset = lanceTableOps.openDataset(location, Map.of())) {
+      Assertions.assertEquals(
+          Types.ExternalType.of("lance.blob.legacy"),
+          LanceDataTypeConverter.CONVERTER.toGravitino(
+              dataset.getSchema().findField("legacy_image")));
+    }
   }
 
   @Test
