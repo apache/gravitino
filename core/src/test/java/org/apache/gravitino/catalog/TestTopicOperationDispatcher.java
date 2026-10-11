@@ -50,6 +50,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.messaging.Topic;
@@ -259,6 +260,14 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+    reset(entityStore);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean(), any(), any());
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
   }
 
   @Test

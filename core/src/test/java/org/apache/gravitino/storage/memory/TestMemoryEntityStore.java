@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -46,6 +47,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -137,6 +139,28 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public <E extends Entity & HasIdentifier> E update(
+        NameIdentifier ident,
+        Class<E> type,
+        EntityType entityType,
+        Function<E, E> updater,
+        @Nullable Long expectedId)
+        throws IOException, NoSuchEntityException {
+      return executeInTransaction(
+          () -> {
+            Entity prev = entityMap.get(ident);
+            if (expectedId != null && prev instanceof HasIdentifier) {
+              if (!expectedId.equals(((HasIdentifier) prev).id())) {
+                throw new OptimisticLockException(
+                    "Entity %s has id %d, expected %d",
+                    ident, ((HasIdentifier) prev).id(), expectedId);
+              }
+            }
+            return update(ident, type, entityType, updater);
+          });
+    }
+
+    @Override
     public <E extends Entity & HasIdentifier> E get(
         NameIdentifier ident, EntityType entityType, Class<E> cl)
         throws NoSuchEntityException, IOException {
@@ -172,6 +196,27 @@ public class TestMemoryEntityStore {
                         && key.name().startsWith(descendantPrefix));
       }
       return prev != null;
+    }
+
+    @Override
+    public boolean delete(
+        NameIdentifier ident,
+        EntityType entityType,
+        boolean cascade,
+        Long expectedId,
+        Long expectedVersion)
+        throws IOException {
+      Entity prev = entityMap.get(ident);
+      if (prev == null) {
+        return false;
+      }
+      if (expectedId != null && prev instanceof HasIdentifier) {
+        if (!expectedId.equals(((HasIdentifier) prev).id())) {
+          throw new OptimisticLockException(
+              "Entity %s has id %d, expected %d", ident, ((HasIdentifier) prev).id(), expectedId);
+        }
+      }
+      return delete(ident, entityType, cascade);
     }
 
     @Override
@@ -348,6 +393,102 @@ public class TestMemoryEntityStore {
         NoSuchEntityException.class, () -> store.get(id, EntityType.METALAKE, BaseMetalake.class));
 
     Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
+    store.close();
+  }
+
+  @Test
+  public void testIdentityFencedUpdateOnReplacementEntity() throws Exception {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(Mockito.mock(Config.class));
+
+    Namespace tableNs = Namespace.of("metalake", "catalog", "schema");
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_fenced_update");
+
+    long initialId = 1001L;
+    TableEntity initialTable =
+        TableEntity.builder()
+            .withId(initialId)
+            .withName(tableIdent.name())
+            .withNamespace(tableNs)
+            .withComment("initial")
+            .withAuditInfo(auditInfo)
+            .build();
+    store.put(initialTable, false);
+
+    // Replace the entity under the same name with a newer ID
+    long replacementId = 2002L;
+    TableEntity replacementTable =
+        TableEntity.builder()
+            .withId(replacementId)
+            .withName(tableIdent.name())
+            .withNamespace(tableNs)
+            .withComment("replacement")
+            .withAuditInfo(auditInfo)
+            .build();
+    store.delete(tableIdent, EntityType.TABLE);
+    store.put(replacementTable, false);
+
+    // Stale update using initialId must fail with OptimisticLockException
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            store.update(
+                tableIdent,
+                TableEntity.class,
+                EntityType.TABLE,
+                entity ->
+                    TableEntity.builder()
+                        .withId(entity.id())
+                        .withName(entity.name())
+                        .withNamespace(entity.namespace())
+                        .withComment("stale_update")
+                        .withAuditInfo(entity.auditInfo())
+                        .build(),
+                initialId));
+
+    // The replacement entity must remain unmodified
+    TableEntity current = store.get(tableIdent, EntityType.TABLE, TableEntity.class);
+    Assertions.assertEquals(replacementId, current.id());
+    Assertions.assertEquals("replacement", current.comment());
+
+    // Matching update using replacementId succeeds
+    TableEntity updated =
+        store.update(
+            tableIdent,
+            TableEntity.class,
+            EntityType.TABLE,
+            entity ->
+                TableEntity.builder()
+                    .withId(entity.id())
+                    .withName(entity.name())
+                    .withNamespace(entity.namespace())
+                    .withComment("matching_update")
+                    .withAuditInfo(entity.auditInfo())
+                    .build(),
+            replacementId);
+    Assertions.assertEquals(replacementId, updated.id());
+    Assertions.assertEquals("matching_update", updated.comment());
+
+    // Null expectedId bypasses identity fencing
+    TableEntity unfenced =
+        store.update(
+            tableIdent,
+            TableEntity.class,
+            EntityType.TABLE,
+            entity ->
+                TableEntity.builder()
+                    .withId(entity.id())
+                    .withName(entity.name())
+                    .withNamespace(entity.namespace())
+                    .withComment("unfenced_update")
+                    .withAuditInfo(entity.auditInfo())
+                    .build(),
+            null);
+    Assertions.assertEquals(replacementId, unfenced.id());
+    Assertions.assertEquals("unfenced_update", unfenced.comment());
+
     store.close();
   }
 }

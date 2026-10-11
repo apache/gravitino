@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1046,6 +1047,80 @@ public class TestCatalogManager {
     Assertions.assertFalse(manager.dropCatalog(ident, true));
     Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
     manager.close();
+  }
+
+  @Test
+  void testConcurrentDropCatalogCallsWithoutTreeLock() throws Exception {
+    try (SecretManager secrets = Mockito.spy(memorySecretManager())) {
+      ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+      store.initialize(config);
+      store.put(metalakeEntity, true);
+
+      CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator(), secrets);
+      NameIdentifier ident = NameIdentifier.of("metalake", "concurrent_drop_catalog");
+      Map<String, String> props =
+          ImmutableMap.of(
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          props,
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
+          Map.of());
+
+      CatalogEntity stored = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String urn = stored.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+
+      CatalogOperations operations =
+          Mockito.mock(
+              CatalogOperations.class,
+              Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
+      CatalogManager.CatalogWrapper realWrapper = manager.loadCatalogAndWrap(ident);
+      CatalogManager.CatalogWrapper spyWrapper = Mockito.spy(realWrapper);
+      Mockito.doAnswer(
+              invocation -> {
+                ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
+                return function.apply(operations);
+              })
+          .when(spyWrapper)
+          .doWithCatalogOps(any());
+      manager.getCatalogCache().put(ident, spyWrapper);
+
+      CountDownLatch startLatch = new CountDownLatch(1);
+      ExecutorService executor = Executors.newFixedThreadPool(2);
+      try {
+        Callable<Boolean> dropTask =
+            () -> {
+              startLatch.await();
+              return manager.dropCatalog(ident, true);
+            };
+
+        Future<Boolean> f1 = executor.submit(dropTask);
+        Future<Boolean> f2 = executor.submit(dropTask);
+
+        startLatch.countDown();
+        boolean r1 = f1.get(10, TimeUnit.SECONDS);
+        boolean r2 = f2.get(10, TimeUnit.SECONDS);
+
+        Assertions.assertTrue(r1 ^ r2, "Exactly one dropCatalog should return true");
+        Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+        Mockito.verify((CatalogDropAware) operations, Mockito.times(1)).onCatalogDropped();
+        Mockito.verify(secrets, Mockito.times(1)).deleteSecretsFromProperties(any());
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+      } finally {
+        executor.shutdownNow();
+        manager.close();
+      }
+    }
   }
 
   @Test

@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -283,7 +284,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                           id,
                           ViewEntity.class,
                           VIEW,
-                          viewEntity -> applyChangesToEntity(viewEntity, alteredView, changes)),
+                          viewEntity -> applyChangesToEntity(viewEntity, alteredView, changes),
+                          viewId),
                   "UPDATE",
                   viewId);
 
@@ -317,40 +319,39 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   @Override
   public boolean dropView(NameIdentifier ident) {
     NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithViewOps(v -> v.dropView(ident)),
-                  RuntimeException.class);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+    Optional<ViewEntity> observedView =
+        isManagedView
+            ? Optional.empty()
+            : Optional.ofNullable(getEntity(ident, VIEW, ViewEntity.class));
+    boolean droppedFromCatalog =
+        doWithCatalog(
+            catalogIdent, c -> c.doWithViewOps(v -> v.dropView(ident)), RuntimeException.class);
 
-          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
-          if (isManagedView) {
-            return droppedFromCatalog;
-          }
+    if (isManagedView) {
+      return droppedFromCatalog;
+    }
 
-          // A false result is ambiguous: the external view may have been renamed or dropped out of
-          // band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, VIEW);
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
+    // A false result is ambiguous: the external view may have been renamed or dropped out of
+    // band. Preserve the registration because deleting it after a rename would lose
+    // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+    // registration that requires separate cleanup.
+    if (droppedFromCatalog && observedView.isPresent()) {
+      try {
+        store.delete(ident, VIEW, false, observedView.get().id(), null);
+      } catch (OptimisticLockException e) {
+        throw e;
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+    // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
+    // cleanup is best-effort and stops as soon as a schema still exists.
+    OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
+    return droppedFromCatalog;
   }
 
   private View internalCreateView(

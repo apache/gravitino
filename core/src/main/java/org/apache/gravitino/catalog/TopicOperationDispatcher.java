@@ -36,6 +36,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -181,6 +182,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                   NoSuchTopicException.class,
                   IllegalArgumentException.class);
 
+          long topicId = getStringIdFromProperties(alteredTopic.properties()).id();
           TopicEntity updatedTopicEntity =
               operateOnEntity(
                   ident,
@@ -206,9 +208,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                                               PrincipalUtils.getCurrentPrincipal().getName())
                                           .withLastModifiedTime(Instant.now())
                                           .build())
-                                  .build()),
+                                  .build(),
+                          topicId),
                   "UPDATE",
-                  getStringIdFromProperties(alteredTopic.properties()).id());
+                  topicId);
 
           return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
               .withHiddenProperties(
@@ -228,40 +231,38 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTopicOps(t -> t.dropTopic(ident)),
-                  RuntimeException.class);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    TopicEntity observedTopic = getEntity(ident, TOPIC, TopicEntity.class);
+    boolean droppedFromCatalog =
+        doWithCatalog(
+            catalogIdent, c -> c.doWithTopicOps(t -> t.dropTopic(ident)), RuntimeException.class);
 
-          // For the unmanaged topic, it could happen that the topic:
-          // 1. It's not found in the catalog (dropped directly from underlying sources)
-          // 2. It's found in the catalog but not in the store (not managed by Gravitino)
-          // 3. It's found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          //
-          // For managed topic, we should take the return value of the store operation into account.
-          boolean droppedFromStore = false;
-          try {
-            droppedFromStore = store.delete(ident, TOPIC);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
+    // For the unmanaged topic, it could happen that the topic:
+    // 1. It's not found in the catalog (dropped directly from underlying sources)
+    // 2. It's found in the catalog but not in the store (not managed by Gravitino)
+    // 3. It's found in the catalog and the store (managed by Gravitino)
+    // 4. Neither found in the catalog nor in the store.
+    // In all situations, we try to delete the schema from the store, but we don't take the
+    // return value of the store operation into account. We only take the return value of the
+    // catalog into account.
+    //
+    // For managed topic, we should take the return value of the store operation into account.
+    boolean droppedFromStore = false;
+    if (observedTopic != null) {
+      try {
+        droppedFromStore = store.delete(ident, TOPIC, false, observedTopic.id(), null);
+      } catch (OptimisticLockException e) {
+        throw e;
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
 
-          return isManagedEntity(catalogIdent, Capability.Scope.TOPIC)
-              ? droppedFromStore
-              : droppedFromCatalog;
-        });
+    return isManagedEntity(catalogIdent, Capability.Scope.TOPIC)
+        ? droppedFromStore
+        : droppedFromCatalog;
   }
 
   private void importTopic(NameIdentifier identifier) {

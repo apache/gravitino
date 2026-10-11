@@ -25,6 +25,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -177,4 +178,14 @@ public interface SchemaMetaMapper {
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
       @Param("schemaNames") List<String> schemaNames);
+
+  /**
+   * Counts soft-deleted schema rows reserving the given schema ID.
+   *
+   * @param schemaId the schema ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select(
+      "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE schema_id = #{schemaId} AND deleted_at > 0")
+  int countDeletedSchemaMetasById(@Param("schemaId") Long schemaId);
 }

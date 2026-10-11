@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -221,8 +222,18 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    return update(ident, entityType, updater, null);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Function<E, E> updater,
+      @Nullable Long expectedId)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     if (!BaseEntityCache.isCacheable(entityType)) {
-      return updateEntity(ident, entityType, updater);
+      return updateEntity(ident, entityType, updater, expectedId);
     }
 
     boolean transactionOwner = !SessionUtils.isInTransaction();
@@ -231,7 +242,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     }
     boolean committed = false;
     try {
-      E updatedEntity = updateEntity(ident, entityType, updater);
+      E updatedEntity = updateEntity(ident, entityType, updater, expectedId);
       EntityChangeLogWriter.append(ident, entityType, OperateType.ALTER);
       if (transactionOwner) {
         SessionUtils.commitTransaction();
@@ -385,8 +396,19 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
+    return delete(ident, entityType, cascade, null, null);
+  }
+
+  @Override
+  public boolean delete(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      boolean cascade,
+      @Nullable Long expectedId,
+      @Nullable Long expectedVersion)
+      throws IOException {
     if (!shouldRecordEntityDrop(entityType)) {
-      return deleteEntity(ident, entityType, cascade);
+      return deleteEntity(ident, entityType, cascade, expectedId, expectedVersion);
     }
 
     boolean transactionOwner = !SessionUtils.isInTransaction();
@@ -395,7 +417,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     }
     boolean committed = false;
     try {
-      boolean deleted = deleteEntity(ident, entityType, cascade);
+      boolean deleted = deleteEntity(ident, entityType, cascade, expectedId, expectedVersion);
       if (deleted) {
         EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
       }
@@ -1029,19 +1051,28 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   private <E extends Entity & HasIdentifier> E updateEntity(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    return updateEntity(ident, entityType, updater, null);
+  }
+
+  private <E extends Entity & HasIdentifier> E updateEntity(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Function<E, E> updater,
+      @Nullable Long expectedId)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
       case CATALOG:
         return (E) CatalogMetaService.getInstance().updateCatalog(ident, updater);
       case SCHEMA:
-        return (E) SchemaMetaService.getInstance().updateSchema(ident, updater);
+        return (E) SchemaMetaService.getInstance().updateSchema(ident, updater, expectedId);
       case TABLE:
-        return (E) TableMetaService.getInstance().updateTable(ident, updater);
+        return (E) TableMetaService.getInstance().updateTable(ident, updater, expectedId);
       case FILESET:
         return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
       case TOPIC:
-        return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
+        return (E) TopicMetaService.getInstance().updateTopic(ident, updater, expectedId);
       case USER:
         return (E) UserMetaService.getInstance().updateUser(ident, updater);
       case GROUP:
@@ -1055,7 +1086,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
       case FUNCTION:
-        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater);
+        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater, expectedId);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
@@ -1063,7 +1094,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB:
         return (E) JobMetaService.getInstance().updateJob(ident, updater);
       case VIEW:
-        return (E) ViewMetaService.getInstance().updateView(ident, updater);
+        return (E) ViewMetaService.getInstance().updateView(ident, updater, expectedId);
       case SEMANTIC_MODEL:
         return (E) SemanticModelMetaService.getInstance().updateSemanticModel(ident, updater);
       default:
@@ -1074,19 +1105,30 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
 
   private boolean deleteEntity(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
+    return deleteEntity(ident, entityType, cascade, null, null);
+  }
+
+  private boolean deleteEntity(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      boolean cascade,
+      @Nullable Long expectedId,
+      @Nullable Long expectedVersion)
+      throws IOException {
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
       case CATALOG:
         return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
       case SCHEMA:
-        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
+        return SchemaMetaService.getInstance()
+            .deleteSchema(ident, cascade, expectedId, expectedVersion);
       case TABLE:
-        return TableMetaService.getInstance().deleteTable(ident);
+        return TableMetaService.getInstance().deleteTable(ident, expectedId, expectedVersion);
       case FILESET:
         return FilesetMetaService.getInstance().deleteFileset(ident);
       case TOPIC:
-        return TopicMetaService.getInstance().deleteTopic(ident);
+        return TopicMetaService.getInstance().deleteTopic(ident, expectedId, expectedVersion);
       case USER:
         return UserMetaService.getInstance().deleteUser(ident);
       case GROUP:
@@ -1100,7 +1142,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case MODEL_VERSION:
         return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
       case FUNCTION:
-        return FunctionMetaService.getInstance().deleteFunction(ident);
+        return FunctionMetaService.getInstance().deleteFunction(ident, expectedId, expectedVersion);
       case POLICY:
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
@@ -1108,7 +1150,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB:
         return JobMetaService.getInstance().deleteJob(ident);
       case VIEW:
-        return ViewMetaService.getInstance().deleteView(ident);
+        return ViewMetaService.getInstance().deleteView(ident, expectedId, expectedVersion);
       case SEMANTIC_MODEL:
         return SemanticModelMetaService.getInstance().deleteSemanticModel(ident);
       default:

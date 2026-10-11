@@ -29,8 +29,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -143,9 +145,37 @@ public class FunctionMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteFunction")
   public boolean deleteFunction(NameIdentifier ident) {
-    FunctionPO functionPO = getFunctionPOByIdentifier(ident);
+    return deleteFunction(ident, null, null);
+  }
 
-    deleteFunctionWithVersion(ident, functionPO);
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFunction")
+  public boolean deleteFunction(
+      NameIdentifier ident, @Nullable Long expectedId, @Nullable Long expectedVersion) {
+    AtomicReference<FunctionPO> poRef = new AtomicReference<>();
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          FunctionPO functionPO = getFunctionPOByIdentifier(ident);
+          if (expectedId != null && !functionPO.functionId().equals(expectedId)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.FUNCTION, ident);
+          }
+          if (expectedVersion != null
+              && (functionPO.functionCurrentVersion() == null
+                  || functionPO.functionCurrentVersion().longValue() != expectedVersion)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.FUNCTION, ident);
+          }
+          poRef.set(functionPO);
+          OccWriteSupport.deleteWithVersion(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      FunctionMetaMapper.class,
+                      mapper ->
+                          mapper.softDeleteFunctionMetaByFunctionId(
+                              functionPO.functionId(), functionPO.functionCurrentVersion())),
+              () -> functionWriteFailure(ident, functionPO));
+        },
+        () -> deleteFunctionDependents(poRef.get().functionId()));
     return true;
   }
 
@@ -243,7 +273,19 @@ public class FunctionMetaService {
       baseMetricName = "updateFunction")
   public <E extends Entity & HasIdentifier> FunctionEntity updateFunction(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    return updateFunction(identifier, updater, null);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateFunction")
+  public <E extends Entity & HasIdentifier> FunctionEntity updateFunction(
+      NameIdentifier identifier, Function<E, E> updater, @Nullable Long expectedId)
+      throws IOException {
     FunctionPO oldFunctionPO = getFunctionPOByIdentifier(identifier);
+    if (expectedId != null && !oldFunctionPO.functionId().equals(expectedId)) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.FUNCTION, identifier);
+    }
     FunctionEntity oldFunctionEntity = fromFunctionPO(oldFunctionPO, identifier.namespace());
     FunctionEntity newEntity = (FunctionEntity) updater.apply((E) oldFunctionEntity);
     Preconditions.checkArgument(
@@ -383,6 +425,12 @@ public class FunctionMetaService {
     }
 
     FunctionPO existingFunctionPO = findAndLockFunctionForOverwrite(initializedFunctionPO);
+    if (existingFunctionPO != null
+        && !existingFunctionPO.functionName().equals(initializedFunctionPO.functionName())) {
+      throw new EntityAlreadyExistsException(
+          "The function ID %s already belongs to a different live entity: %s",
+          initializedFunctionPO.functionId(), existingFunctionPO.functionName());
+    }
     if (existingFunctionPO == null) {
       if (SessionUtils.getWithoutCommit(
               FunctionMetaMapper.class,

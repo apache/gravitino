@@ -1357,103 +1357,95 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
-    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    try (CatalogLease lease = acquireCatalogLease(ident)) {
+      CatalogWrapper catalogWrapper = lease.wrapper();
+      catalogWrapper.catalog().checkMetalakeInUse();
 
-    return TreeLockUtils.doWithTreeLock(
-        metalakeIdent,
-        LockType.WRITE,
-        () -> {
-          try (CatalogLease lease = acquireCatalogLease(ident)) {
-            CatalogWrapper catalogWrapper = lease.wrapper();
-            catalogWrapper.catalog().checkMetalakeInUse();
+      boolean catalogInUse = catalogWrapper.catalog().catalogInUse();
+      if (catalogInUse && !force) {
+        throw new CatalogInUseException(
+            "Catalog %s is in use, please disable it first or use force option", ident);
+      }
 
-            boolean catalogInUse = catalogWrapper.catalog().catalogInUse();
-            if (catalogInUse && !force) {
-              throw new CatalogInUseException(
-                  "Catalog %s is in use, please disable it first or use force option", ident);
+      Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
+      List<SchemaEntity> schemaEntities =
+          store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
+      if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
+        throw new NonEmptyCatalogException(
+            "Catalog %s has schemas, please drop them first or use force option", ident);
+      }
+
+      // Child write-through secrets: capture properties (URNs) from the entity, then
+      // deleteSecrets after a successful drop — same capture-before-delete pattern as
+      // FilesetCatalogOperations.dropSchema. Fileset secrets are cleaned inside that
+      // dropSchema path; schema secrets are cleaned here.
+      boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
+      List<Map<String, String>> unmanagedSchemaSecrets = managedStorage ? null : new ArrayList<>();
+      if (managedStorage) {
+        for (SchemaEntity schema : schemaEntities) {
+          Map<String, String> schemaProps = copyProperties(schema.properties());
+          try {
+            boolean dropped =
+                catalogWrapper.doWithSchemaOps(
+                    ops -> ops.dropSchema(schema.nameIdentifier(), true));
+            if (dropped) {
+              secretManager.deleteSecretsFromProperties(schemaProps);
             }
-
-            Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
-            List<SchemaEntity> schemaEntities =
-                store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
-            if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
-              throw new NonEmptyCatalogException(
-                  "Catalog %s has schemas, please drop them first or use force option", ident);
-            }
-
-            // Child write-through secrets: capture properties (URNs) from the entity, then
-            // deleteSecrets after a successful drop — same capture-before-delete pattern as
-            // FilesetCatalogOperations.dropSchema. Fileset secrets are cleaned inside that
-            // dropSchema path; schema secrets are cleaned here.
-            boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
-            List<Map<String, String>> unmanagedSchemaSecrets =
-                managedStorage ? null : new ArrayList<>();
-            if (managedStorage) {
-              for (SchemaEntity schema : schemaEntities) {
-                Map<String, String> schemaProps = copyProperties(schema.properties());
-                try {
-                  boolean dropped =
-                      catalogWrapper.doWithSchemaOps(
-                          ops -> ops.dropSchema(schema.nameIdentifier(), true));
-                  if (dropped) {
-                    secretManager.deleteSecretsFromProperties(schemaProps);
-                  }
-                } catch (Exception e) {
-                  LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
-                  throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
-                }
-              }
-            } else {
-              for (SchemaEntity schema : schemaEntities) {
-                unmanagedSchemaSecrets.add(copyProperties(schema.properties()));
-              }
-            }
-
-            // Finally, delete the catalog entity as well as all its sub-entities from the store.
-            // Invalidate after store.delete() to prevent a background thread from repopulating
-            // the cache with stale data between invalidate and delete.
-            Map<String, String> catalogProperties =
-                copyProperties(catalogWrapper.catalog().entity().getProperties());
-            boolean deleted = store.delete(ident, EntityType.CATALOG, true);
-            if (deleted) {
-              markLocalMutation(ident);
-              try {
-                catalogWrapper.doWithCatalogOps(
-                    operations -> {
-                      if (operations instanceof CatalogDropAware) {
-                        ((CatalogDropAware) operations).onCatalogDropped();
-                      }
-                      return null;
-                    });
-              } catch (Exception e) {
-                LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
-              }
-              // Unmanaged: schemas removed only via store cascade — clean secrets captured above.
-              if (!managedStorage) {
-                for (Map<String, String> schemaProperties : unmanagedSchemaSecrets) {
-                  secretManager.deleteSecretsFromProperties(schemaProperties);
-                }
-              }
-              secretManager.deleteSecretsFromProperties(catalogProperties);
-            }
-            catalogCache.invalidate(ident);
-            return deleted;
-
-          } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
-            return false;
-          } catch (NoSuchEntityException ignored) {
-            // Another server deleted the catalog after it was loaded above, so a later store read
-            // such as listing its schemas no longer finds it. The drop stays idempotent, but the
-            // wrapper cached by loadCatalogAndWrap has to be discarded. store.delete itself never
-            // reaches here: it maps a missing entity to false on its own.
-            catalogCache.invalidate(ident);
-            return false;
-          } catch (GravitinoRuntimeException e) {
-            throw e;
           } catch (Exception e) {
-            throw new RuntimeException(e);
+            LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
+            throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
           }
-        });
+        }
+      } else {
+        for (SchemaEntity schema : schemaEntities) {
+          unmanagedSchemaSecrets.add(copyProperties(schema.properties()));
+        }
+      }
+
+      // Finally, delete the catalog entity as well as all its sub-entities from the store.
+      // Invalidate after store.delete() to prevent a background thread from repopulating
+      // the cache with stale data between invalidate and delete.
+      Map<String, String> catalogProperties =
+          copyProperties(catalogWrapper.catalog().entity().getProperties());
+      boolean deleted = store.delete(ident, EntityType.CATALOG, force);
+      if (deleted) {
+        markLocalMutation(ident);
+        try {
+          catalogWrapper.doWithCatalogOps(
+              operations -> {
+                if (operations instanceof CatalogDropAware) {
+                  ((CatalogDropAware) operations).onCatalogDropped();
+                }
+                return null;
+              });
+        } catch (Exception e) {
+          LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
+        }
+        // Unmanaged: schemas removed only via store cascade — clean secrets captured above.
+        if (!managedStorage) {
+          for (Map<String, String> schemaProperties : unmanagedSchemaSecrets) {
+            secretManager.deleteSecretsFromProperties(schemaProperties);
+          }
+        }
+        secretManager.deleteSecretsFromProperties(catalogProperties);
+      }
+      catalogCache.invalidate(ident);
+      return deleted;
+
+    } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
+      return false;
+    } catch (NoSuchEntityException ignored) {
+      // Another server deleted the catalog after it was loaded above, so a later store read
+      // such as listing its schemas no longer finds it. The drop stays idempotent, but the
+      // wrapper cached by loadCatalogAndWrap has to be discarded. store.delete itself never
+      // reaches here: it maps a missing entity to false on its own.
+      catalogCache.invalidate(ident);
+      return false;
+    } catch (GravitinoRuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static Map<String, String> copyProperties(Map<String, String> properties) {

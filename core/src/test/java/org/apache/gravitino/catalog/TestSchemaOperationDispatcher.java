@@ -51,6 +51,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -379,6 +380,13 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+
+    dispatcher.createSchema(schemaIdent, "comment", props);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean(), any(), any());
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> dispatcher.dropSchema(schemaIdent, false));
   }
 
   @Test

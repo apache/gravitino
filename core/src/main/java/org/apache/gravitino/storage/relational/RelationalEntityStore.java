@@ -215,6 +215,7 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
+    long epochBeforeInsert = cacheInvalidationEpoch.get();
     backend.insert(e, overwritten);
     if (overwritten) {
       // An overwrite is resolved by the database, which may keep the identity and version of the
@@ -222,17 +223,47 @@ public class RelationalEntityStore
       // does not carry, so the next read is served from the backend instead.
       invalidateCache(e.nameIdentifier(), e.type());
     } else {
-      cache.put(e);
+      if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(e.type())) {
+        // BaseEntityCache.put may invalidate a related entry even when it does not cache this
+        // entity. Keep that hook, but avoid taking a key lock for a value that cannot be cached.
+        if (cacheInvalidationEpoch.get() == epochBeforeInsert) {
+          cache.put(e);
+        }
+        return;
+      }
+      cache.withCacheLock(
+          EntityCacheKey.of(e.nameIdentifier(), e.type()),
+          () -> {
+            if (cacheInvalidationEpoch.get() == epochBeforeInsert) {
+              cache.put(e);
+              // Invalidation of another key or an ancestor can advance the epoch while this key
+              // lock is held. Remove the value if that happened during the put.
+              if (cacheInvalidationEpoch.get() != epochBeforeInsert) {
+                cache.invalidate(e.nameIdentifier(), e.type());
+              }
+            }
+          });
     }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident,
+      Class<E> type,
+      Entity.EntityType entityType,
+      Function<E, E> updater,
+      @Nullable Long expectedId)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    E updatedEntity = backend.update(ident, entityType, updater, expectedId);
+    invalidateCache(ident, entityType);
+    return updatedEntity;
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    E updatedEntity = backend.update(ident, entityType, updater);
-    invalidateCache(ident, entityType);
-    return updatedEntity;
+    return update(ident, type, entityType, updater, null);
   }
 
   @Override
@@ -301,16 +332,27 @@ public class RelationalEntityStore
   }
 
   @Override
-  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+  public boolean delete(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      boolean cascade,
+      @Nullable Long expectedId,
+      @Nullable Long expectedVersion)
       throws IOException {
     try {
-      boolean deleted = backend.delete(ident, entityType, cascade);
+      boolean deleted = backend.delete(ident, entityType, cascade, expectedId, expectedVersion);
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
     } finally {
       invalidateCache(ident, entityType);
     }
+  }
+
+  @Override
+  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+      throws IOException {
+    return delete(ident, entityType, cascade, null, null);
   }
 
   @Override

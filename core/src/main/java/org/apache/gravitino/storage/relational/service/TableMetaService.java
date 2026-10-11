@@ -27,7 +27,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -128,6 +130,28 @@ public class TableMetaService {
               po.getMetalakeId(),
               () -> {
                 if (overwrite) {
+                  TablePO byIdPO =
+                      SessionUtils.getWithoutCommit(
+                          TableMetaMapper.class,
+                          mapper -> mapper.selectTableMetaByIdForUpdate(po.getTableId()));
+                  if (byIdPO != null && !Objects.equals(byIdPO.getSchemaId(), po.getSchemaId())) {
+                    throw new EntityAlreadyExistsException(
+                        "The table ID %s already belongs to a different parent", po.getTableId());
+                  }
+                  if (byIdPO != null && !byIdPO.getTableName().equals(po.getTableName())) {
+                    throw new EntityAlreadyExistsException(
+                        "The table ID %s already belongs to a different live entity: %s",
+                        po.getTableId(), byIdPO.getTableName());
+                  }
+                  if (byIdPO == null
+                      && SessionUtils.getWithoutCommit(
+                              TableMetaMapper.class,
+                              mapper -> mapper.countDeletedTableMetasById(po.getTableId()))
+                          > 0) {
+                    throw new EntityAlreadyExistsException(
+                        "The table ID %s is reserved by a deleted table; use a new ID",
+                        po.getTableId());
+                  }
                   deleteStaleTableWithSameName(tableEntity.nameIdentifier(), po);
                 }
               },
@@ -202,7 +226,17 @@ public class TableMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTable")
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    return updateTable(identifier, updater, null);
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTable")
+  public <E extends Entity & HasIdentifier> TableEntity updateTable(
+      NameIdentifier identifier, Function<E, E> updater, @Nullable Long expectedId)
+      throws IOException {
     TablePO oldTablePO = getTablePOByIdentifier(identifier);
+    if (expectedId != null && !oldTablePO.getTableId().equals(expectedId)) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.TABLE, identifier);
+    }
     List<ColumnPO> oldTableColumns =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
@@ -312,12 +346,26 @@ public class TableMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
-    TablePO tablePO = getTablePOByIdentifier(identifier);
+    return deleteTable(identifier, null, null);
+  }
 
-    // Delete the table row first and only if it still has the version we read. A stale drop stops
-    // there, before it can remove columns, tags, policies, or any other related data.
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
+  public boolean deleteTable(
+      NameIdentifier identifier, @Nullable Long expectedId, @Nullable Long expectedVersion) {
+    AtomicReference<TablePO> poRef = new AtomicReference<>();
     SessionUtils.doMultipleWithCommit(
-        () -> deleteTableWithVersion(identifier, tablePO), () -> deleteTableDependents(tablePO));
+        () -> {
+          TablePO tablePO = getTablePOByIdentifier(identifier);
+          if (expectedId != null && !tablePO.getTableId().equals(expectedId)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.TABLE, identifier);
+          }
+          if (expectedVersion != null && !tablePO.getCurrentVersion().equals(expectedVersion)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.TABLE, identifier);
+          }
+          poRef.set(tablePO);
+          deleteTableWithVersion(identifier, tablePO);
+        },
+        () -> deleteTableDependents(poRef.get()));
 
     return true;
   }

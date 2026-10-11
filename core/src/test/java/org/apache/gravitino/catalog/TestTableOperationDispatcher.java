@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -901,6 +902,223 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
     Assertions.assertThrows(
         OptimisticLockException.class, () -> tableOperationDispatcher.purgeTable(tableIdent));
+  }
+
+  @Test
+  public void testDropTableDoesNotDeleteNewerEntityWhenInitiallyUnobserved() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_race_unobs");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(
+            schemaIdent.namespace().level(0),
+            schemaIdent.namespace().level(1),
+            schemaIdent.name(),
+            "table_race_unobs");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    testCatalogOperations.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+
+    long newTableId = 9901L;
+    TableEntity newTableEntity =
+        TableEntity.builder()
+            .withId(newTableId)
+            .withName(tableIdent.name())
+            .withNamespace(tableIdent.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("concurrent").withCreateTime(Instant.now()).build())
+            .build();
+
+    doAnswer(
+            invocation -> {
+              doCallRealMethod().when(entityStore).get(eq(tableIdent), eq(TABLE), any());
+              entityStore.put(newTableEntity, false);
+              throw new NoSuchEntityException("Table not found initially");
+            })
+        .when(entityStore)
+        .get(eq(tableIdent), eq(TABLE), any());
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    TableEntity current = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(newTableId, current.id());
+  }
+
+  @Test
+  public void testPurgeTableDoesNotDeleteNewerEntityWhenInitiallyUnobserved() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_race_purge_unobs");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(
+            schemaIdent.namespace().level(0),
+            schemaIdent.namespace().level(1),
+            schemaIdent.name(),
+            "table_race_purge_unobs");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    testCatalogOperations.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+
+    long newTableId = 9902L;
+    TableEntity newTableEntity =
+        TableEntity.builder()
+            .withId(newTableId)
+            .withName(tableIdent.name())
+            .withNamespace(tableIdent.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("concurrent").withCreateTime(Instant.now()).build())
+            .build();
+
+    doAnswer(
+            invocation -> {
+              doCallRealMethod().when(entityStore).get(eq(tableIdent), eq(TABLE), any());
+              entityStore.put(newTableEntity, false);
+              throw new NoSuchEntityException("Table not found initially");
+            })
+        .when(entityStore)
+        .get(eq(tableIdent), eq(TABLE), any());
+
+    Assertions.assertTrue(tableOperationDispatcher.purgeTable(tableIdent));
+
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    TableEntity current = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(newTableId, current.id());
+  }
+
+  @Test
+  public void testDropTableDoesNotDeleteNewerEntityOnConcurrentRecreation() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_race_recreated");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(
+            schemaIdent.namespace().level(0),
+            schemaIdent.namespace().level(1),
+            schemaIdent.name(),
+            "table_race_recreated");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    TableEntity initialTable = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    long initialId = initialTable.id();
+
+    long newTableId = initialId + 1000L;
+    TableEntity newTableEntity =
+        TableEntity.builder()
+            .withId(newTableId)
+            .withName(tableIdent.name())
+            .withNamespace(tableIdent.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("concurrent").withCreateTime(Instant.now()).build())
+            .build();
+
+    doAnswer(
+            invocation -> {
+              TableEntity observed = (TableEntity) invocation.callRealMethod();
+              doCallRealMethod().when(entityStore).get(eq(tableIdent), eq(TABLE), any());
+              entityStore.delete(tableIdent, TABLE, false);
+              entityStore.put(newTableEntity, false);
+              return observed;
+            })
+        .when(entityStore)
+        .get(eq(tableIdent), eq(TABLE), any());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    TableEntity current = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(newTableId, current.id());
+  }
+
+  @Test
+  public void testPurgeTableDoesNotDeleteNewerEntityOnConcurrentRecreation() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_race_purge_recreated");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(
+            schemaIdent.namespace().level(0),
+            schemaIdent.namespace().level(1),
+            schemaIdent.name(),
+            "table_race_purge_recreated");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    TableEntity initialTable = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    long initialId = initialTable.id();
+
+    long newTableId = initialId + 1000L;
+    TableEntity newTableEntity =
+        TableEntity.builder()
+            .withId(newTableId)
+            .withName(tableIdent.name())
+            .withNamespace(tableIdent.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("concurrent").withCreateTime(Instant.now()).build())
+            .build();
+
+    doAnswer(
+            invocation -> {
+              TableEntity observed = (TableEntity) invocation.callRealMethod();
+              doCallRealMethod().when(entityStore).get(eq(tableIdent), eq(TABLE), any());
+              entityStore.delete(tableIdent, TABLE, false);
+              entityStore.put(newTableEntity, false);
+              return observed;
+            })
+        .when(entityStore)
+        .get(eq(tableIdent), eq(TABLE), any());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.purgeTable(tableIdent));
+
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+    TableEntity current = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(newTableId, current.id());
   }
 
   @Test

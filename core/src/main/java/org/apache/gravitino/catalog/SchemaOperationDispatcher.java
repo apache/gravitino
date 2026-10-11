@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -372,7 +373,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                               PrincipalUtils.getCurrentPrincipal().getName())
                                           .withLastModifiedTime(Instant.now())
                                           .build())
-                                  .build()),
+                                  .build(),
+                          schemaId),
                   "UPDATE",
                   schemaId);
 
@@ -541,64 +543,61 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       }
     }
 
-    return TreeLockUtils.doWithTreeLock(
-        catalogIdent,
-        LockType.WRITE,
-        () -> {
-          // Schema secret URNs live on SchemaEntity in the store (catalog loadSchema may omit
-          // them). Fileset write-through secrets on cascade are cleaned via FilesetDispatcher
-          // above (and FilesetCatalogOperations.dropSchema as a fallback for fileset catalogs).
-          Map<String, String> schemaProperties = new HashMap<>();
-          SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
-          if (schemaEntity != null
-              && schemaEntity.properties() != null
-              && !schemaEntity.properties().isEmpty()) {
-            schemaProperties = new HashMap<>(schemaEntity.properties());
-          }
+    // Schema secret URNs live on SchemaEntity in the store (catalog loadSchema may omit
+    // them). Fileset write-through secrets on cascade are cleaned via FilesetDispatcher
+    // above (and FilesetCatalogOperations.dropSchema as a fallback for fileset catalogs).
+    Map<String, String> schemaProperties = new HashMap<>();
+    SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
+    if (schemaEntity != null
+        && schemaEntity.properties() != null
+        && !schemaEntity.properties().isEmpty()) {
+      schemaProperties = new HashMap<>(schemaEntity.properties());
+    }
 
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-                  NonEmptySchemaException.class,
-                  RuntimeException.class);
+    boolean droppedFromCatalog =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
+            NonEmptySchemaException.class,
+            RuntimeException.class);
 
-          // For managed schema, we don't need to drop the schema from the store again.
-          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
-          if (isManagedSchema) {
-            if (droppedFromCatalog) {
-              secretManager.deleteSecretsFromProperties(schemaProperties);
-            }
-            return droppedFromCatalog;
-          }
+    // For managed schema, we don't need to drop the schema from the store again.
+    boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
+    if (isManagedSchema) {
+      if (droppedFromCatalog) {
+        secretManager.deleteSecretsFromProperties(schemaProperties);
+      }
+      return droppedFromCatalog;
+    }
 
-          // A non-cascading drop preserves a missing registration because the source schema
-          // may have been renamed. An explicit cascading drop also removes stale metadata.
-          boolean droppedFromStore = false;
-          if (droppedFromCatalog || cascade) {
-            try {
-              droppedFromStore = store.delete(ident, SCHEMA, true);
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
+    // A non-cascading drop preserves a missing registration because the source schema
+    // may have been renamed. An explicit cascading drop also removes stale metadata.
+    boolean droppedFromStore = false;
+    if ((droppedFromCatalog || cascade) && schemaEntity != null) {
+      try {
+        droppedFromStore = store.delete(ident, SCHEMA, true, schemaEntity.id(), null);
+      } catch (OptimisticLockException e) {
+        throw e;
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
 
-          SchemaEntityCleaner.deleteOrphanedSchemaEntities(
-              store,
-              ident,
-              false,
-              schemaIdent ->
-                  doWithCatalog(
-                      catalogIdent,
-                      c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
-                      RuntimeException.class));
-          if (droppedFromCatalog || droppedFromStore) {
-            secretManager.deleteSecretsFromProperties(schemaProperties);
-          }
-          return droppedFromCatalog || droppedFromStore;
-        });
+    SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+        store,
+        ident,
+        false,
+        schemaIdent ->
+            doWithCatalog(
+                catalogIdent,
+                c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                RuntimeException.class));
+    if (droppedFromCatalog || droppedFromStore) {
+      secretManager.deleteSecretsFromProperties(schemaProperties);
+    }
+    return droppedFromCatalog || droppedFromStore;
   }
 
   /**
