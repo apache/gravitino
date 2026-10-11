@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
+import java.util.function.Predicate;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -243,6 +244,18 @@ public class TestSemanticModelSourceValidator {
     assertThrows(
         UnsupportedOperationException.class,
         () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+  }
+
+  @Test
+  void testDeniedSourcesDoNotProbeCatalogCapabilities() {
+    authorizer = mock(GravitinoAuthorizer.class);
+    Predicate<NameIdentifier> supportsViews = mock(Predicate.class);
+    SemanticModelSourceValidator checking =
+        new SemanticModelSourceValidator(tables, views, () -> authorizer, supportsViews);
+    assertThrows(
+        ForbiddenException.class,
+        () -> checking.validate("metalake", definition(dataset("orders", null, null))));
+    verifyNoInteractions(tables, views, supportsViews);
   }
 
   private void authorizeOnly(MetadataObject.Type type, Privilege.Name privilege) {

@@ -158,16 +158,18 @@ public class SemanticModelSourceValidator {
             AuthorizationExpressionConstants.LOAD_VIEW_AUTHORIZATION_EXPRESSION,
             currentAuthorizer,
             context);
-    if (viewAllowed) {
+    boolean viewSupported = true;
+    if (tableAllowed || viewAllowed) {
       try {
-        if (supportsViews.test(ident)) {
+        viewSupported = supportsViews.test(ident);
+        if (viewAllowed && viewSupported) {
           return columnNames(ident, views.loadView(ident).columns());
         }
       } catch (NotFoundException missing) {
         // Do not disclose whether the other, inaccessible object type exists.
       }
     }
-    if (!tableAllowed || !viewAllowed) {
+    if (!tableAllowed || (viewSupported && !viewAllowed)) {
       throw new ForbiddenException("Not authorized to resolve Semantic Model source %s", ident);
     }
     throw new IllegalSemanticModelException("Semantic Model source %s does not exist", ident);

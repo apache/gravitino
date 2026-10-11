@@ -48,9 +48,11 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -696,6 +698,61 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         IllegalSemanticModelException.class.getSimpleName(),
         "does not exist");
     verifyNoInteractions(dispatcher, views);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "create,false",
+    "replace,false",
+    "import,false",
+    "create,true",
+    "replace,true",
+    "import,true"
+  })
+  void testMissingSourceForTableOnlyReader(String operation, boolean catalogSupportsViews) {
+    viewsSupported = catalogSupportsViews;
+    sourceAuthorizer = mock(GravitinoAuthorizer.class);
+    when(sourceAuthorizer.authorize(any(), any(), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              Privilege.Name privilege = invocation.getArgument(3);
+              return privilege == Privilege.Name.USE_CATALOG
+                  || privilege == Privilege.Name.USE_SCHEMA
+                  || (privilege == Privilege.Name.SELECT_TABLE
+                      && ((MetadataObject) invocation.getArgument(2)).type()
+                          == MetadataObject.Type.SCHEMA);
+            });
+    when(tables.loadTable(any())).thenThrow(new NoSuchTableException("missing table"));
+    Response response;
+    if (operation.equals("import")) {
+      String yaml =
+          "version: 0.2.0.dev0\nname: sales\ndatasets:\n"
+              + "  - name: orders\n    source: "
+              + catalog
+              + "."
+              + schema
+              + ".orders\n";
+      response = postDocument(semanticModelPath() + "/ossie", yaml, "application/yaml");
+    } else {
+      response = writeDefinition(operation.equals("replace"), semanticModelDefinition());
+    }
+    if (catalogSupportsViews) {
+      assertError(
+          response,
+          Response.Status.FORBIDDEN,
+          ErrorConstants.FORBIDDEN_CODE,
+          ForbiddenException.class.getSimpleName(),
+          "Not authorized");
+    } else {
+      assertError(
+          response,
+          Response.Status.BAD_REQUEST,
+          ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+          IllegalSemanticModelException.class.getSimpleName(),
+          "does not exist");
+    }
+    verify(tables).loadTable(NameIdentifier.of(metalake, catalog, schema, "orders"));
+    verifyNoInteractions(views, dispatcher);
   }
 
   @ParameterizedTest
