@@ -24,7 +24,7 @@ plugins {
 
 // This module supports Trino version 481. Everything shared by the version-segment modules
 // (toolchain, dependencies, Spotless, test wiring, distribution tasks) is configured once in
-// segment.gradle.kts; this file only declares the module's range and source directories.
+// segment.gradle; this file only declares the module's range and source directories.
 extra["minTrinoVersion"] = 481
 extra["maxTrinoVersion"] = 481
 extra["defaultTrinoVersionIsMin"] = false

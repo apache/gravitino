@@ -24,7 +24,7 @@ plugins {
 
 // This module supports Trino versions 473-477. Everything shared by the version-segment modules
 // (toolchain, dependencies, Spotless, test wiring, distribution tasks) is configured once in
-// segment.gradle.kts; this file only declares the module's range and source directories.
+// segment.gradle; this file only declares the module's range and source directories.
 //
 // 477 itself has no published trino-memory/trino-testing artifact on Maven Central, so default
 // to minTrinoVersion instead (matching the 469-472 module's default).
