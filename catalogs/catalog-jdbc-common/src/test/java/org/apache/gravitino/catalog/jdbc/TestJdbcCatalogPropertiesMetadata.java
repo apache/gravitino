@@ -55,6 +55,44 @@ public class TestJdbcCatalogPropertiesMetadata {
   }
 
   @Test
+  public void testShouldValidateOnCreateHonorsVerifyOnCreate() {
+    // Default (property absent): verify on create.
+    Assertions.assertTrue(buildCatalog(ImmutableMap.of()).shouldValidateOnCreate());
+    // Explicit true: verify.
+    Assertions.assertTrue(
+        buildCatalog(ImmutableMap.of(Catalog.PROPERTY_VERIFY_ON_CREATE, "true"))
+            .shouldValidateOnCreate());
+    // Explicit false: skip.
+    Assertions.assertFalse(
+        buildCatalog(ImmutableMap.of(Catalog.PROPERTY_VERIFY_ON_CREATE, "false"))
+            .shouldValidateOnCreate());
+  }
+
+  private static JdbcCatalog buildCatalog(Map<String, String> extraProperties) {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:")
+            .put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC")
+            .put(JdbcConfig.USERNAME.getKey(), "user")
+            .put(JdbcConfig.PASSWORD.getKey(), "password")
+            .putAll(extraProperties)
+            .build();
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("jdbc_catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("jdbc-test")
+            .withComment("test")
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    return new TestJdbcCatalog().withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+  }
+
+  @Test
   public void testCatalogPropertiesKeepPoolSizeAfterLoad() {
     Map<String, String> createProperties =
         ImmutableMap.<String, String>builder()

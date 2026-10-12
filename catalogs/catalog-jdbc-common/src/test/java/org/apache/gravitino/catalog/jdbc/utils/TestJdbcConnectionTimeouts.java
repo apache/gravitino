@@ -129,13 +129,15 @@ public class TestJdbcConnectionTimeouts {
   }
 
   @Test
-  void testPostgresSecondsConversionIsOverflowSafeNearMaxLong() {
-    // (millis + 999) would overflow and silently collapse to 1s; the overflow-safe ceiling must
-    // instead return a large positive second count.
-    long millis = Long.MAX_VALUE;
+  void testPostgresSecondsConversionAtMaxAllowedValue() {
+    // The config caps the value at Integer.MAX_VALUE ms; the ceiling conversion stays correct and
+    // within int range at that bound (and is overflow-safe for the whole positive long range).
+    long millis = Integer.MAX_VALUE;
     long expectedSeconds = (millis - 1L) / 1000L + 1L;
     assertPostgresConnectSeconds(Long.toString(millis), Long.toString(expectedSeconds));
     Assertions.assertTrue(expectedSeconds > 1L, "conversion must not collapse to 1 second");
+    Assertions.assertTrue(
+        expectedSeconds <= Integer.MAX_VALUE, "converted seconds must fit the driver int range");
   }
 
   private static void assertPostgresConnectSeconds(String millis, String expectedSeconds) {
@@ -228,5 +230,81 @@ public class TestJdbcConnectionTimeouts {
 
     Assertions.assertEquals("30", result.get(CONNECT_TIMEOUT));
     Assertions.assertEquals(1, result.size());
+  }
+
+  @Test
+  void testMysqlProbeEmitsConnectAndSocketTimeoutMillis() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
+    props.put(URL_KEY, "jdbc:mysql://host:3306/db");
+    props.put(CONNECT_TIMEOUT_MS_KEY, "2000");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.probeConnectionProperties(config(props), props.get(URL_KEY));
+
+    // The probe bounds both the connect and the read timeout (milliseconds for MySQL).
+    Assertions.assertEquals("2000", result.get(CONNECT_TIMEOUT));
+    Assertions.assertEquals("2000", result.get(SOCKET_TIMEOUT));
+    Assertions.assertEquals(2, result.size());
+  }
+
+  @Test
+  void testPostgresProbeEmitsConnectSocketAndLoginTimeoutSeconds() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "org.postgresql.Driver");
+    props.put(URL_KEY, "jdbc:postgresql://host:5432/db");
+    props.put(CONNECT_TIMEOUT_MS_KEY, "2000");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.probeConnectionProperties(config(props), props.get(URL_KEY));
+
+    // The probe bounds connect, socket and login timeouts, converted to seconds.
+    Assertions.assertEquals("2", result.get(CONNECT_TIMEOUT));
+    Assertions.assertEquals("2", result.get(SOCKET_TIMEOUT));
+    Assertions.assertEquals("2", result.get("loginTimeout"));
+    Assertions.assertEquals(3, result.size());
+  }
+
+  @Test
+  void testClickHouseProbeEmitsSnakeCaseConnectAndSocketTimeoutMillis() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.clickhouse.jdbc.ClickHouseDriver");
+    props.put(URL_KEY, "jdbc:clickhouse://host:8443/default");
+    props.put(CONNECT_TIMEOUT_MS_KEY, "2000");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.probeConnectionProperties(config(props), props.get(URL_KEY));
+
+    Assertions.assertEquals("2000", result.get(CLICKHOUSE_CONNECT_TIMEOUT));
+    Assertions.assertEquals("2000", result.get(CLICKHOUSE_SOCKET_TIMEOUT));
+    Assertions.assertFalse(result.containsKey(CONNECT_TIMEOUT));
+    Assertions.assertEquals(2, result.size());
+  }
+
+  @Test
+  void testProbeUnknownDriverEmitsNothing() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "org.sqlite.JDBC");
+    props.put(URL_KEY, "jdbc:sqlite::memory:");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.probeConnectionProperties(config(props), props.get(URL_KEY));
+
+    Assertions.assertTrue(result.isEmpty());
+  }
+
+  @Test
+  void testProbeOperatorSocketTimeoutIsPreserved() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
+    String url = "jdbc:mysql://host:3306/db?socketTimeout=9000";
+    props.put(URL_KEY, url);
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.probeConnectionProperties(config(props), url);
+
+    // The operator's socketTimeout wins; only the connect timeout is injected.
+    Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT));
+    Assertions.assertEquals("30000", result.get(CONNECT_TIMEOUT));
   }
 }

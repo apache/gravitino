@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.sql.Connection;
@@ -34,6 +35,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
@@ -53,6 +56,7 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.TableOperation;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectionTimeouts;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -105,6 +109,7 @@ public class JdbcCatalogOperations
 
   private DataSource dataSource;
   private String jdbcUrl;
+  private JdbcConfig jdbcConfig;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
@@ -172,7 +177,7 @@ public class JdbcCatalogOperations
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
 
-    JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
+    this.jdbcConfig = new JdbcConfig(resultConf);
     this.jdbcUrl = jdbcConfig.getJdbcUrl();
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
 
@@ -239,6 +244,78 @@ public class JdbcCatalogOperations
    *
    * @param catalogIdent the name of the catalog.
    */
+  /**
+   * Verifies the backend is reachable using a dedicated, time-bounded one-off connection rather
+   * than a pooled one. Unlike {@link #testConnection(NameIdentifier)} (which borrows from the lazy
+   * pool, whose connections carry only a connect timeout so normal operations stay unbounded), this
+   * probe applies both the connect timeout and the socket-read (and, for PostgreSQL, login) timeout
+   * from {@link JdbcConnectionTimeouts#probeConnectionProperties}. That matters because the probe
+   * runs under the metalake write lock during catalog creation: a backend that accepts the TCP
+   * connection but never speaks the database protocol would otherwise block forever and starve the
+   * whole metalake. The connection is opened, validated and closed within this call.
+   *
+   * @param catalogIdent the identifier of the catalog being verified
+   * @throws ConnectionFailedException if the backend cannot be reached within the bounded timeout
+   */
+  /**
+   * Sets just the configuration the backend probe needs ({@link #jdbcConfig} and {@link #jdbcUrl}),
+   * without building the connection pool. For tests that exercise {@link #probeConnection} with a
+   * fake driver and no real database.
+   *
+   * @param config the resolved JDBC configuration
+   */
+  @VisibleForTesting
+  void setProbeConfigForTest(JdbcConfig config) {
+    this.jdbcConfig = config;
+    this.jdbcUrl = config.getJdbcUrl();
+  }
+
+  public void probeConnection(NameIdentifier catalogIdent) {
+    Driver driver;
+    try {
+      driver = getDriver();
+    } catch (SQLException e) {
+      throw new ConnectionFailedException(
+          e,
+          "Failed to connect to JDBC catalog at %s: %s",
+          hostPortFromJdbcUrl(jdbcUrl),
+          e.getMessage());
+    }
+
+    Properties properties = new Properties();
+    String user = jdbcConfig.getUsername();
+    if (user != null) {
+      properties.setProperty("user", user);
+    }
+    String password = jdbcConfig.getPassword();
+    if (password != null) {
+      properties.setProperty("password", password);
+    }
+    // Bound both the connect and the read/login timeout for this probe so an accept-but-silent
+    // backend fails fast instead of hanging under the metalake write lock.
+    JdbcConnectionTimeouts.probeConnectionProperties(jdbcConfig, jdbcUrl)
+        .forEach(properties::setProperty);
+
+    try (Connection connection = driver.connect(jdbcUrl, properties)) {
+      if (connection == null) {
+        throw new ConnectionFailedException(
+            "Failed to connect to JDBC catalog at %s: the driver did not accept the URL",
+            hostPortFromJdbcUrl(jdbcUrl));
+      }
+      // A lightweight round trip that confirms the connection is actually usable. isValid() is
+      // bounded by the same read timeout applied above.
+      connection.getMetaData().getDatabaseProductName();
+    } catch (ConnectionFailedException e) {
+      throw e;
+    } catch (SQLException e) {
+      throw new ConnectionFailedException(
+          e,
+          "Failed to connect to JDBC catalog at %s: %s",
+          hostPortFromJdbcUrl(jdbcUrl),
+          e.getMessage());
+    }
+  }
+
   @Override
   public void testConnection(NameIdentifier catalogIdent) {
     try {
@@ -265,17 +342,30 @@ public class JdbcCatalogOperations
   }
 
   /**
+   * A plain authority: an optional {@code user-info@}, then either a bracketed IPv6 literal or a
+   * host of letters/digits/dots/hyphens, then an optional {@code :port}. Deliberately strict so
+   * that credential-bearing forms the driver also accepts — MySQL's key-value authority {@code
+   * (host=..,password=..)} and its {@code address=(host=..)(password=..)} form — do NOT match and
+   * are reported as {@code "unknown"} instead of leaking the password.
+   */
+  private static final Pattern HOST_PORT_AUTHORITY =
+      Pattern.compile("^(?:[^@/]*@)?(\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.\\-]+)(?::\\d+)?$");
+
+  /**
    * Extracts {@code host:port} from a {@code jdbc:subprotocol://host:port/...} URL for use in a
-   * connection-failure message. Returns {@code "unknown"} whenever the host/port cannot be located
-   * (including a URL with no {@code ://} authority) rather than the raw URL, because the raw URL
-   * can carry credentials (for example {@code jdbc:postgresql:db?password=...}) that must not leak
-   * into the exception, the REST response, or the server logs. Never throws, so message formatting
+   * connection-failure message. Returns {@code "unknown"} whenever the authority is not a plain
+   * {@code host[:port]} (including a URL with no {@code ://} authority, or MySQL key-value / {@code
+   * address=(...)} host syntaxes) rather than the raw URL, because the raw URL and those
+   * alternative syntaxes can carry credentials (for example {@code jdbc:postgresql:db?password=...}
+   * or {@code jdbc:mysql://(host=h,password=s)/db}) that must not leak into the exception, the REST
+   * response, or the server logs. Any user-info is stripped. Never throws, so message formatting
    * cannot mask the original connection failure.
    *
    * @param url the JDBC URL stored for this catalog
-   * @return a {@code host:port} description, or {@code "unknown"} when it cannot be extracted
+   * @return a {@code host:port} (or {@code host}) description, or {@code "unknown"} when it is not
+   *     a plain host authority
    */
-  private static String hostPortFromJdbcUrl(String url) {
+  static String hostPortFromJdbcUrl(String url) {
     if (StringUtils.isBlank(url)) {
       return "unknown";
     }
@@ -294,7 +384,9 @@ public class JdbcCatalogOperations
       }
     }
     String authority = url.substring(authorityStart, authorityEnd);
-    if (StringUtils.isBlank(authority)) {
+    // Only accept a plain host[:port] authority; anything else (blank, or a credential-bearing
+    // key-value / address=(...) form) is reported as unknown rather than risking a leak.
+    if (!HOST_PORT_AUTHORITY.matcher(authority).matches()) {
       return "unknown";
     }
     // Strip any user-info ("user@host:port"); keep only the host:port part.

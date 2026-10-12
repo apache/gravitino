@@ -100,28 +100,27 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   }
 
   /**
-   * Verifies the backend is reachable at create time by running a single {@code testConnection}
-   * (one {@code listDatabases} round trip) through the catalog operations. On failure the backend
-   * raises a {@link ConnectionFailedException}, which propagates so {@code CatalogManager} rolls
-   * back the just-persisted catalog entity.
+   * Verifies the backend is reachable at create time with a dedicated, time-bounded one-off probe
+   * connection (see {@link JdbcCatalogOperations#probeConnection}). On failure the probe raises a
+   * {@link ConnectionFailedException}, which propagates so {@code CatalogManager} rolls back the
+   * just-persisted catalog entity.
    *
-   * <p>No connection-pool leak: the probe borrows one connection and returns it (JDBC operations
-   * use try-with-resources), and the pool stays lazy. If verification throws, {@code
-   * CatalogManager.initCatalogWrapper} closes the partially-initialized catalog, which closes the
-   * datasource and releases the pool.
+   * <p>The probe does not borrow from the lazy pool: it opens its own connection bounded by both
+   * the connect and the read/login timeout, so a backend that accepts the socket but never speaks
+   * the protocol fails fast instead of blocking the metalake write lock. The probe connection is
+   * opened, validated and closed within the call, so there is no pool or connection leak.
    */
   @Override
   public void validateOnCreate() {
     try {
-      ops().testConnection(entity().nameIdentifier());
+      ((JdbcCatalogOperations) ops()).probeConnection(entity().nameIdentifier());
     } catch (RuntimeException e) {
       // Includes ConnectionFailedException; rethrow unchanged so CatalogManager rolls back and the
       // connection-failed taxonomy the caller relies on is preserved.
       throw e;
     } catch (Exception e) {
-      // The CatalogOperations interface declares a checked Exception; the JDBC override only throws
-      // runtime exceptions, so this wraps any unexpected checked exception without changing the
-      // connection-failed taxonomy the caller relies on.
+      // Defensive: the probe only throws runtime exceptions, so wrap any unexpected checked
+      // exception without changing the connection-failed taxonomy the caller relies on.
       throw new GravitinoRuntimeException(
           e, "Failed to verify JDBC catalog backend at create: %s", e.getMessage());
     }
