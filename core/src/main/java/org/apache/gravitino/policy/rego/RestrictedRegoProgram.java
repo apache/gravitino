@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** A parsed, unresolved program in the {@code restricted-rego-v1} source dialect. */
-public interface RestrictedRegoProgram {
+interface RestrictedRegoProgram {
 
   /**
    * Returns the rule type declared by this program.

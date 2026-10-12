@@ -148,14 +148,18 @@ Validation applies these limits when a policy is created or its content is updat
 - 16 KiB of UTF-8 source;
 - operation depth 8 for the source AST;
 - 256 nodes for the source AST;
-- 4 KiB of UTF-8 for each decoded string literal; and
-- 256 bytes for each numeric literal; and
-- 256 array elements in total in the source.
+- 4 KiB of UTF-8 for each decoded string literal;
+- 256 bytes for each numeric literal;
+- 256 elements in each literal array;
+- 256 array elements in total in the source; and
+- 256 levels of parenthesis nesting.
 
 These limits apply to user-provided source, not to the generated predicate. Gravitino lowers an
 ordered row-filter branch chain to a linear nested Boolean expression in which each condition appears
 at most twice. The source limits therefore bound generated work without reducing the array allowance
-as branches are added. A generated predicate may exceed the source depth or node limits.
+as branches are added. Under the 256-node source limit, 127 minimal branches lower to a predicate
+with depth 256 and 890 node occurrences. A generated predicate may exceed the source depth or node
+limits.
 
 Bare identifiers, arbitrary functions, comments, packages, imports, variables, chained
 comparisons, nested arrays, and a conditional rule without a final `else` are rejected. Read paths

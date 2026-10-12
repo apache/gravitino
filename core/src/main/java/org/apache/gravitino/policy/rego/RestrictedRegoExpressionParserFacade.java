@@ -25,10 +25,32 @@ import org.apache.gravitino.policy.ReadRestrictionContent;
 import org.apache.gravitino.policy.rego.RestrictedRegoProgram.ColumnMask;
 import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RowFilter;
 
-/** Parses and validates complete programs in the {@code restricted-rego-v1} source dialect. */
+/** Validates complete programs in the {@code restricted-rego-v1} source dialect. */
 public final class RestrictedRegoExpressionParserFacade {
 
   private RestrictedRegoExpressionParserFacade() {}
+
+  /**
+   * Validates one complete {@code filter := ...} program.
+   *
+   * @param source row-filter program in {@code restricted-rego-v1}
+   * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
+   *     {@code filter}
+   */
+  public static void validateRowFilter(String source) {
+    parseRowFilter(source);
+  }
+
+  /**
+   * Validates one complete {@code mask := action(...)} program.
+   *
+   * @param source column-mask program in {@code restricted-rego-v1}
+   * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
+   *     {@code mask}
+   */
+  public static void validateColumnMask(String source) {
+    parseColumnMask(source);
+  }
 
   /**
    * Parses and validates one complete row-filter or column-mask program.
@@ -37,7 +59,7 @@ public final class RestrictedRegoExpressionParserFacade {
    * @return validated unresolved program
    * @throws IllegalArgumentException if syntax or semantics are invalid
    */
-  public static RestrictedRegoProgram parse(String source) {
+  static RestrictedRegoProgram parse(String source) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(source), "restricted-rego-v1 program cannot be blank");
     Preconditions.checkArgument(
@@ -59,7 +81,7 @@ public final class RestrictedRegoExpressionParserFacade {
    * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
    *     {@code filter}
    */
-  public static RowFilter parseRowFilter(String source) {
+  static RowFilter parseRowFilter(String source) {
     RestrictedRegoProgram program = parse(source);
     Preconditions.checkArgument(
         program instanceof RowFilter, "row-filter program must declare a filter rule");
@@ -74,7 +96,7 @@ public final class RestrictedRegoExpressionParserFacade {
    * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
    *     {@code mask}
    */
-  public static ColumnMask parseColumnMask(String source) {
+  static ColumnMask parseColumnMask(String source) {
     RestrictedRegoProgram program = parse(source);
     Preconditions.checkArgument(
         program instanceof ColumnMask, "column-mask program must declare a mask rule");

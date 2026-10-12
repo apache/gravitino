@@ -83,6 +83,22 @@ public class TestRestrictedRegoProgram {
   }
 
   @Test
+  void testLowersMaximumNumberOfMinimalBranchesWithinSourceNodeLimit() {
+    StringBuilder source = new StringBuilder();
+    for (int index = 0; index < 127; index++) {
+      source.append(index == 0 ? "filter := true if true" : " else := true if true");
+    }
+    source.append(" else := false");
+
+    RowFilter filter = RestrictedRegoExpressionParserFacade.parseRowFilter(source.toString());
+    CanonicalExpression lowered = filter.lower();
+
+    Assertions.assertEquals(127, filter.branches().size());
+    Assertions.assertEquals(256, lowered.depth());
+    Assertions.assertEquals(890, RestrictedRegoTestUtils.countExpressionNodes(lowered));
+  }
+
+  @Test
   void testDoesNotApplySourceArrayLimitToGeneratedPredicate() {
     RowFilter filter =
         Assertions.assertDoesNotThrow(

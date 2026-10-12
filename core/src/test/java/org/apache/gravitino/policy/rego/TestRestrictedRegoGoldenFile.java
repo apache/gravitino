@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RowFilter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,14 @@ public class TestRestrictedRegoGoldenFile {
     }
   }
 
+  @Test
+  void testFindsRepositoryRootFromChildDirectory() {
+    Path expected = repositoryRoot();
+
+    Assertions.assertEquals(
+        Optional.of(expected), findRepositoryRoot(expected.resolve("core/src/test")));
+  }
+
   private static String renderGoldenResults() throws IOException {
     StringBuilder result = new StringBuilder(GOLDEN_LICENSE_HEADER);
     List<String> lines;
@@ -124,10 +133,27 @@ public class TestRestrictedRegoGoldenFile {
 
   private static Path repositoryRoot() {
     String repositoryRoot = System.getProperty(REPOSITORY_ROOT_PROPERTY);
-    if (repositoryRoot == null) {
-      throw new IllegalStateException("Missing test system property " + REPOSITORY_ROOT_PROPERTY);
+    if (repositoryRoot != null && !repositoryRoot.isBlank()) {
+      return Path.of(repositoryRoot).toAbsolutePath().normalize();
     }
-    return Path.of(repositoryRoot);
+
+    Path workingDirectory = Path.of("").toAbsolutePath().normalize();
+    return findRepositoryRoot(workingDirectory)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Cannot find the repository root from " + workingDirectory));
+  }
+
+  private static Optional<Path> findRepositoryRoot(Path start) {
+    for (Path current = start.toAbsolutePath().normalize();
+        current != null;
+        current = current.getParent()) {
+      if (Files.isRegularFile(current.resolve("docs/policies.md"))) {
+        return Optional.of(current);
+      }
+    }
+    return Optional.empty();
   }
 
   private static List<String> documentedPrograms(Path policiesDocument) throws IOException {

@@ -33,6 +33,15 @@ public class TestRestrictedRegoExpressionParserFacade {
 
   @Test
   void testParsesTypedRules() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            RestrictedRegoExpressionParserFacade.validateRowFilter(
+                "filter := col(\"owner\") == session_user()"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            RestrictedRegoExpressionParserFacade.validateColumnMask(
+                "mask := action(\"show-last-4\")"));
+
     RowFilter filter =
         RestrictedRegoExpressionParserFacade.parseRowFilter(
             "filter := col(\"owner\") == session_user()");

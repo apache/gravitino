@@ -352,11 +352,11 @@ public class PolicyManager implements PolicyDispatcher {
   private static void validateReadRestrictionContent(
       Policy.BuiltInType policyType, PolicyContent content) {
     if (policyType == Policy.BuiltInType.ROW_FILTER && content instanceof RowFilterContent) {
-      RestrictedRegoExpressionParserFacade.parseRowFilter(
+      RestrictedRegoExpressionParserFacade.validateRowFilter(
           ((RowFilterContent) content).expression());
     } else if (policyType == Policy.BuiltInType.COLUMN_MASK
         && content instanceof ColumnMaskContent) {
-      RestrictedRegoExpressionParserFacade.parseColumnMask(
+      RestrictedRegoExpressionParserFacade.validateColumnMask(
           ((ColumnMaskContent) content).expression());
     }
   }
