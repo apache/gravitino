@@ -74,7 +74,7 @@ public class TableMaintenanceInJobSampler {
     Preconditions.checkNotNull(metricsJson, "metricsJson");
     Preconditions.checkNotNull(head, "head");
 
-    metricsMetaService.putMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
+    metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
     jobMetaService.recordBeforeSnapshot(jobId, sampledSnapshotId);
 
     long headSnapshotId = head.currentSnapshotId();

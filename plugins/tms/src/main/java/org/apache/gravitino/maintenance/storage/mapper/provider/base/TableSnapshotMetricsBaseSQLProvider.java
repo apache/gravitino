@@ -38,20 +38,6 @@ public class TableSnapshotMetricsBaseSQLProvider {
   }
 
   /**
-   * Updates {@code metrics_value} for an existing table/policy/snapshot row.
-   *
-   * @param metricsMeta metrics row
-   * @return UPDATE statement
-   */
-  public String updateMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta) {
-    return "UPDATE "
-        + TableSnapshotMetricsMapper.TABLE_NAME
-        + " SET metrics_value = #{metricsMeta.metricsValue}"
-        + " WHERE table_id = #{metricsMeta.tableId} AND policy_id = #{metricsMeta.policyId}"
-        + " AND snapshot_id = #{metricsMeta.snapshotId}";
-  }
-
-  /**
    * @param tableId table id
    * @param policyId policy id
    * @param snapshotId Iceberg snapshot id

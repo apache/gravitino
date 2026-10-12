@@ -72,18 +72,6 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testCronJobPutMetricsOverwritesExistingRow() {
-    long jobId = 1003L;
-    jobMetaService.insertJob(jobId, 5L, 6L);
-    metricsMetaService.insertMetrics(5L, 6L, 300L, "{\"mse\":1}");
-    InJobGateOutcome outcome =
-        sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, "{\"mse\":2}", () -> 300L);
-    Assertions.assertTrue(outcome.continueMaintenance());
-    Assertions.assertEquals(
-        "{\"mse\":2}", metricsMetaService.getMetrics(5L, 6L, 300L).metricsValue());
-  }
-
-  @TestTemplate
   void testCommitChainTypeGateWithoutReSample() {
     InJobGateOutcome ok = sampler.gateCommitChainType(300L, () -> 300L);
     Assertions.assertTrue(ok.continueMaintenance());
