@@ -27,36 +27,22 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 public class TableSnapshotMetricsMetaService {
 
   /**
-   * Stores metrics JSON for a table/policy/snapshot triple.
+   * Inserts metrics JSON for a table/policy/snapshot triple. Does not update an existing row.
    *
    * @param tableId table id
    * @param policyId policy id
    * @param snapshotId Iceberg snapshot id
    * @param metricsJson serialized metrics payload
    */
-  public void putMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
-    TableSnapshotMetricsPO existing = getMetrics(tableId, policyId, snapshotId);
-    if (existing == null) {
-      TableSnapshotMetricsPO po =
-          TableSnapshotMetricsPO.builder()
-              .withTableId(tableId)
-              .withPolicyId(policyId)
-              .withSnapshotId(snapshotId)
-              .withMetricsValue(metricsJson)
-              .build();
-      SessionUtils.doWithCommit(
-          TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(po));
-    } else {
-      TableSnapshotMetricsPO po =
-          TableSnapshotMetricsPO.builder()
-              .withTableId(tableId)
-              .withPolicyId(policyId)
-              .withSnapshotId(snapshotId)
-              .withMetricsValue(metricsJson)
-              .build();
-      SessionUtils.doWithCommit(
-          TableSnapshotMetricsMapper.class, mapper -> mapper.updateMetrics(po));
-    }
+  public void insertMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
+    TableSnapshotMetricsPO po =
+        TableSnapshotMetricsPO.builder()
+            .withTableId(tableId)
+            .withPolicyId(policyId)
+            .withSnapshotId(snapshotId)
+            .withMetricsValue(metricsJson)
+            .build();
+    SessionUtils.doWithCommit(TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(po));
   }
 
   /**

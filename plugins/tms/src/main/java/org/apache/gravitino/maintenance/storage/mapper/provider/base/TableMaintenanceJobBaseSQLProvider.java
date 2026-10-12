@@ -85,4 +85,12 @@ public class TableMaintenanceJobBaseSQLProvider {
         + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
         + " WHERE job_id = #{jobId} AND finished_at IS NULL";
   }
+
+  /**
+   * @param jobId Gravitino job run id
+   * @return DELETE statement
+   */
+  public String deleteByJobId(@Param("jobId") long jobId) {
+    return "DELETE FROM " + TABLE_NAME + " WHERE job_id = #{jobId}";
+  }
 }

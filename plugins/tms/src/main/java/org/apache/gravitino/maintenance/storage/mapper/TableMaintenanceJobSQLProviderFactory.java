@@ -69,4 +69,12 @@ public class TableMaintenanceJobSQLProviderFactory {
       @Param("finishedAt") long finishedAt) {
     return PROVIDER.markFinished(jobId, afterSnapshotId, finishedAt);
   }
+
+  /**
+   * @param jobId job run id
+   * @return DELETE statement
+   */
+  public static String deleteByJobId(@Param("jobId") long jobId) {
+    return PROVIDER.deleteByJobId(jobId);
+  }
 }

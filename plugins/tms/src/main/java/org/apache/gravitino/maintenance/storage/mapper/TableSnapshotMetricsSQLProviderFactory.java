@@ -39,14 +39,6 @@ public class TableSnapshotMetricsSQLProviderFactory {
   }
 
   /**
-   * @param po metrics row
-   * @return UPDATE statement
-   */
-  public static String updateMetrics(@Param("po") TableSnapshotMetricsPO po) {
-    return PROVIDER.updateMetrics(po);
-  }
-
-  /**
    * @param tableId table id
    * @param policyId policy id
    * @param snapshotId snapshot id
@@ -57,5 +49,13 @@ public class TableSnapshotMetricsSQLProviderFactory {
       @Param("policyId") long policyId,
       @Param("snapshotId") long snapshotId) {
     return PROVIDER.selectMetrics(tableId, policyId, snapshotId);
+  }
+
+  /**
+   * @param jobId job run id
+   * @return DELETE statement
+   */
+  public static String deleteByJobId(@Param("jobId") long jobId) {
+    return PROVIDER.deleteByJobId(jobId);
   }
 }

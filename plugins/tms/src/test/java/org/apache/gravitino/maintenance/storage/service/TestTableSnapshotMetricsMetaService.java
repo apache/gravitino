@@ -34,10 +34,8 @@ class TestTableSnapshotMetricsMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testPutAndGetMetrics() {
-    service.putMetrics(1L, 2L, 99L, "{\"mse\":1}");
+  void testInsertAndGetMetrics() {
+    service.insertMetrics(1L, 2L, 99L, "{\"mse\":1}");
     Assertions.assertEquals("{\"mse\":1}", service.getMetrics(1L, 2L, 99L).metricsValue());
-    service.putMetrics(1L, 2L, 99L, "{\"mse\":2}");
-    Assertions.assertEquals("{\"mse\":2}", service.getMetrics(1L, 2L, 99L).metricsValue());
   }
 }

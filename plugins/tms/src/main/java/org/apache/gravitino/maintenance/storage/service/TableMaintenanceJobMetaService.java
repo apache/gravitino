@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.storage.service;
 
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
+import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -76,5 +77,21 @@ public class TableMaintenanceJobMetaService {
     SessionUtils.doWithCommit(
         TableMaintenanceJobMapper.class,
         mapper -> mapper.markFinished(jobId, afterSnapshotId, finishedAt));
+  }
+
+  /**
+   * Deletes {@code table_snapshot_metrics} rows linked to the job's before/after snapshot ids, then
+   * deletes the {@code table_maintenance_job} row for {@code jobId}.
+   *
+   * @param jobId Gravitino job run id
+   */
+  public void deleteByJobId(long jobId) {
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableSnapshotMetricsMapper.class, mapper -> mapper.deleteByJobId(jobId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableMaintenanceJobMapper.class, mapper -> mapper.deleteByJobId(jobId)));
   }
 }

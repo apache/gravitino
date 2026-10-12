@@ -26,21 +26,29 @@ import org.junit.jupiter.api.TestTemplate;
 
 class TestTableMaintenanceJobMetaService extends TestJDBCBackend {
 
-  private TableMaintenanceJobMetaService service;
+  private TableMaintenanceJobMetaService jobService;
+  private TableSnapshotMetricsMetaService metricsService;
 
   @BeforeEach
   void setUpService() {
-    service = new TableMaintenanceJobMetaService();
+    jobService = new TableMaintenanceJobMetaService();
+    metricsService = new TableSnapshotMetricsMetaService();
   }
 
   @TestTemplate
-  void testInsertBindSampleAndFinishLifecycle() {
-    long rowId = service.insertInFlightJob(10L, 20L);
+  void testInsertBindSampleFinishAndDeleteByJobId() {
+    long rowId = jobService.insertInFlightJob(10L, 20L);
     Assertions.assertTrue(rowId > 0);
     long jobId = 999L;
-    service.bindJobId(rowId, jobId);
-    service.recordBeforeSnapshot(jobId, 100L);
-    Assertions.assertDoesNotThrow(
-        () -> service.markFinished(jobId, 200L, System.currentTimeMillis()));
+    jobService.bindJobId(rowId, jobId);
+    jobService.recordBeforeSnapshot(jobId, 100L);
+    metricsService.insertMetrics(10L, 20L, 100L, "{\"mse\":1}");
+    jobService.markFinished(jobId, 200L, System.currentTimeMillis());
+    metricsService.insertMetrics(10L, 20L, 200L, "{\"mse\":2}");
+
+    jobService.deleteByJobId(jobId);
+
+    Assertions.assertNull(metricsService.getMetrics(10L, 20L, 100L));
+    Assertions.assertNull(metricsService.getMetrics(10L, 20L, 200L));
   }
 }

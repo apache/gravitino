@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.storage.mapper;
 
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -47,4 +48,7 @@ public interface TableMaintenanceJobMapper {
       @Param("jobId") long jobId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt);
+
+  @DeleteProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "deleteByJobId")
+  int deleteByJobId(@Param("jobId") long jobId);
 }
