@@ -23,9 +23,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalExpression;
-import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalOperator;
-import org.apache.gravitino.policy.rego.CanonicalExpression.Not;
 
 /** A parsed, unresolved program in the {@code restricted-rego-v1} source dialect. */
 public interface RestrictedRegoProgram {

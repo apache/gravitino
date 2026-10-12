@@ -19,16 +19,6 @@
 package org.apache.gravitino.policy.rego;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.policy.rego.CanonicalExpression.Column;
-import org.apache.gravitino.policy.rego.CanonicalExpression.Comparison;
-import org.apache.gravitino.policy.rego.CanonicalExpression.ComparisonOperator;
-import org.apache.gravitino.policy.rego.CanonicalExpression.GroupMembership;
-import org.apache.gravitino.policy.rego.CanonicalExpression.Literal;
-import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralArray;
-import org.apache.gravitino.policy.rego.CanonicalExpression.LiteralType;
-import org.apache.gravitino.policy.rego.CanonicalExpression.LogicalExpression;
-import org.apache.gravitino.policy.rego.CanonicalExpression.Not;
-import org.apache.gravitino.policy.rego.CanonicalExpression.SessionUser;
 
 /** Semantic validation helpers for unresolved restricted Rego expressions. */
 final class ExpressionValidator {
