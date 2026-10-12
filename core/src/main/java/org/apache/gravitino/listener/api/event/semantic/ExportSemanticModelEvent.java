@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.listener.api.event.semantic;
 
-import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
@@ -28,17 +27,16 @@ import org.apache.gravitino.semantic.OssieFormat;
 /** Successful event for exporting a Semantic Model as an Ossie document. */
 @DeveloperApi
 public final class ExportSemanticModelEvent extends SemanticModelEvent {
-  @Nullable private final OssieFormat format;
+  private final OssieFormat format;
 
   /**
    * Constructs a {@code ExportSemanticModelEvent}.
    *
    * @param user The username of the individual who initiated the operation.
    * @param identifier The Semantic Model identifier.
-   * @param format The document format, or null for an invalid request.
+   * @param format The non-null document format.
    */
-  public ExportSemanticModelEvent(
-      String user, NameIdentifier identifier, @Nullable OssieFormat format) {
+  public ExportSemanticModelEvent(String user, NameIdentifier identifier, OssieFormat format) {
     super(user, identifier);
     this.format = format;
   }
@@ -46,9 +44,8 @@ public final class ExportSemanticModelEvent extends SemanticModelEvent {
   /**
    * Returns the document format.
    *
-   * @return The format, or null for an invalid request.
+   * @return The non-null document format.
    */
-  @Nullable
   public OssieFormat format() {
     return format;
   }
