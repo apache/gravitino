@@ -11,12 +11,22 @@ This document guides you through developing the Apache Gravitino Trino connector
 
 ## Multi-version Architecture
 
-The Gravitino Trino connector supports multiple Trino versions (see [Requirements](requirements.md)). The source code is organized into a shared base module and several version-segment modules:
+The Gravitino Trino connector supports multiple Trino versions (see [Requirements](requirements.md)). The source code is organized into shared shape source directories and several version-segment modules:
 
 ```text
 trino-connector/
-├── src/common/                   # Shared base source code
-│   └── main/java/                # Common implementation used by all versions
+├── src/
+│   ├── common/                   # Version-agnostic shared source used by all versions
+│   │   └── main/java/
+│   ├── common-469-479/           # Shared source for the pre-480 SPI shape
+│   │   └── main/java/
+│   ├── common-469-481/           # Shared source for the pre-482 SPI shape (e.g. Constraint)
+│   │   └── main/java/
+│   ├── common-480-481/           # Shared source for the 480/481 SPI shape
+│   │   └── main/java/
+│   └── common-480-483/           # Shared source for the 480+ SPI shape
+│       └── main/java/
+├── segment.gradle                # Shared build config for the version-segment modules
 ├── trino-connector-469-472/      # Version-specific adapters for Trino 469-472
 │   └── src/main/java/
 ├── trino-connector-473-477/      # Version-specific adapters for Trino 473-477
@@ -32,9 +42,9 @@ trino-connector/
 └── integration-test/             # Integration tests
 ```
 
-Each version-segment module includes the shared base source via Gradle `sourceSets` and adds version-specific adapter classes (e.g., `GravitinoConnector469.java`, `GravitinoPlugin469.java`) to handle Trino SPI differences across versions.
+Each version-segment module lists the shape source directories its Trino versions compile against in its Gradle `sourceSets`, applies the shared `../segment.gradle` build config, and adds only the classes whose SPI shape genuinely differs (e.g., `GravitinoConnector469.java`, `GravitinoPlugin469.java`) to handle Trino SPI differences across versions.
 
-When developing against a specific Trino version in the Trino project, you need to include **both** the shared base source and the matching version-segment source as source directories in the Maven `pom.xml`.
+When developing against a specific Trino version in the Trino project, you need to include **both** the shared shape source directories and the matching version-segment source as source directories in the Maven `pom.xml`.
 
 ## Prerequisites
 
@@ -222,8 +232,12 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
                         </goals>
                         <configuration>
                             <sources>
-                                <!-- Shared base source -->
+                                <!-- Shared shape sources (for Trino 469-472; other version ranges use
+                                     a different combination of src/common-* dirs — see the matching
+                                     module's `sourceSets` in build.gradle.kts) -->
                                 <source>/path/to/gravitino/trino-connector/src/common/main/java</source>
+                                <source>/path/to/gravitino/trino-connector/src/common-469-481/main/java</source>
+                                <source>/path/to/gravitino/trino-connector/src/common-469-479/main/java</source>
                                 <!-- Version-segment source (change to match your Trino version) -->
                                 <source>/path/to/gravitino/trino-connector/trino-connector-469-472/src/main/java</source>
                             </sources>
