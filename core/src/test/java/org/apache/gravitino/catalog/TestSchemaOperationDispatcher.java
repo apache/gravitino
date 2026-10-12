@@ -281,7 +281,6 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertThrows(
             UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
     Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
-    Assertions.assertTrue(exception.getMessage().contains("governance metadata"));
     Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
     Assertions.assertTrue(
         exception.getMessage().contains("external schema and all of its tables and views"));

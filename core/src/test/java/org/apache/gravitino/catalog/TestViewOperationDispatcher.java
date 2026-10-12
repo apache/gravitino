@@ -441,7 +441,6 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertThrows(
             UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
     Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
-    Assertions.assertTrue(exception.getMessage().contains("governance metadata"));
     Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
     Assertions.assertTrue(exception.getMessage().contains("external view"));
   }

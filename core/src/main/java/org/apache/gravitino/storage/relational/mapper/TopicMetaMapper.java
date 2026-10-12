@@ -23,6 +23,7 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -68,6 +69,10 @@ public interface TopicMetaMapper {
 
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "selectTopicMetaById")
   TopicPO selectTopicMetaById(@Param("topicId") Long topicId);
+
+  /** Checks whether a soft-deleted topic still owns the requested primary key. */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE topic_id = #{topicId} AND deleted_at > 0")
+  int countDeletedTopicMetasById(@Param("topicId") Long topicId);
 
   /**
    * Selects and exclusively locks an active topic metadata row.

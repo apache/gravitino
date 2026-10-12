@@ -191,8 +191,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   + " cannot be imported because its name or external identifier is already "
                   + "managed under a different Gravitino identifier. Gravitino does not "
                   + "automatically reconcile external table renames or manage the same table "
-                  + "through multiple paths because overwriting its stored identity can corrupt "
-                  + "privilege relationships. Reconcile the external metadata manually.");
+                  + "through multiple paths. Remove `gravitino.identifier` from the external table, "
+                  + "then retry so it can be imported with a new identifier.");
         }
       }
     }
@@ -560,12 +560,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // An external identifier may already be stored under another Gravitino path because the
       // table was renamed outside Gravitino or because multiple catalogs expose one metastore.
       // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
-      // stored identity: doing so can move the table and its privilege relationships between
-      // paths. The create-only write below reports the conflict for manual reconciliation.
+      // stored identity because doing so can silently move the table between paths. The create-only
+      // write below reports the conflict for manual identifier cleanup.
       LOG.warn(
           "Table uid {} exists externally but is not imported at {}. Gravitino will use a "
               + "create-only import; if this uid is already stored under another identifier, "
-              + "manual reconciliation is required.",
+              + "manual identifier cleanup is required.",
           stringId,
           identifier);
       uid = stringId.id();

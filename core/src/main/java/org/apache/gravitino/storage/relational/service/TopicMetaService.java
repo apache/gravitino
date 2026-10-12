@@ -61,6 +61,18 @@ public class TopicMetaService {
 
   private TopicMetaService() {}
 
+  /**
+   * Checks whether a topic ID is retained by a soft-deleted row.
+   *
+   * @param topicId the topic ID
+   * @return true if a soft-deleted row retains the ID, false otherwise
+   */
+  public boolean isSoftDeleted(long topicId) {
+    return SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class, mapper -> mapper.countDeletedTopicMetasById(topicId))
+        > 0;
+  }
+
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertTopic")
   public void insertTopic(TopicEntity topicEntity, boolean overwrite) throws IOException {
     try {

@@ -121,6 +121,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     ViewEntity view =
         createViewEntity(RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "view_reregister");
     backend.insert(view, false);
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "topic_reregister", AUDIT_INFO);
+    backend.insert(topic, false);
 
     backend.delete(
         NameIdentifier.of(metalakeName, catalogName),
@@ -149,6 +153,11 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     SoftDeletedEntityIdentifierException viewException =
         assertThrows(SoftDeletedEntityIdentifierException.class, () -> backend.insert(view, false));
     Assertions.assertTrue(viewException.getMessage().contains(String.valueOf(view.id())));
+
+    SoftDeletedEntityIdentifierException topicException =
+        assertThrows(
+            SoftDeletedEntityIdentifierException.class, () -> backend.insert(topic, false));
+    Assertions.assertTrue(topicException.getMessage().contains(String.valueOf(topic.id())));
   }
 
   @TestTemplate

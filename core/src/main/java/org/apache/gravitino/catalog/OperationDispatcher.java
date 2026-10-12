@@ -86,14 +86,13 @@ public abstract class OperationDispatcher {
   /**
    * Creates the user-facing error for an external identifier retained by deleted metadata.
    *
-   * <p>Restoring that metadata automatically could also restore governance data that the operator
-   * intended to retire. The error instead gives operators an explicit cleanup path that imports the
-   * external objects with new identifiers after manual reconciliation.
+   * <p>The error gives operators an explicit cleanup path that imports the external objects with
+   * new identifiers.
    *
    * @param ident the external entity identifier
    * @param entityId the stable identifier read from the external system
    * @param entityType the type of the external entity
-   * @return an exception containing manual reconciliation instructions
+   * @return an exception containing manual cleanup instructions
    */
   protected UnsupportedOperationException softDeletedExternalIdentifierException(
       NameIdentifier ident, long entityId, Entity.EntityType entityType) {
@@ -108,6 +107,9 @@ public abstract class OperationDispatcher {
       case VIEW:
         cleanupTarget = "the external view";
         break;
+      case TOPIC:
+        cleanupTarget = "the external topic";
+        break;
       default:
         cleanupTarget = "the external object";
     }
@@ -115,10 +117,10 @@ public abstract class OperationDispatcher {
     return new UnsupportedOperationException(
         String.format(
             "%s %s cannot be imported because external identifier %s is retained by a "
-                + "soft-deleted Gravitino registration that may still have governance metadata. "
+                + "soft-deleted Gravitino registration. "
                 + "Gravitino does not automatically restore or reuse deleted registrations. "
-                + "Reconcile any retained governance metadata, then remove `%s` from %s before "
-                + "retrying. The objects will be imported with new identifiers.",
+                + "Remove `%s` from %s before retrying. The objects will be imported with new "
+                + "identifiers.",
             entityType.name().toLowerCase(),
             ident,
             entityId,

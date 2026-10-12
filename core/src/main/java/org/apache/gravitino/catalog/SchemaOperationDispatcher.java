@@ -288,10 +288,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   + " cannot be imported because its name or external identifier is already "
                   + "managed under a different Gravitino identifier. Gravitino does not "
                   + "automatically reconcile external schema renames or manage the same schema "
-                  + "through multiple catalogs because overwriting its stored identity can "
-                  + "corrupt privilege relationships. Reconcile the external metadata manually, "
-                  + "or remove the affected catalogs and recreate only one catalog for this "
-                  + "schema.");
+                  + "through multiple catalogs. Remove `gravitino.identifier` from the external "
+                  + "schema and all of its tables and views, then retry so they can be imported "
+                  + "with new identifiers.");
         }
       }
     }
@@ -648,12 +647,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       // An external identifier may already be stored under another Gravitino path because the
       // schema was renamed outside Gravitino or because multiple catalogs expose one metastore.
       // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
-      // stored identity: doing so can move the schema and its privilege relationships between
-      // catalogs. The create-only write below reports the conflict for manual reconciliation.
+      // stored identity because doing so can silently move the schema between catalogs. The
+      // create-only write below reports the conflict for manual identifier cleanup.
       LOG.warn(
           "Schema uid {} exists externally but is not imported at {}. Gravitino will use a "
               + "create-only import; if this uid is already stored under another identifier, "
-              + "manual reconciliation is required.",
+              + "manual identifier cleanup is required.",
           stringId,
           identifier);
       uid = stringId.id();

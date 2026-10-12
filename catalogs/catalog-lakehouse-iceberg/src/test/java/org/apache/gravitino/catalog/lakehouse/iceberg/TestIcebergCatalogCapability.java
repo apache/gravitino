@@ -99,6 +99,27 @@ public class TestIcebergCatalogCapability {
   }
 
   @Test
+  public void testHiveBackendIsCaseInsensitive() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":", true);
+
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    Assertions.assertEquals("table", capability.normalizeName(Capability.Scope.TABLE, "Table"));
+  }
+
+  @Test
+  public void testNonHiveBackendIsCaseSensitive() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":", false);
+
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+    Assertions.assertEquals("Table", capability.normalizeName(Capability.Scope.TABLE, "Table"));
+  }
+
+  @Test
   public void testCustomSeparatorSlash() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability("/");
 

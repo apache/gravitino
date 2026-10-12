@@ -165,8 +165,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                   + " cannot be imported because its name or external identifier is already "
                   + "managed under a different Gravitino identifier. Gravitino does not "
                   + "automatically reconcile external view renames or manage the same view "
-                  + "through multiple paths because overwriting its stored identity can corrupt "
-                  + "privilege relationships. Reconcile the external metadata manually.");
+                  + "through multiple paths. Remove `gravitino.identifier` from the external view, "
+                  + "then retry so it can be imported with a new identifier.");
         }
       }
     }
@@ -560,12 +560,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       // An external identifier may already be stored under another Gravitino path because the
       // view was renamed outside Gravitino or because multiple catalogs expose one metastore.
       // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
-      // stored identity: doing so can move the view and its privilege relationships between
-      // paths. The create-only write below reports the conflict for manual reconciliation.
+      // stored identity because doing so can silently move the view between paths. The create-only
+      // write below reports the conflict for manual identifier cleanup.
       LOG.warn(
           "View uid {} exists externally but is not imported at {}. Gravitino will use a "
               + "create-only import; if this uid is already stored under another identifier, "
-              + "manual reconciliation is required.",
+              + "manual identifier cleanup is required.",
           stringId,
           ident);
       uid = stringId.id();
