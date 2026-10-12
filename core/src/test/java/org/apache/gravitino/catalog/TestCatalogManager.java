@@ -25,6 +25,7 @@ import static org.apache.gravitino.TestCatalog.PROPERTY_KEY3;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY4;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY6_PREFIX;
+import static org.apache.gravitino.TestCatalog.PROPERTY_RESERVED_KEY;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -473,6 +474,40 @@ public class TestCatalogManager {
             catalogManager.createCatalog(
                 noOptInIdent, Catalog.Type.RELATIONAL, provider, "comment", noOptInProps));
     Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(noOptInIdent));
+  }
+
+  @Test
+  public void testTestConnectionStillValidatesProperties() {
+    // Regression: the standalone testConnection path skips only the backend probe, NOT property
+    // validation. A reserved property, or a missing required property, must be rejected exactly as
+    // createCatalog would reject it (otherwise testConnection could report success for a
+    // configuration createCatalog then refuses).
+    NameIdentifier ident = NameIdentifier.of("metalake", "testconn-prop-validation");
+
+    Map<String, String> reservedProps = Maps.newHashMap();
+    reservedProps.put(PROPERTY_KEY1, "value1");
+    reservedProps.put(PROPERTY_KEY2, "value2");
+    reservedProps.put(PROPERTY_KEY5_PREFIX + "1", "value3");
+    reservedProps.put(PROPERTY_RESERVED_KEY, "value");
+    IllegalArgumentException reserved =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.testConnection(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", reservedProps));
+    Assertions.assertTrue(reserved.getMessage().contains("reserved"), reserved.getMessage());
+
+    Map<String, String> missingRequiredProps = Maps.newHashMap();
+    // key1 is required; omit it.
+    missingRequiredProps.put(PROPERTY_KEY2, "value2");
+    missingRequiredProps.put(PROPERTY_KEY5_PREFIX + "1", "value3");
+    IllegalArgumentException missing =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.testConnection(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", missingRequiredProps));
+    Assertions.assertTrue(missing.getMessage().contains("required"), missing.getMessage());
   }
 
   @Test
