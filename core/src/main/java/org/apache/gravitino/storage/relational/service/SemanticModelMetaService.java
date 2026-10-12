@@ -40,8 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
@@ -224,13 +223,9 @@ public class SemanticModelMetaService {
       String metalakeName = identifier.namespace().level(0);
       String catalogName = identifier.namespace().level(1);
       String schemaName = identifier.namespace().level(2);
-      String oldFullName =
-          EntityChangeLogNameIdentifierCodec.encode(
-              NameIdentifierUtil.ofSemanticModel(
-                  metalakeName,
-                  catalogName,
-                  schemaName,
-                  oldSemanticModelPO.getSemanticModelName()));
+      NameIdentifier oldSemanticModelIdent =
+          NameIdentifierUtil.ofSemanticModel(
+              metalakeName, catalogName, schemaName, oldSemanticModelPO.getSemanticModelName());
       boolean isRenamed =
           !Objects.equals(
               oldSemanticModelPO.getSemanticModelName(), newSemanticModelPO.getSemanticModelName());
@@ -263,14 +258,8 @@ public class SemanticModelMetaService {
                           newSemanticModelPO.getSemanticModelVersionInfoPO())),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.SEMANTIC_MODEL.name(),
-                          oldFullName,
-                          OperateType.ALTER));
+              EntityChangeLogWriter.append(
+                  oldSemanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.ALTER);
             }
           });
       return newEntity;
@@ -374,13 +363,12 @@ public class SemanticModelMetaService {
       NameIdentifier identifier, SemanticModelPO observedSemanticModelPO) {
     Long semanticModelId = observedSemanticModelPO.getSemanticModelId();
     String metalakeName = identifier.namespace().level(0);
-    String semanticModelFullName =
-        EntityChangeLogNameIdentifierCodec.encode(
-            NameIdentifierUtil.ofSemanticModel(
-                metalakeName,
-                identifier.namespace().level(1),
-                identifier.namespace().level(2),
-                observedSemanticModelPO.getSemanticModelName()));
+    NameIdentifier semanticModelIdent =
+        NameIdentifierUtil.ofSemanticModel(
+            metalakeName,
+            identifier.namespace().level(1),
+            identifier.namespace().level(2),
+            observedSemanticModelPO.getSemanticModelName());
     // TODO: Soft-delete Semantic Model owner, tag, and securable-object relations in this
     // transaction and in the metalake/catalog/schema cascade delete paths.
     SessionUtils.doMultipleWithCommit(
@@ -398,14 +386,8 @@ public class SemanticModelMetaService {
                 SemanticModelVersionInfoMapper.class,
                 mapper -> mapper.softDeleteSemanticModelVersionsBySemanticModelId(semanticModelId)),
         () ->
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.SEMANTIC_MODEL.name(),
-                        semanticModelFullName,
-                        OperateType.DROP)));
+            EntityChangeLogWriter.append(
+                semanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.DROP));
   }
 
   private SemanticModelPO updateSemanticModelPO(
