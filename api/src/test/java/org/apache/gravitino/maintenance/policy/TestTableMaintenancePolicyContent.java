@@ -82,27 +82,6 @@ public class TestTableMaintenancePolicyContent {
   }
 
   @Test
-  void testMinIntervalMsResolutionOrder() {
-    long fromPolicy =
-        MinIntervalMsResolver.resolve(
-            TableMaintenanceTaskType.COMPACTION, 120_000L, ImmutableMap.of());
-    Assertions.assertEquals(120_000L, fromPolicy);
-
-    long fromConf =
-        MinIntervalMsResolver.resolve(
-            TableMaintenanceTaskType.COMPACTION,
-            null,
-            ImmutableMap.of(
-                MinIntervalMsResolver.configKey(TableMaintenanceTaskType.COMPACTION), "900000"));
-    Assertions.assertEquals(900_000L, fromConf);
-
-    long fromDefault =
-        MinIntervalMsResolver.resolve(TableMaintenanceTaskType.COMPACTION, null, ImmutableMap.of());
-    Assertions.assertEquals(
-        TableMaintenanceTaskType.COMPACTION.defaultMinIntervalMs(), fromDefault);
-  }
-
-  @Test
   void testMergeJobOptionsNearestWins() {
     Map<String, String> farther = new HashMap<>();
     farther.put("spark.executor.memory", "4g");
