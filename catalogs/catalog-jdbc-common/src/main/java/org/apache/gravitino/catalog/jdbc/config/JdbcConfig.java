@@ -114,6 +114,24 @@ public class JdbcConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30000L);
 
+  /**
+   * The canonical connect/socket timeout for a single JDBC connection, in milliseconds. This bounds
+   * how long a connection attempt (and a subsequent socket read) may block against an unreachable
+   * or unresponsive backend, so that create-time verification fails fast instead of hanging. It is
+   * translated to each driver family's own connection parameters (and unit) by {@link
+   * org.apache.gravitino.catalog.jdbc.utils.JdbcConnectionTimeouts}; an operator value set directly
+   * on the connection or in the {@code jdbc-url} is never overridden.
+   */
+  public static final ConfigEntry<Long> CONNECT_TIMEOUT_MS =
+      new ConfigBuilder("jdbc.pool.connect-timeout-ms")
+          .doc(
+              "The connect/socket timeout for a single JDBC connection, in milliseconds, "
+                  + "translated per driver so an unreachable backend fails fast")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(30000L);
+
   public String getJdbcUrl() {
     return get(JDBC_URL);
   }
@@ -157,6 +175,15 @@ public class JdbcConfig extends Config {
 
   public long getMaxWaitMs() {
     return get(POOL_MAX_WAIT_MS);
+  }
+
+  /**
+   * Returns the canonical connect/socket timeout for a single JDBC connection, in milliseconds.
+   *
+   * @return the connect/socket timeout in milliseconds
+   */
+  public long getConnectTimeoutMs() {
+    return get(CONNECT_TIMEOUT_MS);
   }
 
   public JdbcConfig(Map<String, String> properties) {

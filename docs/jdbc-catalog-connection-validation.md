@@ -55,3 +55,35 @@ a connection when initializing its connection factory.
 For MySQL drivers affected by the catalog-switching problem, explicitly setting `SELECT 1` restores
 the cached-statement validation path and can reproduce connection churn. Leave the query unset when
 the driver supports `Connection.isValid()`.
+
+## Backend verification at create time
+
+A relational JDBC catalog verifies that its backend is reachable when the catalog is created,
+rather than deferring the first connection to a later operation. The verification performs a single
+`listDatabases` round trip. If it fails, the create is rejected and rolled back (the catalog entity
+is not persisted), and the caller receives a connection error that names the backend `host:port`
+and the underlying driver message.
+
+To register a catalog whose backend is temporarily unavailable, set the hidden catalog property
+`gravitino.catalog.verify-on-create` to `false`, which skips the create-time check:
+
+```json
+{
+  "gravitino.catalog.verify-on-create": "false"
+}
+```
+
+The default is `true` (verify on create). The connection is still opened lazily on first use when
+the check is skipped.
+
+### Bounded connect timeout
+
+So that create-time verification fails fast against an unreachable host instead of hanging, a
+single JDBC connection is bounded by `jdbc.pool.connect-timeout-ms` (default `30000` ms). Gravitino
+translates this canonical millisecond value into each driver family's own connection parameters and
+unit: MySQL Connector/J (also Doris and StarRocks) uses `connectTimeout`/`socketTimeout` in
+milliseconds, and PostgreSQL uses them in seconds (rounded up, minimum 1). A value you set directly
+on the connection or in the `jdbc-url` query string is never overridden; drivers whose family is not
+recognized are left unbounded by Gravitino. The timeout is applied as a per-connection bound, so the
+pool stays lazy and no connection is opened until the first real round trip (create-time
+verification).

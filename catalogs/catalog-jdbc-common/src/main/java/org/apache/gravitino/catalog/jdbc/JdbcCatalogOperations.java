@@ -248,10 +248,52 @@ public class JdbcCatalogOperations
     } catch (GravitinoRuntimeException e) {
       if (e.getClass() == GravitinoRuntimeException.class && e.getCause() instanceof SQLException) {
         throw new ConnectionFailedException(
-            e.getCause(), "Failed to connect to JDBC catalog: %s", e.getMessage());
+            e.getCause(),
+            "Failed to connect to JDBC catalog at %s: %s",
+            hostPortFromJdbcUrl(jdbcUrl),
+            e.getMessage());
       }
       throw e;
     }
+  }
+
+  /**
+   * Extracts {@code host:port} from a {@code jdbc:subprotocol://host:port/...} URL for use in a
+   * connection-failure message. Returns the raw URL when the host/port cannot be located and {@code
+   * "unknown"} when the URL is blank. Never throws, so message formatting cannot mask the original
+   * connection failure.
+   *
+   * @param url the JDBC URL stored for this catalog
+   * @return a {@code host:port} description, the raw URL, or {@code "unknown"}
+   */
+  private static String hostPortFromJdbcUrl(String url) {
+    if (StringUtils.isBlank(url)) {
+      return "unknown";
+    }
+    int schemeEnd = url.indexOf("://");
+    if (schemeEnd < 0) {
+      return url;
+    }
+    int authorityStart = schemeEnd + "://".length();
+    // The authority ends at the first '/', '?', or ';' following it.
+    int authorityEnd = url.length();
+    for (int i = authorityStart; i < url.length(); i++) {
+      char c = url.charAt(i);
+      if (c == '/' || c == '?' || c == ';') {
+        authorityEnd = i;
+        break;
+      }
+    }
+    String authority = url.substring(authorityStart, authorityEnd);
+    if (StringUtils.isBlank(authority)) {
+      return url;
+    }
+    // Strip any user-info ("user@host:port"); keep only the host:port part.
+    int at = authority.lastIndexOf('@');
+    if (at >= 0) {
+      authority = authority.substring(at + 1);
+    }
+    return StringUtils.isBlank(authority) ? url : authority;
   }
 
   /**

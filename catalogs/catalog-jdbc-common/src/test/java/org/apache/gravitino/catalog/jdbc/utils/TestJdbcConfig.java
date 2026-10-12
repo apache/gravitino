@@ -46,4 +46,14 @@ public class TestJdbcConfig {
     jdbcConfig = new JdbcConfig(immutableMap);
     Assertions.assertEquals(60000L, jdbcConfig.getMaxWaitMs());
   }
+
+  @Test
+  void testConnectTimeoutMs() {
+    JdbcConfig jdbcConfig = new JdbcConfig(Maps.newHashMap());
+    Assertions.assertEquals(30000L, jdbcConfig.getConnectTimeoutMs());
+
+    ImmutableMap immutableMap = ImmutableMap.of("jdbc.pool.connect-timeout-ms", "5000");
+    jdbcConfig = new JdbcConfig(immutableMap);
+    Assertions.assertEquals(5000L, jdbcConfig.getConnectTimeoutMs());
+  }
 }

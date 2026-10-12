@@ -1826,11 +1826,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             catalog.properties();
             catalog.capability();
 
-            // Eagerly initialize opted-in catalogs so a misconfiguration fails at create rather
-            // than on first use. The backend translates failures into the caller-error vs
+            // Validate opted-in catalogs so a misconfiguration fails at create rather than on
+            // first use. The default validation eagerly initializes ops(); JDBC overrides it to
+            // run a real backend probe. The backend translates failures into the caller-error vs
             // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
             if (propsToValidate != null && catalog.shouldValidateOnCreate()) {
-              catalog.ops();
+              catalog.validateOnCreate();
             }
             return null;
           },
