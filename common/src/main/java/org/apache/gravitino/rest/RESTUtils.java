@@ -44,6 +44,8 @@ public class RESTUtils {
   private static final Joiner.MapJoiner FORM_JOINER = Joiner.on("&").withKeyValueSeparator("=");
   private static final Splitter.MapSplitter FORM_SPLITTER =
       Splitter.on("&").withKeyValueSeparator("=");
+  private static final String FORM_ENCODED_SPACE = "+";
+  private static final String PERCENT_ENCODED_SPACE = "%20";
 
   private RESTUtils() {}
 
@@ -93,7 +95,8 @@ public class RESTUtils {
   }
 
   /**
-   * URL encode a string.
+   * URL encode a string. Spaces are encoded as {@code %20}, so the result is valid both as a path
+   * segment and as a query or form value.
    *
    * @param toEncode The string to encode.
    * @return The URL encoded string.
@@ -103,7 +106,10 @@ public class RESTUtils {
   public static String encodeString(String toEncode) {
     Preconditions.checkArgument(toEncode != null, "Invalid string to encode: null");
     try {
-      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
+      // URLEncoder follows the form encoding and turns a space into '+', which is a literal '+'
+      // in a path segment. A literal '+' in the input is already encoded as %2B at this point.
+      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name())
+          .replace(FORM_ENCODED_SPACE, PERCENT_ENCODED_SPACE);
     } catch (UnsupportedEncodingException e) {
       throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
     }

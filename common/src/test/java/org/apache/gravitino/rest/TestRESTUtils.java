@@ -67,8 +67,9 @@ class TestRESTUtils {
   void testEncodeString() {
     assertEquals("test", RESTUtils.encodeString("test"));
     assertEquals("", RESTUtils.encodeString(""));
-    /* not %20 as you might expect */
-    assertEquals("hello+world", RESTUtils.encodeString("hello world"));
+    assertEquals("hello%20world", RESTUtils.encodeString("hello world"));
+    assertEquals("a%2Bb", RESTUtils.encodeString("a+b"));
+    assertEquals("a+b c", RESTUtils.decodeString(RESTUtils.encodeString("a+b c")));
     assertThrows(IllegalArgumentException.class, () -> RESTUtils.encodeString(null));
   }
 
