@@ -25,8 +25,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Represents an event that is triggered upon a successful catalog connection test.
  *
- * <p>This event intentionally carries only the catalog identifier so connection properties and
- * credentials are never exposed to listeners.
+ * <p>Connection properties and proposed changes are intentionally omitted because they may contain
+ * credentials.
  */
 @DeveloperApi
 public final class TestConnectionEvent extends CatalogEvent {

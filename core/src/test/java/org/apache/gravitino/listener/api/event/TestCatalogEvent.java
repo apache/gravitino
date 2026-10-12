@@ -40,6 +40,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -60,6 +61,11 @@ public class TestCatalogEvent {
     this.dispatcher = new CatalogEventDispatcher(eventBus, catalogDispatcher);
     CatalogDispatcher catalogExceptionDispatcher = mockExceptionCatalogDispatcher();
     this.failureDispatcher = new CatalogEventDispatcher(eventBus, catalogExceptionDispatcher);
+  }
+
+  @BeforeEach
+  void clearEvents() {
+    dummyEventListener.clear();
   }
 
   @Test
@@ -357,60 +363,6 @@ public class TestCatalogEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
-  private void checkCatalogInfo(CatalogInfo catalogInfo, Catalog catalog) {
-    Assertions.assertEquals(catalog.name(), catalogInfo.name());
-    Assertions.assertEquals(catalog.type(), catalogInfo.type());
-    Assertions.assertEquals(catalog.provider(), catalogInfo.provider());
-    Assertions.assertEquals(catalog.properties(), catalogInfo.properties());
-    Assertions.assertEquals(catalog.comment(), catalogInfo.comment());
-  }
-
-  private Catalog mockCatalog() {
-    Catalog catalog = mock(Catalog.class);
-    when(catalog.comment()).thenReturn("comment");
-    when(catalog.properties()).thenReturn(ImmutableMap.of("a", "b"));
-    when(catalog.name()).thenReturn("catalog");
-    when(catalog.provider()).thenReturn("hive");
-    when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
-    when(catalog.auditInfo()).thenReturn(null);
-    return catalog;
-  }
-
-  private CatalogDispatcher mockCatalogDispatcher() {
-    CatalogDispatcher dispatcher = mock(CatalogDispatcher.class);
-    when(dispatcher.createCatalog(
-            any(NameIdentifier.class),
-            any(Catalog.Type.class),
-            any(String.class),
-            any(String.class),
-            nullable(Map.class),
-            nullable(Map.class),
-            nullable(Map.class)))
-        .thenReturn(catalog);
-    when(dispatcher.loadCatalog(any(NameIdentifier.class))).thenReturn(catalog);
-    when(dispatcher.dropCatalog(any(NameIdentifier.class), anyBoolean())).thenReturn(true);
-    when(dispatcher.listCatalogs(any(Namespace.class)))
-        .thenReturn(
-            new NameIdentifier[] {
-              NameIdentifier.of("metalake", "catalog1"), NameIdentifier.of("metalake", "catalog2")
-            });
-    when(dispatcher.listCatalogsInfo(any(Namespace.class)))
-        .thenReturn(new Catalog[] {catalog, catalog, catalog});
-    when(dispatcher.alterCatalog(any(NameIdentifier.class), any(CatalogChange.class)))
-        .thenReturn(catalog);
-    return dispatcher;
-  }
-
-  private CatalogDispatcher mockExceptionCatalogDispatcher() {
-    CatalogDispatcher dispatcher =
-        mock(
-            CatalogDispatcher.class,
-            invocation -> {
-              throw new GravitinoRuntimeException("Exception for all methods");
-            });
-    return dispatcher;
-  }
-
   @Test
   void testTestConnectionEvent() throws Exception {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
@@ -475,5 +427,59 @@ public class TestCatalogEvent {
     Assertions.assertEquals(TestConnectionFailureEvent.class, event.getClass());
     Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  private void checkCatalogInfo(CatalogInfo catalogInfo, Catalog catalog) {
+    Assertions.assertEquals(catalog.name(), catalogInfo.name());
+    Assertions.assertEquals(catalog.type(), catalogInfo.type());
+    Assertions.assertEquals(catalog.provider(), catalogInfo.provider());
+    Assertions.assertEquals(catalog.properties(), catalogInfo.properties());
+    Assertions.assertEquals(catalog.comment(), catalogInfo.comment());
+  }
+
+  private Catalog mockCatalog() {
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.comment()).thenReturn("comment");
+    when(catalog.properties()).thenReturn(ImmutableMap.of("a", "b"));
+    when(catalog.name()).thenReturn("catalog");
+    when(catalog.provider()).thenReturn("hive");
+    when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(catalog.auditInfo()).thenReturn(null);
+    return catalog;
+  }
+
+  private CatalogDispatcher mockCatalogDispatcher() {
+    CatalogDispatcher dispatcher = mock(CatalogDispatcher.class);
+    when(dispatcher.createCatalog(
+            any(NameIdentifier.class),
+            any(Catalog.Type.class),
+            any(String.class),
+            any(String.class),
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class)))
+        .thenReturn(catalog);
+    when(dispatcher.loadCatalog(any(NameIdentifier.class))).thenReturn(catalog);
+    when(dispatcher.dropCatalog(any(NameIdentifier.class), anyBoolean())).thenReturn(true);
+    when(dispatcher.listCatalogs(any(Namespace.class)))
+        .thenReturn(
+            new NameIdentifier[] {
+              NameIdentifier.of("metalake", "catalog1"), NameIdentifier.of("metalake", "catalog2")
+            });
+    when(dispatcher.listCatalogsInfo(any(Namespace.class)))
+        .thenReturn(new Catalog[] {catalog, catalog, catalog});
+    when(dispatcher.alterCatalog(any(NameIdentifier.class), any(CatalogChange.class)))
+        .thenReturn(catalog);
+    return dispatcher;
+  }
+
+  private CatalogDispatcher mockExceptionCatalogDispatcher() {
+    CatalogDispatcher dispatcher =
+        mock(
+            CatalogDispatcher.class,
+            invocation -> {
+              throw new GravitinoRuntimeException("Exception for all methods");
+            });
+    return dispatcher;
   }
 }

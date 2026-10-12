@@ -25,8 +25,10 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Represents an event that is triggered when a catalog connection test fails.
  *
- * <p>This event intentionally carries only the catalog identifier and the failure exception so
- * connection properties and credentials are never exposed to listeners.
+ * <p>Connection properties and proposed changes are not included. The failure exception is replaced
+ * with a summary containing only its class name, since its message, cause, suppressed exceptions,
+ * stack trace, or custom fields may contain credentials. The original exception is still propagated
+ * to the caller by the dispatcher.
  */
 @DeveloperApi
 public final class TestConnectionFailureEvent extends CatalogFailureEvent {
@@ -35,10 +37,14 @@ public final class TestConnectionFailureEvent extends CatalogFailureEvent {
    *
    * @param user The username of the individual who initiated the connection test.
    * @param identifier The identifier of the catalog whose connection test failed.
-   * @param exception The exception that was encountered during the connection test.
+   * @param exception The exception encountered during the connection test. Only its class name is
+   *     retained in the event's failure summary.
    */
   public TestConnectionFailureEvent(String user, NameIdentifier identifier, Exception exception) {
-    super(user, identifier, exception);
+    super(
+        user,
+        identifier,
+        new Exception("Catalog connection test failed: " + exception.getClass().getName()));
   }
 
   @Override
