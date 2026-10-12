@@ -16,15 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.service;
+package org.apache.gravitino.tms.storage.service;
+
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tms.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.tms.storage.po.TableSnapshotMetricsPO;
 
 /** DAO service for {@code table_snapshot_metrics}. */
 public class TableSnapshotMetricsMetaService {
+
+  private static final TableSnapshotMetricsMetaService INSTANCE =
+      new TableSnapshotMetricsMetaService();
+
+  private TableSnapshotMetricsMetaService() {}
+
+  /**
+   * @return singleton service instance
+   */
+  public static TableSnapshotMetricsMetaService getInstance() {
+    return INSTANCE;
+  }
 
   /**
    * Inserts metrics JSON for a table/policy/snapshot triple. Does not update an existing row.
@@ -34,8 +49,11 @@ public class TableSnapshotMetricsMetaService {
    * @param snapshotId Iceberg snapshot id
    * @param metricsJson serialized metrics payload
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertTableSnapshotMetrics")
   public void insertMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
-    TableSnapshotMetricsPO po =
+    TableSnapshotMetricsPO metricsMeta =
         TableSnapshotMetricsPO.builder()
             .withTableId(tableId)
             .withPolicyId(policyId)
@@ -43,7 +61,8 @@ public class TableSnapshotMetricsMetaService {
             .withMetricsValue(metricsJson)
             .withCreatedAt(System.currentTimeMillis())
             .build();
-    SessionUtils.doWithCommit(TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(po));
+    SessionUtils.doWithCommit(
+        TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(metricsMeta));
   }
 
   /**
@@ -53,6 +72,9 @@ public class TableSnapshotMetricsMetaService {
    * @return stored metrics or null
    */
   @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableSnapshotMetrics")
   public TableSnapshotMetricsPO getMetrics(long tableId, long policyId, long snapshotId) {
     return SessionUtils.getWithoutCommit(
         TableSnapshotMetricsMapper.class,

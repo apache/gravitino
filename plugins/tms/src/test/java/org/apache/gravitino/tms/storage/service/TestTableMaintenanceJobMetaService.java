@@ -17,26 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.storage.service;
+package org.apache.gravitino.tms.storage.service;
 
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestTableMaintenanceJobMetaService extends TestJDBCBackend {
 
-  private TableMaintenanceJobMetaService jobService;
-  private TableSnapshotMetricsMetaService metricsService;
-
-  @BeforeEach
-  void setUpService() {
-    jobService = new TableMaintenanceJobMetaService();
-    metricsService = new TableSnapshotMetricsMetaService();
-  }
-
   @TestTemplate
   void testInsertSampleFinishAndDeleteByJobId() {
+    TableMaintenanceJobMetaService jobService = TableMaintenanceJobMetaService.getInstance();
+    TableSnapshotMetricsMetaService metricsService = TableSnapshotMetricsMetaService.getInstance();
+
     long jobId = 999L;
     jobService.insertJob(jobId, 10L, 20L);
     jobService.recordBeforeSnapshot(jobId, 100L);

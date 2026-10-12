@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.mapper.provider.base;
+package org.apache.gravitino.tms.storage.mapper.provider.base;
 
-import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper.TABLE_NAME;
+import static org.apache.gravitino.tms.storage.mapper.TableMaintenanceJobMapper.TABLE_NAME;
 
-import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import org.apache.gravitino.tms.storage.po.TableMaintenanceJobPO;
 import org.apache.ibatis.annotations.Param;
 
 /** Portable SQL for {@code table_maintenance_job}. */
@@ -30,14 +30,14 @@ public class TableMaintenanceJobBaseSQLProvider {
    * Inserts a run row with {@code job_id}, {@code table_id}, and {@code policy_id} only. Snapshot
    * columns stay null until the Spark Job / terminal listener updates them (§5.2).
    *
-   * @param po row to insert
+   * @param jobMeta row to insert
    * @return INSERT statement
    */
-  public String insertJob(@Param("po") TableMaintenanceJobPO po) {
+  public String insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta) {
     return "INSERT INTO "
         + TABLE_NAME
         + " (job_id, table_id, policy_id)"
-        + " VALUES (#{po.jobId}, #{po.tableId}, #{po.policyId})";
+        + " VALUES (#{jobMeta.jobId}, #{jobMeta.tableId}, #{jobMeta.policyId})";
   }
 
   /**

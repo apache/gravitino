@@ -16,19 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.mapper.provider;
+package org.apache.gravitino.tms.storage.mapper.provider.postgresql;
 
-import com.google.common.collect.ImmutableList;
-import java.util.List;
-import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
-import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
+import org.apache.gravitino.tms.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
 
-/** Supplies TMS mapper classes from the {@code tms} plugin. */
-public class TmsMapperPackageProvider implements MapperPackageProvider {
-
-  @Override
-  public List<Class<?>> getMapperClasses() {
-    return ImmutableList.of(TableMaintenanceJobMapper.class, TableSnapshotMetricsMapper.class);
-  }
-}
+/** PostgreSQL SQL provider for {@code table_maintenance_job}. */
+public class TableMaintenanceJobPostgreSQLProvider extends TableMaintenanceJobBaseSQLProvider {}

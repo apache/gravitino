@@ -17,24 +17,17 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.storage.service;
+package org.apache.gravitino.tms.storage.service;
 
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestTableSnapshotMetricsMetaService extends TestJDBCBackend {
 
-  private TableSnapshotMetricsMetaService service;
-
-  @BeforeEach
-  void setUpService() {
-    service = new TableSnapshotMetricsMetaService();
-  }
-
   @TestTemplate
   void testInsertAndGetMetrics() {
+    TableSnapshotMetricsMetaService service = TableSnapshotMetricsMetaService.getInstance();
     long before = System.currentTimeMillis();
     service.insertMetrics(1L, 2L, 99L, "{\"mse\":1}");
     long after = System.currentTimeMillis();

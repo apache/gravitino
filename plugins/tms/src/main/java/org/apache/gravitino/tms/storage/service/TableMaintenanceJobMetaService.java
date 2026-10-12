@@ -16,15 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.service;
+package org.apache.gravitino.tms.storage.service;
 
-import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
-import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tms.storage.mapper.TableMaintenanceJobMapper;
+import org.apache.gravitino.tms.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.tms.storage.po.TableMaintenanceJobPO;
 
 /** DAO service for {@code table_maintenance_job}. */
 public class TableMaintenanceJobMetaService {
+
+  private static final TableMaintenanceJobMetaService INSTANCE =
+      new TableMaintenanceJobMetaService();
+
+  private TableMaintenanceJobMetaService() {}
+
+  /**
+   * @return singleton service instance
+   */
+  public static TableMaintenanceJobMetaService getInstance() {
+    return INSTANCE;
+  }
 
   /**
    * Inserts a maintenance job row with {@code job_id}, {@code table_id}, and {@code policy_id}
@@ -34,14 +49,17 @@ public class TableMaintenanceJobMetaService {
    * @param tableId table entity id
    * @param policyId policy entity id
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertTableMaintenanceJob")
   public void insertJob(long jobId, long tableId, long policyId) {
-    TableMaintenanceJobPO po =
+    TableMaintenanceJobPO jobMeta =
         TableMaintenanceJobPO.builder()
             .withJobId(jobId)
             .withTableId(tableId)
             .withPolicyId(policyId)
             .build();
-    SessionUtils.doWithCommit(TableMaintenanceJobMapper.class, mapper -> mapper.insertJob(po));
+    SessionUtils.doWithCommit(TableMaintenanceJobMapper.class, mapper -> mapper.insertJob(jobMeta));
   }
 
   /**
@@ -50,6 +68,9 @@ public class TableMaintenanceJobMetaService {
    * @param jobId Gravitino job run id
    * @param beforeSnapshotId sampled snapshot id
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "recordTableMaintenanceJobBeforeSnapshot")
   public void recordBeforeSnapshot(long jobId, long beforeSnapshotId) {
     SessionUtils.doWithCommit(
         TableMaintenanceJobMapper.class,
@@ -63,6 +84,9 @@ public class TableMaintenanceJobMetaService {
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish timestamp millis
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "markTableMaintenanceJobFinished")
   public void markFinished(long jobId, Long afterSnapshotId, long finishedAt) {
     SessionUtils.doWithCommit(
         TableMaintenanceJobMapper.class,
@@ -75,6 +99,9 @@ public class TableMaintenanceJobMetaService {
    *
    * @param jobId Gravitino job run id
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTableMaintenanceJobByJobId")
   public void deleteByJobId(long jobId) {
     SessionUtils.doMultipleWithCommit(
         () ->

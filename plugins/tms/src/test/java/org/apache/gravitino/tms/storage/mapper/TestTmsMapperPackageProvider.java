@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.storage.mapper;
+package org.apache.gravitino.tms.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.ServiceLoader;
-import org.apache.gravitino.maintenance.storage.mapper.provider.TmsMapperPackageProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
+import org.apache.gravitino.tms.storage.mapper.provider.TmsMapperPackageProvider;
 import org.junit.jupiter.api.Test;
 
 class TestTmsMapperPackageProvider {

@@ -16,31 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.po;
+package org.apache.gravitino.tms.storage.mapper.provider.h2;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.Accessors;
+import org.apache.gravitino.tms.storage.mapper.provider.base.TableSnapshotMetricsBaseSQLProvider;
 
-/** Persistence object for {@code table_snapshot_metrics}. */
-@Getter
-@Accessors(fluent = true)
-@EqualsAndHashCode
-@ToString
-@Builder(setterPrefix = "with")
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class TableSnapshotMetricsPO {
-
-  private Long id;
-  private Long tableId;
-  private Long policyId;
-  private Long snapshotId;
-  private String metricsValue;
-  private Long createdAt;
-}
+/** H2 SQL provider for {@code table_snapshot_metrics}. */
+public class TableSnapshotMetricsH2Provider extends TableSnapshotMetricsBaseSQLProvider {}

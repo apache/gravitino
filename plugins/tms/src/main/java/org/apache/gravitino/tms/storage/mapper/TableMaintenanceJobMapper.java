@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.mapper;
+package org.apache.gravitino.tms.storage.mapper;
 
-import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import org.apache.gravitino.tms.storage.po.TableMaintenanceJobPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Options;
@@ -31,8 +31,8 @@ public interface TableMaintenanceJobMapper {
   String TABLE_NAME = "table_maintenance_job";
 
   @InsertProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "insertJob")
-  @Options(useGeneratedKeys = true, keyProperty = "po.id", keyColumn = "id")
-  void insertJob(@Param("po") TableMaintenanceJobPO po);
+  @Options(useGeneratedKeys = true, keyProperty = "jobMeta.id", keyColumn = "id")
+  void insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta);
 
   @UpdateProvider(
       type = TableMaintenanceJobSQLProviderFactory.class,

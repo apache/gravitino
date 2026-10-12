@@ -695,7 +695,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after job; null while pending',
     `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'end time; null = in-flight',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_job_id` (`job_id`),
+    UNIQUE KEY `uk_tmj_job_id` (`job_id`),
     KEY `idx_tmj_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
     KEY `idx_tmj_before_sid` (`table_id`, `before_snapshot_id`),
     KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`)

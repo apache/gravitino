@@ -1192,6 +1192,18 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
 );
 CREATE INDEX IF NOT EXISTS scheduled_tasks_execution_time_idx ON scheduled_tasks (execution_time);
 CREATE INDEX IF NOT EXISTS scheduled_tasks_last_heartbeat_idx ON scheduled_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_tasks IS 'db-scheduler task queue for table maintenance';
+COMMENT ON COLUMN scheduled_tasks.task_name IS 'db-scheduler task name';
+COMMENT ON COLUMN scheduled_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON COLUMN scheduled_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_tasks.last_failure IS 'last failed execution time';
 
 CREATE TABLE IF NOT EXISTS table_maintenance_job (
     id BIGSERIAL PRIMARY KEY,
@@ -1204,6 +1216,16 @@ CREATE TABLE IF NOT EXISTS table_maintenance_job (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tmj_job_id ON table_maintenance_job (job_id);
 CREATE INDEX IF NOT EXISTS idx_tmj_table_policy_finished ON table_maintenance_job (table_id, policy_id, finished_at);
+CREATE INDEX IF NOT EXISTS idx_tmj_before_sid ON table_maintenance_job (table_id, before_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tmj_after_sid ON table_maintenance_job (table_id, after_snapshot_id);
+COMMENT ON TABLE table_maintenance_job IS 'per-run TMS job: snapshot pointers + submit gates';
+COMMENT ON COLUMN table_maintenance_job.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_job.job_id IS 'job id; set at runJob; maps to job_run_meta.job_run_id';
+COMMENT ON COLUMN table_maintenance_job.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_maintenance_job.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_maintenance_job.before_snapshot_id IS 'Iceberg snapshot id at sample; null until sampled';
+COMMENT ON COLUMN table_maintenance_job.after_snapshot_id IS 'Iceberg snapshot id after job; null while pending';
+COMMENT ON COLUMN table_maintenance_job.finished_at IS 'end time; null = in-flight';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
     id BIGSERIAL PRIMARY KEY,
@@ -1215,3 +1237,10 @@ CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
+COMMENT ON TABLE table_snapshot_metrics IS 'per-policy table metrics by Iceberg snapshot_id';
+COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'JSON metrics for this snapshot';
+COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'sample write time in epoch millis';

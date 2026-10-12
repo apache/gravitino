@@ -682,43 +682,45 @@ CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);
 
 CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
-    `task_name` VARCHAR(100) NOT NULL,
-    `task_instance` VARCHAR(100) NOT NULL,
-    `task_data` BLOB,
-    `execution_time` TIMESTAMP(6) NOT NULL,
-    `picked` BOOLEAN NOT NULL,
-    `picked_by` VARCHAR(50),
-    `last_heartbeat` TIMESTAMP(6),
-    `version` BIGINT NOT NULL,
-    `consecutive_failures` INT,
-    `last_success` TIMESTAMP(6),
-    `last_failure` TIMESTAMP(6),
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task instance',
+    `task_data` BLOB COMMENT 'serialized task data',
+    `execution_time` TIMESTAMP(6) NOT NULL COMMENT 'next execution time',
+    `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
+    `picked_by` VARCHAR(50) COMMENT 'scheduler instance that picked the task',
+    `last_heartbeat` TIMESTAMP(6) COMMENT 'last heartbeat from the picker',
+    `version` BIGINT NOT NULL COMMENT 'optimistic lock version',
+    `consecutive_failures` INT COMMENT 'consecutive failure count',
+    `last_success` TIMESTAMP(6) COMMENT 'last successful execution time',
+    `last_failure` TIMESTAMP(6) COMMENT 'last failed execution time',
     PRIMARY KEY (`task_name`, `task_instance`)
-);
+) COMMENT='db-scheduler task queue for table maintenance';
 CREATE INDEX IF NOT EXISTS `scheduled_tasks_execution_time_idx` ON `scheduled_tasks`(`execution_time`);
 CREATE INDEX IF NOT EXISTS `scheduled_tasks_last_heartbeat_idx` ON `scheduled_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL,
-    `job_id` BIGINT,
-    `table_id` BIGINT NOT NULL,
-    `policy_id` BIGINT NOT NULL,
-    `before_snapshot_id` BIGINT,
-    `after_snapshot_id` BIGINT,
-    `finished_at` BIGINT,
+    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `job_id` BIGINT COMMENT 'job id; set at runJob; maps to job_run_meta.job_run_id',
+    `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
+    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id at sample; null until sampled',
+    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after job; null while pending',
+    `finished_at` BIGINT COMMENT 'end time; null = in-flight',
     PRIMARY KEY (`id`)
-);
+) COMMENT='per-run TMS job: snapshot pointers + submit gates';
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tmj_job_id` ON `table_maintenance_job`(`job_id`);
 CREATE INDEX IF NOT EXISTS `idx_tmj_table_policy_finished` ON `table_maintenance_job`(`table_id`, `policy_id`, `finished_at`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_before_sid` ON `table_maintenance_job`(`table_id`, `before_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_after_sid` ON `table_maintenance_job`(`table_id`, `after_snapshot_id`);
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL,
-    `table_id` BIGINT NOT NULL,
-    `policy_id` BIGINT NOT NULL,
-    `snapshot_id` BIGINT NOT NULL,
-    `metrics_value` CLOB NOT NULL,
-    `created_at` BIGINT NOT NULL,
+    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
+    `snapshot_id` BIGINT NOT NULL COMMENT 'Iceberg snapshot id',
+    `metrics_value` CLOB NOT NULL COMMENT 'JSON metrics for this snapshot',
+    `created_at` BIGINT NOT NULL COMMENT 'sample write time in epoch millis',
     PRIMARY KEY (`id`)
-);
+) COMMENT='per-policy table metrics by Iceberg snapshot_id';
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);

@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.mapper;
+package org.apache.gravitino.tms.storage.mapper;
 
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
+import org.apache.gravitino.tms.storage.po.TableSnapshotMetricsPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -31,7 +31,7 @@ public interface TableSnapshotMetricsMapper {
   String TABLE_NAME = "table_snapshot_metrics";
 
   @InsertProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "insertMetrics")
-  void insertMetrics(@Param("po") TableSnapshotMetricsPO po);
+  void insertMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta);
 
   @Nullable
   @SelectProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "selectMetrics")

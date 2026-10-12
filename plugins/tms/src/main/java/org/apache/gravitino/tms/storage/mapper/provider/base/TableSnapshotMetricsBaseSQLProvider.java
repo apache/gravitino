@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.mapper.provider.base;
+package org.apache.gravitino.tms.storage.mapper.provider.base;
 
-import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
-import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
+import org.apache.gravitino.tms.storage.mapper.TableMaintenanceJobMapper;
+import org.apache.gravitino.tms.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.tms.storage.po.TableSnapshotMetricsPO;
 import org.apache.ibatis.annotations.Param;
 
 /** Portable SQL for {@code table_snapshot_metrics}. */
 public class TableSnapshotMetricsBaseSQLProvider {
 
   /**
-   * @param po metrics row
+   * @param metricsMeta metrics row
    * @return INSERT statement
    */
-  public String insertMetrics(@Param("po") TableSnapshotMetricsPO po) {
+  public String insertMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta) {
     return "INSERT INTO "
         + TableSnapshotMetricsMapper.TABLE_NAME
         + " (table_id, policy_id, snapshot_id, metrics_value, created_at)"
-        + " VALUES (#{po.tableId}, #{po.policyId}, #{po.snapshotId}, #{po.metricsValue},"
-        + " #{po.createdAt})";
+        + " VALUES (#{metricsMeta.tableId}, #{metricsMeta.policyId}, #{metricsMeta.snapshotId},"
+        + " #{metricsMeta.metricsValue}, #{metricsMeta.createdAt})";
   }
 
   /**
