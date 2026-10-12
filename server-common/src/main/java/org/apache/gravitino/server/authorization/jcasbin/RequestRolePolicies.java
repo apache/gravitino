@@ -18,22 +18,28 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 
-/** Immutable effective policy indexes pinned for one request, including inactive-role denies. */
+/** Immutable role indexes pinned for one request, including inactive-role denies. */
 final class RequestRolePolicies implements AuthorizationRequestContext.RolePolicyView {
   private final AtomicLong generation;
-  private final Set<PolicyKey> allows;
-  private final Set<PolicyKey> denies;
+  private final List<CachedRolePolicies> allowRoles;
+  private final List<CachedRolePolicies> denyRoles;
   private final Set<String> deniedPrivileges;
   private final boolean readable;
+  private final AtomicLong remainingProbes;
+  @Nullable private volatile Map<PolicyKey, Effect> mergedIndex;
 
   RequestRolePolicies(
       long generation,
@@ -51,9 +57,11 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
       boolean readable) {
     this.readable = readable;
     this.generation = new AtomicLong(generation);
-    Set<PolicyKey> allow = new HashSet<>();
-    Set<PolicyKey> deny = new HashSet<>();
+    List<CachedRolePolicies> allow = new ArrayList<>();
+    List<CachedRolePolicies> deny = new ArrayList<>();
     Set<String> denied = new HashSet<>();
+    long policyCount = roles.values().stream().mapToLong(CachedRolePolicies::policyCount).sum();
+    remainingProbes = new AtomicLong(policyCount);
     roles.forEach(
         (id, policies) -> {
           RoleUpdatedAt info = versions == null ? null : versions.get(id);
@@ -65,20 +73,18 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
                       && info != null
                       && info.getUpdatedAt() == policies.getUpdatedAt()
                       && active.roleNames().contains(info.getRoleName()));
-          policies
-              .getIndex()
-              .forEach(
-                  (key, effect) -> {
-                    if (effect == Effect.DENY) {
-                      deny.add(key);
-                    } else if (enabled) {
-                      allow.add(key);
-                    }
-                  });
+          // Pin immutable role indexes instead of copying every policy for a small request.
+          // DENY remains global even when the role's ALLOW privileges are inactive.
+          if (enabled) {
+            allow.add(policies);
+          }
+          if (!policies.getDeniedPrivileges().isEmpty()) {
+            deny.add(policies);
+          }
           denied.addAll(policies.getDeniedPrivileges());
         });
-    allows = Collections.unmodifiableSet(allow);
-    denies = Collections.unmodifiableSet(deny);
+    allowRoles = Collections.unmodifiableList(allow);
+    denyRoles = Collections.unmodifiableList(deny);
     deniedPrivileges = Collections.unmodifiableSet(denied);
   }
 
@@ -101,7 +107,61 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
     if (!readable) {
       return !allow;
     }
-    return allow ? allows.contains(key) && !denies.contains(key) : denies.contains(key);
+    Map<PolicyKey, Effect> merged = mergedIndex;
+    if (merged != null) {
+      return merged.get(key) == (allow ? Effect.ALLOW : Effect.DENY);
+    }
+    long probes = 0L;
+    try {
+      for (CachedRolePolicies role : denyRoles) {
+        probes++;
+        if (role.getIndex().get(key) == Effect.DENY) {
+          return !allow;
+        }
+      }
+      if (allow) {
+        for (CachedRolePolicies role : allowRoles) {
+          probes++;
+          if (role.getIndex().get(key) == Effect.ALLOW) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } finally {
+      // Large roles stay cheap for small requests. A long list switches to a merged index only
+      // after its actual role probes have paid for scanning the pinned policies.
+      if (probes > 0 && remainingProbes.getAndAdd(-probes) <= probes) {
+        mergePolicies();
+      }
+    }
+  }
+
+  private synchronized void mergePolicies() {
+    if (mergedIndex != null) {
+      return;
+    }
+    Map<PolicyKey, Effect> merged = new HashMap<>();
+    for (CachedRolePolicies role : allowRoles) {
+      role.getIndex()
+          .forEach(
+              (key, effect) -> {
+                if (effect == Effect.ALLOW) {
+                  merged.put(key, Effect.ALLOW);
+                }
+              });
+    }
+    // All held DENYs overwrite active ALLOWs, regardless of role activation.
+    for (CachedRolePolicies role : denyRoles) {
+      role.getIndex()
+          .forEach(
+              (key, effect) -> {
+                if (effect == Effect.DENY) {
+                  merged.put(key, Effect.DENY);
+                }
+              });
+    }
+    mergedIndex = Collections.unmodifiableMap(merged);
   }
 
   boolean hasDeny(Set<String> privileges) {

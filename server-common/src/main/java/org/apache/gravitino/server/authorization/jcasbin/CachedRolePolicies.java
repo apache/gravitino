@@ -75,6 +75,10 @@ final class CachedRolePolicies {
     return updatedAt;
   }
 
+  int policyCount() {
+    return index.size();
+  }
+
   Map<PolicyKey, Effect> getIndex() {
     return index;
   }

@@ -128,6 +128,12 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -1052,6 +1058,87 @@ public class TestJcasbinAuthorizer {
       metadataIdConverterMockedStatic
           .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
           .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  /** Partial-load diagnostics are bounded and repeat only after the retry backoff expires. */
+  @Test
+  public void testPartialRoleLoadDiagnosticsRespectBackoff() throws Exception {
+    List<SecurableObject> objects = new ArrayList<>();
+    objects.add(getAllowSecurableObject());
+    for (int i = 0; i < 12; i++) {
+      objects.add(
+          buildSecurableObject(
+              ALLOW_ROLE_ID, MetadataObject.Type.CATALOG, "missing" + i, USE_CATALOG, "ALLOW"));
+    }
+    RoleEntity role = mockRoleInStore(ALLOW_ROLE_ID, "partialRole", objects);
+    mockDirectUserRoles(role);
+    metadataIdConverterMockedStatic
+        .when(
+            () ->
+                MetadataIdConverter.getID(
+                    Mockito.argThat(
+                        object -> object != null && object.name().startsWith("missing")),
+                    eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    List<String> warnings = new ArrayList<>();
+    AbstractAppender appender =
+        new AbstractAppender("partialRoleLoadCapture", null, null, true, null) {
+          @Override
+          public void append(LogEvent event) {
+            String message = event.getMessage().getFormattedMessage();
+            if (Level.WARN.equals(event.getLevel()) && message.startsWith("Loaded role ")) {
+              warnings.add(message);
+            }
+          }
+        };
+    LoggerContext logContext = (LoggerContext) LogManager.getContext(false);
+    LoggerConfig logger =
+        logContext.getConfiguration().getLoggerConfig(JcasbinAuthorizer.class.getName());
+    Level previousLevel = logger.getLevel();
+    appender.start();
+    logger.addAppender(appender, Level.WARN, null);
+    logger.setLevel(Level.WARN);
+    logContext.updateLoggers();
+    try {
+      Principal principal = PrincipalUtils.getCurrentPrincipal();
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              principal,
+              METALAKE,
+              catalogObject(),
+              USE_CATALOG,
+              new AuthorizationRequestContext()));
+      assertEquals(1, warnings.size());
+      String warning = warnings.get(0);
+      assertTrue(warning.contains("Loaded role " + ALLOW_ROLE_ID + " (partialRole) at version "));
+      assertTrue(warning.contains("with 1 of 13 securable objects"));
+      assertTrue(warning.contains("CATALOG:missing0"));
+      assertFalse(warning.contains("CATALOG:missing10"));
+      assertTrue(warning.contains("10000 ms"));
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              principal,
+              METALAKE,
+              catalogObject(),
+              USE_CATALOG,
+              new AuthorizationRequestContext()));
+      assertEquals(1, warnings.size(), "A request within the backoff must not repeat the warning");
+      getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              principal,
+              METALAKE,
+              catalogObject(),
+              USE_CATALOG,
+              new AuthorizationRequestContext()));
+      assertEquals(
+          2, warnings.size(), "Retrying a partial load must expose the unresolved objects");
+    } finally {
+      logger.removeAppender(appender.getName());
+      logger.setLevel(previousLevel);
+      logContext.updateLoggers();
+      appender.stop();
     }
   }
 

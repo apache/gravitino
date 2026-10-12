@@ -1341,6 +1341,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   resolved.getIndex(),
                   resolved.isComplete(),
                   resolved.getUnresolvedDenies());
+          boolean logPartialLoad = false;
           rolePolicyLock.writeLock().lock();
           try {
             RoleLoadState state = states.get(id);
@@ -1361,6 +1362,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             if (candidate.isComplete()) {
               partialRoleLoadBackoff.invalidate(id);
             } else {
+              logPartialLoad =
+                  !partialRoleLoadBackoff.getIfPresent(id).isPresent()
+                      || (latest != null && latest.getUpdatedAt() != candidate.getUpdatedAt());
               partialRoleLoadBackoff.put(id, Boolean.TRUE);
             }
             // A newer snapshot must also refresh other in-flight requests. TTL eviction itself
@@ -1369,6 +1373,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             policies.put(id, candidate);
           } finally {
             rolePolicyLock.writeLock().unlock();
+          }
+          if (logPartialLoad) {
+            LOG.warn(
+                "Loaded role {} ({}) at version {} with {} of {} securable objects; "
+                    + "unresolved objects (up to 10): {}. Retrying after the backoff of at most {} ms.",
+                id,
+                version.getRoleName(),
+                version.getUpdatedAt(),
+                entity.securableObjects().size() - resolved.getUnresolvedObjects().size(),
+                entity.securableObjects().size(),
+                resolved.getUnresolvedObjects().stream().limit(10).collect(Collectors.toList()),
+                PARTIAL_ROLE_LOAD_RETRY_MS);
           }
         }
       }
