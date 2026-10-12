@@ -296,14 +296,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchTableException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
-    } catch (ForbiddenException e) {
+    } catch (ForbiddenException | IllegalArgumentException e) {
       throw toTrinoException(e);
-    } catch (IllegalArgumentException e) {
-      // TODO yuhui need improve get the error message. From IllegalArgumentException.
-      // At present, the IllegalArgumentException cannot get the error information clearly from the
-      // Gravitino server.
-      String message = GravitinoErrorCode.toSimpleErrorMessage(e);
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, message, e);
     }
   }
 
@@ -495,11 +489,21 @@ public class CatalogConnectorMetadata {
    * as a user-facing error instead of an internal one.
    */
   private static TrinoException toTrinoException(RuntimeException e) {
-    String message = GravitinoErrorCode.toSimpleErrorMessage(e);
     if (e instanceof ForbiddenException) {
+      // A refusal received over REST carries the server stack trace after the first line, and the
+      // first line already holds the complete reason.
+      String message =
+          e.getMessage() == null
+              ? e.toString()
+              : e.getMessage().lines().findFirst().orElse(e.toString());
       return new TrinoException(PERMISSION_DENIED, message, e);
     }
     // Server-side validation failures, such as an illegal object name or a policy refusal.
+    // TODO yuhui need improve get the error message. From IllegalArgumentException.
+    // At present, the IllegalArgumentException cannot get the error information clearly from the
+    // Gravitino server.
+    String message =
+        e.getMessage() == null ? e.toString() : GravitinoErrorCode.toSimpleErrorMessage(e);
     return new TrinoException(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, message, e);
   }
 }

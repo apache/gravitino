@@ -33,6 +33,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -66,6 +67,35 @@ public class TestCatalogConnectorMetadataErrors {
     TrinoException e = assertThrows(TrinoException.class, () -> metadata.getTable("s", "t"));
     assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
     assertEquals(DENIED_MESSAGE, e.getMessage());
+  }
+
+  @Test
+  public void testDeniedMessageWithServerStackKeepsFirstLine() {
+    // The REST client appends the server stack trace to the message of a refusal.
+    String messageWithStack =
+        DENIED_MESSAGE
+            + "\n"
+            + "org.apache.gravitino.exceptions.ForbiddenException: "
+            + DENIED_MESSAGE
+            + "\n"
+            + "\tat org.apache.gravitino.server.web.rest.TableOperations.loadTable(TableOperations.java:1)";
+    TableCatalog tableCatalog = mock(TableCatalog.class);
+    when(tableCatalog.loadTable(any())).thenThrow(new ForbiddenException(messageWithStack));
+    CatalogConnectorMetadata metadata = createMetadata(tableCatalog);
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.getTable("s", "t"));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
+    assertEquals(DENIED_MESSAGE, e.getMessage());
+  }
+
+  @Test
+  public void testIllegalArgumentWithoutMessageIsIllegalArgument() {
+    TableCatalog tableCatalog = mock(TableCatalog.class);
+    when(tableCatalog.loadTable(any())).thenThrow(new IllegalNameIdentifierException());
+    CatalogConnectorMetadata metadata = createMetadata(tableCatalog);
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.getTable("s", "t"));
+    assertEquals(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
   }
 
   @Test
