@@ -28,12 +28,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Optional TMS scheduling and Spark / IRC client options carried on built-in policy content (today
- * {@link org.apache.gravitino.policy.IcebergDataCompactionContent}).
+ * Optional TMS scheduling and Spark / IRC client options shared by the four built-in table
+ * maintenance tasks ({@link TableMaintenanceTaskType}).
  *
- * <p>This is a value object for shared JSON fields, not a separate policy type. Prefer attaching it
- * to existing {@code PolicyContent} implementations rather than introducing parallel content
- * classes.
+ * <p>This is a value object for shared JSON fields, not a separate policy type. Attaching it onto
+ * each built-in {@code PolicyContent} implementation is a separate change.
  */
 public final class TableMaintenancePolicyFields {
 

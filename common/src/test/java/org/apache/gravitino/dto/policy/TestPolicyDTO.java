@@ -25,13 +25,10 @@ import java.time.Instant;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
 import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.PolicyContent;
-import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -178,88 +175,24 @@ public class TestPolicyDTO {
   }
 
   @Test
-  public void testIcebergCompactionPolicyMaintenanceFieldsSerDe() throws JsonProcessingException {
-    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
-    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
-        PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withSchedule(
-                PolicyContentDTO.TableMaintenanceScheduleDTO.builder()
-                    .withOnCommit(true)
-                    .withCrontab("0 1 * * *")
-                    .build())
-            .withMinIntervalMs(7200000L)
-            .withJobOptions(ImmutableMap.of("uri", "http://irc:9001/iceberg"))
+  public void testTableMaintenanceScheduleDtoAndFieldsAnyFieldMapper() throws Exception {
+    PolicyContentDTO.TableMaintenanceScheduleDTO scheduleDTO =
+        PolicyContentDTO.TableMaintenanceScheduleDTO.builder()
+            .withOnCommit(true)
+            .withCrontab("0 1 * * *")
             .build();
+    TableMaintenanceSchedule schedule = scheduleDTO.toDomain();
+    Assertions.assertTrue(schedule.onCommit());
+    Assertions.assertEquals("0 1 * * *", schedule.crontab());
 
-    PolicyDTO policyDTO =
-        PolicyDTO.builder()
-            .withName("iceberg-compaction-tms")
-            .withPolicyType("system_iceberg_compaction")
-            .withEnabled(true)
-            .withContent(typedContent)
-            .withAudit(audit)
-            .build();
-
-    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
-    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
-    PolicyContentDTO.IcebergCompactionContentDTO contentDTO =
-        (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
-
-    Assertions.assertNotNull(contentDTO.maintenanceFields());
-    Assertions.assertTrue(contentDTO.maintenanceFields().schedule().onCommit());
-    Assertions.assertEquals(7200000L, contentDTO.maintenanceFields().minIntervalMs());
-    Assertions.assertDoesNotThrow(contentDTO::validate);
-  }
-
-  @Test
-  public void testIcebergCompactionMaintenanceFieldsDtoConvertersRoundTrip() {
     TableMaintenancePolicyFields fields =
         new TableMaintenancePolicyFields(
-            new TableMaintenanceSchedule(true, "0 1 * * *"),
-            7_200_000L,
-            ImmutableMap.of("uri", "http://irc:9001/iceberg"));
-    PolicyContent domain =
-        PolicyContents.icebergDataCompaction(
-            1000L,
-            1L,
-            2L,
-            150L,
-            99L,
-            "binpack",
-            "",
-            ImmutableMap.of("min-input-files", "1"),
-            fields);
-
-    PolicyContentDTO dto = DTOConverters.toDTO(domain);
-    PolicyContent restored = DTOConverters.fromDTO(dto);
-
-    Assertions.assertEquals(domain, restored);
-    IcebergDataCompactionContent content = (IcebergDataCompactionContent) restored;
-    Assertions.assertEquals(fields, content.maintenanceFields());
-  }
-
-  @Test
-  public void testIcebergCompactionMaintenanceFieldsAnyFieldMapperRoundTrip() throws Exception {
-    TableMaintenancePolicyFields fields =
-        new TableMaintenancePolicyFields(
-            new TableMaintenanceSchedule(true, "0 1 * * *"),
-            7_200_000L,
-            ImmutableMap.of("uri", "http://irc:9001/iceberg"));
-    IcebergDataCompactionContent content =
-        (IcebergDataCompactionContent)
-            PolicyContents.icebergDataCompaction(
-                1000L, 1L, 1L, 100L, 50L, ImmutableMap.of(), fields);
-
-    String json = JsonUtils.anyFieldMapper().writeValueAsString(content);
+            schedule, 7_200_000L, ImmutableMap.of("uri", "http://irc:9001/iceberg"));
+    String json = JsonUtils.anyFieldMapper().writeValueAsString(fields);
     Assertions.assertFalse(json.contains("\"present\""), json);
-    Assertions.assertFalse(json.contains("\"maintenanceFields\""), json);
-    Assertions.assertTrue(json.contains("\"schedule\""), json);
-    Assertions.assertTrue(json.contains("\"minIntervalMs\""), json);
-    Assertions.assertTrue(json.contains("\"jobOptions\""), json);
 
-    IcebergDataCompactionContent restored =
-        JsonUtils.anyFieldMapper().readValue(json, IcebergDataCompactionContent.class);
-    Assertions.assertEquals(content, restored);
-    Assertions.assertEquals(fields, restored.maintenanceFields());
+    TableMaintenancePolicyFields restored =
+        JsonUtils.anyFieldMapper().readValue(json, TableMaintenancePolicyFields.class);
+    Assertions.assertEquals(fields, restored);
   }
 }

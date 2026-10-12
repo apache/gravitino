@@ -19,27 +19,36 @@
 package org.apache.gravitino.maintenance.policy;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.policy.Policy;
 
 /**
- * Maintenance task kinds driven by TMS policy content.
+ * The four built-in table maintenance task kinds driven by TMS.
  *
- * <p>Only task types with a registered {@link Policy.BuiltInType} are listed. Add new values when
- * the corresponding built-in policy type and content class land.
+ * <p>{@link #builtInType()} is set only when the corresponding {@link Policy.BuiltInType} and
+ * policy content class already exist. Attaching {@code schedule} / {@code minIntervalMs} / {@code
+ * jobOptions} onto those content classes is a separate change.
  */
 public enum TableMaintenanceTaskType {
   /** Iceberg data file compaction. */
-  COMPACTION("compaction", Policy.BuiltInType.ICEBERG_COMPACTION, 3_600_000L, true);
+  COMPACTION("compaction", Policy.BuiltInType.ICEBERG_COMPACTION, 3_600_000L, true),
+  /** Iceberg manifest rewrite (built-in policy type not registered yet). */
+  MANIFEST_REWRITE("manifest-rewrite", null, 3_600_000L, true),
+  /** Iceberg snapshot expiration (built-in policy type not registered yet). */
+  SNAPSHOT_EXPIRY("snapshot-expiry", null, 3_600_000L, true),
+  /** Orphan file cleanup. */
+  ORPHAN_CLEANUP(
+      "orphan-cleanup", Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, 86_400_000L, false);
 
   private final String configKey;
-  private final Policy.BuiltInType builtInType;
+  @Nullable private final Policy.BuiltInType builtInType;
   private final long defaultMinIntervalMs;
   private final boolean onCommitAllowed;
 
   TableMaintenanceTaskType(
       String configKey,
-      Policy.BuiltInType builtInType,
+      @Nullable Policy.BuiltInType builtInType,
       long defaultMinIntervalMs,
       boolean onCommitAllowed) {
     this.configKey = configKey;
@@ -58,10 +67,11 @@ public enum TableMaintenanceTaskType {
   }
 
   /**
-   * Returns the built-in policy type that carries this maintenance task.
+   * Returns the built-in policy type that carries this maintenance task, if registered.
    *
-   * @return built-in policy type
+   * @return built-in policy type or {@code null} when not yet wired
    */
+  @Nullable
   public Policy.BuiltInType builtInType() {
     return builtInType;
   }
@@ -109,12 +119,13 @@ public enum TableMaintenanceTaskType {
    * @param policyType policy type string
    * @return task type or {@code null}
    */
+  @Nullable
   public static TableMaintenanceTaskType fromPolicyTypeString(String policyType) {
     if (StringUtils.isBlank(policyType)) {
       return null;
     }
     for (TableMaintenanceTaskType type : values()) {
-      if (type.builtInType.policyType().equalsIgnoreCase(policyType)) {
+      if (type.builtInType != null && type.builtInType.policyType().equalsIgnoreCase(policyType)) {
         return type;
       }
     }

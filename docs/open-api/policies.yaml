@@ -345,9 +345,31 @@ components:
           type: string
           description: Quartz-style cron expression for scheduled evaluation. At least one of onCommit or crontab must be set when schedule is present.
 
+    TableMaintenancePolicyFields:
+      type: object
+      description: >
+        Optional TMS fields shared by the four built-in table maintenance tasks
+        (compaction, manifest-rewrite, snapshot-expiry, orphan-cleanup).
+        Attachment onto concrete policy content types is a separate change.
+      properties:
+        schedule:
+          $ref: '#/components/schemas/TableMaintenanceSchedule'
+        minIntervalMs:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Minimum interval in milliseconds between finished runs for this policy type. Overrides server default when set.
+        jobOptions:
+          type: object
+          default: {}
+          description: Spark / Iceberg REST client properties for TMS jobs.
+          additionalProperties:
+            type: string
+            minLength: 1
+
     IcebergCompactionContent:
       type: object
-      description: Built-in Iceberg compaction thresholds, scoring weights, job options, and optional TMS fields.
+      description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
       properties:
         minDataFileMse:
           type: integer
@@ -387,20 +409,6 @@ components:
           type: object
           default: {}
           description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
-          additionalProperties:
-            type: string
-            minLength: 1
-        schedule:
-          $ref: '#/components/schemas/TableMaintenanceSchedule'
-        minIntervalMs:
-          type: integer
-          format: int64
-          minimum: 1
-          description: Minimum interval in milliseconds between finished runs for this policy type. Overrides server default when set.
-        jobOptions:
-          type: object
-          default: {}
-          description: Spark / Iceberg REST client properties for TMS jobs.
           additionalProperties:
             type: string
             minLength: 1

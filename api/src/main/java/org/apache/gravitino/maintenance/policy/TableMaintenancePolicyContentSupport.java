@@ -19,11 +19,15 @@
 package org.apache.gravitino.maintenance.policy;
 
 import javax.annotation.Nullable;
-import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 
-/** Extracts TMS fields and task types from {@link PolicyContent} instances. */
+/**
+ * Maps built-in policy types to TMS task kinds.
+ *
+ * <p>Extracting {@link TableMaintenancePolicyFields} from concrete policy content is deferred until
+ * those fields are attached to the four built-in content classes.
+ */
 public final class TableMaintenancePolicyContentSupport {
 
   private TableMaintenancePolicyContentSupport() {}
@@ -45,14 +49,13 @@ public final class TableMaintenancePolicyContentSupport {
   /**
    * Extracts TMS fields from policy content when present.
    *
+   * <p>Currently always returns {@code null}; content classes do not carry TMS fields yet.
+   *
    * @param content policy content
    * @return TMS fields or {@code null}
    */
   @Nullable
   public static TableMaintenancePolicyFields maintenanceFields(PolicyContent content) {
-    if (content instanceof IcebergDataCompactionContent) {
-      return ((IcebergDataCompactionContent) content).maintenanceFields();
-    }
     return null;
   }
 

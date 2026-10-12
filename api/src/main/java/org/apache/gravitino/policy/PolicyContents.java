@@ -24,7 +24,6 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -144,81 +143,6 @@ public class PolicyContents {
         rewriteStrategy,
         sortOrder,
         rewriteOptions);
-  }
-
-  /**
-   * Creates an iceberg compaction policy content with optional TMS scheduling fields.
-   *
-   * @param minDataFileMse minimum threshold for custom-data-file-mse
-   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
-   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
-   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
-   * @param maxPartitionNum maximum partition number selected for compaction
-   * @param rewriteOptions rewrite options forwarded as job.options.*
-   * @param maintenanceFields TMS schedule / interval / jobOptions, or null
-   * @return iceberg compaction policy content
-   */
-  public static PolicyContent icebergDataCompaction(
-      Long minDataFileMse,
-      Long minDeleteFileNumber,
-      Long dataFileMseWeight,
-      Long deleteFileNumberWeight,
-      Long maxPartitionNum,
-      Map<String, String> rewriteOptions,
-      @Nullable TableMaintenancePolicyFields maintenanceFields) {
-    return icebergDataCompaction(
-        minDataFileMse,
-        minDeleteFileNumber,
-        dataFileMseWeight,
-        deleteFileNumberWeight,
-        maxPartitionNum,
-        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
-        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
-        rewriteOptions,
-        maintenanceFields);
-  }
-
-  /**
-   * Creates an iceberg compaction policy content with optional TMS scheduling fields.
-   *
-   * <p>TMS fields are applied via {@link IcebergDataCompactionContent#withMaintenanceFields}; the
-   * compaction constructor itself is unchanged.
-   *
-   * @param minDataFileMse minimum threshold for custom-data-file-mse
-   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
-   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
-   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
-   * @param maxPartitionNum maximum partition number selected for compaction
-   * @param rewriteStrategy Iceberg rewrite_data_files top-level strategy
-   * @param sortOrder Iceberg rewrite_data_files top-level sort_order
-   * @param rewriteOptions rewrite options forwarded as job.options.*
-   * @param maintenanceFields TMS schedule / interval / jobOptions, or null
-   * @return iceberg compaction policy content
-   */
-  public static PolicyContent icebergDataCompaction(
-      Long minDataFileMse,
-      Long minDeleteFileNumber,
-      Long dataFileMseWeight,
-      Long deleteFileNumberWeight,
-      Long maxPartitionNum,
-      String rewriteStrategy,
-      String sortOrder,
-      Map<String, String> rewriteOptions,
-      @Nullable TableMaintenancePolicyFields maintenanceFields) {
-    IcebergDataCompactionContent content =
-        new IcebergDataCompactionContent(
-            minDataFileMse,
-            minDeleteFileNumber,
-            dataFileMseWeight,
-            deleteFileNumberWeight,
-            maxPartitionNum,
-            rewriteStrategy,
-            sortOrder,
-            rewriteOptions);
-    if (maintenanceFields == null || !maintenanceFields.anySet()) {
-      return content;
-    }
-    return content.withMaintenanceFields(maintenanceFields);
   }
 
   /**

@@ -28,12 +28,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
-import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
-import org.apache.gravitino.maintenance.policy.TableMaintenanceTaskType;
 
 /** Built-in policy content for Iceberg compaction strategy. */
 public class IcebergDataCompactionContent implements PolicyContent {
@@ -131,11 +127,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
   private final String rewriteStrategy;
   private final String sortOrder;
   private final Map<String, String> rewriteOptions;
-  // Flat TMS fields (same JSON shape as REST DTO). Not constructor params — set via
-  // {@link #withMaintenanceFields} or Jackson field-based persistence.
-  @Nullable private TableMaintenanceSchedule schedule;
-  @Nullable private Long minIntervalMs;
-  private Map<String, String> jobOptions;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
@@ -171,52 +162,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
         rewriteOptions == null
             ? DEFAULT_REWRITE_OPTIONS
             : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
-    this.schedule = null;
-    this.minIntervalMs = null;
-    this.jobOptions = Collections.emptyMap();
-  }
-
-  /**
-   * Returns a copy with optional TMS scheduling fields. Does not change the compaction constructor.
-   *
-   * @param fields schedule / minIntervalMs / jobOptions, or null to clear
-   * @return content with TMS fields applied
-   */
-  public IcebergDataCompactionContent withMaintenanceFields(
-      @Nullable TableMaintenancePolicyFields fields) {
-    IcebergDataCompactionContent copy =
-        new IcebergDataCompactionContent(
-            minDataFileMse,
-            minDeleteFileNumber,
-            dataFileMseWeight,
-            deleteFileNumberWeight,
-            maxPartitionNum,
-            rewriteStrategy,
-            sortOrder,
-            rewriteOptions);
-    if (fields != null && fields.anySet()) {
-      copy.schedule = fields.schedule();
-      copy.minIntervalMs = fields.minIntervalMs();
-      copy.jobOptions =
-          fields.jobOptions().isEmpty()
-              ? Collections.emptyMap()
-              : Collections.unmodifiableMap(new LinkedHashMap<>(fields.jobOptions()));
-    }
-    return copy;
-  }
-
-  /**
-   * Returns TMS scheduling and job options stored in this policy content, when set.
-   *
-   * @return maintenance fields or {@code null}
-   */
-  @Nullable
-  public TableMaintenancePolicyFields maintenanceFields() {
-    Map<String, String> options = jobOptions == null ? Collections.emptyMap() : jobOptions;
-    if (schedule == null && minIntervalMs == null && options.isEmpty()) {
-      return null;
-    }
-    return new TableMaintenancePolicyFields(schedule, minIntervalMs, options);
   }
 
   /**
@@ -361,10 +306,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
           Preconditions.checkArgument(
               StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
         });
-    TableMaintenancePolicyFields fields = maintenanceFields();
-    if (fields != null) {
-      fields.validate(TableMaintenanceTaskType.COMPACTION);
-    }
   }
 
   @Override
@@ -380,10 +321,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
         && Objects.equals(maxPartitionNum, that.maxPartitionNum)
         && Objects.equals(rewriteStrategy, that.rewriteStrategy)
         && Objects.equals(sortOrder, that.sortOrder)
-        && Objects.equals(rewriteOptions, that.rewriteOptions)
-        && Objects.equals(schedule, that.schedule)
-        && Objects.equals(minIntervalMs, that.minIntervalMs)
-        && Objects.equals(normalizedJobOptions(), that.normalizedJobOptions());
+        && Objects.equals(rewriteOptions, that.rewriteOptions);
   }
 
   @Override
@@ -396,14 +334,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
         maxPartitionNum,
         rewriteStrategy,
         sortOrder,
-        rewriteOptions,
-        schedule,
-        minIntervalMs,
-        normalizedJobOptions());
-  }
-
-  private Map<String, String> normalizedJobOptions() {
-    return jobOptions == null ? Collections.emptyMap() : jobOptions;
+        rewriteOptions);
   }
 
   @Override
@@ -427,12 +358,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
         + '\''
         + ", rewriteOptions="
         + rewriteOptions
-        + ", schedule="
-        + schedule
-        + ", minIntervalMs="
-        + minIntervalMs
-        + ", jobOptions="
-        + jobOptions
         + '}';
   }
 }
