@@ -20,24 +20,24 @@ package org.apache.gravitino.maintenance.storage.mapper;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
-import org.apache.gravitino.maintenance.storage.mapper.provider.h2.TableMaintenanceJobH2Provider;
-import org.apache.gravitino.maintenance.storage.mapper.provider.postgresql.TableMaintenanceJobPostgreSQLProvider;
-import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceActionBaseSQLProvider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.h2.TableMaintenanceActionH2Provider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.postgresql.TableMaintenanceActionPostgreSQLProvider;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-/** SQL provider factory for {@link TableMaintenanceJobMapper}. */
-public class TableMaintenanceJobSQLProviderFactory {
+/** SQL provider factory for {@link TableMaintenanceActionMapper}. */
+public class TableMaintenanceActionSQLProviderFactory {
 
-  private static final TableMaintenanceJobBaseSQLProvider MYSQL_PROVIDER =
-      new TableMaintenanceJobBaseSQLProvider();
-  private static final TableMaintenanceJobBaseSQLProvider H2_PROVIDER =
-      new TableMaintenanceJobH2Provider();
-  private static final TableMaintenanceJobBaseSQLProvider POSTGRESQL_PROVIDER =
-      new TableMaintenanceJobPostgreSQLProvider();
-  private static final Map<JDBCBackendType, TableMaintenanceJobBaseSQLProvider> PROVIDER_MAP =
+  private static final TableMaintenanceActionBaseSQLProvider MYSQL_PROVIDER =
+      new TableMaintenanceActionBaseSQLProvider();
+  private static final TableMaintenanceActionBaseSQLProvider H2_PROVIDER =
+      new TableMaintenanceActionH2Provider();
+  private static final TableMaintenanceActionBaseSQLProvider POSTGRESQL_PROVIDER =
+      new TableMaintenanceActionPostgreSQLProvider();
+  private static final Map<JDBCBackendType, TableMaintenanceActionBaseSQLProvider> PROVIDER_MAP =
       ImmutableMap.of(
           JDBCBackendType.MYSQL,
           MYSQL_PROVIDER,
@@ -46,14 +46,31 @@ public class TableMaintenanceJobSQLProviderFactory {
           JDBCBackendType.POSTGRESQL,
           POSTGRESQL_PROVIDER);
 
-  private TableMaintenanceJobSQLProviderFactory() {}
+  private TableMaintenanceActionSQLProviderFactory() {}
 
   /**
-   * @param jobMeta row to insert
+   * @param actionMeta row to insert
    * @return INSERT statement
    */
-  public static String insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta) {
-    return getProvider().insertJob(jobMeta);
+  public static String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
+    return getProvider().insertAction(actionMeta);
+  }
+
+  /**
+   * @param id action id
+   * @param jobId job run id
+   * @return UPDATE statement
+   */
+  public static String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
+    return getProvider().bindJobId(id, jobId);
+  }
+
+  /**
+   * @param id action id
+   * @return SELECT statement
+   */
+  public static String selectById(@Param("id") long id) {
+    return getProvider().selectById(id);
   }
 
   /**
@@ -88,6 +105,14 @@ public class TableMaintenanceJobSQLProviderFactory {
   }
 
   /**
+   * @param id action id
+   * @return DELETE statement
+   */
+  public static String deleteById(@Param("id") long id) {
+    return getProvider().deleteById(id);
+  }
+
+  /**
    * @param jobId job run id
    * @return DELETE statement
    */
@@ -95,7 +120,7 @@ public class TableMaintenanceJobSQLProviderFactory {
     return getProvider().deleteByJobId(jobId);
   }
 
-  static TableMaintenanceJobBaseSQLProvider getProvider() {
+  static TableMaintenanceActionBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()

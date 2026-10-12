@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.storage.mapper;
 
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
-import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
@@ -39,7 +38,4 @@ public interface TableSnapshotMetricsMapper {
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
       @Param("snapshotId") long snapshotId);
-
-  @DeleteProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "deleteByJobId")
-  int deleteByJobId(@Param("jobId") long jobId);
 }

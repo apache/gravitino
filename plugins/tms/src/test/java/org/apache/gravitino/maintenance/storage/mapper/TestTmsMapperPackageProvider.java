@@ -34,7 +34,7 @@ class TestTmsMapperPackageProvider {
   void testMapperClasses() {
     MapperPackageProvider provider = new TmsMapperPackageProvider();
     assertEquals(2, provider.getMapperClasses().size());
-    assertTrue(provider.getMapperClasses().contains(TableMaintenanceJobMapper.class));
+    assertTrue(provider.getMapperClasses().contains(TableMaintenanceActionMapper.class));
     assertTrue(provider.getMapperClasses().contains(TableSnapshotMetricsMapper.class));
   }
 

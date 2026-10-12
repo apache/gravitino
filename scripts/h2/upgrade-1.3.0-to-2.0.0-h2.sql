@@ -102,9 +102,9 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB COMMENT 'semantic model version information';
 
-CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
+CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
-    `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',
+    `job_id` BIGINT COMMENT 'optional job run id mapped to job_run_meta.job_run_id; null until bound after runJob',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
@@ -112,12 +112,12 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `finished_at` BIGINT COMMENT 'finish timestamp in milliseconds, null while in flight',
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`)
-) COMMENT='table maintenance job run metadata';
-CREATE UNIQUE INDEX IF NOT EXISTS `uk_tmj_job_id` ON `table_maintenance_job`(`job_id`);
-CREATE INDEX IF NOT EXISTS `idx_tmj_table_policy_finished` ON `table_maintenance_job`(`table_id`, `policy_id`, `finished_at`);
-CREATE INDEX IF NOT EXISTS `idx_tmj_before_sid` ON `table_maintenance_job`(`table_id`, `before_snapshot_id`);
-CREATE INDEX IF NOT EXISTS `idx_tmj_after_sid` ON `table_maintenance_job`(`table_id`, `after_snapshot_id`);
-CREATE INDEX IF NOT EXISTS `idx_tmj_created_at` ON `table_maintenance_job`(`created_at`);
+) COMMENT='table maintenance action occupancy and run metadata';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_job_id` ON `table_maintenance_action`(`job_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
+CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_after_sid` ON `table_maintenance_action`(`table_id`, `after_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_created_at` ON `table_maintenance_action`(`created_at`);
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',

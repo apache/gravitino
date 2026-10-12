@@ -18,28 +18,48 @@
  */
 package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 
-import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper.TABLE_NAME;
+import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper.TABLE_NAME;
 
-import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.ibatis.annotations.Param;
 
-/** Portable SQL for {@code table_maintenance_job}. */
-public class TableMaintenanceJobBaseSQLProvider {
+/** Portable SQL for {@code table_maintenance_action}. */
+public class TableMaintenanceActionBaseSQLProvider {
 
   /**
-   * Inserts a run row with {@code job_id}, {@code table_id}, {@code policy_id}, and {@code
-   * created_at}. Snapshot columns stay null until the Spark Job / terminal listener updates them
-   * (§5.2).
+   * Inserts an in-flight occupancy row before {@code runJob}. {@code job_id} stays null until bound
+   * after submission (§5.2).
    *
-   * @param jobMeta row to insert
+   * @param actionMeta row to insert
    * @return INSERT statement
    */
-  public String insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta) {
+  public String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (job_id, table_id, policy_id, created_at)"
-        + " VALUES (#{jobMeta.jobId}, #{jobMeta.tableId}, #{jobMeta.policyId},"
-        + " #{jobMeta.createdAt})";
+        + " (table_id, policy_id, created_at)"
+        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt})";
+  }
+
+  /**
+   * Binds the Gravitino job run id after {@code runJob} succeeds.
+   *
+   * @param id action row id
+   * @param jobId {@code job_run_meta.job_run_id}
+   * @return UPDATE statement
+   */
+  public String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET job_id = #{jobId}"
+        + " WHERE id = #{id} AND job_id IS NULL AND finished_at IS NULL";
+  }
+
+  /**
+   * @param id action row id
+   * @return SELECT statement
+   */
+  public String selectById(@Param("id") long id) {
+    return selectColumns() + " WHERE id = #{id}";
   }
 
   /**
@@ -47,15 +67,11 @@ public class TableMaintenanceJobBaseSQLProvider {
    * @return SELECT statement
    */
   public String selectByJobId(@Param("jobId") long jobId) {
-    return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
-        + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
-        + " finished_at AS finishedAt, created_at AS createdAt FROM "
-        + TABLE_NAME
-        + " WHERE job_id = #{jobId}";
+    return selectColumns() + " WHERE job_id = #{jobId}";
   }
 
   /**
-   * Sets {@code before_snapshot_id} from inside the Spark Job when {@code S0} is sampled.
+   * Sets {@code before_snapshot_id} once when {@code S0} is sampled.
    *
    * @param jobId Gravitino job run id
    * @param beforeSnapshotId sampled snapshot id
@@ -66,7 +82,7 @@ public class TableMaintenanceJobBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET before_snapshot_id = #{beforeSnapshotId}"
-        + " WHERE job_id = #{jobId} AND finished_at IS NULL";
+        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at IS NULL";
   }
 
   /**
@@ -88,10 +104,25 @@ public class TableMaintenanceJobBaseSQLProvider {
   }
 
   /**
+   * @param id action row id
+   * @return DELETE statement
+   */
+  public String deleteById(@Param("id") long id) {
+    return "DELETE FROM " + TABLE_NAME + " WHERE id = #{id}";
+  }
+
+  /**
    * @param jobId Gravitino job run id
    * @return DELETE statement
    */
   public String deleteByJobId(@Param("jobId") long jobId) {
     return "DELETE FROM " + TABLE_NAME + " WHERE job_id = #{jobId}";
+  }
+
+  private static String selectColumns() {
+    return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
+        + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
+        + " finished_at AS finishedAt, created_at AS createdAt FROM "
+        + TABLE_NAME;
   }
 }

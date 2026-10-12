@@ -69,14 +69,6 @@ public class TableSnapshotMetricsSQLProviderFactory {
     return getProvider().selectMetrics(tableId, policyId, snapshotId);
   }
 
-  /**
-   * @param jobId job run id
-   * @return DELETE statement
-   */
-  public static String deleteByJobId(@Param("jobId") long jobId) {
-    return getProvider().deleteByJobId(jobId);
-  }
-
   static TableSnapshotMetricsBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()

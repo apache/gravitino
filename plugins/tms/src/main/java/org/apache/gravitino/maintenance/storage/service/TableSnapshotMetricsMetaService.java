@@ -42,7 +42,8 @@ public class TableSnapshotMetricsMetaService {
   }
 
   /**
-   * Inserts metrics JSON for a table/policy/snapshot triple. Does not update an existing row.
+   * Idempotently stores metrics JSON for a table/policy/snapshot triple. If a row already exists,
+   * this is a no-op (does not overwrite) so sample / listener retries are safe.
    *
    * @param tableId table id
    * @param policyId policy id
@@ -53,6 +54,9 @@ public class TableSnapshotMetricsMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertTableSnapshotMetrics")
   public void insertMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
+    if (getMetrics(tableId, policyId, snapshotId) != null) {
+      return;
+    }
     TableSnapshotMetricsPO metricsMeta =
         TableSnapshotMetricsPO.builder()
             .withTableId(tableId)

@@ -19,7 +19,7 @@
 package org.apache.gravitino.maintenance.storage.mapper;
 
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Options;
@@ -27,31 +27,41 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** MyBatis mapper for {@code table_maintenance_job}. */
-public interface TableMaintenanceJobMapper {
+/** MyBatis mapper for {@code table_maintenance_action}. */
+public interface TableMaintenanceActionMapper {
 
-  String TABLE_NAME = "table_maintenance_job";
+  String TABLE_NAME = "table_maintenance_action";
 
-  @InsertProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "insertJob")
-  @Options(useGeneratedKeys = true, keyProperty = "jobMeta.id", keyColumn = "id")
-  void insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta);
+  @InsertProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "insertAction")
+  @Options(useGeneratedKeys = true, keyProperty = "actionMeta.id", keyColumn = "id")
+  void insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta);
+
+  @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "bindJobId")
+  int bindJobId(@Param("id") long id, @Param("jobId") long jobId);
 
   @Nullable
-  @SelectProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "selectByJobId")
-  TableMaintenanceJobPO selectByJobId(@Param("jobId") long jobId);
+  @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectById")
+  TableMaintenanceActionPO selectById(@Param("id") long id);
+
+  @Nullable
+  @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectByJobId")
+  TableMaintenanceActionPO selectByJobId(@Param("jobId") long jobId);
 
   @UpdateProvider(
-      type = TableMaintenanceJobSQLProviderFactory.class,
+      type = TableMaintenanceActionSQLProviderFactory.class,
       method = "updateBeforeSnapshot")
   int updateBeforeSnapshot(
       @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId);
 
-  @UpdateProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "markFinished")
+  @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "markFinished")
   int markFinished(
       @Param("jobId") long jobId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt);
 
-  @DeleteProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "deleteByJobId")
+  @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
+  int deleteById(@Param("id") long id);
+
+  @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteByJobId")
   int deleteByJobId(@Param("jobId") long jobId);
 }

@@ -18,7 +18,8 @@
  */
 package org.apache.gravitino.maintenance.storage.mapper.provider.postgresql;
 
-import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceActionBaseSQLProvider;
 
-/** PostgreSQL SQL provider for {@code table_maintenance_job}. */
-public class TableMaintenanceJobPostgreSQLProvider extends TableMaintenanceJobBaseSQLProvider {}
+/** PostgreSQL SQL provider for {@code table_maintenance_action}. */
+public class TableMaintenanceActionPostgreSQLProvider
+    extends TableMaintenanceActionBaseSQLProvider {}

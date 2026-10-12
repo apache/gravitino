@@ -549,9 +549,9 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
 
-CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
+CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'optional job run id mapped to job_run_meta.job_run_id; null until bound after runJob',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
@@ -559,13 +559,13 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'finish timestamp in milliseconds, null while in flight',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tmj_job_id` (`job_id`),
-    KEY `idx_tmj_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
-    KEY `idx_tmj_before_sid` (`table_id`, `before_snapshot_id`),
-    KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`),
-    KEY `idx_tmj_created_at` (`created_at`)
+    UNIQUE KEY `uk_tma_job_id` (`job_id`),
+    KEY `idx_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
+    KEY `idx_tma_before_sid` (`table_id`, `before_snapshot_id`),
+    KEY `idx_tma_after_sid` (`table_id`, `after_snapshot_id`),
+    KEY `idx_tma_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-  COMMENT 'table maintenance job run metadata';
+  COMMENT 'table maintenance action occupancy and run metadata';
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

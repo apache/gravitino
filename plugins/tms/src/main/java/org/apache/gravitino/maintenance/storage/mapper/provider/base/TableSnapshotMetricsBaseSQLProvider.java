@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 
-import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
 import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
 import org.apache.ibatis.annotations.Param;
@@ -53,29 +52,5 @@ public class TableSnapshotMetricsBaseSQLProvider {
         + TableSnapshotMetricsMapper.TABLE_NAME
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND snapshot_id ="
         + " #{snapshotId}";
-  }
-
-  /**
-   * Deletes metrics rows tied to a maintenance job's before/after snapshot ids.
-   *
-   * @param jobId Gravitino job run id
-   * @return DELETE statement
-   */
-  public String deleteByJobId(@Param("jobId") long jobId) {
-    String metrics = TableSnapshotMetricsMapper.TABLE_NAME;
-    String job = TableMaintenanceJobMapper.TABLE_NAME;
-    return "DELETE FROM "
-        + metrics
-        + " WHERE EXISTS (SELECT 1 FROM "
-        + job
-        + " j WHERE j.job_id = #{jobId} AND j.table_id = "
-        + metrics
-        + ".table_id AND j.policy_id = "
-        + metrics
-        + ".policy_id AND (j.before_snapshot_id = "
-        + metrics
-        + ".snapshot_id OR j.after_snapshot_id = "
-        + metrics
-        + ".snapshot_id))";
   }
 }

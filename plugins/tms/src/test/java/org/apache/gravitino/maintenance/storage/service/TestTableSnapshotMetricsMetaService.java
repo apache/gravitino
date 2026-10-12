@@ -35,4 +35,12 @@ class TestTableSnapshotMetricsMetaService extends TestJDBCBackend {
     Assertions.assertTrue(service.getMetrics(1L, 2L, 99L).createdAt() >= before);
     Assertions.assertTrue(service.getMetrics(1L, 2L, 99L).createdAt() <= after);
   }
+
+  @TestTemplate
+  void testInsertMetricsIsIdempotent() {
+    TableSnapshotMetricsMetaService service = TableSnapshotMetricsMetaService.getInstance();
+    service.insertMetrics(3L, 4L, 88L, "{\"mse\":1}");
+    service.insertMetrics(3L, 4L, 88L, "{\"mse\":2}");
+    Assertions.assertEquals("{\"mse\":1}", service.getMetrics(3L, 4L, 88L).metricsValue());
+  }
 }

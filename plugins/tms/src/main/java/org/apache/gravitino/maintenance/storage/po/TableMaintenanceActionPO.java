@@ -16,9 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.mapper.provider.h2;
+package org.apache.gravitino.maintenance.storage.po;
 
-import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.Accessors;
 
-/** H2 SQL provider for {@code table_maintenance_job}. */
-public class TableMaintenanceJobH2Provider extends TableMaintenanceJobBaseSQLProvider {}
+/** Persistence object for {@code table_maintenance_action}. */
+@Getter
+@Accessors(fluent = true)
+@EqualsAndHashCode
+@ToString
+@Builder(setterPrefix = "with")
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class TableMaintenanceActionPO {
+
+  private Long id;
+  private Long jobId;
+  private Long tableId;
+  private Long policyId;
+  private Long beforeSnapshotId;
+  private Long afterSnapshotId;
+  private Long finishedAt;
+  private Long createdAt;
+}
