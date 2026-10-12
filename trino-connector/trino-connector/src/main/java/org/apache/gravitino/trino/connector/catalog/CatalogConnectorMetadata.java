@@ -46,6 +46,7 @@ import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
@@ -64,6 +65,7 @@ public class CatalogConnectorMetadata {
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
   @Nullable private final FunctionCatalog functionCatalog;
+  @Nullable private final ViewCatalog viewCatalog;
 
   /**
    * Constructs a new CatalogConnectorMetadata.
@@ -85,6 +87,13 @@ public class CatalogConnectorMetadata {
         LOG.debug("Catalog %s does not support function operations", catalogName);
       }
       this.functionCatalog = fc;
+      ViewCatalog vc = null;
+      try {
+        vc = catalog.asViewCatalog();
+      } catch (UnsupportedOperationException e) {
+        LOG.debug("Catalog %s does not support view operations", catalogName);
+      }
+      this.viewCatalog = vc;
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
@@ -181,6 +190,28 @@ public class CatalogConnectorMetadata {
   public boolean tableExists(String schemaName, String tableName) {
     try {
       return tableCatalog.tableExists(NameIdentifier.of(schemaName, tableName));
+    } catch (ForbiddenException | IllegalArgumentException e) {
+      throw toTrinoException(e);
+    }
+  }
+
+  /**
+   * Checks if a view exists in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @param viewName the name of the view
+   * @return true if the view exists, false otherwise or if the catalog does not support views
+   */
+  public boolean viewExists(String schemaName, String viewName) {
+    if (viewCatalog == null) {
+      return false;
+    }
+    try {
+      return viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName));
+    } catch (UnsupportedOperationException | NoSuchSchemaException e) {
+      // The client exposes a view catalog for every relational catalog, so a catalog without view
+      // support (for example JDBC) only reports it when called. A missing schema has no views.
+      return false;
     } catch (ForbiddenException | IllegalArgumentException e) {
       throw toTrinoException(e);
     }
