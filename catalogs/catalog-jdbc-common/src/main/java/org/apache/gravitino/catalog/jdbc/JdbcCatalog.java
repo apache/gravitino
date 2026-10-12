@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -37,6 +38,8 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /** Implementation of an Jdbc catalog in Gravitino. */
 public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
@@ -77,6 +80,51 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   @Override
   public Capability newCapability() {
     return new JdbcCatalogCapability();
+  }
+
+  /**
+   * Returns the effective {@link Catalog#PROPERTY_VERIFY_ON_CREATE verify-on-create} setting for
+   * this catalog. A relational JDBC catalog verifies its backend at create time by default; an
+   * administrator opts out by setting {@code gravitino.catalog.verify-on-create=false} to register
+   * a catalog whose backend is temporarily unavailable.
+   *
+   * @return {@code true} to verify the backend at create (default); {@code false} to skip the check
+   */
+  @Override
+  public boolean shouldValidateOnCreate() {
+    Map<String, String> properties = entity().getProperties();
+    if (properties == null) {
+      return true;
+    }
+    return Boolean.parseBoolean(properties.getOrDefault(Catalog.PROPERTY_VERIFY_ON_CREATE, "true"));
+  }
+
+  /**
+   * Verifies the backend is reachable at create time by running a single {@code testConnection}
+   * (one {@code listDatabases} round trip) through the catalog operations. On failure the backend
+   * raises a {@link ConnectionFailedException}, which propagates so {@code CatalogManager} rolls
+   * back the just-persisted catalog entity.
+   *
+   * <p>No connection-pool leak: the probe borrows one connection and returns it (JDBC operations
+   * use try-with-resources), and the pool stays lazy. If verification throws, {@code
+   * CatalogManager.initCatalogWrapper} closes the partially-initialized catalog, which closes the
+   * datasource and releases the pool.
+   */
+  @Override
+  public void validateOnCreate() {
+    try {
+      ops().testConnection(entity().nameIdentifier());
+    } catch (RuntimeException e) {
+      // Includes ConnectionFailedException; rethrow unchanged so CatalogManager rolls back and the
+      // connection-failed taxonomy the caller relies on is preserved.
+      throw e;
+    } catch (Exception e) {
+      // The CatalogOperations interface declares a checked Exception; the JDBC override only throws
+      // runtime exceptions, so this wraps any unexpected checked exception without changing the
+      // connection-failed taxonomy the caller relies on.
+      throw new GravitinoRuntimeException(
+          e, "Failed to verify JDBC catalog backend at create: %s", e.getMessage());
+    }
   }
 
   /**

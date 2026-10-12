@@ -1,0 +1,102 @@
+---
+title: "JDBC Catalog Connection Validation"
+slug: "/jdbc-catalog-connection-validation"
+keywords:
+- jdbc
+- catalog
+- connection-pool
+license: "This software is licensed under the Apache License version 2."
+---
+
+This page describes connection validation for JDBC catalogs' datasource pools. The settings apply
+to the MySQL, PostgreSQL, Doris, StarRocks, ClickHouse, Hologres, and OceanBase catalogs.
+
+## Connection Validation
+
+JDBC catalogs validate connections on borrow by default using the JDBC driver's
+`Connection.isValid()` method. Gravitino does not force a validation SQL query, so the driver
+can validate the connection after catalog or schema changes.
+
+The default avoids a connection-reuse problem with MySQL URLs that have no default database.
+DBCP caches SQL validation as a prepared statement. MySQL Connector/J retains the database used
+when that statement was prepared and tries to switch back to it when executing the statement.
+After an application calls `setCatalog()`, switching back to an empty original database can fail
+even though the connection is still healthy. DBCP then discards that connection and opens another.
+Connector/J's `Connection.isValid()` uses a ping instead of the cached statement, so validation
+does not need to restore the statement's original database.
+
+The benefit is preserving healthy pooled connections and avoiding repeated connection setup and
+authentication caused by failed validation. Validation remains enabled and disconnected connections
+are still replaced. This does not establish a general throughput improvement: other drivers may
+implement `isValid()` using SQL, and validation can still require a network round trip.
+
+For a driver that does not support `Connection.isValid()`, set the catalog property
+`gravitino.bypass.validationQuery` to a SQL SELECT statement that returns at least one row.
+Explicit validation queries are passed to DBCP without being overwritten. The
+`jdbc.pool.test-on-borrow` property controls validation on borrow. See the
+[DBCP configuration reference](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+for other pool validation settings. DBCP-specific properties require the `gravitino.bypass.`
+prefix in catalog configuration; the prefix is removed before passing them to DBCP.
+
+For example, to use SQL validation with a driver that does not support `Connection.isValid()`:
+
+```json
+{
+  "jdbc.pool.test-on-borrow": "true",
+  "gravitino.bypass.validationQuery": "SELECT 1",
+  "gravitino.bypass.validationQueryTimeout": "5"
+}
+```
+
+Choose a validation query supported by the driver and database. Disabling validation on borrow
+alone does not make a driver without `Connection.isValid()` support compatible: DBCP also validates
+a connection when initializing its connection factory.
+
+For MySQL drivers affected by the catalog-switching problem, explicitly setting `SELECT 1` restores
+the cached-statement validation path and can reproduce connection churn. Leave the query unset when
+the driver supports `Connection.isValid()`.
+
+## Backend verification at create time
+
+A relational JDBC catalog verifies that its backend is reachable when the catalog is created,
+rather than deferring the first connection to a later operation. The verification performs a single
+`listDatabases` round trip. If it fails, the create is rejected and rolled back (the catalog entity
+is not persisted), and the caller receives a connection error that names the backend `host:port`
+and the underlying driver message.
+
+To register a catalog whose backend is temporarily unavailable, set the hidden catalog property
+`gravitino.catalog.verify-on-create` to `false`, which skips the create-time check:
+
+```json
+{
+  "gravitino.catalog.verify-on-create": "false"
+}
+```
+
+The default is `true` (verify on create). The connection is still opened lazily on first use when
+the check is skipped.
+
+### Bounded connect timeout
+
+So that create-time verification fails fast against an unreachable host instead of hanging, the
+JDBC **connection-establishment** timeout is bounded by `jdbc.pool.connect-timeout-ms` (default
+`30000` ms). Gravitino translates this canonical millisecond value into each driver family's own
+connect-timeout parameter and unit:
+
+- MySQL Connector/J — also used by the Doris, StarRocks, and OceanBase catalogs: `connectTimeout`
+  in milliseconds.
+- PostgreSQL — also used by the Hologres catalog: `connectTimeout` in seconds (rounded up,
+  minimum 1).
+- ClickHouse: `connect_timeout` in milliseconds (note the underscore name).
+
+Only the connect timeout is bounded, deliberately not the socket-read timeout. The connect timeout
+makes an unreachable host fail fast at TCP connect, and it is safe for every connection: a
+connection that cannot be established is dead regardless of the operation. A socket-read timeout
+would also abort legitimate long-running operations on a healthy backend (a large `ALTER TABLE`, a
+slow metadata query), so Gravitino does not impose one; set a read timeout explicitly in the
+`jdbc-url` if you want one.
+
+A connect-timeout value you set directly on the connection or in the `jdbc-url` query string is
+never overridden; drivers whose family is not recognized are left unbounded by Gravitino. The
+timeout is applied as a per-connection bound, so the pool stays lazy and no connection is opened
+until the first real round trip (create-time verification).

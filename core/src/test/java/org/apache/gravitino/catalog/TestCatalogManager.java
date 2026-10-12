@@ -59,11 +59,14 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockManager;
@@ -400,6 +403,76 @@ public class TestCatalogManager {
             .contains("Properties or property prefixes are reserved and cannot be set"),
         exception4.getMessage());
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failedIdent));
+  }
+
+  @Test
+  public void testCreateCatalogVerifiesBackendViaTestConnection() throws Exception {
+    // Opted in via validateOnCreate() force-probe, and the probe reports the backend unreachable:
+    // creation must propagate ConnectionFailedException and roll back both the cache and the store.
+    NameIdentifier failIdent = NameIdentifier.of("metalake", "verify-testconn-fail");
+    Map<String, String> failProps =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                TestCatalogOperations.VALIDATE_ON_CREATE,
+                "true",
+                TestCatalogOperations.FAIL_TEST,
+                "true"));
+
+    Assertions.assertThrows(
+        ConnectionFailedException.class,
+        () ->
+            catalogManager.createCatalog(
+                failIdent, Catalog.Type.RELATIONAL, provider, "comment", failProps));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failIdent));
+    // Store rollback: the just-persisted entity is deleted.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(failIdent, EntityType.CATALOG, CatalogEntity.class));
+
+    // Rolled back, so the identifier is reusable with a reachable backend.
+    Map<String, String> okProps =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                TestCatalogOperations.VALIDATE_ON_CREATE,
+                "true"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                failIdent, Catalog.Type.RELATIONAL, provider, "comment", okProps));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(failIdent));
+
+    // Not opted in (no VALIDATE_ON_CREATE): the backend probe is never forced, so a FAIL_TEST
+    // catalog is still created. This mirrors model/generic/non-JDBC catalogs that are never
+    // force-verified.
+    NameIdentifier noOptInIdent = NameIdentifier.of("metalake", "verify-no-optin");
+    Map<String, String> noOptInProps =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                TestCatalogOperations.FAIL_TEST,
+                "true"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                noOptInIdent, Catalog.Type.RELATIONAL, provider, "comment", noOptInProps));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(noOptInIdent));
   }
 
   @Test

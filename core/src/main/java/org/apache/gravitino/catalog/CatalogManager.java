@@ -91,6 +91,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -931,7 +932,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
+      // Pass null propsToValidate so wrapper construction does NOT run the create-time backend
+      // validation (BaseCatalog#validateOnCreate). This standalone path performs its own explicit
+      // probe below; letting the wrapper validate as well would probe the backend twice and could
+      // fail an otherwise-successful test on a transient second-round-trip error.
+      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, null);
       try {
         wrapper.doWithCatalogOps(
             c -> {
@@ -1652,9 +1657,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // so that AppClassLoader can get the value of properties.
           wrapper.catalog.properties();
           wrapper.catalog.capability();
+
+          // Validate opted-in catalogs so a misconfiguration fails at create rather than on
+          // first use. The default validation eagerly initializes ops(); JDBC overrides it to
+          // run a real backend probe. The backend translates failures into the caller-error vs
+          // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
+          if (propsToValidate != null && catalog.shouldValidateOnCreate()) {
+            catalog.validateOnCreate();
+          }
           return null;
         },
-        IllegalArgumentException.class);
+        IllegalArgumentException.class,
+        ConnectionFailedException.class);
 
     return wrapper;
   }
