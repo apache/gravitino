@@ -33,11 +33,14 @@ import org.slf4j.LoggerFactory;
  * parameter name and its unit differ per driver family:
  *
  * <ul>
- *   <li><b>MySQL Connector/J</b> ({@code com.mysql.cj.jdbc.Driver}, and the legacy {@code
- *       com.mysql.jdbc.Driver} — also used by Doris and StarRocks): {@code connectTimeout} and
- *       {@code socketTimeout} in <b>milliseconds</b>.
- *   <li><b>PostgreSQL</b> ({@code org.postgresql.Driver}): {@code connectTimeout} and {@code
- *       socketTimeout} in <b>seconds</b>.
+ *   <li><b>MySQL Connector/J</b> ({@code com.mysql.cj.jdbc.Driver}, the legacy {@code
+ *       com.mysql.jdbc.Driver} — also used by Doris and StarRocks — and the MySQL-compatible
+ *       OceanBase Connector/J {@code com.oceanbase.jdbc.Driver}): {@code connectTimeout} and {@code
+ *       socketTimeout} in <b>milliseconds</b>.
+ *   <li><b>PostgreSQL</b> ({@code org.postgresql.Driver}, also used by the PostgreSQL-compatible
+ *       Hologres catalog): {@code connectTimeout} and {@code socketTimeout} in <b>seconds</b>.
+ *   <li><b>ClickHouse</b> ({@code com.clickhouse.jdbc.ClickHouseDriver}): {@code connect_timeout}
+ *       and {@code socket_timeout} in <b>milliseconds</b> (note the underscore names).
  * </ul>
  *
  * <p>An unknown driver family yields no properties (logged at debug), so adding a new JDBC provider
@@ -66,14 +69,24 @@ public final class JdbcConnectionTimeouts {
   /** The MySQL Connector/J driver class (legacy, pre-8.0). */
   static final String MYSQL_LEGACY_DRIVER = "com.mysql.jdbc.Driver";
 
-  /** The PostgreSQL driver class. */
+  /** The OceanBase Connector/J driver class (MySQL-compatible, milliseconds). */
+  static final String OCEANBASE_DRIVER = "com.oceanbase.jdbc.Driver";
+
+  /** The PostgreSQL driver class (also used by the Hologres catalog). */
   static final String POSTGRESQL_DRIVER = "org.postgresql.Driver";
 
-  /** The connection-establishment timeout parameter name shared by both families. */
+  /** The ClickHouse JDBC driver class. */
+  static final String CLICKHOUSE_DRIVER = "com.clickhouse.jdbc.ClickHouseDriver";
+
+  /** The connect/socket parameter names used by the MySQL and PostgreSQL families (camelCase). */
   static final String CONNECT_TIMEOUT_PARAM = "connectTimeout";
 
-  /** The socket-read timeout parameter name shared by both families. */
   static final String SOCKET_TIMEOUT_PARAM = "socketTimeout";
+
+  /** The connect/socket parameter names used by ClickHouse (snake_case). */
+  static final String CLICKHOUSE_CONNECT_TIMEOUT_PARAM = "connect_timeout";
+
+  static final String CLICKHOUSE_SOCKET_TIMEOUT_PARAM = "socket_timeout";
 
   private JdbcConnectionTimeouts() {
     // Utility class, prevent instantiation.
@@ -94,14 +107,26 @@ public final class JdbcConnectionTimeouts {
     String driver = config.getJdbcDriver();
     long millis = config.getConnectTimeoutMs();
 
-    String value;
-    if (MYSQL_DRIVER.equals(driver) || MYSQL_LEGACY_DRIVER.equals(driver)) {
-      // MySQL Connector/J expects milliseconds; emit the canonical value as-is.
-      value = Long.toString(millis);
+    String connectParam;
+    String socketParam;
+    boolean seconds;
+    if (MYSQL_DRIVER.equals(driver)
+        || MYSQL_LEGACY_DRIVER.equals(driver)
+        || OCEANBASE_DRIVER.equals(driver)) {
+      // MySQL Connector/J and the MySQL-compatible OceanBase driver expect milliseconds.
+      connectParam = CONNECT_TIMEOUT_PARAM;
+      socketParam = SOCKET_TIMEOUT_PARAM;
+      seconds = false;
     } else if (POSTGRESQL_DRIVER.equals(driver)) {
-      // PostgreSQL expects seconds; round up so a sub-second bound never collapses to 0
-      // ("no timeout"), with a minimum of 1 second.
-      value = Long.toString(Math.max(1L, (millis + 999L) / 1000L));
+      // PostgreSQL (and Hologres via the PostgreSQL driver) expect seconds.
+      connectParam = CONNECT_TIMEOUT_PARAM;
+      socketParam = SOCKET_TIMEOUT_PARAM;
+      seconds = true;
+    } else if (CLICKHOUSE_DRIVER.equals(driver)) {
+      // ClickHouse uses snake_case parameter names and expects milliseconds.
+      connectParam = CLICKHOUSE_CONNECT_TIMEOUT_PARAM;
+      socketParam = CLICKHOUSE_SOCKET_TIMEOUT_PARAM;
+      seconds = false;
     } else {
       LOG.debug(
           "JDBC driver '{}' has no known connect-timeout translation; leaving connection timeouts "
@@ -110,9 +135,21 @@ public final class JdbcConnectionTimeouts {
       return properties;
     }
 
-    addIfAbsent(properties, CONNECT_TIMEOUT_PARAM, value, config, jdbcUrl);
-    addIfAbsent(properties, SOCKET_TIMEOUT_PARAM, value, config, jdbcUrl);
+    String value = Long.toString(seconds ? millisToSeconds(millis) : millis);
+    addIfAbsent(properties, connectParam, value, config, jdbcUrl);
+    addIfAbsent(properties, socketParam, value, config, jdbcUrl);
     return properties;
+  }
+
+  /**
+   * Converts milliseconds to seconds, rounded up with a minimum of 1 so a sub-second bound never
+   * collapses to 0 ("no timeout").
+   *
+   * @param millis the timeout in milliseconds
+   * @return the timeout in whole seconds, at least 1
+   */
+  private static long millisToSeconds(long millis) {
+    return Math.max(1L, (millis + 999L) / 1000L);
   }
 
   /**

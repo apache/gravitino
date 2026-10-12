@@ -81,9 +81,15 @@ the check is skipped.
 So that create-time verification fails fast against an unreachable host instead of hanging, a
 single JDBC connection is bounded by `jdbc.pool.connect-timeout-ms` (default `30000` ms). Gravitino
 translates this canonical millisecond value into each driver family's own connection parameters and
-unit: MySQL Connector/J (also Doris and StarRocks) uses `connectTimeout`/`socketTimeout` in
-milliseconds, and PostgreSQL uses them in seconds (rounded up, minimum 1). A value you set directly
-on the connection or in the `jdbc-url` query string is never overridden; drivers whose family is not
-recognized are left unbounded by Gravitino. The timeout is applied as a per-connection bound, so the
-pool stays lazy and no connection is opened until the first real round trip (create-time
-verification).
+unit:
+
+- MySQL Connector/J — also used by the Doris, StarRocks, and OceanBase catalogs:
+  `connectTimeout`/`socketTimeout` in milliseconds.
+- PostgreSQL — also used by the Hologres catalog: `connectTimeout`/`socketTimeout` in seconds
+  (rounded up, minimum 1).
+- ClickHouse: `connect_timeout`/`socket_timeout` in milliseconds (note the underscore names).
+
+A value you set directly on the connection or in the `jdbc-url` query string is never overridden;
+drivers whose family is not recognized are left unbounded by Gravitino. The timeout is applied as a
+per-connection bound, so the pool stays lazy and no connection is opened until the first real round
+trip (create-time verification).

@@ -32,6 +32,8 @@ public class TestJdbcConnectionTimeouts {
   private static final String CONNECT_TIMEOUT_MS_KEY = "jdbc.pool.connect-timeout-ms";
   private static final String CONNECT_TIMEOUT = "connectTimeout";
   private static final String SOCKET_TIMEOUT = "socketTimeout";
+  private static final String CLICKHOUSE_CONNECT_TIMEOUT = "connect_timeout";
+  private static final String CLICKHOUSE_SOCKET_TIMEOUT = "socket_timeout";
 
   private static JdbcConfig config(Map<String, String> props) {
     return new JdbcConfig(props);
@@ -52,6 +54,68 @@ public class TestJdbcConnectionTimeouts {
       Assertions.assertEquals("30000", result.get(SOCKET_TIMEOUT), driver);
       Assertions.assertEquals(2, result.size(), driver);
     }
+  }
+
+  @Test
+  void testOceanBaseDriverEmitsMilliseconds() {
+    // OceanBase Connector/J is MySQL-compatible and uses the same camelCase params in milliseconds.
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.oceanbase.jdbc.Driver");
+    props.put(URL_KEY, "jdbc:oceanbase://host:2881/db");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
+
+    Assertions.assertEquals("30000", result.get(CONNECT_TIMEOUT));
+    Assertions.assertEquals("30000", result.get(SOCKET_TIMEOUT));
+    Assertions.assertEquals(2, result.size());
+  }
+
+  @Test
+  void testClickHouseDriverEmitsSnakeCaseMilliseconds() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.clickhouse.jdbc.ClickHouseDriver");
+    props.put(URL_KEY, "jdbc:clickhouse://host:8443/default");
+    props.put(CONNECT_TIMEOUT_MS_KEY, "7500");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
+
+    // ClickHouse uses snake_case names and milliseconds; the camelCase names must NOT be emitted.
+    Assertions.assertEquals("7500", result.get(CLICKHOUSE_CONNECT_TIMEOUT));
+    Assertions.assertEquals("7500", result.get(CLICKHOUSE_SOCKET_TIMEOUT));
+    Assertions.assertFalse(result.containsKey(CONNECT_TIMEOUT));
+    Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT));
+    Assertions.assertEquals(2, result.size());
+  }
+
+  @Test
+  void testClickHouseOperatorValueInJdbcUrlIsPreserved() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.clickhouse.jdbc.ClickHouseDriver");
+    String url = "jdbc:clickhouse://host:8443/default?socket_timeout=60000";
+    props.put(URL_KEY, url);
+
+    Map<String, String> result = JdbcConnectionTimeouts.connectionProperties(config(props), url);
+
+    // socket_timeout is left to the operator; connect_timeout is still defaulted.
+    Assertions.assertFalse(result.containsKey(CLICKHOUSE_SOCKET_TIMEOUT));
+    Assertions.assertEquals("30000", result.get(CLICKHOUSE_CONNECT_TIMEOUT));
+  }
+
+  @Test
+  void testHologresUsesPostgresqlDriverSeconds() {
+    // Hologres connects through the PostgreSQL driver, so it inherits the seconds translation.
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "org.postgresql.Driver");
+    props.put(URL_KEY, "jdbc:postgresql://host:80/db");
+    props.put(CONNECT_TIMEOUT_MS_KEY, "5000");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
+
+    Assertions.assertEquals("5", result.get(CONNECT_TIMEOUT));
+    Assertions.assertEquals("5", result.get(SOCKET_TIMEOUT));
   }
 
   @Test
