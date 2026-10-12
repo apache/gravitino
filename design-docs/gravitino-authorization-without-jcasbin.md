@@ -19,11 +19,14 @@
 
 # Design of a JCasbin-free Policy Evaluator for the Built-in Authorizer in Gravitino
 
-| Item | Value |
-|---|---|
-| Implementation PR | [#12286](https://github.com/apache/gravitino/pull/12286) |
-| Related issues | [#12173](https://github.com/apache/gravitino/issues/12173) (per-role policy index), [#12282](https://github.com/apache/gravitino/issues/12282) (remove the enforcer), [#13748](https://github.com/apache/gravitino/issues/13748) (shared role bindings) |
-| Scope | `JcasbinAuthorizer` in `server-common`, `AuthorizationRequestContext` in `core`, the JCasbin dependency in `server-common` and Iceberg REST |
+| Item                     | Value                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design issue             | [#13789](https://github.com/apache/gravitino/issues/13789)                                                                                  |
+| Implementation PR        | [#12286](https://github.com/apache/gravitino/pull/12286)                                                                                    |
+| Per-role policy index    | [#12173](https://github.com/apache/gravitino/issues/12173)                                                                                  |
+| Enforcer removal         | [#12282](https://github.com/apache/gravitino/issues/12282)                                                                                  |
+| Shared role bindings bug | [#13748](https://github.com/apache/gravitino/issues/13748)                                                                                  |
+| Scope                    | `JcasbinAuthorizer` in `server-common`, `AuthorizationRequestContext` in `core`, the JCasbin dependency in `server-common` and Iceberg REST |
 
 ---
 
@@ -37,13 +40,13 @@ Gravitino's built-in authorizer answers questions of the form:
 
 Its inputs are:
 
-| Input | Source |
-|---|---|
-| The caller | A user stored in Gravitino, plus the groups carried by the request. With OAuth/JWT, groups come from the token's groups claim and live only in the request's `UserPrincipal`; Gravitino does not store user-to-group membership. |
-| Roles held by the caller | Roles granted to the user directly, plus roles granted to each of the request's groups (`user_role_rel`, `group_role_rel`). |
-| What each role allows or denies | The role's securable objects; each privilege has condition `ALLOW` or `DENY`. |
-| Active roles | With role assumption, a request can narrow its ALLOW privileges to a subset of its roles. DENY always applies over all held roles. |
-| Ownership | `OWNER` is answered from the owner relation (`owner_meta`), not from role privileges. |
+| Input                           | Source                                                                                                                                                                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The caller                      | A user stored in Gravitino, plus the groups carried by the request. With OAuth/JWT, groups come from the token's groups claim and live only in the request's `UserPrincipal`; Gravitino does not store user-to-group membership. |
+| Roles held by the caller        | Roles granted to the user directly, plus roles granted to each of the request's groups (`user_role_rel`, `group_role_rel`).                                                                                                      |
+| What each role allows or denies | The role's securable objects; each privilege has condition `ALLOW` or `DENY`.                                                                                                                                                    |
+| Active roles                    | With role assumption, a request can narrow its ALLOW privileges to a subset of its roles. DENY always applies over all held roles.                                                                                               |
+| Ownership                       | `OWNER` is answered from the owner relation (`owner_meta`), not from role privileges.                                                                                                                                            |
 
 The decision rules are:
 
@@ -76,10 +79,10 @@ m = g(r.sub, p.sub) && r.metadataId == p.metadataId && r.metadataType == p.metad
 
 Gravitino state is translated into JCasbin rows:
 
-| Gravitino state | JCasbin row | Written when |
-|---|---|---|
-| Role `R` grants `SELECT_TABLE` on table 42 | `p, R, TABLE, 42, SELECT_TABLE, allow` | Role policies are loaded or reloaded |
-| User `U` holds role `R`, directly or through a request group | `g, U, R` | Each request binds its roles and prunes stale ones |
+| Gravitino state                                              | JCasbin row                            | Written when                                       |
+| ------------------------------------------------------------ | -------------------------------------- | -------------------------------------------------- |
+| Role `R` grants `SELECT_TABLE` on table 42                   | `p, R, TABLE, 42, SELECT_TABLE, allow` | Role policies are loaded or reloaded               |
+| User `U` holds role `R`, directly or through a request group | `g, U, R`                              | Each request binds its roles and prunes stale ones |
 
 A check calls `enforcer.enforce(userId, type, id, privilege)`. Around the enforcers, the authorizer already keeps version-validated caches:
 
@@ -92,16 +95,16 @@ In practice JCasbin is used as an in-memory table of `(role, type, id, privilege
 
 ### Problem 1: every probe scans every policy on the node
 
-JCasbin 1.99.0 has no index by subject or object. `enforce` evaluates the Aviator matcher against **every** `p` row loaded in the enforcer, including rows of roles the caller does not hold. The enforcer accumulates rows for up to `GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE` roles (default 10,000) across all metalakes.
+JCasbin 1.99.0 has no index by subject or object. `enforce` evaluates the Aviator matcher against **every** `p` row loaded in the enforcer, including rows of roles the caller does not hold. The enforcer accumulates rows for up to `gravitino.authorization.jcasbin.roleCacheSize` roles (default 10,000) across all metalakes.
 
 Standalone benchmark from #12173 (real model, one user with one role, one target object):
 
 | Roles loaded | `p` rows | `enforce` avg | Hash lookup |
-|---|---|---|---|
-| 100 | 6,000 | ~1.0 ms | 0.06 µs |
-| 1,000 | 60,000 | ~12.8 ms | 0.015 µs |
-| 5,000 | 300,000 | ~51 ms | 0.015 µs |
-| 10,000 | 600,000 | ~106 ms | 0.015 µs |
+| ------------ | -------- | ------------- | ----------- |
+| 100          | 6,000    | ~1.0 ms       | 0.06 µs     |
+| 1,000        | 60,000   | ~12.8 ms      | 0.015 µs    |
+| 5,000        | 300,000  | ~51 ms        | 0.015 µs    |
+| 10,000       | 600,000  | ~106 ms       | 0.015 µs    |
 
 The cost is multiplied because one request makes many probes:
 
@@ -118,11 +121,11 @@ Role membership is computed per request (user roles plus roles of the request's 
 
 **Correctness (#13748).** The same user can send concurrent requests with different group claims, for example an old token in a long-running Spark job and a new token after an IdP group change. Each request binds its roles and prunes the ones it does not hold, so one request can overwrite the other's view:
 
-| Step | Event | Shared `g(alice, ...)` |
-|---|---|---|
-| 1 | Request A (`groups=[analysts, contractors]`) binds `read_sales` and `no_pii` (DENY) | read_sales, no_pii |
-| 2 | Request B (`groups=[analysts]`) prunes `no_pii`, which it does not hold | read_sales |
-| 3 | A checks `SELECT_TABLE` on `sales.orders` | **allowed**: the DENY was lost |
+| Step | Event                                                                               | Shared `g(alice, ...)`         |
+| ---- | ----------------------------------------------------------------------------------- | ------------------------------ |
+| 1    | Request A (`groups=[analysts, contractors]`) binds `read_sales` and `no_pii` (DENY) | read_sales, no_pii             |
+| 2    | Request B (`groups=[analysts]`) prunes `no_pii`, which it does not hold             | read_sales                     |
+| 3    | A checks `SELECT_TABLE` on `sales.orders`                                           | **allowed**: the DENY was lost |
 
 The reverse interleaving injects an ALLOW into a request that should hold no role.
 
@@ -156,7 +159,7 @@ JCasbin brings the enforcer, Aviator, model files, a no-op adapter, engine-speci
 ## Non-Goals
 
 1. **Privilege model changes**: No new privileges, conditions, or decision rules. This design changes how decisions are computed, not what they are.
-2. **Public API or configuration changes**: No REST, client, or configuration-key change. The class name `JcasbinAuthorizer` is kept so that existing `gravitino.authorization.impl` values keep working; renaming it is a separate decision.
+2. **Public API or configuration changes**: No REST, client, or configuration-key change. The class name `JcasbinAuthorizer` is kept so that existing `gravitino.authorization.impl` values keep working, and the `gravitino.authorization.jcasbin.*` keys keep their names even though JCasbin is gone. Renaming either is a separate decision because it needs a deprecation path.
 3. **Cross-node invalidation changes**: The existing channels (local hooks and the entity change-log poller) are reused as they are.
 4. **External policy engines**: OPA, Cedar, or Ranger are not introduced for the built-in authorizer; see [Solution Investigations](#solution-investigations).
 5. **Persisting compiled policies**: Compiled indexes stay in memory and are rebuilt from role entities on demand, as JCasbin rows are today. No schema change is needed.
@@ -165,13 +168,13 @@ JCasbin brings the enforcer, Aviator, model files, a no-op adapter, engine-speci
 
 ## Solution Investigations
 
-| Approach | Pros | Cons | Decision |
-|---|---|---|---|
-| A. Keep JCasbin, replace `g(r.sub, p.sub)` with a request-aware `hasRole` function (#13747) | Small diff; fixes #13748 | Keeps the O(N) scan, in-place reload, the global lock around every probe, and the dependency | Rejected as the long-term design; acceptable as a short-term fix |
-| B. Keep JCasbin, one enforcer per role or per user | Removes the global scan | Per role: still evaluates Aviator per row and pays model overhead per enforcer. Per user: duplicates policies across users and must be invalidated on every role change | Rejected |
-| C. Precompute a per-user effective policy map | O(1) lookups | Group membership is per request, so the key is (user, group set, active roles). Any role change invalidates every combination that includes it, and the number of combinations is unbounded | Rejected |
-| D. External policy engine (OPA, Cedar, Ranger) | Rich policy languages and central management | Adds a network hop or a new runtime, and still needs Gravitino's id resolution, versioning and owner logic. Ranger already exists as a separate authorization plugin | Rejected for the built-in authorizer |
-| E. Immutable per-role hash indexes pinned by a request-local view | O(k) or O(1) probes; isolation by construction; no in-place mutation; no dependency | New concurrency code for publication and invalidation that must be proven correct | **Chosen** |
+| Approach                                                                                    | Pros                                                                                | Cons                                                                                                                                                                                        | Decision                                                         |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A. Keep JCasbin, replace `g(r.sub, p.sub)` with a request-aware `hasRole` function (#13747) | Small diff; fixes #13748                                                            | Keeps the O(N) scan, in-place reload, the global lock around every probe, and the dependency                                                                                                | Rejected as the long-term design; acceptable as a short-term fix |
+| B. Keep JCasbin, one enforcer per role or per user                                          | Removes the global scan                                                             | Per role: still evaluates Aviator per row and pays model overhead per enforcer. Per user: duplicates policies across users and must be invalidated on every role change                     | Rejected                                                         |
+| C. Precompute a per-user effective policy map                                               | O(1) lookups                                                                        | Group membership is per request, so the key is (user, group set, active roles). Any role change invalidates every combination that includes it, and the number of combinations is unbounded | Rejected                                                         |
+| D. External policy engine (OPA, Cedar, Ranger)                                              | Rich policy languages and central management                                        | Adds a network hop or a new runtime, and still needs Gravitino's id resolution, versioning and owner logic. Ranger already exists as a separate authorization plugin                        | Rejected for the built-in authorizer                             |
+| E. Immutable per-role hash indexes pinned by a request-local view                           | O(k) or O(1) probes; isolation by construction; no in-place mutation; no dependency | New concurrency code for publication and invalidation that must be proven correct                                                                                                           | **Chosen**                                                       |
 
 Option A and option E both make role membership request-local, so they agree on #13748. Option E additionally removes the costs listed in Problems 1, 3, 4 and 5.
 
@@ -235,11 +238,11 @@ enum Effect { ALLOW, DENY }      // DENY wins over ALLOW
 
 Built from a `RoleEntity` outside any lock:
 
-| Field | Meaning |
-|---|---|
-| `index: Map<PolicyKey, Effect>` | Each securable object resolved to its metadata id; each privilege becomes one key. Within one role, DENY beats ALLOW on the same key. |
-| `unresolvedObjects` | Objects whose id could not be resolved, usually dropped objects still referenced by the role. Logged with throttling. |
-| `unresolvedDenies` | Privilege names of DENYs on unresolved objects. They keep the `hasDenyPolicy` shortcut disabled even though the exact object is unknown. |
+| Field                           | Meaning                                                                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `index: Map<PolicyKey, Effect>` | Each securable object resolved to its metadata id; each privilege becomes one key. Within one role, DENY beats ALLOW on the same key.    |
+| `unresolvedObjects`             | Objects whose id could not be resolved, usually dropped objects still referenced by the role. Logged with throttling.                    |
+| `unresolvedDenies`              | Privilege names of DENYs on unresolved objects. They keep the `hasDenyPolicy` shortcut disabled even though the exact object is unknown. |
 
 If an object's name cannot be normalized because the catalog capability lookup failed, its DENY privileges are installed conservatively on the **catalog** id, so a parent ALLOW cannot bypass a DENY that is temporarily unresolvable. If even the catalog id cannot be resolved, the role is marked unreadable and none of its policies are published.
 
@@ -276,12 +279,12 @@ A role is in `allowRoles` only if the request's active roles include it. For nam
 
 #### Publication state in the authorizer
 
-| Field | Purpose |
-|---|---|
-| `rolePolicyLock` (read-write lock) | Serializes publication and invalidation. Held only around in-memory map updates; no database or metadata lookup runs under it. |
-| `rolePolicyGenerationCounter` | Monotonic counter, advanced on each publication or explicit invalidation. |
+| Field                                        | Purpose                                                                                                                                                                                                                                        |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rolePolicyLock` (read-write lock)           | Serializes publication and invalidation. Held only around in-memory map updates; no database or metadata lookup runs under it.                                                                                                                 |
+| `rolePolicyGenerationCounter`                | Monotonic counter, advanced on each publication or explicit invalidation.                                                                                                                                                                      |
 | `roleClearGenerations: roleId -> generation` | Generation of a role's latest publication or invalidation. Bounded by the role cache size; on overflow the older half is pruned and `prunedRoleClearGeneration` is raised, so a request older than that watermark conservatively reloads once. |
-| `loadingRoles: roleId -> RoleLoadState` | In-flight loaders keep publication state even if the cache evicts the role, so a slow loader with an older version cannot overwrite a newer publication or resurrect an invalidated role. |
+| `loadingRoles: roleId -> RoleLoadState`      | In-flight loaders keep publication state even if the cache evicts the role, so a slow loader with an older version cannot overwrite a newer publication or resurrect an invalidated role.                                                      |
 
 TTL and size eviction of `loadedRoles` **do not** advance generations: requests pin immutable objects, so eviction cannot change what an in-flight request sees.
 
@@ -351,13 +354,13 @@ boolean evaluate(PolicyKey key, boolean allow) {    // allow = true for the allo
 }
 ```
 
-| Rule | JCasbin | This design |
-|---|---|---|
-| Subject match | `g(userId, p.sub)` over shared rows | Role is in this request's pinned list |
-| Object match | Linear scan, `==` on type, id, act | Hash lookup on `PolicyKey` |
-| DENY precedence | `!some(where p.eft == deny)` in the deny enforcer | Scan `denyRoles` first |
-| Active roles | One `enforce` per active role | `allowRoles` holds active roles only; `denyRoles` holds all |
-| OWNER | Owner relation, already outside the enforcer | Unchanged |
+| Rule            | JCasbin                                           | This design                                                 |
+| --------------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| Subject match   | `g(userId, p.sub)` over shared rows               | Role is in this request's pinned list                       |
+| Object match    | Linear scan, `==` on type, id, act                | Hash lookup on `PolicyKey`                                  |
+| DENY precedence | `!some(where p.eft == deny)` in the deny enforcer | Scan `denyRoles` first                                      |
+| Active roles    | One `enforce` per active role                     | `allowRoles` holds active roles only; `denyRoles` holds all |
+| OWNER           | Owner relation, already outside the enforcer      | Unchanged                                                   |
 
 `hasDenyPolicy` becomes a set intersection, `privileges ∩ deniedPrivileges ≠ ∅`. An unreadable view returns `true`, which disables the shortcut and falls back to per-object checks.
 
@@ -383,10 +386,10 @@ A request never makes a **new** decision with a role version that was replaced o
 
 #### Example
 
-| Object | Value |
-|---|---|
-| User | `alice` (id 100), no direct roles |
-| Group `analysts` | Granted role `read_sales` (id 7): ALLOW `SELECT_TABLE` on schema `sales` (id 20) |
+| Object              | Value                                                                             |
+| ------------------- | --------------------------------------------------------------------------------- |
+| User                | `alice` (id 100), no direct roles                                                 |
+| Group `analysts`    | Granted role `read_sales` (id 7): ALLOW `SELECT_TABLE` on schema `sales` (id 20)  |
 | Group `contractors` | Granted role `no_pii` (id 9): DENY `SELECT_TABLE` on table `sales.orders` (id 42) |
 
 Compiled entries in `loadedRoles`:
@@ -412,18 +415,18 @@ Neither request writes anything the other reads, so the #13748 interleaving cann
 
 Notation: `N` = policies loaded on the node, `k` = roles held by the caller, `a` = active roles, `L` = objects in a list, `d` = scopes checked per object.
 
-| Operation | JCasbin | This design |
-|---|---|---|
-| One probe | O(N) matcher evaluations | O(k) hash lookups; O(1) after merge |
-| Narrowed probe | O(a · N) | O(k) |
-| List of `L` objects | O(L · d · N) | O(min(L · d · k, held policies + L · d)) |
-| `hasDenyPolicy` | O(policies of held roles) on string rows | O(\|privileges\|) set lookups |
-| Bind or prune membership | Write lock per request with role changes | None |
-| Reload a role | Remove and add rows under the write lock | Replace one reference under the write lock |
+| Operation                | JCasbin                                  | This design                                |
+| ------------------------ | ---------------------------------------- | ------------------------------------------ |
+| One probe                | O(N) matcher evaluations                 | O(k) hash lookups; O(1) after merge        |
+| Narrowed probe           | O(a · N)                                 | O(k)                                       |
+| List of `L` objects      | O(L · d · N)                             | O(min(L · d · k, held policies + L · d))   |
+| `hasDenyPolicy`          | O(policies of held roles) on string rows | O(\|privileges\|) set lookups              |
+| Bind or prune membership | Write lock per request with role changes | None                                       |
+| Reload a role            | Remove and add rows under the write lock | Replace one reference under the write lock |
 
 ### Backward compatibility
 
-- No public API, REST, configuration-key, or default-authorizer change. The class stays `JcasbinAuthorizer`.
+- No public API, REST, configuration-key, or default-authorizer change. The class stays `JcasbinAuthorizer`, and the existing `gravitino.authorization.jcasbin.*` keys (`roleCacheSize`, `ownerCacheSize`, `metadataIdCacheSize`, `cacheExpirationSecs`, `changePollIntervalSecs`) keep their names and meaning; `roleCacheSize` now bounds the number of cached per-role indexes.
 - No storage or schema change; policies are still derived from role entities on demand.
 - Removed: `GravitinoAdapter`, `jcasbin_model.conf`, `TestJcasbinModel`, `jcasbin_policy.txt`, and the JCasbin dependency from `server-common` and Iceberg REST. `LICENSE.bin` and `LICENSE.iceberg` drop the JCasbin and Aviator entries. Commons Codec, previously transitive through JCasbin, is declared explicitly.
 - Log targets in `conf/log4j2.properties.template` and the Helm chart change from the JCasbin package to the authorizer package. Operators who configured a custom logger for `org.casbin` should switch to the authorizer package.
@@ -431,30 +434,37 @@ Notation: `N` = policies loaded on the node, `k` = roles held by the caller, `a`
 
 ### Verification
 
-| Area | How |
-|---|---|
-| Decision equivalence | A review probe compared 81,000 decisions against the current JCasbin model with no differences and detected a seeded DENY mutation. It is not committed CI. |
-| Regressions | `TestJcasbinAuthorizer` and `TestRequestRolePolicies`: direct and group roles, group revocation at the IdP, the #13748 interleavings (`testInterleavedGroupRequestsMustNot*`, including list filtering), role changes between and within requests, DENY evicted or changed mid-request, global DENY precedence, unreadable roles, incomplete loads and backoff, large roles without a scan, adaptive merge. |
-| Races | Committed tests cover an older load overwriting a newer DENY and a newer publication refreshing an evicted view. A review probe also ran 60 latch-controlled publication and invalidation races with no stale ALLOW. |
-| Performance | `TestListAuthorizationPerformance` (opt-in) covers large-role, many-role, and long-list scenarios. It guards complexity, not absolute latency. |
+- **Decision equivalence**: a review probe compared 81,000 decisions against the current JCasbin model with no differences, and detected a seeded DENY mutation. It is not committed CI.
+- **Regressions**: `TestJcasbinAuthorizer` and `TestRequestRolePolicies` cover:
+  - direct and group roles, and group revocation at the IdP;
+  - the #13748 interleavings (`testInterleavedGroupRequestsMustNot*`), including list filtering;
+  - role changes between and within requests, and a DENY evicted or changed mid-request;
+  - global DENY precedence and active-role narrowing;
+  - unreadable roles, incomplete loads, and the retry backoff;
+  - large roles without a scan, and the adaptive merge.
+- **Races**: committed tests cover an older load overwriting a newer DENY, and a newer publication refreshing an evicted view. A review probe also ran 60 latch-controlled publication and invalidation races with no stale ALLOW.
+- **Performance**: `TestListAuthorizationPerformance` (opt-in) covers large-role, many-role, and long-list scenarios. It guards complexity, not absolute latency.
 
 ### Risks
 
-| Risk | Mitigation |
-|---|---|
-| Decisions drift from the JCasbin model | Differential comparison; a regression test for each rule in [Evaluating a single check](#evaluating-a-single-check) |
-| Stale ALLOW after a role change | Generations are checked before every new decision; delayed loaders cannot publish over newer or invalidated state |
-| Memory of a merged index for very long lists | Built only after probes have paid its cost, and lives only for the request |
-| Growth of `roleClearGenerations` | Bounded by the role cache size; pruning raises a watermark that forces a conservative reload |
+| Risk                                         | Mitigation                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Decisions drift from the JCasbin model       | Differential comparison; a regression test for each rule in [Evaluating a single check](#evaluating-a-single-check) |
+| Stale ALLOW after a role change              | Generations are checked before every new decision; delayed loaders cannot publish over newer or invalidated state   |
+| Memory of a merged index for very long lists | Built only after probes have paid its cost, and lives only for the request                                          |
+| Growth of `roleClearGenerations`             | Bounded by the role cache size; pruning raises a watermark that forces a conservative reload                        |
 
 ---
 
 ## Task Breakdown
 
-- [ ] Add this design document.
-- [ ] Replace JCasbin `p` rows with per-role `PolicyKey -> Effect` indexes in `loadedRoles` (#12173).
-- [ ] Remove the enforcer and the shared grouping graph; add `RequestRolePolicies`, the request-local role set, and generation-based publication and invalidation (#12282). #12286 implements this task together with the previous one.
-- [ ] Remove `GravitinoAdapter`, the JCasbin model, model tests, and the JCasbin dependency from `server-common` and Iceberg REST; update license files and log targets (#12286).
+### Phase 1: Replace the enforcer
+
+- [ ] Add this design document (#13789).
+- [ ] Replace JCasbin evaluation with per-role `PolicyKey -> Effect` indexes and request-local `RequestRolePolicies` views, with generation-based publication and invalidation; remove the enforcer, the model, the adapter, and the JCasbin dependency (#12173, #12282, PR #12286).
+
+### Phase 2: Follow-ups
+
 - [ ] Add storage-backed authorization integration tests that cover direct roles, group roles, DENY precedence, and active roles end to end.
 - [ ] Add multi-node tests for role-change invalidation through the change-log poller.
-- [ ] Decide whether to rename `JcasbinAuthorizer` and its package, keeping the old class name as a deprecated alias.
+- [ ] Decide whether to rename `JcasbinAuthorizer`, its package, and the `gravitino.authorization.jcasbin.*` keys, keeping the old names as deprecated aliases.
