@@ -18,13 +18,17 @@
  */
 package org.apache.gravitino.job.k8s;
 
+import com.google.common.collect.ImmutableList;
 import io.fabric8.kubernetes.client.Config;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -281,6 +285,46 @@ public class TestK8sClientUtils {
       } else {
         System.setProperty(property, before);
       }
+    }
+  }
+
+  @Test
+  public void testRequestLimits() throws IOException {
+    // The limits are set in every connection mode.
+    Path kubeconfig =
+        Files.write(dir.resolve("config"), KUBECONFIG.getBytes(StandardCharsets.UTF_8));
+    Map<String, String> withKubeconfig = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    withKubeconfig.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+    Map<String, String> withMasterUrl = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    withMasterUrl.put(K8sJobExecutorConfigs.MASTER_URL, "https://jobs:6443");
+    for (Map<String, String> map : ImmutableList.of(withKubeconfig, withMasterUrl)) {
+      Config defaults = K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map));
+      Assertions.assertEquals(5_000, defaults.getConnectionTimeout());
+      Assertions.assertEquals(10_000, defaults.getRequestTimeout());
+      Assertions.assertEquals(2, defaults.getRequestRetryBackoffLimit());
+
+      map.put(K8sJobExecutorConfigs.CONNECTION_TIMEOUT_MS, "1000");
+      map.put(K8sJobExecutorConfigs.REQUEST_TIMEOUT_MS, "2000");
+      map.put(K8sJobExecutorConfigs.REQUEST_RETRIES, "0");
+      Config custom = K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map));
+      Assertions.assertEquals(1_000, custom.getConnectionTimeout());
+      Assertions.assertEquals(2_000, custom.getRequestTimeout());
+      Assertions.assertEquals(0, custom.getRequestRetryBackoffLimit());
+    }
+  }
+
+  @Test
+  public void testRequestFailsFastWithoutApiServer() {
+    // Nothing listens on the port. With the client's own defaults this takes about 20 seconds.
+    Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    map.put(K8sJobExecutorConfigs.MASTER_URL, "https://127.0.0.1:1");
+    try (KubernetesClient client = K8sClientUtils.createClient(new K8sJobExecutorConfigs(map))) {
+      Assertions.assertTimeout(
+          Duration.ofSeconds(10),
+          () ->
+              Assertions.assertThrows(
+                  KubernetesClientException.class,
+                  () -> client.pods().inNamespace("default").list()));
     }
   }
 

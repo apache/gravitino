@@ -144,6 +144,9 @@ public final class K8sClientUtils {
    *
    * <p>In every case the default namespace of the client is the namespace of the job executor
    * configurations, rather than the one of the kubeconfig context or of the pod Gravitino runs in.
+   * The connection timeout, the request timeout and the number of request retries are the ones of
+   * the job executor configurations too. They bound how long a call to the client waits while the
+   * job cluster is down: with the defaults, about 15 seconds if the API server can't be reached.
    *
    * @param configs the job executor configurations
    * @return the Kubernetes client configuration
@@ -151,6 +154,17 @@ public final class K8sClientUtils {
    *     token, or the kubeconfig has no context that selects a cluster with a server
    */
   static Config createClientConfig(K8sJobExecutorConfigs configs) {
+    Config config = createConnectionConfig(configs);
+    config.setNamespace(configs.namespace());
+    // The client would otherwise try a request again 10 times, which holds a status query or a
+    // job submission for about two minutes while the job cluster can't be reached.
+    config.setConnectionTimeout(configs.connectionTimeoutMs());
+    config.setRequestTimeout(configs.requestTimeoutMs());
+    config.setRequestRetryBackoffLimit(configs.requestRetries());
+    return config;
+  }
+
+  private static Config createConnectionConfig(K8sJobExecutorConfigs configs) {
     if (configs.masterUrl() != null) {
       ConfigBuilder builder = new ConfigBuilder(Config.empty()).withMasterUrl(configs.masterUrl());
       if (configs.caCertFile() != null) {
@@ -173,7 +187,7 @@ public final class K8sClientUtils {
         }
         builder.withOauthTokenProvider(tokenProvider);
       }
-      return builder.withNamespace(configs.namespace()).build();
+      return builder.build();
     }
 
     Config config;
@@ -222,7 +236,6 @@ public final class K8sClientUtils {
         "The context %s set by %s doesn't exist in the kubeconfig",
         configs.context(),
         K8sJobExecutorConfigs.CONTEXT);
-    config.setNamespace(configs.namespace());
     return config;
   }
 

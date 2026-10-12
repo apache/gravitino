@@ -43,6 +43,9 @@ public class TestK8sJobExecutorConfigs {
     Assertions.assertNull(configs.masterUrl());
     Assertions.assertEquals("default", configs.namespace());
     Assertions.assertEquals("gravitino-job", configs.namePrefix());
+    Assertions.assertEquals(5_000, configs.connectionTimeoutMs());
+    Assertions.assertEquals(10_000, configs.requestTimeoutMs());
+    Assertions.assertEquals(2, configs.requestRetries());
     Assertions.assertEquals(5_000L, configs.statusCacheTtlMs());
     Assertions.assertEquals(600_000L, configs.noStatusTimeoutMs());
     Assertions.assertEquals("gravitino-spark:3.5.9", configs.sparkImage());
@@ -80,6 +83,9 @@ public class TestK8sJobExecutorConfigs {
   public void testDurationKeys() {
     // The duration keys end with InMs, like the other job configurations of Gravitino.
     Map<String, String> map = new HashMap<>(requiredConfigs());
+    map.put("connectionTimeoutInMs", "7");
+    map.put("requestTimeoutInMs", "8");
+    map.put("requestRetries", "0");
     map.put("statusCacheTtlInMs", "1");
     map.put("noStatusTimeoutInMs", "2");
     map.put("spark.resourceRetainDurationInMs", "3");
@@ -89,6 +95,9 @@ public class TestK8sJobExecutorConfigs {
 
     K8sJobExecutorConfigs configs = new K8sJobExecutorConfigs(map);
 
+    Assertions.assertEquals(7, configs.connectionTimeoutMs());
+    Assertions.assertEquals(8, configs.requestTimeoutMs());
+    Assertions.assertEquals(0, configs.requestRetries());
     Assertions.assertEquals(1L, configs.statusCacheTtlMs());
     Assertions.assertEquals(2L, configs.noStatusTimeoutMs());
     Assertions.assertEquals(3L, configs.sparkResourceRetainDurationMs());
@@ -164,6 +173,11 @@ public class TestK8sJobExecutorConfigs {
     assertInvalid(K8sJobExecutorConfigs.NAME_PREFIX, "gravitino-");
     assertInvalid(K8sJobExecutorConfigs.NAME_PREFIX, "a-name-prefix-that-is-too-long");
     assertInvalid(K8sJobExecutorConfigs.NO_STATUS_TIMEOUT_MS, "0");
+    assertInvalid(K8sJobExecutorConfigs.CONNECTION_TIMEOUT_MS, "0");
+    assertInvalid(K8sJobExecutorConfigs.REQUEST_TIMEOUT_MS, "-1");
+    assertInvalid(K8sJobExecutorConfigs.REQUEST_TIMEOUT_MS, "3000000000");
+    assertInvalid(K8sJobExecutorConfigs.REQUEST_RETRIES, "-1");
+    assertInvalid(K8sJobExecutorConfigs.REQUEST_RETRIES, "many");
     assertInvalid(K8sJobExecutorConfigs.SPARK_DRIVER_START_TIMEOUT_MS, "1h");
   }
 

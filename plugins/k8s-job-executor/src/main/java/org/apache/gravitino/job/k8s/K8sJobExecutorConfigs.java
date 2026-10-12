@@ -62,6 +62,28 @@ public class K8sJobExecutorConfigs {
    */
   public static final String TOKEN_FILE = "tokenFile";
 
+  /** How long to wait to connect to the API server. */
+  public static final String CONNECTION_TIMEOUT_MS = "connectionTimeoutInMs";
+
+  /** The default connection timeout, 5 seconds. */
+  public static final long DEFAULT_CONNECTION_TIMEOUT_MS = 5_000L;
+
+  /** How long to wait for the response of a request to the API server. */
+  public static final String REQUEST_TIMEOUT_MS = "requestTimeoutInMs";
+
+  /** The default request timeout, 10 seconds. */
+  public static final long DEFAULT_REQUEST_TIMEOUT_MS = 10_000L;
+
+  /**
+   * How many times a failed request to the API server is tried again, for example if the server
+   * can't be reached or answers with a server error. Together with the timeouts it bounds how long
+   * a submission, a status query or a cancellation waits while the job cluster is down.
+   */
+  public static final String REQUEST_RETRIES = "requestRetries";
+
+  /** The default number of request retries. */
+  public static final long DEFAULT_REQUEST_RETRIES = 2L;
+
   /**
    * The namespace the jobs run in, unless a job sets its own. It must be set: the namespace needs
    * the permissions and the Spark operator set up for the jobs, so none is assumed.
@@ -142,6 +164,9 @@ public class K8sJobExecutorConfigs {
   @Nullable private final String caCertFile;
   @Nullable private final String tokenFile;
   private final String namespace;
+  private final int connectionTimeoutMs;
+  private final int requestTimeoutMs;
+  private final int requestRetries;
   private final String namePrefix;
   private final long statusCacheTtlMs;
   private final long noStatusTimeoutMs;
@@ -205,6 +230,19 @@ public class K8sJobExecutorConfigs {
         "%s isn't a valid namespace name: %s",
         NAMESPACE,
         namespace);
+    this.connectionTimeoutMs =
+        intValue(
+            CONNECTION_TIMEOUT_MS,
+            positiveLongValue(configs, CONNECTION_TIMEOUT_MS, DEFAULT_CONNECTION_TIMEOUT_MS));
+    this.requestTimeoutMs =
+        intValue(
+            REQUEST_TIMEOUT_MS,
+            positiveLongValue(configs, REQUEST_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS));
+    long retries = longValue(configs, REQUEST_RETRIES, DEFAULT_REQUEST_RETRIES);
+    Preconditions.checkArgument(
+        retries >= 0, "%s must not be negative: %s", REQUEST_RETRIES, retries);
+    this.requestRetries = intValue(REQUEST_RETRIES, retries);
+
     this.namePrefix = stringValue(configs, NAME_PREFIX, DEFAULT_NAME_PREFIX);
     Preconditions.checkArgument(
         namePrefix.length() <= MAX_NAME_PREFIX_LENGTH
@@ -311,6 +349,33 @@ public class K8sJobExecutorConfigs {
    */
   public String namespace() {
     return namespace;
+  }
+
+  /**
+   * Returns how long to wait to connect to the API server.
+   *
+   * @return the connection timeout in milliseconds
+   */
+  public int connectionTimeoutMs() {
+    return connectionTimeoutMs;
+  }
+
+  /**
+   * Returns how long to wait for the response of a request to the API server.
+   *
+   * @return the request timeout in milliseconds
+   */
+  public int requestTimeoutMs() {
+    return requestTimeoutMs;
+  }
+
+  /**
+   * Returns how many times a failed request to the API server is tried again.
+   *
+   * @return the number of request retries
+   */
+  public int requestRetries() {
+    return requestRetries;
   }
 
   /**
@@ -427,9 +492,13 @@ public class K8sJobExecutorConfigs {
     try {
       return Long.parseLong(value);
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          String.format("%s must be a number of milliseconds: %s", key, value), e);
+      throw new IllegalArgumentException(String.format("%s must be a number: %s", key, value), e);
     }
+  }
+
+  private static int intValue(String key, long value) {
+    Preconditions.checkArgument(value <= Integer.MAX_VALUE, "%s is too large: %s", key, value);
+    return (int) value;
   }
 
   private static long positiveLongValue(
