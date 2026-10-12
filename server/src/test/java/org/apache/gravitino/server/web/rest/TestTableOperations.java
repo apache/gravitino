@@ -524,14 +524,14 @@ public class TestTableOperations extends BaseOperationsTest {
 
     // The client builds request paths with RESTUtils.encodeString, so the server must decode the
     // encoded name back to the original one.
-    Response resp =
+    try (Response resp =
         target(tablePath(metalake, catalog, schema) + RESTUtils.encodeString("table 1"))
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Assertions.assertEquals("table 1", resp.readEntity(TableResponse.class).getTable().name());
+            .get()) {
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+      Assertions.assertEquals("table 1", resp.readEntity(TableResponse.class).getTable().name());
+    }
   }
 
   @Test

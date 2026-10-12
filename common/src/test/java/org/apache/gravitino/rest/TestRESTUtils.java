@@ -45,6 +45,11 @@ class TestRESTUtils {
     String expected = "key1=value1&key2=value2";
     assertEquals(expected, RESTUtils.encodeFormData(formData));
 
+    // Form data keeps the form encoding, in which a space becomes '+'.
+    assertEquals(
+        "scope=read+write&secret=a%2Bb",
+        RESTUtils.encodeFormData(ImmutableMap.of("scope", "read write", "secret", "a+b")));
+
     Map<Object, Object> emptyFormData = ImmutableMap.of();
     assertEquals("", RESTUtils.encodeFormData(emptyFormData));
   }

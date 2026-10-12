@@ -77,7 +77,7 @@ public class RESTUtils {
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     formData.forEach(
         (key, value) ->
-            builder.put(encodeString(String.valueOf(key)), encodeString(String.valueOf(value))));
+            builder.put(formEncode(String.valueOf(key)), formEncode(String.valueOf(value))));
     return FORM_JOINER.join(builder.build());
   }
 
@@ -105,14 +105,9 @@ public class RESTUtils {
    */
   public static String encodeString(String toEncode) {
     Preconditions.checkArgument(toEncode != null, "Invalid string to encode: null");
-    try {
-      // URLEncoder follows the form encoding and turns a space into '+', which is a literal '+'
-      // in a path segment. A literal '+' in the input is already encoded as %2B at this point.
-      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name())
-          .replace(FORM_ENCODED_SPACE, PERCENT_ENCODED_SPACE);
-    } catch (UnsupportedEncodingException e) {
-      throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
-    }
+    // URLEncoder follows the form encoding and turns a space into '+', which is a literal '+'
+    // in a path segment. A literal '+' in the input is already encoded as %2B at this point.
+    return formEncode(toEncode).replace(FORM_ENCODED_SPACE, PERCENT_ENCODED_SPACE);
   }
 
   /**
@@ -174,5 +169,14 @@ public class RESTUtils {
       }
     }
     throw new IOException("No available port in the range: " + portRangeStart + ":" + portRangeEnd);
+  }
+
+  // Encodes in application/x-www-form-urlencoded format, in which a space becomes '+'.
+  private static String formEncode(String toEncode) {
+    try {
+      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
+    }
   }
 }
