@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 import javax.inject.Inject;
@@ -354,6 +355,10 @@ public class SemanticModelOperations {
                 request.getUpdates().stream()
                     .map(SemanticModelUpdateRequest::semanticModelChange)
                     .toArray(SemanticModelChange[]::new);
+            if (Arrays.stream(changes)
+                .anyMatch(change -> change instanceof SemanticModelChange.ReplaceDefinition)) {
+              dispatcher.loadSemanticModel(ident);
+            }
             for (SemanticModelChange change : changes) {
               if (change instanceof SemanticModelChange.ReplaceDefinition) {
                 sourceValidator.validate(
