@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.maintenance.storage.mapper;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** MyBatis mapper for {@code table_maintenance_job}. */
@@ -33,6 +35,10 @@ public interface TableMaintenanceJobMapper {
   @InsertProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "insertJob")
   @Options(useGeneratedKeys = true, keyProperty = "jobMeta.id", keyColumn = "id")
   void insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta);
+
+  @Nullable
+  @SelectProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "selectByJobId")
+  TableMaintenanceJobPO selectByJobId(@Param("jobId") long jobId);
 
   @UpdateProvider(
       type = TableMaintenanceJobSQLProviderFactory.class,

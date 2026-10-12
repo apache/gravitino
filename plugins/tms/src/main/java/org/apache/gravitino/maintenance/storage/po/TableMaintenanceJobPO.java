@@ -44,4 +44,5 @@ public class TableMaintenanceJobPO {
   private Long beforeSnapshotId;
   private Long afterSnapshotId;
   private Long finishedAt;
+  private Long createdAt;
 }

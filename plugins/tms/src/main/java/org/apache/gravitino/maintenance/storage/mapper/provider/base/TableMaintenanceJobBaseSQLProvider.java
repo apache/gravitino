@@ -27,8 +27,9 @@ import org.apache.ibatis.annotations.Param;
 public class TableMaintenanceJobBaseSQLProvider {
 
   /**
-   * Inserts a run row with {@code job_id}, {@code table_id}, and {@code policy_id} only. Snapshot
-   * columns stay null until the Spark Job / terminal listener updates them (§5.2).
+   * Inserts a run row with {@code job_id}, {@code table_id}, {@code policy_id}, and {@code
+   * created_at}. Snapshot columns stay null until the Spark Job / terminal listener updates them
+   * (§5.2).
    *
    * @param jobMeta row to insert
    * @return INSERT statement
@@ -36,8 +37,21 @@ public class TableMaintenanceJobBaseSQLProvider {
   public String insertJob(@Param("jobMeta") TableMaintenanceJobPO jobMeta) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (job_id, table_id, policy_id)"
-        + " VALUES (#{jobMeta.jobId}, #{jobMeta.tableId}, #{jobMeta.policyId})";
+        + " (job_id, table_id, policy_id, created_at)"
+        + " VALUES (#{jobMeta.jobId}, #{jobMeta.tableId}, #{jobMeta.policyId},"
+        + " #{jobMeta.createdAt})";
+  }
+
+  /**
+   * @param jobId Gravitino job run id
+   * @return SELECT statement
+   */
+  public String selectByJobId(@Param("jobId") long jobId) {
+    return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
+        + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
+        + " finished_at AS finishedAt, created_at AS createdAt FROM "
+        + TABLE_NAME
+        + " WHERE job_id = #{jobId}";
   }
 
   /**

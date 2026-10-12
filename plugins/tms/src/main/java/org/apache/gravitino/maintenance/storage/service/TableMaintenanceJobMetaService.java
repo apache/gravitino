@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
 import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
@@ -42,8 +43,8 @@ public class TableMaintenanceJobMetaService {
   }
 
   /**
-   * Inserts a maintenance job row with {@code job_id}, {@code table_id}, and {@code policy_id}
-   * (§5.2).
+   * Inserts a maintenance job row with {@code job_id}, {@code table_id}, {@code policy_id}, and
+   * {@code created_at} (§5.2).
    *
    * @param jobId {@code job_run_meta.job_run_id}
    * @param tableId table entity id
@@ -58,8 +59,22 @@ public class TableMaintenanceJobMetaService {
             .withJobId(jobId)
             .withTableId(tableId)
             .withPolicyId(policyId)
+            .withCreatedAt(System.currentTimeMillis())
             .build();
     SessionUtils.doWithCommit(TableMaintenanceJobMapper.class, mapper -> mapper.insertJob(jobMeta));
+  }
+
+  /**
+   * @param jobId Gravitino job run id
+   * @return job row or null
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableMaintenanceJob")
+  public TableMaintenanceJobPO getJob(long jobId) {
+    return SessionUtils.getWithoutCommit(
+        TableMaintenanceJobMapper.class, mapper -> mapper.selectByJobId(jobId));
   }
 
   /**

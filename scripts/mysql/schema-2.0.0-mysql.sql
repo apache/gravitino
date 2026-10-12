@@ -694,11 +694,13 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id at sample; null until sampled',
     `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after job; null while pending',
     `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'end time; null = in-flight',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'row create time in epoch millis',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tmj_job_id` (`job_id`),
     KEY `idx_tmj_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
     KEY `idx_tmj_before_sid` (`table_id`, `before_snapshot_id`),
-    KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`)
+    KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`),
+    KEY `idx_tmj_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
   COMMENT 'per-run TMS job: snapshot pointers + submit gates';
 

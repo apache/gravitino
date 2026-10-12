@@ -31,7 +31,12 @@ class TestTableMaintenanceJobMetaService extends TestJDBCBackend {
     TableSnapshotMetricsMetaService metricsService = TableSnapshotMetricsMetaService.getInstance();
 
     long jobId = 999L;
+    long before = System.currentTimeMillis();
     jobService.insertJob(jobId, 10L, 20L);
+    long after = System.currentTimeMillis();
+    Assertions.assertTrue(jobService.getJob(jobId).createdAt() >= before);
+    Assertions.assertTrue(jobService.getJob(jobId).createdAt() <= after);
+
     jobService.recordBeforeSnapshot(jobId, 100L);
     metricsService.insertMetrics(10L, 20L, 100L, "{\"mse\":1}");
     jobService.markFinished(jobId, 200L, System.currentTimeMillis());
@@ -39,6 +44,7 @@ class TestTableMaintenanceJobMetaService extends TestJDBCBackend {
 
     jobService.deleteByJobId(jobId);
 
+    Assertions.assertNull(jobService.getJob(jobId));
     Assertions.assertNull(metricsService.getMetrics(10L, 20L, 100L));
     Assertions.assertNull(metricsService.getMetrics(10L, 20L, 200L));
   }

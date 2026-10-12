@@ -706,12 +706,14 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id at sample; null until sampled',
     `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after job; null while pending',
     `finished_at` BIGINT COMMENT 'end time; null = in-flight',
+    `created_at` BIGINT NOT NULL COMMENT 'row create time in epoch millis',
     PRIMARY KEY (`id`)
 ) COMMENT='per-run TMS job: snapshot pointers + submit gates';
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tmj_job_id` ON `table_maintenance_job`(`job_id`);
 CREATE INDEX IF NOT EXISTS `idx_tmj_table_policy_finished` ON `table_maintenance_job`(`table_id`, `policy_id`, `finished_at`);
 CREATE INDEX IF NOT EXISTS `idx_tmj_before_sid` ON `table_maintenance_job`(`table_id`, `before_snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tmj_after_sid` ON `table_maintenance_job`(`table_id`, `after_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_created_at` ON `table_maintenance_job`(`created_at`);
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',

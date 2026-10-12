@@ -58,6 +58,14 @@ public class TableMaintenanceJobSQLProviderFactory {
 
   /**
    * @param jobId job run id
+   * @return SELECT statement
+   */
+  public static String selectByJobId(@Param("jobId") long jobId) {
+    return getProvider().selectByJobId(jobId);
+  }
+
+  /**
+   * @param jobId job run id
    * @param beforeSnapshotId snapshot id
    * @return UPDATE statement
    */
