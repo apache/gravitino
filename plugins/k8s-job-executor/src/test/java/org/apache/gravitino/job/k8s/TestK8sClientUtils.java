@@ -279,6 +279,36 @@ public class TestK8sClientUtils {
       Assertions.assertEquals(
           "https://prod:6443/",
           K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+
+      // A context that doesn't exist is reported as such, even if the current context that the
+      // client falls back to is broken too.
+      map.put(K8sJobExecutorConfigs.CONTEXT, "staging");
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)));
+      Assertions.assertTrue(e.getMessage().contains("The context staging"), e.getMessage());
+
+      // No context is selected: no current context, or one that doesn't exist.
+      map.remove(K8sJobExecutorConfigs.CONTEXT);
+      for (String content :
+          new String[] {
+            KUBECONFIG.replace("current-context: dev\n", ""),
+            KUBECONFIG.replace("current-context: dev\n", "current-context: staging\n")
+          }) {
+        Files.write(kubeconfig, content.getBytes(StandardCharsets.UTF_8));
+        e =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)),
+                content);
+        Assertions.assertTrue(e.getMessage().contains("has no current context"), e.getMessage());
+      }
+
+      // Without any kubeconfig, as in a pod, the lookup isn't rejected.
+      System.setProperty(property, dir.resolve("missing").toString());
+      Assertions.assertNotNull(
+          K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
     } finally {
       if (before == null) {
         System.clearProperty(property);

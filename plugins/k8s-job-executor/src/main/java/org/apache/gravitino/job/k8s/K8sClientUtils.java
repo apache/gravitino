@@ -19,6 +19,7 @@
 package org.apache.gravitino.job.k8s;
 
 import com.google.common.base.Preconditions;
+import io.fabric8.kubernetes.api.model.NamedContext;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -146,7 +147,9 @@ public final class K8sClientUtils {
    * configurations, rather than the one of the kubeconfig context or of the pod Gravitino runs in.
    * The connection timeout, the request timeout and the number of request retries are the ones of
    * the job executor configurations too. They bound how long a call to the client waits while the
-   * job cluster is down: with the defaults, about 15 seconds if the API server can't be reached.
+   * job cluster is down. With the defaults that is about 15 seconds if the API server can't be
+   * reached, and up to about 30 seconds if it accepts the requests but never answers them, as a
+   * request that timed out is tried again too.
    *
    * @param configs the job executor configurations
    * @return the Kubernetes client configuration
@@ -208,35 +211,50 @@ public final class K8sClientUtils {
           config.getMasterUrl());
     } else {
       config = Config.autoConfigure(configs.context());
-      // The default lookup may merge several kubeconfig files, so they aren't checked one by one.
-      // A context was found in them if there is a current context, and a context that selects a
-      // cluster with a server moves the client off its default API server. If it is still there,
-      // the context selects none, and the client would silently run the jobs in the cluster
-      // Gravitino runs in.
-      Preconditions.checkArgument(
-          config.getCurrentContext() == null
-              || !getHostAndPath(Config.DEFAULT_MASTER_URL)
-                  .equals(getHostAndPath(config.getMasterUrl())),
-          "The context %s of the kubeconfig found by the default lookup selects no cluster with a"
-              + " server. Fix that kubeconfig, or set %s or %s. To use the API server %s itself,"
-              + " set it by %s",
-          config.getCurrentContext() == null ? null : config.getCurrentContext().getName(),
-          K8sJobExecutorConfigs.KUBECONFIG,
-          K8sJobExecutorConfigs.MASTER_URL,
-          Config.DEFAULT_MASTER_URL,
-          K8sJobExecutorConfigs.MASTER_URL);
+      checkDefaultLookup(config, configs);
     }
+    return config;
+  }
 
-    // The client falls back to the current context if the given one doesn't exist, which would
-    // silently run the jobs in another cluster.
-    String context =
-        config.getCurrentContext() == null ? null : config.getCurrentContext().getName();
+  /**
+   * Checks the client configuration that the default lookup found. The lookup may merge several
+   * kubeconfig files, so they aren't checked one by one like a configured kubeconfig. Instead, the
+   * result must not be one of those where the client silently stays on its default API server, the
+   * one of the cluster Gravitino runs in, although a kubeconfig was found.
+   */
+  private static void checkDefaultLookup(Config config, K8sJobExecutorConfigs configs) {
+    NamedContext current = config.getCurrentContext();
+    String currentName = current == null ? null : current.getName();
+    // The client falls back to the current context if the given one doesn't exist. Checked
+    // first, so that the error is about the context that was asked for.
     Preconditions.checkArgument(
-        configs.context() == null || configs.context().equals(context),
-        "The context %s set by %s doesn't exist in the kubeconfig",
+        configs.context() == null || configs.context().equals(currentName),
+        "The context %s set by %s doesn't exist in the kubeconfig found by the default lookup",
         configs.context(),
         K8sJobExecutorConfigs.CONTEXT);
-    return config;
+
+    // A kubeconfig with contexts was found, but none of them is selected. Without any
+    // kubeconfig, as in a pod, there are no contexts and the service account is used.
+    Preconditions.checkArgument(
+        current != null || config.getContexts() == null || config.getContexts().isEmpty(),
+        "The kubeconfig found by the default lookup has no current context, set its"
+            + " current-context or %s",
+        K8sJobExecutorConfigs.CONTEXT);
+
+    // A context that selects a cluster with a server moves the client off its default API
+    // server. If it is still there, the context selects none.
+    Preconditions.checkArgument(
+        current == null
+            || !getHostAndPath(Config.DEFAULT_MASTER_URL)
+                .equals(getHostAndPath(config.getMasterUrl())),
+        "The context %s of the kubeconfig found by the default lookup selects no cluster with a"
+            + " server. Fix that kubeconfig, or set %s or %s. To use the API server %s itself,"
+            + " set it by %s",
+        currentName,
+        K8sJobExecutorConfigs.KUBECONFIG,
+        K8sJobExecutorConfigs.MASTER_URL,
+        Config.DEFAULT_MASTER_URL,
+        K8sJobExecutorConfigs.MASTER_URL);
   }
 
   /**
