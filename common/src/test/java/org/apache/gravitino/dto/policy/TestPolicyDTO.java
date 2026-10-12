@@ -252,6 +252,10 @@ public class TestPolicyDTO {
 
     String json = JsonUtils.anyFieldMapper().writeValueAsString(content);
     Assertions.assertFalse(json.contains("\"present\""), json);
+    Assertions.assertFalse(json.contains("\"maintenanceFields\""), json);
+    Assertions.assertTrue(json.contains("\"schedule\""), json);
+    Assertions.assertTrue(json.contains("\"minIntervalMs\""), json);
+    Assertions.assertTrue(json.contains("\"jobOptions\""), json);
 
     IcebergDataCompactionContent restored =
         JsonUtils.anyFieldMapper().readValue(json, IcebergDataCompactionContent.class);

@@ -181,6 +181,9 @@ public class PolicyContents {
   /**
    * Creates an iceberg compaction policy content with optional TMS scheduling fields.
    *
+   * <p>TMS fields are applied via {@link IcebergDataCompactionContent#withMaintenanceFields}; the
+   * compaction constructor itself is unchanged.
+   *
    * @param minDataFileMse minimum threshold for custom-data-file-mse
    * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
    * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
@@ -202,16 +205,20 @@ public class PolicyContents {
       String sortOrder,
       Map<String, String> rewriteOptions,
       @Nullable TableMaintenancePolicyFields maintenanceFields) {
-    return new IcebergDataCompactionContent(
-        minDataFileMse,
-        minDeleteFileNumber,
-        dataFileMseWeight,
-        deleteFileNumberWeight,
-        maxPartitionNum,
-        rewriteStrategy,
-        sortOrder,
-        rewriteOptions,
-        maintenanceFields);
+    IcebergDataCompactionContent content =
+        new IcebergDataCompactionContent(
+            minDataFileMse,
+            minDeleteFileNumber,
+            dataFileMseWeight,
+            deleteFileNumberWeight,
+            maxPartitionNum,
+            rewriteStrategy,
+            sortOrder,
+            rewriteOptions);
+    if (maintenanceFields == null || !maintenanceFields.anySet()) {
+      return content;
+    }
+    return content.withMaintenanceFields(maintenanceFields);
   }
 
   /**

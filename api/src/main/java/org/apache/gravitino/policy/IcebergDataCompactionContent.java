@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
+import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
 import org.apache.gravitino.maintenance.policy.TableMaintenanceTaskType;
 
 /** Built-in policy content for Iceberg compaction strategy. */
@@ -130,11 +131,15 @@ public class IcebergDataCompactionContent implements PolicyContent {
   private final String rewriteStrategy;
   private final String sortOrder;
   private final Map<String, String> rewriteOptions;
-  @Nullable private final TableMaintenancePolicyFields maintenanceFields;
+  // Flat TMS fields (same JSON shape as REST DTO). Not constructor params — set via
+  // {@link #withMaintenanceFields} or Jackson field-based persistence.
+  @Nullable private TableMaintenanceSchedule schedule;
+  @Nullable private Long minIntervalMs;
+  private Map<String, String> jobOptions;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
-    this(null, null, null, null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null);
   }
 
   IcebergDataCompactionContent(
@@ -146,28 +151,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
-    this(
-        minDataFileMse,
-        minDeleteFileNumber,
-        dataFileMseWeight,
-        deleteFileNumberWeight,
-        maxPartitionNum,
-        rewriteStrategy,
-        sortOrder,
-        rewriteOptions,
-        null);
-  }
-
-  IcebergDataCompactionContent(
-      Long minDataFileMse,
-      Long minDeleteFileNumber,
-      Long dataFileMseWeight,
-      Long deleteFileNumberWeight,
-      Long maxPartitionNum,
-      String rewriteStrategy,
-      String sortOrder,
-      Map<String, String> rewriteOptions,
-      @Nullable TableMaintenancePolicyFields maintenanceFields) {
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -188,7 +171,38 @@ public class IcebergDataCompactionContent implements PolicyContent {
         rewriteOptions == null
             ? DEFAULT_REWRITE_OPTIONS
             : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
-    this.maintenanceFields = maintenanceFields;
+    this.schedule = null;
+    this.minIntervalMs = null;
+    this.jobOptions = Collections.emptyMap();
+  }
+
+  /**
+   * Returns a copy with optional TMS scheduling fields. Does not change the compaction constructor.
+   *
+   * @param fields schedule / minIntervalMs / jobOptions, or null to clear
+   * @return content with TMS fields applied
+   */
+  public IcebergDataCompactionContent withMaintenanceFields(
+      @Nullable TableMaintenancePolicyFields fields) {
+    IcebergDataCompactionContent copy =
+        new IcebergDataCompactionContent(
+            minDataFileMse,
+            minDeleteFileNumber,
+            dataFileMseWeight,
+            deleteFileNumberWeight,
+            maxPartitionNum,
+            rewriteStrategy,
+            sortOrder,
+            rewriteOptions);
+    if (fields != null && fields.anySet()) {
+      copy.schedule = fields.schedule();
+      copy.minIntervalMs = fields.minIntervalMs();
+      copy.jobOptions =
+          fields.jobOptions().isEmpty()
+              ? Collections.emptyMap()
+              : Collections.unmodifiableMap(new LinkedHashMap<>(fields.jobOptions()));
+    }
+    return copy;
   }
 
   /**
@@ -198,7 +212,11 @@ public class IcebergDataCompactionContent implements PolicyContent {
    */
   @Nullable
   public TableMaintenancePolicyFields maintenanceFields() {
-    return maintenanceFields;
+    Map<String, String> options = jobOptions == null ? Collections.emptyMap() : jobOptions;
+    if (schedule == null && minIntervalMs == null && options.isEmpty()) {
+      return null;
+    }
+    return new TableMaintenancePolicyFields(schedule, minIntervalMs, options);
   }
 
   /**
@@ -343,8 +361,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
           Preconditions.checkArgument(
               StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
         });
-    if (maintenanceFields != null) {
-      maintenanceFields.validate(TableMaintenanceTaskType.COMPACTION);
+    TableMaintenancePolicyFields fields = maintenanceFields();
+    if (fields != null) {
+      fields.validate(TableMaintenanceTaskType.COMPACTION);
     }
   }
 
@@ -362,7 +381,9 @@ public class IcebergDataCompactionContent implements PolicyContent {
         && Objects.equals(rewriteStrategy, that.rewriteStrategy)
         && Objects.equals(sortOrder, that.sortOrder)
         && Objects.equals(rewriteOptions, that.rewriteOptions)
-        && Objects.equals(maintenanceFields, that.maintenanceFields);
+        && Objects.equals(schedule, that.schedule)
+        && Objects.equals(minIntervalMs, that.minIntervalMs)
+        && Objects.equals(normalizedJobOptions(), that.normalizedJobOptions());
   }
 
   @Override
@@ -376,7 +397,13 @@ public class IcebergDataCompactionContent implements PolicyContent {
         rewriteStrategy,
         sortOrder,
         rewriteOptions,
-        maintenanceFields);
+        schedule,
+        minIntervalMs,
+        normalizedJobOptions());
+  }
+
+  private Map<String, String> normalizedJobOptions() {
+    return jobOptions == null ? Collections.emptyMap() : jobOptions;
   }
 
   @Override
@@ -400,8 +427,12 @@ public class IcebergDataCompactionContent implements PolicyContent {
         + '\''
         + ", rewriteOptions="
         + rewriteOptions
-        + ", maintenanceFields="
-        + maintenanceFields
+        + ", schedule="
+        + schedule
+        + ", minIntervalMs="
+        + minIntervalMs
+        + ", jobOptions="
+        + jobOptions
         + '}';
   }
 }
