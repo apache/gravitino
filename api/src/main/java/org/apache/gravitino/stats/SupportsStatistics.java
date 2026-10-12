@@ -50,6 +50,19 @@ public interface SupportsStatistics {
       throws UnmodifiableStatisticException, IllegalStatisticNameException;
 
   /**
+   * Atomically shallow-merges object-valued statistics. Supplied keys replace existing keys;
+   * omitted keys are preserved. Missing statistics are created. All values, including existing
+   * values, must be objects. The whole batch is published together to statistics readers.
+   *
+   * @param statistics object-valued statistics containing the keys to merge
+   * @throws UnsupportedOperationException if atomic merging is unsupported
+   * @throws IllegalArgumentException if a value is not an object
+   */
+  default void mergeStatistics(Map<String, StatisticValue<?>> statistics) {
+    throw new UnsupportedOperationException("Atomic statistics merging is not supported");
+  }
+
+  /**
    * Drop statistics by their names. If the statistic is unmodifiable, it will throw an
    * UnmodifiableStatisticException.
    *

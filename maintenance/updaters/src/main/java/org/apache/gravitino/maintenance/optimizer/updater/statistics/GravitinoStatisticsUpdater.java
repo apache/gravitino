@@ -63,6 +63,22 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
   }
 
   @Override
+  public void mergeTableStatistics(
+      NameIdentifier tableIdentifier, List<StatisticEntry<?>> tableStatistics) {
+    Preconditions.checkArgument(tableIdentifier != null, "tableIdentifier must not be null");
+    ensureInitialized();
+    Map<String, StatisticValue<?>> values = getTableStatisticsMap(tableStatistics);
+    if (!values.isEmpty()) {
+      gravitinoClient
+          .loadCatalog(IdentifierUtils.getCatalogNameFromTableIdentifier(tableIdentifier))
+          .asTableCatalog()
+          .loadTable(IdentifierUtils.removeCatalogFromIdentifier(tableIdentifier))
+          .supportsStatistics()
+          .mergeStatistics(values);
+    }
+  }
+
+  @Override
   public void updatePartitionStatistics(
       NameIdentifier tableIdentifier,
       Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics) {

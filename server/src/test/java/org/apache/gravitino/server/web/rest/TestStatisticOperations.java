@@ -25,12 +25,14 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,6 +74,7 @@ import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
@@ -323,6 +326,28 @@ public class TestStatisticOperations extends BaseOperationsTest {
           Assertions.assertEquals(
               IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
         });
+  }
+
+  @Test
+  public void testMergeTableStatistics() {
+    Map<String, StatisticValue<?>> values = Maps.newHashMap();
+    values.put(
+        "custom-count-by-spec",
+        StatisticValues.objectValue(Collections.singletonMap("1", StatisticValues.longValue(2L))));
+    MetadataObject object =
+        MetadataObjects.parse(catalog + "." + schema + "." + table, MetadataObject.Type.TABLE);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    try (Response response =
+        target("/metalakes/" + metalake + "/objects/table/" + object.fullName() + "/statistics")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method(
+                "PATCH",
+                entity(new StatisticsUpdateRequest(values), MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(200, response.getStatus());
+      verify(manager).mergeStatistics(metalake, object, values);
+    }
   }
 
   @Test

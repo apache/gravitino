@@ -295,6 +295,9 @@ class RelationalTable(
     def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
         self._object_statistics_operations.update_statistics(statistics)
 
+    def merge_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
+        self._object_statistics_operations.merge_statistics(statistics)
+
     def drop_statistics(self, statistics: list[str]) -> bool:
         return self._object_statistics_operations.drop_statistics(statistics)
 

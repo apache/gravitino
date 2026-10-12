@@ -14,7 +14,7 @@ This page covers the Gravitino API for statistics. For what a statistic is, the 
 reserved and custom, and how partition statistics relate to partitions, see
 [Statistics](./statistics.md).
 
-Statistics attach to tables. Custom names must begin with `custom.` to stay clear of names Gravitino
+Statistics attach to tables. Custom names must begin with `custom-` to stay clear of names Gravitino
 may reserve later.
 
 ## Table Statistics
@@ -31,8 +31,8 @@ maintained by the system are not modifiable and the request is rejected.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "updates": {
-    "custom.last_reviewed": "2026-08-02",
-    "custom.owner_team": "risk"
+    "custom-last_reviewed": "2026-08-02",
+    "custom-owner_team": "risk"
   }
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
@@ -43,14 +43,79 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 Table orders = ...
 Map<String, StatisticValue<?>> updates = Maps.newHashMap();
-updates.put("custom.last_reviewed", StatisticValues.stringValue("2026-08-02"));
-updates.put("custom.owner_team", StatisticValues.stringValue("risk"));
+updates.put("custom-last_reviewed", StatisticValues.stringValue("2026-08-02"));
+updates.put("custom-owner_team", StatisticValues.stringValue("risk"));
 
 orders.supportsStatistics().updateStatistics(updates);
 ```
 
 </TabItem>
 </Tabs>
+
+### Merge Statistics
+
+Use `PATCH` to atomically shallow-merge object-valued statistics. Supplied keys replace existing
+keys, omitted keys are preserved, and missing statistics are created. All supplied values and
+any existing values being merged must be objects. Nested objects are replaced rather than
+recursively merged. `PUT` continues to replace complete statistic values.
+
+For example, merging `{"west": 120}` into `{"east": 80, "west": 100}` produces
+`{"east": 80, "west": 120}`. Send related measurements in one request and read them from one
+statistics response so readers see a complete batch.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "updates": {
+    "custom-count-by-group": {"west": 120},
+    "custom-average-size-by-group": {"west": 4096.0}
+  }
+}' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Map<String, StatisticValue<?>> updates = Maps.newHashMap();
+updates.put("custom-count-by-group",
+    StatisticValues.objectValue(ImmutableMap.of("west", StatisticValues.longValue(120L))));
+updates.put("custom-average-size-by-group",
+    StatisticValues.objectValue(ImmutableMap.of("west", StatisticValues.doubleValue(4096.0))));
+orders.supportsStatistics().mergeStatistics(updates);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.stats.statistic_values import StatisticValues
+
+orders.supports_statistics().merge_statistics({
+    "custom-count-by-group": StatisticValues.object_value({
+        "west": StatisticValues.long_value(120)
+    }),
+    "custom-average-size-by-group": StatisticValues.object_value({
+        "west": StatisticValues.double_value(4096.0)
+    }),
+})
+```
+
+</TabItem>
+</Tabs>
+
+The server reads, merges, and writes under the same table lock used by statistics readers, and
+persists the batch together. Concurrent writers using the same Gravitino server preserve each
+other's object entries. This coordination uses an in-process tree lock, not a distributed lock
+across independent server instances. Route these writers to the same server.
+
+An older server rejects PATCH. Custom `StatisticsUpdater` implementations must implement
+`mergeTableStatistics`; its default implementation rejects merging. There is no fallback to
+client-side read/modify/write. Merge operations reuse the update-statistics listener events with
+the submitted partial payload, as described in [Server Configuration](./gravitino-server-config.md).
 
 ### List Statistics
 
@@ -80,7 +145,7 @@ List<Statistic> statistics = orders.supportsStatistics().listStatistics();
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
-  "names": ["custom.owner_team"]
+  "names": ["custom-owner_team"]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
 
@@ -88,7 +153,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-orders.supportsStatistics().dropStatistics(ImmutableList.of("custom.owner_team"));
+orders.supportsStatistics().dropStatistics(ImmutableList.of("custom-owner_team"));
 ```
 
 </TabItem>
@@ -111,7 +176,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   "updates": [
     {
       "partitionName": "dt=2026-08-02",
-      "statistics": {"custom.row_estimate": "18000"}
+      "statistics": {"custom-row_estimate": "18000"}
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -122,7 +187,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 Map<String, StatisticValue<?>> stats = Maps.newHashMap();
-stats.put("custom.row_estimate", StatisticValues.longValue(18000L));
+stats.put("custom-row_estimate", StatisticValues.longValue(18000L));
 
 orders.supportsPartitionStatistics().updatePartitionStatistics(
     ImmutableList.of(PartitionStatisticsModification.update("dt=2026-08-02", stats)));
@@ -167,7 +232,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "drops": [
     {
       "partitionName": "dt=2026-08-02",
-      "statisticNames": ["custom.row_estimate"]
+      "statisticNames": ["custom-row_estimate"]
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -180,7 +245,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 orders.supportsPartitionStatistics().dropPartitionStatistics(
     ImmutableList.of(
         PartitionStatisticsModification.drop(
-            "dt=2026-08-02", ImmutableList.of("custom.row_estimate"))));
+            "dt=2026-08-02", ImmutableList.of("custom-row_estimate"))));
 ```
 
 </TabItem>

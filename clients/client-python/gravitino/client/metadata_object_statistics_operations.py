@@ -84,6 +84,20 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         )
         BaseResponse.from_json(resp.body, infer_missing=True).validate()
 
+    def merge_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
+        Precondition.check_argument(
+            statistics is not None and len(statistics) > 0,
+            "Statistics map must not be null or empty",
+        )
+        req = StatisticsUpdateRequest(_updates=statistics)
+        req.validate()
+        resp = self._rest_client.patch(
+            endpoint=self.request_path,
+            json=req,
+            error_handler=STATISTICS_ERROR_HANDLER,
+        )
+        BaseResponse.from_json(resp.body, infer_missing=True).validate()
+
     def drop_statistics(self, statistics: list[str]) -> bool:
         Precondition.check_argument(
             statistics is not None and len(statistics) > 0,

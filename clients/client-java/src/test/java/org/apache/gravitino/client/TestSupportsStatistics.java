@@ -151,6 +151,23 @@ public class TestSupportsStatistics extends TestBase {
     Assertions.assertThrows(RuntimeException.class, supportsStatistics::listStatistics);
   }
 
+  @Test
+  public void testMergeStatisticsForTable() throws JsonProcessingException {
+    Map<String, StatisticValue<?>> values = new HashMap<>();
+    values.put(
+        "custom-count-by-spec",
+        StatisticValues.objectValue(Collections.singletonMap("1", StatisticValues.longValue(10L))));
+    StatisticsUpdateRequest request = StatisticsUpdateRequest.builder().updates(values).build();
+    buildMockResource(
+        Method.PATCH,
+        getTableStatisticsPath(),
+        Collections.emptyMap(),
+        request,
+        new BaseResponse(0),
+        SC_OK);
+    relationalTable.supportsStatistics().mergeStatistics(values);
+  }
+
   private void testUpdateStatistics(SupportsStatistics supportsStatistics, String path)
       throws JsonProcessingException {
     // Test successful update

@@ -438,6 +438,11 @@ class RelationalTable
   }
 
   @Override
+  public void mergeStatistics(Map<String, StatisticValue<?>> statistics) {
+    objectStatisticsOperations.mergeStatistics(statistics);
+  }
+
+  @Override
   public boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException {
     return objectStatisticsOperations.dropStatistics(statistics);
   }

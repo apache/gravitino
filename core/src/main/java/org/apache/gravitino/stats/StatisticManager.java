@@ -177,50 +177,13 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
   @Override
   public void updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
-    try {
-      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      List<StatisticEntity> statisticEntities = Lists.newArrayList();
-      for (Map.Entry<String, StatisticValue<?>> entry : statistics.entrySet()) {
-        String name = entry.getKey();
-        StatisticValue<?> value = entry.getValue();
+    writeStatistics(metalake, metadataObject, statistics, WriteMode.REPLACE);
+  }
 
-        StatisticEntity statistic =
-            StatisticEntity.builder(StatisticEntity.getStatisticType(metadataObject.type()))
-                .withId(idGenerator.nextId())
-                .withName(name)
-                .withValue(value)
-                .withNamespace(Namespace.fromString(identifier.toString()))
-                .withAuditInfo(
-                    AuditInfo.builder()
-                        .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                        .withCreateTime(Instant.now())
-                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                        .withLastModifiedTime(Instant.now())
-                        .build())
-                .build();
-        statisticEntities.add(statistic);
-      }
-      TreeLockUtils.doWithTreeLock(
-          identifier,
-          LockType.WRITE,
-          (Executable<Void, IOException>)
-              () -> {
-                store.batchPut(statisticEntities, true);
-                return null;
-              });
-
-    } catch (NoSuchEntityException nse) {
-      LOG.warn(
-          "Failed to update statistics for metadata object {} in the metalake {}: {}",
-          metadataObject.fullName(),
-          metalake,
-          nse.getMessage());
-      throw new NoSuchMetadataObjectException(
-          "The metadata object %s in the metalake %s isn't found",
-          metadataObject.fullName(), metalake);
-    } catch (IOException ioe) {
-      throw new RuntimeException(ioe);
-    }
+  @Override
+  public void mergeStatistics(
+      String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
+    writeStatistics(metalake, metadataObject, statistics, WriteMode.MERGE);
   }
 
   @Override
@@ -423,5 +386,82 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
     public Statistic[] statistics() {
       return statistics;
     }
+  }
+
+  private void writeStatistics(
+      String metalake,
+      MetadataObject metadataObject,
+      Map<String, StatisticValue<?>> statistics,
+      WriteMode mode) {
+    try {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      TreeLockUtils.doWithTreeLock(
+          identifier,
+          LockType.WRITE,
+          (Executable<Void, IOException>)
+              () -> {
+                Map<String, StatisticValue<?>> values = new HashMap<>(statistics);
+                if (mode == WriteMode.MERGE) {
+                  Map<String, StatisticValue<?>> existing = new HashMap<>();
+                  for (StatisticEntity entity :
+                      store.list(
+                          Namespace.fromString(identifier.toString()),
+                          StatisticEntity.class,
+                          StatisticEntity.getStatisticType(metadataObject.type()))) {
+                    existing.put(entity.name(), entity.value());
+                  }
+                  for (Map.Entry<String, StatisticValue<?>> entry : statistics.entrySet()) {
+                    StatisticValue<?> previous = existing.get(entry.getKey());
+                    if (!(entry.getValue() instanceof StatisticValues.ObjectValue)
+                        || (previous != null
+                            && !(previous instanceof StatisticValues.ObjectValue))) {
+                      throw new IllegalArgumentException(
+                          "Statistics merge requires object values: " + entry.getKey());
+                    }
+                    Map<String, StatisticValue<?>> merged = new HashMap<>();
+                    if (previous != null) {
+                      merged.putAll(((StatisticValues.ObjectValue) previous).value());
+                    }
+                    merged.putAll(((StatisticValues.ObjectValue) entry.getValue()).value());
+                    values.put(entry.getKey(), StatisticValues.objectValue(merged));
+                  }
+                }
+                List<StatisticEntity> statisticEntities = Lists.newArrayList();
+                for (Map.Entry<String, StatisticValue<?>> entry : values.entrySet()) {
+                  String name = entry.getKey();
+                  StatisticValue<?> value = entry.getValue();
+
+                  StatisticEntity statistic =
+                      StatisticEntity.builder(
+                              StatisticEntity.getStatisticType(metadataObject.type()))
+                          .withId(idGenerator.nextId())
+                          .withName(name)
+                          .withValue(value)
+                          .withNamespace(Namespace.fromString(identifier.toString()))
+                          .withAuditInfo(
+                              AuditInfo.builder()
+                                  .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                                  .withCreateTime(Instant.now())
+                                  .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                                  .withLastModifiedTime(Instant.now())
+                                  .build())
+                          .build();
+                  statisticEntities.add(statistic);
+                }
+                store.batchPut(statisticEntities, true);
+                return null;
+              });
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetadataObjectException(
+          "The metadata object %s in the metalake %s isn't found",
+          metadataObject.fullName(), metalake);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private enum WriteMode {
+    REPLACE,
+    MERGE
   }
 }
