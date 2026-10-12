@@ -24,7 +24,6 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.OAuthTokenProvider;
-import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -33,8 +32,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
-import java.util.List;
-import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -49,13 +48,18 @@ public final class K8sClientUtils {
    */
   static final class FileTokenProvider implements OAuthTokenProvider {
 
+    // How often a token file that stays empty or unreadable is reported.
+    private static final long FAILURE_LOG_INTERVAL_NANOS = TimeUnit.MINUTES.toNanos(5);
+
     private final Path tokenFile;
 
     private FileTime lastModified;
 
     private String token;
 
-    private boolean readFailureLogged;
+    private boolean failing;
+
+    private long failureLoggedAtNanos;
 
     FileTokenProvider(Path tokenFile) {
       this.tokenFile = tokenFile;
@@ -67,36 +71,54 @@ public final class K8sClientUtils {
         FileTime modified = Files.getLastModifiedTime(tokenFile);
         if (token == null || !modified.equals(lastModified)) {
           String content = new String(Files.readAllBytes(tokenFile), StandardCharsets.UTF_8).trim();
-          if (StringUtils.isNotBlank(content)) {
-            token = content;
-            lastModified = modified;
-          } else if (token == null) {
-            throw new IllegalStateException("The token file " + tokenFile + " is empty");
-          } else {
-            // The file is being rewritten, keep the token until the new one is there. Remember
-            // this version of the file, so that it is neither read nor reported again.
-            lastModified = modified;
-            LOG.warn("The token file {} is empty, keeping the token read before", tokenFile);
+          if (StringUtils.isBlank(content)) {
+            if (token == null) {
+              throw new IllegalStateException("The token file " + tokenFile + " is empty");
+            }
+            // The file is being rewritten. Its modification time isn't remembered: the new token
+            // may be written within the same tick of the file system's clock, and would then
+            // never be read.
+            return keepToken("is empty", null);
           }
+          token = content;
+          lastModified = modified;
         }
       } catch (IOException e) {
         if (token == null) {
           throw new UncheckedIOException("Failed to read the token file " + tokenFile, e);
         }
-        // For example, the file is being replaced, keep the token until the new one is there. It
-        // is checked again on every request, so only the first failure in a row is reported.
-        if (!readFailureLogged) {
-          LOG.warn("Failed to read the token file {}, keeping the token read before", tokenFile, e);
-          readFailureLogged = true;
-        }
-        return token;
+        // For example, the file is being replaced.
+        return keepToken("can't be read", e);
       }
-      readFailureLogged = false;
+      failing = false;
+      return token;
+    }
+
+    /**
+     * Keeps the token read before while the file has no token, checking the file again on the next
+     * request. The problem is reported when it starts, and then at an interval rather than on every
+     * request, so that a file that stays broken remains visible without flooding the log.
+     */
+    private String keepToken(String problem, @Nullable IOException cause) {
+      long now = System.nanoTime();
+      if (!failing || now - failureLoggedAtNanos >= FAILURE_LOG_INTERVAL_NANOS) {
+        LOG.warn(
+            "The token file {} {}, keeping the token read before. Requests will fail once that"
+                + " token expires",
+            tokenFile,
+            problem,
+            cause);
+        failing = true;
+        failureLoggedAtNanos = now;
+      }
       return token;
     }
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(K8sClientUtils.class);
+
+  private static final Pattern SERVER_SCHEME =
+      Pattern.compile("^https?://", Pattern.CASE_INSENSITIVE);
 
   private K8sClientUtils() {}
 
@@ -145,12 +167,13 @@ public final class K8sClientUtils {
     Config config;
     if (configs.kubeconfig() != null) {
       checkFileExists(configs.kubeconfig(), K8sJobExecutorConfigs.KUBECONFIG);
-      String server = getKubeconfigServer(configs);
-      config = Config.fromKubeconfig(configs.context(), new File(configs.kubeconfig()));
+      File kubeconfig = new File(configs.kubeconfig());
+      String server = K8sKubeconfigUtils.getSelectedServer(kubeconfig, configs.context());
+      config = Config.fromKubeconfig(configs.context(), kubeconfig);
       // The client reads the file itself, so make sure it ended up with the server found above,
       // whatever it does with a kubeconfig that is malformed or changed in between.
       Preconditions.checkArgument(
-          normalizeServer(server).equals(normalizeServer(config.getMasterUrl())),
+          getHostAndPath(server).equals(getHostAndPath(config.getMasterUrl())),
           "The kubeconfig %s set by %s selects the server %s, but the client would use %s",
           configs.kubeconfig(),
           K8sJobExecutorConfigs.KUBECONFIG,
@@ -174,95 +197,12 @@ public final class K8sClientUtils {
   }
 
   /**
-   * Returns the API server of the cluster that the kubeconfig selects, and fails if it selects
-   * none. Otherwise the client keeps its default API server, the one of the cluster Gravitino runs
-   * in, and would silently run the jobs there. The default API server itself isn't rejected, as a
-   * kubeconfig may well select it.
+   * Returns the URL of an API server without its scheme and trailing slashes, to compare the server
+   * of a kubeconfig with the one the client uses. The scheme is left out because the client picks
+   * it for a server without one, by probing whether the server speaks HTTPS.
    */
-  private static String getKubeconfigServer(K8sJobExecutorConfigs configs) {
-    Map<String, Object> kubeconfig;
-    try {
-      kubeconfig =
-          getMap(
-              Serialization.unmarshal(
-                  new String(
-                      Files.readAllBytes(Paths.get(configs.kubeconfig())), StandardCharsets.UTF_8),
-                  Map.class));
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to read the kubeconfig " + configs.kubeconfig(), e);
-    } catch (RuntimeException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The kubeconfig %s set by %s can't be parsed",
-              configs.kubeconfig(), K8sJobExecutorConfigs.KUBECONFIG),
-          e);
-    }
-
-    Object contextName =
-        configs.context() != null
-            ? configs.context()
-            : kubeconfig == null ? null : kubeconfig.get("current-context");
-    Preconditions.checkArgument(
-        contextName instanceof String && StringUtils.isNotBlank((String) contextName),
-        "The kubeconfig %s set by %s has no current context, set its current-context or %s",
-        configs.kubeconfig(),
-        K8sJobExecutorConfigs.KUBECONFIG,
-        K8sJobExecutorConfigs.CONTEXT);
-
-    Map<String, Object> context = getNamedEntry(kubeconfig, "contexts", contextName, "context");
-    Preconditions.checkArgument(
-        context != null,
-        "The context %s doesn't exist in the kubeconfig %s set by %s",
-        contextName,
-        configs.kubeconfig(),
-        K8sJobExecutorConfigs.KUBECONFIG);
-
-    Object clusterName = context.get("cluster");
-    Map<String, Object> cluster = getNamedEntry(kubeconfig, "clusters", clusterName, "cluster");
-    Object server = cluster == null ? null : cluster.get("server");
-    Preconditions.checkArgument(
-        server instanceof String && StringUtils.isNotBlank((String) server),
-        "The cluster %s of the context %s has no server in the kubeconfig %s set by %s",
-        clusterName,
-        contextName,
-        configs.kubeconfig(),
-        K8sJobExecutorConfigs.KUBECONFIG);
-    return (String) server;
-  }
-
-  /** Returns the URL of an API server in the form the client keeps it, to compare two of them. */
-  private static String normalizeServer(String server) {
-    String url = server.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = "https://" + url;
-    }
-    return url.endsWith("/") ? url : url + "/";
-  }
-
-  /**
-   * Returns the content of the entry with the given name in a list of the kubeconfig, for example
-   * the {@code cluster} of the entry named {@code dev} in {@code clusters}.
-   */
-  @Nullable
-  private static Map<String, Object> getNamedEntry(
-      @Nullable Map<String, Object> kubeconfig, String list, Object name, String content) {
-    Object entries = kubeconfig == null ? null : kubeconfig.get(list);
-    if (!(entries instanceof List) || name == null) {
-      return null;
-    }
-    for (Object entry : (List<?>) entries) {
-      Map<String, Object> fields = getMap(entry);
-      if (fields != null && name.equals(fields.get("name"))) {
-        return getMap(fields.get(content));
-      }
-    }
-    return null;
-  }
-
-  @Nullable
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> getMap(Object value) {
-    return value instanceof Map ? (Map<String, Object>) value : null;
+  private static String getHostAndPath(String server) {
+    return SERVER_SCHEME.matcher(server.trim()).replaceFirst("").replaceAll("/+$", "");
   }
 
   private static void checkFileExists(String path, String key) {

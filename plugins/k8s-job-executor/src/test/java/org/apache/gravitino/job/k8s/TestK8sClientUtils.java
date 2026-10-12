@@ -173,6 +173,49 @@ public class TestK8sClientUtils {
   }
 
   @Test
+  public void testKubeconfigServerWithoutScheme() throws IOException {
+    // The client picks the scheme of such a server by probing it, whatever it picks is accepted.
+    // Nothing listens on the port, so the probe fails right away.
+    Path kubeconfig =
+        Files.write(
+            dir.resolve("config"),
+            KUBECONFIG.replace("https://dev:6443", "localhost:1").getBytes(StandardCharsets.UTF_8));
+    Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+    String masterUrl =
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl();
+    Assertions.assertTrue(masterUrl.endsWith("://localhost:1/"), masterUrl);
+
+    Files.write(
+        kubeconfig,
+        KUBECONFIG
+            .replace("https://dev:6443", "HTTPS://dev:6443/")
+            .getBytes(StandardCharsets.UTF_8));
+    // The scheme is compared ignoring its case, and the client keeps the server as written.
+    Assertions.assertEquals(
+        "HTTPS://dev:6443/",
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+  }
+
+  @Test
+  public void testKubeconfigWithDuplicateClusters() throws IOException {
+    // Like the client, the last cluster with a name wins.
+    Path kubeconfig =
+        Files.write(
+            dir.resolve("config"),
+            KUBECONFIG
+                .replace(
+                    "- name: prod\n",
+                    "- name: dev\n  cluster: {server: 'https://dev2:6443'}\n- name: prod\n")
+                .getBytes(StandardCharsets.UTF_8));
+    Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+    map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+    Assertions.assertEquals(
+        "https://dev2:6443/",
+        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+  }
+
+  @Test
   public void testNamespace() throws IOException {
     // The configured namespace wins over the one of the kubeconfig context.
     Path kubeconfig =
@@ -221,6 +264,23 @@ public class TestK8sClientUtils {
 
     Files.write(token, "token-3".getBytes(StandardCharsets.UTF_8));
     Assertions.assertEquals("token-3", provider.getToken());
+  }
+
+  @Test
+  public void testTokenRotationWithinOneModificationTime() throws IOException {
+    // The file is emptied and rewritten within one tick of a coarse file system clock.
+    Path token = Files.write(dir.resolve("token"), "token-1".getBytes(StandardCharsets.UTF_8));
+    K8sClientUtils.FileTokenProvider provider = new K8sClientUtils.FileTokenProvider(token);
+    Assertions.assertEquals("token-1", provider.getToken());
+
+    FileTime rotatedAt = FileTime.fromMillis(Files.getLastModifiedTime(token).toMillis() + 1000);
+    Files.write(token, new byte[0]);
+    Files.setLastModifiedTime(token, rotatedAt);
+    Assertions.assertEquals("token-1", provider.getToken());
+
+    Files.write(token, "token-2".getBytes(StandardCharsets.UTF_8));
+    Files.setLastModifiedTime(token, rotatedAt);
+    Assertions.assertEquals("token-2", provider.getToken());
   }
 
   @Test
