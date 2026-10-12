@@ -70,6 +70,33 @@ public class TableSnapshotMetricsMetaService {
   }
 
   /**
+   * Inserts or updates metrics JSON for a table/policy/snapshot triple.
+   *
+   * @param tableId table id
+   * @param policyId policy id
+   * @param snapshotId Iceberg snapshot id
+   * @param metricsJson serialized metrics payload
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "putTableSnapshotMetrics")
+  public void putMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
+    if (getMetrics(tableId, policyId, snapshotId) == null) {
+      insertMetrics(tableId, policyId, snapshotId, metricsJson);
+      return;
+    }
+    TableSnapshotMetricsPO metricsMeta =
+        TableSnapshotMetricsPO.builder()
+            .withTableId(tableId)
+            .withPolicyId(policyId)
+            .withSnapshotId(snapshotId)
+            .withMetricsValue(metricsJson)
+            .build();
+    SessionUtils.doWithCommit(
+        TableSnapshotMetricsMapper.class, mapper -> mapper.updateMetrics(metricsMeta));
+  }
+
+  /**
    * @param tableId table id
    * @param policyId policy id
    * @param snapshotId snapshot id

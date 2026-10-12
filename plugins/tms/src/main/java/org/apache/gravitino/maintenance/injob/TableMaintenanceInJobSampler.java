@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceJobMetaService;
@@ -64,7 +64,7 @@ public class TableMaintenanceInJobSampler {
    * @param head supplies current HEAD after persistence
    * @return continue vs drift stop outcome
    */
-  public InJobSampleOutcome sampleAtS0AndGateCronJob(
+  public InJobGateOutcome sampleAndGateCronJob(
       long jobId,
       long tableId,
       long policyId,
@@ -74,17 +74,15 @@ public class TableMaintenanceInJobSampler {
     Preconditions.checkNotNull(metricsJson, "metricsJson");
     Preconditions.checkNotNull(head, "head");
 
-    if (metricsMetaService.getMetrics(tableId, policyId, sampledSnapshotId) == null) {
-      metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
-    }
+    metricsMetaService.putMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
     jobMetaService.recordBeforeSnapshot(jobId, sampledSnapshotId);
 
     long headSnapshotId = head.currentSnapshotId();
-    if (SnapshotDrift.hasDrifted(sampledSnapshotId, headSnapshotId)) {
-      return InJobSampleOutcome.stop(
-          InJobSampleOutcome.StopReason.SNAPSHOT_DRIFT, sampledSnapshotId, headSnapshotId);
+    if (sampledSnapshotId != headSnapshotId) {
+      return InJobGateOutcome.stop(
+          InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, sampledSnapshotId, headSnapshotId);
     }
-    return InJobSampleOutcome.continueMaintenance(sampledSnapshotId);
+    return InJobGateOutcome.continueMaintenance(sampledSnapshotId);
   }
 
   /**
@@ -95,14 +93,13 @@ public class TableMaintenanceInJobSampler {
    * @param head supplies current HEAD after persistence for this type
    * @return continue vs drift stop outcome
    */
-  public InJobSampleOutcome gateCommitChainTypeAfterSample(
-      long sampledSnapshotId, SnapshotHead head) {
+  public InJobGateOutcome gateCommitChainType(long sampledSnapshotId, SnapshotHead head) {
     Preconditions.checkNotNull(head, "head");
     long headSnapshotId = head.currentSnapshotId();
-    if (SnapshotDrift.hasDrifted(sampledSnapshotId, headSnapshotId)) {
-      return InJobSampleOutcome.stop(
-          InJobSampleOutcome.StopReason.SNAPSHOT_DRIFT, sampledSnapshotId, headSnapshotId);
+    if (sampledSnapshotId != headSnapshotId) {
+      return InJobGateOutcome.stop(
+          InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, sampledSnapshotId, headSnapshotId);
     }
-    return InJobSampleOutcome.continueMaintenance(sampledSnapshotId);
+    return InJobGateOutcome.continueMaintenance(sampledSnapshotId);
   }
 }

@@ -16,23 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.maintenance.injob;
 
-package org.apache.gravitino.maintenance.job;
+/**
+ * Supplies the Iceberg table HEAD snapshot id from inside a Spark Job (§4.3, §5.2.2).
+ *
+ * <p>Implementations typically delegate to {@code Table#currentSnapshot()}.
+ */
+@FunctionalInterface
+public interface SnapshotHead {
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
-class TestSnapshotDrift {
-
-  @Test
-  void testNoDriftWhenHeadMatchesSample() {
-    Assertions.assertFalse(SnapshotDrift.hasDrifted(42L, 42L));
-    Assertions.assertFalse(SnapshotDrift.hasDrifted(42L, () -> 42L));
-  }
-
-  @Test
-  void testDriftWhenHeadMoved() {
-    Assertions.assertTrue(SnapshotDrift.hasDrifted(42L, 43L));
-    Assertions.assertTrue(SnapshotDrift.hasDrifted(42L, () -> 99L));
-  }
+  /**
+   * @return current Iceberg snapshot id at table HEAD
+   */
+  long currentSnapshotId();
 }

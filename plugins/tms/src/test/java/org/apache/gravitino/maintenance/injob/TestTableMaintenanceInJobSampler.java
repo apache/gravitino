@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceJobMetaService;
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.TestTemplate;
 
 class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
 
-  private static final String METRICS_JSON = "{\"fileCount\":3}";
+  private static final String METRICS_JSON = "{\"mse\":3}";
 
   private TableMaintenanceInJobSampler sampler;
   private TableMaintenanceJobMetaService jobMetaService;
@@ -46,8 +46,8 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
   void testCronJobSamplePersistsAndContinuesWhenNoDrift() {
     long jobId = 1001L;
     jobMetaService.insertJob(jobId, 1L, 2L);
-    InJobSampleOutcome outcome =
-        sampler.sampleAtS0AndGateCronJob(jobId, 1L, 2L, 100L, METRICS_JSON, () -> 100L);
+    InJobGateOutcome outcome =
+        sampler.sampleAndGateCronJob(jobId, 1L, 2L, 100L, METRICS_JSON, () -> 100L);
 
     Assertions.assertTrue(outcome.continueMaintenance());
     Assertions.assertNull(outcome.stopReason());
@@ -61,23 +61,35 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
   void testCronJobEndsEarlyWhenSnapshotDriftsAfterSample() {
     long jobId = 1002L;
     jobMetaService.insertJob(jobId, 3L, 4L);
-    InJobSampleOutcome outcome =
-        sampler.sampleAtS0AndGateCronJob(jobId, 3L, 4L, 200L, METRICS_JSON, () -> 201L);
+    InJobGateOutcome outcome =
+        sampler.sampleAndGateCronJob(jobId, 3L, 4L, 200L, METRICS_JSON, () -> 201L);
 
     Assertions.assertFalse(outcome.continueMaintenance());
-    Assertions.assertEquals(InJobSampleOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
+    Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
     Assertions.assertEquals(200L, outcome.sampledSnapshotId());
     Assertions.assertEquals(201L, outcome.headSnapshotId());
     Assertions.assertNotNull(metricsMetaService.getMetrics(3L, 4L, 200L));
   }
 
   @TestTemplate
+  void testCronJobPutMetricsOverwritesExistingRow() {
+    long jobId = 1003L;
+    jobMetaService.insertJob(jobId, 5L, 6L);
+    metricsMetaService.insertMetrics(5L, 6L, 300L, "{\"mse\":1}");
+    InJobGateOutcome outcome =
+        sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, "{\"mse\":2}", () -> 300L);
+    Assertions.assertTrue(outcome.continueMaintenance());
+    Assertions.assertEquals(
+        "{\"mse\":2}", metricsMetaService.getMetrics(5L, 6L, 300L).metricsValue());
+  }
+
+  @TestTemplate
   void testCommitChainTypeGateWithoutReSample() {
-    InJobSampleOutcome ok = sampler.gateCommitChainTypeAfterSample(300L, () -> 300L);
+    InJobGateOutcome ok = sampler.gateCommitChainType(300L, () -> 300L);
     Assertions.assertTrue(ok.continueMaintenance());
 
-    InJobSampleOutcome drift = sampler.gateCommitChainTypeAfterSample(300L, () -> 301L);
+    InJobGateOutcome drift = sampler.gateCommitChainType(300L, () -> 301L);
     Assertions.assertFalse(drift.continueMaintenance());
-    Assertions.assertEquals(InJobSampleOutcome.StopReason.SNAPSHOT_DRIFT, drift.stopReason());
+    Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, drift.stopReason());
   }
 }

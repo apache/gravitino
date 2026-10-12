@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceJobMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
@@ -28,8 +28,11 @@ import org.junit.jupiter.api.TestTemplate;
 
 class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
 
+  private static final String METRICS_JSON = "{\"mse\":1}";
+
   private TableMaintenanceJobMetaService jobMetaService;
-  private TableMaintenanceInJobPipeline pipeline;
+  private TableMaintenanceInJobPipeline maintainPipeline;
+  private TableMaintenanceInJobPipeline skipPipeline;
 
   @BeforeEach
   void setUp() {
@@ -37,16 +40,20 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
     TableMaintenanceInJobSampler sampler =
         new TableMaintenanceInJobSampler(
             TableSnapshotMetricsMetaService.getInstance(), jobMetaService);
-    pipeline = new TableMaintenanceInJobPipeline(sampler, new FileCountThresholdRecommender(5));
+    maintainPipeline =
+        new TableMaintenanceInJobPipeline(
+            sampler, (tableId, policyId, snapshotId, metricsJson) -> RecommendDecision.MAINTAIN);
+    skipPipeline =
+        new TableMaintenanceInJobPipeline(
+            sampler, (tableId, policyId, snapshotId, metricsJson) -> RecommendDecision.SKIP);
   }
 
   @TestTemplate
   void testContinuesWhenNoDriftAndRecommenderMaintains() {
     long jobId = 2001L;
     jobMetaService.insertJob(jobId, 10L, 20L);
-    InJobSampleOutcome outcome =
-        pipeline.sampleDriftAndRecommendCronJob(
-            jobId, 10L, 20L, 100L, "{\"fileCount\":5}", () -> 100L);
+    InJobGateOutcome outcome =
+        maintainPipeline.gateCronJob(jobId, 10L, 20L, 100L, METRICS_JSON, () -> 100L);
     Assertions.assertTrue(outcome.continueMaintenance());
     Assertions.assertNull(outcome.stopReason());
   }
@@ -55,34 +62,30 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
   void testStopsOnDriftBeforeRecommend() {
     long jobId = 2002L;
     jobMetaService.insertJob(jobId, 11L, 21L);
-    InJobSampleOutcome outcome =
-        pipeline.sampleDriftAndRecommendCronJob(
-            jobId, 11L, 21L, 200L, "{\"fileCount\":100}", () -> 201L);
+    InJobGateOutcome outcome =
+        maintainPipeline.gateCronJob(jobId, 11L, 21L, 200L, METRICS_JSON, () -> 201L);
     Assertions.assertFalse(outcome.continueMaintenance());
-    Assertions.assertEquals(InJobSampleOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
+    Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
   }
 
   @TestTemplate
   void testStopsWhenRecommenderSkips() {
     long jobId = 2003L;
     jobMetaService.insertJob(jobId, 12L, 22L);
-    InJobSampleOutcome outcome =
-        pipeline.sampleDriftAndRecommendCronJob(
-            jobId, 12L, 22L, 300L, "{\"fileCount\":2}", () -> 300L);
+    InJobGateOutcome outcome =
+        skipPipeline.gateCronJob(jobId, 12L, 22L, 300L, METRICS_JSON, () -> 300L);
     Assertions.assertFalse(outcome.continueMaintenance());
-    Assertions.assertEquals(InJobSampleOutcome.StopReason.RECOMMENDER_SKIP, outcome.stopReason());
+    Assertions.assertEquals(InJobGateOutcome.StopReason.RECOMMENDER_SKIP, outcome.stopReason());
   }
 
   @TestTemplate
   void testCommitChainTypeRecommendGate() {
-    InJobSampleOutcome maintain =
-        pipeline.gateCommitChainTypeAfterSampleAndRecommend(
-            1L, 2L, 400L, "{\"fileCount\":9}", () -> 400L);
+    InJobGateOutcome maintain =
+        maintainPipeline.gateCommitChainType(1L, 2L, 400L, METRICS_JSON, () -> 400L);
     Assertions.assertTrue(maintain.continueMaintenance());
 
-    InJobSampleOutcome skip =
-        pipeline.gateCommitChainTypeAfterSampleAndRecommend(
-            1L, 2L, 401L, "{\"fileCount\":1}", () -> 401L);
-    Assertions.assertEquals(InJobSampleOutcome.StopReason.RECOMMENDER_SKIP, skip.stopReason());
+    InJobGateOutcome skip =
+        skipPipeline.gateCommitChainType(1L, 2L, 401L, METRICS_JSON, () -> 401L);
+    Assertions.assertEquals(InJobGateOutcome.StopReason.RECOMMENDER_SKIP, skip.stopReason());
   }
 }

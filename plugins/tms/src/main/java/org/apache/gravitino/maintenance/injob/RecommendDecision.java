@@ -16,14 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 /**
  * Whether the in-job path should run maintenance work after a successful {@code S0} sample
  * (§5.2.2).
+ *
+ * <p>Type-specific strategy recommenders are wired in a follow-up subtask; this enum only models
+ * the gate outcome.
  */
-public enum MaintenanceRecommendDecision {
-  /** Proceed to execute maintenance work (wired in follow-up subtasks). */
+public enum RecommendDecision {
+  /** Proceed to execute maintenance work. */
   MAINTAIN,
   /** End this job or type early; do not run maintenance work. */
   SKIP

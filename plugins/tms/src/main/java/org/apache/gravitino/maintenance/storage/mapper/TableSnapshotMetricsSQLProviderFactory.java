@@ -57,6 +57,14 @@ public class TableSnapshotMetricsSQLProviderFactory {
   }
 
   /**
+   * @param metricsMeta metrics row
+   * @return UPDATE statement
+   */
+  public static String updateMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta) {
+    return getProvider().updateMetrics(metricsMeta);
+  }
+
+  /**
    * @param tableId table id
    * @param policyId policy id
    * @param snapshotId snapshot id

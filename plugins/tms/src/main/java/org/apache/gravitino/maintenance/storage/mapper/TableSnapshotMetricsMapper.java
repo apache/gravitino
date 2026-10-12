@@ -23,6 +23,7 @@ import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /** MyBatis mapper for {@code table_snapshot_metrics}. */
 public interface TableSnapshotMetricsMapper {
@@ -31,6 +32,9 @@ public interface TableSnapshotMetricsMapper {
 
   @InsertProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "insertMetrics")
   void insertMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta);
+
+  @UpdateProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "updateMetrics")
+  int updateMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta);
 
   @Nullable
   @SelectProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "selectMetrics")

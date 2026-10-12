@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 import com.google.common.base.Preconditions;
 
 /**
- * Cron in-job gate: sample at {@code S0}, stop on snapshot drift, then apply the recommender
- * maintain? gate (§5.2.2). Does not execute the four maintenance types.
+ * Cron / commit-chain in-job gates: sample at {@code S0}, stop on snapshot drift, then apply the
+ * recommend maintain? gate (§5.2.2). Does not execute the four maintenance types.
  */
 public class TableMaintenanceInJobPipeline {
 
   private final TableMaintenanceInJobSampler sampler;
-  private final MaintenanceRecommender recommender;
+  private final InJobRecommender recommender;
 
   /**
    * @param sampler S0 sample + drift gate
    * @param recommender maintain vs skip after a clean sample
    */
   public TableMaintenanceInJobPipeline(
-      TableMaintenanceInJobSampler sampler, MaintenanceRecommender recommender) {
+      TableMaintenanceInJobSampler sampler, InJobRecommender recommender) {
     this.sampler = Preconditions.checkNotNull(sampler);
     this.recommender = Preconditions.checkNotNull(recommender);
   }
@@ -50,25 +50,25 @@ public class TableMaintenanceInJobPipeline {
    * @param head current HEAD supplier after persistence
    * @return continue only when HEAD matches {@code S0} and recommender says maintain
    */
-  public InJobSampleOutcome sampleDriftAndRecommendCronJob(
+  public InJobGateOutcome gateCronJob(
       long jobId,
       long tableId,
       long policyId,
       long sampledSnapshotId,
       String metricsJson,
       SnapshotHead head) {
-    InJobSampleOutcome afterSample =
-        sampler.sampleAtS0AndGateCronJob(
+    InJobGateOutcome afterSample =
+        sampler.sampleAndGateCronJob(
             jobId, tableId, policyId, sampledSnapshotId, metricsJson, head);
     if (!afterSample.continueMaintenance()) {
       return afterSample;
     }
 
-    MaintenanceRecommendDecision decision =
+    RecommendDecision decision =
         recommender.recommend(tableId, policyId, sampledSnapshotId, metricsJson);
-    if (decision == MaintenanceRecommendDecision.SKIP) {
-      return InJobSampleOutcome.stop(
-          InJobSampleOutcome.StopReason.RECOMMENDER_SKIP,
+    if (decision == RecommendDecision.SKIP) {
+      return InJobGateOutcome.stop(
+          InJobGateOutcome.StopReason.RECOMMENDER_SKIP,
           sampledSnapshotId,
           afterSample.headSnapshotId());
     }
@@ -86,17 +86,17 @@ public class TableMaintenanceInJobPipeline {
    * @param head current HEAD after this type's sample persistence
    * @return continue vs stop for this type
    */
-  public InJobSampleOutcome gateCommitChainTypeAfterSampleAndRecommend(
+  public InJobGateOutcome gateCommitChainType(
       long tableId, long policyId, long sampledSnapshotId, String metricsJson, SnapshotHead head) {
-    InJobSampleOutcome afterDrift = sampler.gateCommitChainTypeAfterSample(sampledSnapshotId, head);
+    InJobGateOutcome afterDrift = sampler.gateCommitChainType(sampledSnapshotId, head);
     if (!afterDrift.continueMaintenance()) {
       return afterDrift;
     }
-    MaintenanceRecommendDecision decision =
+    RecommendDecision decision =
         recommender.recommend(tableId, policyId, sampledSnapshotId, metricsJson);
-    if (decision == MaintenanceRecommendDecision.SKIP) {
-      return InJobSampleOutcome.stop(
-          InJobSampleOutcome.StopReason.RECOMMENDER_SKIP,
+    if (decision == RecommendDecision.SKIP) {
+      return InJobGateOutcome.stop(
+          InJobGateOutcome.StopReason.RECOMMENDER_SKIP,
           sampledSnapshotId,
           afterDrift.headSnapshotId());
     }

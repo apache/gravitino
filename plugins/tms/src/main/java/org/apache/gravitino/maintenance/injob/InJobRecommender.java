@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 /**
  * Decides whether maintenance should run after metrics were sampled at {@code S0}.
  *
- * <p>Full type-specific recommenders land with the four maintenance executors; this gate only
- * answers maintain vs skip for the current in-job path.
+ * <p>Production implementations come with the four maintenance executors; callers inject the
+ * strategy for the current type.
  */
 @FunctionalInterface
-public interface MaintenanceRecommender {
+public interface InJobRecommender {
 
   /**
    * @param tableId table entity id
@@ -34,6 +34,6 @@ public interface MaintenanceRecommender {
    * @param metricsJson serialized metrics for that snapshot
    * @return maintain or skip
    */
-  MaintenanceRecommendDecision recommend(
+  RecommendDecision recommend(
       long tableId, long policyId, long sampledSnapshotId, String metricsJson);
 }

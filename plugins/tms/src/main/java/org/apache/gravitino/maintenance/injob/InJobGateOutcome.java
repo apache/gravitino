@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.job;
+package org.apache.gravitino.maintenance.injob;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
-/** Result of persisting an in-job sample and evaluating snapshot drift / recommend (§5.2.2). */
-public final class InJobSampleOutcome {
+/** Result of the in-job sample / drift / recommend gates (§5.2.2). */
+public final class InJobGateOutcome {
 
-  /** Why maintenance should not continue after the sample. */
+  /** Why maintenance should not continue. */
   public enum StopReason {
     /** HEAD snapshot id differs from {@code S0}; do not re-sample in a loop. */
     SNAPSHOT_DRIFT,
-    /** Recommender decided not to maintain; end early without running work (§5.2.2). */
+    /** Recommender decided not to maintain; end early without running work. */
     RECOMMENDER_SKIP
   }
 
@@ -37,7 +37,7 @@ public final class InJobSampleOutcome {
   private final long sampledSnapshotId;
   private final long headSnapshotId;
 
-  private InJobSampleOutcome(
+  private InJobGateOutcome(
       boolean continueMaintenance,
       @Nullable StopReason stopReason,
       long sampledSnapshotId,
@@ -52,8 +52,8 @@ public final class InJobSampleOutcome {
    * @param sampledSnapshotId {@code S0}
    * @return outcome when maintenance may proceed
    */
-  public static InJobSampleOutcome continueMaintenance(long sampledSnapshotId) {
-    return new InJobSampleOutcome(true, null, sampledSnapshotId, sampledSnapshotId);
+  public static InJobGateOutcome continueMaintenance(long sampledSnapshotId) {
+    return new InJobGateOutcome(true, null, sampledSnapshotId, sampledSnapshotId);
   }
 
   /**
@@ -62,14 +62,14 @@ public final class InJobSampleOutcome {
    * @param headSnapshotId current HEAD when stopping
    * @return outcome when maintenance must not continue
    */
-  public static InJobSampleOutcome stop(
+  public static InJobGateOutcome stop(
       StopReason reason, long sampledSnapshotId, long headSnapshotId) {
     Preconditions.checkNotNull(reason);
-    return new InJobSampleOutcome(false, reason, sampledSnapshotId, headSnapshotId);
+    return new InJobGateOutcome(false, reason, sampledSnapshotId, headSnapshotId);
   }
 
   /**
-   * @return whether the Spark Job should run recommend / work for this type
+   * @return whether the Spark Job should run work for this type
    */
   public boolean continueMaintenance() {
     return continueMaintenance;
@@ -91,7 +91,7 @@ public final class InJobSampleOutcome {
   }
 
   /**
-   * @return HEAD snapshot id observed after persisting the sample
+   * @return HEAD snapshot id observed for the gate
    */
   public long headSnapshotId() {
     return headSnapshotId;
