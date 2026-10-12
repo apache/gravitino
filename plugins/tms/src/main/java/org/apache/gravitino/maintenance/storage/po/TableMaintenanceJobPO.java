@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.po;
+package org.apache.gravitino.maintenance.storage.po;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

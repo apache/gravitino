@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-org.apache.gravitino.tms.storage.mapper.provider.TmsMapperPackageProvider
+org.apache.gravitino.maintenance.storage.mapper.provider.TmsMapperPackageProvider

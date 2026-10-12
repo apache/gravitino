@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.mapper.provider.postgresql;
+package org.apache.gravitino.maintenance.storage.mapper.provider.h2;
 
-import org.apache.gravitino.tms.storage.mapper.provider.base.TableSnapshotMetricsBaseSQLProvider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableSnapshotMetricsBaseSQLProvider;
 
-/** PostgreSQL SQL provider for {@code table_snapshot_metrics}. */
-public class TableSnapshotMetricsPostgreSQLProvider extends TableSnapshotMetricsBaseSQLProvider {}
+/** H2 SQL provider for {@code table_snapshot_metrics}. */
+public class TableSnapshotMetricsH2Provider extends TableSnapshotMetricsBaseSQLProvider {}

@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.service;
+package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.tms.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.tms.storage.po.TableSnapshotMetricsPO;
 
 /** DAO service for {@code table_snapshot_metrics}. */
 public class TableSnapshotMetricsMetaService {

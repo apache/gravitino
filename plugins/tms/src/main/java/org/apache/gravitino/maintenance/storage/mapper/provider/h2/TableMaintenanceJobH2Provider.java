@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.mapper.provider.postgresql;
+package org.apache.gravitino.maintenance.storage.mapper.provider.h2;
 
-import org.apache.gravitino.tms.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
 
-/** PostgreSQL SQL provider for {@code table_maintenance_job}. */
-public class TableMaintenanceJobPostgreSQLProvider extends TableMaintenanceJobBaseSQLProvider {}
+/** H2 SQL provider for {@code table_maintenance_job}. */
+public class TableMaintenanceJobH2Provider extends TableMaintenanceJobBaseSQLProvider {}

@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.service;
+package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
+import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.tms.storage.mapper.TableMaintenanceJobMapper;
-import org.apache.gravitino.tms.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.tms.storage.po.TableMaintenanceJobPO;
 
 /** DAO service for {@code table_maintenance_job}. */
 public class TableMaintenanceJobMetaService {

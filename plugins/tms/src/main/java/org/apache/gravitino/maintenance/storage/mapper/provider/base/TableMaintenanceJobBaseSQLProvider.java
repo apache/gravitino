@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.mapper.provider.base;
+package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 
-import static org.apache.gravitino.tms.storage.mapper.TableMaintenanceJobMapper.TABLE_NAME;
+import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper.TABLE_NAME;
 
-import org.apache.gravitino.tms.storage.po.TableMaintenanceJobPO;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
 import org.apache.ibatis.annotations.Param;
 
 /** Portable SQL for {@code table_maintenance_job}. */

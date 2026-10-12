@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.tms.storage.service;
+package org.apache.gravitino.maintenance.storage.service;
 
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;

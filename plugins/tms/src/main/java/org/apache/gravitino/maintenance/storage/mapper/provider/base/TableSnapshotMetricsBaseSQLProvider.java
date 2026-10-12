@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.mapper.provider.base;
+package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 
-import org.apache.gravitino.tms.storage.mapper.TableMaintenanceJobMapper;
-import org.apache.gravitino.tms.storage.mapper.TableSnapshotMetricsMapper;
-import org.apache.gravitino.tms.storage.po.TableSnapshotMetricsPO;
+import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
+import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
 import org.apache.ibatis.annotations.Param;
 
 /** Portable SQL for {@code table_snapshot_metrics}. */

@@ -16,31 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.po;
+package org.apache.gravitino.maintenance.storage.mapper.provider;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.Accessors;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
+import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 
-/** Persistence object for {@code table_snapshot_metrics}. */
-@Getter
-@Accessors(fluent = true)
-@EqualsAndHashCode
-@ToString
-@Builder(setterPrefix = "with")
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class TableSnapshotMetricsPO {
+/** Supplies TMS mapper classes from the {@code tms} plugin. */
+public class TmsMapperPackageProvider implements MapperPackageProvider {
 
-  private Long id;
-  private Long tableId;
-  private Long policyId;
-  private Long snapshotId;
-  private String metricsValue;
-  private Long createdAt;
+  @Override
+  public List<Class<?>> getMapperClasses() {
+    return ImmutableList.of(TableMaintenanceJobMapper.class, TableSnapshotMetricsMapper.class);
+  }
 }

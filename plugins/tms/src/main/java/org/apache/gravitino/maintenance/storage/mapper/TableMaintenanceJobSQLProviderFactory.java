@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.tms.storage.mapper;
+package org.apache.gravitino.maintenance.storage.mapper;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.h2.TableMaintenanceJobH2Provider;
+import org.apache.gravitino.maintenance.storage.mapper.provider.postgresql.TableMaintenanceJobPostgreSQLProvider;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.gravitino.tms.storage.mapper.provider.base.TableMaintenanceJobBaseSQLProvider;
-import org.apache.gravitino.tms.storage.mapper.provider.h2.TableMaintenanceJobH2Provider;
-import org.apache.gravitino.tms.storage.mapper.provider.postgresql.TableMaintenanceJobPostgreSQLProvider;
-import org.apache.gravitino.tms.storage.po.TableMaintenanceJobPO;
 import org.apache.ibatis.annotations.Param;
 
 /** SQL provider factory for {@link TableMaintenanceJobMapper}. */
