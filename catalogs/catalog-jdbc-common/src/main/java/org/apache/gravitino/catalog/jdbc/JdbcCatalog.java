@@ -114,9 +114,9 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   public void validateOnCreate() {
     try {
       ops().testConnection(entity().nameIdentifier());
-    } catch (ConnectionFailedException e) {
-      throw e;
     } catch (RuntimeException e) {
+      // Includes ConnectionFailedException; rethrow unchanged so CatalogManager rolls back and the
+      // connection-failed taxonomy the caller relies on is preserved.
       throw e;
     } catch (Exception e) {
       // The CatalogOperations interface declares a checked Exception; the JDBC override only throws
