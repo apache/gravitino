@@ -95,6 +95,12 @@ public interface ModelCatalog {
    * model is registered, in the meantime, the model version (version 0) will also be created and
    * linked to the registered model.
    *
+   * <p>If linking the model version fails, the model is deleted before the exception is rethrown,
+   * unless it already has a version, because {@link #deleteModel(NameIdentifier)} also deletes the
+   * model's versions. The check and the delete are not atomic, so a version linked between them is
+   * deleted too. If the check or the delete fails, its exception is added to the rethrown one with
+   * {@link Throwable#addSuppressed(Throwable)}.
+   *
    * @param ident The name identifier of the model.
    * @param uris The names and URIs of the model version artifact.
    * @param aliases The aliases of the model version. The aliases should be unique in this model,
@@ -118,7 +124,19 @@ public interface ModelCatalog {
       throws NoSuchSchemaException, ModelAlreadyExistsException,
           ModelVersionAliasesAlreadyExistException {
     Model model = registerModel(ident, comment, properties);
-    linkModelVersion(ident, uris, aliases, comment, properties);
+    try {
+      linkModelVersion(ident, uris, aliases, comment, properties);
+    } catch (RuntimeException e) {
+      try {
+        // deleteModel also deletes versions, so only roll back a model that is still empty.
+        if (listModelVersions(ident).length == 0) {
+          deleteModel(ident);
+        }
+      } catch (RuntimeException compensationFailure) {
+        e.addSuppressed(compensationFailure);
+      }
+      throw e;
+    }
     return model;
   }
 
