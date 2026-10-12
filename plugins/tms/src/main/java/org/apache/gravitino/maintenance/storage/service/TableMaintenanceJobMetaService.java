@@ -27,7 +27,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 public class TableMaintenanceJobMetaService {
 
   /**
-   * Inserts an in-flight maintenance job row before {@code runJob}.
+   * Inserts a maintenance job row before {@code runJob} (§5.2). {@code job_id} stays null until
+   * {@link #bindJobId(long, long)}.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
@@ -42,37 +43,38 @@ public class TableMaintenanceJobMetaService {
   }
 
   /**
-   * @param tableId table id
-   * @param policyId policy id
-   * @return whether a row exists with {@code finished_at IS NULL}
+   * Sets {@code job_id} after {@code runJob} returns a job run id.
+   *
+   * @param id {@code table_maintenance_job.id}
+   * @param jobId {@code job_run_meta.job_run_id}
    */
-  public boolean hasInFlightJob(long tableId, long policyId) {
-    int count =
-        SessionUtils.getWithoutCommit(
-            TableMaintenanceJobMapper.class,
-            mapper -> mapper.countInFlightByTableAndPolicy(tableId, policyId));
-    return count > 0;
+  public void bindJobId(long id, long jobId) {
+    SessionUtils.doWithCommit(
+        TableMaintenanceJobMapper.class, mapper -> mapper.updateJobId(id, jobId));
   }
 
   /**
-   * @param id maintenance job row id
+   * Records the sampled Iceberg snapshot id ({@code S0}) for a running job.
+   *
+   * @param jobId Gravitino job run id
    * @param beforeSnapshotId sampled snapshot id
    */
-  public void recordBeforeSnapshot(long id, long beforeSnapshotId) {
+  public void recordBeforeSnapshot(long jobId, long beforeSnapshotId) {
     SessionUtils.doWithCommit(
         TableMaintenanceJobMapper.class,
-        mapper -> mapper.updateBeforeSnapshot(id, beforeSnapshotId));
+        mapper -> mapper.updateBeforeSnapshot(jobId, beforeSnapshotId));
   }
 
   /**
-   * @param id maintenance job row id
+   * Marks the job finished with the terminal snapshot id.
+   *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish timestamp millis
    */
-  public void markFinished(long id, Long jobId, Long afterSnapshotId, long finishedAt) {
+  public void markFinished(long jobId, Long afterSnapshotId, long finishedAt) {
     SessionUtils.doWithCommit(
         TableMaintenanceJobMapper.class,
-        mapper -> mapper.markFinished(id, jobId, afterSnapshotId, finishedAt));
+        mapper -> mapper.markFinished(jobId, afterSnapshotId, finishedAt));
   }
 }

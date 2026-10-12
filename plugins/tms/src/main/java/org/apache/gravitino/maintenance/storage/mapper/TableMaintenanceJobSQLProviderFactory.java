@@ -39,37 +39,34 @@ public class TableMaintenanceJobSQLProviderFactory {
   }
 
   /**
-   * @param tableId table id
-   * @param policyId policy id
-   * @return COUNT statement
+   * @param id row id
+   * @param jobId job run id
+   * @return UPDATE statement
    */
-  public static String countInFlightByTableAndPolicy(
-      @Param("tableId") long tableId, @Param("policyId") long policyId) {
-    return PROVIDER.countInFlightByTableAndPolicy(tableId, policyId);
+  public static String updateJobId(@Param("id") long id, @Param("jobId") long jobId) {
+    return PROVIDER.updateJobId(id, jobId);
   }
 
   /**
-   * @param id row id
+   * @param jobId job run id
    * @param beforeSnapshotId snapshot id
    * @return UPDATE statement
    */
   public static String updateBeforeSnapshot(
-      @Param("id") long id, @Param("beforeSnapshotId") long beforeSnapshotId) {
-    return PROVIDER.updateBeforeSnapshot(id, beforeSnapshotId);
+      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId) {
+    return PROVIDER.updateBeforeSnapshot(jobId, beforeSnapshotId);
   }
 
   /**
-   * @param id row id
    * @param jobId job run id
    * @param afterSnapshotId after snapshot
    * @param finishedAt finish millis
    * @return UPDATE statement
    */
   public static String markFinished(
-      @Param("id") long id,
-      @Param("jobId") Long jobId,
+      @Param("jobId") long jobId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt) {
-    return PROVIDER.markFinished(id, jobId, afterSnapshotId, finishedAt);
+    return PROVIDER.markFinished(jobId, afterSnapshotId, finishedAt);
   }
 }

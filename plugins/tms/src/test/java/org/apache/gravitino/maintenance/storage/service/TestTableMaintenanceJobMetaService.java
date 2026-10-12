@@ -34,11 +34,13 @@ class TestTableMaintenanceJobMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testInFlightAndFinishLifecycle() {
+  void testInsertBindSampleAndFinishLifecycle() {
     long rowId = service.insertInFlightJob(10L, 20L);
-    Assertions.assertTrue(service.hasInFlightJob(10L, 20L));
-    service.recordBeforeSnapshot(rowId, 100L);
-    service.markFinished(rowId, 999L, 200L, System.currentTimeMillis());
-    Assertions.assertFalse(service.hasInFlightJob(10L, 20L));
+    Assertions.assertTrue(rowId > 0);
+    long jobId = 999L;
+    service.bindJobId(rowId, jobId);
+    service.recordBeforeSnapshot(jobId, 100L);
+    Assertions.assertDoesNotThrow(
+        () -> service.markFinished(jobId, 200L, System.currentTimeMillis()));
   }
 }

@@ -27,56 +27,62 @@ import org.apache.ibatis.annotations.Param;
 public class TableMaintenanceJobBaseSQLProvider {
 
   /**
-   * @param po row to insert
+   * Inserts a run row with occupancy keys only. Snapshot columns stay null until the Spark Job /
+   * terminal listener updates them (§5.2).
+   *
+   * @param po row to insert ({@code jobId} may be null until {@code runJob})
    * @return INSERT statement
    */
   public String insertJob(@Param("po") TableMaintenanceJobPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (job_id, table_id, policy_id, before_snapshot_id, after_snapshot_id, finished_at)"
-        + " VALUES (#{po.jobId}, #{po.tableId}, #{po.policyId}, #{po.beforeSnapshotId},"
-        + " #{po.afterSnapshotId}, #{po.finishedAt})";
+        + " (job_id, table_id, policy_id)"
+        + " VALUES (#{po.jobId}, #{po.tableId}, #{po.policyId})";
   }
 
   /**
-   * @param tableId table id
-   * @param policyId policy id
-   * @return COUNT of in-flight rows
+   * Binds {@code job_run_meta.job_run_id} after {@code runJob} (§5.2: job_id set at runJob).
+   *
+   * @param id row id returned from insert
+   * @param jobId Gravitino job run id
+   * @return UPDATE statement
    */
-  public String countInFlightByTableAndPolicy(
-      @Param("tableId") long tableId, @Param("policyId") long policyId) {
-    return "SELECT COUNT(*) FROM "
+  public String updateJobId(@Param("id") long id, @Param("jobId") long jobId) {
+    return "UPDATE "
         + TABLE_NAME
-        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NULL";
+        + " SET job_id = #{jobId} WHERE id = #{id} AND finished_at IS NULL";
   }
 
   /**
-   * @param id row id
-   * @param beforeSnapshotId snapshot sampled in the job
+   * Sets {@code before_snapshot_id} from inside the Spark Job when {@code S0} is sampled.
+   *
+   * @param jobId Gravitino job run id
+   * @param beforeSnapshotId sampled snapshot id
    * @return UPDATE statement
    */
   public String updateBeforeSnapshot(
-      @Param("id") long id, @Param("beforeSnapshotId") long beforeSnapshotId) {
+      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET before_snapshot_id = #{beforeSnapshotId} WHERE id = #{id} AND finished_at IS NULL";
+        + " SET before_snapshot_id = #{beforeSnapshotId}"
+        + " WHERE job_id = #{jobId} AND finished_at IS NULL";
   }
 
   /**
-   * @param id row id
+   * Sets terminal snapshot pointers when the Spark Job finishes.
+   *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish time millis
    * @return UPDATE statement
    */
   public String markFinished(
-      @Param("id") long id,
-      @Param("jobId") Long jobId,
+      @Param("jobId") long jobId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET job_id = COALESCE(job_id, #{jobId}), after_snapshot_id = #{afterSnapshotId},"
-        + " finished_at = #{finishedAt} WHERE id = #{id} AND finished_at IS NULL";
+        + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
+        + " WHERE job_id = #{jobId} AND finished_at IS NULL";
   }
 }

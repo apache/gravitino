@@ -22,7 +22,6 @@ import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** MyBatis mapper for {@code table_maintenance_job}. */
@@ -34,21 +33,18 @@ public interface TableMaintenanceJobMapper {
   @Options(useGeneratedKeys = true, keyProperty = "po.id", keyColumn = "id")
   void insertJob(@Param("po") TableMaintenanceJobPO po);
 
-  @SelectProvider(
-      type = TableMaintenanceJobSQLProviderFactory.class,
-      method = "countInFlightByTableAndPolicy")
-  int countInFlightByTableAndPolicy(
-      @Param("tableId") long tableId, @Param("policyId") long policyId);
+  @UpdateProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "updateJobId")
+  int updateJobId(@Param("id") long id, @Param("jobId") long jobId);
 
   @UpdateProvider(
       type = TableMaintenanceJobSQLProviderFactory.class,
       method = "updateBeforeSnapshot")
-  int updateBeforeSnapshot(@Param("id") long id, @Param("beforeSnapshotId") long beforeSnapshotId);
+  int updateBeforeSnapshot(
+      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId);
 
   @UpdateProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "markFinished")
   int markFinished(
-      @Param("id") long id,
-      @Param("jobId") Long jobId,
+      @Param("jobId") long jobId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt);
 }
