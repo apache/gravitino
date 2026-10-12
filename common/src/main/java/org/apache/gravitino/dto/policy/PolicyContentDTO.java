@@ -29,7 +29,6 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -39,33 +38,6 @@ import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
 public interface PolicyContentDTO extends PolicyContent {
-
-  /** JSON DTO for {@link TableMaintenanceSchedule}. */
-  @EqualsAndHashCode
-  @ToString
-  @Builder(setterPrefix = "with")
-  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-  class TableMaintenanceScheduleDTO {
-    @JsonProperty("onCommit")
-    private Boolean onCommit;
-
-    @JsonProperty("crontab")
-    private String crontab;
-
-    private TableMaintenanceScheduleDTO() {}
-
-    /**
-     * Converts to domain schedule.
-     *
-     * @return domain object or null when unset
-     */
-    public TableMaintenanceSchedule toDomain() {
-      if (onCommit == null && crontab == null) {
-        return null;
-      }
-      return new TableMaintenanceSchedule(onCommit, crontab);
-    }
-  }
 
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode

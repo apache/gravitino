@@ -26,8 +26,6 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
-import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -178,27 +176,5 @@ public class TestPolicyDTO {
     Assertions.assertEquals(
         IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
     Assertions.assertDoesNotThrow(contentDTO::validate);
-  }
-
-  @Test
-  public void testTableMaintenanceScheduleDtoAndFieldsAnyFieldMapper() throws Exception {
-    PolicyContentDTO.TableMaintenanceScheduleDTO scheduleDTO =
-        PolicyContentDTO.TableMaintenanceScheduleDTO.builder()
-            .withOnCommit(true)
-            .withCrontab("0 1 * * *")
-            .build();
-    TableMaintenanceSchedule schedule = scheduleDTO.toDomain();
-    Assertions.assertTrue(schedule.onCommit());
-    Assertions.assertEquals("0 1 * * *", schedule.crontab());
-
-    TableMaintenancePolicyFields fields =
-        new TableMaintenancePolicyFields(
-            schedule, 7_200_000L, ImmutableMap.of("uri", "http://irc:9001/iceberg"));
-    String json = JsonUtils.anyFieldMapper().writeValueAsString(fields);
-    Assertions.assertFalse(json.contains("\"present\""), json);
-
-    TableMaintenancePolicyFields restored =
-        JsonUtils.anyFieldMapper().readValue(json, TableMaintenancePolicyFields.class);
-    Assertions.assertEquals(fields, restored);
   }
 }
