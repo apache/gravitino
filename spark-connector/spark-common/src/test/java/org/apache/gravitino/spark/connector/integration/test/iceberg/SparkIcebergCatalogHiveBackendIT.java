@@ -24,16 +24,24 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 /** This class use Apache Iceberg HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
 
-  /** {@inheritDoc} */
+  @Test
   @Override
-  protected boolean replaceColumnsRequiresManualReconciliation() {
-    return true;
+  protected void testAlterTableReplaceColumns() {
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, super::testAlterTableReplaceColumns);
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile external table renames"));
   }
 
   @Override

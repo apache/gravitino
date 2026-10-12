@@ -198,7 +198,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       try {
         insertEntity(e, overwritten);
       } catch (EntityAlreadyExistsException duplicate) {
-        if (!overwritten && isSoftDeleted(e.id(), e.type())) {
+        if (!overwritten && isSoftDeleted(e)) {
           throw new SoftDeletedEntityIdentifierException(duplicate, e.type(), e.id());
         }
         throw duplicate;
@@ -1034,14 +1034,14 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     }
   }
 
-  private boolean isSoftDeleted(long entityId, Entity.EntityType entityType) {
-    switch (entityType) {
+  private <E extends Entity & HasIdentifier> boolean isSoftDeleted(E entity) {
+    switch (entity.type()) {
       case SCHEMA:
-        return SchemaMetaService.getInstance().isSoftDeleted(entityId);
+        return SchemaMetaService.getInstance().isSoftDeleted(entity.id());
       case TABLE:
-        return TableMetaService.getInstance().isSoftDeleted(entityId);
+        return TableMetaService.getInstance().isSoftDeleted(entity.id());
       case VIEW:
-        return ViewMetaService.getInstance().isSoftDeleted(entityId);
+        return ViewMetaService.getInstance().isSoftDeleted(entity.id());
       default:
         return false;
     }
