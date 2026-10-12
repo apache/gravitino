@@ -456,7 +456,12 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (OptimisticLockException e) {
       // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
       // not stored. Drop the dataset just created so that a retry can create it again.
-      Dataset.drop(location, storageProps);
+      try {
+        Dataset.drop(location, storageProps);
+      } catch (RuntimeException dropFailure) {
+        LOG.warn("Failed to drop the Lance dataset at {} after a conflict", location, dropFailure);
+        e.addSuppressed(dropFailure);
+      }
       throw e;
     } catch (IllegalArgumentException e) {
       if (e.getMessage().contains("Dataset already exists")) {

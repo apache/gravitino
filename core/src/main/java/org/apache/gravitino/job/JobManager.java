@@ -600,6 +600,27 @@ public class JobManager implements JobOperationDispatcher {
           "Job template with name %s under metalake %s does not exist",
           jobTemplateName,
           metalake);
+    } catch (OptimisticLockException e) {
+      // The registration conflicted with a concurrent writer, e.g. a lock wait timeout, and the
+      // conflict tells the caller to retry. A retry submits the job again, so cancel this
+      // execution rather than leave it running untracked.
+      LOG.error(
+          "Job {} was submitted as execution {} but could not be registered because of a "
+              + "concurrent operation, cancelling the execution",
+          jobEntity.name(),
+          jobExecutionId,
+          e);
+      try {
+        jobExecutor.cancelJob(jobExecutionId);
+      } catch (Exception cancelFailure) {
+        LOG.error(
+            "Failed to cancel the unregistered execution {} of job {}",
+            jobExecutionId,
+            jobEntity.name(),
+            cancelFailure);
+        e.addSuppressed(cancelFailure);
+      }
+      throw e;
     } catch (IOException e) {
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }

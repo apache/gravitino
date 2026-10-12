@@ -220,6 +220,36 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobCancelsExecutionWhenRegistrationConflicts() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    Mockito.reset(entityStore, jobExecutor);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_conflict");
+    OptimisticLockException conflict = new OptimisticLockException("lock wait timeout");
+    doThrow(conflict).when(entityStore).put(any(JobEntity.class), eq(false));
+
+    // The conflict tells the caller to retry, which submits the job again, so the execution that
+    // could not be registered is cancelled.
+    Assertions.assertSame(
+        conflict,
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap())));
+    verify(jobExecutor, times(1)).cancelJob("submitted_conflict");
+
+    // A failed cancellation is kept on the conflict for diagnosis.
+    Mockito.reset(jobExecutor);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_conflict_2");
+    RuntimeException cancelFailure = new RuntimeException("executor unavailable");
+    doThrow(cancelFailure).when(jobExecutor).cancelJob("submitted_conflict_2");
+    OptimisticLockException second =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertTrue(List.of(second.getSuppressed()).contains(cancelFailure));
+  }
+
+  @Test
   public void testAlterJobTemplateDistinguishesMissingFromConflict() throws IOException {
     NoSuchEntityException missing = new NoSuchEntityException("Template was deleted");
     doThrow(missing).when(entityStore).update(any(), any(), any(), any());
