@@ -1220,15 +1220,15 @@ CREATE INDEX IF NOT EXISTS idx_tmj_table_policy_finished ON table_maintenance_jo
 CREATE INDEX IF NOT EXISTS idx_tmj_before_sid ON table_maintenance_job (table_id, before_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tmj_after_sid ON table_maintenance_job (table_id, after_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tmj_created_at ON table_maintenance_job (created_at);
-COMMENT ON TABLE table_maintenance_job IS 'per-run TMS job: snapshot pointers + submit gates';
+COMMENT ON TABLE table_maintenance_job IS 'table maintenance job run metadata';
 COMMENT ON COLUMN table_maintenance_job.id IS 'auto increment id';
-COMMENT ON COLUMN table_maintenance_job.job_id IS 'job id, set at runJob, maps to job_run_meta.job_run_id';
+COMMENT ON COLUMN table_maintenance_job.job_id IS 'job run id, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_job.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_job.policy_id IS 'policy id from policy_meta';
-COMMENT ON COLUMN table_maintenance_job.before_snapshot_id IS 'Iceberg snapshot id at sample, null until sampled';
-COMMENT ON COLUMN table_maintenance_job.after_snapshot_id IS 'Iceberg snapshot id after job, null while pending';
-COMMENT ON COLUMN table_maintenance_job.finished_at IS 'end time, null = in-flight';
-COMMENT ON COLUMN table_maintenance_job.created_at IS 'row create time in epoch millis';
+COMMENT ON COLUMN table_maintenance_job.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
+COMMENT ON COLUMN table_maintenance_job.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
+COMMENT ON COLUMN table_maintenance_job.finished_at IS 'finish timestamp in milliseconds, null while in flight';
+COMMENT ON COLUMN table_maintenance_job.created_at IS 'creation timestamp in milliseconds';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
     id BIGSERIAL PRIMARY KEY,
@@ -1240,10 +1240,10 @@ CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
-COMMENT ON TABLE table_snapshot_metrics IS 'per-policy table metrics by Iceberg snapshot_id';
+COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
 COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
 COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
-COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'JSON metrics for this snapshot';
-COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'sample write time in epoch millis';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'metrics value as JSON';
+COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'creation timestamp in milliseconds';

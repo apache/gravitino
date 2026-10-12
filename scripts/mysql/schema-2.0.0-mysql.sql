@@ -688,13 +688,13 @@ CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job id, set at runJob, maps to job_run_meta.job_run_id',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
-    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id at sample, null until sampled',
-    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after job, null while pending',
-    `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'end time, null = in-flight',
-    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'row create time in epoch millis',
+    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
+    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after maintenance, null while pending',
+    `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'finish timestamp in milliseconds, null while in flight',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tmj_job_id` (`job_id`),
     KEY `idx_tmj_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
@@ -702,17 +702,17 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`),
     KEY `idx_tmj_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-  COMMENT 'per-run TMS job: snapshot pointers + submit gates';
+  COMMENT 'table maintenance job run metadata';
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
     `snapshot_id` BIGINT(20) NOT NULL COMMENT 'Iceberg snapshot id',
-    `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'JSON metrics for this snapshot',
-    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sample write time in epoch millis',
+    `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'metrics value as JSON',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
     KEY `idx_tsm_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-  COMMENT 'per-policy table metrics by Iceberg snapshot_id';
+  COMMENT 'table snapshot metrics metadata';
