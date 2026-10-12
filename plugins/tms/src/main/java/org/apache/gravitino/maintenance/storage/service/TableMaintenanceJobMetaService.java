@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.maintenance.storage.service;
 
-import com.google.common.base.Preconditions;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceJobMapper;
 import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceJobPO;
@@ -28,30 +27,21 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 public class TableMaintenanceJobMetaService {
 
   /**
-   * Inserts a maintenance job row before {@code runJob} (§5.2). {@code job_id} stays null until
-   * {@link #bindJobId(long, long)}.
+   * Inserts a maintenance job row with {@code job_id}, {@code table_id}, and {@code policy_id}
+   * (§5.2).
    *
+   * @param jobId {@code job_run_meta.job_run_id}
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return generated row id
    */
-  public long insertInFlightJob(long tableId, long policyId) {
+  public void insertJob(long jobId, long tableId, long policyId) {
     TableMaintenanceJobPO po =
-        TableMaintenanceJobPO.builder().withTableId(tableId).withPolicyId(policyId).build();
+        TableMaintenanceJobPO.builder()
+            .withJobId(jobId)
+            .withTableId(tableId)
+            .withPolicyId(policyId)
+            .build();
     SessionUtils.doWithCommit(TableMaintenanceJobMapper.class, mapper -> mapper.insertJob(po));
-    Preconditions.checkState(po.id() != null, "insert did not return generated id");
-    return po.id();
-  }
-
-  /**
-   * Sets {@code job_id} after {@code runJob} returns a job run id.
-   *
-   * @param id {@code table_maintenance_job.id}
-   * @param jobId {@code job_run_meta.job_run_id}
-   */
-  public void bindJobId(long id, long jobId) {
-    SessionUtils.doWithCommit(
-        TableMaintenanceJobMapper.class, mapper -> mapper.updateJobId(id, jobId));
   }
 
   /**

@@ -36,11 +36,9 @@ class TestTableMaintenanceJobMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testInsertBindSampleFinishAndDeleteByJobId() {
-    long rowId = jobService.insertInFlightJob(10L, 20L);
-    Assertions.assertTrue(rowId > 0);
+  void testInsertSampleFinishAndDeleteByJobId() {
     long jobId = 999L;
-    jobService.bindJobId(rowId, jobId);
+    jobService.insertJob(jobId, 10L, 20L);
     jobService.recordBeforeSnapshot(jobId, 100L);
     metricsService.insertMetrics(10L, 20L, 100L, "{\"mse\":1}");
     jobService.markFinished(jobId, 200L, System.currentTimeMillis());

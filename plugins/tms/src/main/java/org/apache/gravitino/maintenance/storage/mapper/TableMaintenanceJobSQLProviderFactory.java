@@ -39,15 +39,6 @@ public class TableMaintenanceJobSQLProviderFactory {
   }
 
   /**
-   * @param id row id
-   * @param jobId job run id
-   * @return UPDATE statement
-   */
-  public static String updateJobId(@Param("id") long id, @Param("jobId") long jobId) {
-    return PROVIDER.updateJobId(id, jobId);
-  }
-
-  /**
    * @param jobId job run id
    * @param beforeSnapshotId snapshot id
    * @return UPDATE statement

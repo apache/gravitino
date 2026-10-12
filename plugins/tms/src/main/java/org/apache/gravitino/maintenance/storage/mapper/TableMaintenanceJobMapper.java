@@ -34,9 +34,6 @@ public interface TableMaintenanceJobMapper {
   @Options(useGeneratedKeys = true, keyProperty = "po.id", keyColumn = "id")
   void insertJob(@Param("po") TableMaintenanceJobPO po);
 
-  @UpdateProvider(type = TableMaintenanceJobSQLProviderFactory.class, method = "updateJobId")
-  int updateJobId(@Param("id") long id, @Param("jobId") long jobId);
-
   @UpdateProvider(
       type = TableMaintenanceJobSQLProviderFactory.class,
       method = "updateBeforeSnapshot")

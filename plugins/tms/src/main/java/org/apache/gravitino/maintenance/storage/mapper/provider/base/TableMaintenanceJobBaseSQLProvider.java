@@ -27,10 +27,10 @@ import org.apache.ibatis.annotations.Param;
 public class TableMaintenanceJobBaseSQLProvider {
 
   /**
-   * Inserts a run row with occupancy keys only. Snapshot columns stay null until the Spark Job /
-   * terminal listener updates them (§5.2).
+   * Inserts a run row with {@code job_id}, {@code table_id}, and {@code policy_id} only. Snapshot
+   * columns stay null until the Spark Job / terminal listener updates them (§5.2).
    *
-   * @param po row to insert ({@code jobId} may be null until {@code runJob})
+   * @param po row to insert
    * @return INSERT statement
    */
   public String insertJob(@Param("po") TableMaintenanceJobPO po) {
@@ -38,19 +38,6 @@ public class TableMaintenanceJobBaseSQLProvider {
         + TABLE_NAME
         + " (job_id, table_id, policy_id)"
         + " VALUES (#{po.jobId}, #{po.tableId}, #{po.policyId})";
-  }
-
-  /**
-   * Binds {@code job_run_meta.job_run_id} after {@code runJob} (§5.2: job_id set at runJob).
-   *
-   * @param id row id returned from insert
-   * @param jobId Gravitino job run id
-   * @return UPDATE statement
-   */
-  public String updateJobId(@Param("id") long id, @Param("jobId") long jobId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET job_id = #{jobId} WHERE id = #{id} AND finished_at IS NULL";
   }
 
   /**
