@@ -25,6 +25,7 @@ import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.util.Properties;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -194,10 +195,10 @@ public class TestJdbcCatalogOperationsProbe {
     }
 
     @Override
-    public java.util.logging.Logger getParentLogger() {
-      // FQN: java.sql.Driver requires java.util.logging.Logger, which would clash with other
-      // Logger types if imported.
-      return java.util.logging.Logger.getLogger("SocketReadingDriver");
+    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
+      // This fake driver does not use java.util.logging. FQN is used because java.sql.Driver
+      // mandates java.util.logging.Logger, whose simple name would clash with org.slf4j.Logger.
+      throw new SQLFeatureNotSupportedException();
     }
   }
 }

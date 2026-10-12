@@ -166,18 +166,34 @@ public class TestJdbcConnectionTimeouts {
   }
 
   @Test
-  void testOperatorConnectTimeoutAsConfigKeyIsPreserved() {
+  void testOperatorConnectTimeoutInConnectionPropertiesIsPreserved() {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
     props.put(URL_KEY, "jdbc:mysql://host:3306/db");
-    // The operator set connectTimeout as a connection property directly.
+    // The operator set connectTimeout inside the DBCP connectionProperties value (name=value;...).
+    props.put("connectionProperties", "connectTimeout=5000;useSSL=false");
+
+    Map<String, String> result =
+        JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
+
+    // The operator's connectTimeout wins, so nothing is injected (no overwrite).
+    Assertions.assertTrue(result.isEmpty());
+  }
+
+  @Test
+  void testBareTopLevelConnectTimeoutKeyDoesNotSuppressInjection() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
+    props.put(URL_KEY, "jdbc:mysql://host:3306/db");
+    // A bare top-level connectTimeout key is NOT a DBCP connection property (DBCP ignores it), so
+    // it must NOT suppress injection — otherwise the connection would end up with no timeout.
     props.put(CONNECT_TIMEOUT, "5000");
 
     Map<String, String> result =
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
-    // The operator's connectTimeout wins, so nothing is injected.
-    Assertions.assertTrue(result.isEmpty());
+    Assertions.assertEquals("30000", result.get(CONNECT_TIMEOUT));
+    Assertions.assertEquals(1, result.size());
   }
 
   @Test

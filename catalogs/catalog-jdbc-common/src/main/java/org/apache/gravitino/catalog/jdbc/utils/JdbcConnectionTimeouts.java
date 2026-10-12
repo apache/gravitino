@@ -66,12 +66,14 @@ import org.slf4j.LoggerFactory;
  * <p>An unknown driver family yields no properties (logged at debug), so adding a new JDBC provider
  * never breaks; that provider opts in by registering its family here.
  *
- * <p><b>Default, never override.</b> A property is omitted when the operator has already set it,
- * either as a connection property key in the catalog configuration ({@link
- * JdbcConfig#getAllConfig()}) or as a query parameter in the {@code jdbc-url}, so the operator's
- * value always wins. The URL-parameter check is case-sensitive and anchored at a parameter boundary
- * ({@code ?} or {@code &}), so a differently-cased or substring variant does not suppress injection
- * of the canonical key.
+ * <p><b>Default, never override.</b> A property is omitted when the operator has already set it in
+ * one of the two places that actually reach the driver: a query parameter in the {@code jdbc-url},
+ * or inside the DBCP {@code connectionProperties} value (a {@code name=value;...} string), so the
+ * operator's value always wins. Both checks are case-sensitive and anchored at a boundary ({@code
+ * ?} or {@code &} for the URL, {@code ;} for connectionProperties), so a differently-cased or
+ * substring variant does not suppress injection of the canonical key. A bare top-level config key
+ * of the same name is deliberately not treated as operator-set, because DBCP does not honor such a
+ * key.
  *
  * <p>The pooled properties are applied as DBCP <em>connection</em> properties (via {@code
  * BasicDataSource.addConnectionProperty}), not raw pool keys, so they neither collide with the
@@ -214,9 +216,20 @@ public final class JdbcConnectionTimeouts {
   }
 
   /**
-   * Adds a timeout property unless the operator has already set it (as a connection property key in
-   * the catalog configuration or as a {@code jdbc-url} query parameter), preserving the operator's
-   * value in that case.
+   * The DBCP2 pool key whose value is a {@code name=value;name2=value2} string of connection
+   * properties. {@code DataSourceUtils} forwards it to {@code BasicDataSourceFactory}, which parses
+   * it into the pool's connection properties, and the create-time probe reads the same catalog
+   * configuration. An operator-set timeout lives inside this value, not as a top-level config key.
+   */
+  static final String DBCP_CONNECTION_PROPERTIES_KEY = "connectionProperties";
+
+  /**
+   * Adds a timeout property unless the operator has already set it, preserving the operator's value
+   * in that case. The operator can set it in two places that actually reach the driver: a {@code
+   * jdbc-url} query parameter, or inside the DBCP {@code connectionProperties} value (a {@code
+   * name=value;...} string). A bare top-level config key of the same name is deliberately NOT
+   * treated as operator-set, because DBCP does not recognize such a key — honoring it would
+   * suppress the bound while the driver still saw no timeout.
    *
    * @param properties the map being built
    * @param name the timeout property name
@@ -230,10 +243,35 @@ public final class JdbcConnectionTimeouts {
       String value,
       JdbcConfig config,
       String jdbcUrl) {
-    if (config.getAllConfig().containsKey(name) || hasUrlParameter(jdbcUrl, name)) {
+    if (hasUrlParameter(jdbcUrl, name)
+        || hasConnectionProperty(config.getAllConfig().get(DBCP_CONNECTION_PROPERTIES_KEY), name)) {
       return;
     }
     properties.put(name, value);
+  }
+
+  /**
+   * Determines whether the DBCP {@code connectionProperties} value already defines the given
+   * property. The value is a {@code name=value} list separated by {@code ;} (the format DBCP's
+   * {@code BasicDataSourceFactory} parses), so the name is matched case-sensitively at a {@code ;}
+   * boundary, mirroring the URL check; a differently-cased or substring variant does not count.
+   *
+   * @param connectionProperties the DBCP connectionProperties string; may be null or blank
+   * @param name the exact property name to look for
+   * @return true if the property is present with exactly this name
+   */
+  private static boolean hasConnectionProperty(String connectionProperties, String name) {
+    if (StringUtils.isBlank(connectionProperties)) {
+      return false;
+    }
+    for (String pair : connectionProperties.split(";")) {
+      int eq = pair.indexOf('=');
+      String key = (eq >= 0 ? pair.substring(0, eq) : pair).trim();
+      if (key.equals(name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
