@@ -85,6 +85,16 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
+  // The driver version is fixed for a data source. It is cached so that column parsing in load,
+  // which holds a connection, does not borrow another one to read it. A driver may report a null
+  // version, so a separate flag records that it was read; written after the version, it publishes
+  // it.
+  private String driverVersion;
+  private volatile boolean driverVersionCached;
+  // Even a failed attempt must prevent a fallback borrow while load holds its connection.
+  // cacheDriverVersion retries failures using the connection held by a later load.
+  private volatile boolean driverVersionAttempted;
+
   @Override
   public void initialize(
       DataSource dataSource,
@@ -93,6 +103,9 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
     this.dataSource = dataSource;
+    driverVersion = null;
+    driverVersionCached = false;
+    driverVersionAttempted = false;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
     this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
@@ -142,18 +155,19 @@ public abstract class JdbcTableOperations implements TableOperation {
       SortOrder[] sortOrders)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
+    // Generate the SQL before borrowing the connection that executes it, as generators may query
+    // the server through another connection (for example, Doris checks its backends and version).
+    String sql =
+        generateCreateTableSql(
+            tableName,
+            columns,
+            comment,
+            properties,
+            partitioning,
+            distribution,
+            indexes,
+            sortOrders);
     try (Connection connection = getConnection(databaseName)) {
-      String sql =
-          generateCreateTableSql(
-              tableName,
-              columns,
-              comment,
-              properties,
-              partitioning,
-              distribution,
-              indexes,
-              sortOrders);
-
       JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
     } catch (final SQLException se) {
@@ -248,6 +262,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
     // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
+      cacheDriverVersion(connection);
       // 1. Get table information, The result of tables may be more than one due to the reason
       // above, so we need to check the result.
       ResultSet tables = getTable(connection, databaseName, tableName);
@@ -353,12 +368,15 @@ public abstract class JdbcTableOperations implements TableOperation {
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
+    // Generate the SQL before borrowing the connection that executes it. Generators may load the
+    // table, which borrows another connection; holding both lets concurrent alters on distinct
+    // tables exhaust the pool and wait for each other until the borrow timeout.
+    String sql = generateAlterTableSql(databaseName, tableName, changes);
+    if (StringUtils.isEmpty(sql)) {
+      LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+      return;
+    }
     try (Connection connection = getConnection(databaseName)) {
-      String sql = generateAlterTableSql(databaseName, tableName, changes);
-      if (StringUtils.isEmpty(sql)) {
-        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-        return;
-      }
       JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
@@ -511,6 +529,21 @@ public abstract class JdbcTableOperations implements TableOperation {
     return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
+  /**
+   * Generates the SQL statement that creates a table without sort orders.
+   *
+   * <p>Implementations may borrow connections from {@link #dataSource}, so callers must not hold
+   * one while calling this method.
+   *
+   * @param tableName the name of the table
+   * @param columns the columns of the table
+   * @param comment the comment of the table
+   * @param properties the properties of the table
+   * @param partitioning the partitioning of the table
+   * @param distribution the distribution of the table
+   * @param indexes the indexes of the table
+   * @return the SQL statement to create the table
+   */
   protected abstract String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
@@ -520,6 +553,22 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes);
 
+  /**
+   * Generates the SQL statement that creates a table.
+   *
+   * <p>Implementations may borrow connections from {@link #dataSource}, so callers must not hold
+   * one while calling this method.
+   *
+   * @param tableName the name of the table
+   * @param columns the columns of the table
+   * @param comment the comment of the table
+   * @param properties the properties of the table
+   * @param partitioning the partitioning of the table
+   * @param distribution the distribution of the table
+   * @param indexes the indexes of the table
+   * @param sortOrders the sort orders of the table
+   * @return the SQL statement to create the table
+   */
   protected String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
@@ -567,6 +616,17 @@ public abstract class JdbcTableOperations implements TableOperation {
     return generatePurgeTableSql(tableName);
   }
 
+  /**
+   * Generates the SQL statement that applies the given changes to a table.
+   *
+   * <p>Implementations may load the table, which borrows a connection from {@link #dataSource}, so
+   * callers must not hold one while calling this method.
+   *
+   * @param databaseName the name of the database
+   * @param tableName the name of the table
+   * @param changes the changes to apply
+   * @return the SQL statement, or null or an empty string if nothing needs to be executed
+   */
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
@@ -754,21 +814,49 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   /**
-   * Get MySQL driver version from DatabaseMetaData
+   * Get MySQL driver version from DatabaseMetaData.
+   *
+   * <p>The version is cached once read. {@link #load} caches it from the connection it holds before
+   * parsing columns (see {@link #cacheDriverVersion}), so this method borrows a connection only
+   * before the first version-read attempt. Failed reads return null until a later load retries
+   * using its own connection, avoiding a nested borrow during column parsing.
    *
    * @return the driver version string, or null if not available
    */
   protected String getMySQLDriverVersion() {
-    try {
-      if (dataSource != null) {
-        try (Connection connection = dataSource.getConnection()) {
-          return connection.getMetaData().getDriverVersion();
-        }
-      }
+    if (driverVersionCached || driverVersionAttempted || dataSource == null) {
+      return driverVersion;
+    }
+    try (Connection connection = dataSource.getConnection()) {
+      cacheDriverVersion(connection);
     } catch (SQLException e) {
       LOG.debug("Failed to get driver version", e);
     }
-    return null;
+    return driverVersion;
+  }
+
+  /**
+   * Caches the driver version from a connection the caller already holds.
+   *
+   * <p>Overrides of {@link #load} that parse columns must call this first, so that {@link
+   * #getMySQLDriverVersion()} does not borrow another connection while theirs is held.
+   *
+   * @param connection the connection held by the caller
+   */
+  protected void cacheDriverVersion(Connection connection) {
+    if (driverVersionCached) {
+      return;
+    }
+    try {
+      driverVersion = connection.getMetaData().getDriverVersion();
+      driverVersionCached = true;
+    } catch (SQLException e) {
+      // A later load retries on its held connection; column parsing must not retry by borrowing
+      // another connection. Until recovery, preserve the existing null-version precision fallback.
+      LOG.debug("Failed to get driver version", e);
+    } finally {
+      driverVersionAttempted = true;
+    }
   }
 
   /**

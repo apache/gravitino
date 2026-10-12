@@ -75,6 +75,8 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
+| `External("lance.blob")`         | Lance blob                              |
+| `External("lance.blob.legacy")`  | Lance legacy blob                       |
 
 ### External Types
 
@@ -82,7 +84,8 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 
 **Requirements:**
 - JSON must conform to Apache Arrow [Field specification](https://github.com/apache/arrow-java/blob/ed81e5981a2bee40584b3a411ed755cb4cc5b91f/vector/src/main/java/org/apache/arrow/vector/types/pojo/Field.java#L80C1-L86C68)
-- `name` attribute must match column name exactly
+- `name` attribute is ignored: the column name is authoritative and overrides the name in the JSON,
+  so a column keeps its stored JSON type after a rename
 - `nullable` attribute must match column nullability
 - `children` array:
   - Empty for primitive types
@@ -96,6 +99,46 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 | `Large Binary`    | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largebinary\"},\"children\":[]}")`                                                                                                                                         |
 | `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`                     |
 | `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
+
+Gravitino types cannot carry Arrow field metadata. When loading a Lance table, only Lance blob metadata
+is recognized (see [Blob Types](#blob-types)); other field metadata is ignored. Blob fields nested in a
+`Struct`, `List`, `Map` or `Union` keep the container as a native Gravitino type, for example
+`List(External("lance.blob"))`. As with other list columns, the list child is written back as
+`element`, whatever name it had in the Lance dataset (Lance and pyarrow use `item`).
+
+### Blob Types
+
+Lance blob columns use a readable external type instead of Arrow JSON:
+
+| External Type Definition          | Arrow Field                                                                               | Lance File Format Version |
+|-----------------------------------|-------------------------------------------------------------------------------------------|---------------------------|
+| `External("lance.blob")`          | `Struct<data: LargeBinary, uri: Utf8>` with metadata `ARROW:extension:name=lance.blob.v2` | 2.2 or later              |
+| `External("lance.blob.legacy")`   | `LargeBinary` with metadata `lance-encoding:blob=true`                                    | 2.1 or earlier            |
+
+Use `lance.blob` for new tables. `lance.blob.legacy` is only for datasets that already use Lance's
+legacy blob encoding.
+
+When Gravitino creates a Lance dataset with blob columns, it picks the Lance file format version for
+them: 2.2 for `lance.blob` and 2.1 for `lance.blob.legacy`. A table cannot have both. Adding a blob
+column to an existing dataset fails with a clear error if the dataset's file format version does not
+support it.
+
+Only the blob marker is recognized. Other blob metadata, such as
+`lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
+through Gravitino use Lance's defaults. A blob field in any other layout, for example a blob v2 struct
+with the optional `position` and `size` fields or a legacy blob stored as `Binary`, is returned as
+`External(arrow_field_json_str)` so that it keeps its exact definition.
+
+:::note
+Column types stored by an earlier Gravitino version are rewritten only when the table schema is
+refreshed from the Lance dataset, which depends on the catalog's
+[schema refresh mode](#schema-refresh). The default `DECLARED_AND_EMPTY` mode never refreshes a
+table that is neither declared nor empty, so such a table keeps its stored types even after the
+dataset version changes; set `lance.schema-refresh-mode` to `VERSION_CHECK` to refresh it on the next
+version change. Until a refresh happens, blob v2 columns still appear as a plain `Struct`, and legacy
+blob columns stored as `External(arrow_field_json_str)` keep that form instead of
+`External("lance.blob.legacy")`.
+:::
 
 ### Table Properties
 

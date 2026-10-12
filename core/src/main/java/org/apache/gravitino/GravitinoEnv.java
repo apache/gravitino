@@ -91,6 +91,7 @@ import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
@@ -1145,8 +1146,7 @@ public class GravitinoEnv {
         new ViewNormalizeDispatcher(viewHookDispatcher, catalogManager);
     this.viewDispatcher = new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
 
-    // Semantic Model operation chain: Normalize -> Hook -> Operation.
-    // TODO(#12595): Add an outer SemanticModelEventDispatcher.
+    // Semantic Model operation chain: Event -> Normalize -> Hook -> Operation.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
             catalogManager,
@@ -1157,8 +1157,10 @@ public class GravitinoEnv {
     SemanticModelHookDispatcher semanticModelHookDispatcher =
         new SemanticModelHookDispatcher(
             semanticModelOperationDispatcher, this::internalOwnerDispatcher);
-    this.semanticModelDispatcher =
+    SemanticModelNormalizeDispatcher semanticModelNormalizeDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelHookDispatcher, catalogManager);
+    this.semanticModelDispatcher =
+        new SemanticModelEventDispatcher(eventBus, semanticModelNormalizeDispatcher);
 
     this.statisticDispatcher = new StatisticEventDispatcher(eventBus, internalStatisticDispatcher);
 
