@@ -490,7 +490,9 @@ public class ModelVersionMetaService {
         throw ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, modelIdent);
       }
       // Re-read immediately: a read through the entity cache holds its cache segment lock here,
-      // so pausing would also stall unrelated entities hashed to the same segment.
+      // so pausing would also stall unrelated entities hashed to the same segment. Spacing the
+      // attempts needs the retry loop lifted above that lock, or a single-statement read that
+      // cannot tear; both are left to #13181, so do not add a sleep inside this loop.
       LOG.debug(
           "Model {} changed during attempt {} of a model-version read, reading it again",
           modelIdent,
