@@ -30,9 +30,26 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Immutable role indexes pinned for one request, including inactive-role denies. */
+/**
+ * Immutable role indexes pinned for one request, including inactive-role denies.
+ *
+ * <p>The pinned indexes never change. The view itself is request-local: it tracks the validated
+ * generation, the remaining probe budget, and an optional merged index built lazily for long
+ * requests.
+ */
 final class RequestRolePolicies implements AuthorizationRequestContext.RolePolicyView {
+
+  /**
+   * Upper bound on the policies a merged index may hold. A request pinning more policies keeps
+   * probing each role, so one request never allocates more than this many merged entries.
+   */
+  static final long MAX_MERGED_POLICIES = 100_000L;
+
+  private static final Logger LOG = LoggerFactory.getLogger(RequestRolePolicies.class);
+
   private final AtomicLong generation;
   private final List<CachedRolePolicies> allowRoles;
   private final List<CachedRolePolicies> denyRoles;
@@ -55,13 +72,25 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
       ActiveRoles active,
       Map<Long, RoleUpdatedAt> versions,
       boolean readable) {
+    this(generation, roles, active, versions, readable, MAX_MERGED_POLICIES);
+  }
+
+  RequestRolePolicies(
+      long generation,
+      Map<Long, CachedRolePolicies> roles,
+      ActiveRoles active,
+      Map<Long, RoleUpdatedAt> versions,
+      boolean readable,
+      long maxMergedPolicies) {
     this.readable = readable;
     this.generation = new AtomicLong(generation);
     List<CachedRolePolicies> allow = new ArrayList<>();
     List<CachedRolePolicies> deny = new ArrayList<>();
     Set<String> denied = new HashSet<>();
     long policyCount = roles.values().stream().mapToLong(CachedRolePolicies::policyCount).sum();
-    remainingProbes = new AtomicLong(policyCount);
+    // Too many pinned policies disable merging; direct probes stay O(held roles) per check.
+    remainingProbes =
+        new AtomicLong(policyCount <= maxMergedPolicies ? policyCount : Long.MAX_VALUE);
     roles.forEach(
         (id, policies) -> {
           RoleUpdatedAt info = versions == null ? null : versions.get(id);
@@ -71,7 +100,7 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
               active.isAll()
                   || (!active.isNone()
                       && info != null
-                      && info.getUpdatedAt() == policies.getUpdatedAt()
+                      && info.getVersion() == policies.getVersion()
                       && active.roleNames().contains(info.getRoleName()));
           // Pin immutable role indexes instead of copying every policy for a small request.
           // DENY remains global even when the role's ALLOW privileges are inactive.
@@ -137,10 +166,13 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
     }
   }
 
+  // Callers must not hold the authorizer's policy lock: merging reads only pinned immutable
+  // indexes.
   private synchronized void mergePolicies() {
     if (mergedIndex != null) {
       return;
     }
+    long start = System.nanoTime();
     Map<PolicyKey, Effect> merged = new HashMap<>();
     for (CachedRolePolicies role : allowRoles) {
       role.getIndex()
@@ -162,6 +194,16 @@ final class RequestRolePolicies implements AuthorizationRequestContext.RolePolic
               });
     }
     mergedIndex = Collections.unmodifiableMap(merged);
+    LOG.debug(
+        "Merged {} policies from {} roles for a request in {} us",
+        merged.size(),
+        allowRoles.size() + denyRoles.size(),
+        (System.nanoTime() - start) / 1_000L);
+  }
+
+  /** Returns whether later probes use the merged index. */
+  boolean isMerged() {
+    return mergedIndex != null;
   }
 
   boolean hasDeny(Set<String> privileges) {

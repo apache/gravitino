@@ -25,9 +25,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Cached, indexed privileges of a single role. The {@code updatedAt} timestamp corresponds to the
- * {@code role_meta.updated_at} column and is used as a version sentinel: if the DB value is newer,
- * the cached index is stale and must be rebuilt from the role entity.
+ * Cached, indexed privileges of a single role. The {@code version} is the {@code
+ * role_meta.current_version} read before the role's securable objects were loaded. Every role
+ * update advances it in the same transaction, so a newer database value means the cached index is
+ * stale and must be rebuilt from the role entity.
  *
  * <p>The {@code index} maps each {@link PolicyKey} the role grants or denies to its {@link Effect},
  * with {@link Effect#DENY} already taking precedence over {@link Effect#ALLOW} within the role. A
@@ -35,22 +36,19 @@ import java.util.Set;
  */
 final class CachedRolePolicies {
 
-  private final long updatedAt;
+  private final long version;
   private final Map<PolicyKey, Effect> index;
 
   private final boolean complete;
   private final Set<String> deniedPrivileges;
 
-  CachedRolePolicies(long updatedAt, Map<PolicyKey, Effect> index) {
-    this(updatedAt, index, true, Collections.emptySet());
+  CachedRolePolicies(long version, Map<PolicyKey, Effect> index) {
+    this(version, index, true, Collections.emptySet());
   }
 
   CachedRolePolicies(
-      long updatedAt,
-      Map<PolicyKey, Effect> index,
-      boolean complete,
-      Set<String> unresolvedDenies) {
-    this.updatedAt = updatedAt;
+      long version, Map<PolicyKey, Effect> index, boolean complete, Set<String> unresolvedDenies) {
+    this.version = version;
     this.index = Collections.unmodifiableMap(new HashMap<>(index));
     this.complete = complete;
     Set<String> denies = new HashSet<>(unresolvedDenies);
@@ -71,8 +69,8 @@ final class CachedRolePolicies {
     return deniedPrivileges;
   }
 
-  long getUpdatedAt() {
-    return updatedAt;
+  long getVersion() {
+    return version;
   }
 
   int policyCount() {

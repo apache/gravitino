@@ -46,11 +46,11 @@ public class TestRequestRolePolicies {
     ActiveRoles active = ActiveRoles.of(Set.of("activeRole"));
     RequestRolePolicies olderName =
         new RequestRolePolicies(
-            0L, roles, active, Map.of(1L, new RoleUpdatedAt(1L, "activeRole", 1L)));
+            0L, roles, active, Map.of(1L, new RoleUpdatedAt(1L, "activeRole", 1L, 1L)));
     assertFalse(olderName.evaluate(KEY, true));
     RequestRolePolicies currentName =
         new RequestRolePolicies(
-            0L, roles, active, Map.of(1L, new RoleUpdatedAt(1L, "activeRole", 2L)));
+            0L, roles, active, Map.of(1L, new RoleUpdatedAt(1L, "activeRole", 2L, 2L)));
     assertTrue(currentName.evaluate(KEY, true));
     RequestRolePolicies unheld =
         new RequestRolePolicies(
@@ -59,9 +59,9 @@ public class TestRequestRolePolicies {
             ActiveRoles.of(Set.of("unheldRole")),
             Map.of(
                 1L,
-                new RoleUpdatedAt(1L, "activeRole", 2L),
+                new RoleUpdatedAt(1L, "activeRole", 2L, 2L),
                 2L,
-                new RoleUpdatedAt(2L, "unheldRole", 2L)));
+                new RoleUpdatedAt(2L, "unheldRole", 2L, 2L)));
     assertFalse(unheld.evaluate(KEY, true));
   }
 
@@ -83,9 +83,9 @@ public class TestRequestRolePolicies {
               active,
               Map.of(
                   1L,
-                  new RoleUpdatedAt(1L, "allowRole", 1L),
+                  new RoleUpdatedAt(1L, "allowRole", 1L, 1L),
                   2L,
-                  new RoleUpdatedAt(2L, "denyRole", 1L)));
+                  new RoleUpdatedAt(2L, "denyRole", 1L, 1L)));
       assertFalse(view.evaluate(KEY, true));
       assertTrue(view.evaluate(KEY, false));
       assertTrue(view.hasDeny(Set.of("SELECT_TABLE")));
@@ -137,9 +137,9 @@ public class TestRequestRolePolicies {
             ActiveRoles.of(Set.of("allowRole")),
             Map.of(
                 1L,
-                new RoleUpdatedAt(1L, "allowRole", 1L),
+                new RoleUpdatedAt(1L, "allowRole", 1L, 1L),
                 2L,
-                new RoleUpdatedAt(2L, "denyRole", 1L)));
+                new RoleUpdatedAt(2L, "denyRole", 1L, 1L)));
     assertTrue(view.evaluate(KEY, true));
     clearInvocations(allow, deny);
     assertTrue(view.evaluate(KEY, true));
@@ -147,6 +147,41 @@ public class TestRequestRolePolicies {
     assertTrue(view.evaluate(denied, false));
     verify(allow, never()).getIndex();
     verify(deny, never()).getIndex();
+  }
+
+  /** A view pinning more policies than the merge limit keeps probing roles and stays correct. */
+  @Test
+  public void testMergeLimitKeepsProbingRoles() {
+    PolicyKey denied = new PolicyKey("TABLE", 43L, "SELECT_TABLE");
+    RequestRolePolicies view =
+        new RequestRolePolicies(
+            0L,
+            Map.of(
+                1L,
+                new CachedRolePolicies(1L, Map.of(KEY, Effect.ALLOW)),
+                2L,
+                new CachedRolePolicies(1L, Map.of(denied, Effect.DENY))),
+            ActiveRoles.all(),
+            Map.of(),
+            true,
+            1L);
+    for (int i = 0; i < 100; i++) {
+      assertTrue(view.evaluate(KEY, true));
+      assertFalse(view.evaluate(denied, true));
+      assertTrue(view.evaluate(denied, false));
+    }
+    assertFalse(view.isMerged(), "the view merged more policies than its limit");
+
+    RequestRolePolicies unlimited =
+        new RequestRolePolicies(
+            0L,
+            Map.of(1L, new CachedRolePolicies(1L, Map.of(KEY, Effect.ALLOW))),
+            ActiveRoles.all(),
+            Map.of());
+    for (int i = 0; i < 100; i++) {
+      assertTrue(unlimited.evaluate(KEY, true));
+    }
+    assertTrue(unlimited.isMerged());
   }
 
   /** An unreadable snapshot denies access even when a pinned role otherwise grants it. */

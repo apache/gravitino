@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,6 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
@@ -84,6 +87,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.GravitinoCache;
@@ -122,6 +126,7 @@ import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -142,6 +147,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -197,7 +203,21 @@ public class TestJcasbinAuthorizer {
    * Tracks roles registered via {@link #mockRoleInStore} so {@code
    * roleMetaMapper.batchGetRoleUpdatedAt} can return their versions on demand.
    */
-  private static final Map<Long, RoleUpdatedAt> mockedRoleVersions = new HashMap<>();
+  private static final Map<Long, RoleUpdatedAt> mockedRoleVersions = new ConcurrentHashMap<>();
+
+  /** Reads roles through the mocked entity store, which the tests stub per role. */
+  private static final JcasbinAuthorizer.RoleReader STORE_ROLE_READER =
+      new JcasbinAuthorizer.RoleReader() {
+        @Override
+        public List<RoleEntity> batchGet(List<NameIdentifier> names) {
+          return entityStore.batchGet(names, Entity.EntityType.ROLE, RoleEntity.class);
+        }
+
+        @Override
+        public RoleEntity get(NameIdentifier name) throws IOException {
+          return entityStore.get(name, Entity.EntityType.ROLE, RoleEntity.class);
+        }
+      };
 
   /**
    * Monotonic counter for {@code group_meta.updated_at} mocks so that successive {@link
@@ -277,9 +297,14 @@ public class TestJcasbinAuthorizer {
                   for (RolePO rp : directRoles) {
                     RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
                     long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
+                    long roleVersion = rv != null ? rv.getVersion() : 0L;
                     rows.add(
                         AuthPrefetchRow.forUserRole(
-                            rp.getRoleId(), rp.getRoleName(), roleUpdatedAt, u.getUserId()));
+                            rp.getRoleId(),
+                            rp.getRoleName(),
+                            roleUpdatedAt,
+                            roleVersion,
+                            u.getUserId()));
                   }
                 }
               }
@@ -293,9 +318,14 @@ public class TestJcasbinAuthorizer {
                       for (RolePO rp : groupRoles) {
                         RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
                         long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
+                        long roleVersion = rv != null ? rv.getVersion() : 0L;
                         rows.add(
                             AuthPrefetchRow.forGroupRole(
-                                rp.getRoleId(), rp.getRoleName(), roleUpdatedAt, g.getGroupId()));
+                                rp.getRoleId(),
+                                rp.getRoleName(),
+                                roleUpdatedAt,
+                                roleVersion,
+                                g.getGroupId()));
                       }
                     }
                   }
@@ -419,6 +449,7 @@ public class TestJcasbinAuthorizer {
     when(gravitinoEnv.catalogManager()).thenReturn(catalogs);
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
+    jcasbinAuthorizer.setRoleReader(STORE_ROLE_READER);
     restoreDefaultPrincipal();
     // Reset role-user relation mock to return empty list (no roles) by default; individual tests
     // can override as needed.
@@ -493,7 +524,9 @@ public class TestJcasbinAuthorizer {
     RolePO allowRolePO = buildRolePO(ALLOW_ROLE_ID, "allowRole");
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of(allowRolePO));
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion)));
+        .thenReturn(
+            ImmutableList.of(
+                new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion, roleVersion)));
     // Bump user version to invalidate userRoleCache
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
@@ -514,7 +547,9 @@ public class TestJcasbinAuthorizer {
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of(tempNewRolePO));
     long roleVersion2 = nextRoleVersion();
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(newRoleId, "tempNewRole", roleVersion2)));
+        .thenReturn(
+            ImmutableList.of(
+                new RoleUpdatedAt(newRoleId, "tempNewRole", roleVersion2, roleVersion2)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     // tempNewRole has no privileges; prune step removes stale allowRole g-row, so authz fails.
@@ -527,7 +562,9 @@ public class TestJcasbinAuthorizer {
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of(allowRolePO));
     long roleVersion3 = nextRoleVersion();
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion3)));
+        .thenReturn(
+            ImmutableList.of(
+                new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion3, roleVersion3)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertTrue(doAuthorize(currentPrincipal));
@@ -547,8 +584,8 @@ public class TestJcasbinAuthorizer {
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
         .thenReturn(
             ImmutableList.of(
-                new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion4),
-                new RoleUpdatedAt(DENY_ROLE_ID, "denyRole", roleVersion4)));
+                new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion4, roleVersion4),
+                new RoleUpdatedAt(DENY_ROLE_ID, "denyRole", roleVersion4, roleVersion4)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertFalse(doAuthorize(currentPrincipal));
@@ -1215,9 +1252,11 @@ public class TestJcasbinAuthorizer {
     RoleEntity otherRole =
         getRoleEntity(otherRoleId, otherRoleName, ImmutableList.of(getAllowSecurableObject()));
     mockedRoleVersions.put(
-        ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, nextRoleVersion()));
+        ALLOW_ROLE_ID,
+        new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, nextRoleVersion(), nextRoleVersion()));
     mockedRoleVersions.put(
-        otherRoleId, new RoleUpdatedAt(otherRoleId, otherRoleName, nextRoleVersion()));
+        otherRoleId,
+        new RoleUpdatedAt(otherRoleId, otherRoleName, nextRoleVersion(), nextRoleVersion()));
     AtomicReference<Boolean> armed = new AtomicReference<>(false);
     // Reloading either role explicitly invalidates the other, preventing a stable policy view.
     doAnswer(
@@ -1348,7 +1387,8 @@ public class TestJcasbinAuthorizer {
     String otherRoleName = "roleLoadedDuringEviction";
     RoleEntity otherRole = getRoleEntity(otherRoleId, otherRoleName, ImmutableList.of());
     mockedRoleVersions.put(
-        otherRoleId, new RoleUpdatedAt(otherRoleId, otherRoleName, nextRoleVersion()));
+        otherRoleId,
+        new RoleUpdatedAt(otherRoleId, otherRoleName, nextRoleVersion(), nextRoleVersion()));
     GravitinoCache<Long, CachedRolePolicies> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
     doAnswer(
             invocation -> {
@@ -1551,7 +1591,8 @@ public class TestJcasbinAuthorizer {
               if (nested.compareAndSet(false, true)) {
                 mockedRoleVersions.put(
                     ALLOW_ROLE_ID,
-                    new RoleUpdatedAt(ALLOW_ROLE_ID, "racingRole", nextRoleVersion()));
+                    new RoleUpdatedAt(
+                        ALLOW_ROLE_ID, "racingRole", nextRoleVersion(), nextRoleVersion()));
                 invokeLoadRequestPolicies(
                     jcasbinAuthorizer,
                     METALAKE,
@@ -2888,7 +2929,8 @@ public class TestJcasbinAuthorizer {
             eq(Entity.EntityType.ROLE),
             eq(RoleEntity.class)))
         .thenReturn(role);
-    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, nextRoleVersion()));
+    mockedRoleVersions.put(
+        roleId, new RoleUpdatedAt(roleId, roleName, nextRoleVersion(), nextRoleVersion()));
     return role;
   }
 
@@ -4145,11 +4187,12 @@ public class TestJcasbinAuthorizer {
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
         .thenReturn(ImmutableList.of(buildRolePO(roleId, roleName)));
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(roleId, roleName, roleVersion)));
+        .thenReturn(
+            ImmutableList.of(new RoleUpdatedAt(roleId, roleName, roleVersion, roleVersion)));
     // Also register the role in mockedRoleVersions so the fat-JOIN test stub for
     // batchGetAuthSubjectsForUser surfaces it; otherwise prefetch's role-version map would
     // miss this role and downstream loadPolicyByRoleEntity would never run.
-    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, roleVersion));
+    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, roleVersion, roleVersion));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
   }
@@ -4711,5 +4754,428 @@ public class TestJcasbinAuthorizer {
           .thenReturn(Optional.of(CATALOG_ID));
       restoreDefaultPrincipal();
     }
+  }
+
+  /**
+   * One expression must not combine a probe made under one role version with probes made under a
+   * newer one. Both versions reject the request, so any mixed result that grants access is wrong.
+   */
+  @Test
+  public void testExpressionDoesNotMixRolePolicyVersions() throws Exception {
+    String roleName = "mixedVersionRole";
+    RoleEntity v1 =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            roleName,
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID, MetadataObject.Type.METALAKE, METALAKE, USE_CATALOG, "ALLOW"),
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "DENY")));
+    mockDirectUserRoles(v1);
+    AtomicBoolean updated = new AtomicBoolean();
+    GravitinoAuthorizer interleaving =
+        mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(jcasbinAuthorizer));
+    doAnswer(
+            invocation -> {
+              boolean result =
+                  jcasbinAuthorizer.authorize(
+                      invocation.getArgument(0),
+                      invocation.getArgument(1),
+                      invocation.getArgument(2),
+                      invocation.getArgument(3),
+                      invocation.getArgument(4));
+              // Version 2 drops both policies, between the ALLOW probe and the DENY probes.
+              if (updated.compareAndSet(false, true)) {
+                mockRoleInStore(ALLOW_ROLE_ID, roleName, ImmutableList.of());
+                jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+              }
+              return result;
+            })
+        .when(interleaving)
+        .authorize(any(), any(), any(), any(), any());
+
+    boolean allowed =
+        new AuthorizationExpressionEvaluator("ANY_USE_CATALOG", interleaving)
+            .evaluate(catalogMetadataNames(), new AuthorizationRequestContext());
+
+    assertTrue(updated.get());
+    assertFalse(allowed, "an ALLOW of version 1 must not combine with the missing DENY of 2");
+  }
+
+  /**
+   * The list shortcut must take its parent grant and its deny check from one role version. Both
+   * versions hide the denied table; a mixed shortcut would return it.
+   */
+  @Test
+  public void testListShortcutDoesNotMixRolePolicyVersions() throws Exception {
+    Field executorField = MetadataAuthzHelper.class.getDeclaredField("executor");
+    executorField.setAccessible(true);
+    Object previousExecutor = executorField.get(null);
+    executorField.set(null, (Executor) Runnable::run);
+    Config previousConfig = gravitinoEnv.config();
+    Config config = mock(Config.class);
+    when(config.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
+    when(gravitinoEnv.config()).thenReturn(config);
+    String roleName = "mixedListRole";
+    SecurableObject deniedObject =
+        buildSecurableObject(
+            ALLOW_ROLE_ID,
+            MetadataObject.Type.TABLE,
+            "testCatalog.testSchema.hidden",
+            SELECT_TABLE,
+            "DENY");
+    try {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(eq(deniedObject), eq(METALAKE)))
+          .thenReturn(Optional.of(42L));
+      RoleEntity v1 =
+          mockRoleInStore(
+              ALLOW_ROLE_ID,
+              roleName,
+              ImmutableList.of(
+                  buildSecurableObject(
+                      ALLOW_ROLE_ID,
+                      MetadataObject.Type.CATALOG,
+                      "testCatalog",
+                      SELECT_TABLE,
+                      "ALLOW"),
+                  buildSecurableObject(
+                      ALLOW_ROLE_ID,
+                      MetadataObject.Type.CATALOG,
+                      "testCatalog",
+                      USE_CATALOG,
+                      "ALLOW"),
+                  buildSecurableObject(
+                      ALLOW_ROLE_ID,
+                      MetadataObject.Type.SCHEMA,
+                      "testCatalog.testSchema",
+                      USE_SCHEMA,
+                      "ALLOW"),
+                  deniedObject));
+      mockDirectUserRoles(v1);
+      AtomicBoolean updated = new AtomicBoolean();
+      GravitinoAuthorizer interleaving =
+          mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(jcasbinAuthorizer));
+      // Version 2 drops every policy after the parent grant and before the deny check.
+      doAnswer(
+              invocation -> {
+                if (updated.compareAndSet(false, true)) {
+                  mockRoleInStore(ALLOW_ROLE_ID, roleName, ImmutableList.of());
+                  jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+                }
+                return jcasbinAuthorizer.hasDenyPolicy(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1),
+                    invocation.getArgument(2),
+                    invocation.getArgument(3));
+              })
+          .when(interleaving)
+          .hasDenyPolicy(any(), any(), any(), any());
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      when(provider.getGravitinoAuthorizer()).thenReturn(interleaving);
+      try (MockedStatic<GravitinoAuthorizerProvider> providerMock =
+              mockStatic(GravitinoAuthorizerProvider.class);
+          AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+        providerMock.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+        scope.bind(METALAKE, new AuthorizationRequestContext());
+        NameIdentifier hidden = NameIdentifier.of(METALAKE, "testCatalog", "testSchema", "hidden");
+        NameIdentifier visible =
+            NameIdentifier.of(METALAKE, "testCatalog", "testSchema", "visible");
+        NameIdentifier[] filtered =
+            MetadataAuthzHelper.filterByExpression(
+                METALAKE,
+                AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+                Entity.EntityType.TABLE,
+                new NameIdentifier[] {hidden, visible});
+        assertTrue(updated.get());
+        assertFalse(
+            Arrays.asList(filtered).contains(hidden), "a mixed shortcut exposed the denied table");
+        assertEquals(0, filtered.length, "version 2 grants no table");
+      }
+    } finally {
+      executorField.set(null, previousExecutor);
+      when(gravitinoEnv.config()).thenReturn(previousConfig);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  /**
+   * {@code role_meta.updated_at} can repeat across updates. A remote update that keeps the
+   * timestamp but advances {@code current_version} must still replace the cached policies, without
+   * any local invalidation hook.
+   */
+  @Test
+  public void testNewRoleVersionWithSameTimestampReloadsPolicies() throws Exception {
+    String roleName = "sameTimestampRole";
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, roleName);
+    RoleEntity allow =
+        getRoleEntity(
+            ALLOW_ROLE_ID,
+            roleName,
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    when(entityStore.get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class)))
+        .thenReturn(allow);
+    mockedRoleVersions.put(ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, 1000L, 1L));
+    mockDirectUserRoles(allow);
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal(),
+            METALAKE,
+            catalogObject(),
+            USE_CATALOG,
+            new AuthorizationRequestContext()));
+
+    RoleEntity deny =
+        getRoleEntity(
+            ALLOW_ROLE_ID,
+            roleName,
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "DENY")));
+    when(entityStore.get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class)))
+        .thenReturn(deny);
+    mockedRoleVersions.put(ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, 1000L, 2L));
+
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal(),
+            METALAKE,
+            catalogObject(),
+            USE_CATALOG,
+            new AuthorizationRequestContext()),
+        "a newer role version must replace the cached ALLOW even with an equal timestamp");
+  }
+
+  /** Policy loading reads roles from the database, never from the entity store cache. */
+  @Test
+  public void testDefaultRoleReaderBypassesEntityStore() throws Exception {
+    jcasbinAuthorizer.setRoleReader(JcasbinAuthorizer.DATABASE_ROLE_READER);
+    String roleName = "databaseRole";
+    RoleEntity role =
+        getRoleEntity(
+            ALLOW_ROLE_ID,
+            roleName,
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    RoleMetaService roleMetaService = mock(RoleMetaService.class);
+    when(roleMetaService.getRoleByIdentifier(NameIdentifierUtil.ofRole(METALAKE, roleName)))
+        .thenReturn(role);
+    mockedRoleVersions.put(
+        ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, 1L, nextRoleVersion()));
+    mockDirectUserRoles(role);
+    Mockito.clearInvocations(entityStore);
+    try (MockedStatic<RoleMetaService> roleMetaServiceMock = mockStatic(RoleMetaService.class)) {
+      roleMetaServiceMock.when(RoleMetaService::getInstance).thenReturn(roleMetaService);
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              currentPrincipal(),
+              METALAKE,
+              catalogObject(),
+              USE_CATALOG,
+              new AuthorizationRequestContext()));
+    }
+    verify(roleMetaService).getRoleByIdentifier(NameIdentifierUtil.ofRole(METALAKE, roleName));
+    verify(entityStore, never()).get(any(), eq(Entity.EntityType.ROLE), any());
+    verify(entityStore, never()).batchGet(anyList(), eq(Entity.EntityType.ROLE), any());
+  }
+
+  /** Evaluation, including building a merged index, must not run under the policy lock. */
+  @Test
+  public void testPolicyEvaluationRunsOutsidePolicyLock() throws Exception {
+    RoleEntity role =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "lockFreeRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    mockDirectUserRoles(role);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal(), METALAKE, catalogObject(), USE_CATALOG, context));
+    Field lockField = JcasbinAuthorizer.class.getDeclaredField("rolePolicyLock");
+    lockField.setAccessible(true);
+    ReentrantReadWriteLock lock = (ReentrantReadWriteLock) lockField.get(jcasbinAuthorizer);
+    Method evaluate =
+        JcasbinAuthorizer.class.getDeclaredMethod(
+            "evaluateWithLoadedRolePolicies",
+            String.class,
+            AuthorizationRequestContext.class,
+            Function.class);
+    evaluate.setAccessible(true);
+    AtomicLong heldLocks = new AtomicLong(-1L);
+    Function<RequestRolePolicies, Boolean> evaluation =
+        view -> {
+          heldLocks.set(lock.getReadHoldCount() + (lock.isWriteLockedByCurrentThread() ? 1 : 0));
+          return true;
+        };
+
+    assertEquals(
+        Optional.of(true), evaluate.invoke(jcasbinAuthorizer, METALAKE, context, evaluation));
+    assertEquals(0L, heldLocks.get());
+  }
+
+  /**
+   * Role updates published and invalidated on worker threads, while other workers keep evicting the
+   * role cache, must be visible to every request that starts after the update completed.
+   */
+  @Test
+  public void testRoleUpdatesOnWorkerThreadsReachLaterRequests() throws Exception {
+    String roleName = "workerUpdatedRole";
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, roleName);
+    RoleEntity allow =
+        getRoleEntity(
+            ALLOW_ROLE_ID,
+            roleName,
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    RoleEntity deny =
+        getRoleEntity(
+            ALLOW_ROLE_ID,
+            roleName,
+            ImmutableList.of(
+                buildSecurableObject(
+                    ALLOW_ROLE_ID,
+                    MetadataObject.Type.CATALOG,
+                    "testCatalog",
+                    USE_CATALOG,
+                    "DENY")));
+    // The stored role and its version change on worker threads, so read them from thread-safe
+    // holders instead of re-stubbing mocks concurrently with their use.
+    AtomicReference<RoleEntity> stored = new AtomicReference<>(allow);
+    jcasbinAuthorizer.setRoleReader(
+        new JcasbinAuthorizer.RoleReader() {
+          @Override
+          public List<RoleEntity> batchGet(List<NameIdentifier> names) {
+            return names.contains(roleIdent) ? ImmutableList.of(stored.get()) : ImmutableList.of();
+          }
+
+          @Override
+          public RoleEntity get(NameIdentifier name) {
+            return stored.get();
+          }
+        });
+    mockedRoleVersions.put(
+        ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, 1L, nextRoleVersion()));
+    mockDirectUserRoles(allow);
+    GravitinoCache<Long, CachedRolePolicies> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+
+    int rounds = 20;
+    int checksPerRound = 25;
+    AtomicLong publishedRound = new AtomicLong();
+    Semaphore verified = new Semaphore(0);
+    AtomicBoolean done = new AtomicBoolean();
+    AtomicReference<Throwable> workerFailure = new AtomicReference<>();
+    Thread updater =
+        new Thread(
+            () -> {
+              try {
+                for (int round = 1; round <= rounds; round++) {
+                  LockSupport.parkNanos(
+                      TimeUnit.MICROSECONDS.toNanos(ThreadLocalRandom.current().nextInt(500)));
+                  // Commit the new role first, then run the local hook, as the store does.
+                  stored.set(round % 2 == 1 ? deny : allow);
+                  mockedRoleVersions.put(
+                      ALLOW_ROLE_ID,
+                      new RoleUpdatedAt(ALLOW_ROLE_ID, roleName, 1L, nextRoleVersion()));
+                  jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+                  publishedRound.set(round);
+                  if (!verified.tryAcquire(30, TimeUnit.SECONDS)) {
+                    throw new AssertionError("requests did not verify round " + round);
+                  }
+                }
+              } catch (Throwable t) {
+                workerFailure.compareAndSet(null, t);
+              } finally {
+                done.set(true);
+              }
+            },
+            "role-updater");
+    Thread evictor =
+        new Thread(
+            () -> {
+              while (!done.get()) {
+                loadedRoles.invalidate(ALLOW_ROLE_ID);
+                LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(200));
+              }
+            },
+            "role-evictor");
+    updater.start();
+    evictor.start();
+    try {
+      long verifiedRound = 0;
+      int checks = 0;
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+      while (verifiedRound < rounds && workerFailure.get() == null) {
+        assertTrue(System.nanoTime() < deadline, "race test timed out at round " + verifiedRound);
+        // A request that starts after the update completed must observe it.
+        long round = publishedRound.get();
+        boolean allowed =
+            jcasbinAuthorizer.authorize(
+                currentPrincipal(),
+                METALAKE,
+                catalogObject(),
+                USE_CATALOG,
+                new AuthorizationRequestContext());
+        if (round > verifiedRound) {
+          assertEquals(round % 2 == 0, allowed, "stale decision after round " + round);
+          if (++checks == checksPerRound) {
+            checks = 0;
+            verifiedRound = round;
+            verified.release();
+          }
+        }
+      }
+    } finally {
+      done.set(true);
+      verified.release(rounds);
+      updater.join(TimeUnit.SECONDS.toMillis(30));
+      evictor.join(TimeUnit.SECONDS.toMillis(30));
+    }
+    assertNull(workerFailure.get(), () -> "worker failed: " + workerFailure.get());
+  }
+
+  private static Map<Entity.EntityType, NameIdentifier> catalogMetadataNames() {
+    return ImmutableMap.of(
+        Entity.EntityType.METALAKE,
+        NameIdentifierUtil.ofMetalake(METALAKE),
+        Entity.EntityType.CATALOG,
+        NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog"));
+  }
+
+  private static Principal currentPrincipal() {
+    return PrincipalUtils.getCurrentPrincipal();
   }
 }

@@ -175,6 +175,8 @@ openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
 jmh = "1.37"
+# Test-only: reference implementation for the authorization differential test.
+jcasbin = "1.99.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
@@ -381,6 +383,7 @@ flinkHive21 = {group='org.apache.flink',name='flink-connector-hive_2.12', versio
 openlineageSqlJava21 = {group='io.openlineage',name='openlineage-sql-java', version.ref='openlineageSqlJava21'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
+jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
 ql-expression = { group='com.alibaba', name='qlexpress4', version.ref="ql-expression" }
 

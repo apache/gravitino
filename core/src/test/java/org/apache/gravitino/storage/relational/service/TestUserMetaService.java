@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Lists;
@@ -1264,6 +1265,56 @@ class TestUserMetaService extends TestJDBCBackend {
                 m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
     assertTrue(none.isEmpty());
+  }
+
+  @TestTemplate
+  void testBatchGetAuthSubjectsForUserReturnsRoleVersions() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "catalog");
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "versionedRole",
+            AUDIT_INFO,
+            "catalog");
+    backend.insert(role, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "versionedUser",
+            AUDIT_INFO,
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
+    backend.insert(user, false);
+
+    List<AuthPrefetchRow> rows =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "versionedUser", Collections.emptyList()));
+    AuthPrefetchRow userRow =
+        rows.stream()
+            .filter(r -> AuthPrefetchRow.Kind.USER == r.getSubjectType())
+            .findFirst()
+            .orElseThrow();
+    AuthPrefetchRow roleRow =
+        rows.stream()
+            .filter(r -> AuthPrefetchRow.Kind.USER_ROLE == r.getSubjectType())
+            .findFirst()
+            .orElseThrow();
+    long roleVersion =
+        SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(List.of(role.id())))
+            .get(0)
+            .getVersion();
+
+    // Identity rows carry no version; role rows carry role_meta.current_version.
+    assertNull(userRow.getVersion());
+    assertEquals(role.id(), roleRow.getEntityId());
+    assertEquals(roleVersion, roleRow.getVersion());
   }
 
   @TestTemplate

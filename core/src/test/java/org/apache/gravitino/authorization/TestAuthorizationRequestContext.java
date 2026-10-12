@@ -52,6 +52,56 @@ import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationRequestContext {
 
+  /** Replacing the view drops decisions cached under the old one and moves the epoch twice. */
+  @Test
+  public void testReplacingRolePolicyViewAdvancesEpochAndDropsDecisions() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AuthorizationRequestContext.RolePolicyView first = () -> 1L;
+    AuthorizationRequestContext.RolePolicyView second = () -> 2L;
+    UserPrincipal principal = new UserPrincipal("user");
+    MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    AtomicInteger allowLoads = new AtomicInteger();
+    AtomicInteger denyLoads = new AtomicInteger();
+
+    context.setRolePolicyView(first);
+    assertEquals(0L, context.getRolePolicyEpoch(), "the first view replaces nothing");
+    for (int i = 0; i < 2; i++) {
+      context.authorizeAllow(
+          principal,
+          "metalake",
+          catalog,
+          Privilege.Name.USE_CATALOG,
+          key -> allowLoads.incrementAndGet() > 0);
+      context.authorizeDeny(
+          principal,
+          "metalake",
+          catalog,
+          Privilege.Name.USE_CATALOG,
+          key -> denyLoads.incrementAndGet() < 0);
+    }
+    context.setRolePolicyView(first);
+    assertEquals(0L, context.getRolePolicyEpoch(), "republishing the same view changes nothing");
+
+    context.setRolePolicyView(second);
+    assertEquals(2L, context.getRolePolicyEpoch());
+    assertTrue(
+        context.authorizeAllow(
+            principal,
+            "metalake",
+            catalog,
+            Privilege.Name.USE_CATALOG,
+            key -> allowLoads.incrementAndGet() > 0));
+    assertFalse(
+        context.authorizeDeny(
+            principal,
+            "metalake",
+            catalog,
+            Privilege.Name.USE_CATALOG,
+            key -> denyLoads.incrementAndGet() < 0));
+    assertEquals(2, allowLoads.get(), "an allow decision of the old view was reused");
+    assertEquals(2, denyLoads.get(), "a deny decision of the old view was reused");
+  }
+
   @Test
   public void testLoadRoleRunsOnceEvenWhenInvokedConcurrently() throws Exception {
     AuthorizationRequestContext context = new AuthorizationRequestContext();

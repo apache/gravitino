@@ -71,7 +71,7 @@ public class TestJcasbinLoadedRolesCache {
     cache.put(ROLE_ID, new CachedRolePolicies(2L, Collections.emptyMap()));
     cache.size();
 
-    Assertions.assertEquals(2L, cache.getIfPresent(ROLE_ID).get().getUpdatedAt());
+    Assertions.assertEquals(2L, cache.getIfPresent(ROLE_ID).get().getVersion());
 
     cache.invalidate(ROLE_ID);
     Assertions.assertFalse(cache.getIfPresent(ROLE_ID).isPresent());
