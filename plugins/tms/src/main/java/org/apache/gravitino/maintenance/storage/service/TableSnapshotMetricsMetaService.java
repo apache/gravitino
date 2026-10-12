@@ -41,6 +41,7 @@ public class TableSnapshotMetricsMetaService {
             .withPolicyId(policyId)
             .withSnapshotId(snapshotId)
             .withMetricsValue(metricsJson)
+            .withCreatedAt(System.currentTimeMillis())
             .build();
     SessionUtils.doWithCommit(TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(po));
   }

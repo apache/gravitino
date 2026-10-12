@@ -708,7 +708,9 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
     `snapshot_id` BIGINT(20) NOT NULL COMMENT 'Iceberg snapshot id',
     `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'JSON metrics for this snapshot',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sample write time in epoch millis',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`)
+    UNIQUE KEY `uk_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
+    KEY `idx_tsm_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
   COMMENT 'per-policy table metrics by Iceberg snapshot_id';

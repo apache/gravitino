@@ -1210,6 +1210,8 @@ CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
     snapshot_id BIGINT NOT NULL,
-    metrics_value TEXT NOT NULL
+    metrics_value TEXT NOT NULL,
+    created_at BIGINT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);

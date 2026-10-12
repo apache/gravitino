@@ -717,6 +717,8 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     `policy_id` BIGINT NOT NULL,
     `snapshot_id` BIGINT NOT NULL,
     `metrics_value` CLOB NOT NULL,
+    `created_at` BIGINT NOT NULL,
     PRIMARY KEY (`id`)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);

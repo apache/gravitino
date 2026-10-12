@@ -42,4 +42,5 @@ public class TableSnapshotMetricsPO {
   private Long policyId;
   private Long snapshotId;
   private String metricsValue;
+  private Long createdAt;
 }

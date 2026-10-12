@@ -35,7 +35,11 @@ class TestTableSnapshotMetricsMetaService extends TestJDBCBackend {
 
   @TestTemplate
   void testInsertAndGetMetrics() {
+    long before = System.currentTimeMillis();
     service.insertMetrics(1L, 2L, 99L, "{\"mse\":1}");
+    long after = System.currentTimeMillis();
     Assertions.assertEquals("{\"mse\":1}", service.getMetrics(1L, 2L, 99L).metricsValue());
+    Assertions.assertTrue(service.getMetrics(1L, 2L, 99L).createdAt() >= before);
+    Assertions.assertTrue(service.getMetrics(1L, 2L, 99L).createdAt() <= after);
   }
 }

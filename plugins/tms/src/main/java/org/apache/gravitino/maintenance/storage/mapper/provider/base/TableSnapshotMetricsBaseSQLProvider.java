@@ -33,8 +33,9 @@ public class TableSnapshotMetricsBaseSQLProvider {
   public String insertMetrics(@Param("po") TableSnapshotMetricsPO po) {
     return "INSERT INTO "
         + TableSnapshotMetricsMapper.TABLE_NAME
-        + " (table_id, policy_id, snapshot_id, metrics_value)"
-        + " VALUES (#{po.tableId}, #{po.policyId}, #{po.snapshotId}, #{po.metricsValue})";
+        + " (table_id, policy_id, snapshot_id, metrics_value, created_at)"
+        + " VALUES (#{po.tableId}, #{po.policyId}, #{po.snapshotId}, #{po.metricsValue},"
+        + " #{po.createdAt})";
   }
 
   /**
@@ -48,7 +49,7 @@ public class TableSnapshotMetricsBaseSQLProvider {
       @Param("policyId") long policyId,
       @Param("snapshotId") long snapshotId) {
     return "SELECT id, table_id AS tableId, policy_id AS policyId, snapshot_id AS snapshotId,"
-        + " metrics_value AS metricsValue FROM "
+        + " metrics_value AS metricsValue, created_at AS createdAt FROM "
         + TableSnapshotMetricsMapper.TABLE_NAME
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND snapshot_id ="
         + " #{snapshotId}";
