@@ -449,7 +449,13 @@ public class RelationalEntityStore
     try {
       backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
     } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, srcType, srcIdentifier);
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re,
+          String.format(
+              "The %s relation of %s %s",
+              relType.name().toLowerCase(Locale.ROOT),
+              srcType.name().toLowerCase(Locale.ROOT),
+              srcIdentifier));
     }
     // Relation query results themselves are not cached, but both endpoints may be cached entities
     // (OWNER_REL, TAG_METADATA_OBJECT_REL and METADATA_OBJECT_ROLE_REL are keyed by
@@ -477,7 +483,14 @@ public class RelationalEntityStore
       backend.batchInsertRelations(
           relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
     } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, dstType, dstIdentifier);
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re,
+          String.format(
+              "The %s relations of %d %s entities starting with %s",
+              relType.name().toLowerCase(Locale.ROOT),
+              srcIdentifiers.size(),
+              srcType.name().toLowerCase(Locale.ROOT),
+              srcIdentifiers.get(0)));
     }
     // Invalidate both endpoints for the same reason as insertRelation, including the hierarchy
     // cascade noted there.

@@ -313,6 +313,9 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     try {
       store.put(topicEntity, true);
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);

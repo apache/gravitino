@@ -25,9 +25,11 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -36,6 +38,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +51,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -196,6 +201,59 @@ public class TestLanceTableOperations {
 
     Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
     verify(store, never()).delete(any(), any());
+  }
+
+  /**
+   * Verifies a conflict of the table metadata, such as a lock wait timeout, reaches the caller as a
+   * conflict and the dataset created for the table is dropped again, so that a retry can create it.
+   */
+  @Test
+  public void testCreateTableDropsDatasetOnMetadataConflict() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table_conflict");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("conflict-create").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    when(idGenerator.nextId()).thenReturn(2L);
+    doThrow(new OptimisticLockException("mock conflict")).when(store).put(any(), anyBoolean());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                columns,
+                null,
+                StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), properties),
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
+    Assertions.assertFalse(
+        Files.exists(Paths.get(location, "_versions")), "the created dataset must be dropped");
+  }
+
+  /** Verifies a conflict of the table metadata on drop reaches the caller as a conflict. */
+  @Test
+  public void testDropTablePropagatesMetadataConflict() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table_drop_conflict");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_LOCATION,
+                    tempDir.resolve("conflict-drop").toString(),
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance")));
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(store)
+        .delete(eq(ident), eq(Entity.EntityType.TABLE));
+
+    Assertions.assertThrows(OptimisticLockException.class, () -> lanceTableOps.dropTable(ident));
+    Assertions.assertThrows(OptimisticLockException.class, () -> lanceTableOps.purgeTable(ident));
   }
 
   /** Verifies the purge guard preserves the original IllegalArgumentException. */

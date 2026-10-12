@@ -383,6 +383,27 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testImportSchemaPropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_occ");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    entityStore.delete(schemaIdent, SCHEMA);
+
+    // The schema is only in the catalog, so loading it imports it into the store.
+    doThrow(new NoSuchEntityException("mock error"))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(SchemaEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> dispatcher.loadSchema(schemaIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testDropSchemaPropagatesOptimisticLockConflict() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_occ");
     dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));

@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -540,6 +541,11 @@ public class TagMetaService {
       return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
 
     } catch (RuntimeException e) {
+      ExceptionUtils.throwIfLockWaitTimeout(
+          e,
+          String.format(
+              "The tags of %s %s",
+              metadataObject.type().name().toLowerCase(Locale.ROOT), objectIdent));
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, objectIdent.toString());
       throw e;
     }

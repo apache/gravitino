@@ -317,6 +317,10 @@ public class LanceTableOperations extends ManagedTableOperations {
       return false;
     } catch (IllegalArgumentException e) {
       throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not changed, so the dataset is kept and the operation can be retried.
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
@@ -353,6 +357,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not changed, so the dataset is kept and the operation can be retried.
       throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
@@ -443,6 +451,11 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (TableAlreadyExistsException e) {
       // If the table metadata already exists, but the underlying lance table was just created
       // successfully, we need to clean up the created lance table to avoid orphaned datasets.
+      Dataset.drop(location, storageProps);
+      throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not stored. Drop the dataset just created so that a retry can create it again.
       Dataset.drop(location, storageProps);
       throw e;
     } catch (IllegalArgumentException e) {

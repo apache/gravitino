@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -27,7 +28,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -80,6 +80,7 @@ public class TestRelationalEntityStoreLockWaitTimeout {
   private RelationalEntityStore store;
   private String dbPath;
   private Object previousConfig;
+  private Object previousIdGenerator;
 
   @AfterEach
   void tearDown() throws Exception {
@@ -89,6 +90,7 @@ public class TestRelationalEntityStoreLockWaitTimeout {
       FileUtils.deleteQuietly(new File(dbPath));
       dbPath = null;
       FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
     }
     store = null;
   }
@@ -126,12 +128,19 @@ public class TestRelationalEntityStoreLockWaitTimeout {
     TableEntity table = createTable();
     NameIdentifier renamed = NameIdentifier.of(TABLE_IDENT.namespace(), "t1_renamed");
 
-    writeWhileRowHeld(
-        jdbcUrl,
-        "table_meta",
-        "table_id",
-        table.id(),
-        () -> store.update(TABLE_IDENT, TableEntity.class, Entity.EntityType.TABLE, this::rename));
+    OptimisticLockException conflict =
+        writeWhileRowHeld(
+            jdbcUrl,
+            "table_meta",
+            "table_id",
+            table.id(),
+            () ->
+                store.update(
+                    TABLE_IDENT, TableEntity.class, Entity.EntityType.TABLE, this::rename));
+    // The service names the entity it writes, which is the new name of a rename.
+    Assertions.assertTrue(
+        conflict.getMessage().startsWith("The table " + renamed + " could not be changed"),
+        conflict.getMessage());
 
     Assertions.assertTrue(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
     Assertions.assertFalse(store.exists(renamed, Entity.EntityType.TABLE));
@@ -149,8 +158,12 @@ public class TestRelationalEntityStoreLockWaitTimeout {
     store.put(schema, false);
     TableEntity table = table();
 
-    writeWhileRowHeld(
-        jdbcUrl, "schema_meta", "schema_id", schema.id(), () -> store.put(table, false));
+    OptimisticLockException conflict =
+        writeWhileRowHeld(
+            jdbcUrl, "schema_meta", "schema_id", schema.id(), () -> store.put(table, false));
+    Assertions.assertTrue(
+        conflict.getMessage().startsWith("The table " + TABLE_IDENT + " could not be changed"),
+        conflict.getMessage());
 
     Assertions.assertFalse(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
     store.put(table, false);
@@ -174,7 +187,11 @@ public class TestRelationalEntityStoreLockWaitTimeout {
     store.put(tag, false);
     NameIdentifier[] tags = {tag.nameIdentifier()};
 
-    writeWhileRowHeld(jdbcUrl, "table_meta", "table_id", table.id(), () -> associateTags(tags));
+    OptimisticLockException conflict =
+        writeWhileRowHeld(jdbcUrl, "table_meta", "table_id", table.id(), () -> associateTags(tags));
+    Assertions.assertTrue(
+        conflict.getMessage().startsWith("The tags of table " + TABLE_IDENT + " could not"),
+        conflict.getMessage());
 
     Assertions.assertTrue(
         store
@@ -383,11 +400,7 @@ public class TestRelationalEntityStoreLockWaitTimeout {
   }
 
   private String initH2Store() throws IOException, IllegalAccessException {
-    dbPath = "/tmp/gravitino_lock_wait_timeout_" + UUID.randomUUID().toString().replace("-", "");
-    File dir = new File(dbPath);
-    if (!dir.exists() && !dir.mkdirs()) {
-      throw new IOException("Failed to create test directory " + dbPath);
-    }
+    dbPath = Files.createTempDirectory("gravitino_lock_wait_timeout_").toString();
     String jdbcUrl = String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", dbPath);
 
     Config config = Mockito.mock(Config.class);
@@ -416,6 +429,7 @@ public class TestRelationalEntityStoreLockWaitTimeout {
     Mockito.when(config.get(Configs.SCHEMA_SEPARATOR)).thenReturn(":");
 
     previousConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    previousIdGenerator = FieldUtils.readField(GravitinoEnv.getInstance(), "idGenerator", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);

@@ -54,12 +54,8 @@ public class ExceptionUtils {
    */
   public static void checkSQLException(
       RuntimeException re, Entity.EntityType type, String entityName) throws IOException {
-    RuntimeException conflict =
-        lockWaitTimeoutAsConflict(
-            re, String.format("The %s %s", type.name().toLowerCase(Locale.ROOT), entityName));
-    if (conflict != re) {
-      throw conflict;
-    }
+    throwIfLockWaitTimeout(
+        re, String.format("The %s %s", type.name().toLowerCase(Locale.ROOT), entityName));
     if (re.getCause() instanceof SQLException) {
       SQLExceptionConverterFactory.getConverter()
           .toGravitinoException((SQLException) re.getCause(), type, entityName);
@@ -97,6 +93,24 @@ public class ExceptionUtils {
         childType.name().toLowerCase(Locale.ROOT),
         parentType.name().toLowerCase(Locale.ROOT),
         parentIdentifier);
+  }
+
+  /**
+   * Throws a write that failed on a lock wait timeout as a conflict, and returns otherwise. A
+   * service calls this before {@link #checkSQLException} when the type and name it reports for
+   * other SQL errors do not describe what was written, for example the metadata object of a tag
+   * association.
+   *
+   * @param re The failure of the write.
+   * @param target What was being written, as the subject of the message.
+   * @throws OptimisticLockException If the failure is a lock wait timeout.
+   * @see #lockWaitTimeoutAsConflict(RuntimeException, String)
+   */
+  public static void throwIfLockWaitTimeout(RuntimeException re, String target) {
+    RuntimeException conflict = lockWaitTimeoutAsConflict(re, target);
+    if (conflict != re) {
+      throw conflict;
+    }
   }
 
   /**
