@@ -19,13 +19,9 @@
 
 package org.apache.gravitino.maintenance.optimizer.common;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 
@@ -35,6 +31,9 @@ public final class IcebergManifestStatistics {
   public static final String MANIFEST_NUMBER = "custom-manifest-number-by-spec";
   /** Object-valued average manifest sizes in bytes keyed by decimal spec ID. */
   public static final String AVG_MANIFEST_SIZE = "custom-avg-manifest-size-by-spec";
+
+  /** Snapshot ID shared by both complete maps, or -1 for a table without a snapshot. */
+  public static final String SNAPSHOT_ID = "custom-manifest-snapshot-id";
 
   private final int specId;
   private final long count;
@@ -85,24 +84,6 @@ public final class IcebergManifestStatistics {
    */
   public double averageSize() {
     return averageSize;
-  }
-
-  /**
-   * Converts this measurement into a single-spec update for the statistics API.
-   *
-   * @return both object-valued measurements to publish in one atomic merge
-   */
-  public List<StatisticEntry<?>> statistics() {
-    String key = Integer.toString(specId);
-    return Arrays.asList(
-        new StatisticEntryImpl<>(
-            MANIFEST_NUMBER,
-            StatisticValues.objectValue(
-                Collections.singletonMap(key, StatisticValues.longValue(count)))),
-        new StatisticEntryImpl<>(
-            AVG_MANIFEST_SIZE,
-            StatisticValues.objectValue(
-                Collections.singletonMap(key, StatisticValues.doubleValue(averageSize)))));
   }
 
   /**

@@ -56,6 +56,8 @@ public class TestIcebergUpdateManifestStatsJobMain {
             "cli",
             "--table",
             "db.cli",
+            "--coordination-dir",
+            tempDir.toAbsolutePath().toString(),
             "--updater-options",
             "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
             "--spark-conf",

@@ -246,7 +246,7 @@ The following Iceberg job templates ship with the service. A full maintenance pa
 | `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
 | `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
 | `builtin-iceberg-rewrite-manifests`   | Consolidates small manifest files         |
-| `builtin-iceberg-update-manifest-stats` | Collects manifest statistics for one spec |
+| `builtin-iceberg-update-manifest-stats` | Collects complete per-spec manifest maps |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
@@ -298,16 +298,18 @@ evolution, including for specs whose partition fields are absent from older file
 `builtin-iceberg-update-stats` and the `submit-update-stats-job` CLI retain their existing behavior;
 they do not collect manifest statistics. Submit the new template directly through the jobs API.
 
-Set `spec_id` in the job template's `jobConf` (`--spec-id` for the Spark main class) to collect
-an existing non-negative partition spec ID. Omission resolves the table's current default once.
-The collector reads data and delete manifests from one current Iceberg snapshot and filters by
-that resolved spec. A defined spec with no manifests, including a table without a snapshot,
-produces count `0` and average `0.0`. An unknown spec ID fails collection.
+Each table cycle pins one current snapshot, calls `allManifests` once, and groups data and
+delete manifests by `partitionSpecId`. Every defined spec is included. A spec with no manifests,
+including a table without a snapshot, produces count `0` and average `0.0`.
+The job also publishes `custom-manifest-snapshot-id` in the same update (`-1` without a snapshot).
+Snapshot IDs identify measurements; they are not monotonically increasing version numbers.
 
-The new template accepts `catalog_name`, `table_identifier`, optional `spec_id`,
-`updater_options`, and optional `spark_conf`, alongside the standard Spark template settings.
+The template accepts `catalog_name`, `table_identifier`, `coordination_directory`,
+`updater_options`, and optional
+`spark_conf`, alongside the standard Spark template settings. There is no `spec_id` filter:
+collection always replaces the complete maps for the table.
 `updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
-a `statistics_updater` that implements atomic merging. The template has no `update_mode`.
+a `statistics_updater` implementing the existing table statistics update operation.
 For example:
 
 ```bash
@@ -318,7 +320,7 @@ curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
     "jobConf": {
       "catalog_name": "rest_catalog",
       "table_identifier": "db.t1",
-      "spec_id": "1",
+      "coordination_directory": "/mnt/gravitino-maintenance-locks",
       "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
       "spark_master": "local[2]",
       "spark_executor_instances": "1",
@@ -332,18 +334,42 @@ curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
   }'
 ```
 
-For example, collecting spec `1` can produce logical object values `{"0": 620, "1": 120}`
-and `{"0": 10485760.0, "1": 4194304.0}`. It replaces only spec `1`; spec `0` remains intact.
-Both measurements are published together through the
-[atomic statistics merge API](../manage-statistics-in-gravitino.md#merge-statistics), which preserves
-other specs' entries. Route concurrent collectors to the same Gravitino server, as the API's
-coordination uses an in-process table lock. Custom statistics updaters must support atomic merging.
+For example, one collection can produce complete maps `{"0": 620, "1": 120}` and
+`{"0": 10485760.0, "1": 4194304.0}`. The collector owns both statistic names and publishes
+them together with the snapshot ID in one existing PUT/update call. Old map entries are
+replaced, not merged. Other statistic names are unchanged. No PATCH or merge API is needed.
 
-Consumers must read both objects from one table-statistics response and use the same resolved
+### Shared coordination and recovery
+
+Provision `coordination_directory` (`--coordination-dir` for direct Spark invocation) as an
+existing absolute directory on a shared filesystem that supports durable files and cross-host
+Java/POSIX file locks. Every runner for a destination table must use the same shared directory,
+metalake, and canonical catalog/schema/table names. A host-local directory, object-store mount,
+or filesystem without reliable cross-host locking does not satisfy this requirement.
+The collector must be the sole writer of these statistic names.
+
+The job locks a persistent file keyed by metalake and table before refreshing the Iceberg table
+or choosing a snapshot, and holds it through the PUT. Concurrent runs for that table fail;
+other tables can proceed. Snapshot IDs are recorded for provenance, not compared numerically.
+The job forces `gravitino.client.disableAutomaticRetries=true` for its Gravitino client.
+Custom statistics updaters and any intervening proxies must likewise avoid retrying PUT requests;
+an automatic resend could hide an original request that is still executing. There are no expiring
+leases, automatic retries, scheduling, or cooldowns.
+
+Before collection, the job durably writes an in-progress marker. It clears the marker only after
+a successful PUT. A crash, collection error, or ambiguous PUT failure therefore blocks later
+cycles, even after the operating system releases the lock. This prevents a timed-out write from
+completing after a newer cycle publishes. The error reports the recovery file path.
+
+For recovery, stop all runners for that table and verify the previous process has terminated
+and any outstanding Gravitino PUT has completed or been definitively cancelled. While holding
+an exclusive lock on the reported file, truncate it to zero bytes and flush it to durable storage,
+then resume collection. Never delete or replace the file: a new inode can permit two independent
+locks. If the previous PUT outcome cannot be established, leave the marker intact.
+
+Consumers must read both objects from one table-statistics response and use the same chosen
 spec key in each. A missing object or key means collection is required, not zero manifests.
 `IcebergManifestStatistics.fromStatistics` returns an empty result for an incomplete pair.
-Retain the collector result's `specId()` through evaluation and submission; the two maps do not
-identify a previously resolved default spec. Do not resolve the default again after collection.
 Automatic manifest policy triggering is separate follow-up work.
 
 ## Rewrite Data Files

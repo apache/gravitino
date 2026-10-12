@@ -52,6 +52,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
+import org.mockserver.model.HttpError;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 
@@ -96,6 +97,35 @@ public class TestHTTPClient {
   @Test
   public void testPutSuccess() throws Exception {
     testHttpMethodOnSuccess(Method.PUT, true, true);
+  }
+
+  /** Verifies ambiguous PUT connection failures can be surfaced without an automatic resend. */
+  @Test
+  public void testDisableAutomaticPutRetries() throws Exception {
+    for (boolean disabled : new boolean[] {false, true}) {
+      String path = "put-dropped-connection-" + disabled;
+      HttpRequest expected = request("/" + path).withMethod("PUT");
+      mockServer.when(expected).error(HttpError.error().withDropConnection(true));
+      try (RESTClient client =
+          HTTPClient.builder(
+                  ImmutableMap.of(
+                      GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES,
+                      Boolean.toString(disabled)))
+              .uri("http://127.0.0.1:" + mockServer.getPort())
+              .build()) {
+        Assertions.assertThrows(
+            RESTException.class,
+            () ->
+                client.put(
+                    path,
+                    new Item(1L, "stats"),
+                    Item.class,
+                    ImmutableMap.of(),
+                    mock(ErrorHandler.class)));
+      }
+      Assertions.assertEquals(
+          disabled ? 1 : 2, mockServer.retrieveRecordedRequests(expected).length);
+    }
   }
 
   @Test

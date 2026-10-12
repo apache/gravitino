@@ -104,7 +104,10 @@ public class TestBuiltInJobTemplateProvider {
     expected.put("builtin-iceberg-update-stats", icebergCatalog);
     expected.put(
         "builtin-iceberg-update-manifest-stats",
-        ImmutableSet.<String>builder().addAll(icebergCatalog).add("updater_options").build());
+        ImmutableSet.<String>builder()
+            .addAll(icebergCatalog)
+            .add("updater_options", "coordination_directory")
+            .build());
     expected.put("builtin-iceberg-expire-snapshots", icebergCatalog);
     expected.put("builtin-iceberg-remove-orphan-files", icebergCatalog);
     expected.put("builtin-iceberg-rewrite-manifests", icebergCatalog);

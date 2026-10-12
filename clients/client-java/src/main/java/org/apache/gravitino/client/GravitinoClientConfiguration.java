@@ -66,8 +66,13 @@ public class GravitinoClientConfiguration {
   public static final String CLIENT_SOCKET_TIMEOUT_MS =
       GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs";
 
+  /** Disables automatic transport retries, so ambiguous writes are surfaced to the caller. */
+  public static final String CLIENT_DISABLE_AUTOMATIC_RETRIES =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "disableAutomaticRetries";
+
   private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
       ImmutableSet.of(
+          CLIENT_DISABLE_AUTOMATIC_RETRIES,
           CLIENT_CONNECTION_TIMEOUT_MS,
           CLIENT_SOCKET_TIMEOUT_MS,
           CLIENT_MAX_CONNECTIONS,
@@ -94,6 +99,20 @@ public class GravitinoClientConfiguration {
     GravitinoClientConfiguration config = new GravitinoClientConfiguration(properties);
     config.validateConnectionPoolSettings();
     return config;
+  }
+
+  /**
+   * Returns whether automatic transport retries are disabled.
+   *
+   * @return true to issue each HTTP request only once; false by default
+   */
+  public boolean isAutomaticRetriesDisabled() {
+    String value = properties.getOrDefault(CLIENT_DISABLE_AUTOMATIC_RETRIES, "false");
+    if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+      throw new IllegalArgumentException(
+          CLIENT_DISABLE_AUTOMATIC_RETRIES + " must be true or false");
+    }
+    return Boolean.parseBoolean(value);
   }
 
   /**

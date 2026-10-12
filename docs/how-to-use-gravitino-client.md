@@ -42,6 +42,7 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 | Configuration item                     | Description                                          | Default value       | Required |
 |----------------------------------------|------------------------------------------------------|---------------------|----------|
 | `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | `180000`(3 minutes) | No       |
+| `gravitino.client.disableAutomaticRetries` | Disable automatic HTTP retries to surface ambiguous write failures. | `false` | No |
 | `gravitino.client.socketTimeoutMs`     | An optional http socket timeout in milliseconds.     | `180000`(3 minutes) | No       |
 
 **Note:** Invalid configuration properties will result in exceptions.

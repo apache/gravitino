@@ -31,9 +31,7 @@ class TestIcebergManifestStatistics {
   void testMissingAndEmptyMeasurements() {
     Map<String, StatisticValue<?>> values = new HashMap<>();
     Assertions.assertFalse(IcebergManifestStatistics.fromStatistics(values, 2).isPresent());
-    new IcebergManifestStatistics(2, 0L, 0D)
-        .statistics()
-        .forEach(stat -> values.put(stat.name(), stat.value()));
+    values.putAll(measurement(2, 0L, 0D));
     IcebergManifestStatistics empty = IcebergManifestStatistics.fromStatistics(values, 2).get();
     Assertions.assertEquals(2, empty.specId());
     Assertions.assertEquals(0L, empty.count());
@@ -59,9 +57,7 @@ class TestIcebergManifestStatistics {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new IcebergManifestStatistics(1, 1, Double.NaN));
     Map<String, StatisticValue<?>> values = new HashMap<>();
-    new IcebergManifestStatistics(1, 3L, 20D)
-        .statistics()
-        .forEach(stat -> values.put(stat.name(), stat.value()));
+    values.putAll(measurement(1, 3L, 20D));
     Assertions.assertEquals(3L, IcebergManifestStatistics.fromStatistics(values, 1).get().count());
     values.put(
         IcebergManifestStatistics.MANIFEST_NUMBER,
@@ -72,5 +68,18 @@ class TestIcebergManifestStatistics {
     values.put(IcebergManifestStatistics.MANIFEST_NUMBER, StatisticValues.longValue(3));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> IcebergManifestStatistics.fromStatistics(values, 1));
+  }
+
+  private static Map<String, StatisticValue<?>> measurement(int spec, long count, double size) {
+    Map<String, StatisticValue<?>> values = new HashMap<>();
+    values.put(
+        IcebergManifestStatistics.MANIFEST_NUMBER,
+        StatisticValues.objectValue(
+            Collections.singletonMap(Integer.toString(spec), StatisticValues.longValue(count))));
+    values.put(
+        IcebergManifestStatistics.AVG_MANIFEST_SIZE,
+        StatisticValues.objectValue(
+            Collections.singletonMap(Integer.toString(spec), StatisticValues.doubleValue(size))));
+    return values;
   }
 }

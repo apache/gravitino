@@ -148,6 +148,9 @@ public class HTTPClient implements RESTClient {
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
+    if (clientConfiguration.isAutomaticRetriesDisabled()) {
+      clientBuilder.disableAutomaticRetries();
+    }
     clientBuilder.setConnectionManager(
         configureConnectionManager(clientConfiguration, tlsConfigurer));
 

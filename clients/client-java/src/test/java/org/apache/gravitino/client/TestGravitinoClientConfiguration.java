@@ -25,6 +25,25 @@ import org.junit.jupiter.api.Test;
 
 public class TestGravitinoClientConfiguration {
   @Test
+  void testAutomaticRetryConfiguration() {
+    Assertions.assertFalse(
+        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of())
+            .isAutomaticRetriesDisabled());
+    Assertions.assertTrue(
+        GravitinoClientConfiguration.buildFromProperties(
+                ImmutableMap.of(
+                    GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "true"))
+            .isAutomaticRetriesDisabled());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            GravitinoClientConfiguration.buildFromProperties(
+                    ImmutableMap.of(
+                        GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "invalid"))
+                .isAutomaticRetriesDisabled());
+  }
+
+  @Test
   void testValidConfig() {
     Map<String, String> properties =
         ImmutableMap.of(

@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +29,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJobTemplateProvider;
@@ -50,10 +50,7 @@ public class TestIcebergUpdateManifestStatsJob {
     assertNotNull(template);
     assertEquals(IcebergUpdateManifestStatsJob.class.getName(), template.className());
     assertEquals(10, template.arguments().size());
-    assertTrue(
-        template
-            .arguments()
-            .containsAll(Arrays.asList("--spec-id", "{{spec_id:-}}", "--updater-options")));
+    assertFalse(template.arguments().contains("--spec-id"));
     assertTrue(template.arguments().contains("{{spark_conf:-}}"));
     assertFalse(template.arguments().contains("--update-mode"));
     assertEquals("v1", template.customFields().get("version"));
@@ -64,19 +61,6 @@ public class TestIcebergUpdateManifestStatsJob {
     assertThrows(
         IllegalArgumentException.class,
         () -> IcebergUpdateStatsAndMetricsJob.parseUpdateMode("manifests"));
-  }
-
-  /** Verifies optional spec IDs and invalid spec arguments. */
-  @Test
-  public void testSpecArgument() {
-    assertNull(IcebergUpdateManifestStatsJob.parseSpecId(null));
-    assertNull(IcebergUpdateManifestStatsJob.parseSpecId(""));
-    assertEquals(0, IcebergUpdateManifestStatsJob.parseSpecId("0"));
-    assertEquals(Integer.MAX_VALUE, IcebergUpdateManifestStatsJob.parseSpecId("2147483647"));
-    for (String invalid : Arrays.asList("-1", "1.0", "abc", "2147483648", "1 OR 1=1")) {
-      assertThrows(
-          IllegalArgumentException.class, () -> IcebergUpdateManifestStatsJob.parseSpecId(invalid));
-    }
   }
 
   /** Verifies catalog and table identifiers are validated and escaped. */
@@ -104,8 +88,11 @@ public class TestIcebergUpdateManifestStatsJob {
     Map<String, String> options = new HashMap<>();
     options.put("gravitino_uri", " http://localhost:8090 ");
     options.put("metalake", " test ");
+    options.put(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "false");
     Map<String, String> properties =
         IcebergUpdateManifestStatsJob.buildOptimizerProperties(options);
+    assertEquals(
+        "true", properties.get(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES));
     assertEquals("http://localhost:8090", properties.get(OptimizerConfig.GRAVITINO_URI));
     assertEquals("test", properties.get(OptimizerConfig.GRAVITINO_METALAKE));
     assertEquals(" test ", options.get("metalake"));
