@@ -238,6 +238,7 @@ paths:
             to that location, and a leading slash is relative to it. Complete `..` path
             segments and NUL characters (U+0000) are not allowed.
             The normalized path must remain within the selected storage location.
+            The path must exist; otherwise, this operation returns HTTP 400.
         - name: location_name
           in: query
           required: false
@@ -567,7 +568,6 @@ components:
     InvalidSubPathErrorResponse:
       description: >-
         The sub path does not satisfy the fileset path requirements.
-        For file listing, this response also applies when the sub path does not exist.
       content:
         application/vnd.gravitino.v1+json:
           schema:
