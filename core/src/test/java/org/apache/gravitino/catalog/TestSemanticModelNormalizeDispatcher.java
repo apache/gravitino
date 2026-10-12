@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -67,6 +68,8 @@ public class TestSemanticModelNormalizeDispatcher {
   @BeforeEach
   public void setUp() throws Exception {
     delegate = mock(SemanticModelDispatcher.class);
+    doCallRealMethod().when(delegate).importSemanticModel(any(), any());
+    doCallRealMethod().when(delegate).exportOssieDocument(any(), any());
     CatalogManager catalogManager = mock(CatalogManager.class);
     BaseCatalog<?> catalog = mock(BaseCatalog.class);
     when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
@@ -139,6 +142,7 @@ public class TestSemanticModelNormalizeDispatcher {
     verify(delegate)
         .createSemanticModel(eq(NORMALIZED_IDENT), isNull(), definition.capture(), eq(properties));
     assertEquals(definition(), definition.getValue());
+    verify(delegate).importSemanticModel(eq(NORMALIZED_IDENT), any());
     verifyNoMoreInteractions(delegate);
   }
 
@@ -163,6 +167,7 @@ public class TestSemanticModelNormalizeDispatcher {
     assertEquals(OssieFormat.JSON, document.format());
     assertEquals("SalesModel", OssieDocumentConverter.importDocument(document).name());
     verify(delegate).loadSemanticModel(NORMALIZED_IDENT);
+    verify(delegate).exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON);
     verifyNoMoreInteractions(delegate);
   }
 
