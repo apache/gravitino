@@ -115,18 +115,20 @@ public class JdbcConfig extends Config {
           .createWithDefault(30000L);
 
   /**
-   * The canonical connect/socket timeout for a single JDBC connection, in milliseconds. This bounds
-   * how long a connection attempt (and a subsequent socket read) may block against an unreachable
-   * or unresponsive backend, so that create-time verification fails fast instead of hanging. It is
-   * translated to each driver family's own connection parameters (and unit) by {@link
-   * org.apache.gravitino.catalog.jdbc.utils.JdbcConnectionTimeouts}; an operator value set directly
-   * on the connection or in the {@code jdbc-url} is never overridden.
+   * The canonical connection-establishment timeout for a single JDBC connection, in milliseconds.
+   * This bounds how long establishing a connection may block against an unreachable backend, so
+   * that create-time verification fails fast instead of hanging. It is translated to each driver
+   * family's own connect-timeout parameter (and unit) by {@link
+   * org.apache.gravitino.catalog.jdbc.utils.JdbcConnectionTimeouts}; only the connect timeout is
+   * bounded (never the socket-read timeout, which would also abort legitimate long-running
+   * operations), and an operator value set directly on the connection or in the {@code jdbc-url} is
+   * never overridden.
    */
   public static final ConfigEntry<Long> CONNECT_TIMEOUT_MS =
       new ConfigBuilder("jdbc.pool.connect-timeout-ms")
           .doc(
-              "The connect/socket timeout for a single JDBC connection, in milliseconds, "
-                  + "translated per driver so an unreachable backend fails fast")
+              "The connection-establishment timeout for a single JDBC connection, in "
+                  + "milliseconds, translated per driver so an unreachable backend fails fast")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
