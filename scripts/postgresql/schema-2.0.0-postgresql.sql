@@ -1222,12 +1222,12 @@ CREATE INDEX IF NOT EXISTS idx_tmj_after_sid ON table_maintenance_job (table_id,
 CREATE INDEX IF NOT EXISTS idx_tmj_created_at ON table_maintenance_job (created_at);
 COMMENT ON TABLE table_maintenance_job IS 'per-run TMS job: snapshot pointers + submit gates';
 COMMENT ON COLUMN table_maintenance_job.id IS 'auto increment id';
-COMMENT ON COLUMN table_maintenance_job.job_id IS 'job id; set at runJob; maps to job_run_meta.job_run_id';
+COMMENT ON COLUMN table_maintenance_job.job_id IS 'job id, set at runJob, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_job.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_job.policy_id IS 'policy id from policy_meta';
-COMMENT ON COLUMN table_maintenance_job.before_snapshot_id IS 'Iceberg snapshot id at sample; null until sampled';
-COMMENT ON COLUMN table_maintenance_job.after_snapshot_id IS 'Iceberg snapshot id after job; null while pending';
-COMMENT ON COLUMN table_maintenance_job.finished_at IS 'end time; null = in-flight';
+COMMENT ON COLUMN table_maintenance_job.before_snapshot_id IS 'Iceberg snapshot id at sample, null until sampled';
+COMMENT ON COLUMN table_maintenance_job.after_snapshot_id IS 'Iceberg snapshot id after job, null while pending';
+COMMENT ON COLUMN table_maintenance_job.finished_at IS 'end time, null = in-flight';
 COMMENT ON COLUMN table_maintenance_job.created_at IS 'row create time in epoch millis';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (

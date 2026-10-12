@@ -688,12 +688,12 @@ CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job id; set at runJob; maps to job_run_meta.job_run_id',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job id, set at runJob, maps to job_run_meta.job_run_id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
-    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id at sample; null until sampled',
-    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after job; null while pending',
-    `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'end time; null = in-flight',
+    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id at sample, null until sampled',
+    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after job, null while pending',
+    `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'end time, null = in-flight',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'row create time in epoch millis',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tmj_job_id` (`job_id`),

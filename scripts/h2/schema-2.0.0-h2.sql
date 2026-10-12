@@ -700,12 +700,12 @@ CREATE INDEX IF NOT EXISTS `scheduled_tasks_last_heartbeat_idx` ON `scheduled_ta
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
-    `job_id` BIGINT COMMENT 'job id; set at runJob; maps to job_run_meta.job_run_id',
+    `job_id` BIGINT COMMENT 'job id, set at runJob, maps to job_run_meta.job_run_id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
-    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id at sample; null until sampled',
-    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after job; null while pending',
-    `finished_at` BIGINT COMMENT 'end time; null = in-flight',
+    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id at sample, null until sampled',
+    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after job, null while pending',
+    `finished_at` BIGINT COMMENT 'end time, null = in-flight',
     `created_at` BIGINT NOT NULL COMMENT 'row create time in epoch millis',
     PRIMARY KEY (`id`)
 ) COMMENT='per-run TMS job: snapshot pointers + submit gates';
