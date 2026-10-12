@@ -28,6 +28,7 @@ public class TestK8sJobExecutorConfigs {
 
   public static Map<String, String> requiredConfigs() {
     return ImmutableMap.of(
+        K8sJobExecutorConfigs.NAMESPACE, "default",
         K8sJobExecutorConfigs.SPARK_IMAGE, "gravitino-spark:3.5.9",
         K8sJobExecutorConfigs.SPARK_VERSION, "3.5.9");
   }
@@ -97,17 +98,24 @@ public class TestK8sJobExecutorConfigs {
   }
 
   @Test
-  public void testRequiredSparkConfigs() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            new K8sJobExecutorConfigs(
-                ImmutableMap.of(K8sJobExecutorConfigs.SPARK_VERSION, "3.5.9")));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            new K8sJobExecutorConfigs(
-                ImmutableMap.of(K8sJobExecutorConfigs.SPARK_IMAGE, "gravitino-spark:3.5.9")));
+  public void testRequiredConfigs() {
+    for (String required :
+        new String[] {
+          K8sJobExecutorConfigs.NAMESPACE,
+          K8sJobExecutorConfigs.SPARK_IMAGE,
+          K8sJobExecutorConfigs.SPARK_VERSION
+        }) {
+      Map<String, String> map = new HashMap<>(requiredConfigs());
+      map.remove(required);
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new K8sJobExecutorConfigs(map), required);
+      Assertions.assertEquals(required + " must be set", e.getMessage());
+
+      map.put(required, " ");
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> new K8sJobExecutorConfigs(map), required);
+    }
   }
 
   @Test

@@ -59,11 +59,11 @@ public class K8sJobExecutorConfigs {
    */
   public static final String TOKEN_FILE = "tokenFile";
 
-  /** The default namespace of the jobs. */
+  /**
+   * The namespace the jobs run in, unless a job sets its own. It must be set: the namespace needs
+   * the permissions and the Spark operator set up for the jobs, so none is assumed.
+   */
   public static final String NAMESPACE = "namespace";
-
-  /** The default namespace. */
-  public static final String DEFAULT_NAMESPACE = "default";
 
   /** The prefix of the names of the Kubernetes resources created for the jobs. */
   public static final String NAME_PREFIX = "namePrefix";
@@ -180,7 +180,8 @@ public class K8sJobExecutorConfigs {
         TOKEN_FILE,
         MASTER_URL);
 
-    this.namespace = stringValue(configs, NAMESPACE, DEFAULT_NAMESPACE);
+    this.namespace = stringValue(configs, NAMESPACE, null);
+    Preconditions.checkArgument(namespace != null, "%s must be set", NAMESPACE);
     Preconditions.checkArgument(
         K8sJobResourceUtils.isValidNamespace(namespace),
         "%s isn't a valid namespace name: %s",
@@ -286,9 +287,9 @@ public class K8sJobExecutorConfigs {
   }
 
   /**
-   * Returns the default namespace of the jobs.
+   * Returns the namespace the jobs run in, unless a job sets its own.
    *
-   * @return the default namespace
+   * @return the namespace of the jobs
    */
   public String namespace() {
     return namespace;

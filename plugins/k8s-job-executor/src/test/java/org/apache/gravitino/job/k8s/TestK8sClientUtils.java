@@ -227,9 +227,6 @@ public class TestK8sClientUtils {
                 .getBytes(StandardCharsets.UTF_8));
     Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
     map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
-    Assertions.assertEquals(
-        "default",
-        K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getNamespace());
     map.put(K8sJobExecutorConfigs.NAMESPACE, "jobs");
     Assertions.assertEquals(
         "jobs", K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getNamespace());
