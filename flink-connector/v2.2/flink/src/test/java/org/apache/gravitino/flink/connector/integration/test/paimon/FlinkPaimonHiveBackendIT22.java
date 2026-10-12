@@ -19,5 +19,4 @@
 
 package org.apache.gravitino.flink.connector.integration.test.paimon;
 
-/** Runs Paimon Hive backend integration tests with Flink 2.2. */
 public class FlinkPaimonHiveBackendIT22 extends FlinkPaimonHiveBackendIT {}

@@ -19,5 +19,4 @@
 
 package org.apache.gravitino.flink.connector.integration.test.paimon;
 
-/** Runs Paimon JDBC backend integration tests with Flink 2.2. */
 public class FlinkPaimonJdbcBackendIT22 extends FlinkPaimonJdbcBackendIT {}

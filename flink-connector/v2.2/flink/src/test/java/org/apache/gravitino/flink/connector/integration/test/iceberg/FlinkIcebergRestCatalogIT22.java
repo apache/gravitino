@@ -19,10 +19,4 @@
 
 package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
-import org.junit.jupiter.api.condition.DisabledIf;
-
-/** Runs Iceberg Rest backend integration tests with Flink 2.2 in deploy mode. */
-// The Flink runtime uses Iceberg 1.12 while the server uses Iceberg 1.11. Embedded mode shares
-// their incompatible classes in one JVM; each concrete class declares this non-inherited condition.
-@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class FlinkIcebergRestCatalogIT22 extends FlinkIcebergRestCatalogIT {}

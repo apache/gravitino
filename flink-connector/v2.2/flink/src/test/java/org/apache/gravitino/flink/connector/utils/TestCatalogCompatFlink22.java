@@ -31,10 +31,8 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests catalog table creation, serialization, and JDBC factory compatibility with Flink 2.2. */
 public class TestCatalogCompatFlink22 {
 
-  /** Verifies table schema, partitions, comments, and options are preserved. */
   @Test
   public void testCreateCatalogTable() {
     CatalogTable catalogTable =
@@ -50,7 +48,6 @@ public class TestCatalogCompatFlink22 {
     Assertions.assertEquals(1, catalogTable.getUnresolvedSchema().getColumns().size());
   }
 
-  /** Verifies catalog table serialization preserves the schema and options. */
   @Test
   @SuppressWarnings("deprecation")
   public void testSerializeCatalogTable() {
@@ -75,7 +72,6 @@ public class TestCatalogCompatFlink22 {
     Assertions.assertEquals("value", serialized.get("key"));
   }
 
-  /** Verifies the JDBC dynamic table factory uses the Flink 2.2 connector API. */
   @Test
   public void testJdbcDynamicTableFactory() {
     Assertions.assertInstanceOf(

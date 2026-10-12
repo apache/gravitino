@@ -22,10 +22,8 @@ package org.apache.gravitino.flink.connector.catalog;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink22;
 
-/** Runs the shared base catalog tests with Flink 2.2 compatibility. */
 public class TestBaseCatalogFlink22 extends TestBaseCatalog {
 
-  /** {@inheritDoc} */
   @Override
   protected CatalogCompat catalogCompat() {
     return CatalogCompatFlink22.INSTANCE;

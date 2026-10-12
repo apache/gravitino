@@ -35,8 +35,8 @@ Place the following JAR files in the lib directory of your Flink installation:
 
 For Flink 2.x, `flink-connector-jdbc` is split into core and per-database artifacts. Place all three JARs from the matching row in the classpath instead of a single combined JAR:
 
-| Flink version | Core artifact                          | MySQL artifact                          | PostgreSQL artifact                        |
-|---------------|----------------------------------------|-----------------------------------------|--------------------------------------------|
+| Flink version | Core artifact                             | MySQL artifact                             | PostgreSQL artifact                           |
+|---------------|-------------------------------------------|--------------------------------------------|-----------------------------------------------|
 | 2.1           | `flink-connector-jdbc-core-4.1.0-2.1.jar` | `flink-connector-jdbc-mysql-4.1.0-2.1.jar` | `flink-connector-jdbc-postgres-4.1.0-2.1.jar` |
 | 2.2           | `flink-connector-jdbc-core-4.1.0-2.2.jar` | `flink-connector-jdbc-mysql-4.1.0-2.2.jar` | `flink-connector-jdbc-postgres-4.1.0-2.2.jar` |
 

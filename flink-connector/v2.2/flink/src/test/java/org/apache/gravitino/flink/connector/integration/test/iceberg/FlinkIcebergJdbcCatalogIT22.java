@@ -21,8 +21,9 @@ package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
 import org.junit.jupiter.api.condition.DisabledIf;
 
-/** Runs Iceberg Jdbc backend integration tests with Flink 2.2 in deploy mode. */
-// The Flink runtime uses Iceberg 1.12 while the server uses Iceberg 1.11. Embedded mode shares
-// their incompatible classes in one JVM; each concrete class declares this non-inherited condition.
+// Even though Flink 2.2 and lakehouse-iceberg both use Iceberg 1.11, a JDBC backend exercises the
+// server-side Iceberg JdbcCatalog, which hits a cross-classloader IllegalAccessError when the
+// embedded MiniGravitino server shares the JVM with the Flink Iceberg runtime. Run in deploy mode
+// only. @DisabledIf is not @Inherited, so each concrete subclass must declare it explicitly.
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class FlinkIcebergJdbcCatalogIT22 extends FlinkIcebergJdbcCatalogIT {}

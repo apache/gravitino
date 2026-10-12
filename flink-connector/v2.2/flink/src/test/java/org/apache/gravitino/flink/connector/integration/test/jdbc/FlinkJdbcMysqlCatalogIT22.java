@@ -23,10 +23,8 @@ import org.apache.flink.table.api.ValidationException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Runs the shared MySQL JDBC catalog integration tests with Flink 2.2. */
 public class FlinkJdbcMysqlCatalogIT22 extends FlinkJdbcMysqlCatalogIT {
 
-  /** {@inheritDoc} */
   @Override
   @Test
   public void testCreateGravitinoJdbcCatalogUsingSQLMissingOptions() {

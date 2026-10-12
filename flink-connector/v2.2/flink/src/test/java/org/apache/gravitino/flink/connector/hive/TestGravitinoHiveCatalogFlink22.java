@@ -22,10 +22,8 @@ package org.apache.gravitino.flink.connector.hive;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink22;
 
-/** Runs the shared Hive table conversion tests with Flink 2.2 compatibility. */
 public class TestGravitinoHiveCatalogFlink22 extends TestGravitinoHiveCatalog {
 
-  /** {@inheritDoc} */
   @Override
   protected CatalogCompat catalogCompat() {
     return CatalogCompatFlink22.INSTANCE;

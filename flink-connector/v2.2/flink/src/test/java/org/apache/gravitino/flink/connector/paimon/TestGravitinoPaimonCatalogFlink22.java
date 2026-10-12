@@ -22,10 +22,8 @@ package org.apache.gravitino.flink.connector.paimon;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink22;
 
-/** Runs the shared Paimon catalog tests with Flink 2.2 compatibility. */
 public class TestGravitinoPaimonCatalogFlink22 extends TestGravitinoPaimonCatalog {
 
-  /** {@inheritDoc} */
   @Override
   protected CatalogCompat catalogCompat() {
     return CatalogCompatFlink22.INSTANCE;

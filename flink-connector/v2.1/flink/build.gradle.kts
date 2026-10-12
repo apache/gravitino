@@ -71,8 +71,8 @@ dependencies {
     // can't simply be excluded: the connector's lineage extraction actually calls into it at
     // runtime (JdbcSource.getLineageVertex). Force this newer release instead, which ships an
     // up-to-date bundled copy.
-    compileOnly(libs.openlineageSqlJava21)
-    testImplementation(libs.openlineageSqlJava21)
+    compileOnly(libs.openlineageSqlJava)
+    testImplementation(libs.openlineageSqlJava)
   }
 
   // Dependencies needed to compile flink-common's sources (mirrors flink-common/build.gradle.kts).

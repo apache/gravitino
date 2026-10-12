@@ -31,7 +31,7 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink22.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-// The connector uses Flink's Java APIs and does not need Scala-version-specific artifacts.
+// Flink 2.x removed the Scala APIs entirely, so unlike the 1.x modules there is no scala suffix.
 val artifactName = "gravitino-${project.name}"
 val baseName = "${rootProject.name}-flink-connector-runtime-$flinkMajorVersion"
 
@@ -46,11 +46,11 @@ configurations.all {
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":flink-connector:flink-2.2"))
-  // flink-2.2's own openlineageSqlJava21 constraint only applies to that module's compileOnly and
+  // flink-2.2's own openlineageSqlJava constraint only applies to that module's compileOnly and
   // testImplementation configurations, so it never reaches this module's runtimeClasspath (which
   // shadowJar packages). Depend on it directly here so the shaded runtime jar ships the patched
   // 1.52.0 release instead of the vulnerable 1.32.0 pulled transitively by flink-connector-jdbc.
-  implementation(libs.openlineageSqlJava21)
+  implementation(libs.openlineageSqlJava)
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)

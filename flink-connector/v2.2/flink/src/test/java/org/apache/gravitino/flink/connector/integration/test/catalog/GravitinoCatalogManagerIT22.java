@@ -19,5 +19,4 @@
 
 package org.apache.gravitino.flink.connector.integration.test.catalog;
 
-/** Runs the shared catalog manager integration tests with Flink 2.2. */
 public class GravitinoCatalogManagerIT22 extends GravitinoCatalogManagerIT {}
