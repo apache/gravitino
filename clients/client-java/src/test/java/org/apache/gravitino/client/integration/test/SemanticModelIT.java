@@ -64,6 +64,9 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
@@ -165,12 +168,17 @@ public class SemanticModelIT extends BaseIT {
     semanticModelCatalog = catalog.asSemanticModelCatalog();
   }
 
-  /** Removes models and tags left by a test so failures do not affect subsequent tests. */
+  /**
+   * Removes models, policies, and tags left by a test so failures do not affect subsequent tests.
+   */
   @AfterEach
   public void cleanUpSemanticModels() {
     for (NameIdentifier ident :
         semanticModelCatalog.listSemanticModels(Namespace.of(SCHEMA_NAME))) {
       semanticModelCatalog.dropSemanticModel(ident);
+    }
+    for (String policy : metalake.listPolicies()) {
+      metalake.deletePolicy(policy);
     }
     for (String tag : metalake.listTags()) {
       metalake.deleteTag(tag);
@@ -814,6 +822,59 @@ public class SemanticModelIT extends BaseIT {
     assertArrayEquals(new Tag[0], tags.listTagsInfo());
   }
 
+  /** Verifies tag-derived policy lookup, inheritance, disabled policies, and tag removal. */
+  @Test
+  public void testSemanticModelPolicyLifecycle() {
+    NameIdentifier ident = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
+    SemanticModel model =
+        semanticModelCatalog.createSemanticModel(
+            ident, null, initialDefinition(), Collections.emptyMap());
+    Tag catalogTag = createTag("catalog_policy_tag");
+    Tag schemaTag = createTag("schema_policy_tag");
+    Tag modelTag = createTag("model_policy_tag");
+    Policy catalogPolicy = createPolicy("catalog_policy");
+    Policy schemaPolicy = createPolicy("schema_policy");
+    Policy modelPolicy = createPolicy("model_policy");
+    metalake.addPolicyForTag(catalogTag.name(), catalogPolicy.name());
+    metalake.addPolicyForTag(schemaTag.name(), schemaPolicy.name());
+    metalake.addPolicyForTag(modelTag.name(), modelPolicy.name());
+
+    assertArrayEquals(new String[0], model.supportsPolicies().listPolicies());
+    assertArrayEquals(new Policy[0], model.supportsPolicies().listPolicyInfos());
+    SupportsTags schemaTags = catalog.asSchemas().loadSchema(SCHEMA_NAME).supportsTags();
+    catalog.supportsTags().associateTags(new String[] {catalogTag.name()}, null);
+    schemaTags.associateTags(new String[] {schemaTag.name()}, null);
+    model.supportsTags().associateTags(new String[] {modelTag.name()}, null);
+
+    SupportsPolicies policies = semanticModelCatalog.loadSemanticModel(ident).supportsPolicies();
+    assertEquals(
+        Set.of(catalogPolicy.name(), schemaPolicy.name(), modelPolicy.name()),
+        Set.of(policies.listPolicies()));
+    assertEquals(
+        Map.of(catalogPolicy.name(), true, schemaPolicy.name(), true, modelPolicy.name(), false),
+        Arrays.stream(policies.listPolicyInfos())
+            .collect(Collectors.toMap(Policy::name, policy -> policy.inherited().orElseThrow())));
+
+    metalake.disablePolicy(modelPolicy.name());
+    assertEquals(
+        Set.of(catalogPolicy.name(), schemaPolicy.name()), Set.of(policies.listPolicies()));
+    assertEquals(
+        Set.of(catalogPolicy.name(), schemaPolicy.name()),
+        Arrays.stream(policies.listPolicyInfos()).map(Policy::name).collect(Collectors.toSet()));
+    metalake.enablePolicy(modelPolicy.name());
+    assertEquals(
+        Set.of(catalogPolicy.name(), schemaPolicy.name(), modelPolicy.name()),
+        Set.of(policies.listPolicies()));
+
+    model.supportsTags().associateTags(null, new String[] {modelTag.name()});
+    assertEquals(
+        Set.of(catalogPolicy.name(), schemaPolicy.name()), Set.of(policies.listPolicies()));
+    schemaTags.associateTags(null, new String[] {schemaTag.name()});
+    catalog.supportsTags().associateTags(null, new String[] {catalogTag.name()});
+    assertArrayEquals(new String[0], policies.listPolicies());
+    assertArrayEquals(new Policy[0], policies.listPolicyInfos());
+  }
+
   /** Verifies tag values, ancestor precedence, direct overrides, and value-filtered lookup. */
   @Test
   public void testSemanticModelTagValues() {
@@ -1080,6 +1141,18 @@ public class SemanticModelIT extends BaseIT {
   private Tag createTag(String prefix) {
     return metalake.createTag(
         GravitinoITUtils.genRandomName(prefix), "Semantic Model tag", Collections.emptyMap());
+  }
+
+  private Policy createPolicy(String prefix) {
+    return metalake.createPolicy(
+        GravitinoITUtils.genRandomName(prefix),
+        "custom",
+        "Semantic Model policy",
+        true,
+        PolicyContents.custom(
+            Collections.emptyMap(),
+            Set.of(MetadataObject.Type.SEMANTIC_MODEL),
+            Collections.emptyMap()));
   }
 
   private static MetadataObject semanticModelObject(String name) {

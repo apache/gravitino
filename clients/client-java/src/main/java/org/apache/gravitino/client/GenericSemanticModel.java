@@ -28,6 +28,8 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.tag.SupportsTags;
@@ -35,13 +37,14 @@ import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** An immutable client-side Semantic Model returned by the Gravitino REST API. */
-class GenericSemanticModel implements SemanticModel, SupportsTags {
+class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolicies {
 
   private final String name;
   private final SemanticModelDefinition definition;
   private final Map<String, String> properties;
   private final Audit audit;
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   @Nullable private final String comment;
 
@@ -62,6 +65,9 @@ class GenericSemanticModel implements SemanticModel, SupportsTags {
             MetadataObject.Type.SEMANTIC_MODEL);
     this.objectTagOperations =
         new MetadataObjectTagOperations(
+            semanticModelNamespace.level(0), metadataObject, restClient);
+    this.objectPolicyOperations =
+        new MetadataObjectPolicyOperations(
             semanticModelNamespace.level(0), metadataObject, restClient);
   }
 
@@ -104,6 +110,12 @@ class GenericSemanticModel implements SemanticModel, SupportsTags {
 
   /** {@inheritDoc} */
   @Override
+  public SupportsPolicies supportsPolicies() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public String[] listTags() {
     return objectTagOperations.listTags();
   }
@@ -130,6 +142,18 @@ class GenericSemanticModel implements SemanticModel, SupportsTags {
   @Override
   public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listPolicies() {
+    return objectPolicyOperations.listPolicies();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Policy[] listPolicyInfos() {
+    return objectPolicyOperations.listPolicyInfos();
   }
 
   /** {@inheritDoc} */

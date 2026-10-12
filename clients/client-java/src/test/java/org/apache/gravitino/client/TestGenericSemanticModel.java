@@ -88,6 +88,8 @@ public class TestGenericSemanticModel {
     assertSame(audit, semanticModel.auditInfo());
     assertSame(semanticModel, semanticModel.supportsTags());
     assertThrows(UnsupportedOperationException.class, source::supportsTags);
+    assertSame(semanticModel, semanticModel.supportsPolicies());
+    assertThrows(UnsupportedOperationException.class, source::supportsPolicies);
 
     Dataset[] returnedDatasets = semanticModel.definition().datasets();
     returnedDatasets[0] = explicitEmpty;
