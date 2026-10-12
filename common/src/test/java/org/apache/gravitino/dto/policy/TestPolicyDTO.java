@@ -237,4 +237,25 @@ public class TestPolicyDTO {
     IcebergDataCompactionContent content = (IcebergDataCompactionContent) restored;
     Assertions.assertEquals(fields, content.maintenanceFields());
   }
+
+  @Test
+  public void testIcebergCompactionMaintenanceFieldsAnyFieldMapperRoundTrip() throws Exception {
+    TableMaintenancePolicyFields fields =
+        new TableMaintenancePolicyFields(
+            new TableMaintenanceSchedule(true, "0 1 * * *"),
+            7_200_000L,
+            ImmutableMap.of("uri", "http://irc:9001/iceberg"));
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
+                1000L, 1L, 1L, 100L, 50L, ImmutableMap.of(), fields);
+
+    String json = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    Assertions.assertFalse(json.contains("\"present\""), json);
+
+    IcebergDataCompactionContent restored =
+        JsonUtils.anyFieldMapper().readValue(json, IcebergDataCompactionContent.class);
+    Assertions.assertEquals(content, restored);
+    Assertions.assertEquals(fields, restored.maintenanceFields());
+  }
 }

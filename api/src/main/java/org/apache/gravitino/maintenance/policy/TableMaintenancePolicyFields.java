@@ -41,6 +41,11 @@ public final class TableMaintenancePolicyFields {
   @Nullable private final Long minIntervalMs;
   private final Map<String, String> jobOptions;
 
+  /** Default constructor for Jackson field-based deserialization only. */
+  private TableMaintenancePolicyFields() {
+    this(null, null, null);
+  }
+
   /**
    * Creates TMS policy fields.
    *
@@ -64,9 +69,12 @@ public final class TableMaintenancePolicyFields {
   /**
    * Returns whether any TMS field is set.
    *
+   * <p>Named {@code anySet} (not {@code isPresent}) so Jackson field mappers do not emit a
+   * synthetic {@code present} property into persisted policy JSON.
+   *
    * @return {@code true} when schedule, interval, or job options are present
    */
-  public boolean isPresent() {
+  public boolean anySet() {
     return schedule != null || minIntervalMs != null || !jobOptions.isEmpty();
   }
 
@@ -100,7 +108,7 @@ public final class TableMaintenancePolicyFields {
    */
   public void validate(TableMaintenanceTaskType taskType) {
     Preconditions.checkNotNull(taskType, "taskType cannot be null");
-    if (!isPresent()) {
+    if (!anySet()) {
       return;
     }
     if (schedule != null) {

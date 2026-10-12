@@ -30,6 +30,11 @@ public final class TableMaintenanceSchedule {
   private final boolean onCommit;
   @Nullable private final String crontab;
 
+  /** Default constructor for Jackson field-based deserialization only. */
+  private TableMaintenanceSchedule() {
+    this(false, null);
+  }
+
   /**
    * Creates a schedule.
    *

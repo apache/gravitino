@@ -701,7 +701,7 @@ public class DTOConverters {
               .withSortOrder(icebergCompactionContent.sortOrder())
               .withRewriteOptions(icebergCompactionContent.rewriteOptions());
       TableMaintenancePolicyFields maintenanceFields = icebergCompactionContent.maintenanceFields();
-      if (maintenanceFields != null && maintenanceFields.isPresent()) {
+      if (maintenanceFields != null && maintenanceFields.anySet()) {
         if (maintenanceFields.schedule() != null) {
           builder.withSchedule(
               PolicyContentDTO.TableMaintenanceScheduleDTO.builder()
