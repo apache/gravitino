@@ -695,6 +695,8 @@ public class DTOConverters {
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
+          .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
@@ -1572,6 +1574,8 @@ public class DTOConverters {
           icebergCompactionContentDTO.dataFileMseWeight(),
           icebergCompactionContentDTO.deleteFileNumberWeight(),
           icebergCompactionContentDTO.maxPartitionNum(),
+          icebergCompactionContentDTO.rewriteStrategy(),
+          icebergCompactionContentDTO.sortOrder(),
           icebergCompactionContentDTO.rewriteOptions());
     }
 

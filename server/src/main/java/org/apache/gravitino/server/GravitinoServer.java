@@ -73,6 +73,7 @@ import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.NotFoundExceptionMapper;
 import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
 import org.apache.gravitino.server.web.mapper.WebApplicationExceptionMapper;
+import org.apache.gravitino.server.web.rest.SemanticModelSourceValidator;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -168,6 +169,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
+            bindAsContract(SemanticModelSourceValidator.class);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
             bind(gravitinoEnv.viewDispatcher()).to(ViewDispatcher.class).ranked(1);
             bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);

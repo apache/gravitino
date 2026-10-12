@@ -29,6 +29,7 @@ import java.util.TreeMap;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 
 public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
 
@@ -41,11 +42,19 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
         jobExecutionContext instanceof CompactionJobContext,
         "jobExecutionContext must be CompactionJobExecutionContext");
     CompactionJobContext jobContext = (CompactionJobContext) jobExecutionContext;
+    String rewriteStrategy =
+        jobContext.getRewriteStrategy() == null
+            ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+            : jobContext.getRewriteStrategy();
+    String sortOrder =
+        jobContext.getSortOrder() == null
+            ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER
+            : jobContext.getSortOrder();
     return ImmutableMap.of(
         "table_identifier", getTableName(jobContext),
         "where_clause", getWhereClause(jobContext),
-        "sort_order", "",
-        "strategy", "binpack",
+        "sort_order", sortOrder,
+        "strategy", rewriteStrategy,
         "options", getOptions(jobContext));
   }
 
