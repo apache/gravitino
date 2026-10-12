@@ -28,8 +28,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Optional TMS scheduling and non-sensitive Spark / IRC client options carried on built-in policy
- * content (today {@link org.apache.gravitino.policy.IcebergDataCompactionContent}).
+ * Optional TMS scheduling and Spark / IRC client options carried on built-in policy content (today
+ * {@link org.apache.gravitino.policy.IcebergDataCompactionContent}).
  *
  * <p>This is a value object for shared JSON fields, not a separate policy type. Prefer attaching it
  * to existing {@code PolicyContent} implementations rather than introducing parallel content
@@ -51,7 +51,7 @@ public final class TableMaintenancePolicyFields {
    *
    * @param schedule evaluate triggers, or null when unset
    * @param minIntervalMs cooldown after last finished job for this policy type, or null
-   * @param jobOptions non-sensitive Spark / IRC client properties
+   * @param jobOptions Spark / IRC client properties
    */
   public TableMaintenancePolicyFields(
       @Nullable TableMaintenanceSchedule schedule,
@@ -95,7 +95,7 @@ public final class TableMaintenancePolicyFields {
   }
 
   /**
-   * @return non-sensitive job options
+   * @return job options
    */
   public Map<String, String> jobOptions() {
     return jobOptions;
@@ -117,7 +117,6 @@ public final class TableMaintenancePolicyFields {
     if (minIntervalMs != null) {
       Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");
     }
-    MaintenanceSensitiveOptionKeys.validateNonSensitive(jobOptions, "jobOptions");
     jobOptions.forEach(
         (key, value) -> {
           Preconditions.checkArgument(StringUtils.isNotBlank(key), "jobOptions key is blank");

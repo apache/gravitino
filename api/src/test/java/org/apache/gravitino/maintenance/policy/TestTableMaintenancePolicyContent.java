@@ -50,21 +50,6 @@ public class TestTableMaintenancePolicyContent {
   }
 
   @Test
-  void testRejectsCredentialShapedJobOptions() {
-    TableMaintenancePolicyFields fields =
-        new TableMaintenancePolicyFields(
-            new TableMaintenanceSchedule(false, "0 3 * * *"),
-            null,
-            ImmutableMap.of("oauthCredential", "id:secret"));
-
-    IllegalArgumentException ex =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> fields.validate(TableMaintenanceTaskType.COMPACTION));
-    Assertions.assertTrue(ex.getMessage().contains("jobOptions"));
-  }
-
-  @Test
   void testRejectsEmptySchedule() {
     TableMaintenanceSchedule schedule = new TableMaintenanceSchedule(false, null);
 
@@ -91,16 +76,5 @@ public class TestTableMaintenancePolicyContent {
     Map<String, String> merged = TableMaintenancePolicyFields.mergeJobOptions(farther, nearer);
     Assertions.assertEquals("4g", merged.get("spark.executor.memory"));
     Assertions.assertEquals("http://new", merged.get("uri"));
-  }
-
-  @Test
-  void testSensitiveRewriteOptionsRejected() {
-    IcebergDataCompactionContent content =
-        (IcebergDataCompactionContent)
-            PolicyContents.icebergDataCompaction(1000L, 1L, ImmutableMap.of("password", "secret"));
-
-    IllegalArgumentException ex =
-        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
-    Assertions.assertTrue(ex.getMessage().contains("rewriteOptions"));
   }
 }

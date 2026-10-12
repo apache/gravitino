@@ -386,7 +386,7 @@ components:
         rewriteOptions:
           type: object
           default: {}
-          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix. Credential-shaped keys are rejected.
+          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
           additionalProperties:
             type: string
             minLength: 1
@@ -400,7 +400,7 @@ components:
         jobOptions:
           type: object
           default: {}
-          description: Non-sensitive Spark / Iceberg REST client properties for TMS jobs. Credential-shaped keys are rejected.
+          description: Spark / Iceberg REST client properties for TMS jobs.
           additionalProperties:
             type: string
             minLength: 1

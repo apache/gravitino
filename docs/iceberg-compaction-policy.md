@@ -31,7 +31,7 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                        |
 | `schedule`               | No       | unset               | TMS triggers: `onCommit` (boolean) and/or `crontab` (Quartz cron). At least one must be set when present.   |
 | `minIntervalMs`          | No       | server / code default | Cooldown in milliseconds between finished runs for this policy type.                                      |
-| `jobOptions`             | No       | `{}`                | Non-sensitive Spark / Iceberg REST client properties for TMS. Credential-shaped keys are rejected.          |
+| `jobOptions`             | No       | `{}`                | Spark / Iceberg REST client properties for TMS jobs.                                                        |
 
 `rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
 parameters separate from the `options` map.

@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.MaintenanceSensitiveOptionKeys;
 import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
 import org.apache.gravitino.maintenance.policy.TableMaintenanceTaskType;
 
@@ -329,7 +328,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
           rewriteStrategy);
     }
 
-    MaintenanceSensitiveOptionKeys.validateNonSensitive(rewriteOptions, "rewriteOptions");
     rewriteOptions.forEach(
         (key, value) -> {
           Preconditions.checkArgument(StringUtils.isNotBlank(key), "rewrite option key is blank");
