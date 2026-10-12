@@ -39,10 +39,12 @@ public class GravitinoNodePartitioningProvider482 extends GravitinoNodePartition
       ConnectorSession session,
       ConnectorPartitioningHandle partitioningHandle,
       int bucketCount) {
-    return nodePartitioningProvider.getSplitBucketFunction(
-        GravitinoHandle.unWrap(transactionHandle),
-        session,
-        GravitinoHandle.unWrap(partitioningHandle),
-        bucketCount);
+    ToIntFunction<ConnectorSplit> splitBucketFunction =
+        nodePartitioningProvider.getSplitBucketFunction(
+            GravitinoHandle.unWrap(transactionHandle),
+            session,
+            GravitinoHandle.unWrap(partitioningHandle),
+            bucketCount);
+    return split -> splitBucketFunction.applyAsInt(GravitinoHandle.unWrap(split));
   }
 }
