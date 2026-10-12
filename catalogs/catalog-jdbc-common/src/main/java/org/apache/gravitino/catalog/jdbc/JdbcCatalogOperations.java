@@ -244,7 +244,14 @@ public class JdbcCatalogOperations
     try {
       databaseOperation.listDatabases();
     } catch (ConnectionFailedException e) {
-      throw e;
+      // Already classified as a connection failure (for example a MySQL access-denied or a
+      // PostgreSQL SQLSTATE 08 error). Re-wrap it with the host context so every connection failure
+      // satisfies the documented "names the host" contract, preserving the original cause.
+      throw new ConnectionFailedException(
+          e.getCause() != null ? e.getCause() : e,
+          "Failed to connect to JDBC catalog at %s: %s",
+          hostPortFromJdbcUrl(jdbcUrl),
+          e.getMessage());
     } catch (GravitinoRuntimeException e) {
       if (e.getClass() == GravitinoRuntimeException.class && e.getCause() instanceof SQLException) {
         throw new ConnectionFailedException(
@@ -259,12 +266,14 @@ public class JdbcCatalogOperations
 
   /**
    * Extracts {@code host:port} from a {@code jdbc:subprotocol://host:port/...} URL for use in a
-   * connection-failure message. Returns the raw URL when the host/port cannot be located and {@code
-   * "unknown"} when the URL is blank. Never throws, so message formatting cannot mask the original
-   * connection failure.
+   * connection-failure message. Returns {@code "unknown"} whenever the host/port cannot be located
+   * (including a URL with no {@code ://} authority) rather than the raw URL, because the raw URL
+   * can carry credentials (for example {@code jdbc:postgresql:db?password=...}) that must not leak
+   * into the exception, the REST response, or the server logs. Never throws, so message formatting
+   * cannot mask the original connection failure.
    *
    * @param url the JDBC URL stored for this catalog
-   * @return a {@code host:port} description, the raw URL, or {@code "unknown"}
+   * @return a {@code host:port} description, or {@code "unknown"} when it cannot be extracted
    */
   private static String hostPortFromJdbcUrl(String url) {
     if (StringUtils.isBlank(url)) {
@@ -272,7 +281,7 @@ public class JdbcCatalogOperations
     }
     int schemeEnd = url.indexOf("://");
     if (schemeEnd < 0) {
-      return url;
+      return "unknown";
     }
     int authorityStart = schemeEnd + "://".length();
     // The authority ends at the first '/', '?', or ';' following it.
@@ -286,14 +295,14 @@ public class JdbcCatalogOperations
     }
     String authority = url.substring(authorityStart, authorityEnd);
     if (StringUtils.isBlank(authority)) {
-      return url;
+      return "unknown";
     }
     // Strip any user-info ("user@host:port"); keep only the host:port part.
     int at = authority.lastIndexOf('@');
     if (at >= 0) {
       authority = authority.substring(at + 1);
     }
-    return StringUtils.isBlank(authority) ? url : authority;
+    return StringUtils.isBlank(authority) ? "unknown" : authority;
   }
 
   /**

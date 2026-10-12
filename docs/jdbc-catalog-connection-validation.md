@@ -78,18 +78,25 @@ the check is skipped.
 
 ### Bounded connect timeout
 
-So that create-time verification fails fast against an unreachable host instead of hanging, a
-single JDBC connection is bounded by `jdbc.pool.connect-timeout-ms` (default `30000` ms). Gravitino
-translates this canonical millisecond value into each driver family's own connection parameters and
-unit:
+So that create-time verification fails fast against an unreachable host instead of hanging, the
+JDBC **connection-establishment** timeout is bounded by `jdbc.pool.connect-timeout-ms` (default
+`30000` ms). Gravitino translates this canonical millisecond value into each driver family's own
+connect-timeout parameter and unit:
 
-- MySQL Connector/J — also used by the Doris, StarRocks, and OceanBase catalogs:
-  `connectTimeout`/`socketTimeout` in milliseconds.
-- PostgreSQL — also used by the Hologres catalog: `connectTimeout`/`socketTimeout` in seconds
-  (rounded up, minimum 1).
-- ClickHouse: `connect_timeout`/`socket_timeout` in milliseconds (note the underscore names).
+- MySQL Connector/J — also used by the Doris, StarRocks, and OceanBase catalogs: `connectTimeout`
+  in milliseconds.
+- PostgreSQL — also used by the Hologres catalog: `connectTimeout` in seconds (rounded up,
+  minimum 1).
+- ClickHouse: `connect_timeout` in milliseconds (note the underscore name).
 
-A value you set directly on the connection or in the `jdbc-url` query string is never overridden;
-drivers whose family is not recognized are left unbounded by Gravitino. The timeout is applied as a
-per-connection bound, so the pool stays lazy and no connection is opened until the first real round
-trip (create-time verification).
+Only the connect timeout is bounded, deliberately not the socket-read timeout. The connect timeout
+makes an unreachable host fail fast at TCP connect, and it is safe for every connection: a
+connection that cannot be established is dead regardless of the operation. A socket-read timeout
+would also abort legitimate long-running operations on a healthy backend (a large `ALTER TABLE`, a
+slow metadata query), so Gravitino does not impose one; set a read timeout explicitly in the
+`jdbc-url` if you want one.
+
+A connect-timeout value you set directly on the connection or in the `jdbc-url` query string is
+never overridden; drivers whose family is not recognized are left unbounded by Gravitino. The
+timeout is applied as a per-connection bound, so the pool stays lazy and no connection is opened
+until the first real round trip (create-time verification).

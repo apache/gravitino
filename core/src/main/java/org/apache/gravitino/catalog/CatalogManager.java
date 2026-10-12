@@ -996,7 +996,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
+      // Pass null propsToValidate so wrapper construction does NOT run the create-time backend
+      // validation (BaseCatalog#validateOnCreate). This standalone path performs its own explicit
+      // probe below; letting the wrapper validate as well would probe the backend twice and could
+      // fail an otherwise-successful test on a transient second-round-trip error.
+      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, null);
       try {
         wrapper.doWithCatalogOps(
             c -> {

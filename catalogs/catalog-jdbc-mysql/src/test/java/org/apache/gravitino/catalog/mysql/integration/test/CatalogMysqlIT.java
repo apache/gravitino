@@ -216,6 +216,10 @@ public class CatalogMysqlIT extends BaseIT {
         JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
+    // This test registers a catalog pointing at an unreachable endpoint on purpose, so it can then
+    // assert testConnection fails on the EXISTING catalog. It must opt out of create-time
+    // verification; the rejection by the default create-time verification is covered separately.
+    catalogProperties.put(Catalog.PROPERTY_VERIFY_ON_CREATE, "false");
 
     metalake.createCatalog(
         unreachableCatalogName,
@@ -2435,7 +2439,7 @@ public class CatalogMysqlIT extends BaseIT {
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
     // This test deliberately creates the catalog with a wrong password and then fixes it via
     // alterCatalog, so it must opt out of create-time backend verification; otherwise the create
-    // itself would be rejected for the unreachable backend (the behavior added in #2154).
+    // itself would be rejected for the unreachable backend (the behavior added in #13769).
     catalogProperties.put(Catalog.PROPERTY_VERIFY_ON_CREATE, "false");
 
     metalake.createCatalog(

@@ -40,7 +40,7 @@ public class TestJdbcConnectionTimeouts {
   }
 
   @Test
-  void testMysqlFamilyEmitsMilliseconds() {
+  void testMysqlFamilyEmitsConnectTimeoutMillisOnly() {
     for (String driver : new String[] {"com.mysql.cj.jdbc.Driver", "com.mysql.jdbc.Driver"}) {
       Map<String, String> props = Maps.newHashMap();
       props.put(DRIVER_KEY, driver);
@@ -49,16 +49,16 @@ public class TestJdbcConnectionTimeouts {
       Map<String, String> result =
           JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
-      // Default canonical value is 30000 ms, emitted as-is for MySQL Connector/J.
+      // Only the connect timeout is emitted (never a socket-read timeout), as milliseconds.
       Assertions.assertEquals("30000", result.get(CONNECT_TIMEOUT), driver);
-      Assertions.assertEquals("30000", result.get(SOCKET_TIMEOUT), driver);
-      Assertions.assertEquals(2, result.size(), driver);
+      Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT), driver);
+      Assertions.assertEquals(1, result.size(), driver);
     }
   }
 
   @Test
-  void testOceanBaseDriverEmitsMilliseconds() {
-    // OceanBase Connector/J is MySQL-compatible and uses the same camelCase params in milliseconds.
+  void testOceanBaseDriverEmitsConnectTimeoutMillis() {
+    // OceanBase Connector/J is MySQL-compatible and uses the same camelCase param in milliseconds.
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.oceanbase.jdbc.Driver");
     props.put(URL_KEY, "jdbc:oceanbase://host:2881/db");
@@ -67,12 +67,12 @@ public class TestJdbcConnectionTimeouts {
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
     Assertions.assertEquals("30000", result.get(CONNECT_TIMEOUT));
-    Assertions.assertEquals("30000", result.get(SOCKET_TIMEOUT));
-    Assertions.assertEquals(2, result.size());
+    Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT));
+    Assertions.assertEquals(1, result.size());
   }
 
   @Test
-  void testClickHouseDriverEmitsSnakeCaseMilliseconds() {
+  void testClickHouseDriverEmitsSnakeCaseConnectTimeoutMillis() {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.clickhouse.jdbc.ClickHouseDriver");
     props.put(URL_KEY, "jdbc:clickhouse://host:8443/default");
@@ -81,26 +81,25 @@ public class TestJdbcConnectionTimeouts {
     Map<String, String> result =
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
-    // ClickHouse uses snake_case names and milliseconds; the camelCase names must NOT be emitted.
+    // ClickHouse uses the snake_case name and milliseconds; the camelCase name must NOT be emitted,
+    // and no socket-read timeout is emitted.
     Assertions.assertEquals("7500", result.get(CLICKHOUSE_CONNECT_TIMEOUT));
-    Assertions.assertEquals("7500", result.get(CLICKHOUSE_SOCKET_TIMEOUT));
+    Assertions.assertFalse(result.containsKey(CLICKHOUSE_SOCKET_TIMEOUT));
     Assertions.assertFalse(result.containsKey(CONNECT_TIMEOUT));
-    Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT));
-    Assertions.assertEquals(2, result.size());
+    Assertions.assertEquals(1, result.size());
   }
 
   @Test
-  void testClickHouseOperatorValueInJdbcUrlIsPreserved() {
+  void testClickHouseOperatorConnectTimeoutInJdbcUrlIsPreserved() {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.clickhouse.jdbc.ClickHouseDriver");
-    String url = "jdbc:clickhouse://host:8443/default?socket_timeout=60000";
+    String url = "jdbc:clickhouse://host:8443/default?connect_timeout=5000";
     props.put(URL_KEY, url);
 
     Map<String, String> result = JdbcConnectionTimeouts.connectionProperties(config(props), url);
 
-    // socket_timeout is left to the operator; connect_timeout is still defaulted.
-    Assertions.assertFalse(result.containsKey(CLICKHOUSE_SOCKET_TIMEOUT));
-    Assertions.assertEquals("30000", result.get(CLICKHOUSE_CONNECT_TIMEOUT));
+    // The operator's connect_timeout wins, so nothing is injected.
+    Assertions.assertTrue(result.isEmpty());
   }
 
   @Test
@@ -115,20 +114,31 @@ public class TestJdbcConnectionTimeouts {
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
     Assertions.assertEquals("5", result.get(CONNECT_TIMEOUT));
-    Assertions.assertEquals("5", result.get(SOCKET_TIMEOUT));
+    Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT));
+    Assertions.assertEquals(1, result.size());
   }
 
   @Test
   void testPostgresRoundsUpToSecondsWithMinimumOne() {
-    assertPostgresValue("30000", "30");
-    assertPostgresValue("1", "1");
-    assertPostgresValue("999", "1");
-    assertPostgresValue("1000", "1");
-    assertPostgresValue("1001", "2");
-    assertPostgresValue("1999", "2");
+    assertPostgresConnectSeconds("30000", "30");
+    assertPostgresConnectSeconds("1", "1");
+    assertPostgresConnectSeconds("999", "1");
+    assertPostgresConnectSeconds("1000", "1");
+    assertPostgresConnectSeconds("1001", "2");
+    assertPostgresConnectSeconds("1999", "2");
   }
 
-  private static void assertPostgresValue(String millis, String expectedSeconds) {
+  @Test
+  void testPostgresSecondsConversionIsOverflowSafeNearMaxLong() {
+    // (millis + 999) would overflow and silently collapse to 1s; the overflow-safe ceiling must
+    // instead return a large positive second count.
+    long millis = Long.MAX_VALUE;
+    long expectedSeconds = (millis - 1L) / 1000L + 1L;
+    assertPostgresConnectSeconds(Long.toString(millis), Long.toString(expectedSeconds));
+    Assertions.assertTrue(expectedSeconds > 1L, "conversion must not collapse to 1 second");
+  }
+
+  private static void assertPostgresConnectSeconds(String millis, String expectedSeconds) {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "org.postgresql.Driver");
     props.put(URL_KEY, "jdbc:postgresql://host:5432/db");
@@ -138,7 +148,7 @@ public class TestJdbcConnectionTimeouts {
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
     Assertions.assertEquals(expectedSeconds, result.get(CONNECT_TIMEOUT), millis);
-    Assertions.assertEquals(expectedSeconds, result.get(SOCKET_TIMEOUT), millis);
+    Assertions.assertFalse(result.containsKey(SOCKET_TIMEOUT), millis);
   }
 
   @Test
@@ -154,26 +164,25 @@ public class TestJdbcConnectionTimeouts {
   }
 
   @Test
-  void testOperatorValueAsConnectionPropertyIsPreserved() {
+  void testOperatorConnectTimeoutAsConfigKeyIsPreserved() {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
     props.put(URL_KEY, "jdbc:mysql://host:3306/db");
-    // The operator set connectTimeout as a DBCP connection property directly.
+    // The operator set connectTimeout as a connection property directly.
     props.put(CONNECT_TIMEOUT, "5000");
 
     Map<String, String> result =
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
-    // connectTimeout is left to the operator; socketTimeout is still defaulted.
-    Assertions.assertFalse(result.containsKey(CONNECT_TIMEOUT));
-    Assertions.assertEquals("30000", result.get(SOCKET_TIMEOUT));
+    // The operator's connectTimeout wins, so nothing is injected.
+    Assertions.assertTrue(result.isEmpty());
   }
 
   @Test
-  void testOperatorValueInJdbcUrlIsPreserved() {
+  void testOperatorConnectTimeoutInJdbcUrlIsPreserved() {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
-    String url = "jdbc:mysql://host:3306/db?connectTimeout=5000&socketTimeout=6000";
+    String url = "jdbc:mysql://host:3306/db?connectTimeout=5000";
     props.put(URL_KEY, url);
 
     Map<String, String> result = JdbcConnectionTimeouts.connectionProperties(config(props), url);
@@ -185,15 +194,15 @@ public class TestJdbcConnectionTimeouts {
   void testUrlParameterMatchIsCaseSensitiveAndBoundaryAnchored() {
     Map<String, String> props = Maps.newHashMap();
     props.put(DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
-    // "ConnectTimeout" (wrong case) and "tunnelSocketTimeout" (substring) must NOT suppress the
-    // canonical keys, so both canonical timeouts are still injected.
-    String url = "jdbc:mysql://host:3306/db?ConnectTimeout=5000&tunnelSocketTimeout=6000";
+    // "ConnectTimeout" (wrong case) and "tunnelConnectTimeout" (substring) must NOT suppress the
+    // canonical key, so the canonical connect timeout is still injected.
+    String url = "jdbc:mysql://host:3306/db?ConnectTimeout=5000&tunnelConnectTimeout=6000";
     props.put(URL_KEY, url);
 
     Map<String, String> result = JdbcConnectionTimeouts.connectionProperties(config(props), url);
 
     Assertions.assertEquals("30000", result.get(CONNECT_TIMEOUT));
-    Assertions.assertEquals("30000", result.get(SOCKET_TIMEOUT));
+    Assertions.assertEquals(1, result.size());
   }
 
   @Test
@@ -207,7 +216,7 @@ public class TestJdbcConnectionTimeouts {
         JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
 
     Assertions.assertEquals("7500", result.get(CONNECT_TIMEOUT));
-    Assertions.assertEquals("7500", result.get(SOCKET_TIMEOUT));
+    Assertions.assertEquals(1, result.size());
   }
 
   @Test
@@ -218,6 +227,6 @@ public class TestJdbcConnectionTimeouts {
     Map<String, String> result = JdbcConnectionTimeouts.connectionProperties(config(props), null);
 
     Assertions.assertEquals("30", result.get(CONNECT_TIMEOUT));
-    Assertions.assertEquals("30", result.get(SOCKET_TIMEOUT));
+    Assertions.assertEquals(1, result.size());
   }
 }

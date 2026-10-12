@@ -96,6 +96,31 @@ public class TestJdbcCatalogPropertiesMetadata {
             .get(JdbcConfig.POOL_MAX_IDLE.getKey()));
   }
 
+  @Test
+  public void testConnectTimeoutSurvivesTransformProperties() {
+    // transformProperties only retains keys in the JDBC allowlist; the connect-timeout key must be
+    // on it, otherwise an operator-configured value is silently dropped and the catalog always uses
+    // the 30000 ms default (the production-path bug behind the create-time verification feature).
+    Map<String, String> createProperties =
+        ImmutableMap.<String, String>builder()
+            .put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:")
+            .put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC")
+            .put(JdbcConfig.USERNAME.getKey(), "user")
+            .put(JdbcConfig.PASSWORD.getKey(), "password")
+            .put(JdbcConfig.CONNECT_TIMEOUT_MS.getKey(), "7500")
+            .build();
+
+    Map<String, String> transformed =
+        new JdbcCatalogPropertiesMetadata().transformProperties(createProperties);
+
+    Assertions.assertEquals("7500", transformed.get(JdbcConfig.CONNECT_TIMEOUT_MS.getKey()));
+    Assertions.assertEquals(
+        7500L, new JdbcConfig(transformed).getConnectTimeoutMs(), "value must reach JdbcConfig");
+    Assertions.assertFalse(
+        new JdbcCatalogPropertiesMetadata()
+            .isHiddenProperty(JdbcConfig.CONNECT_TIMEOUT_MS.getKey()));
+  }
+
   /** Verifies the actual catalog configuration path for drivers without isValid support. */
   @ParameterizedTest
   @CsvSource({
