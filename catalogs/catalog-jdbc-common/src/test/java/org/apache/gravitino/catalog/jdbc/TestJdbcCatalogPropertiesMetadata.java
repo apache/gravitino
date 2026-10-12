@@ -60,11 +60,11 @@ public class TestJdbcCatalogPropertiesMetadata {
     Assertions.assertTrue(buildCatalog(ImmutableMap.of()).shouldValidateOnCreate());
     // Explicit true: verify.
     Assertions.assertTrue(
-        buildCatalog(ImmutableMap.of(Catalog.PROPERTY_VERIFY_ON_CREATE, "true"))
+        buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), "true"))
             .shouldValidateOnCreate());
     // Explicit false: skip.
     Assertions.assertFalse(
-        buildCatalog(ImmutableMap.of(Catalog.PROPERTY_VERIFY_ON_CREATE, "false"))
+        buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false"))
             .shouldValidateOnCreate());
   }
 

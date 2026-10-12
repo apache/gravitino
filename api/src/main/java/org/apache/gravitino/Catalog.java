@@ -137,16 +137,6 @@ public interface Catalog extends Auditable {
   String PROPERTY_IN_USE = "in-use";
 
   /**
-   * The property that gates create-time backend verification for relational JDBC catalogs. When it
-   * is {@code true} (the default, and when absent) such a catalog verifies that its backend is
-   * reachable at create time; setting it to {@code false} registers the catalog without that check,
-   * for a backend that is temporarily unavailable. It is a hidden, non-reserved property, so a
-   * caller may set it on the create request, and it is persisted on the catalog entity to record
-   * the choice. Non-JDBC catalogs ignore it.
-   */
-  String PROPERTY_VERIFY_ON_CREATE = "gravitino.catalog.verify-on-create";
-
-  /**
    * The property name for the catalog location. This property indicates the physical location of
    * the catalog's data, such as a file path or a URI.
    *

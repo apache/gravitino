@@ -66,11 +66,11 @@ persisted), and the caller receives a connection error that names the backend `h
 underlying driver message.
 
 To register a catalog whose backend is temporarily unavailable, set the hidden catalog property
-`gravitino.catalog.verify-on-create` to `false`, which skips the create-time check:
+`verify-on-create` to `false`, which skips the create-time check:
 
 ```json
 {
-  "gravitino.catalog.verify-on-create": "false"
+  "verify-on-create": "false"
 }
 ```
 
