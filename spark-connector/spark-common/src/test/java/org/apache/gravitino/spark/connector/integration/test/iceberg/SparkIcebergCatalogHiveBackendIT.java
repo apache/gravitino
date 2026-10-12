@@ -39,9 +39,7 @@ public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatal
         Assertions.assertThrows(
             UnsupportedOperationException.class, super::testAlterTableReplaceColumns);
     Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains("does not automatically reconcile external table renames"));
+        exception.getMessage().contains("does not automatically reconcile external table renames"));
   }
 
   @Override
