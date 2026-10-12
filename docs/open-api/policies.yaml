@@ -386,7 +386,11 @@ components:
       properties:
         supportedObjectTypes:
           type: array
-          description: The types of metadata objects this policy content can be applied to.
+          description: >-
+            Declares the metadata object types the policy's rules are intended for. The field
+            is not enforced: associating a policy does not check it, and object policy lookup
+            does not filter by it. Consumers decide whether a policy type applies to the
+            object they are processing.
           minItems: 1
           items:
             type: string
