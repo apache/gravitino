@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -83,10 +82,10 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   }
 
   /**
-   * Returns the effective {@link Catalog#PROPERTY_VERIFY_ON_CREATE verify-on-create} setting for
-   * this catalog. A relational JDBC catalog verifies its backend at create time by default; an
-   * administrator opts out by setting {@code gravitino.catalog.verify-on-create=false} to register
-   * a catalog whose backend is temporarily unavailable.
+   * Returns the effective {@link JdbcConfig#VERIFY_ON_CREATE verify-on-create} setting for this
+   * catalog. A relational JDBC catalog verifies its backend at create time by default; an
+   * administrator opts out by setting {@code verify-on-create=false} to register a catalog whose
+   * backend is temporarily unavailable.
    *
    * @return {@code true} to verify the backend at create (default); {@code false} to skip the check
    */
@@ -96,7 +95,7 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     if (properties == null) {
       return true;
     }
-    return Boolean.parseBoolean(properties.getOrDefault(Catalog.PROPERTY_VERIFY_ON_CREATE, "true"));
+    return new JdbcConfig(properties).getVerifyOnCreate();
   }
 
   /**

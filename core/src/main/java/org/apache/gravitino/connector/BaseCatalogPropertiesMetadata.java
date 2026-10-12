@@ -23,7 +23,6 @@ import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
-import static org.apache.gravitino.Catalog.PROPERTY_VERIFY_ON_CREATE;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -100,15 +99,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   PROPERTY_METALAKE_IN_USE,
                   "The property indicating the metalake that holds the catalog is in use",
                   true /* default value */,
-                  true /* hidden */),
-              PropertyEntry.booleanPropertyEntry(
-                  PROPERTY_VERIFY_ON_CREATE,
-                  "Whether a relational JDBC catalog verifies its backend is reachable at create time",
-                  false /* required */,
-                  false /* immutable */,
-                  true /* default value */,
-                  true /* hidden */,
-                  false /* reserved */)),
+                  true /* hidden */)),
           PropertyEntry::getName);
 
   @Override
