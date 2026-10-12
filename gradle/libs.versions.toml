@@ -79,7 +79,7 @@ spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
 spark40 = "4.0.3"
-kyuubi4spark = "1.11.0"
+kyuubi4spark = "1.12.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
 # Trino version the iceberg-rest-trino-it module's in-process query runner is tested against.

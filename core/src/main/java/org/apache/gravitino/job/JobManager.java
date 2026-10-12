@@ -54,6 +54,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -516,11 +517,11 @@ public class JobManager implements JobOperationDispatcher {
           e);
     }
 
-    // Create a JobTemplate by replacing the template parameters with the jobConf values, and
-    // also downloading any necessary files from the URIs specified in the job template.
+    // Create a JobTemplate by replacing the template parameters with the jobConf values. Its
+    // resources are kept as URIs, the job executor decides how to handle them.
     JobTemplate jobTemplate;
     try {
-      jobTemplate = jobTemplateResolver.resolve(jobConf, jobStagingDir);
+      jobTemplate = jobTemplateResolver.resolve(jobConf);
     } catch (RuntimeException e) {
       deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw e;
@@ -548,7 +549,8 @@ public class JobManager implements JobOperationDispatcher {
     // Submit the job template to the job executor
     String jobExecutionId;
     try {
-      jobExecutionId = jobExecutor.submitJob(jobTemplate);
+      jobExecutionId =
+          jobExecutor.submitJob(new JobContext(jobId, metalake, jobStagingDir), jobTemplate);
     } catch (IllegalArgumentException e) {
       // The job executor rejects the job because it cannot be launched, for example, a required
       // configuration is missing. Rethrow it as is so the caller gets the original reason.
@@ -557,7 +559,10 @@ public class JobManager implements JobOperationDispatcher {
     } catch (Exception e) {
       deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw new RuntimeException(
-          String.format("Failed to submit job template %s for execution", jobTemplate), e);
+          String.format(
+              "Failed to submit job %s of job template %s for execution: %s",
+              jobId, jobTemplateName, e.getMessage()),
+          e);
     }
 
     // Create a new JobEntity to represent the job

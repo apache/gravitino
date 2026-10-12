@@ -43,6 +43,8 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.dataformat.yaml)
   implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino

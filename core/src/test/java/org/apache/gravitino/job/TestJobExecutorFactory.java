@@ -31,6 +31,7 @@ import javax.tools.ToolProvider;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -162,16 +163,68 @@ public class TestJobExecutorFactory {
         () -> JobExecutorFactory.checkJobExecutorClass(String.class));
   }
 
+  @Test
+  public void testJobExecutorBuiltAgainstPreviousSpiStillSubmitsJobs() throws Exception {
+    // A job executor plugin built before submitJob(JobContext, JobTemplate) was added implements
+    // the then-abstract submitJob(JobTemplate). It must still be accepted, and receive the jobs
+    // localized by the default submitJob(JobContext, JobTemplate).
+    Class<?> previousJobExecutorClass = compileAgainstPreviousSubmitSpi();
+    try {
+      Assertions.assertDoesNotThrow(
+          () -> JobExecutorFactory.checkJobExecutorClass(previousJobExecutorClass));
+
+      JobExecutor previousJobExecutor =
+          (JobExecutor) previousJobExecutorClass.getDeclaredConstructor().newInstance();
+      File script = new File(testDir, "run.sh");
+      Assertions.assertTrue(script.createNewFile());
+      File jobDir = new File(testDir, "job");
+      Assertions.assertTrue(jobDir.mkdirs());
+      JobTemplate jobTemplate =
+          ShellJobTemplate.builder()
+              .withName("shell_job")
+              .withExecutable(script.getAbsolutePath())
+              .build();
+
+      String executionId =
+          previousJobExecutor.submitJob(new JobContext(1L, "metalake", jobDir), jobTemplate);
+      Assertions.assertEquals(new File(jobDir, "run.sh").getAbsolutePath(), executionId);
+    } finally {
+      ((URLClassLoader) previousJobExecutorClass.getClassLoader()).close();
+    }
+  }
+
+  @Test
+  public void testRejectLocalJobExecutorSubclassOverridingDeprecatedSubmitJob() {
+    Assertions.assertDoesNotThrow(
+        () -> JobExecutorFactory.checkJobExecutorClass(CustomLocalJobExecutor.class));
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobExecutorFactory.checkJobExecutorClass(LegacyLocalJobExecutor.class));
+    Assertions.assertTrue(e.getMessage().contains("LocalJobExecutor"), e.getMessage());
+  }
+
+  @Test
+  public void testRejectJobExecutorWithoutSubmitJob() {
+    // Either submit method is enough: the old one through the default of the new one.
+    Assertions.assertDoesNotThrow(
+        () -> JobExecutorFactory.checkJobExecutorClass(RecordingJobExecutor.class));
+    Assertions.assertDoesNotThrow(
+        () -> JobExecutorFactory.checkJobExecutorClass(ContextJobExecutor.class));
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JobExecutorFactory.checkJobExecutorClass(NoSubmitJobExecutor.class));
+    Assertions.assertTrue(e.getMessage().contains("submitJob"), e.getMessage());
+  }
+
   // Compiles a job executor against the SPI as it was before getJobExecutionInfo was added, and
   // loads it against the current SPI, like a plugin jar built for an older Gravitino version.
   private Class<?> compileAgainstOldSpi() throws IOException {
-    File sourceDir = new File(testDir, "old-spi-src");
-    File classDir = new File(testDir, "old-spi-classes");
-    Assertions.assertTrue(classDir.mkdirs());
-
-    File oldSpi = new File(sourceDir, "org/apache/gravitino/connector/job/JobExecutor.java");
-    FileUtils.writeStringToFile(
-        oldSpi,
+    return compileAgainstSpi(
+        "old-spi",
         String.join(
             "\n",
             "package org.apache.gravitino.connector.job;",
@@ -184,10 +237,7 @@ public class TestJobExecutorFactory {
             "  JobHandle.Status getJobStatus(String jobId);",
             "  void cancelJob(String jobId);",
             "}"),
-        StandardCharsets.UTF_8);
-    File oldExecutor = new File(sourceDir, "com/example/OldJobExecutor.java");
-    FileUtils.writeStringToFile(
-        oldExecutor,
+        "OldJobExecutor",
         String.join(
             "\n",
             "package com.example;",
@@ -203,8 +253,55 @@ public class TestJobExecutorFactory {
             "  }",
             "  public void cancelJob(String jobId) {}",
             "  public void close() {}",
+            "}"));
+  }
+
+  // Compiles a job executor against the SPI as it was before submitJob(JobContext, JobTemplate) was
+  // added, where submitJob(JobTemplate) was abstract. Its submitJob returns the executable it gets.
+  private Class<?> compileAgainstPreviousSubmitSpi() throws IOException {
+    return compileAgainstSpi(
+        "previous-submit-spi",
+        String.join(
+            "\n",
+            "package org.apache.gravitino.connector.job;",
+            "import java.util.Map;",
+            "import org.apache.gravitino.job.JobTemplate;",
+            "public interface JobExecutor extends java.io.Closeable {",
+            "  void initialize(Map<String, String> configs);",
+            "  String submitJob(JobTemplate jobTemplate);",
+            "  JobExecutionInfo getJobExecutionInfo(String jobId);",
+            "  void cancelJob(String jobId);",
             "}"),
-        StandardCharsets.UTF_8);
+        "PreviousJobExecutor",
+        String.join(
+            "\n",
+            "package com.example;",
+            "import java.util.Map;",
+            "import org.apache.gravitino.connector.job.JobExecutionInfo;",
+            "import org.apache.gravitino.connector.job.JobExecutor;",
+            "import org.apache.gravitino.job.JobTemplate;",
+            "public class PreviousJobExecutor implements JobExecutor {",
+            "  public void initialize(Map<String, String> configs) {}",
+            "  public String submitJob(JobTemplate jobTemplate) { return jobTemplate.executable(); }",
+            "  public JobExecutionInfo getJobExecutionInfo(String jobId) { return null; }",
+            "  public void cancelJob(String jobId) {}",
+            "  public void close() {}",
+            "}"));
+  }
+
+  // Compiles the job executor com.example.<executorName> against the given SPI source, and loads it
+  // against the current SPI, like a plugin jar built for an older Gravitino version.
+  private Class<?> compileAgainstSpi(
+      String name, String spiSource, String executorName, String executorSource)
+      throws IOException {
+    File sourceDir = new File(testDir, name + "-src");
+    File classDir = new File(testDir, name + "-classes");
+    Assertions.assertTrue(classDir.mkdirs());
+
+    File spi = new File(sourceDir, "org/apache/gravitino/connector/job/JobExecutor.java");
+    FileUtils.writeStringToFile(spi, spiSource, StandardCharsets.UTF_8);
+    File executor = new File(sourceDir, "com/example/" + executorName + ".java");
+    FileUtils.writeStringToFile(executor, executorSource, StandardCharsets.UTF_8);
 
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     Assertions.assertNotNull(compiler, "The tests must run on a JDK");
@@ -217,8 +314,8 @@ public class TestJobExecutorFactory {
             System.getProperty("java.class.path"),
             "-d",
             classDir.getAbsolutePath(),
-            oldSpi.getAbsolutePath(),
-            oldExecutor.getAbsolutePath());
+            spi.getAbsolutePath(),
+            executor.getAbsolutePath());
     Assertions.assertEquals(0, result);
 
     // Only the plugin class is loaded from the compiled classes: the class loader delegates to its
@@ -227,7 +324,7 @@ public class TestJobExecutorFactory {
         new URLClassLoader(
             new URL[] {classDir.toURI().toURL()}, TestJobExecutorFactory.class.getClassLoader());
     try {
-      return classLoader.loadClass("com.example.OldJobExecutor");
+      return classLoader.loadClass("com.example." + executorName);
     } catch (ClassNotFoundException e) {
       classLoader.close();
       throw new IOException(e);
@@ -237,7 +334,19 @@ public class TestJobExecutorFactory {
   /** A user's subclass of the local job executor, inheriting its initialization. */
   public static class CustomLocalJobExecutor extends LocalJobExecutor {}
 
+  // Overrides the deprecated submit method, which LocalJobExecutor no longer calls.
+  @SuppressWarnings("deprecation")
+  public static class LegacyLocalJobExecutor extends LocalJobExecutor {
+    @Override
+    public String submitJob(JobTemplate jobTemplate) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
   /** A job executor that only records the configurations it's initialized with. */
+  // Implements the deprecated submitJob(JobTemplate), like a job executor built for an earlier
+  // version of Gravitino.
+  @SuppressWarnings("deprecation")
   public static class RecordingJobExecutor implements JobExecutor {
 
     private Map<String, String> configs;
@@ -251,6 +360,33 @@ public class TestJobExecutorFactory {
     public String submitJob(JobTemplate jobTemplate) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException {
+      throw new NoSuchJobException("No job found with ID: %s", jobId);
+    }
+
+    @Override
+    public void cancelJob(String jobId) throws NoSuchJobException {
+      throw new NoSuchJobException("No job found with ID: %s", jobId);
+    }
+
+    @Override
+    public void close() {}
+  }
+
+  public static class ContextJobExecutor extends NoSubmitJobExecutor {
+
+    @Override
+    public String submitJob(JobContext context, JobTemplate jobTemplate) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public static class NoSubmitJobExecutor implements JobExecutor {
+
+    @Override
+    public void initialize(Map<String, String> configs) {}
 
     @Override
     public JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException {

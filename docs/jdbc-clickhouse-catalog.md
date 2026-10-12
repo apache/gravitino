@@ -46,6 +46,9 @@ Use your staging validation results and the official ClickHouse documentation as
 
 ### Catalog Properties
 
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
+
 Pass any JDBC pool property that Gravitino does not define by adding the `gravitino.bypass.` prefix (for example `gravitino.bypass.maxWaitMillis`). See [commons-dbcp configuration](https://commons.apache.org/proper/commons-dbcp/configuration.html) for details.
 
 When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`, and `jdbc-password`. Common catalog properties are listed [here](./gravitino-server-config.md#catalog-properties-configuration); ClickHouse adds no extra catalog-scoped keys.
@@ -175,7 +178,7 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
 | Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; `PARTITION BY` supports single-column identity and the function expressions listed below. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, `DATA_SKIPPING_SET`, `DATA_SKIPPING_NGRAMBFV1`, `DATA_SKIPPING_TOKENBFV1`, and `DATA_SKIPPING_VECTOR_SIMILARITY` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, `DATA_SKIPPING_SET`, `DATA_SKIPPING_NGRAMBFV1`, `DATA_SKIPPING_TOKENBFV1`, and `DATA_SKIPPING_VECTOR_SIMILARITY` (configurable granularity via `Index.properties()`). Legacy `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` definitions can be read as metadata only.                                                                                                                                                                |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine and connector-owned property changes after creation; mixing table setting changes with schema changes; auto-increment columns.                                                                                                                                                                                                                                                                                                                                    |
@@ -300,9 +303,15 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
 
   When adding a data-skipping index to an existing table through Gravitino's `ALTER TABLE ADD INDEX`, existing data parts are not synchronously backfilled, and Gravitino does not issue a materialization command. To materialize the index on existing data, run `ALTER TABLE <table> MATERIALIZE INDEX <index_name>` directly in ClickHouse. This can take time, especially for vector indexes; ClickHouse may also materialize indexes during later background merges, depending on its settings.
 
+  - Legacy `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` metadata read from ClickHouse versions that expose these definitions. Their reported type expression is retained in `clickhouse_type_full`.
+  - Annoy parameters are exposed as `annoy_distance_function` (`L2Distance` or `cosineDistance`) and `annoy_trees`. USearch parameters are exposed as `usearch_distance_function` (`L2Distance` or `cosineDistance`) and `usearch_scalar_kind` (`f64`, `f32`, `f16`, or `i8`). Only parameters present in the reported expression are materialized; omitted parameters are not inferred. Empty parameter lists and bare legacy type names are valid metadata forms.
+  - These index types are metadata-only: Gravitino rejects CREATE TABLE definitions, ALTER TABLE ADD INDEX requests, and table recreation that use them. They do not provide insert or vector-search support. Gravitino does not automatically migrate them to `vector_similarity`; any migration must be explicit.
+
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
   On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
+  The legacy fallback query may return only the bare `annoy` or `usearch` type name. Gravitino preserves that reported name without a parsing warning; parameter properties remain absent because the server did not expose them.
 
   For `DATA_SKIPPING_VECTOR_SIMILARITY`, Gravitino restores parameters from the legacy `type` value when present. If the legacy value is bare and cannot provide the required parameters, the index is skipped with a warning.
 
@@ -310,16 +319,18 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
 
   ClickHouse data-skipping indexes whose field expressions cannot be represented as Gravitino field names, such as `lower(name)` or `name + 1`, are skipped with a warning when the table is loaded and are not recreated. Direct column references and tuples containing only column references remain supported.
 
+  ClickHouse legacy Annoy and USearch indexes with unrepresentable field expressions are also omitted with an explicit warning. The Gravitino index API does not represent arbitrary index expressions.
+
 ### Partitioning, Sorting, and Distribution
 
 - `ORDER BY`: required for MergeTree-family engines and only columns identity are supported;
    - Accept format: `id`, `(id, name)`, `(func(id), name)`, `func(id)`;
    - Reject format: `(id + 1)`, `(func(id) + 1)`, etc.
 
-- `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at`, `PARTITION BY toYYYYMM(created_at)`, `PARTITION BY toStartOfWeek(created_at)`, and `PARTITION BY toStartOfMonth(created_at)` are supported, but `PARTITION BY (created_at + 1)` is not supported.
+- `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at`, `PARTITION BY toYYYYMM(created_at)`, `PARTITION BY toStartOfWeek(created_at)`, `PARTITION BY toStartOfMonth(created_at)`, `PARTITION BY toStartOfQuarter(created_at)`, and `PARTITION BY toStartOfYear(created_at)` are supported, but `PARTITION BY (created_at + 1)` is not supported.
    In all, the following partitioning expressions are supported:
    - Identity: `PARTITION BY column_name`
-   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`, `PARTITION BY toStartOfWeek(column_name)`, and `PARTITION BY toStartOfMonth(column_name)`. Other function expressions are not supported as structured transforms.
+   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`, `PARTITION BY toStartOfWeek(column_name)`, `PARTITION BY toStartOfMonth(column_name)`, `PARTITION BY toStartOfQuarter(column_name)`, and `PARTITION BY toStartOfYear(column_name)`. Other function expressions are not supported as structured transforms.
    - `toStartOfWeek(column_name)` uses ClickHouse's default mode `0` (Sunday start) and the server timezone. Calls with an explicit mode or timezone are not structured.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
 

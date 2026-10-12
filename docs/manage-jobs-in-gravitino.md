@@ -44,8 +44,34 @@ a job runs. See [Placeholders](#placeholders).
 }
 ```
 
-`executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
-HTTP, HTTPS, FTP, and FTPS URLs.
+`executable` and `scripts` are fetched by the job executor. With the `local` job executor they must
+be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
+
+Each of them is fetched into the job's working directory under the file name of its path, so it
+must point to a file, and two different resources of a template must not share a file name: a run
+is rejected otherwise, instead of one file silently overwriting the other. The same applies to the
+`executable`, `jars`, `files` and `archives` of a Spark template.
+
+`executable` can also be a command name with no path, such as `python` or `bash`. Such a command is
+not fetched, it is looked up where the job runs: the `local` job executor looks it up on the `PATH`
+of the Gravitino server process, and setting `PATH` in `environments` doesn't change that. The
+scripts are still fetched next to it, into the job's working directory, so a template can run a
+script with an installed interpreter:
+
+```json
+{
+  "name": "python_report",
+  "jobType": "shell",
+  "executable": "python",
+  "arguments": ["report.py", "{{date}}"],
+  "scripts": ["https://repo.example.com/jobs/report.py"]
+}
+```
+
+A file name without a path, such as `run.sh`, is a command name too. Earlier versions fetched it as
+a file relative to the working directory of the Gravitino server; to run a file, write its absolute
+path or URI instead. To avoid running a different program than the one that was fetched, a run is
+rejected when a script has the same file name as a command-name `executable`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

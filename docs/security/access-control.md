@@ -209,7 +209,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
 | `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
-| `SELECT_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
+| `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
 | `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
@@ -281,7 +281,7 @@ return only the entries the caller is entitled to see, which for a metalake owne
 | Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
 | Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
-| Semantic Model | `CREATE_SEMANTIC_MODEL` | `SELECT_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
+| Semantic Model | `CREATE_SEMANTIC_MODEL` | `USE_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
 
 Testing a catalog connection follows the catalog row. Testing a catalog before it is created takes
 `CREATE_CATALOG`. Testing an existing catalog with its stored configuration takes `USE_CATALOG`, the
@@ -309,6 +309,16 @@ authorization behavior.
 
 The native View rename operation changes only the name within the existing schema and remains
 owner-only; it does not accept a target schema.
+
+Creating or importing a Semantic Model, or replacing its definition, validates every dataset source
+as a Table or supported logical View under the
+caller's permissions, including cross-catalog references within the request's metalake. Each lookup
+requires visibility of that source type before loading metadata. Primary-key, unique-key, and
+relationship columns must exist in the resolved source. Source existence and column validation also
+run when authorization is disabled. Access denial returns `403`, missing sources or columns return
+`400`, and source catalog connection failures return `502`. These checks do not authorize queries
+against the referenced data or interpret SQL expressions. A missing table in a catalog without View
+support is a missing source (`400`); no unsupported View lookup is attempted.
 
 #### Metalake Objects
 

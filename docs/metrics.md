@@ -77,8 +77,9 @@ gravitino_catalog_datasource_max_connections{provider="jdbc",metalake="test_meta
 The `entity-change-log` source exposes each server's change-log processing state through JMX and
 `/prometheus/metrics`. For example, `entity-change-log.record-lag` in the metrics registry becomes
 `entity_change_log_record_lag` in Prometheus. Gauges read only in-memory values; the poller samples
-the database tail once per cycle. If only the tail sample fails, delivery continues and the tail
-value remains at its last successful sample.
+the database tail on partial and empty polls, and at most once per `pollIntervalSecs` during
+a full-batch drain (including failed sample attempts). If only the tail sample fails, delivery
+continues and the tail value remains at its last successful sample.
 
 | Metric suffix                                                | Type and unit            | Meaning                                                                                                                                                     |
 | ------------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,7 +93,7 @@ value remains at its last successful sample.
 | `records-fetched-total`, `records-delivered-total`           | counter, records         | Rows fetched and rows delivered successfully to listeners; one row delivered to two listeners counts twice as delivered.                                    |
 | `records-delivered.<class>-total`                            | counter, records         | Successful deliveries by listener class. Lambda and anonymous listeners share the `anonymous` bucket.                                                       |
 | `records-applied-total`                                      | counter, invalidations   | Targeted entity-cache invalidations completed successfully; malformed rows and fallback clears do not count.                                                |
-| `batch-size-records`                                         | histogram, records       | Number of rows fetched per successful poll, including empty polls.                                                                                          |
+| `batch-size-records`                                         | histogram, records       | Number of rows fetched per successful poll, including empty polls. Polls at `pollBatchSize` mean the server is draining a backlog and polls again at once.  |
 | `poll-duration`                                              | timer, duration          | End-to-end poll-cycle duration.                                                                                                                             |
 | `invalidation-failures-total`, `fallback-clears-total`       | counter, failures/clears | Failed targeted entity-cache invalidations and successful full-cache recovery clears.                                                                       |
 
@@ -102,9 +103,11 @@ recover locally; its failure counter and log identify the affected listener. The
 row was added to the current transaction, not that the transaction committed.
 
 For an incident, check `seconds-since-last-successful-tail-sample` before comparing `db-tail-id`
-with `cursor-id` on the affected server. If it exceeds the poll interval, the tail sample itself is
-failing: the retained tail can fall below an advancing cursor and `record-lag` can read zero despite
-an unknown database tail. `tail-sample-failures-total` counts those failures for alerting. With a
+with `cursor-id` on the affected server. If it substantially exceeds the normal sampling interval,
+investigate slow or failed polling and tail sampling; `tail-sample-failures-total` counts actual
+sample failures. Between samples, an advancing cursor can pass the retained tail, so `record-lag`
+can read zero even while full batches remain. Use `batch-size-records` at `pollBatchSize` as the
+backlog signal rather than treating zero sampled lag as proof that the poller has caught up. With a
 fresh tail sample, a growing `record-lag` together with an increasing poll age or
 `poll-failures-total` points to polling trouble.
 If the cursor advances but data remains stale, inspect `listener-failures-total`, `records-delivered.<class>-total`,
