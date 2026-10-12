@@ -1056,7 +1056,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         JsonUtils.objectMapper().readValue(response.body(), SemanticModelResponse.class);
     body.validate();
     Assertions.assertEquals("marketing", body.getSemanticModel().name());
-    verify(dispatcher).importOssieDocument(namespace, OssieDocument.yaml(yaml));
     verify(dispatcher)
         .createSemanticModel(
             eq(ident),

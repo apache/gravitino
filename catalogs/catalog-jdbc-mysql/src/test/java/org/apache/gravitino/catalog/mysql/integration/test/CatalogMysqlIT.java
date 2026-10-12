@@ -536,6 +536,75 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testColumnDefaultValueWithDatetimePrecision() {
+    // MySQL rejects `DATETIME(6) DEFAULT CURRENT_TIMESTAMP`: once a column declares a fractional
+    // seconds precision, CURRENT_TIMESTAMP has to carry the same one.
+    Column col1 =
+        Column.of(
+            "col_1",
+            Types.TimestampType.withoutTimeZone(6),
+            "col_1_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column col2 =
+        Column.of(
+            "col_2",
+            Types.TimestampType.withTimeZone(3),
+            "col_2_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column col3 =
+        Column.of(
+            "col_3",
+            Types.TimestampType.withoutTimeZone(),
+            "col_3_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(tableIdent, new Column[] {col1, col2, col3}, null, ImmutableMap.of());
+
+    // An added column is rendered the same way as the ones above.
+    Column col4 =
+        Column.of(
+            "col_4",
+            Types.TimestampType.withoutTimeZone(6),
+            "col_4_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    tableCatalog.alterTable(
+        tableIdent,
+        TableChange.addColumn(
+            new String[] {col4.name()},
+            col4.dataType(),
+            col4.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col4.nullable(),
+            col4.autoIncrement(),
+            col4.defaultValue()));
+
+    Table createdTable = tableCatalog.loadTable(tableIdent);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), createdTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(3), createdTable.columns()[1].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(0), createdTable.columns()[2].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), createdTable.columns()[3].dataType());
+    for (Column column : createdTable.columns()) {
+      Assertions.assertEquals(
+          DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue(), column.name());
+    }
+  }
+
+  @Test
   // MySQL support column default value expression after 8.0.13
   // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("SupportColumnDefaultValueExpression")
