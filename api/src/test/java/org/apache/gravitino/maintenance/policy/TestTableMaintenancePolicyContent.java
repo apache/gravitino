@@ -65,14 +65,20 @@ public class TestTableMaintenancePolicyContent {
   }
 
   @Test
-  void testRejectsOnCommitForOrphanCleanup() {
-    TableMaintenanceSchedule schedule = new TableMaintenanceSchedule(true, null);
+  void testRejectsEmptySchedule() {
+    TableMaintenanceSchedule schedule = new TableMaintenanceSchedule(false, null);
 
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> schedule.validate(TableMaintenanceTaskType.ORPHAN_CLEANUP));
-    Assertions.assertTrue(ex.getMessage().contains("onCommit"));
+            () -> schedule.validate(TableMaintenanceTaskType.COMPACTION));
+    Assertions.assertTrue(ex.getMessage().contains("schedule"));
+  }
+
+  @Test
+  void testCompactionAllowsOnCommit() {
+    TableMaintenanceSchedule schedule = new TableMaintenanceSchedule(true, null);
+    Assertions.assertDoesNotThrow(() -> schedule.validate(TableMaintenanceTaskType.COMPACTION));
   }
 
   @Test

@@ -334,9 +334,20 @@ components:
           items:
             $ref: "#/components/schemas/TagForPolicyAssociation"
 
+    TableMaintenanceSchedule:
+      type: object
+      description: Optional TMS evaluate triggers for table maintenance (onCommit and/or crontab).
+      properties:
+        onCommit:
+          type: boolean
+          description: When true, IRC commit paths may enqueue maintenance for this policy type.
+        crontab:
+          type: string
+          description: Quartz-style cron expression for scheduled evaluation. At least one of onCommit or crontab must be set when schedule is present.
+
     IcebergCompactionContent:
       type: object
-      description: Built-in Iceberg compaction thresholds, scoring weights, and job options.
+      description: Built-in Iceberg compaction thresholds, scoring weights, job options, and optional TMS fields.
       properties:
         minDataFileMse:
           type: integer
@@ -363,10 +374,33 @@ components:
           format: int64
           minimum: 1
           default: 50
+        rewriteStrategy:
+          type: string
+          enum: [binpack, sort]
+          default: binpack
+          description: Iceberg rewrite_data_files top-level strategy.
+        sortOrder:
+          type: string
+          default: ""
+          description: Iceberg rewrite_data_files top-level sort_order. Required when rewriteStrategy is sort; must be empty for binpack.
         rewriteOptions:
           type: object
           default: {}
-          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
+          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix. Credential-shaped keys are rejected.
+          additionalProperties:
+            type: string
+            minLength: 1
+        schedule:
+          $ref: '#/components/schemas/TableMaintenanceSchedule'
+        minIntervalMs:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Minimum interval in milliseconds between finished runs for this policy type. Overrides server default when set.
+        jobOptions:
+          type: object
+          default: {}
+          description: Non-sensitive Spark / Iceberg REST client properties for TMS jobs. Credential-shaped keys are rejected.
           additionalProperties:
             type: string
             minLength: 1

@@ -284,12 +284,6 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
     }
   }
 
-  @Override
-  public PolicyEntity[] listDirectPolicyInfosForMetadataObject(
-      String metalake, MetadataObject metadataObject) {
-    return dispatcher.listDirectPolicyInfosForMetadataObject(metalake, metadataObject);
-  }
-
   private PolicyInfo toPolicyInfo(PolicyEntity policy) {
     return new PolicyInfo(
         policy.name(),

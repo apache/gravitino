@@ -19,8 +19,6 @@
 package org.apache.gravitino.maintenance.policy;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -30,9 +28,9 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 /**
  * Selects the nearest attached maintenance policy of a given task type for a metadata object.
  *
- * <p>Direct associations on the object are preferred over ancestors (table before schema before
- * catalog). Tag-selected policies are considered only when no direct or inherited direct
- * association matches at any level.
+ * <p>Policies are resolved from effective tag associations via {@link
+ * PolicyDispatcher#listPolicyInfosForMetadataObject}. Non-inherited matches are preferred over
+ * inherited ones. Direct policy–object bindings can be layered in once that storage exists.
  */
 public class NearestMaintenancePolicyResolver {
 
@@ -61,37 +59,24 @@ public class NearestMaintenancePolicyResolver {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     Preconditions.checkNotNull(taskType, "taskType cannot be null");
 
-    List<MetadataObject> resolutionOrder = new ArrayList<>();
-    resolutionOrder.add(metadataObject);
-    resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
-
-    for (MetadataObject object : resolutionOrder) {
-      PolicyEntity[] direct =
-          policyDispatcher.listDirectPolicyInfosForMetadataObject(metalake, object);
-      for (PolicyEntity policy : direct) {
-        if (matchesTaskType(policy, taskType)) {
-          return Optional.of(policy);
-        }
-      }
-    }
-
     PolicyEntity[] effective =
         policyDispatcher.listPolicyInfosForMetadataObject(metalake, metadataObject);
+    PolicyEntity inheritedMatch = null;
     for (PolicyEntity policy : effective) {
-      if (matchesTaskType(policy, taskType)) {
+      if (!matchesTaskType(policy, taskType)) {
+        continue;
+      }
+      if (!policy.inherited().orElse(false)) {
         return Optional.of(policy);
       }
+      if (inheritedMatch == null) {
+        inheritedMatch = policy;
+      }
     }
-    return Optional.empty();
+    return Optional.ofNullable(inheritedMatch);
   }
 
   private static boolean matchesTaskType(PolicyEntity policy, TableMaintenanceTaskType taskType) {
-    if (!policy.enabled()) {
-      return false;
-    }
-    if (taskType.builtInType() == null) {
-      return false;
-    }
-    return policy.policyType() == taskType.builtInType();
+    return policy.enabled() && policy.policyType() == taskType.builtInType();
   }
 }

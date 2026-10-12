@@ -260,16 +260,6 @@ public class PolicyManager implements PolicyDispatcher {
     return objectPolicyResolver.resolve(metalake, metadataObject);
   }
 
-  @Override
-  public PolicyEntity[] listDirectPolicyInfosForMetadataObject(
-      String metalake, MetadataObject metadataObject) {
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-    checkMetalake(NameIdentifier.of(metalake), entityStore);
-    // Direct policy-to-metadata-object relations are not stored on main yet; tag-based policies
-    // are returned from {@link #listPolicyInfosForMetadataObject}.
-    return new PolicyEntity[0];
-  }
-
   private PolicyEntity getPolicyWithoutLock(String metalake, String policyName) {
     try {
       return entityStore.get(

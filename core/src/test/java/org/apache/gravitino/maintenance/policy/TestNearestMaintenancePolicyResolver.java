@@ -74,20 +74,28 @@ public class TestNearestMaintenancePolicyResolver {
   }
 
   @Test
-  void testPrefersDirectTablePolicyOverCatalog() {
-    PolicyEntity tablePolicy = compactionPolicy("table-policy", 11L);
-    PolicyEntity catalogPolicy = compactionPolicy("catalog-policy", 22L);
+  void testPrefersNonInheritedPolicyOverInherited() {
+    PolicyEntity directPolicy = compactionPolicy("table-policy", 11L).copyWithInherited(false);
+    PolicyEntity inheritedPolicy = compactionPolicy("catalog-policy", 22L).copyWithInherited(true);
 
-    Mockito.when(dispatcher.listDirectPolicyInfosForMetadataObject(METALAKE, TABLE))
-        .thenReturn(new PolicyEntity[] {tablePolicy});
-    Mockito.when(dispatcher.listDirectPolicyInfosForMetadataObject(METALAKE, catalogParent()))
-        .thenReturn(new PolicyEntity[] {catalogPolicy});
     Mockito.when(dispatcher.listPolicyInfosForMetadataObject(METALAKE, TABLE))
-        .thenReturn(new PolicyEntity[] {catalogPolicy});
+        .thenReturn(new PolicyEntity[] {inheritedPolicy, directPolicy});
 
     PolicyEntity resolved =
         resolver.resolveNearest(METALAKE, TABLE, TableMaintenanceTaskType.COMPACTION).orElseThrow();
     Assertions.assertEquals(11L, resolved.id());
+  }
+
+  @Test
+  void testFallsBackToInheritedWhenNoDirectMatch() {
+    PolicyEntity inheritedPolicy = compactionPolicy("catalog-policy", 22L).copyWithInherited(true);
+
+    Mockito.when(dispatcher.listPolicyInfosForMetadataObject(METALAKE, TABLE))
+        .thenReturn(new PolicyEntity[] {inheritedPolicy});
+
+    PolicyEntity resolved =
+        resolver.resolveNearest(METALAKE, TABLE, TableMaintenanceTaskType.COMPACTION).orElseThrow();
+    Assertions.assertEquals(22L, resolved.id());
   }
 
   @Test
@@ -106,12 +114,11 @@ public class TestNearestMaintenancePolicyResolver {
                     1000L, 1L, 1L, 100L, 50L, ImmutableMap.of(), fields))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("u").withCreateTime(Instant.now()).build())
-            .build();
+            .build()
+            .copyWithInherited(false);
 
-    Mockito.when(dispatcher.listDirectPolicyInfosForMetadataObject(METALAKE, TABLE))
-        .thenReturn(new PolicyEntity[] {policy});
     Mockito.when(dispatcher.listPolicyInfosForMetadataObject(METALAKE, TABLE))
-        .thenReturn(new PolicyEntity[] {});
+        .thenReturn(new PolicyEntity[] {policy});
 
     EffectiveTableMaintenancePolicy effective =
         EffectiveTableMaintenancePolicy.resolve(
@@ -120,10 +127,6 @@ public class TestNearestMaintenancePolicyResolver {
 
     Assertions.assertEquals(42_000L, effective.minIntervalMs());
     Assertions.assertEquals(fields, effective.maintenanceFields());
-  }
-
-  private static MetadataObject catalogParent() {
-    return MetadataObjects.of(ImmutableList.of("cat"), MetadataObject.Type.CATALOG);
   }
 
   private static PolicyEntity compactionPolicy(String name, long id) {

@@ -29,9 +29,15 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `rewriteStrategy`        | No       | `binpack`           | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                       |
 | `sortOrder`              | No       | `""`                | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`.        |
 | `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                        |
+| `schedule`               | No       | unset               | TMS triggers: `onCommit` (boolean) and/or `crontab` (Quartz cron). At least one must be set when present.   |
+| `minIntervalMs`          | No       | server / code default | Cooldown in milliseconds between finished runs for this policy type.                                      |
+| `jobOptions`             | No       | `{}`                | Non-sensitive Spark / Iceberg REST client properties for TMS. Credential-shaped keys are rejected.          |
 
 `rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
 parameters separate from the `options` map.
+
+`schedule`, `minIntervalMs`, and `jobOptions` are optional Table Maintenance Service (TMS) fields. They are
+stored on the policy content alongside compaction thresholds and are distinct from `rewriteOptions`.
 
 ## Generated Rules and Properties
 

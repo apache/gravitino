@@ -101,6 +101,7 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -689,16 +690,31 @@ public class DTOConverters {
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
           (IcebergDataCompactionContent) policyContent;
-      return PolicyContentDTO.IcebergCompactionContentDTO.builder()
-          .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
-          .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
-          .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
-          .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
-          .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
-          .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
-          .withSortOrder(icebergCompactionContent.sortOrder())
-          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
-          .build();
+      PolicyContentDTO.IcebergCompactionContentDTO.IcebergCompactionContentDTOBuilder builder =
+          PolicyContentDTO.IcebergCompactionContentDTO.builder()
+              .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
+              .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
+              .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
+              .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
+              .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+              .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
+              .withSortOrder(icebergCompactionContent.sortOrder())
+              .withRewriteOptions(icebergCompactionContent.rewriteOptions());
+      TableMaintenancePolicyFields maintenanceFields = icebergCompactionContent.maintenanceFields();
+      if (maintenanceFields != null && maintenanceFields.isPresent()) {
+        if (maintenanceFields.schedule() != null) {
+          builder.withSchedule(
+              PolicyContentDTO.TableMaintenanceScheduleDTO.builder()
+                  .withOnCommit(maintenanceFields.schedule().onCommit())
+                  .withCrontab(maintenanceFields.schedule().crontab())
+                  .build());
+        }
+        builder.withMinIntervalMs(maintenanceFields.minIntervalMs());
+        if (!maintenanceFields.jobOptions().isEmpty()) {
+          builder.withJobOptions(maintenanceFields.jobOptions());
+        }
+      }
+      return builder.build();
     }
 
     if (policyContent instanceof RowFilterContent) {
@@ -1576,7 +1592,8 @@ public class DTOConverters {
           icebergCompactionContentDTO.maxPartitionNum(),
           icebergCompactionContentDTO.rewriteStrategy(),
           icebergCompactionContentDTO.sortOrder(),
-          icebergCompactionContentDTO.rewriteOptions());
+          icebergCompactionContentDTO.rewriteOptions(),
+          icebergCompactionContentDTO.maintenanceFields());
     }
 
     if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {

@@ -25,8 +25,13 @@ import java.time.Instant;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicyFields;
+import org.apache.gravitino.maintenance.policy.TableMaintenanceSchedule;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -204,5 +209,32 @@ public class TestPolicyDTO {
     Assertions.assertTrue(contentDTO.maintenanceFields().schedule().onCommit());
     Assertions.assertEquals(7200000L, contentDTO.maintenanceFields().minIntervalMs());
     Assertions.assertDoesNotThrow(contentDTO::validate);
+  }
+
+  @Test
+  public void testIcebergCompactionMaintenanceFieldsDtoConvertersRoundTrip() {
+    TableMaintenancePolicyFields fields =
+        new TableMaintenancePolicyFields(
+            new TableMaintenanceSchedule(true, "0 1 * * *"),
+            7_200_000L,
+            ImmutableMap.of("uri", "http://irc:9001/iceberg"));
+    PolicyContent domain =
+        PolicyContents.icebergDataCompaction(
+            1000L,
+            1L,
+            2L,
+            150L,
+            99L,
+            "binpack",
+            "",
+            ImmutableMap.of("min-input-files", "1"),
+            fields);
+
+    PolicyContentDTO dto = DTOConverters.toDTO(domain);
+    PolicyContent restored = DTOConverters.fromDTO(dto);
+
+    Assertions.assertEquals(domain, restored);
+    IcebergDataCompactionContent content = (IcebergDataCompactionContent) restored;
+    Assertions.assertEquals(fields, content.maintenanceFields());
   }
 }

@@ -22,16 +22,15 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.policy.Policy;
 
-/** Maintenance task kinds driven by TMS policy content. */
+/**
+ * Maintenance task kinds driven by TMS policy content.
+ *
+ * <p>Only task types with a registered {@link Policy.BuiltInType} are listed. Add new values when
+ * the corresponding built-in policy type and content class land.
+ */
 public enum TableMaintenanceTaskType {
   /** Iceberg data file compaction. */
-  COMPACTION("compaction", Policy.BuiltInType.ICEBERG_COMPACTION, 3_600_000L, true),
-  /** Iceberg manifest rewrite (future built-in policy type). */
-  MANIFEST_REWRITE("manifest-rewrite", null, 3_600_000L, true),
-  /** Iceberg snapshot expiration (future built-in policy type). */
-  SNAPSHOT_EXPIRY("snapshot-expiry", null, 3_600_000L, true),
-  /** Orphan file cleanup (future built-in policy type). */
-  ORPHAN_CLEANUP("orphan-cleanup", null, 86_400_000L, false);
+  COMPACTION("compaction", Policy.BuiltInType.ICEBERG_COMPACTION, 3_600_000L, true);
 
   private final String configKey;
   private final Policy.BuiltInType builtInType;
@@ -59,9 +58,9 @@ public enum TableMaintenanceTaskType {
   }
 
   /**
-   * Returns the built-in policy type that carries this maintenance task, if registered.
+   * Returns the built-in policy type that carries this maintenance task.
    *
-   * @return built-in policy type or {@code null} when not yet wired
+   * @return built-in policy type
    */
   public Policy.BuiltInType builtInType() {
     return builtInType;
@@ -115,7 +114,7 @@ public enum TableMaintenanceTaskType {
       return null;
     }
     for (TableMaintenanceTaskType type : values()) {
-      if (type.builtInType != null && type.builtInType.policyType().equalsIgnoreCase(policyType)) {
+      if (type.builtInType.policyType().equalsIgnoreCase(policyType)) {
         return type;
       }
     }
