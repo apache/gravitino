@@ -48,13 +48,24 @@ Its inputs are:
 | Active roles                    | With role assumption, a request can narrow its ALLOW privileges to a subset of its roles. DENY always applies over all held roles.                                                                                               |
 | Ownership                       | `OWNER` is answered from the owner relation (`owner_meta`), not from role privileges.                                                                                                                                            |
 
-The decision rules are:
+The rules for a role-privilege check, that is, `authorize` or `deny` for a privilege other than `OWNER`, are:
 
 1. A `DENY` from **any** held role on `(O, P)` wins.
 2. Otherwise, an `ALLOW` from any **active** role on `(O, P)` grants access.
 3. Otherwise the check is denied. Callers walk parent scopes (metalake, catalog, schema chain, object) and stop at the first scope that grants.
 
-List endpoints filter every returned object through these rules. `hasDenyPolicy` is a list shortcut: if the caller holds no DENY for the relevant privileges at any scope, a parent-level ALLOW is enough and per-object checks can be skipped.
+These rules cover only the role-privilege branch of an authorization expression. Expressions combine it with paths that do not read role policies:
+
+| Path                  | Expression token                                     | Answered from                                                                                           |
+| --------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Ownership             | `OWNER`, `ANY(OWNER, ...)`, `TABLE::OWNER`           | The owner relation                                                                                      |
+| Service administrator | `SERVICE_ADMIN`                                      | The configured service administrators                                                                   |
+| Metalake membership   | `METALAKE_USER`                                      | The user's existence in the metalake                                                                    |
+| Self access           | `USER::SELF`, `GROUP::SELF`, `ROLE::SELF` (`isSelf`) | The principal's user name and groups; for a role, the caller's role membership, not the role's policies |
+
+For example, `LOAD_TABLE_AUTHORIZATION_EXPRESSION` starts with `ANY(OWNER, METALAKE, CATALOG) || ...`, so a catalog owner can load a table even when one of their roles denies `SELECT_TABLE`. `testHasMetadataPrivilegePermissionAllowsOwnerWithDenyManageGrants` keeps this behavior. This design does not change these paths.
+
+List endpoints evaluate the expression for every returned object, so each object goes through the role-privilege rules unless another path already grants it. `hasDenyPolicy` is a list shortcut: if the caller holds no DENY for the relevant privileges at any scope, a parent-level ALLOW is enough and per-object checks can be skipped.
 
 ### How JCasbin is used today
 
@@ -341,7 +352,7 @@ loadRolePrivilege(request):
     [write lock] release the RoleLoadStates
 ```
 
-Missing roles (no `role_meta` row, or `NoSuchEntityException`) are invalidated and skipped. Roles that cannot be read are recorded as unreadable; the view becomes unreadable and every new decision fails closed.
+Missing roles (no `role_meta` row, or `NoSuchEntityException`) are invalidated and skipped. Roles that cannot be read are recorded as unreadable; the view becomes unreadable and every new role-privilege decision fails closed. Ownership, service-administrator, metalake-membership, and self checks do not read the view, so they are unaffected.
 
 #### Evaluating a single check
 
