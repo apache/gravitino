@@ -67,7 +67,8 @@ public class IcebergSnapshotExpirationContent implements PolicyContent {
   @Override
   public Map<String, Object> rules() {
     Map<String, Object> rules = new LinkedHashMap<>();
-    rules.put(TRIGGER_EXPR_KEY, "true");
+    // Placeholders must not auto-trigger until real thresholds land in a follow-up.
+    rules.put(TRIGGER_EXPR_KEY, "false");
     rules.put(SCORE_EXPR_KEY, "1");
     return Collections.unmodifiableMap(rules);
   }
