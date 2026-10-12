@@ -77,8 +77,10 @@ public class K8sJobExecutorConfigs {
 
   /**
    * How many times a failed request to the API server is tried again, for example if the server
-   * can't be reached or answers with a server error. Together with the timeouts it bounds how long
-   * a submission, a status query or a cancellation waits while the job cluster is down.
+   * can't be reached, doesn't answer in time or answers with a server error. Each attempt waits for
+   * the timeouts again, so while the job cluster is down a submission, a status query or a
+   * cancellation waits up to 1 + retries times the connection timeout if the API server can't be
+   * reached, or the request timeout if it never answers.
    */
   public static final String REQUEST_RETRIES = "requestRetries";
 
@@ -222,6 +224,12 @@ public class K8sJobExecutorConfigs {
             + " text: %s",
         MASTER_URL,
         TOKEN_FILE,
+        masterUrl);
+    Preconditions.checkArgument(
+        masterUrl == null || https || caCertFile == null,
+        "%s has no effect on an http:// %s, which isn't verified nor encrypted: %s",
+        CA_CERT_FILE,
+        MASTER_URL,
         masterUrl);
 
     this.namespace = stringValue(configs, NAMESPACE, null);

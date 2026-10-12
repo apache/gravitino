@@ -151,6 +151,12 @@ public class TestK8sJobExecutorConfigs {
         "http://k8s:6443",
         K8sJobExecutorConfigs.TOKEN_FILE,
         "/token");
+    // A CA certificate would never be used with plain HTTP.
+    assertInvalid(
+        K8sJobExecutorConfigs.MASTER_URL,
+        "http://k8s:6443",
+        K8sJobExecutorConfigs.CA_CERT_FILE,
+        "/ca.crt");
     Map<String, String> http = new HashMap<>(requiredConfigs());
     http.put(K8sJobExecutorConfigs.MASTER_URL, "http://localhost:8001");
     Assertions.assertEquals("http://localhost:8001", new K8sJobExecutorConfigs(http).masterUrl());

@@ -152,14 +152,15 @@ public final class K8sClientUtils {
    * configurations, rather than the one of the kubeconfig context or of the pod Gravitino runs in.
    * The connection timeout, the request timeout and the number of request retries are the ones of
    * the job executor configurations too. They bound how long a call to the client waits while the
-   * job cluster is down. With the defaults that is about 15 seconds if the API server can't be
-   * reached, and up to about 30 seconds if it accepts the requests but never answers them, as a
-   * request that timed out is tried again too.
+   * job cluster is down: each of the 1 + retries attempts waits for the connection timeout if the
+   * API server can't be reached, and for the request timeout if it accepts the request but never
+   * answers. With the defaults that is about 15 and 30 seconds.
    *
    * @param configs the job executor configurations
    * @return the Kubernetes client configuration
    * @throws IllegalArgumentException if a configured file doesn't exist, the token file has no
-   *     token, or the kubeconfig has no context that selects a cluster with a server
+   *     token, the kubeconfig has no context that selects a cluster with a server, or the default
+   *     lookup finds no cluster at all
    */
   static Config createClientConfig(K8sJobExecutorConfigs configs) {
     Config config = createConnectionConfig(configs);
@@ -246,16 +247,25 @@ public final class K8sClientUtils {
             + " current-context or %s",
         K8sJobExecutorConfigs.CONTEXT);
 
-    // A context that selects a cluster with a server moves the client off its default API
-    // server. If it is still there, the context selects none.
+    // Both a context that selects a cluster with a server, and the environment of a pod, move
+    // the client off its default API server. If it is still there, the lookup found neither.
+    boolean foundServer =
+        !getHostAndPath(Config.DEFAULT_MASTER_URL).equals(getHostAndPath(config.getMasterUrl()));
     Preconditions.checkArgument(
-        current == null
-            || !getHostAndPath(Config.DEFAULT_MASTER_URL)
-                .equals(getHostAndPath(config.getMasterUrl())),
+        foundServer || current == null,
         "The context %s of the kubeconfig found by the default lookup selects no cluster with a"
             + " server. Fix that kubeconfig, or set %s or %s. To use the API server %s itself,"
             + " set it by %s",
         currentName,
+        K8sJobExecutorConfigs.KUBECONFIG,
+        K8sJobExecutorConfigs.MASTER_URL,
+        Config.DEFAULT_MASTER_URL,
+        K8sJobExecutorConfigs.MASTER_URL);
+    Preconditions.checkArgument(
+        foundServer,
+        "No Kubernetes cluster is configured: the default lookup found no kubeconfig, and"
+            + " Gravitino doesn't run in a pod. Set %s or %s. To use the API server %s itself,"
+            + " set it by %s",
         K8sJobExecutorConfigs.KUBECONFIG,
         K8sJobExecutorConfigs.MASTER_URL,
         Config.DEFAULT_MASTER_URL,

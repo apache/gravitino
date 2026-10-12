@@ -305,10 +305,26 @@ public class TestK8sClientUtils {
         Assertions.assertTrue(e.getMessage().contains("has no current context"), e.getMessage());
       }
 
-      // Without any kubeconfig, as in a pod, the lookup isn't rejected.
+      // Without any kubeconfig, and outside a pod, no cluster is configured at all.
       System.setProperty(property, dir.resolve("missing").toString());
-      Assertions.assertNotNull(
-          K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)));
+      Assertions.assertTrue(e.getMessage().contains("No Kubernetes cluster"), e.getMessage());
+
+      // In a pod, the kubelet sets the API server through these, which the client reads from
+      // the system properties first.
+      System.setProperty("KUBERNETES_SERVICE_HOST", "10.0.0.1");
+      System.setProperty("KUBERNETES_SERVICE_PORT", "443");
+      try {
+        Assertions.assertEquals(
+            "https://10.0.0.1:443/",
+            K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+      } finally {
+        System.clearProperty("KUBERNETES_SERVICE_HOST");
+        System.clearProperty("KUBERNETES_SERVICE_PORT");
+      }
     } finally {
       if (before == null) {
         System.clearProperty(property);
