@@ -49,7 +49,9 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -98,41 +100,90 @@ public class TestRelationalEntityStoreLockWaitTimeout {
   @Test
   void testDropWaitingOnHeldTableRowIsConflict() throws Exception {
     String jdbcUrl = initH2Store();
-    store.put(metalake(), false);
-    store.put(catalog(), false);
-    store.put(schema(), false);
-    TableEntity table = table();
-    store.put(table, false);
+    TableEntity table = createTable();
 
-    try (Connection holder = DriverManager.getConnection(jdbcUrl, USER, PASSWORD)) {
-      holder.setAutoCommit(false);
-      try (PreparedStatement statement =
-          holder.prepareStatement(
-              "SELECT table_id FROM table_meta WHERE table_id = ? FOR UPDATE")) {
-        statement.setLong(1, table.id());
-        try (ResultSet rs = statement.executeQuery()) {
-          Assertions.assertTrue(rs.next(), "the table row must exist to be held");
-        }
-      }
-
-      OptimisticLockException conflict =
-          Assertions.assertThrows(
-              OptimisticLockException.class,
-              () -> store.delete(TABLE_IDENT, Entity.EntityType.TABLE));
-      Assertions.assertTrue(
-          conflict.getMessage().contains("The table " + TABLE_IDENT), conflict.getMessage());
-      Assertions.assertTrue(conflict.getMessage().contains("retry"), conflict.getMessage());
-      SQLException timeout = findSqlException(conflict);
-      Assertions.assertNotNull(timeout, "the lock wait timeout stays attached for diagnosis");
-      Assertions.assertEquals(50200, timeout.getErrorCode());
-
-      holder.rollback();
-    }
+    OptimisticLockException conflict =
+        writeWhileRowHeld(
+            jdbcUrl,
+            "table_meta",
+            "table_id",
+            table.id(),
+            () -> store.delete(TABLE_IDENT, Entity.EntityType.TABLE));
+    Assertions.assertTrue(
+        conflict.getMessage().startsWith("The table " + TABLE_IDENT + " could not be changed"),
+        conflict.getMessage());
 
     // The failed drop was rolled back, so the table is still there and a retry succeeds.
     Assertions.assertTrue(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
     Assertions.assertTrue(store.delete(TABLE_IDENT, Entity.EntityType.TABLE));
     Assertions.assertFalse(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
+  }
+
+  /** An alter goes through the service's own SQL error conversion, which must keep the conflict. */
+  @Test
+  void testAlterWaitingOnHeldTableRowIsConflict() throws Exception {
+    String jdbcUrl = initH2Store();
+    TableEntity table = createTable();
+    NameIdentifier renamed = NameIdentifier.of(TABLE_IDENT.namespace(), "t1_renamed");
+
+    writeWhileRowHeld(
+        jdbcUrl,
+        "table_meta",
+        "table_id",
+        table.id(),
+        () -> store.update(TABLE_IDENT, TableEntity.class, Entity.EntityType.TABLE, this::rename));
+
+    Assertions.assertTrue(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
+    Assertions.assertFalse(store.exists(renamed, Entity.EntityType.TABLE));
+    store.update(TABLE_IDENT, TableEntity.class, Entity.EntityType.TABLE, this::rename);
+    Assertions.assertTrue(store.exists(renamed, Entity.EntityType.TABLE));
+  }
+
+  /** A create locks its parent row first, so it waits behind a write that holds the schema. */
+  @Test
+  void testCreateWaitingOnHeldSchemaRowIsConflict() throws Exception {
+    String jdbcUrl = initH2Store();
+    store.put(metalake(), false);
+    store.put(catalog(), false);
+    SchemaEntity schema = schema();
+    store.put(schema, false);
+    TableEntity table = table();
+
+    writeWhileRowHeld(
+        jdbcUrl, "schema_meta", "schema_id", schema.id(), () -> store.put(table, false));
+
+    Assertions.assertFalse(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
+    store.put(table, false);
+    Assertions.assertTrue(store.exists(TABLE_IDENT, Entity.EntityType.TABLE));
+  }
+
+  /**
+   * A tag association locks the table row first, as the issue's example of a table-scoped write.
+   */
+  @Test
+  void testTagAssociationWaitingOnHeldTableRowIsConflict() throws Exception {
+    String jdbcUrl = initH2Store();
+    TableEntity table = createTable();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag1")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    store.put(tag, false);
+    NameIdentifier[] tags = {tag.nameIdentifier()};
+
+    writeWhileRowHeld(jdbcUrl, "table_meta", "table_id", table.id(), () -> associateTags(tags));
+
+    Assertions.assertTrue(
+        store
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                TABLE_IDENT,
+                Entity.EntityType.TABLE)
+            .isEmpty());
+    Assertions.assertEquals(1, associateTags(tags).size());
   }
 
   /** Verifies every write of the store maps a lock wait timeout of the backend to a conflict. */
@@ -253,6 +304,69 @@ public class TestRelationalEntityStoreLockWaitTimeout {
             "batchDelete",
             () -> store.batchDelete(List.of(Pair.of(TABLE_IDENT, Entity.EntityType.TABLE)), false)),
         Pair.of("batchPut", () -> store.batchPut(List.of(table), true)));
+  }
+
+  private List<TagEntity> associateTags(NameIdentifier[] tags) throws IOException {
+    return store.updateEntityRelations(
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+        TABLE_IDENT,
+        Entity.EntityType.TABLE,
+        tags,
+        new NameIdentifier[0]);
+  }
+
+  private TableEntity rename(TableEntity table) {
+    return TableEntity.builder()
+        .withId(table.id())
+        .withName("t1_renamed")
+        .withNamespace(table.namespace())
+        .withColumns(table.columns())
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private TableEntity createTable() throws IOException {
+    store.put(metalake(), false);
+    store.put(catalog(), false);
+    store.put(schema(), false);
+    TableEntity table = table();
+    store.put(table, false);
+    return table;
+  }
+
+  /**
+   * Runs a write while another session holds a row with {@code SELECT ... FOR UPDATE}, and checks
+   * that the write fails as a conflict caused by H2's lock wait timeout.
+   */
+  private OptimisticLockException writeWhileRowHeld(
+      String jdbcUrl, String table, String idColumn, long id, Executable write)
+      throws SQLException {
+    try (Connection holder = DriverManager.getConnection(jdbcUrl, USER, PASSWORD)) {
+      holder.setAutoCommit(false);
+      try {
+        try (PreparedStatement statement =
+            holder.prepareStatement(
+                String.format(
+                    "SELECT %s FROM %s WHERE %s = ? FOR UPDATE", idColumn, table, idColumn))) {
+          statement.setLong(1, id);
+          try (ResultSet rs = statement.executeQuery()) {
+            Assertions.assertTrue(rs.next(), "the row must exist to be held");
+          }
+        }
+
+        OptimisticLockException conflict =
+            Assertions.assertThrows(OptimisticLockException.class, write);
+        Assertions.assertTrue(
+            conflict.getMessage().contains("lock wait timeout; retry the operation"),
+            conflict.getMessage());
+        SQLException timeout = findSqlException(conflict);
+        Assertions.assertNotNull(timeout, "the lock wait timeout stays attached for diagnosis");
+        Assertions.assertEquals(50200, timeout.getErrorCode());
+        return conflict;
+      } finally {
+        holder.rollback();
+      }
+    }
   }
 
   /** Creates a store whose backend fails every call with the given failure. */

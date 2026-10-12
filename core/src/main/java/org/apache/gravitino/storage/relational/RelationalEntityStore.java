@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -568,7 +569,11 @@ public class RelationalEntityStore
       return backend.batchDelete(entitiesToDelete, cascade);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(
-          re, String.format("The batch of %d entities", entitiesToDelete.size()));
+          re,
+          describeBatch(
+              entitiesToDelete.size(),
+              entitiesToDelete.isEmpty() ? null : entitiesToDelete.get(0).getRight(),
+              entitiesToDelete.isEmpty() ? null : entitiesToDelete.get(0).getLeft()));
     }
   }
 
@@ -579,8 +584,23 @@ public class RelationalEntityStore
       backend.batchPut(entities, overwritten);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(
-          re, String.format("The batch of %d entities", entities.size()));
+          re,
+          describeBatch(
+              entities.size(),
+              entities.isEmpty() ? null : entities.get(0).type(),
+              entities.isEmpty() ? null : entities.get(0).nameIdentifier()));
     }
+  }
+
+  /** Describes a batch write by its size and its first entity, for a conflict message. */
+  private static String describeBatch(
+      int size, @Nullable Entity.EntityType firstType, @Nullable NameIdentifier first) {
+    if (firstType == null) {
+      return String.format("The batch of %d entities", size);
+    }
+    return String.format(
+        "The batch of %d entities starting with %s %s",
+        size, firstType.name().toLowerCase(Locale.ROOT), first);
   }
 
   private void invalidateRelationTargetCache(

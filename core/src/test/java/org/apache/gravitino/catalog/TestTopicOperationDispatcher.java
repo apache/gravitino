@@ -50,6 +50,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.messaging.Topic;
@@ -259,6 +260,25 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+  }
+
+  @Test
+  public void testDropTopicPropagatesOptimisticLockConflict() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_drop_topic_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_occ");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+    } finally {
+      reset(entityStore);
+    }
   }
 
   @Test

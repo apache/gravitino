@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.SQLException;
@@ -109,5 +110,22 @@ public class TestExceptionUtils {
     PersistenceException deadlock =
         new PersistenceException(new SQLException("MySQL deadlock", "40001", 1213));
     assertSame(deadlock, ExceptionUtils.lockWaitTimeoutAsConflict(deadlock, "The table t1"));
+  }
+
+  @Test
+  public void testCheckSQLExceptionReportsLockWaitTimeoutAsConflict() {
+    // Services call checkSQLException before the store sees the failure, so the timeout must be
+    // classified here; the backend converter would turn it into an IOException.
+    PersistenceException timeout =
+        new PersistenceException(new SQLException("MySQL lock wait timeout", "40001", 1205));
+    OptimisticLockException conflict =
+        assertThrows(
+            OptimisticLockException.class,
+            () ->
+                ExceptionUtils.checkSQLException(timeout, Entity.EntityType.TABLE, "m1.c1.s1.t1"));
+    assertSame(timeout, conflict.getCause());
+    assertTrue(
+        conflict.getMessage().startsWith("The table m1.c1.s1.t1 could not be changed"),
+        conflict.getMessage());
   }
 }

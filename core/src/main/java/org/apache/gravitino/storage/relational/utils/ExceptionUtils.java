@@ -40,8 +40,26 @@ public class ExceptionUtils {
 
   private ExceptionUtils() {}
 
+  /**
+   * Converts a failure of a write whose cause is a {@link SQLException} into the matching Gravitino
+   * exception. A lock wait timeout becomes an {@link OptimisticLockException}, see {@link
+   * #lockWaitTimeoutAsConflict(RuntimeException, String)}. It is classified here, before the
+   * backend converter, because the converter reports an unrecognised SQL error as an {@link
+   * IOException}, which callers turn into an internal error.
+   *
+   * @param re The failure of the write.
+   * @param type The type of the entity being written.
+   * @param entityName The name of the entity being written.
+   * @throws IOException If the SQL error has no more specific mapping.
+   */
   public static void checkSQLException(
       RuntimeException re, Entity.EntityType type, String entityName) throws IOException {
+    RuntimeException conflict =
+        lockWaitTimeoutAsConflict(
+            re, String.format("The %s %s", type.name().toLowerCase(Locale.ROOT), entityName));
+    if (conflict != re) {
+      throw conflict;
+    }
     if (re.getCause() instanceof SQLException) {
       SQLExceptionConverterFactory.getConverter()
           .toGravitinoException((SQLException) re.getCause(), type, entityName);
