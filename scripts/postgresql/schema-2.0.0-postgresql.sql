@@ -1193,7 +1193,7 @@ CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_
 CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
 COMMENT ON TABLE table_maintenance_action IS 'table maintenance action occupancy and run metadata';
 COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
-COMMENT ON COLUMN table_maintenance_action.job_id IS 'optional job run id mapped to job_run_meta.job_run_id; null until bound after runJob';
+COMMENT ON COLUMN table_maintenance_action.job_id IS 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob';
 COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';

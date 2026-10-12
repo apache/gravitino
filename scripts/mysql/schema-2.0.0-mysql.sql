@@ -670,7 +670,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'optional job run id mapped to job_run_meta.job_run_id; null until bound after runJob',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',

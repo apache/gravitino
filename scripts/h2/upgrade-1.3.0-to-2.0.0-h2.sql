@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
-    `job_id` BIGINT COMMENT 'optional job run id mapped to job_run_meta.job_run_id; null until bound after runJob',
+    `job_id` BIGINT COMMENT 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
