@@ -167,9 +167,9 @@ build script runs. Removing it outright risks breaking any tooling (IDE run butt
 that targets `:<module>:test` by convention across the whole repo, not just `core`. Instead its
 `tasks.test { ... }` configuration block gained a `doFirst` that logs a warning naming the four
 lanes and `coreTestLaneOf` every time it runs, so it still works exactly as before but visibly
-tells a developer it is the wrong task. No CI change was needed: `dev/ci/test-shards.sh` already
-emits `-x :core:test` for the `others` shard, so the warning only ever fires for someone running
-it directly. See Appendix C for the day-to-day commands this replaces.
+tells a developer it is the wrong task. The CI `build` job passes `-x :core:test`, since core's
+tests run in the `core-test` job, so the warning only ever fires for someone running it
+directly. See Appendix C for the day-to-day commands this replaces.
 
 ### Alternatives considered (brief)
 
@@ -248,9 +248,10 @@ and included in `coreH2Test`, that the manifest step passes on the lane output, 
 - Migration of all three existing usage patterns (`AbstractEntityStorageTest`,
   `TestJDBCBackend`, `TestJdbcPartitionStatisticStorageIT`) and removal of the gatekeeper tag.
 - Removal of the dead `compare-legacy` subcommand from `core_test_identity.py`.
-- CI wiring: `build` matrix shards `core-unit`/`core-h2`/`core-mysql`/`core-postgresql` each run
-  one lane and upload evidence; `core-test-contract` (`needs: [changes, build]`) runs the tool's
-  own unit tests, downloads the four evidence artifacts, and reconciles.
+- CI wiring: a `core-test` job with a `lane` matrix (`unit`/`h2`/`mysql`/`postgresql`) runs one
+  lane per job and uploads evidence; `build` skips `:core:test`; `core-test-contract`
+  (`needs: [changes, core-test]`) runs the tool's own unit tests, downloads the four evidence
+  artifacts, and reconciles.
 - `:core:test` deprecated in place: a `doFirst` warning on its `tasks.test` block names the four
   lanes and `coreTestLaneOf`; the task still runs and still passes.
 
@@ -305,7 +306,7 @@ Each criterion is concrete and checkable.
 
 **Final (CI, on every PR touching core):**
 
-7. All four `build` shards succeed and each uploads `core-<lane>-test-evidence` containing a
+7. All four `core-test` lane jobs succeed and each uploads `core-<lane>-test-evidence` containing a
    non-empty `<lane>.json` manifest, JUnit XML, HTML report, and JaCoCo `.exec`.
 8. `core-test-contract` passes: `reconcile` reports `database_identities_equal: true` and
    `unit_database_disjoint: true`, i.e. the H2, MySQL, and PostgreSQL manifests hold identical
@@ -574,24 +575,24 @@ summaries, and combined counts. Any violation exits 1 and fails the `core-test-c
 ### B.4 End-to-end flow in CI
 
 ```
-changes ──► build (matrix: core-unit | core-h2 | core-mysql | core-postgresql | ...)
-              │  each core-* shard:
+changes ──► core-test (matrix lane: unit | h2 | mysql | postgresql)
+              │  each lane job:
               │    ./gradlew :core:<laneTask> ...            (tag filter prunes at discovery)
               │    core_test_identity.py manifest --lane L   (fails on foreign markers)
               │    validate evidence files exist and are non-empty
               │    upload core-<L>-test-evidence
               ▼
-           core-test-contract  (needs: [changes, build])
+           core-test-contract  (needs: [changes, core-test])
               │    unittest dev/ci/tests/test_core_test_identity.py
               │    download the four evidence artifacts
               │    core_test_identity.py reconcile --manifests unit h2 mysql postgresql
               │    upload summary.json as core-test-contract
               ▼
-           coverage  (needs core-test-contract; merges the four JaCoCo .exec files)
+           coverage  (needs build and core-test-contract; merges the four JaCoCo .exec files)
 ```
 
-`dev/ci/test-shards.sh` maps `build/core-<lane>` to `:core:<laneTask>` and emits `-x :core:test`
-for the `others` shard so the unsplit task never runs in CI.
+The `core-test` matrix maps each lane to its `:core:<laneTask>`, and the `build` job passes
+`-x :core:test` so the unsplit task never runs in CI.
 
 ### B.5 Invariants, in one place
 
@@ -630,7 +631,7 @@ neither Docker nor that flag. Each lane runs its `Test` task sequentially
 (`maxParallelForks = 1`) because database tests mutate process-wide state.
 
 Do **not** run `./gradlew :core:test` - it is deprecated in place (Q4/A.2): it still works, but
-warns and does not correspond to any of the four lanes above or any CI shard.
+warns and does not correspond to any of the four lanes above or any CI job.
 
 ### Tagging a new test class
 

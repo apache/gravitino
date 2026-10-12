@@ -256,10 +256,10 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 //    above (coreUnitTest / coreH2Test / coreMySQLTest / corePostgreSQLTest), never :core:test -
 //    it predates the lane split and does not correspond to any CI lane. Check where a class runs
 //    with `./gradlew :core:coreTestLaneOf -PclassName=...` instead of guessing.
-//  - CI CUJ: no change needed here. The `build` suite never runs :core:test - dev/ci/test-shards.sh
-//    emits `-x :core:test` for its `others` shard. BackendIT's `others` shard still realizes it
-//    via the root `test` task under -PskipTests, where the `**/integration/test/**` filter matches
-//    nothing in core, so the warning below can also appear in those logs.
+//  - CI CUJ: no change needed here. build.yml's `build` job passes `-x :core:test` and runs each
+//    lane in its own `core-test` job. Backend IT still realizes it via the root `test` task under
+//    -PskipTests, where the `**/integration/test/**` filter matches nothing in core, so the
+//    warning below can also appear in those logs.
 tasks.test {
   val policiesDocument = rootProject.file("docs/policies.md")
   inputs.file(policiesDocument)
