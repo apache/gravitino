@@ -34,6 +34,7 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
@@ -138,7 +139,9 @@ public class StatisticMetaService {
       if (!names.contains(stored)) {
         String requested =
             names.stream()
-                .filter(name -> withoutTrailingSpaces(name).equals(withoutTrailingSpaces(stored)))
+                .filter(
+                    name ->
+                        StringUtils.stripEnd(name, " ").equals(StringUtils.stripEnd(stored, " ")))
                 .findFirst()
                 .orElse(stored);
         throw new IllegalStatisticNameException(
@@ -308,7 +311,7 @@ public class StatisticMetaService {
     Map<String, String> requestedByKey = new HashMap<>();
     for (StatisticPO po : pos) {
       String name = po.getStatisticName();
-      String other = requestedByKey.putIfAbsent(withoutTrailingSpaces(name), name);
+      String other = requestedByKey.putIfAbsent(StringUtils.stripEnd(name, " "), name);
       if (other != null) {
         throw new IllegalStatisticNameException(
             "Statistic names '%s' and '%s' of %s are the same statistic in the backend collation;"
@@ -316,14 +319,6 @@ public class StatisticMetaService {
             other, name, target);
       }
     }
-  }
-
-  private static String withoutTrailingSpaces(String name) {
-    int end = name.length();
-    while (end > 0 && name.charAt(end - 1) == ' ') {
-      end--;
-    }
-    return name.substring(0, end);
   }
 
   private static OptimisticLockException statisticConflict(
@@ -372,10 +367,13 @@ public class StatisticMetaService {
 
   /**
    * Returns whether a failure is a deadlock, serialization failure or lock wait timeout caused by a
-   * concurrent writer. PostgreSQL reports SQLState 40001 or 40P01, or 55P03 for a lock timeout. H2
-   * reports 40001 for a deadlock and error code 50200 (SQLState HYT00) for a lock wait timeout.
-   * MySQL reports error code 1213 for a deadlock and 1205 for a lock wait timeout. Vendor error
-   * codes are matched because the SQLState of a lock wait timeout depends on the driver.
+   * concurrent writer. The accepted codes intentionally cover more than the current default
+   * configuration emits. PostgreSQL reports 40P01 for deadlocks at our READ COMMITTED isolation;
+   * 40001 also covers serialization failures at stricter isolation levels, and 55P03 covers a
+   * server-configured lock_timeout. H2 reports 40001 for a deadlock and error code 50200 (SQLState
+   * HYT00) for a lock wait timeout. MySQL reports error code 1213 for a deadlock and 1205 for a
+   * lock wait timeout. Vendor error codes are matched because a timeout's SQLState depends on the
+   * driver.
    */
   private static boolean isConcurrencyFailure(Throwable failure) {
     return hasSqlException(
