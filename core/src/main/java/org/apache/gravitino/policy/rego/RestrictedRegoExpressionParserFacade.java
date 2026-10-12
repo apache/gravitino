@@ -125,21 +125,6 @@ public final class RestrictedRegoExpressionParserFacade {
         arrayElementCount <= MAX_TOTAL_ARRAY_ELEMENTS,
         "restricted-rego-v1 literal arrays must not contain more than %s total elements",
         MAX_TOTAL_ARRAY_ELEMENTS);
-    if (program instanceof RowFilter) {
-      CanonicalExpression lowered = ((RowFilter) program).lower();
-      Preconditions.checkArgument(
-          lowered.depth() <= MAX_SOURCE_DEPTH,
-          "lowered row-filter depth must not exceed %s",
-          MAX_SOURCE_DEPTH);
-      Preconditions.checkArgument(
-          countNodes(lowered) <= MAX_AST_NODES,
-          "lowered row-filter AST must not exceed %s nodes",
-          MAX_AST_NODES);
-      Preconditions.checkArgument(
-          countArrayElements(lowered) <= MAX_TOTAL_ARRAY_ELEMENTS,
-          "lowered row-filter literal arrays must not contain more than %s total elements",
-          MAX_TOTAL_ARRAY_ELEMENTS);
-    }
   }
 
   private static List<CanonicalExpression> expressions(RestrictedRegoProgram program) {

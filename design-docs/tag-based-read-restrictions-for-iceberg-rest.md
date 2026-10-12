@@ -362,15 +362,16 @@ Save-time validation applies these limits before canonicalization:
 - source AST nodes: 256;
 - decoded string literal: 4 KiB of UTF-8; and
 - numeric literal: 256 bytes;
-- array elements: 256 per literal; and
-- total array elements: 256 in the source and lowered row-filter predicate.
-
-The lowered row-filter predicate also has maximum operation depth 8 and maximum AST nodes 256.
-Canonicalization cannot make an oversized expression valid.
+- total array elements: 256 in the source.
 
 Operation depth counts AST operation nodes. A consecutive associative `and` or `or` chain is one
-n-ary logical node, and parentheses do not add depth. Conditional row filters are also lowered and
-checked against the resolved-predicate depth limit at save time.
+n-ary logical node, and parentheses do not add depth. These limits apply to user-provided source.
+They are not re-applied to the generated row-filter predicate.
+
+Conditional row filters use linear nested lowering. Each condition appears once in its selected arm
+and once, negated, in its remaining-branches arm. The source limits therefore bound generated work:
+lowering is linear in the number and size of source branches, and generated array occurrences are at
+most twice the source total. A generated predicate may exceed the source depth or node limits.
 
 ## Context and Schema Binding
 
@@ -403,8 +404,10 @@ is lowered to:
 
 ```text
 (condition1 and result1)
-or (not condition1 and condition2 and result2)
-or (not condition1 and not condition2 and fallback)
+or (not condition1 and (
+  (condition2 and result2)
+  or (not condition2 and fallback)
+))
 ```
 
 Request-context-only conditions are folded before the final predicate is built, but every branch
@@ -412,7 +415,7 @@ must still parse and type-check. For a column mask, all conditions are context-o
 evaluates them in order and selects the first action whose condition is true, or the final fallback
 action. The conditional assignment, `if`, and `else` nodes never appear in the Iceberg wire
 expression or projection. This preserves the first-matching-branch semantics of Rego's `else`
-chain while producing the one closed Boolean predicate or one column action required by Iceberg.
+The nested form grows linearly rather than repeating every earlier condition in every later branch.
 
 The first version supports these value predicates:
 

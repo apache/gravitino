@@ -53,6 +53,7 @@ public class TestRestrictedRegoExpressionParserFacade {
   private static final String GOLDEN_FILE =
       "core/src/test/resources/restricted-rego-v1-cases.golden";
   private static final String UPDATE_GOLDEN_ENV = "GRAVITINO_UPDATE_RESTRICTED_REGO_GOLDEN";
+  private static final String REPOSITORY_ROOT_PROPERTY = "gravitino.repositoryRoot";
   private static final String GOLDEN_LICENSE_HEADER =
       "# Licensed to the Apache Software Foundation (ASF) under one or more\n"
           + "# contributor license agreements. See the NOTICE file distributed with\n"
@@ -157,12 +158,11 @@ public class TestRestrictedRegoExpressionParserFacade {
     CanonicalExpression expected =
         parseFilterExpression(
             "(is_group_member(\"member\") and col(\"tenant\") == session_user()) or "
-                + "(not is_group_member(\"member\") and session_user() == \"guest\" and "
-                + "col(\"public\") == true) or "
                 + "(not is_group_member(\"member\") and "
-                + "not session_user() == \"guest\" and false)");
+                + "((session_user() == \"guest\" and col(\"public\") == true) or "
+                + "(not session_user() == \"guest\" and false)))");
     Assertions.assertEquals(expected, filter.lower());
-    Assertions.assertEquals(4, filter.lower().depth());
+    Assertions.assertEquals(6, filter.lower().depth());
   }
 
   @Test
@@ -252,59 +252,52 @@ public class TestRestrictedRegoExpressionParserFacade {
   }
 
   @Test
-  void testChecksLoweredRowFilterDepthAtSaveTime() {
-    Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parseRowFilter(
-                "filter := true if not not not not col(\"active\") == true else := false"));
-
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                RestrictedRegoExpressionParserFacade.parseRowFilter(
-                    "filter := true if not not not not not col(\"active\") == true "
-                        + "else := false"));
-    Assertions.assertTrue(error.getMessage().contains("lowered row-filter depth"));
-  }
-
-  @Test
-  void testFlattensLoweredLogicalOperands() {
+  void testDoesNotApplySourceDepthLimitToGeneratedPredicate() {
     RowFilter filter =
         RestrictedRegoExpressionParserFacade.parseRowFilter(
-            "filter := true if is_group_member(\"g\") else := "
-                + "true and (true or (true and (true or (true and (true or true)))))");
+            "filter := true if not not not not not not not col(\"active\") == true "
+                + "else := false");
 
-    Assertions.assertEquals(8, filter.lower().depth());
-    LogicalExpression lowered = (LogicalExpression) filter.lower();
-    LogicalExpression fallback = (LogicalExpression) lowered.operands().get(1);
-    Assertions.assertEquals(3, fallback.operands().size());
+    Assertions.assertTrue(filter.lower().depth() > 8);
   }
 
   @Test
-  void testChecksLoweredRowFilterNodeCountAtSaveTime() {
-    Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parseRowFilter(conditionalFilterWithBranches(9)));
+  void testFoldsDoubleNegationIntroducedByLowering() {
+    RowFilter filter =
+        RestrictedRegoExpressionParserFacade.parseRowFilter(
+            "filter := true if not is_group_member(\"g\") else := false");
 
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                RestrictedRegoExpressionParserFacade.parseRowFilter(
-                    conditionalFilterWithBranches(10)));
-    Assertions.assertTrue(error.getMessage().contains("lowered row-filter AST"));
+    CanonicalExpression expected =
+        parseFilterExpression(
+            "(not is_group_member(\"g\") and true) or " + "(is_group_member(\"g\") and false)");
+    Assertions.assertEquals(expected, filter.lower());
   }
 
   @Test
-  void testSemanticErrorsIncludeOffendingSubExpression() {
+  void testLowersConditionalBranchesWithLinearNodeGrowth() {
+    RowFilter filter =
+        RestrictedRegoExpressionParserFacade.parseRowFilter(conditionalFilterWithBranches(24));
+
+    Assertions.assertEquals(265, countExpressionNodes(filter.lower()));
+  }
+
+  @Test
+  void testSemanticErrorsDescribeOperandKindsWithoutValues() {
     IllegalArgumentException error =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> parseFilterExpression("col(\"b\") < true"));
 
     Assertions.assertTrue(error.getMessage().contains("boolean literal supports only == and !="));
-    Assertions.assertTrue(error.getMessage().contains("offending comparison"));
-    Assertions.assertTrue(error.getMessage().contains("name='b'"));
+    Assertions.assertTrue(error.getMessage().contains("operator '<'"));
+    Assertions.assertTrue(error.getMessage().contains("left=column"));
+    Assertions.assertTrue(error.getMessage().contains("right=literal(BOOLEAN)"));
+
+    IllegalArgumentException largeComparisonError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> parseFilterExpression("session_user() in " + literalArray(256)));
+    Assertions.assertTrue(largeComparisonError.getMessage().length() < 512);
+    Assertions.assertFalse(largeComparisonError.getMessage().contains("value=255"));
   }
 
   @Test
@@ -406,19 +399,16 @@ public class TestRestrictedRegoExpressionParserFacade {
   }
 
   @Test
-  void testChecksLoweredRowFilterArrayElementCountAtSaveTime() {
-    Assertions.assertDoesNotThrow(
-        () ->
-            RestrictedRegoExpressionParserFacade.parseRowFilter(
-                "filter := true if col(\"value\") in " + literalArray(128) + " else := false"));
-
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
+  void testDoesNotApplySourceArrayLimitToGeneratedPredicate() {
+    RowFilter filter =
+        Assertions.assertDoesNotThrow(
             () ->
                 RestrictedRegoExpressionParserFacade.parseRowFilter(
-                    "filter := true if col(\"value\") in " + literalArray(129) + " else := false"));
-    Assertions.assertTrue(error.getMessage().contains("lowered row-filter literal arrays"));
+                    "filter := true if col(\"value\") in "
+                        + literalArray(256)
+                        + " else := true if is_group_member(\"fallback\") else := false"));
+
+    Assertions.assertEquals(512, countArrayElements(filter.lower()));
   }
 
   @Test
@@ -442,7 +432,7 @@ public class TestRestrictedRegoExpressionParserFacade {
   void testParsesDocumentedPrograms() throws IOException {
     List<String> programs = documentedPrograms(repositoryRoot().resolve("docs/policies.md"));
 
-    Assertions.assertEquals(2, programs.size());
+    Assertions.assertFalse(programs.isEmpty());
     for (String program : programs) {
       Assertions.assertDoesNotThrow(() -> RestrictedRegoExpressionParserFacade.parse(program));
     }
@@ -595,6 +585,12 @@ public class TestRestrictedRegoExpressionParserFacade {
       try {
         RestrictedRegoProgram program = RestrictedRegoExpressionParserFacade.parse(source);
         result.append("result: ").append(escapeGoldenValue(program.toString())).append('\n');
+        if (program instanceof RowFilter && ((RowFilter) program).isConditional()) {
+          result
+              .append("lowered: ")
+              .append(escapeGoldenValue(((RowFilter) program).lower().toString()))
+              .append('\n');
+        }
       } catch (IllegalArgumentException exception) {
         result.append("error: ").append(escapeGoldenValue(exception.getMessage())).append('\n');
       }
@@ -611,15 +607,11 @@ public class TestRestrictedRegoExpressionParserFacade {
   }
 
   private static Path repositoryRoot() {
-    Path current = Path.of("").toAbsolutePath();
-    while (current != null) {
-      if (Files.isRegularFile(current.resolve("docs/policies.md"))) {
-        return current;
-      }
-      current = current.getParent();
+    String repositoryRoot = System.getProperty(REPOSITORY_ROOT_PROPERTY);
+    if (repositoryRoot == null) {
+      throw new IllegalStateException("Missing test system property " + REPOSITORY_ROOT_PROPERTY);
     }
-    throw new IllegalStateException(
-        "Cannot locate repository root from the test working directory");
+    return Path.of(repositoryRoot);
   }
 
   private static List<String> documentedPrograms(Path policiesDocument) throws IOException {
@@ -684,5 +676,41 @@ public class TestRestrictedRegoExpressionParserFacade {
           .append("\") == 1");
     }
     return source.append(" else := false").toString();
+  }
+
+  private static int countExpressionNodes(CanonicalExpression expression) {
+    if (expression instanceof Comparison) {
+      Comparison comparison = (Comparison) expression;
+      return 1 + countExpressionNodes(comparison.left()) + countExpressionNodes(comparison.right());
+    }
+    if (expression instanceof Not) {
+      return 1 + countExpressionNodes(((Not) expression).operand());
+    }
+    if (expression instanceof LogicalExpression) {
+      int count = 1;
+      for (CanonicalExpression operand : ((LogicalExpression) expression).operands()) {
+        count += countExpressionNodes(operand);
+      }
+      return count;
+    }
+    return 1;
+  }
+
+  private static int countArrayElements(CanonicalExpression expression) {
+    if (expression instanceof Comparison) {
+      Comparison comparison = (Comparison) expression;
+      return countArrayElements(comparison.left()) + countArrayElements(comparison.right());
+    }
+    if (expression instanceof Not) {
+      return countArrayElements(((Not) expression).operand());
+    }
+    if (expression instanceof LogicalExpression) {
+      int count = 0;
+      for (CanonicalExpression operand : ((LogicalExpression) expression).operands()) {
+        count += countArrayElements(operand);
+      }
+      return count;
+    }
+    return expression instanceof LiteralArray ? ((LiteralArray) expression).values().size() : 0;
   }
 }

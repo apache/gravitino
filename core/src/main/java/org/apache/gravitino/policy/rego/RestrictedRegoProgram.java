@@ -227,20 +227,16 @@ public interface RestrictedRegoProgram {
         return fallback;
       }
 
-      List<CanonicalExpression> disjuncts = new ArrayList<>();
-      List<CanonicalExpression> precedingBranchMisses = new ArrayList<>();
-      for (FilterBranch branch : branches) {
-        List<CanonicalExpression> selected = new ArrayList<>(precedingBranchMisses);
-        selected.add(branch.condition());
-        selected.add(branch.result());
-        disjuncts.add(LogicalExpression.of(LogicalOperator.AND, selected));
-        precedingBranchMisses.add(new Not(branch.condition()));
+      CanonicalExpression lowered = fallback;
+      for (int index = branches.size() - 1; index >= 0; index--) {
+        FilterBranch branch = branches.get(index);
+        CanonicalExpression selected =
+            LogicalExpression.of(LogicalOperator.AND, List.of(branch.condition(), branch.result()));
+        CanonicalExpression remaining =
+            LogicalExpression.of(
+                LogicalOperator.AND, List.of(Not.negate(branch.condition()), lowered));
+        lowered = LogicalExpression.of(LogicalOperator.OR, List.of(selected, remaining));
       }
-
-      List<CanonicalExpression> fallbackOperands = new ArrayList<>(precedingBranchMisses);
-      fallbackOperands.add(fallback);
-      disjuncts.add(LogicalExpression.of(LogicalOperator.AND, fallbackOperands));
-      CanonicalExpression lowered = LogicalExpression.of(LogicalOperator.OR, disjuncts);
       lowered.validate();
       return lowered;
     }

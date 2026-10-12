@@ -54,6 +54,40 @@ syntax owned by Gravitino. Each expression is one complete rule, not an arbitrar
 row filter starts with `filter :=` and produces a Boolean predicate. A column mask starts with
 `mask := action("...")` and produces an allowlisted masking action.
 
+The complete grammar is:
+
+```text
+program     := filterRule | maskRule
+filterRule  := unconditionalFilter | conditionalFilter
+unconditionalFilter := "filter" ":=" expr
+conditionalFilter := "filter" ":=" expr "if" expr filterElse* filterFallback
+filterElse  := "else" ":=" expr "if" expr
+filterFallback := "else" ":=" expr
+maskRule    := unconditionalMask | conditionalMask
+unconditionalMask := "mask" ":=" maskAction
+conditionalMask := "mask" ":=" maskAction "if" contextExpr maskElse* maskFallback
+maskElse    := "else" ":=" maskAction "if" contextExpr
+maskFallback := "else" ":=" maskAction
+maskAction  := "action" "(" string ")"
+contextExpr := expr
+expr        := orExpr
+orExpr      := andExpr ("or" andExpr)*
+andExpr     := notExpr ("and" notExpr)*
+notExpr     := "not" notExpr | compareExpr
+compareExpr := primary (("==" | "!=" | "<" | "<=" | ">" | ">=" | "in") primary)?
+primary     := colRef | sessionUser | groupMember | literal | array | "(" expr ")"
+colRef      := "col" "(" string ")"
+sessionUser := "session_user" "(" ")"
+groupMember := "is_group_member" "(" string ")"
+literal     := string | number | boolean | null
+array       := "[" literal ("," literal)* "]"
+boolean     := "true" | "false"
+null        := "null"
+number      := "-"? ("0" | nonZeroDigit digit*) ("." digit+)?
+digit       := "0" | nonZeroDigit
+nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+```
+
 For example, a row-filter program can select the first matching predicate:
 
 ```restricted-rego-v1
@@ -83,6 +117,12 @@ The syntax supports these constructs:
 Keywords and built-in function names are case-sensitive. For example, only lowercase `in` is an
 operator; `In`, `IN`, and `iN` are invalid.
 
+Strings use JSON double-quoted syntax and are decoded exactly once after the enclosing HTTP JSON is
+decoded. Raw control characters, NUL, isolated Unicode surrogates, single-quoted strings, and invalid
+JSON escapes are rejected. Gravitino does not normalize, trim, or case-fold decoded column names,
+group names, or values. Numbers are exact decimals; exponent notation, a leading `+`, leading zeroes,
+and a trailing decimal point are invalid.
+
 Supported operand shapes are:
 
 | Form | Operators | Requirements |
@@ -106,12 +146,16 @@ Column-mask actions are `mask-alphanum`, `mask-to-fixed-value`, `replace-with-nu
 Validation applies these limits when a policy is created or its content is updated:
 
 - 16 KiB of UTF-8 source;
-- operation depth 8 for the source and lowered row-filter predicate;
-- 256 nodes for the source AST and lowered row-filter predicate;
+- operation depth 8 for the source AST;
+- 256 nodes for the source AST;
 - 4 KiB of UTF-8 for each decoded string literal; and
-- 256 bytes for each numeric literal;
-- 256 elements in a literal array; and
-- 256 array elements in total in the source and lowered row-filter predicate.
+- 256 bytes for each numeric literal; and
+- 256 array elements in total in the source.
+
+These limits apply to user-provided source, not to the generated predicate. Gravitino lowers an
+ordered row-filter branch chain to a linear nested Boolean expression in which each condition appears
+at most twice. The source limits therefore bound generated work without reducing the array allowance
+as branches are added. A generated predicate may exceed the source depth or node limits.
 
 Bare identifiers, arbitrary functions, comments, packages, imports, variables, chained
 comparisons, nested arrays, and a conditional rule without a final `else` are rejected. Read paths

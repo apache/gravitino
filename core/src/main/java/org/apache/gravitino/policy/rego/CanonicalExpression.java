@@ -200,8 +200,39 @@ public interface CanonicalExpression {
         ExpressionValidator.validateComparison(operator, left, right);
       } catch (IllegalArgumentException exception) {
         throw new IllegalArgumentException(
-            exception.getMessage() + "; offending comparison: " + this, exception);
+            String.format(
+                "%s; operator '%s' with left=%s and right=%s",
+                exception.getMessage(),
+                operator.sourceToken(),
+                operandKind(left),
+                operandKind(right)),
+            exception);
       }
+    }
+
+    private static String operandKind(CanonicalExpression expression) {
+      if (expression instanceof Literal) {
+        return "literal(" + ((Literal) expression).literalType() + ")";
+      }
+      if (expression instanceof LiteralArray) {
+        return "literal-array(" + ((LiteralArray) expression).elementType() + ")";
+      }
+      if (expression instanceof Column) {
+        return "column";
+      }
+      if (expression instanceof SessionUser) {
+        return "session-user";
+      }
+      if (expression instanceof GroupMembership) {
+        return "group-membership";
+      }
+      if (expression instanceof Not) {
+        return "not";
+      }
+      if (expression instanceof LogicalExpression) {
+        return "logical(" + ((LogicalExpression) expression).operator().sourceToken() + ")";
+      }
+      return expression.getClass().getSimpleName();
     }
 
     @Override
@@ -237,6 +268,10 @@ public interface CanonicalExpression {
 
     Not(CanonicalExpression operand) {
       this.operand = operand;
+    }
+
+    static CanonicalExpression negate(CanonicalExpression operand) {
+      return operand instanceof Not ? ((Not) operand).operand() : new Not(operand);
     }
 
     /**

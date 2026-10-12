@@ -104,6 +104,10 @@ artifacts {
 }
 
 tasks.test {
+  val policiesDocument = rootProject.file("docs/policies.md")
+  inputs.file(policiesDocument)
+  systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
     environment("GRAVITINO_HOME", project.rootDir.path)
