@@ -272,9 +272,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable3.auditInfo().creator());
 
-    // Case 4: Test if the table entity is not matched
+    // Case 4: An external rename or conflicting path must not overwrite the stored identity.
     reset(entityStore);
-    TableEntity tableEntity =
+    TableEntity storedBeforeConflict = entityStore.get(tableIdent1, TABLE, TableEntity.class);
+    TableEntity mismatchedEntity =
         TableEntity.builder()
             .withId(1L)
             .withName("table11")
@@ -282,14 +283,20 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
-    doReturn(tableEntity).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
-    Table loadedTable4 = tableOperationDispatcher.loadTable(tableIdent1);
-    // Succeed to import the topic entity
+    doReturn(mismatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> tableOperationDispatcher.loadTable(tableIdent1));
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not automatically reconcile external table renames"));
+    verify(entityStore).put(any(TableEntity.class), eq(false));
+
+    // The rejected import leaves the existing entity and its identity unchanged.
     reset(entityStore);
-    TableEntity tableImportedEntity = entityStore.get(tableIdent1, TABLE, TableEntity.class);
-    Assertions.assertEquals("test", tableImportedEntity.auditInfo().creator());
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
+    TableEntity storedAfterConflict = entityStore.get(tableIdent1, TABLE, TableEntity.class);
+    Assertions.assertEquals(storedBeforeConflict.id(), storedAfterConflict.id());
+    Assertions.assertEquals(storedBeforeConflict.name(), storedAfterConflict.name());
   }
 
   @Test
@@ -391,6 +398,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertDoesNotThrow(() -> tableOperationDispatcher.loadTable(tableIdent));
     Assertions.assertEquals(tableIdent.name(), loadedTable.name());
     Assertions.assertEquals("comment", loadedTable.comment());
+    verify(entityStore).put(any(TableEntity.class), eq(false));
   }
 
   @Test
@@ -496,7 +504,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () -> tableOperationDispatcher.loadTable(tableIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Table managed by multiple catalogs"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not automatically reconcile external table renames"));
+    Assertions.assertTrue(exception.getMessage().contains("through multiple paths"));
+    verify(entityStore).put(any(TableEntity.class), eq(false));
   }
 
   @Test

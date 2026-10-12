@@ -177,16 +177,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
       } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this table. Reload from the
-        // entity store to pick up the entity stored by the winning node.
-        LOG.info(
-            "Table {} was concurrently imported by another node; reloading from store.", ident);
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
+        LOG.info("Table {} import conflicted with existing metadata; reloading from store.", ident);
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {
           throw new UnsupportedOperationException(
-              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+              "Table "
+                  + ident
+                  + " cannot be imported because its name or external identifier is already "
+                  + "managed under a different Gravitino identifier. Gravitino does not "
+                  + "automatically reconcile external table renames or manage the same table "
+                  + "through multiple paths because overwriting its stored identity can corrupt "
+                  + "privilege relationships. Reconcile the external metadata manually.");
         }
       }
     }
@@ -551,13 +556,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
+      // An external identifier may already be stored under another Gravitino path because the
+      // table was renamed outside Gravitino or because multiple catalogs expose one metastore.
+      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
+      // stored identity: doing so can move the table and its privilege relationships between
+      // paths. The create-only write below reports the conflict for manual reconciliation.
       LOG.warn(
-          "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
-          stringId);
+          "Table uid {} exists externally but is not imported at {}. Gravitino will use a "
+              + "create-only import; if this uid is already stored under another identifier, "
+              + "manual reconciliation is required.",
+          stringId,
+          identifier);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -582,11 +591,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      // Overwrite only with the id stored in the catalog: it identifies the table, so a row under
-      // the same name with another id is stale and gets replaced. A generated id identifies
-      // nothing, so a row that appeared meanwhile, e.g. from a concurrent import on another node,
-      // must win. The plain insert then conflicts, and loadTable reloads that row.
-      store.put(tableEntity, stringId != null);
+      // Never overwrite imported table metadata. In particular, an overwrite by stable ID can
+      // silently change schema or catalog ownership and make existing privileges refer to the
+      // wrong path.
+      store.put(tableEntity, false);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {

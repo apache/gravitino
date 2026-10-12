@@ -273,16 +273,24 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               return null;
             });
       } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this schema. Reload from the
-        // entity store to verify the entity stored by the winning node is consistent.
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
         LOG.info(
-            "Schema {} was concurrently imported by another node; reloading from store.", ident);
+            "Schema {} import conflicted with existing metadata; reloading from store.", ident);
         EntityCombinedSchema reloaded =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {
           throw new UnsupportedOperationException(
-              "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+              "Schema "
+                  + ident
+                  + " cannot be imported because its name or external identifier is already "
+                  + "managed under a different Gravitino identifier. Gravitino does not "
+                  + "automatically reconcile external schema renames or manage the same schema "
+                  + "through multiple catalogs because overwriting its stored identity can "
+                  + "corrupt privilege relationships. Reconcile the external metadata manually, "
+                  + "or remove the affected catalogs and recreate only one catalog for this "
+                  + "schema.");
         }
       }
     }
@@ -636,13 +644,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the one in the external system, we use the data
-      // of external system to correct it.
+      // An external identifier may already be stored under another Gravitino path because the
+      // schema was renamed outside Gravitino or because multiple catalogs expose one metastore.
+      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
+      // stored identity: doing so can move the schema and its privilege relationships between
+      // catalogs. The create-only write below reports the conflict for manual reconciliation.
       LOG.warn(
-          "The Schema uid {} existed but still needs to be imported, this could be happened "
-              + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
-              + "we need to overwrite the stored entity to keep consistency.",
-          stringId);
+          "Schema uid {} exists externally but is not imported at {}. Gravitino will use a "
+              + "create-only import; if this uid is already stored under another identifier, "
+              + "manual reconciliation is required.",
+          stringId,
+          identifier);
       uid = stringId.id();
     } else {
       // If the entity doesn't exist, we import the entity from the external system.
@@ -665,7 +677,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
+      // Never overwrite imported schema metadata. In particular, an overwrite by stable ID can
+      // silently change catalog ownership and make existing privileges refer to the wrong path.
+      store.put(schemaEntity, false);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
