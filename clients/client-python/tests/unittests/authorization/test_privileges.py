@@ -58,6 +58,7 @@ from gravitino.api.authorization.privileges import (
     WriteFileset,
 )
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -75,6 +76,17 @@ class TestPrivileges(unittest.TestCase):
                 self.assertEqual(name, deny_privilege.name())
                 self.assertEqual(Privilege.Condition.DENY, deny_privilege.condition())
                 self.assertIs(deny_privilege, Privileges.deny(name.name))
+
+    def test_privilege_dto_equality_and_hash(self) -> None:
+        for name in Privilege.Name:
+            for factory in (Privileges.allow, Privileges.deny):
+                with self.subTest(privilege=name.name, factory=factory):
+                    privilege = factory(name.name)
+                    dto = PrivilegeDTO(privilege.name(), privilege.condition())
+                    self.assertEqual(privilege, dto)
+                    self.assertEqual(dto, privilege)
+                    self.assertEqual(hash(privilege), hash(dto))
+                    self.assertEqual(1, len({privilege, dto}))
 
     def test_allow_raises_illegal_argument_exception_for_unknown_privilege(
         self,
