@@ -435,7 +435,7 @@ public class TestStatisticManager {
   }
 
   @Test
-  public void testPartitionStatisticUpdateStillWaitsForTableTreeLock() throws Exception {
+  public void testPartitionStatisticsStillWaitForTableTreeLock() throws Exception {
     StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
     MetadataObject tableObject =
         MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
@@ -452,6 +452,34 @@ public class TestStatisticManager {
       TreeLockTestSupport.assertWaitsFor(
           tableWriter,
           () -> statisticManager.updatePartitionStatistics(METALAKE, tableObject, updates));
+    }
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () ->
+              statisticManager.listPartitionStatistics(
+                  METALAKE,
+                  tableObject,
+                  PartitionRange.between(
+                      "p_lock",
+                      PartitionRange.BoundType.CLOSED,
+                      "p_lock",
+                      PartitionRange.BoundType.CLOSED)));
+    }
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () ->
+              statisticManager.dropPartitionStatistics(
+                  METALAKE,
+                  tableObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          "p_lock", Lists.newArrayList("locked")))));
     }
   }
 

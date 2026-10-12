@@ -20,14 +20,17 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -122,9 +125,9 @@ public class TestStatisticConcurrentWrites extends TestJDBCBackend {
                 || outcome instanceof OptimisticLockException,
             "Unexpected outcome: " + outcome);
       }
-      // Whatever won, each name has at most one live row.
+      // Each upsert and each drop is all-or-nothing, so a round ends with every name or none.
       List<String> live = liveNames(table);
-      Assertions.assertEquals(live.stream().distinct().count(), live.size());
+      Assertions.assertTrue(live.isEmpty() || live.equals(NAMES), "Partial batch: " + live);
     }
   }
 
@@ -162,9 +165,28 @@ public class TestStatisticConcurrentWrites extends TestJDBCBackend {
                 || outcome instanceof NoSuchEntityException
                 || outcome instanceof OptimisticLockException,
             "Unexpected outcome: " + outcome);
+        // The drop and the writers queue on the table row, so a conflict here is a version check
+        // that lost, never a deadlock mapped to a conflict.
+        Assertions.assertFalse(isDeadlock(outcome), "Deadlock between drop and writer: " + outcome);
       }
       Assertions.assertEquals(0, countLiveStatistics(table.id()));
     }
+  }
+
+  private static boolean isDeadlock(Object outcome) {
+    for (Throwable cause = outcome instanceof Throwable ? (Throwable) outcome : null;
+        cause != null;
+        cause = cause.getCause()) {
+      if (cause instanceof SQLException) {
+        SQLException sql = (SQLException) cause;
+        if ("40001".equals(sql.getSQLState())
+            || "40P01".equals(sql.getSQLState())
+            || sql.getErrorCode() == 1213) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private TableEntity createTable(String name) throws Exception {
@@ -220,16 +242,36 @@ public class TestStatisticConcurrentWrites extends TestJDBCBackend {
 
   /**
    * H2 gives new sessions a short lock timeout, so writers that queue behind each other would fail
-   * on a slow machine. The other backends wait long enough by default.
+   * on a slow machine. The other backends wait long enough by default. The database default only
+   * reaches sessions opened later, so the sessions already idle in the pool are raised one by one:
+   * they are all borrowed at once, which hands out every idle connection exactly once.
    */
   private void raiseDefaultLockTimeout() throws SQLException {
     if (!"h2".equals(backendType)) {
       return;
     }
-    try (SqlSession session =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Statement statement = session.getConnection().createStatement()) {
-      statement.execute("SET DEFAULT_LOCK_TIMEOUT 30000");
+    BasicDataSource dataSource =
+        (BasicDataSource)
+            SqlSessionFactoryHelper.getInstance()
+                .getSqlSessionFactory()
+                .getConfiguration()
+                .getEnvironment()
+                .getDataSource();
+    List<Connection> idle = new ArrayList<>();
+    try {
+      for (int i = Math.max(1, dataSource.getNumIdle()); i > 0; i--) {
+        idle.add(dataSource.getConnection());
+      }
+      for (Connection connection : idle) {
+        try (Statement statement = connection.createStatement()) {
+          statement.execute("SET DEFAULT_LOCK_TIMEOUT 30000");
+          statement.execute("SET LOCK_TIMEOUT 30000");
+        }
+      }
+    } finally {
+      for (Connection connection : idle) {
+        connection.close();
+      }
     }
   }
 }
