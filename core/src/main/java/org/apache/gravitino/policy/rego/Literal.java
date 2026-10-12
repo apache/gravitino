@@ -23,7 +23,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 /** A decoded source literal. */
-final class Literal implements CanonicalExpression {
+public final class Literal implements CanonicalExpression {
   private final LiteralType literalType;
   private final Object value;
   private final boolean negativeZero;
@@ -38,15 +38,30 @@ final class Literal implements CanonicalExpression {
     this.negativeZero = negativeZero;
   }
 
-  LiteralType literalType() {
+  /**
+   * Returns the source literal type.
+   *
+   * @return literal type
+   */
+  public LiteralType literalType() {
     return literalType;
   }
 
-  Object value() {
+  /**
+   * Returns the decoded literal value.
+   *
+   * @return decoded value, or {@code null} for a null literal
+   */
+  public Object value() {
     return value;
   }
 
-  boolean negativeZero() {
+  /**
+   * Returns whether a numeric zero used a negative sign in the source.
+   *
+   * @return {@code true} for source negative zero
+   */
+  public boolean negativeZero() {
     return negativeZero;
   }
 

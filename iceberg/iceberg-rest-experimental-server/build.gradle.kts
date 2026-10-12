@@ -39,6 +39,7 @@ configurations.configureEach {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":common")) {
     exclude("*")
   }
@@ -50,6 +51,9 @@ dependencies {
   }
   implementation(project(":iceberg:iceberg-rest-server"))
   implementation(libs.bundles.iceberg)
+
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {

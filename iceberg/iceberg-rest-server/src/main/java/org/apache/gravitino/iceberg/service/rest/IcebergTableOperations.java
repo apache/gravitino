@@ -63,6 +63,7 @@ import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -107,6 +108,7 @@ public class IcebergTableOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
+  private IcebergReadRestrictionLoader readRestrictionLoader;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -117,6 +119,7 @@ public class IcebergTableOperations {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
+    this.readRestrictionLoader = IcebergReadRestrictionLoader.load();
   }
 
   @GET
@@ -330,7 +333,7 @@ public class IcebergTableOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
 
             // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
-            if (StringUtils.isNotBlank(ifNoneMatch)) {
+            if (!readRestrictionLoader.enabled() && StringUtils.isNotBlank(ifNoneMatch)) {
               Optional<String> metadataLocation =
                   tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
               if (metadataLocation.isPresent()) {
@@ -343,13 +346,19 @@ public class IcebergTableOperations {
 
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
-            Optional<EntityTag> etag =
-                generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), snapshots);
-            if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
-              return Response.notModified(etag.get()).build();
-            }
             if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
               loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
+            }
+            IcebergReadRestrictionLoader.Result restrictionResult =
+                readRestrictionLoader.load(context, tableIdentifier, loadTableResponse);
+            loadTableResponse = restrictionResult.response();
+            Optional<EntityTag> etag =
+                generateETag(
+                    loadTableResponse.tableMetadata().metadataFileLocation(),
+                    snapshots,
+                    restrictionResult.etagSeed());
+            if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
             }
             return buildResponseWithETag(loadTableResponse, etag);
           });
@@ -680,6 +689,12 @@ public class IcebergTableOperations {
   @VisibleForTesting
   static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
     return IcebergRESTUtils.generateETag(metadataLocation, snapshots);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(
+      String metadataLocation, String snapshots, String representationSeed) {
+    return IcebergRESTUtils.generateETag(metadataLocation, snapshots, representationSeed);
   }
 
   /**

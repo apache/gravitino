@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** An n-ary Boolean conjunction or disjunction. */
-final class LogicalExpression implements CanonicalExpression {
+public final class LogicalExpression implements CanonicalExpression {
   private final LogicalOperator operator;
   private final List<CanonicalExpression> operands;
 
@@ -52,11 +52,21 @@ final class LogicalExpression implements CanonicalExpression {
     return flattened.size() == 1 ? flattened.get(0) : new LogicalExpression(operator, flattened);
   }
 
-  LogicalOperator operator() {
+  /**
+   * Returns the logical operator.
+   *
+   * @return logical operator
+   */
+  public LogicalOperator operator() {
     return operator;
   }
 
-  List<CanonicalExpression> operands() {
+  /**
+   * Returns the immutable operands.
+   *
+   * @return logical operands
+   */
+  public List<CanonicalExpression> operands() {
     return operands;
   }
 
