@@ -427,14 +427,14 @@ Notation: `N` = policies loaded on the node, `k` = roles held by the caller, `a`
 - No storage or schema change; policies are still derived from role entities on demand.
 - Removed: `GravitinoAdapter`, `jcasbin_model.conf`, `TestJcasbinModel`, `jcasbin_policy.txt`, and the JCasbin dependency from `server-common` and Iceberg REST. `LICENSE.bin` and `LICENSE.iceberg` drop the JCasbin and Aviator entries. Commons Codec, previously transitive through JCasbin, is declared explicitly.
 - Log targets in `conf/log4j2.properties.template` and the Helm chart change from the JCasbin package to the authorizer package. Operators who configured a custom logger for `org.casbin` should switch to the authorizer package.
-- Relationship with #13747: both make role membership request-local. If #13747 merges first, the implementation also deletes its `jcasbin_request_model.conf` and `RequestRoleFunction`, and ports its three interleaving tests (`testInterleavedGroupRequestsMustNot*`) so #13748 stays covered.
+- Relationship with #13747: both make role membership request-local and carry the same three interleaving tests (`testInterleavedGroupRequestsMustNot*`). If #13747 merges first, the implementation also deletes its `jcasbin_request_model.conf` and `RequestRoleFunction`.
 
 ### Verification
 
 | Area | How |
 |---|---|
 | Decision equivalence | A review probe compared 81,000 decisions against the current JCasbin model with no differences and detected a seeded DENY mutation. It is not committed CI. |
-| Regressions | `TestJcasbinAuthorizer` and `TestRequestRolePolicies`: direct and group roles, group revocation at the IdP, role changes between and within requests, DENY evicted or changed mid-request, global DENY precedence, unreadable roles, incomplete loads and backoff, large roles without a scan, adaptive merge. |
+| Regressions | `TestJcasbinAuthorizer` and `TestRequestRolePolicies`: direct and group roles, group revocation at the IdP, the #13748 interleavings (`testInterleavedGroupRequestsMustNot*`, including list filtering), role changes between and within requests, DENY evicted or changed mid-request, global DENY precedence, unreadable roles, incomplete loads and backoff, large roles without a scan, adaptive merge. |
 | Races | Committed tests cover an older load overwriting a newer DENY and a newer publication refreshing an evicted view. A review probe also ran 60 latch-controlled publication and invalidation races with no stale ALLOW. |
 | Performance | `TestListAuthorizationPerformance` (opt-in) covers large-role, many-role, and long-list scenarios. It guards complexity, not absolute latency. |
 
@@ -455,7 +455,6 @@ Notation: `N` = policies loaded on the node, `k` = roles held by the caller, `a`
 - [ ] Replace JCasbin `p` rows with per-role `PolicyKey -> Effect` indexes in `loadedRoles` (#12173).
 - [ ] Remove the enforcer and the shared grouping graph; add `RequestRolePolicies`, the request-local role set, and generation-based publication and invalidation (#12282). #12286 implements this task together with the previous one.
 - [ ] Remove `GravitinoAdapter`, the JCasbin model, model tests, and the JCasbin dependency from `server-common` and Iceberg REST; update license files and log targets (#12286).
-- [ ] Port the #13748 interleaving tests from #13747 if #13747 merges first, or add equivalent tests.
 - [ ] Add storage-backed authorization integration tests that cover direct roles, group roles, DENY precedence, and active roles end to end.
 - [ ] Add multi-node tests for role-change invalidation through the change-log poller.
 - [ ] Decide whether to rename `JcasbinAuthorizer` and its package, keeping the old class name as a deprecated alias.
