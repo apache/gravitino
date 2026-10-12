@@ -46,6 +46,11 @@ public final class K8sClientUtils {
   /**
    * An {@link OAuthTokenProvider} that reads the token from a file, and reads it again whenever the
    * file changes, so that a rotated token is picked up without restarting the server.
+   *
+   * <p>It doesn't refresh the token itself, whoever provides the file does. For a file mounted from
+   * a Secret, that is whatever updates the Secret, and the kubelet then updates the mounted file,
+   * unless it is mounted with a {@code subPath}. For a projected service account token, the kubelet
+   * rotates it by itself.
    */
   static final class FileTokenProvider implements OAuthTokenProvider {
 

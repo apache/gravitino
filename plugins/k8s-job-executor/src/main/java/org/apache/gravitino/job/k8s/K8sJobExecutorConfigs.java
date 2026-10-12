@@ -58,7 +58,8 @@ public class K8sJobExecutorConfigs {
 
   /**
    * The bearer token file to access the API server, used with {@link #MASTER_URL}. It is read again
-   * whenever it changes, so the token can be rotated.
+   * whenever it changes, so the token can be rotated by whoever provides the file, for example by
+   * updating the Secret it is mounted from. Gravitino doesn't refresh the token itself.
    */
   public static final String TOKEN_FILE = "tokenFile";
 
