@@ -4006,6 +4006,55 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @Test
+  public void testAlterFilesetDeletesReplacedSecretOnlyAfterCommit() throws Exception {
+    long filesetId = idGenerator.nextId();
+    SecretUrn urn = writeThroughUrn("fileset", filesetId, "fileset-sk");
+    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "fileset-secret")));
+
+    String schemaName = "schema_alter_secret_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/catalog_alter_secret_" + generateTestId();
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          Maps.newHashMap(Map.of(LOCATION, catalogPath)),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+      ops.createSchema(
+          schemaIdent,
+          "comment",
+          Maps.newHashMap(
+              StringIdentifier.newPropertiesWithId(
+                  StringIdentifier.fromId(idGenerator.nextId()),
+                  Map.of(LOCATION, catalogPath + "/" + schemaName))));
+      NameIdentifier filesetIdent =
+          NameIdentifierUtil.ofFileset("m1", "c1", schemaName, "fs_alter_secret");
+      ops.createFileset(
+          filesetIdent,
+          "comment",
+          Fileset.Type.MANAGED,
+          null,
+          Maps.newHashMap(
+              StringIdentifier.newPropertiesWithId(
+                  StringIdentifier.fromId(filesetId), Map.of("fileset-sk", urn.toString()))));
+
+      // A later change in the same alter is rejected, so the alter aborts and the fileset still
+      // references the secret: it must stay readable.
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ops.alterFileset(
+                  filesetIdent,
+                  FilesetChange.removeProperty("fileset-sk"),
+                  FilesetChange.setProperty("other", "******")));
+      Assertions.assertEquals("fileset-secret", secretManager.readSecret(urn));
+
+      // Once the alter commits, the removed secret is deleted.
+      ops.alterFileset(filesetIdent, FilesetChange.removeProperty("fileset-sk"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secretManager.readSecret(urn));
+    }
+  }
+
   private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
     return SecretUrn.buildWriteThrough(
         "memory",
