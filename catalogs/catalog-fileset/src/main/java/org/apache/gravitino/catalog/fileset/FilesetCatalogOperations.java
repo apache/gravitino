@@ -1798,10 +1798,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
     String processedSubPath = subPath.trim();
     // Validate before constructing a Hadoop Path, which normalizes away parent directory segments.
-    // Backslashes can be interpreted as separators by a client on a different operating system.
     Preconditions.checkArgument(
-        subPath.indexOf('\\') < 0 && subPath.indexOf('\0') < 0,
-        "subPath must not contain backslashes or null characters");
+        subPath.indexOf('\0') < 0, "subPath must not contain null characters");
     for (String segment : processedSubPath.split(SLASH)) {
       Preconditions.checkArgument(
           !"..".equals(segment), "subPath must not contain parent directory segments");

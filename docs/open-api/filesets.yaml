@@ -180,7 +180,7 @@ paths:
             The sub path to the file or directory within the selected storage location.
             Leading and trailing whitespace is trimmed. An empty path or `/` refers to
             that location, and a leading slash is relative to it. Complete `..` path
-            segments, backslashes, and NUL characters (U+0000) are not allowed.
+            segments and NUL characters (U+0000) are not allowed.
             The normalized path must remain within the selected storage location.
         - name: location_name
           in: query
@@ -236,7 +236,7 @@ paths:
             The sub path within the selected storage location to list files and directories
             from. Leading and trailing whitespace is trimmed. An empty path or `/` refers
             to that location, and a leading slash is relative to it. Complete `..` path
-            segments, backslashes, and NUL characters (U+0000) are not allowed.
+            segments and NUL characters (U+0000) are not allowed.
             The normalized path must remain within the selected storage location.
         - name: location_name
           in: query
@@ -250,7 +250,7 @@ paths:
         "400":
           $ref: "#/components/responses/InvalidSubPathErrorResponse"
         "404":
-          description: Not Found – the target fileset or subPath or locationName does not exist
+          description: Not Found – the target fileset or locationName does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -565,7 +565,9 @@ components:
 
   responses:
     InvalidSubPathErrorResponse:
-      description: The sub path does not satisfy the fileset path requirements.
+      description: >-
+        The sub path does not satisfy the fileset path requirements.
+        For file listing, this response also applies when the sub path does not exist.
       content:
         application/vnd.gravitino.v1+json:
           schema:

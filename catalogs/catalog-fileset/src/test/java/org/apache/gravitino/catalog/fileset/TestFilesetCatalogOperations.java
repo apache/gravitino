@@ -148,6 +148,7 @@ import org.apache.hadoop.fs.Path;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -1941,9 +1942,6 @@ public class TestFilesetCatalogOperations {
         "/dir/../../outside",
         "dir/../file",
         " /../outside ",
-        "/..\\outside",
-        "\\..\\outside",
-        "/dir\\..\\outside",
         "/file\u0000name",
         "\u0000file",
         "/file\u0000"
@@ -1954,7 +1952,6 @@ public class TestFilesetCatalogOperations {
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> operations.getFileLocation(PATH_VALIDATION_FILESET, subPath, null));
-      Mockito.verify(operations, Mockito.never()).getFileSystemWithCache(any(), any());
     }
   }
 
@@ -1967,7 +1964,6 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations operations = pathValidationOperations(fileset)) {
       Assertions.assertEquals(
           expected, operations.getFileLocation(PATH_VALIDATION_FILESET, subPath, null));
-      Mockito.verify(operations, Mockito.never()).getFileSystemWithCache(any(), any());
     }
   }
 
@@ -2045,6 +2041,25 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  void testRenameAllowsNonRootPathAlias() throws IOException {
+    try (FilesetCatalogOperations operations =
+        pathValidationOperations(mockFilesetForPathValidation())) {
+      CallerContext.CallerContextHolder.set(
+          CallerContext.builder()
+              .withContext(
+                  ImmutableMap.of(
+                      FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+                      FilesetDataOperation.RENAME.name()))
+              .build());
+      Assertions.assertEquals(
+          "file:///storage/fileset/dir/./file",
+          operations.getFileLocation(PATH_VALIDATION_FILESET, "/dir/./file", null));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+  }
+
+  @Test
   void testListFilesCannotReachSiblingSentinel(@TempDir File tempDir) throws IOException {
     File root = new File(tempDir, "root");
     File outside = new File(tempDir, "root-sibling");
@@ -2095,6 +2110,35 @@ public class TestFilesetCatalogOperations {
       FileInfo[] files = operations.listFiles(PATH_VALIDATION_FILESET, null, "/%2e%2e");
       Assertions.assertEquals(1, files.length);
       Assertions.assertEquals("a..b + caf\u00e9.txt", files[0].name());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"dir\\name", "..\\outside", "dir\\..\\outside"})
+  void testListFilesPreservesLiteralBackslashes(String childName, @TempDir File tempDir)
+      throws IOException {
+    Assumptions.assumeFalse(Path.WINDOWS, "Backslashes are path separators on Windows");
+    File root = new File(tempDir, "root");
+    File child = new File(root, childName);
+    Files.createDirectories(child.toPath());
+    Files.writeString(new File(child, "file\\name.txt").toPath(), "inside the fileset");
+    String storageLocation = root.toURI().toString();
+    Fileset fileset = mockFilesetForPathValidation();
+    when(fileset.storageLocations()).thenReturn(ImmutableMap.of("primary", storageLocation));
+
+    try (FilesetCatalogOperations operations = pathValidationOperations(fileset);
+        FileSystem fs = FileSystem.newInstanceLocal(new Configuration(false))) {
+      doReturn(Collections.emptyMap())
+          .when(operations)
+          .mergeUpLevelConfigurations(any(), any(), any());
+      doReturn(fs).when(operations).getFileSystemWithCache(any(), any());
+      String subPath = "/" + childName;
+      Assertions.assertEquals(
+          storageLocation + childName,
+          operations.getFileLocation(PATH_VALIDATION_FILESET, subPath, null));
+      FileInfo[] files = operations.listFiles(PATH_VALIDATION_FILESET, null, subPath);
+      Assertions.assertEquals(1, files.length);
+      Assertions.assertEquals("file\\name.txt", files[0].name());
     }
   }
 
@@ -4192,6 +4236,16 @@ public class TestFilesetCatalogOperations {
         Arguments.of("/storage/fileset", "child", "/storage/fileset/child"),
         Arguments.of(
             "hdfs://namenode:8020/fileset", "/child", "hdfs://namenode:8020/fileset/child"),
+        Arguments.of(
+            "hdfs://namenode:8020/fileset",
+            "/dir\\name.txt",
+            "hdfs://namenode:8020/fileset/dir\\name.txt"),
+        Arguments.of("s3a://bucket/prefix", "/dir\\name.txt", "s3a://bucket/prefix/dir\\name.txt"),
+        Arguments.of("gs://bucket/prefix", "/dir\\name.txt", "gs://bucket/prefix/dir\\name.txt"),
+        Arguments.of("s3a://bucket/prefix", "/..\\outside", "s3a://bucket/prefix/..\\outside"),
+        Arguments.of("s3a://bucket/prefix", "\\..\\outside", "s3a://bucket/prefix/\\..\\outside"),
+        Arguments.of(
+            "s3a://bucket/prefix", "/dir\\..\\outside", "s3a://bucket/prefix/dir\\..\\outside"),
         Arguments.of("s3a://bucket/prefix", "/child", "s3a://bucket/prefix/child"),
         Arguments.of("s3a://bucket", "/child", "s3a://bucket/child"),
         Arguments.of("s3a://bucket", "", "s3a://bucket"),

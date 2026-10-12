@@ -241,9 +241,9 @@ public interface FilesetCatalog {
    * @param ident A fileset identifier.
    * @param subPath The sub path to the file or directory.
    * @return The actual location of the file or directory.
-   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment, a
-   *     backslash, or a NUL character ({@code U+0000}), or its normalized path is outside the
-   *     default storage location.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), or its normalized path is outside the default storage
+   *     location.
    * @throws NoSuchFilesetException If the fileset does not exist.
    */
   default String getFileLocation(NameIdentifier ident, String subPath)
@@ -262,9 +262,9 @@ public interface FilesetCatalog {
    * @param subPath The sub path to the file or directory.
    * @param locationName The location name. If null, the default location will be used.
    * @return The actual location of the file or directory.
-   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment, a
-   *     backslash, or a NUL character ({@code U+0000}), or its normalized path is outside the
-   *     selected storage location.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), or its normalized path is outside the selected storage
+   *     location.
    * @throws NoSuchFilesetException If the fileset does not exist.
    * @throws NoSuchLocationNameException If the location name does not exist.
    */
