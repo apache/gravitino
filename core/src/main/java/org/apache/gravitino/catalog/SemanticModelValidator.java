@@ -56,9 +56,6 @@ final class SemanticModelValidator {
 
   private SemanticModelValidator() {}
 
-  // TODO(#12594): Validate source existence, columns, and authorization in the caller before
-  // invoking this definition-only validator. Cover whitespace-only source segments in regression
-  // tests for create and replaceDefinition, and verify consistency with Ossie import/export.
   static void validateDefinition(@Nullable SemanticModelDefinition definition) {
     if (definition == null) {
       throw invalid("$", "definition must not be null");
