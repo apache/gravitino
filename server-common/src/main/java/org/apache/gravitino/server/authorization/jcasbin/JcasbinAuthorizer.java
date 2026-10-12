@@ -107,10 +107,11 @@ import org.slf4j.LoggerFactory;
  * contracts they rely on (most notably that {@code entity_change_log.full_name} is the pre-mutation
  * name).
  *
- * <p>Role indexes are immutable. Each request merges them once into an effective allow/deny view,
- * so object checks do constant-time lookups without role graph traversal. Ordinary cache eviction
- * cannot remove a request's denies. Explicit invalidation and new policy publication refresh the
- * view before a new decision. Previously memoized decisions retain their request-scoped results.
+ * <p>Role indexes are immutable and pinned by each request. Small requests probe the held role
+ * indexes directly; repeated role probes amortize construction of a merged request index, after
+ * which object checks use constant-time lookups. Ordinary cache eviction cannot remove a request's
+ * denies. Explicit invalidation and new policy publication refresh the view before a new decision.
+ * Previously memoized decisions retain their request-scoped results.
  */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
