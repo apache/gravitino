@@ -33,8 +33,12 @@ public class TestTableMaintenancePolicyContent {
     Assertions.assertEquals(4, TableMaintenanceTaskType.values().length);
     Assertions.assertEquals(
         Policy.BuiltInType.ICEBERG_COMPACTION, TableMaintenanceTaskType.COMPACTION.builtInType());
-    Assertions.assertNull(TableMaintenanceTaskType.MANIFEST_REWRITE.builtInType());
-    Assertions.assertNull(TableMaintenanceTaskType.SNAPSHOT_EXPIRY.builtInType());
+    Assertions.assertEquals(
+        Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS,
+        TableMaintenanceTaskType.MANIFEST_REWRITE.builtInType());
+    Assertions.assertEquals(
+        Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
+        TableMaintenanceTaskType.SNAPSHOT_EXPIRY.builtInType());
     Assertions.assertEquals(
         Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
         TableMaintenanceTaskType.ORPHAN_CLEANUP.builtInType());
@@ -103,6 +107,14 @@ public class TestTableMaintenancePolicyContent {
     Assertions.assertEquals(
         TableMaintenanceTaskType.COMPACTION,
         TableMaintenancePolicyContentSupport.taskTypeFor(Policy.BuiltInType.ICEBERG_COMPACTION));
+    Assertions.assertEquals(
+        TableMaintenanceTaskType.MANIFEST_REWRITE,
+        TableMaintenancePolicyContentSupport.taskTypeFor(
+            Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS));
+    Assertions.assertEquals(
+        TableMaintenanceTaskType.SNAPSHOT_EXPIRY,
+        TableMaintenancePolicyContentSupport.taskTypeFor(
+            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION));
     Assertions.assertEquals(
         TableMaintenanceTaskType.ORPHAN_CLEANUP,
         TableMaintenancePolicyContentSupport.taskTypeFor(
