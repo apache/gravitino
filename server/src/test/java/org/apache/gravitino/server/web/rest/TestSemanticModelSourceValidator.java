@@ -32,7 +32,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
-import java.util.function.Predicate;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.function.Function;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -50,6 +53,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
@@ -59,7 +63,7 @@ import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.MockedStatic;
 
 /** Tests catalog-backed validation independently of model persistence. */
@@ -73,7 +77,8 @@ public class TestSemanticModelSourceValidator {
   private final ViewDispatcher views = mock(ViewDispatcher.class);
   private GravitinoAuthorizer authorizer = new PassThroughAuthorizer();
   private final SemanticModelSourceValidator validator =
-      new SemanticModelSourceValidator(tables, views, () -> authorizer, ident -> true);
+      new SemanticModelSourceValidator(
+          tables, views, () -> authorizer, ident -> EnumSet.of(EntityType.TABLE, EntityType.VIEW));
 
   @Test
   void testCrossCatalogSourceAndKeysWithDisabledAuthorization() {
@@ -201,19 +206,25 @@ public class TestSemanticModelSourceValidator {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testViewSupportCheckedBeforeFallback(boolean supportsViews) {
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void testSourceSupportCheckedBeforeLookup(boolean supportsTables, boolean supportsViews) {
     CatalogManager catalogs = mock(CatalogManager.class);
     BaseCatalog catalog = mock(BaseCatalog.class);
+    Class<?>[] interfaces =
+        supportsTables
+            ? (supportsViews
+                ? new Class<?>[] {TableCatalog.class, ViewCatalog.class}
+                : new Class<?>[] {TableCatalog.class})
+            : (supportsViews ? new Class<?>[] {ViewCatalog.class} : new Class<?>[0]);
     CatalogOperations operations =
-        supportsViews
-            ? mock(CatalogOperations.class, withSettings().extraInterfaces(ViewCatalog.class))
-            : mock(CatalogOperations.class);
+        interfaces.length == 0
+            ? mock(CatalogOperations.class)
+            : mock(CatalogOperations.class, withSettings().extraInterfaces(interfaces));
     when(catalog.ops()).thenReturn(operations);
     when(catalogs.doWithCatalog(eq(NameIdentifier.of("metalake", "other_catalog")), any()))
         .thenAnswer(
             invocation -> {
-              ThrowableFunction<BaseCatalog, Boolean> callback = invocation.getArgument(1);
+              ThrowableFunction<BaseCatalog, Set<EntityType>> callback = invocation.getArgument(1);
               return callback.apply(catalog);
             });
     when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
@@ -227,6 +238,11 @@ public class TestSemanticModelSourceValidator {
       assertThrows(
           IllegalSemanticModelException.class,
           () -> checking.validate("metalake", definition(dataset("orders", null, null))));
+      if (supportsTables) {
+        verify(tables).loadTable(FULL_SOURCE);
+      } else {
+        verifyNoInteractions(tables);
+      }
       if (supportsViews) {
         verify(views).loadView(FULL_SOURCE);
       } else {
@@ -234,6 +250,34 @@ public class TestSemanticModelSourceValidator {
       }
       verify(catalogs).doWithCatalog(eq(NameIdentifier.of("metalake", "other_catalog")), any());
     }
+  }
+
+  @Test
+  void testViewOnlyCatalogCanResolveSourceWithoutTableLookup() {
+    authorizeOnly(MetadataObject.Type.VIEW, Privilege.Name.SELECT_VIEW);
+    View view = mock(View.class);
+    doReturn(columns("id")).when(view).columns();
+    when(views.loadView(FULL_SOURCE)).thenReturn(view);
+    SemanticModelSourceValidator checking =
+        new SemanticModelSourceValidator(
+            tables, views, () -> authorizer, ident -> EnumSet.of(EntityType.VIEW));
+    checking.validate("metalake", definition(dataset("orders", new String[] {"id"}, null)));
+    verifyNoInteractions(tables);
+    verify(views).loadView(FULL_SOURCE);
+    when(views.loadView(FULL_SOURCE)).thenThrow(new NoSuchViewException("missing"));
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () -> checking.validate("metalake", definition(dataset("orders", null, null))));
+  }
+
+  @Test
+  void testSupportedTableOperationFailureIsNotHidden() {
+    when(tables.loadTable(FULL_SOURCE))
+        .thenThrow(new UnsupportedOperationException("connector failure"));
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+    verifyNoInteractions(views);
   }
 
   @Test
@@ -249,13 +293,13 @@ public class TestSemanticModelSourceValidator {
   @Test
   void testDeniedSourcesDoNotProbeCatalogCapabilities() {
     authorizer = mock(GravitinoAuthorizer.class);
-    Predicate<NameIdentifier> supportsViews = mock(Predicate.class);
+    Function<NameIdentifier, Set<EntityType>> supportedSourceTypes = mock(Function.class);
     SemanticModelSourceValidator checking =
-        new SemanticModelSourceValidator(tables, views, () -> authorizer, supportsViews);
+        new SemanticModelSourceValidator(tables, views, () -> authorizer, supportedSourceTypes);
     assertThrows(
         ForbiddenException.class,
         () -> checking.validate("metalake", definition(dataset("orders", null, null))));
-    verifyNoInteractions(tables, views, supportsViews);
+    verifyNoInteractions(tables, views, supportedSourceTypes);
   }
 
   private void authorizeOnly(MetadataObject.Type type, Privilege.Name privilege) {
