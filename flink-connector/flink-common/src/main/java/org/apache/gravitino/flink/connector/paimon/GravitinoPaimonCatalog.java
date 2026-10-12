@@ -87,6 +87,7 @@ public abstract class GravitinoPaimonCatalog extends BaseCatalog {
   private static final String HADOOP_S3_ENDPOINT = "fs.s3a.endpoint";
   private static final String HADOOP_S3_ACCESS_KEY = "fs.s3a.access.key";
   private static final String HADOOP_S3_SECRET_KEY = "fs.s3a.secret.key";
+  private static final String OSS_OPTION_PREFIX = "fs.oss.";
 
   private final CatalogFactory.Context context;
   // Mutable copy shared with BaseCatalog.catalogOptions. The inner Paimon catalog is created from a
@@ -155,6 +156,7 @@ public abstract class GravitinoPaimonCatalog extends BaseCatalog {
           e);
     }
     movePaimonStorageOptionsToConf(paimonOptions, hadoopConf);
+    copyOssOptionsBackToPaimonOptions(hadoopConf, paimonOptions);
     this.paimonCatalog = createInnerCatalog(paimonOptions, hadoopConf);
     super.open();
   }
@@ -195,6 +197,24 @@ public abstract class GravitinoPaimonCatalog extends BaseCatalog {
         paimonOptions, hadoopConf, PaimonConstants.OSS_ACCESS_KEY, PaimonConstants.OSS_ACCESS_KEY);
     moveOptionToHadoopConf(
         paimonOptions, hadoopConf, PaimonConstants.OSS_SECRET_KEY, PaimonConstants.OSS_SECRET_KEY);
+  }
+
+  /**
+   * Paimon's OSSFileIO (paimon-oss 1.x) builds its Hadoop configuration only from the catalog
+   * options and never reads the Hadoop configuration, so after the move above the OSS endpoint and
+   * keys would be invisible to it ("Aliyun OSS endpoint should not be null or empty"). Hand those
+   * entries back to the inner catalog's options; they stay out of this connector's own option map
+   * and other filesystems keep using the Hadoop configuration.
+   */
+  @VisibleForTesting
+  static void copyOssOptionsBackToPaimonOptions(
+      Configuration hadoopConf, Map<String, String> paimonOptions) {
+    for (Map.Entry<String, String> entry : hadoopConf) {
+      String key = entry.getKey();
+      if (key.startsWith(OSS_OPTION_PREFIX) && !paimonOptions.containsKey(key)) {
+        paimonOptions.put(key, hadoopConf.get(key));
+      }
+    }
   }
 
   private static void moveOptionToHadoopConf(
