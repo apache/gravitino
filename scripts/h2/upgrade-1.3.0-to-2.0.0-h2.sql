@@ -102,6 +102,52 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB COMMENT 'semantic model version information';
 
+CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task instance',
+    `task_data` BLOB COMMENT 'serialized task data',
+    `execution_time` TIMESTAMP(6) NOT NULL COMMENT 'next execution time',
+    `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
+    `picked_by` VARCHAR(50) COMMENT 'scheduler instance that picked the task',
+    `last_heartbeat` TIMESTAMP(6) COMMENT 'last heartbeat from the picker',
+    `version` BIGINT NOT NULL COMMENT 'optimistic lock version',
+    `consecutive_failures` INT COMMENT 'consecutive failure count',
+    `last_success` TIMESTAMP(6) COMMENT 'last successful execution time',
+    `last_failure` TIMESTAMP(6) COMMENT 'last failed execution time',
+    PRIMARY KEY (`task_name`, `task_instance`)
+) COMMENT='db-scheduler task queue for table maintenance';
+CREATE INDEX IF NOT EXISTS `scheduled_tasks_execution_time_idx` ON `scheduled_tasks`(`execution_time`);
+CREATE INDEX IF NOT EXISTS `scheduled_tasks_last_heartbeat_idx` ON `scheduled_tasks`(`last_heartbeat`);
+
+CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
+    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',
+    `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
+    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
+    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
+    `finished_at` BIGINT COMMENT 'finish timestamp in milliseconds, null while in flight',
+    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`)
+) COMMENT='table maintenance job run metadata';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tmj_job_id` ON `table_maintenance_job`(`job_id`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_table_policy_finished` ON `table_maintenance_job`(`table_id`, `policy_id`, `finished_at`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_before_sid` ON `table_maintenance_job`(`table_id`, `before_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_after_sid` ON `table_maintenance_job`(`table_id`, `after_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tmj_created_at` ON `table_maintenance_job`(`created_at`);
+
+CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
+    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
+    `snapshot_id` BIGINT NOT NULL COMMENT 'Iceberg snapshot id',
+    `metrics_value` CLOB NOT NULL COMMENT 'metrics value as JSON',
+    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`)
+) COMMENT='table snapshot metrics metadata';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
+
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
 -- (largest id) wins, and older ones are soft-deleted.
 UPDATE `owner_meta`

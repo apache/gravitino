@@ -151,6 +151,78 @@ COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model prop
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
 
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP(6) NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP(6),
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP(6),
+    last_failure TIMESTAMP(6),
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_tasks_execution_time_idx ON scheduled_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_tasks_last_heartbeat_idx ON scheduled_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_tasks IS 'db-scheduler task queue for table maintenance';
+COMMENT ON COLUMN scheduled_tasks.task_name IS 'db-scheduler task name';
+COMMENT ON COLUMN scheduled_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON COLUMN scheduled_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_tasks.last_failure IS 'last failed execution time';
+
+CREATE TABLE IF NOT EXISTS table_maintenance_job (
+    id BIGSERIAL PRIMARY KEY,
+    job_id BIGINT,
+    table_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    before_snapshot_id BIGINT,
+    after_snapshot_id BIGINT,
+    finished_at BIGINT,
+    created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tmj_job_id ON table_maintenance_job (job_id);
+CREATE INDEX IF NOT EXISTS idx_tmj_table_policy_finished ON table_maintenance_job (table_id, policy_id, finished_at);
+CREATE INDEX IF NOT EXISTS idx_tmj_before_sid ON table_maintenance_job (table_id, before_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tmj_after_sid ON table_maintenance_job (table_id, after_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tmj_created_at ON table_maintenance_job (created_at);
+COMMENT ON TABLE table_maintenance_job IS 'table maintenance job run metadata';
+COMMENT ON COLUMN table_maintenance_job.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_job.job_id IS 'job run id, maps to job_run_meta.job_run_id';
+COMMENT ON COLUMN table_maintenance_job.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_maintenance_job.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_maintenance_job.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
+COMMENT ON COLUMN table_maintenance_job.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
+COMMENT ON COLUMN table_maintenance_job.finished_at IS 'finish timestamp in milliseconds, null while in flight';
+COMMENT ON COLUMN table_maintenance_job.created_at IS 'creation timestamp in milliseconds';
+
+CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    table_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    snapshot_id BIGINT NOT NULL,
+    metrics_value TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
+COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
+COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'metrics value as JSON';
+COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'creation timestamp in milliseconds';
+
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
 -- (largest id) wins, and older ones are soft-deleted.
 UPDATE owner_meta

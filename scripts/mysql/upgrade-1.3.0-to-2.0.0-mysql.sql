@@ -549,6 +549,55 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
 
+CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
+    `task_name` VARCHAR(100) NOT NULL,
+    `task_instance` VARCHAR(100) NOT NULL,
+    `task_data` BLOB,
+    `execution_time` TIMESTAMP(6) NOT NULL,
+    `picked` BOOLEAN NOT NULL,
+    `picked_by` VARCHAR(50),
+    `last_heartbeat` TIMESTAMP(6) NULL,
+    `version` BIGINT NOT NULL,
+    `consecutive_failures` INT,
+    `last_success` TIMESTAMP(6) NULL,
+    `last_failure` TIMESTAMP(6) NULL,
+    PRIMARY KEY (`task_name`, `task_instance`),
+    KEY `execution_time_idx` (`execution_time`),
+    KEY `last_heartbeat_idx` (`last_heartbeat`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'db-scheduler task queue for table maintenance';
+
+CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
+    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
+    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after maintenance, null while pending',
+    `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'finish timestamp in milliseconds, null while in flight',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_tmj_job_id` (`job_id`),
+    KEY `idx_tmj_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
+    KEY `idx_tmj_before_sid` (`table_id`, `before_snapshot_id`),
+    KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`),
+    KEY `idx_tmj_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'table maintenance job run metadata';
+
+CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
+    `snapshot_id` BIGINT(20) NOT NULL COMMENT 'Iceberg snapshot id',
+    `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'metrics value as JSON',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
+    KEY `idx_tsm_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'table snapshot metrics metadata';
+
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
 -- (largest id) wins, and older ones are soft-deleted.
 UPDATE `owner_meta` o
