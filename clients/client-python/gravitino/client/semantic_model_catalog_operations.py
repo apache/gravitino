@@ -94,7 +94,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             f"/{encode_string(identifier.name())}",
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def create_semantic_model(
         self,
@@ -121,7 +121,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             json=req,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def alter_semantic_model(
         self, identifier: NameIdentifier, *changes: SemanticModelChange
@@ -141,7 +141,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             json=updates_request,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def drop_semantic_model(self, identifier: NameIdentifier) -> bool:
         self._check_semantic_model_name_identifier(identifier)
@@ -155,13 +155,14 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
         drop_resp.validate()
         return drop_resp.dropped()
 
-    @staticmethod
-    def _to_semantic_model(resp) -> SemanticModel:
+    def _to_semantic_model(self, resp, namespace: Namespace) -> SemanticModel:
         semantic_model_resp = SemanticModelResponse.from_json(
             resp.body, infer_missing=True
         )
         semantic_model_resp.validate()
-        return GenericSemanticModel(semantic_model_resp.semantic_model())
+        return GenericSemanticModel(
+            semantic_model_resp.semantic_model(), self._rest_client, namespace
+        )
 
     @staticmethod
     def _to_semantic_model_update_request(
