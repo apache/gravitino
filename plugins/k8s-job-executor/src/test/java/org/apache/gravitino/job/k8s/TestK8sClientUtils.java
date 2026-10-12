@@ -70,13 +70,23 @@ public class TestK8sClientUtils {
   }
 
   @Test
-  public void testMissingFiles() {
+  public void testMissingFiles() throws IOException {
     Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
     map.put(K8sJobExecutorConfigs.MASTER_URL, "https://jobs:6443");
     map.put(K8sJobExecutorConfigs.TOKEN_FILE, dir.resolve("missing").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)));
+
+    // A token file without a token fails the startup too, rather than the first request.
+    map.put(
+        K8sJobExecutorConfigs.TOKEN_FILE,
+        Files.write(dir.resolve("empty-token"), new byte[0]).toString());
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)));
+    Assertions.assertTrue(e.getMessage().contains("No token can be read"), e.getMessage());
 
     Map<String, String> kubeconfig = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
     kubeconfig.put(K8sJobExecutorConfigs.KUBECONFIG, dir.resolve("missing").toString());
@@ -213,6 +223,65 @@ public class TestK8sClientUtils {
     Assertions.assertEquals(
         "https://dev2:6443/",
         K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+  }
+
+  @Test
+  public void testEmptyKubeconfig() throws IOException {
+    for (String content : new String[] {"", "# nothing\n", "---\n"}) {
+      Path kubeconfig =
+          Files.write(dir.resolve("config"), content.getBytes(StandardCharsets.UTF_8));
+      Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+      map.put(K8sJobExecutorConfigs.KUBECONFIG, kubeconfig.toString());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)),
+          content);
+    }
+  }
+
+  @Test
+  public void testDefaultLookupWithoutUsableCluster() throws IOException {
+    // The client prefers this system property over the KUBECONFIG environment variable.
+    String property = "kubeconfig";
+    String before = System.getProperty(property);
+    Path kubeconfig = dir.resolve("config");
+    System.setProperty(property, kubeconfig.toString());
+    try {
+      Files.write(kubeconfig, KUBECONFIG.getBytes(StandardCharsets.UTF_8));
+      Map<String, String> map = new HashMap<>(TestK8sJobExecutorConfigs.requiredConfigs());
+      Assertions.assertEquals(
+          "https://dev:6443/",
+          K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+
+      // The cluster of the context isn't defined, so the client would stay on the API server of
+      // the cluster Gravitino itself runs in.
+      Files.write(
+          kubeconfig,
+          KUBECONFIG
+              .replace("context: {cluster: dev, user: admin}", "context: {cluster: nope}")
+              .getBytes(StandardCharsets.UTF_8));
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)));
+      Assertions.assertTrue(e.getMessage().contains("selects no cluster"), e.getMessage());
+
+      map.put(K8sJobExecutorConfigs.CONTEXT, "dev");
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)));
+
+      map.put(K8sJobExecutorConfigs.CONTEXT, "prod");
+      Assertions.assertEquals(
+          "https://prod:6443/",
+          K8sClientUtils.createClientConfig(new K8sJobExecutorConfigs(map)).getMasterUrl());
+    } finally {
+      if (before == null) {
+        System.clearProperty(property);
+      } else {
+        System.setProperty(property, before);
+      }
+    }
   }
 
   @Test

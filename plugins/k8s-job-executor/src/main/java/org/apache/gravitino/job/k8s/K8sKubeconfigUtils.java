@@ -24,13 +24,16 @@ import io.fabric8.kubernetes.api.model.Config;
 import io.fabric8.kubernetes.api.model.Context;
 import io.fabric8.kubernetes.api.model.NamedCluster;
 import io.fabric8.kubernetes.api.model.NamedContext;
-import io.fabric8.kubernetes.client.internal.KubeConfigUtils;
+import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Reads a kubeconfig file with the parser of the Kubernetes client, to check what the client will
+ * Reads a kubeconfig file into the model of the Kubernetes client, to check what the client will
  * make of it.
  */
 final class K8sKubeconfigUtils {
@@ -50,18 +53,23 @@ final class K8sKubeconfigUtils {
    */
   static String getSelectedServer(File kubeconfig, @Nullable String contextName) {
     Config content;
-    try {
-      content = KubeConfigUtils.parseConfig(kubeconfig);
-    } catch (RuntimeException e) {
+    try (InputStream in = Files.newInputStream(kubeconfig.toPath())) {
+      content = Serialization.unmarshal(in, Config.class);
+    } catch (IOException | RuntimeException e) {
       throw new IllegalArgumentException(
           String.format(
               "The kubeconfig %s set by %s can't be parsed",
               kubeconfig, K8sJobExecutorConfigs.KUBECONFIG),
           e);
     }
+    // An empty file has no content at all.
+    Preconditions.checkArgument(
+        content != null,
+        "The kubeconfig %s set by %s is empty",
+        kubeconfig,
+        K8sJobExecutorConfigs.KUBECONFIG);
 
-    String name =
-        contextName != null ? contextName : content == null ? null : content.getCurrentContext();
+    String name = contextName != null ? contextName : content.getCurrentContext();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name),
         "The kubeconfig %s set by %s has no current context, set its current-context or %s",

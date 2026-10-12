@@ -133,6 +133,19 @@ public class TestK8sJobExecutorConfigs {
     assertInvalid(K8sJobExecutorConfigs.TOKEN_FILE, "/token");
     assertInvalid(K8sJobExecutorConfigs.CA_CERT_FILE, "/ca.crt");
 
+    // A master URL without a scheme would let the client fall back to plain HTTP, and a token
+    // must never be sent over it.
+    assertInvalid(K8sJobExecutorConfigs.MASTER_URL, "k8s:6443");
+    assertInvalid(K8sJobExecutorConfigs.MASTER_URL, "ftp://k8s:6443");
+    assertInvalid(
+        K8sJobExecutorConfigs.MASTER_URL,
+        "http://k8s:6443",
+        K8sJobExecutorConfigs.TOKEN_FILE,
+        "/token");
+    Map<String, String> http = new HashMap<>(requiredConfigs());
+    http.put(K8sJobExecutorConfigs.MASTER_URL, "http://localhost:8001");
+    Assertions.assertEquals("http://localhost:8001", new K8sJobExecutorConfigs(http).masterUrl());
+
     Map<String, String> map = new HashMap<>(requiredConfigs());
     map.put(K8sJobExecutorConfigs.MASTER_URL, "https://k8s:6443");
     map.put(K8sJobExecutorConfigs.CA_CERT_FILE, "/ca.crt");

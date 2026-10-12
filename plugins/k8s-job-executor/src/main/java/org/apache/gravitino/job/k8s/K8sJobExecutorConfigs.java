@@ -47,7 +47,10 @@ public class K8sJobExecutorConfigs {
   /** The kubeconfig context to use, the current context if not set. */
   public static final String CONTEXT = "context";
 
-  /** The API server URL of the job cluster, an alternative to the kubeconfig. */
+  /**
+   * The API server URL of the job cluster, an alternative to the kubeconfig. It must start with
+   * {@code https://}, or with {@code http://} if no token file is set.
+   */
   public static final String MASTER_URL = "masterUrl";
 
   /** The CA certificate file of the API server, used with {@link #MASTER_URL}. */
@@ -179,6 +182,21 @@ public class K8sJobExecutorConfigs {
         CA_CERT_FILE,
         TOKEN_FILE,
         MASTER_URL);
+    // Without a scheme the client would pick one by probing the server, and fall back to plain
+    // HTTP if the probe fails, for example because the server isn't reachable at startup.
+    boolean https = StringUtils.startsWithIgnoreCase(masterUrl, "https://");
+    Preconditions.checkArgument(
+        masterUrl == null || https || StringUtils.startsWithIgnoreCase(masterUrl, "http://"),
+        "%s must start with https:// or http://: %s",
+        MASTER_URL,
+        masterUrl);
+    Preconditions.checkArgument(
+        masterUrl == null || https || tokenFile == null,
+        "%s must start with https:// when %s is set, otherwise the token would be sent in clear"
+            + " text: %s",
+        MASTER_URL,
+        TOKEN_FILE,
+        masterUrl);
 
     this.namespace = stringValue(configs, NAMESPACE, null);
     Preconditions.checkArgument(namespace != null, "%s must be set", NAMESPACE);

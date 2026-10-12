@@ -147,8 +147,8 @@ public final class K8sClientUtils {
    *
    * @param configs the job executor configurations
    * @return the Kubernetes client configuration
-   * @throws IllegalArgumentException if a configured file doesn't exist, or the kubeconfig has no
-   *     usable context
+   * @throws IllegalArgumentException if a configured file doesn't exist, the token file has no
+   *     token, or the kubeconfig has no context that selects a cluster with a server
    */
   static Config createClientConfig(K8sJobExecutorConfigs configs) {
     if (configs.masterUrl() != null) {
@@ -159,7 +159,19 @@ public final class K8sClientUtils {
       }
       if (configs.tokenFile() != null) {
         checkFileExists(configs.tokenFile(), K8sJobExecutorConfigs.TOKEN_FILE);
-        builder.withOauthTokenProvider(new FileTokenProvider(Paths.get(configs.tokenFile())));
+        FileTokenProvider tokenProvider = new FileTokenProvider(Paths.get(configs.tokenFile()));
+        // Read the token once now, so that a file without a token fails the startup rather than
+        // the first request.
+        try {
+          tokenProvider.getToken();
+        } catch (IllegalStateException | UncheckedIOException e) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "No token can be read from the file %s set by %s",
+                  configs.tokenFile(), K8sJobExecutorConfigs.TOKEN_FILE),
+              e);
+        }
+        builder.withOauthTokenProvider(tokenProvider);
       }
       return builder.withNamespace(configs.namespace()).build();
     }
@@ -170,8 +182,9 @@ public final class K8sClientUtils {
       File kubeconfig = new File(configs.kubeconfig());
       String server = K8sKubeconfigUtils.getSelectedServer(kubeconfig, configs.context());
       config = Config.fromKubeconfig(configs.context(), kubeconfig);
-      // The client reads the file itself, so make sure it ended up with the server found above,
-      // whatever it does with a kubeconfig that is malformed or changed in between.
+      // The client reads the file itself, so make sure it ended up with the server found above.
+      // This is a safety net with no known input that triggers it: it only fails if the client
+      // reads a kubeconfig differently from the check above, or the file changes in between.
       Preconditions.checkArgument(
           getHostAndPath(server).equals(getHostAndPath(config.getMasterUrl())),
           "The kubeconfig %s set by %s selects the server %s, but the client would use %s",
@@ -181,6 +194,23 @@ public final class K8sClientUtils {
           config.getMasterUrl());
     } else {
       config = Config.autoConfigure(configs.context());
+      // The default lookup may merge several kubeconfig files, so they aren't checked one by one.
+      // A context was found in them if there is a current context, and a context that selects a
+      // cluster with a server moves the client off its default API server. If it is still there,
+      // the context selects none, and the client would silently run the jobs in the cluster
+      // Gravitino runs in.
+      Preconditions.checkArgument(
+          config.getCurrentContext() == null
+              || !getHostAndPath(Config.DEFAULT_MASTER_URL)
+                  .equals(getHostAndPath(config.getMasterUrl())),
+          "The context %s of the kubeconfig found by the default lookup selects no cluster with a"
+              + " server. Fix that kubeconfig, or set %s or %s. To use the API server %s itself,"
+              + " set it by %s",
+          config.getCurrentContext() == null ? null : config.getCurrentContext().getName(),
+          K8sJobExecutorConfigs.KUBECONFIG,
+          K8sJobExecutorConfigs.MASTER_URL,
+          Config.DEFAULT_MASTER_URL,
+          K8sJobExecutorConfigs.MASTER_URL);
     }
 
     // The client falls back to the current context if the given one doesn't exist, which would
