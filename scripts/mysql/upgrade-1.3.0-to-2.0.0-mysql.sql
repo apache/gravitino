@@ -549,24 +549,6 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
 
-CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
-    `task_name` VARCHAR(100) NOT NULL,
-    `task_instance` VARCHAR(100) NOT NULL,
-    `task_data` BLOB,
-    `execution_time` TIMESTAMP(6) NOT NULL,
-    `picked` BOOLEAN NOT NULL,
-    `picked_by` VARCHAR(50),
-    `last_heartbeat` TIMESTAMP(6) NULL,
-    `version` BIGINT NOT NULL,
-    `consecutive_failures` INT,
-    `last_success` TIMESTAMP(6) NULL,
-    `last_failure` TIMESTAMP(6) NULL,
-    PRIMARY KEY (`task_name`, `task_instance`),
-    KEY `execution_time_idx` (`execution_time`),
-    KEY `last_heartbeat_idx` (`last_heartbeat`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-  COMMENT 'db-scheduler task queue for table maintenance';
-
 CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',

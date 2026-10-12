@@ -681,23 +681,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);
 
-CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
-    `task_name` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task name',
-    `task_instance` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task instance',
-    `task_data` BLOB COMMENT 'serialized task data',
-    `execution_time` TIMESTAMP(6) NOT NULL COMMENT 'next execution time',
-    `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
-    `picked_by` VARCHAR(50) COMMENT 'scheduler instance that picked the task',
-    `last_heartbeat` TIMESTAMP(6) COMMENT 'last heartbeat from the picker',
-    `version` BIGINT NOT NULL COMMENT 'optimistic lock version',
-    `consecutive_failures` INT COMMENT 'consecutive failure count',
-    `last_success` TIMESTAMP(6) COMMENT 'last successful execution time',
-    `last_failure` TIMESTAMP(6) COMMENT 'last failed execution time',
-    PRIMARY KEY (`task_name`, `task_instance`)
-) COMMENT='db-scheduler task queue for table maintenance';
-CREATE INDEX IF NOT EXISTS `scheduled_tasks_execution_time_idx` ON `scheduled_tasks`(`execution_time`);
-CREATE INDEX IF NOT EXISTS `scheduled_tasks_last_heartbeat_idx` ON `scheduled_tasks`(`last_heartbeat`);
-
 CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
     `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',

@@ -1176,35 +1176,6 @@ COMMENT ON COLUMN iceberg_cleanup_job.heartbeat_at IS 'last heartbeat from the w
 COMMENT ON COLUMN iceberg_cleanup_job.created_by IS 'principal that requested the drop (audit)';
 COMMENT ON COLUMN iceberg_cleanup_job.updated_at IS 'last state change, drives poll ordering and old finished-job cleanup';
 
-CREATE TABLE IF NOT EXISTS scheduled_tasks (
-    task_name VARCHAR(100) NOT NULL,
-    task_instance VARCHAR(100) NOT NULL,
-    task_data BYTEA,
-    execution_time TIMESTAMP(6) NOT NULL,
-    picked BOOLEAN NOT NULL,
-    picked_by VARCHAR(50),
-    last_heartbeat TIMESTAMP(6),
-    version BIGINT NOT NULL,
-    consecutive_failures INT,
-    last_success TIMESTAMP(6),
-    last_failure TIMESTAMP(6),
-    PRIMARY KEY (task_name, task_instance)
-);
-CREATE INDEX IF NOT EXISTS scheduled_tasks_execution_time_idx ON scheduled_tasks (execution_time);
-CREATE INDEX IF NOT EXISTS scheduled_tasks_last_heartbeat_idx ON scheduled_tasks (last_heartbeat);
-COMMENT ON TABLE scheduled_tasks IS 'db-scheduler task queue for table maintenance';
-COMMENT ON COLUMN scheduled_tasks.task_name IS 'db-scheduler task name';
-COMMENT ON COLUMN scheduled_tasks.task_instance IS 'db-scheduler task instance';
-COMMENT ON COLUMN scheduled_tasks.task_data IS 'serialized task data';
-COMMENT ON COLUMN scheduled_tasks.execution_time IS 'next execution time';
-COMMENT ON COLUMN scheduled_tasks.picked IS 'whether the task is currently picked';
-COMMENT ON COLUMN scheduled_tasks.picked_by IS 'scheduler instance that picked the task';
-COMMENT ON COLUMN scheduled_tasks.last_heartbeat IS 'last heartbeat from the picker';
-COMMENT ON COLUMN scheduled_tasks.version IS 'optimistic lock version';
-COMMENT ON COLUMN scheduled_tasks.consecutive_failures IS 'consecutive failure count';
-COMMENT ON COLUMN scheduled_tasks.last_success IS 'last successful execution time';
-COMMENT ON COLUMN scheduled_tasks.last_failure IS 'last failed execution time';
-
 CREATE TABLE IF NOT EXISTS table_maintenance_job (
     id BIGSERIAL PRIMARY KEY,
     job_id BIGINT,
