@@ -1561,6 +1561,16 @@ public class ErrorHandlers {
         case ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE:
           throw new OptimisticLockException(errorMessage);
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (CatalogNotInUseException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new CatalogNotInUseException(errorMessage);
+          } else if (MetalakeNotInUseException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new MetalakeNotInUseException(errorMessage);
+          }
+          throw new NotInUseException(errorMessage);
+
         default:
           super.accept(errorResponse);
       }

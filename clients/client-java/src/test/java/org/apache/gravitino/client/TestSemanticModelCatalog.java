@@ -58,11 +58,18 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
@@ -333,6 +340,19 @@ public class TestSemanticModelCatalog extends TestBase {
         NoSuchSemanticModelException.class,
         () -> catalog.asSemanticModelCatalog().loadSemanticModel(ident));
 
+    for (Class<? extends NotFoundException> exceptionClass :
+        List.of(
+            NoSuchMetalakeException.class, NoSuchCatalogException.class, NotFoundException.class)) {
+      String message = "Resource not found: " + exceptionClass.getSimpleName();
+      ErrorResponse notFound = ErrorResponse.notFound(exceptionClass.getSimpleName(), message);
+      buildMockResource(Method.GET, entityPath, null, notFound, SC_NOT_FOUND);
+      NotFoundException exception =
+          assertThrows(
+              exceptionClass, () -> catalog.asSemanticModelCatalog().loadSemanticModel(ident));
+      assertEquals(exceptionClass, exception.getClass());
+      assertTrue(exception.getMessage().contains(message));
+    }
+
     SemanticModelDefinition definition = definition();
     SemanticModelCreateRequest createRequest =
         new SemanticModelCreateRequest(
@@ -352,6 +372,22 @@ public class TestSemanticModelCatalog extends TestBase {
             catalog
                 .asSemanticModelCatalog()
                 .createSemanticModel(ident, null, definition, Collections.emptyMap()));
+
+    String alreadyExistsMessage = "Resource already exists";
+    ErrorResponse genericExists =
+        ErrorResponse.alreadyExists(
+            AlreadyExistsException.class.getSimpleName(), alreadyExistsMessage);
+    buildMockResource(
+        Method.POST, withSlash(semanticModelPath()), createRequest, genericExists, SC_CONFLICT);
+    AlreadyExistsException alreadyExistsException =
+        assertThrows(
+            AlreadyExistsException.class,
+            () ->
+                catalog
+                    .asSemanticModelCatalog()
+                    .createSemanticModel(ident, null, definition, Collections.emptyMap()));
+    assertEquals(AlreadyExistsException.class, alreadyExistsException.getClass());
+    assertTrue(alreadyExistsException.getMessage().contains(alreadyExistsMessage));
 
     ErrorResponse invalid =
         ErrorResponse.illegalArguments(
@@ -403,6 +439,22 @@ public class TestSemanticModelCatalog extends TestBase {
     assertThrows(
         OptimisticLockException.class,
         () -> ErrorHandlers.semanticModelErrorHandler().accept(conflict));
+
+    for (Class<? extends NotInUseException> exceptionClass :
+        List.of(
+            CatalogNotInUseException.class,
+            MetalakeNotInUseException.class,
+            NotInUseException.class)) {
+      String message = "Resource not in use: " + exceptionClass.getSimpleName();
+      ErrorResponse notInUse =
+          ErrorResponse.notInUse(exceptionClass.getSimpleName(), message, null);
+      buildMockResource(Method.GET, entityPath, null, notInUse, SC_CONFLICT);
+      NotInUseException exception =
+          assertThrows(
+              exceptionClass, () -> catalog.asSemanticModelCatalog().loadSemanticModel(ident));
+      assertEquals(exceptionClass, exception.getClass());
+      assertTrue(exception.getMessage().contains(message));
+    }
   }
 
   @Test
