@@ -38,6 +38,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
@@ -680,6 +681,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       // Never overwrite imported schema metadata. In particular, an overwrite by stable ID can
       // silently change catalog ownership and make existing privileges refer to the wrong path.
       store.put(schemaEntity, false);
+    } catch (SoftDeletedEntityIdentifierException e) {
+      throw softDeletedExternalIdentifierException(identifier, uid, SCHEMA);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {

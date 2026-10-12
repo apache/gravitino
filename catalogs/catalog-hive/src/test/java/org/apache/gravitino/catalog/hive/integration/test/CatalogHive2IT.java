@@ -1420,7 +1420,7 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   @Test
-  public void testOutOfBandRenameKeepsColumnTags() throws InterruptedException {
+  public void testOutOfBandRenameRequiresManualReconciliation() throws InterruptedException {
     // Hive stores names in lower case, and tag operations resolve a column by its stored name.
     String schema = schemaName.toLowerCase(Locale.ROOT);
     NameIdentifier ident =
@@ -1435,7 +1435,7 @@ public class CatalogHive2IT extends BaseIT {
       loadColumn(ident, HIVE_COL_NAME1).supportsTags().associateTags(new String[] {tagName}, null);
 
       // Rename the table directly in the Hive Metastore. It keeps its Gravitino id in its table
-      // parameters, so loading it under the new name imports it again over the same id.
+      // parameters, but Gravitino must not automatically move the stored identity to the new path.
       String newName = GravitinoITUtils.genRandomName("hive_oob_renamed_table");
       HiveTable hiveTable = loadHiveTable(schema, ident.name());
       HiveTable.Builder renamed =
@@ -1458,14 +1458,21 @@ public class CatalogHive2IT extends BaseIT {
             return null;
           });
 
-      // The column keeps its id, so the tag follows the table to its new name.
+      // Loading the external name now requires manual reconciliation. The rejected import must
+      // leave the tag relation attached to the original Gravitino identity.
       NameIdentifier newIdent = NameIdentifier.of(schema, newName);
-      Column column = loadColumn(newIdent, HIVE_COL_NAME1);
-      Assertions.assertArrayEquals(new String[] {tagName}, column.supportsTags().listTags());
+      UnsupportedOperationException exception =
+          assertThrows(
+              UnsupportedOperationException.class, () -> loadColumn(newIdent, HIVE_COL_NAME1));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("does not automatically reconcile external table renames"));
       MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
       Assertions.assertEquals(1, objects.length);
       Assertions.assertEquals(
-          String.join(".", catalogName, schema, newName, HIVE_COL_NAME1).toLowerCase(Locale.ROOT),
+          String.join(".", catalogName, schema, ident.name(), HIVE_COL_NAME1)
+              .toLowerCase(Locale.ROOT),
           objects[0].fullName().toLowerCase(Locale.ROOT));
     } finally {
       metalake.deleteTag(tagName);

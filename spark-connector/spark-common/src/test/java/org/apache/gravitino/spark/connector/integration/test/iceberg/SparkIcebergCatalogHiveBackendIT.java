@@ -30,6 +30,12 @@ import org.junit.jupiter.api.Tag;
 @Tag("gravitino-docker-test")
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
 
+  /** {@inheritDoc} */
+  @Override
+  protected boolean replaceColumnsRequiresManualReconciliation() {
+    return true;
+  }
+
   @Override
   protected Map<String, String> getExtraSparkConfigs() {
     // This class deliberately exercises the legacy Hive backend without a discoverable Iceberg

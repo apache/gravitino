@@ -46,6 +46,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
@@ -194,7 +195,14 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
     if (!overwritten || !BaseEntityCache.isCacheable(e.type())) {
-      insertEntity(e, overwritten);
+      try {
+        insertEntity(e, overwritten);
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (!overwritten && isSoftDeleted(e.id(), e.type())) {
+          throw new SoftDeletedEntityIdentifierException(duplicate, e.type(), e.id());
+        }
+        throw duplicate;
+      }
       return;
     }
 
@@ -1023,6 +1031,19 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
+    }
+  }
+
+  private boolean isSoftDeleted(long entityId, Entity.EntityType entityType) {
+    switch (entityType) {
+      case SCHEMA:
+        return SchemaMetaService.getInstance().isSoftDeleted(entityId);
+      case TABLE:
+        return TableMetaService.getInstance().isSoftDeleted(entityId);
+      case VIEW:
+        return ViewMetaService.getInstance().isSoftDeleted(entityId);
+      default:
+        return false;
     }
   }
 

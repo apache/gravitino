@@ -120,6 +120,14 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsReplaceColumns();
 
+  /**
+   * Returns whether replacing all columns changes the external table identity and therefore
+   * requires manual reconciliation before Gravitino can load the table again.
+   */
+  protected boolean replaceColumnsRequiresManualReconciliation() {
+    return false;
+  }
+
   protected abstract boolean supportsSchemaAndTableProperties();
 
   protected abstract boolean supportsComplexType();
@@ -620,6 +628,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         String.format(
             "ALTER TABLE %s REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
             tableName));
+    if (replaceColumnsRequiresManualReconciliation()) {
+      UnsupportedOperationException exception =
+          Assertions.assertThrows(
+              UnsupportedOperationException.class, () -> getTableInfo(tableName));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("does not automatically reconcile external table renames"));
+      return;
+    }
+
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>();
     // change comment for id
     updateColumns.add(SparkColumnInfo.of("id", DataTypes.IntegerType, "new comment"));

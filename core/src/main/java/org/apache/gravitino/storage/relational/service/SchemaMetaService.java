@@ -131,6 +131,18 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
+  /**
+   * Checks whether a schema ID is retained by a soft-deleted row.
+   *
+   * @param schemaId the schema ID
+   * @return true if a soft-deleted row retains the ID, false otherwise
+   */
+  public boolean isSoftDeleted(long schemaId) {
+    return SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.countDeletedSchemaMetasById(schemaId))
+        > 0;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertSchema")

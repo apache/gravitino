@@ -108,6 +108,18 @@ public class TableMetaService {
     return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
+  /**
+   * Checks whether a table ID is retained by a soft-deleted row.
+   *
+   * @param tableId the table ID
+   * @return true if a soft-deleted row retains the ID, false otherwise
+   */
+  public boolean isSoftDeleted(long tableId) {
+    return SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> mapper.countDeletedTableMetasById(tableId))
+        > 0;
+  }
+
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertTable")
   public void insertTable(TableEntity tableEntity, boolean overwrite) throws IOException {
     try {
