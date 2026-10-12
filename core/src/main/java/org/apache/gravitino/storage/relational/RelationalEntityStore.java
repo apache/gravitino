@@ -59,6 +59,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,13 @@ import org.slf4j.LoggerFactory;
  * Relation store to store entities. This means we can store entities in a relational store. I.e.,
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
+ *
+ * <p>A write that fails because a statement waited on a row lock longer than the backend's lock
+ * wait timeout is reported as an {@link org.apache.gravitino.exceptions.OptimisticLockException},
+ * so callers see a conflict they can retry rather than an internal error. Writers queue on the same
+ * rows inside the database, for example a table drop behind a statistic update of that table, and
+ * the backend aborts the waiting statement once the timeout is reached. See {@link
+ * ExceptionUtils#isLockWaitTimeout}.
  */
 public class RelationalEntityStore
     implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
@@ -215,7 +223,11 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    backend.insert(e, overwritten);
+    try {
+      backend.insert(e, overwritten);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, e.type(), e.nameIdentifier());
+    }
     if (overwritten) {
       // An overwrite is resolved by the database, which may keep the identity and version of the
       // row it already had. Caching the copy handed in here would publish values the stored row
@@ -230,7 +242,12 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    E updatedEntity = backend.update(ident, entityType, updater);
+    E updatedEntity;
+    try {
+      updatedEntity = backend.update(ident, entityType, updater);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+    }
     invalidateCache(ident, entityType);
     return updatedEntity;
   }
@@ -308,6 +325,8 @@ public class RelationalEntityStore
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       invalidateCache(ident, entityType);
     }
@@ -322,6 +341,8 @@ public class RelationalEntityStore
       throws IOException {
     try {
       return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       invalidateCache(ident, entityType);
     }
@@ -424,7 +445,11 @@ public class RelationalEntityStore
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
-    backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+    try {
+      backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, srcType, srcIdentifier);
+    }
     // Relation query results themselves are not cached, but both endpoints may be cached entities
     // (OWNER_REL, TAG_METADATA_OBJECT_REL and METADATA_OBJECT_ROLE_REL are keyed by
     // catalog/schema/table/... on the source side), so drop their entries conservatively: a
@@ -447,8 +472,12 @@ public class RelationalEntityStore
     if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
       return;
     }
-    backend.batchInsertRelations(
-        relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
+    try {
+      backend.batchInsertRelations(
+          relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, dstType, dstIdentifier);
+    }
     // Invalidate both endpoints for the same reason as insertRelation, including the hierarchy
     // cascade noted there.
     for (NameIdentifier ident : srcIdentifiers) {
@@ -476,9 +505,14 @@ public class RelationalEntityStore
       return updateEntityRelations(update);
     }
 
-    List<E> result =
-        backend.updateEntityRelations(
-            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    List<E> result;
+    try {
+      result =
+          backend.updateEntityRelations(
+              relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, srcEntityType, srcEntityIdent);
+    }
     Entity.EntityType targetEntityType = relationUpdateTargetType(relType);
     invalidateCache(srcEntityIdent, srcEntityType);
     invalidateRelationTargetCache(targetEntityType, update.targetsToAdd());
@@ -508,7 +542,13 @@ public class RelationalEntityStore
 
     RelationEdgeTarget[] targetsToAdd = update.targetsToAdd();
     RelationEdgeTarget[] targetsToRemove = update.targetsToRemove();
-    List<E> result = backend.updateEntityRelations(update);
+    List<E> result;
+    try {
+      result = backend.updateEntityRelations(update);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, update.sourceEntityType(), update.sourceIdentifier());
+    }
 
     // Invalidate after the backend write, not before: invalidating first opens a window where a
     // concurrent read could repopulate the cache with stale pre-commit data.
@@ -524,13 +564,23 @@ public class RelationalEntityStore
   public int batchDelete(
       List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
-    return backend.batchDelete(entitiesToDelete, cascade);
+    try {
+      return backend.batchDelete(entitiesToDelete, cascade);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, String.format("The batch of %d entities", entitiesToDelete.size()));
+    }
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    backend.batchPut(entities, overwritten);
+    try {
+      backend.batchPut(entities, overwritten);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, String.format("The batch of %d entities", entities.size()));
+    }
   }
 
   private void invalidateRelationTargetCache(

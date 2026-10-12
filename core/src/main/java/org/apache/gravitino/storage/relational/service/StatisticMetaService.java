@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -46,6 +45,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticSQLProviderFactory;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -55,9 +55,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 public class StatisticMetaService {
 
-  private static final int MYSQL_LOCK_WAIT_TIMEOUT = 1205;
   private static final int MYSQL_DEADLOCK = 1213;
-  private static final int H2_LOCK_TIMEOUT = 50200;
 
   private static final StatisticMetaService INSTANCE = new StatisticMetaService();
 
@@ -362,38 +360,22 @@ public class StatisticMetaService {
    * and MySQL reports error code 1062, the same codes the backend exception converters match.
    */
   private static boolean isDuplicateKey(Throwable failure) {
-    return hasSqlException(failure, Set.of("23505"), Set.of(1062));
+    return ExceptionUtils.hasSqlException(failure, Set.of("23505"), Set.of(1062));
   }
 
   /**
    * Returns whether a failure is a deadlock, serialization failure or lock wait timeout caused by a
-   * concurrent writer. The accepted codes intentionally cover more than the current default
-   * configuration emits. PostgreSQL reports 40P01 for deadlocks at our READ COMMITTED isolation;
-   * 40001 also covers serialization failures at stricter isolation levels, and 55P03 covers a
-   * server-configured lock_timeout. H2 reports 40001 for a deadlock and error code 50200 (SQLState
-   * HYT00) for a lock wait timeout. MySQL reports error code 1213 for a deadlock and 1205 for a
-   * lock wait timeout. Vendor error codes are matched because a timeout's SQLState depends on the
-   * driver.
+   * concurrent writer. Lock wait timeouts are classified by {@link
+   * ExceptionUtils#isLockWaitTimeout}, as for every other store write. Unlike other writes, a batch
+   * statement here locks its rows in the order of the database's plan, which differs between
+   * batches, so deadlocks are expected and accepted as conflicts too. PostgreSQL reports 40P01 for
+   * deadlocks at our READ COMMITTED isolation; 40001 also covers serialization failures at stricter
+   * isolation levels. H2 reports 40001 for a deadlock, and MySQL reports error code 1213.
    */
   private static boolean isConcurrencyFailure(Throwable failure) {
-    return hasSqlException(
-        failure,
-        Set.of("40001", "40P01", "55P03"),
-        Set.of(MYSQL_DEADLOCK, MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT));
-  }
-
-  private static boolean hasSqlException(
-      Throwable failure, Set<String> sqlStates, Set<Integer> vendorErrorCodes) {
-    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-      if (cause instanceof SQLException) {
-        SQLException sql = (SQLException) cause;
-        if (sqlStates.contains(sql.getSQLState())
-            || vendorErrorCodes.contains(sql.getErrorCode())) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return ExceptionUtils.isLockWaitTimeout(failure)
+        || ExceptionUtils.hasSqlException(
+            failure, Set.of("40001", "40P01"), Set.of(MYSQL_DEADLOCK));
   }
 
   @Monitored(

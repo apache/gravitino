@@ -19,10 +19,17 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.sql.SQLException;
+import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Test;
 
 public class TestExceptionUtils {
@@ -46,5 +53,61 @@ public class TestExceptionUtils {
     assertEquals(
         "A schema under catalog m1.c1 was modified concurrently; retry the operation",
         e.getMessage());
+  }
+
+  @Test
+  public void testIsLockWaitTimeout() {
+    for (SQLException timeout :
+        List.of(
+            // The MySQL driver reports 1205 as SQLState 40001 or HY000 depending on its version.
+            new SQLException("MySQL lock wait timeout", "40001", 1205),
+            new SQLException("MySQL lock wait timeout", "HY000", 1205),
+            new SQLException("H2 lock wait timeout", "HYT00", 50200),
+            new SQLException("PostgreSQL lock timeout", "55P03"))) {
+      assertTrue(ExceptionUtils.isLockWaitTimeout(timeout), timeout.getMessage());
+      // MyBatis wraps the driver exception, possibly more than once.
+      assertTrue(
+          ExceptionUtils.isLockWaitTimeout(new RuntimeException(new PersistenceException(timeout))),
+          timeout.getMessage());
+    }
+
+    for (Throwable other :
+        List.of(
+            new SQLException("MySQL deadlock", "40001", 1213),
+            new SQLException("H2 deadlock", "40001", 40001),
+            new SQLException("PostgreSQL deadlock", "40P01"),
+            new SQLException("serialization failure", "40001"),
+            new SQLException("H2 statement timeout", "57014", 57014),
+            new SQLException("connection lost", "08006"),
+            new PersistenceException("no SQL cause"))) {
+      assertFalse(ExceptionUtils.isLockWaitTimeout(other), other.getMessage());
+    }
+  }
+
+  @Test
+  public void testLockWaitTimeoutAsConflict() {
+    PersistenceException timeout =
+        new PersistenceException(new SQLException("H2 lock wait timeout", "HYT00", 50200));
+    RuntimeException conflict =
+        ExceptionUtils.lockWaitTimeoutAsConflict(
+            timeout, Entity.EntityType.TABLE, NameIdentifier.of("m1", "c1", "s1", "t1"));
+    assertInstanceOf(OptimisticLockException.class, conflict);
+    assertSame(timeout, conflict.getCause());
+    assertEquals(
+        "The table m1.c1.s1.t1 could not be changed because a concurrent operation held its lock"
+            + " longer than the backend's lock wait timeout; retry the operation",
+        conflict.getMessage());
+
+    assertEquals(
+        "The batch of 2 entities could not be changed because a concurrent operation held its"
+            + " lock longer than the backend's lock wait timeout; retry the operation",
+        ExceptionUtils.lockWaitTimeoutAsConflict(timeout, "The batch of 2 entities").getMessage());
+
+    // A conflict is never wrapped again, and any other failure is returned as is.
+    OptimisticLockException existing = new OptimisticLockException(timeout, "already a conflict");
+    assertSame(existing, ExceptionUtils.lockWaitTimeoutAsConflict(existing, "The table t1"));
+    PersistenceException deadlock =
+        new PersistenceException(new SQLException("MySQL deadlock", "40001", 1213));
+    assertSame(deadlock, ExceptionUtils.lockWaitTimeoutAsConflict(deadlock, "The table t1"));
   }
 }

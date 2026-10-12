@@ -21,12 +21,23 @@ package org.apache.gravitino.storage.relational.utils;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Locale;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 
 public class ExceptionUtils {
+
+  /** MySQL error code of a lock wait timeout (ER_LOCK_WAIT_TIMEOUT). */
+  private static final int MYSQL_LOCK_WAIT_TIMEOUT = 1205;
+
+  /** H2 error code of a lock wait timeout (LOCK_TIMEOUT_1, SQLState HYT00). */
+  private static final int H2_LOCK_TIMEOUT = 50200;
+
+  /** PostgreSQL SQLState of a lock that is not available within lock_timeout. */
+  private static final String POSTGRESQL_LOCK_NOT_AVAILABLE = "55P03";
+
   private ExceptionUtils() {}
 
   public static void checkSQLException(
@@ -68,5 +79,86 @@ public class ExceptionUtils {
         childType.name().toLowerCase(Locale.ROOT),
         parentType.name().toLowerCase(Locale.ROOT),
         parentIdentifier);
+  }
+
+  /**
+   * Returns whether a failure was caused by a statement that waited on a row lock longer than the
+   * backend's lock wait timeout. MySQL reports error code 1205, H2 error code 50200 (SQLState
+   * HYT00), and PostgreSQL SQLState 55P03 when lock_timeout is set. The MySQL and H2 vendor codes
+   * are matched rather than their SQLState, because the MySQL driver reports a lock wait timeout as
+   * SQLState 40001 or HY000 depending on its version, and 40001 is also used for deadlocks.
+   *
+   * <p>Deadlocks are deliberately not included: a deadlock on a write path points at an
+   * inconsistent lock order, which should be fixed on that path rather than reported as a conflict.
+   *
+   * @param failure The failure to inspect, including its causes.
+   * @return {@code true} if a lock wait timeout is found in the cause chain.
+   */
+  public static boolean isLockWaitTimeout(Throwable failure) {
+    return hasSqlException(
+        failure,
+        Set.of(POSTGRESQL_LOCK_NOT_AVAILABLE),
+        Set.of(MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT));
+  }
+
+  /**
+   * Returns whether the cause chain of a failure contains a {@link SQLException} with one of the
+   * given SQLStates or vendor error codes.
+   *
+   * @param failure The failure to inspect, including its causes.
+   * @param sqlStates The SQLStates to match.
+   * @param vendorErrorCodes The vendor error codes to match.
+   * @return {@code true} if a matching {@link SQLException} is found.
+   */
+  public static boolean hasSqlException(
+      Throwable failure, Set<String> sqlStates, Set<Integer> vendorErrorCodes) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SQLException) {
+        SQLException sql = (SQLException) cause;
+        if (sqlStates.contains(sql.getSQLState())
+            || vendorErrorCodes.contains(sql.getErrorCode())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Reports a write of one entity that failed on a lock wait timeout as a conflict.
+   *
+   * @param failure The failure of the write.
+   * @param type The type of the entity being written.
+   * @param identifier The identifier of the entity being written.
+   * @return An {@link OptimisticLockException} for a lock wait timeout, otherwise {@code failure}.
+   * @see #lockWaitTimeoutAsConflict(RuntimeException, String)
+   */
+  public static RuntimeException lockWaitTimeoutAsConflict(
+      RuntimeException failure, Entity.EntityType type, NameIdentifier identifier) {
+    return lockWaitTimeoutAsConflict(
+        failure, String.format("The %s %s", type.name().toLowerCase(Locale.ROOT), identifier));
+  }
+
+  /**
+   * Reports a write that failed on a lock wait timeout as a conflict. The statement waited behind a
+   * concurrent writer of the same rows until the backend aborted it, and the store rolls the
+   * transaction back, so the caller can retry the operation. Any other failure, including one that
+   * is already an {@link OptimisticLockException}, is returned unchanged.
+   *
+   * @param failure The failure of the write.
+   * @param target What was being written, as the subject of the message, for example "The table
+   *     m1.c1.s1.t1".
+   * @return An {@link OptimisticLockException} for a lock wait timeout, otherwise {@code failure}.
+   */
+  public static RuntimeException lockWaitTimeoutAsConflict(
+      RuntimeException failure, String target) {
+    if (failure instanceof OptimisticLockException || !isLockWaitTimeout(failure)) {
+      return failure;
+    }
+    return new OptimisticLockException(
+        failure,
+        "%s could not be changed because a concurrent operation held its lock longer than the"
+            + " backend's lock wait timeout; retry the operation",
+        target);
   }
 }
