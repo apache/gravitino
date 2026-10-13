@@ -19,7 +19,8 @@ The connector is published as a version-specific runtime JAR for each supported 
 2. Supports [Iceberg catalog](flink-catalog-iceberg.md)
 3. Supports [Paimon catalog](flink-catalog-paimon.md)
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
-5. Supports most DDL and DML SQLs.
+5. Supports [Lance REST catalog](flink-catalog-lance.md)
+6. Supports most DDL and DML SQLs.
 
 ## Prerequisites
 
@@ -29,7 +30,7 @@ The connector is published as a version-specific runtime JAR for each supported 
 
 On Flink 2.x, the Hive catalog is not supported: `flink-connector-hive` has not published a
 release targeting the Flink 2.x line yet (tracked upstream as
-[FLINK-38031](https://issues.apache.org/jira/browse/FLINK-38031)). Iceberg, Paimon, and JDBC
+[FLINK-38031](https://issues.apache.org/jira/browse/FLINK-38031)). Iceberg, Paimon, JDBC, and Lance
 catalogs are supported on Flink 2.x.
 
 ## Usage

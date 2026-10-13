@@ -287,6 +287,36 @@ public class TestGravitinoCatalogStore {
     }
   }
 
+  @Test
+  public void testCatalogFactoryForLanceProviders() {
+    BaseCatalogFactory lanceFactory = mock(BaseCatalogFactory.class);
+    when(lanceFactory.gravitinoCatalogProvider()).thenReturn("lakehouse-generic");
+    when(lanceFactory.supportsProvider("lakehouse-generic")).thenCallRealMethod();
+    when(lanceFactory.supportsProvider("lance")).thenReturn(true);
+    when(lanceFactory.supportsProvider("lakehouse-lance")).thenReturn(true);
+
+    BaseCatalogFactory matched =
+        gravitinoCatalogStore.discoverFactories(
+            java.util.List.<Factory>of(lanceFactory).iterator(),
+            factory -> ((BaseCatalogFactory) factory).supportsProvider("lakehouse-generic"),
+            "Error");
+    assertSame(lanceFactory, matched);
+
+    matched =
+        gravitinoCatalogStore.discoverFactories(
+            java.util.List.<Factory>of(lanceFactory).iterator(),
+            factory -> ((BaseCatalogFactory) factory).supportsProvider("lance"),
+            "Error");
+    assertSame(lanceFactory, matched);
+
+    matched =
+        gravitinoCatalogStore.discoverFactories(
+            java.util.List.<Factory>of(lanceFactory).iterator(),
+            factory -> ((BaseCatalogFactory) factory).supportsProvider("lakehouse-lance"),
+            "Error");
+    assertSame(lanceFactory, matched);
+  }
+
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();

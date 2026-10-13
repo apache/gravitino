@@ -96,6 +96,7 @@ dependencies {
   compileOnly(libs.flinkjdbc21.core)
   compileOnly(libs.flinkjdbc21.mysql)
   compileOnly(libs.flinkjdbc21.postgres)
+  compileOnly(libs.lance.namespace.apache.client)
   compileOnly(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -140,6 +141,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.metrics.core)
   testImplementation(libs.minikdc)
+  testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
