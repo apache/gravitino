@@ -195,7 +195,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-                    secondaryExpressionCondition);
+                    secondaryExpressionCondition,
+                    expressionAnnotation.allowCheckExistence());
             Optional<String> dynamicMetalake;
             try {
               dynamicMetalake = executor.getAuthorizationMetalake();

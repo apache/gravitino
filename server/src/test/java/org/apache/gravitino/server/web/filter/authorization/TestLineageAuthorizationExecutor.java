@@ -403,7 +403,8 @@ class TestLineageAuthorizationExecutor {
         lineageMethod().getParameters(),
         new Object[] {event},
         "",
-        ExpressionCondition.NEVER);
+        ExpressionCondition.NEVER,
+        "");
   }
 
   private static Method lineageMethod() throws NoSuchMethodException {

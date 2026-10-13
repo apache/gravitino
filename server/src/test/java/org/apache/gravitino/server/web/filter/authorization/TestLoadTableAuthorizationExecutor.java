@@ -74,7 +74,8 @@ public class TestLoadTableAuthorizationExecutor {
         Collections.emptyMap(),
         Optional.empty(),
         SECONDARY_EXPRESSION,
-        condition);
+        condition,
+        "");
   }
 
   private static String expression(LoadTableAuthorizationExecutor executor) throws Exception {
