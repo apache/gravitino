@@ -108,22 +108,9 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Core's tests run in one of four Gradle lanes: coreUnitTest (default, no Docker) and
-// coreH2Test/coreMySQLTest/corePostgreSQLTest (one per backend, coreMySQLTest and
-// corePostgreSQLTest need Docker). Lane membership is decided purely by which of the three
-// backend tags below a test class carries - see CoreBackend in
-// core/src/test/java/org/apache/gravitino/storage/relational/CoreBackend.java for the typed
-// annotations (@CoreBackend.H2/.MySQL/.PostgreSQL/.All) that set them, instead of writing raw
-// @Tag("...") strings by hand:
-//   @CoreBackend.H2                        -> runs only in coreH2Test
-//   @CoreBackend.H2 @CoreBackend.MySQL     -> runs in coreH2Test and coreMySQLTest
-//   @CoreBackend.All                       -> runs in all three backend lanes
-//   (no CoreBackend annotation at all)     -> a plain unit test, runs in coreUnitTest
-// A class needing Docker but carrying no backend tag runs in no lane task (only in legacy
-// :core:test with Docker on), and TestCoreLaneMembership fails coreUnitTest for it.
-//
-// Backend name -> JUnit tag that admits a test class to that backend's lane. Adding a backend
-// here is enough to teach the lane filtering below about it; also add it to CoreBackend.java.
+// Core's tests run in four lanes: coreUnitTest, plus coreH2Test/coreMySQLTest/corePostgreSQLTest.
+// A class joins a backend lane through its @CoreBackend.* annotation; see CoreBackend.java.
+// Backend name -> the JUnit tag that admits a class to that lane. Keep in sync with CoreBackend.
 val coreBackendTestTags =
   linkedMapOf(
     "h2" to "gravitino-core-h2-test",
@@ -149,11 +136,6 @@ fun registerCoreTestTask(
 
   inputs.property("coreTestSuite", backend ?: "unit")
   inputs.property("coreTestBackend", backend ?: "none")
-  // Distinct from the extensions.extraProperties["includeDockerTaggedTests"] flag set below,
-  // which is a different mechanism (read by root build.gradle.kts's shared test-environment
-  // setup to decide whether to exclude gravitino-docker-test) - this is only a Gradle
-  // up-to-date-check input.
-  inputs.property("coreTestIncludesDockerTaggedTests", backend != null)
   reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/$taskName"))
   reports.html.outputLocation.set(
     rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")
@@ -234,16 +216,8 @@ tasks.named<JacocoReport>("jacocoTestReport") {
   }
 }
 
-// :core:test is the java plugin's built-in `test` task, kept registered (and working) only for
-// backward compatibility - IDEs and other tooling may still target it by convention. It is
-// deprecated in place, not removed:
-//  - Dev CUJ: a contributor running tests locally should target one of the four lanes registered
-//    above (coreUnitTest / coreH2Test / coreMySQLTest / corePostgreSQLTest), never :core:test -
-//    it predates the lane split and does not correspond to any CI lane.
-//  - CI CUJ: no change needed here. build.yml's `build` job passes `-x :core:test` and runs each
-//    lane in its own `core-test` job. Backend IT still realizes it via the root `test` task under
-//    -PskipTests, where the `**/integration/test/**` filter matches nothing in core, so the
-//    warning below can also appear in those logs.
+// :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
+// (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
 tasks.test {
   val policiesDocument = rootProject.file("docs/policies.md")
   inputs.file(policiesDocument)

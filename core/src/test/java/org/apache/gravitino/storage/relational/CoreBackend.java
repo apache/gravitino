@@ -27,35 +27,15 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 
 /**
- * Namespace for the annotations that select which core database test lane(s) a class runs in.
+ * Annotations that choose which core database test lane(s) a class runs in. Each lane task ({@code
+ * coreH2Test}, {@code coreMySQLTest}, {@code corePostgreSQLTest}) includes only classes with its
+ * tag; stack annotations to join several lanes, or use {@link All}. A class with none of them is a
+ * unit test and runs in {@code coreUnitTest}. {@code TestCoreLaneMembership} fails if a class
+ * carries {@code gravitino-docker-test} but no backend tag, since it would run in no lane.
  *
- * <p>The core test suite is split into one Gradle task per backend ({@code coreH2Test}, {@code
- * coreMySQLTest}, {@code corePostgreSQLTest}), and each lane simply includes the classes carrying
- * its backend tag. A class runs under exactly the lanes it is tagged for - there is no separate "is
- * this a database test" gatekeeper tag to keep in sync:
- *
- * <ul>
- *   <li>{@link H2}, {@link MySQL}, {@link PostgreSQL} pin a class to one lane; stack more than one
- *       to run under several lanes, e.g. {@code @CoreBackend.H2 @CoreBackend.MySQL}.
- *   <li>{@link All} runs a class under all three lanes.
- *   <li>A class with none of these is a unit test and runs in {@code coreUnitTest} - unless it also
- *       carries {@code @Tag("gravitino-docker-test")}, in which case it runs in no lane task (only
- *       in legacy {@code :core:test} with Docker on) and {@code TestCoreLaneMembership} fails.
- * </ul>
- *
- * <p>Each is a plain JUnit composed annotation: meta-annotated with {@link Tag} and nothing else,
- * so it is exactly equivalent to writing the raw {@code @Tag} string(s) on the class. JUnit expands
- * it while scanning class annotations during test discovery (see {@code
- * org.junit.platform.commons.support.AnnotationSupport#findRepeatableAnnotations}), so {@code
- * core/build.gradle.kts} only needs the tag strings themselves and no execution-time condition is
- * involved. {@link #H2_TAG}, {@link #MYSQL_TAG}, and {@link #POSTGRESQL_TAG} must stay in sync with
- * {@code coreBackendTestTags} in {@code core/build.gradle.kts}.
- *
- * <p>These tags choose the lane; whether a container is needed follows from the lane, not the
- * class. The MySQL and PostgreSQL lanes require Docker and fail fast without it; the H2 lane runs
- * without Docker. {@code gravitino-docker-test} on a backend class only keeps it out of {@code
- * coreUnitTest}, and out of legacy {@code :core:test} when Docker tests are skipped, so a class
- * tagged for H2 must not need a container itself.
+ * <p>The lane, not the class, decides whether Docker is needed: MySQL and PostgreSQL require it and
+ * H2 does not, so a class tagged for H2 must not need a container itself. The tag strings must stay
+ * in sync with {@code coreBackendTestTags} in {@code core/build.gradle.kts}.
  */
 public final class CoreBackend {
 
