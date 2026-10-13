@@ -25,7 +25,7 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.OptionalLong;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper;
@@ -63,12 +63,13 @@ public class TableMaintenanceActionMetaService {
    * @param policyId policy entity id
    * @param nowMs current epoch millis
    * @param claimTimeoutMs unbound claim TTL
-   * @return action id when acquired, empty when another live claim or open run holds the slot
+   * @return claim ({@code id} + acquire-time {@code created_at}) when acquired, empty when another
+   *     live claim or open run holds the slot
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "tryAcquireTableMaintenanceAction")
-  public OptionalLong tryAcquireInFlight(
+  public Optional<OccupancyClaim> tryAcquireInFlight(
       long tableId, long policyId, long nowMs, long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     long expireBefore = nowMs - claimTimeoutMs;
@@ -82,7 +83,8 @@ public class TableMaintenanceActionMetaService {
               TableMaintenanceActionMapper.class,
               mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
       Preconditions.checkState(unbound != null && unbound.id() != null, "reclaim lost unbound row");
-      return OptionalLong.of(unbound.id());
+      // Fence with the created_at this acquire wrote (nowMs), never re-read created_at.
+      return Optional.of(new OccupancyClaim(unbound.id(), nowMs));
     }
 
     TableMaintenanceActionPO existing =
@@ -92,7 +94,7 @@ public class TableMaintenanceActionMetaService {
     if (existing != null
         && existing.createdAt() != null
         && nowMs - existing.createdAt() < claimTimeoutMs) {
-      return OptionalLong.empty();
+      return Optional.empty();
     }
 
     TableMaintenanceActionPO actionMeta =
@@ -107,12 +109,12 @@ public class TableMaintenanceActionMetaService {
           TableMaintenanceActionMapper.class, mapper -> mapper.insertAction(actionMeta));
     } catch (RuntimeException e) {
       if (isUniqueViolation(e)) {
-        return OptionalLong.empty();
+        return Optional.empty();
       }
       throw e;
     }
     Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
-    return OptionalLong.of(actionMeta.id());
+    return Optional.of(new OccupancyClaim(actionMeta.id(), nowMs));
   }
 
   /**
@@ -121,9 +123,9 @@ public class TableMaintenanceActionMetaService {
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param config maintenance config supplying the unbound claim TTL
-   * @return generated action id
+   * @return acquired claim
    */
-  public long insertInFlight(long tableId, long policyId, TableMaintenanceConfig config) {
+  public OccupancyClaim insertInFlight(long tableId, long policyId, TableMaintenanceConfig config) {
     Preconditions.checkNotNull(config, "config must not be null");
     return insertInFlight(tableId, policyId, config.claimTimeoutMs());
   }
@@ -134,38 +136,38 @@ public class TableMaintenanceActionMetaService {
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param claimTimeoutMs unbound claim TTL
-   * @return generated action id
+   * @return acquired claim
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertTableMaintenanceAction")
-  public long insertInFlight(long tableId, long policyId, long claimTimeoutMs) {
-    OptionalLong acquired =
+  public OccupancyClaim insertInFlight(long tableId, long policyId, long claimTimeoutMs) {
+    Optional<OccupancyClaim> acquired =
         tryAcquireInFlight(tableId, policyId, System.currentTimeMillis(), claimTimeoutMs);
     Preconditions.checkState(acquired.isPresent(), "failed to acquire unbound occupancy claim");
-    return acquired.getAsLong();
+    return acquired.get();
   }
 
   /**
    * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob}. Does not release the
    * soft slot ({@code finished_at} stays {@code 0} until {@link #markFinished}).
    *
-   * <p>{@code expectedCreatedAt} must be the {@code created_at} observed when the caller acquired
-   * the claim. After another node reclaims via CAS on {@code created_at}, this update matches zero
-   * rows so the stale holder cannot bind.
+   * <p>Pass the {@link OccupancyClaim} from acquire / reclaim as-is. Do not re-read {@code
+   * created_at} from the row: after another node reclaims, that would observe the new fence and
+   * defeat reclaim fencing. The CAS matches zero rows for a stale claim.
    *
-   * @param id action row id
+   * @param claim claim returned by {@link #tryAcquireInFlight} / {@link #insertInFlight}
    * @param jobId Gravitino job run id
-   * @param expectedCreatedAt claim lease start from acquire / reclaim
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "bindTableMaintenanceActionJobId")
-  public void bindJobId(long id, long jobId, long expectedCreatedAt) {
+  public void bindJobId(OccupancyClaim claim, long jobId) {
+    Preconditions.checkNotNull(claim, "claim must not be null");
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.bindJobId(id, jobId, expectedCreatedAt));
+            mapper -> mapper.bindJobId(claim.id(), jobId, claim.createdAt()));
     Preconditions.checkState(
         updated == 1,
         "expected to bind job_id on exactly one in-flight action, updated=%s",
@@ -221,10 +223,9 @@ public class TableMaintenanceActionMetaService {
   /**
    * Marks the action finished with the terminal snapshot id.
    *
-   * <p>The soft slot ({@code finished_at = 0}) admits only one in-flight action per {@code
-   * (table_id, policy_id)}, so only one submitter can finish that pair at a time. Concurrent
-   * duplicate {@code finished_at} values are not a concern; {@code UNIQUE(table_id, policy_id,
-   * finished_at)} primarily enforces the soft slot.
+   * <p>{@code UNIQUE(table_id, policy_id, finished_at)} exists so {@code finished_at = 0} is a
+   * single soft slot per pair (like {@code deleted_at}). Only one in-flight row can finish that
+   * pair at a time, so two completed rows cannot race to the same millisecond {@code finished_at}.
    *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id

@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.maintenance.storage.service;
 
-import java.util.OptionalLong;
+import java.util.Optional;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
@@ -34,18 +34,18 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableSnapshotMetricsMetaService metricsService = TableSnapshotMetricsMetaService.getInstance();
 
     long before = System.currentTimeMillis();
-    long actionId =
+    OccupancyClaim claim =
         actionService.insertInFlight(
             10L, 20L, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
     long after = System.currentTimeMillis();
-    long createdAt = actionService.getById(actionId).createdAt();
-    Assertions.assertNull(actionService.getById(actionId).jobId());
-    Assertions.assertEquals(0L, actionService.getById(actionId).finishedAt());
-    Assertions.assertTrue(createdAt >= before);
-    Assertions.assertTrue(createdAt <= after);
+    Assertions.assertNull(actionService.getById(claim.id()).jobId());
+    Assertions.assertEquals(0L, actionService.getById(claim.id()).finishedAt());
+    Assertions.assertTrue(claim.createdAt() >= before);
+    Assertions.assertTrue(claim.createdAt() <= after);
+    Assertions.assertEquals(claim.createdAt(), actionService.getById(claim.id()).createdAt());
 
     long jobId = 999L;
-    actionService.bindJobId(actionId, jobId, createdAt);
+    actionService.bindJobId(claim, jobId);
     Assertions.assertEquals(jobId, actionService.getByJobId(jobId).jobId());
     Assertions.assertEquals(0L, actionService.getByJobId(jobId).finishedAt());
 
@@ -78,24 +78,27 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long timeoutMs = 60_000L;
     long t0 = 1_700_000_300_000L;
 
-    OptionalLong first = actions.tryAcquireInFlight(tableId, policyId, t0, timeoutMs);
+    Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, t0, timeoutMs);
     Assertions.assertTrue(first.isPresent());
-    Assertions.assertEquals(t0, actions.getById(first.getAsLong()).createdAt());
-    Assertions.assertEquals(0L, actions.getById(first.getAsLong()).finishedAt());
+    Assertions.assertEquals(t0, first.get().createdAt());
+    Assertions.assertEquals(t0, actions.getById(first.get().id()).createdAt());
+    Assertions.assertEquals(0L, actions.getById(first.get().id()).finishedAt());
     Assertions.assertTrue(
         actions.tryAcquireInFlight(tableId, policyId, t0 + 1_000L, timeoutMs).isEmpty());
 
     long reclaimAt = t0 + timeoutMs;
-    OptionalLong reclaimed = actions.tryAcquireInFlight(tableId, policyId, reclaimAt, timeoutMs);
+    Optional<OccupancyClaim> reclaimed =
+        actions.tryAcquireInFlight(tableId, policyId, reclaimAt, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
-    Assertions.assertEquals(first.getAsLong(), reclaimed.getAsLong());
-    Assertions.assertEquals(reclaimAt, actions.getById(reclaimed.getAsLong()).createdAt());
-    Assertions.assertEquals(0L, actions.getById(reclaimed.getAsLong()).finishedAt());
+    Assertions.assertEquals(first.get().id(), reclaimed.get().id());
+    Assertions.assertEquals(reclaimAt, reclaimed.get().createdAt());
+    Assertions.assertEquals(reclaimAt, actions.getById(reclaimed.get().id()).createdAt());
+    Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
 
-    // Stale holder still has the old created_at; bind must fail after reclaim.
+    // Stale holder must bind with the claim from acquire, not a re-read of created_at.
     Assertions.assertThrows(
-        IllegalStateException.class, () -> actions.bindJobId(first.getAsLong(), 1001L, t0));
-    actions.bindJobId(reclaimed.getAsLong(), 1002L, reclaimAt);
-    Assertions.assertEquals(1002L, actions.getById(reclaimed.getAsLong()).jobId());
+        IllegalStateException.class, () -> actions.bindJobId(first.get(), 1001L));
+    actions.bindJobId(reclaimed.get(), 1002L);
+    Assertions.assertEquals(1002L, actions.getById(reclaimed.get().id()).jobId());
   }
 }
