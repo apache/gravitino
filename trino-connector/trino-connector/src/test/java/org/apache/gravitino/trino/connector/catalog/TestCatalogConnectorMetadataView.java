@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
@@ -44,9 +45,10 @@ public class TestCatalogConnectorMetadataView {
   @Test
   public void testViewExists() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
-    when(viewCatalog.viewExists(NameIdentifier.of("s", "v"))).thenReturn(true);
+    when(viewCatalog.viewExists(any())).thenReturn(true);
 
     assertTrue(createMetadata(viewCatalog).viewExists("s", "v"));
+    verify(viewCatalog).viewExists(NameIdentifier.of("s", "v"));
   }
 
   @Test

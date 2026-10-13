@@ -211,8 +211,8 @@ public class CatalogConnectorMetadata {
       // The client exposes a view catalog for every relational catalog, so a catalog without view
       // support (for example JDBC) only reports it when called. A missing schema has no views.
       return false;
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
