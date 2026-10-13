@@ -305,9 +305,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
     long nextDelayMillis = TimeUnit.SECONDS.toMillis(pollIntervalSecs);
     try {
       if (pollChanges()) {
-        // Continuous draining is intentional: every cycle advances the cursor and is bounded by
-        // batchSize. Tail sampling is rate-limited separately so diagnostics do not double the
-        // database query rate while a sustained backlog is being consumed.
+        // Full batches advance the incremental cursor or the replay page cursor. Each query is
+        // bounded by batchSize. Tail sampling is rate-limited during full incremental batches;
+        // replay-only drains still sample the tail when their incremental query is partial.
         nextDelayMillis = 0;
       }
     } finally {

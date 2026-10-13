@@ -330,16 +330,17 @@ its neighbors. Every server writes its changes to an entity change log table and
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
 Each poll reads at most `pollBatchSize` incremental records and, when replay is enabled,
-one additional recent-history page of at most `pollBatchSize` records. When a poll returns a full batch, the next poll
-starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
+one additional recent-history page of at most `pollBatchSize` records. If either query returns a
+full page, the next poll starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
 server can read and apply batches rather than at a fixed `pollBatchSize / pollIntervalSecs`
-records per second. Once a poll returns fewer records than the batch size, or fails, the server
-waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
+records per second. Once both queries return fewer records than the batch size, or the cycle
+fails, the server waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
 on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
 it. Continuous draining deliberately has no minimum delay between batches; a sustained backlog
 can therefore keep the data query running at the rate the database and listeners support. The
 observability-only database-tail query is sampled at most once per `pollIntervalSecs` during a
-full-batch drain; partial and empty polls still sample the tail. Each poll holds its whole batch
+full incremental-batch drain; partial and empty incremental queries still sample the tail,
+including each cycle of a replay-only drain. Each poll holds its whole batch
 in memory, so raise `pollBatchSize` in moderate steps.
 
 | Configuration Item                              | Description                                                                                                                                         | Default Value       |

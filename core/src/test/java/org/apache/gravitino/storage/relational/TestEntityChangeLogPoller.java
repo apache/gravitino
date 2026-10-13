@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
@@ -72,6 +73,78 @@ import org.mockito.MockedStatic;
 public class TestEntityChangeLogPoller {
 
   private static final int MAX_ROWS = 2000;
+
+  @Test
+  void testDefaultPollingKeepsIncrementalEventWithinSixSecondsWithReplayWork()
+      throws InterruptedException {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+    AtomicLong clockMillis = new AtomicLong();
+    AtomicLong committedAt = new AtomicLong(-1);
+    AtomicLong deliveredAt = new AtomicLong(-1);
+    AtomicReference<Runnable> nextPoll = new AtomicReference<>();
+    AtomicLong nextDelayMillis = new AtomicLong();
+    AtomicInteger incrementalQueries = new AtomicInteger();
+    when(mapper.selectMaxChangeId()).thenReturn(1L, 2L);
+    when(mapper.selectEntityChanges(anyLong(), anyInt()))
+        .thenAnswer(
+            invocation -> {
+              // Commit just after the previous query's snapshot: this poll cannot see the row.
+              boolean first = incrementalQueries.getAndIncrement() == 0;
+              if (first) {
+                committedAt.set(clockMillis.get());
+              }
+              clockMillis.addAndGet(900);
+              return first ? List.of() : changes(2, 2);
+            });
+    when(mapper.selectRecentEntityChanges(anyLong(), anyLong(), anyLong(), anyLong(), anyInt()))
+        .thenAnswer(
+            invocation -> {
+              clockMillis.addAndGet(900);
+              return changes(1, 1);
+            });
+    when(scheduler.awaitTermination(anyLong(), any())).thenReturn(true);
+    doAnswer(
+            invocation -> {
+              nextPoll.set(invocation.getArgument(0));
+              TimeUnit unit = invocation.getArgument(2);
+              nextDelayMillis.set(unit.toMillis(invocation.getArgument(1)));
+              return mock(ScheduledFuture.class);
+            })
+        .when(scheduler)
+        .schedule(any(Runnable.class), anyLong(), any(TimeUnit.class));
+    EntityChangeLogPoller poller =
+        spy(new EntityChangeLogPoller(Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS));
+    doReturn(scheduler).when(poller).createScheduler();
+    doAnswer(invocation -> TimeUnit.MILLISECONDS.toNanos(clockMillis.get()))
+        .when(poller)
+        .nanoTime();
+    poller.registerListener(
+        records -> {
+          if (records.stream().anyMatch(record -> record.getId() == 2)) {
+            deliveredAt.set(clockMillis.get());
+          }
+        });
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      try {
+        poller.start();
+        for (int cycle = 0; cycle < 2; cycle++) {
+          Assertions.assertEquals(3000, nextDelayMillis.get());
+          clockMillis.addAndGet(nextDelayMillis.get());
+          nextPoll.get().run();
+        }
+        // The original incremental pull and one added replay page each take less than a second.
+        // Assert delivery before the second replay page finishes, not just eventual delivery.
+        Assertions.assertEquals(5700, deliveredAt.get() - committedAt.get());
+        Assertions.assertTrue(deliveredAt.get() - committedAt.get() < 6000);
+        verify(mapper, times(2))
+            .selectRecentEntityChanges(anyLong(), anyLong(), anyLong(), anyLong(), anyInt());
+      } finally {
+        poller.close();
+      }
+    }
+  }
 
   @Test
   void testReplayRecoversLateLowerIdWithoutMovingCursorBackOrRedelivering() {
