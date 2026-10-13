@@ -29,6 +29,7 @@ from gravitino.exceptions.base import (
     ForbiddenException,
     IllegalArgumentException,
     IllegalMetadataObjectException,
+    IllegalSemanticModelException,
     IllegalPrivilegeException,
     IllegalRoleException,
     IllegalStatisticNameException,
@@ -45,6 +46,7 @@ from gravitino.exceptions.base import (
     NoSuchRoleException,
     NoSuchGroupException,
     NoSuchSchemaException,
+    NoSuchSemanticModelException,
     NoSuchTableException,
     NoSuchUserException,
     NoSuchViewException,
@@ -56,6 +58,7 @@ from gravitino.exceptions.base import (
     RESTException,
     RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
+    SemanticModelAlreadyExistsException,
     TableAlreadyExistsException,
     UnauthorizedException,
     UnsupportedOperationException,
@@ -76,6 +79,9 @@ from gravitino.exceptions.handlers.partition_error_handler import (
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.statistics_error_handler import (
     STATISTICS_ERROR_HANDLER,
+)
+from gravitino.exceptions.handlers.semantic_model_error_handler import (
+    SEMANTIC_MODEL_ERROR_HANDLER,
 )
 from gravitino.exceptions.handlers.permission_error_handler import (
     PERMISSION_ERROR_HANDLER,
@@ -908,4 +914,102 @@ class TestErrorHandler(unittest.TestCase):
         with self.assertRaises(NotFoundException):
             PERMISSION_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+    def test_semantic_model_error_handler(self):
+        with self.assertRaises(IllegalSemanticModelException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalSemanticModelException, "mock error"
+                )
+            )
+
+        with self.assertRaises(IllegalArgumentException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchMetalakeException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetalakeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchCatalogException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchCatalogException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSchemaException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSchemaException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSemanticModelException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSemanticModelException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotFoundException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+        with self.assertRaises(SemanticModelAlreadyExistsException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    SemanticModelAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(AlreadyExistsException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    AlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(UnsupportedOperationException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    UnsupportedOperationException, "mock error"
+                )
+            )
+
+        with self.assertRaises(ForbiddenException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
+            )
+
+        with self.assertRaises(CatalogNotInUseException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    CatalogNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotInUseException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotInUseException, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
             )

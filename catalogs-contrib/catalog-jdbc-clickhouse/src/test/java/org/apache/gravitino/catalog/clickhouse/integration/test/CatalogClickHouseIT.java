@@ -3274,6 +3274,10 @@ public class CatalogClickHouseIT extends BaseIT {
     String password = CLICKHOUSE_CONTAINER.getPassword();
     String wrongPassword = password + "wrong";
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
+    // This test deliberately creates the catalog with a wrong password and then fixes it via
+    // alterCatalog, so it must opt out of create-time backend verification; otherwise the create
+    // itself would be rejected for the unreachable backend (the behavior added in #13767).
+    catalogProperties.put(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false");
 
     metalake.createCatalog(
         testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);

@@ -132,6 +132,7 @@ include(":catalogs:hadoop-auth")
 include(":lineage")
 include(":mcp-server")
 include(":plugins:idp-basic")
+include(":plugins:tms")
 include(
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
