@@ -176,7 +176,9 @@ For example, call `create_semantic_model` with the following arguments after the
 }
 ```
 
-`definition` uses the native camelCase [Semantic Model REST schema](./open-api/semantic-models.yaml).
+`definition` uses the native REST format with camelCase field names. It requires a
+non-empty `datasets` array and supports optional `relationships`, `metrics`,
+`aiContext`, and `customExtensions` fields.
 `comment` and `properties` are optional. Load, create, and alter return the model object
 with its definition, properties, and audit information.
 

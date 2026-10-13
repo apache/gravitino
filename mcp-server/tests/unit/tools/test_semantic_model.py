@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Semantic Model tools exercised through FastMCP and a mocked HTTP transport."""
+"""Semantic Model tools exercised through FastMCP with REST and stub clients."""
 
 import json
 import unittest
@@ -31,6 +31,7 @@ from mcp_server.client.plain.plain_rest_client_operation import (
 )
 from mcp_server.core import Setting
 from mcp_server.server import GravitinoMCPServer
+from tests.unit.tools import MockOperation
 
 _NAMESPACE = {"catalog_name": "sales", "schema_name": "mart"}
 _MODEL_ARGS = {**_NAMESPACE, "semantic_model_name": "sales_model"}
@@ -379,3 +380,45 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             set(tools["drop_semantic_model"].inputSchema["required"]),
             {"catalog_name", "schema_name", "semantic_model_name"},
         )
+
+
+class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
+    async def test_all_tools_return_json_from_mock_operation(self):
+        model_args = {
+            **_NAMESPACE,
+            "semantic_model_name": "mock_semantic_model",
+        }
+        model = {"name": "mock_semantic_model"}
+        cases = (
+            ("list_of_semantic_models", _NAMESPACE, []),
+            ("load_semantic_model", model_args, model),
+            (
+                "create_semantic_model",
+                {**_NAMESPACE, "name": "mock_semantic_model", "definition": {}},
+                model,
+            ),
+            (
+                "alter_semantic_model",
+                {
+                    **model_args,
+                    "updates": [
+                        {"@type": "updateComment", "newComment": "Updated"}
+                    ],
+                },
+                model,
+            ),
+            ("drop_semantic_model", model_args, True),
+        )
+        with patch.object(
+            RESTClientFactory, "_rest_client_class", MockOperation
+        ):
+            mcp = GravitinoMCPServer(
+                Setting("mock_metalake", tags={"semantic_model"})
+            ).mcp
+            async with Client(mcp) as client:
+                for tool, arguments, expected in cases:
+                    with self.subTest(tool=tool):
+                        result = await client.call_tool(tool, arguments)
+                        self.assertEqual(
+                            json.loads(result.content[0].text), expected
+                        )

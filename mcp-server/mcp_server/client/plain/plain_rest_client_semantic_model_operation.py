@@ -92,9 +92,9 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
 
     def _models_path(self, catalog_name: str, schema_name: str) -> str:
         return (
-            f"/api/metalakes/{self._encode_path_name(self.metalake_name)}"
-            f"/catalogs/{self._encode_path_name(catalog_name)}"
-            f"/schemas/{self._encode_path_name(schema_name)}/semantic-models"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/semantic-models"
         )
 
     def _model_path(
@@ -102,12 +102,5 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
     ) -> str:
         return (
             f"{self._models_path(catalog_name, schema_name)}"
-            f"/{self._encode_path_name(semantic_model_name)}"
+            f"/{encode_path_segment(semantic_model_name)}"
         )
-
-    @staticmethod
-    def _encode_path_name(name: str) -> str:
-        # HTTP clients normalize dot segments, which can target another resource.
-        if name in ("", ".", ".."):
-            raise ValueError("REST path names must not be empty, '.' or '..'")
-        return encode_path_segment(name)
