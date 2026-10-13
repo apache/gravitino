@@ -151,7 +151,7 @@ Use the `semantic_model` tag with `--include-tool-tags` to expose these five too
 They use the same per-call `metalake` selection and authentication as other tools;
 Gravitino filters listings and enforces authorization, including access to referenced source tables.
 Names used in REST paths must be non-empty and cannot be `.` or `..`, which HTTP clients
-normalize as path navigation. Dots within names, such as `sales.v2`, are supported.
+normalize as path navigation. Names must also satisfy the server's naming rules.
 
 For example, call `create_semantic_model` with the following arguments after the
 `sales.mart.orders` source table exists in the selected metalake:
