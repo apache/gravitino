@@ -1042,8 +1042,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return TableMetaService.getInstance().isSoftDeleted(entity.id());
       case VIEW:
         return ViewMetaService.getInstance().isSoftDeleted(entity.id());
-      case TOPIC:
-        return TopicMetaService.getInstance().isSoftDeleted(entity.id());
       default:
         return false;
     }

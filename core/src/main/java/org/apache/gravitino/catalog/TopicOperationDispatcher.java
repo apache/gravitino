@@ -26,12 +26,10 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
@@ -109,23 +107,14 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the topic.
-      try {
-        topic = TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTopic(ident));
-      } catch (EntityAlreadyExistsException e) {
-        // Reload after a create-only conflict to distinguish an HA race from an identity conflict.
-        LOG.info("Topic {} import conflicted with existing metadata; reloading from store.", ident);
-        topic = TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTopic(ident));
-        if (!topic.imported()) {
-          throw new UnsupportedOperationException(
-              "Topic "
-                  + ident
-                  + " cannot be imported because its name or external identifier is already "
-                  + "managed under a different Gravitino identifier. Remove "
-                  + "`gravitino.identifier` from the external topic and retry so it can be "
-                  + "imported with a new identifier.");
-        }
-      }
+      // Import the topic
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            importTopic(ident);
+            return null;
+          });
     }
 
     return topic;
@@ -275,12 +264,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         });
   }
 
-  private EntityCombinedTopic importTopic(NameIdentifier identifier) {
+  private void importTopic(NameIdentifier identifier) {
 
     EntityCombinedTopic topic = internalLoadTopic(identifier);
 
     if (topic.imported()) {
-      return topic;
+      return;
     }
 
     StringIdentifier stringId = null;
@@ -320,24 +309,15 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      // Never overwrite imported topic metadata because the stable ID may be owned by another
-      // Gravitino path.
-      store.put(topicEntity, false);
-    } catch (SoftDeletedEntityIdentifierException e) {
-      throw softDeletedExternalIdentifierException(identifier, uid, TOPIC);
-    } catch (EntityAlreadyExistsException e) {
-      throw e;
+      // Kafka does not persist a removable Gravitino identifier. Its immutable topic UUID is
+      // converted to the entity ID on every load, so catalog re-registration must rebind that ID
+      // to the current Gravitino path. Overwrite is safe for this Kafka-specific identity model:
+      // Kafka does not support topic rename, and deleting a topic gives a replacement a new UUID.
+      store.put(topicEntity, true);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);
     }
-
-    return EntityCombinedTopic.of(topic, topicEntity)
-        .withHiddenProperties(
-            getMaskAndOmitKeys(
-                getCatalogIdentifier(identifier),
-                HasPropertyMetadata::topicPropertiesMetadata,
-                topic.properties()));
   }
 
   private EntityCombinedTopic internalLoadTopic(NameIdentifier ident) {

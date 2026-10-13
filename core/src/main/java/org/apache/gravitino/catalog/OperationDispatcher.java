@@ -107,9 +107,6 @@ public abstract class OperationDispatcher {
       case VIEW:
         cleanupTarget = "the external view";
         break;
-      case TOPIC:
-        cleanupTarget = "the external topic";
-        break;
       default:
         cleanupTarget = "the external object";
     }
