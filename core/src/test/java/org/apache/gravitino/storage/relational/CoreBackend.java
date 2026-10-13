@@ -50,6 +50,12 @@ import org.junit.jupiter.api.Tag;
  * core/build.gradle.kts} only needs the tag strings themselves and no execution-time condition is
  * involved. {@link #H2_TAG}, {@link #MYSQL_TAG}, and {@link #POSTGRESQL_TAG} must stay in sync with
  * {@code coreBackendTestTags} in {@code core/build.gradle.kts}.
+ *
+ * <p>These tags choose the lane; whether a container is needed follows from the lane, not the
+ * class. The MySQL and PostgreSQL lanes require Docker and fail fast without it; the H2 lane runs
+ * without Docker. {@code gravitino-docker-test} on a backend class only keeps it out of {@code
+ * coreUnitTest}, and out of legacy {@code :core:test} when Docker tests are skipped, so a class
+ * tagged for H2 must not need a container itself.
  */
 public final class CoreBackend {
 
