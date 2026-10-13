@@ -52,6 +52,15 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   /** Commit-pool db-scheduler table. */
   public static final String COMMIT_TASKS_TABLE = "scheduled_commit_tasks";
 
+  /** Long-lived policy expand lease ({@code task_name}). */
+  public static final String POLICY_EXPAND = "policy-expand";
+
+  /** One-shot crontab Spark submit ({@code task_name}). */
+  public static final String CRON_JOB = "cron-job";
+
+  /** One-shot on-commit chained Spark submit ({@code task_name}). */
+  public static final String COMMIT_JOB = "commit-job";
+
   private final List<Scheduler> schedulers = new ArrayList<>();
 
   /**
@@ -70,21 +79,13 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
             config,
             config.expandThreads(),
             EXPAND_TASKS_TABLE,
-            noopTask(TableMaintenanceTaskNames.POLICY_EXPAND)));
+            noopTask(POLICY_EXPAND)));
     schedulers.add(
         buildScheduler(
-            dataSource,
-            config,
-            config.cronThreads(),
-            CRON_TASKS_TABLE,
-            noopTask(TableMaintenanceTaskNames.CRON_JOB)));
+            dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, noopTask(CRON_JOB)));
     schedulers.add(
         buildScheduler(
-            dataSource,
-            config,
-            config.commitThreads(),
-            COMMIT_TASKS_TABLE,
-            noopTask(TableMaintenanceTaskNames.COMMIT_JOB)));
+            dataSource, config, config.commitThreads(), COMMIT_TASKS_TABLE, noopTask(COMMIT_JOB)));
 
     schedulers.forEach(Scheduler::start);
     LOG.info("Started {} table maintenance scheduler pools", schedulers.size());
