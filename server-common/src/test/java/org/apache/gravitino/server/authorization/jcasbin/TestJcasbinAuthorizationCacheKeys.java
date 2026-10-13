@@ -33,8 +33,7 @@ public class TestJcasbinAuthorizationCacheKeys {
     MetadataObject metalake =
         MetadataObjects.of(Collections.singletonList("ml1"), MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        key("ml1", "METALAKE", ""),
-        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
+        key("ml1", ""), JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
 
     MetadataObject catalog =
         MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
@@ -118,6 +117,35 @@ public class TestJcasbinAuthorizationCacheKeys {
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.COLUMN));
     Assertions.assertFalse(
         JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.SEMANTIC_MODEL));
+  }
+
+  @Test
+  void testMetalakeKeyIsPrefixOfEveryChildKey() {
+    String metalakeKey =
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+            "ml1",
+            MetadataObjects.of(Collections.singletonList("ml1"), MetadataObject.Type.METALAKE));
+    String catalogKey =
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+            "ml1",
+            MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG));
+    String tagKey =
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+            "ml1", MetadataObjects.of(Collections.singletonList("tag1"), MetadataObject.Type.TAG));
+    String policyKey =
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+            "ml1",
+            MetadataObjects.of(Collections.singletonList("policy1"), MetadataObject.Type.POLICY));
+    String otherMetalakeKey =
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+            "ml10",
+            MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG));
+
+    Assertions.assertTrue(catalogKey.startsWith(metalakeKey));
+    Assertions.assertTrue(tagKey.startsWith(metalakeKey));
+    Assertions.assertTrue(policyKey.startsWith(metalakeKey));
+    // The trailing separator keeps the metalake name boundary.
+    Assertions.assertFalse(otherMetalakeKey.startsWith(metalakeKey));
   }
 
   @Test
