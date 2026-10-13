@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.policy.rego;
 
+import java.util.List;
+
 /** Shared builders and counters for restricted Rego tests. */
 final class RestrictedRegoTestUtils {
 
@@ -67,6 +69,14 @@ final class RestrictedRegoTestUtils {
   static String unicodeEscape(int first, int second, int third, int fourth) {
     return "\\u"
         + new String(new char[] {(char) first, (char) second, (char) third, (char) fourth});
+  }
+
+  static List<String> invalidUnicodeEscapes() {
+    return List.of(
+        unicodeEscape(0x0660, 0x0660, 0x0664, 0x0661),
+        unicodeEscape(0xFF10, 0xFF10, 0xFF14, 0xFF11),
+        unicodeEscape(0x0966, 0x0966, 0x096A, 0x0967),
+        unicodeEscape('0', '0', 0x0664, 0x0661));
   }
 
   static int countExpressionNodes(CanonicalExpression expression) {

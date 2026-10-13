@@ -337,13 +337,13 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
 
     newContent.validate();
-    validateReadRestrictionContent(policyEntity.policyType(), newContent);
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);

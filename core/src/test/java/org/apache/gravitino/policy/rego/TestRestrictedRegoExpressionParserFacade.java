@@ -82,6 +82,19 @@ public class TestRestrictedRegoExpressionParserFacade {
         () -> RestrictedRegoExpressionParserFacade.parseRowFilter(maximumSource + " "));
   }
 
+  @Test
+  void testRejectsInvalidUnicodeEscapeDigitsThroughFacade() {
+    for (String invalidEscape : RestrictedRegoTestUtils.invalidUnicodeEscapes()) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  RestrictedRegoExpressionParserFacade.validateRowFilter(
+                      "filter := col(\"" + invalidEscape + "\") == \"x\""));
+      Assertions.assertTrue(error.getMessage().contains("invalid Unicode escape"));
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.policy.rego;
 
-import java.util.List;
 import org.apache.gravitino.policy.rego.RestrictedRegoLexer.Token;
 import org.apache.gravitino.policy.rego.RestrictedRegoLexer.TokenType;
 import org.junit.jupiter.api.Assertions;
@@ -44,14 +43,7 @@ public class TestRestrictedRegoLexer {
 
   @Test
   void testRejectsInvalidUnicodeEscapeDigits() {
-    List<String> invalidEscapes =
-        List.of(
-            RestrictedRegoTestUtils.unicodeEscape(0x0660, 0x0660, 0x0664, 0x0661),
-            RestrictedRegoTestUtils.unicodeEscape(0xFF10, 0xFF10, 0xFF14, 0xFF11),
-            RestrictedRegoTestUtils.unicodeEscape(0x0966, 0x0966, 0x096A, 0x0967),
-            RestrictedRegoTestUtils.unicodeEscape('0', '0', 0x0664, 0x0661));
-
-    for (String invalidEscape : invalidEscapes) {
+    for (String invalidEscape : RestrictedRegoTestUtils.invalidUnicodeEscapes()) {
       IllegalArgumentException error =
           Assertions.assertThrows(
               IllegalArgumentException.class,
