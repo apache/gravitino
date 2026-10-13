@@ -492,39 +492,26 @@ public class TestMetadataAuthzHelper {
   /** A SELECT_VIEW grant on the schema makes every view visible without per-view checks. */
   @Test
   public void testListShortCircuitViewViaSchemaGrant() {
-    EntityStore store = mock(EntityStore.class);
-    when(gravitinoEnv.entityStore()).thenReturn(store);
-    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    when(gravitinoEnv.internalAccessControlDispatcher())
-        .thenReturn(mock(AccessControlDispatcher.class));
     GravitinoAuthorizer authorizer =
         mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.SELECT_VIEW);
     NameIdentifier[] identifiers = views(2000);
-    try {
-      withAuthorizer(
-          authorizer,
-          () -> {
-            NameIdentifier[] filtered =
-                MetadataAuthzHelper.filterByExpression(
-                    "testMetalake",
-                    AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.VIEW,
-                    identifiers);
-            Assertions.assertSame(identifiers, filtered);
-            verify(authorizer, never())
-                .authorize(
-                    any(),
-                    eq("testMetalake"),
-                    argThat(object -> object.type() == MetadataObject.Type.VIEW),
-                    any(),
-                    any());
-            verifyNoInteractions(store);
-          });
-    } finally {
-      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
-      when(gravitinoEnv.entityStore()).thenReturn(null);
-      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
-    }
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.VIEW,
+                  identifiers);
+          Assertions.assertArrayEquals(identifiers, filtered);
+          verify(authorizer, never())
+              .isOwner(
+                  any(),
+                  eq("testMetalake"),
+                  argThat(object -> object.type() == MetadataObject.Type.VIEW),
+                  any());
+        });
   }
 
   /** A possible SELECT_VIEW deny disables the schema-grant path and each view is checked. */
@@ -565,39 +552,26 @@ public class TestMetadataAuthzHelper {
    */
   @Test
   public void testListShortCircuitFunctionViaSchemaGrant() {
-    EntityStore store = mock(EntityStore.class);
-    when(gravitinoEnv.entityStore()).thenReturn(store);
-    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    when(gravitinoEnv.internalAccessControlDispatcher())
-        .thenReturn(mock(AccessControlDispatcher.class));
     GravitinoAuthorizer authorizer =
         mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.EXECUTE_FUNCTION);
     NameIdentifier[] identifiers = functions(2000);
-    try {
-      withAuthorizer(
-          authorizer,
-          () -> {
-            NameIdentifier[] filtered =
-                MetadataAuthzHelper.filterByExpression(
-                    "testMetalake",
-                    AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.FUNCTION,
-                    identifiers);
-            Assertions.assertSame(identifiers, filtered);
-            verify(authorizer, never())
-                .authorize(
-                    any(),
-                    eq("testMetalake"),
-                    argThat(object -> object.type() == MetadataObject.Type.FUNCTION),
-                    any(),
-                    any());
-            verifyNoInteractions(store);
-          });
-    } finally {
-      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
-      when(gravitinoEnv.entityStore()).thenReturn(null);
-      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
-    }
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.FUNCTION,
+                  identifiers);
+          Assertions.assertArrayEquals(identifiers, filtered);
+          verify(authorizer, never())
+              .isOwner(
+                  any(),
+                  eq("testMetalake"),
+                  argThat(object -> object.type() == MetadataObject.Type.FUNCTION),
+                  any());
+        });
   }
 
   /**
@@ -638,38 +612,32 @@ public class TestMetadataAuthzHelper {
   @Test
   public void testListShortCircuitFilesetViaSchemaGrant() {
     EntityStore store = mock(EntityStore.class);
-    when(gravitinoEnv.entityStore()).thenReturn(store);
-    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    when(gravitinoEnv.internalAccessControlDispatcher())
-        .thenReturn(mock(AccessControlDispatcher.class));
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
     GravitinoAuthorizer authorizer =
         mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.READ_FILESET);
     NameIdentifier[] identifiers = filesets(2000);
-    try {
-      withAuthorizer(
-          authorizer,
-          () -> {
-            NameIdentifier[] filtered =
-                MetadataAuthzHelper.filterByExpression(
-                    "testMetalake",
-                    AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.FILESET,
-                    identifiers);
-            Assertions.assertSame(identifiers, filtered);
-            verify(authorizer, never())
-                .authorize(
-                    any(),
-                    eq("testMetalake"),
-                    argThat(object -> object.type() == MetadataObject.Type.FILESET),
-                    any(),
-                    any());
-            verifyNoInteractions(store);
-          });
-    } finally {
-      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
-      when(gravitinoEnv.entityStore()).thenReturn(null);
-      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
-    }
+    withPreloadEnv(
+        store,
+        schemaDispatcher,
+        () ->
+            withAuthorizer(
+                authorizer,
+                () -> {
+                  NameIdentifier[] filtered =
+                      MetadataAuthzHelper.filterByExpression(
+                          "testMetalake",
+                          AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
+                          Entity.EntityType.FILESET,
+                          identifiers);
+                  Assertions.assertArrayEquals(identifiers, filtered);
+                  verify(authorizer, never())
+                      .isOwner(
+                          any(),
+                          eq("testMetalake"),
+                          argThat(object -> object.type() == MetadataObject.Type.FILESET),
+                          any());
+                  verifyNoInteractions(store, schemaDispatcher);
+                }));
   }
 
   /**
@@ -712,38 +680,26 @@ public class TestMetadataAuthzHelper {
    */
   @Test
   public void testListShortCircuitSemanticModelViaSchemaGrant() {
-    EntityStore store = mock(EntityStore.class);
-    when(gravitinoEnv.entityStore()).thenReturn(store);
-    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    when(gravitinoEnv.internalAccessControlDispatcher())
-        .thenReturn(mock(AccessControlDispatcher.class));
     GravitinoAuthorizer authorizer =
         mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.USE_SEMANTIC_MODEL);
     NameIdentifier[] identifiers = semanticModels(2000);
-    try {
-      withAuthorizer(
-          authorizer,
-          () -> {
-            NameIdentifier[] filtered =
-                MetadataAuthzHelper.filterByExpression(
-                    "testMetalake",
-                    AuthorizationExpressionConstants.FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.SEMANTIC_MODEL,
-                    identifiers);
-            Assertions.assertSame(identifiers, filtered);
-            verify(authorizer, never())
-                .authorize(
-                    any(),
-                    eq("testMetalake"),
-                    argThat(object -> object.type() == MetadataObject.Type.SEMANTIC_MODEL),
-                    any(),
-                    any());
-          });
-    } finally {
-      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
-      when(gravitinoEnv.entityStore()).thenReturn(null);
-      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
-    }
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.SEMANTIC_MODEL,
+                  identifiers);
+          Assertions.assertArrayEquals(identifiers, filtered);
+          verify(authorizer, never())
+              .isOwner(
+                  any(),
+                  eq("testMetalake"),
+                  argThat(object -> object.type() == MetadataObject.Type.SEMANTIC_MODEL),
+                  any());
+        });
   }
 
   /**
@@ -789,41 +745,31 @@ public class TestMetadataAuthzHelper {
   public void testListShortCircuitTopicViaSchemaGrant() {
     EntityStore store = mock(EntityStore.class);
     SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
-    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
-    when(gravitinoEnv.entityStore()).thenReturn(store);
-    when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
-    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    when(gravitinoEnv.internalAccessControlDispatcher())
-        .thenReturn(mock(AccessControlDispatcher.class));
     GravitinoAuthorizer authorizer =
         mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.CONSUME_TOPIC);
     NameIdentifier[] identifiers = topics(2000);
-    try {
-      withAuthorizer(
-          authorizer,
-          () -> {
-            NameIdentifier[] filtered =
-                MetadataAuthzHelper.filterByExpression(
-                    "testMetalake",
-                    AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.TOPIC,
-                    identifiers);
-            Assertions.assertSame(identifiers, filtered);
-            verify(authorizer, never())
-                .authorize(
-                    any(),
-                    eq("testMetalake"),
-                    argThat(object -> object.type() == MetadataObject.Type.TOPIC),
-                    any(),
-                    any());
-            verifyNoInteractions(store, schemaDispatcher);
-          });
-    } finally {
-      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
-      when(gravitinoEnv.entityStore()).thenReturn(null);
-      when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(null);
-      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
-    }
+    withPreloadEnv(
+        store,
+        schemaDispatcher,
+        () ->
+            withAuthorizer(
+                authorizer,
+                () -> {
+                  NameIdentifier[] filtered =
+                      MetadataAuthzHelper.filterByExpression(
+                          "testMetalake",
+                          AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
+                          Entity.EntityType.TOPIC,
+                          identifiers);
+                  Assertions.assertArrayEquals(identifiers, filtered);
+                  verify(authorizer, never())
+                      .isOwner(
+                          any(),
+                          eq("testMetalake"),
+                          argThat(object -> object.type() == MetadataObject.Type.TOPIC),
+                          any());
+                  verifyNoInteractions(store, schemaDispatcher);
+                }));
   }
 
   /**
@@ -1175,6 +1121,27 @@ public class TestMetadataAuthzHelper {
         .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
         .thenReturn(false);
     return authorizer;
+  }
+
+  /**
+   * Runs {@code body} with the entity cache enabled and the store and schema dispatcher that the
+   * list preload uses replaced by the given mocks.
+   */
+  private void withPreloadEnv(EntityStore store, SchemaDispatcher schemaDispatcher, Runnable body) {
+    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    when(gravitinoEnv.internalAccessControlDispatcher())
+        .thenReturn(mock(AccessControlDispatcher.class));
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    try {
+      body.run();
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+      when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(null);
+      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
+    }
   }
 
   @Test

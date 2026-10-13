@@ -96,6 +96,7 @@ public class MetadataAuthzHelper {
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String MODEL_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
+  private static final String SCHEMA_OBJECT_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
   private static final String METALAKE_ONLY_SCOPE = "METALAKE";
   private static final String CATALOG_PARENT_SCOPES = "METALAKE";
@@ -152,44 +153,50 @@ public class MetadataAuthzHelper {
                   Map.of(
                       AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
                       List.of(
-                          parentOwnerPath(TABLE_PARENT_SCOPES),
-                          parentPrivilegePath(Privilege.Name.SELECT_VIEW, TABLE_PARENT_SCOPES)))),
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.SELECT_VIEW, SCHEMA_OBJECT_PARENT_SCOPES)))),
               Map.entry(
                   Entity.EntityType.FUNCTION,
                   Map.of(
                       AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
                       List.of(
-                          parentOwnerPath(TABLE_PARENT_SCOPES),
-                          parentPrivilegePath(Privilege.Name.EXECUTE_FUNCTION, TABLE_PARENT_SCOPES),
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
                           parentPrivilegePath(
-                              Privilege.Name.MODIFY_FUNCTION, TABLE_PARENT_SCOPES)))),
+                              Privilege.Name.EXECUTE_FUNCTION, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.MODIFY_FUNCTION, SCHEMA_OBJECT_PARENT_SCOPES)))),
               Map.entry(
                   Entity.EntityType.FILESET,
                   Map.of(
                       AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
                       List.of(
-                          parentOwnerPath(TABLE_PARENT_SCOPES),
-                          parentPrivilegePath(Privilege.Name.READ_FILESET, TABLE_PARENT_SCOPES),
-                          parentPrivilegePath(Privilege.Name.WRITE_FILESET, TABLE_PARENT_SCOPES)))),
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.READ_FILESET, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.WRITE_FILESET, SCHEMA_OBJECT_PARENT_SCOPES)))),
               Map.entry(
                   Entity.EntityType.TOPIC,
                   Map.of(
                       AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
                       List.of(
-                          parentOwnerPath(TABLE_PARENT_SCOPES),
-                          parentPrivilegePath(Privilege.Name.CONSUME_TOPIC, TABLE_PARENT_SCOPES),
-                          parentPrivilegePath(Privilege.Name.PRODUCE_TOPIC, TABLE_PARENT_SCOPES)))),
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.CONSUME_TOPIC, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.PRODUCE_TOPIC, SCHEMA_OBJECT_PARENT_SCOPES)))),
               Map.entry(
                   Entity.EntityType.SEMANTIC_MODEL,
                   Map.of(
                       AuthorizationExpressionConstants
                           .FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
                       List.of(
-                          parentOwnerPath(TABLE_PARENT_SCOPES),
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
                           parentPrivilegePath(
-                              Privilege.Name.USE_SEMANTIC_MODEL, TABLE_PARENT_SCOPES),
+                              Privilege.Name.USE_SEMANTIC_MODEL, SCHEMA_OBJECT_PARENT_SCOPES),
                           parentPrivilegePath(
-                              Privilege.Name.MODIFY_SEMANTIC_MODEL, TABLE_PARENT_SCOPES)))),
+                              Privilege.Name.MODIFY_SEMANTIC_MODEL, SCHEMA_OBJECT_PARENT_SCOPES)))),
               Map.entry(
                   Entity.EntityType.JOB_TEMPLATE,
                   Map.of(
