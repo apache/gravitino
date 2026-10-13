@@ -35,8 +35,8 @@ import org.apache.gravitino.policy.TableMaintenanceContent;
  *
  * <p>Validation of {@code schedule} / {@code minIntervalMs} / {@code jobOptions} / {@code
  * updateOptions} on {@link TableMaintenanceContent} is centralized here and invoked from {@link
- * PolicyContent#validate()}, {@link org.apache.gravitino.meta.PolicyEntity}, and maintenance
- * PolicyContentDTO {@code validate()}.
+ * PolicyContent#validate()}, {@code PolicyEntity}, and maintenance PolicyContentDTO {@code
+ * validate()}.
  */
 public final class TableMaintenancePolicies {
 
