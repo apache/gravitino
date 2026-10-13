@@ -34,6 +34,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('../../page', async () => {
   const { createContext } = await import('react')
+
   return { TreeRefContext: createContext(null) }
 })
 vi.mock('@/components/CustomTags', () => ({ default: () => null }))

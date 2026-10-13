@@ -38,6 +38,7 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
     try {
       const document = await file.text()
       if (!document.trim()) throw new Error('The selected file is empty.')
+
       const response = await importSemanticModelApi({
         metalake,
         catalog,
@@ -84,9 +85,11 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
             if (!/\.(ya?ml|json)$/i.test(selected.name)) {
               setFile(null)
               setError('Select a .yaml, .yml, or .json file.')
+
               return Upload.LIST_IGNORE
             }
             setFile(selected)
+
             return false
           }}
           onRemove={() => {

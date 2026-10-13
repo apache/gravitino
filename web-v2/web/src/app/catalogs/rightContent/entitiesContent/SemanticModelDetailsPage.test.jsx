@@ -131,10 +131,12 @@ const click = async element => {
     await new Promise(resolve => setTimeout(resolve, 50))
   })
 }
+
 const findText = (selector, text) =>
   [...document.querySelectorAll(selector)].find(element => element.textContent === text)
 const expandContext = async label => click(findText('.ant-collapse-header', label))
 const selectTab = async name => click(findText('[role="tab"]', name))
+
 const exportDocument = async format => {
   await click(findText('button', 'Export OSSIE'))
   await click(findText('[role="menuitem"]', `Download ${format.toUpperCase()}`))
@@ -159,6 +161,7 @@ describe('Semantic Model AI guidance', () => {
             extra: { scope: label }
           }
     await renderDetails(definitionWith(context))
+
     const verify = label => {
       expect(document.body.textContent).toContain(`${label} guidance`)
       if (form === 'structured') {
@@ -265,6 +268,7 @@ describe('Semantic Model metadata', () => {
     definition.relationships[0].customExtensions = extension('relationship')
     definition.metrics[0].customExtensions = extension('metric')
     await renderDetails(definition)
+
     const verify = async name => {
       await expandContext(`${name} vendor`)
       expect([...document.querySelectorAll('pre')].some(pre => pre.textContent === extension(name)[0].data)).toBe(true)
@@ -307,6 +311,7 @@ describe('editing from Semantic Model details', () => {
       navigation.name = 'orders'
       const definition = { datasets: [{ name: 'orders', source: { namespace: ['sales', 'mart'], name: 'orders' } }] }
       let model = { name: 'orders', definition, properties: {}, comment: 'original' }
+
       const updated = {
         ...model,
         name: rename ? 'orders_v2' : 'orders',
@@ -318,6 +323,7 @@ describe('editing from Semantic Model details', () => {
       )
       defHttp.put.mockRejectedValueOnce(new Error('Invalid source')).mockImplementation(() => {
         model = updated
+
         return Promise.resolve({ semanticModel: updated })
       })
       await renderDetails(definition, model)

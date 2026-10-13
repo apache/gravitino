@@ -89,6 +89,7 @@ const selectFile = async (name, text) => {
   Object.defineProperty(input, 'files', { configurable: true, value: [file] })
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
 }
+
 const submit = async () => {
   await act(async () => {
     document.querySelector('[data-refer="import-semantic-model-submit"]').click()
