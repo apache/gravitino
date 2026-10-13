@@ -71,7 +71,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
     Assertions.assertTrue(
         gate.shouldSkip(table.id(), policyId, 3_600_000L, System.currentTimeMillis()));
-    Assertions.assertNull(actions.getByJobId(started.id()).finishedAt());
+    Assertions.assertEquals(0L, actions.getByJobId(started.id()).finishedAt());
 
     long finishedAt = 1_700_000_000_000L;
     JobMetaService.getInstance()
@@ -91,7 +91,7 @@ class TestOccupancyGate extends TestJDBCBackend {
                         .build());
 
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
-    Assertions.assertNull(actions.getByJobId(started.id()).finishedAt());
+    Assertions.assertEquals(0L, actions.getByJobId(started.id()).finishedAt());
     Assertions.assertTrue(
         gate.withinMinInterval(table.id(), policyId, 3_600_000L, finishedAt + 1_000L));
     Assertions.assertFalse(
@@ -121,7 +121,7 @@ class TestOccupancyGate extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testInFlightScansAllOpenRowsWhenStaleTerminalExists() throws IOException {
+  void testSoftSlotBlocksNewAcquireUntilMarkFinished() throws IOException {
     String metalakeName = "tms_occ_ml3";
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, "cat");
@@ -149,8 +149,13 @@ class TestOccupancyGate extends TestJDBCBackend {
     backend.insert(succeeded, false);
     long staleActionId = actions.insertInFlight(table.id(), policyId);
     actions.bindJobId(staleActionId, succeeded.id());
-    Assertions.assertNull(actions.getByJobId(succeeded.id()).finishedAt());
+    Assertions.assertEquals(0L, actions.getByJobId(succeeded.id()).finishedAt());
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> actions.insertInFlight(table.id(), policyId));
+
+    actions.markFinished(succeeded.id(), 200L, finishedAt);
+    Assertions.assertEquals(0, actions.listInFlight(table.id(), policyId).size());
 
     JobEntity started =
         JobEntity.builder()
@@ -167,7 +172,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     long activeActionId = actions.insertInFlight(table.id(), policyId);
     actions.bindJobId(activeActionId, started.id());
 
-    Assertions.assertEquals(2, actions.listInFlight(table.id(), policyId).size());
+    Assertions.assertEquals(1, actions.listInFlight(table.id(), policyId).size());
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
     Assertions.assertTrue(
         gate.shouldSkip(table.id(), policyId, 3_600_000L, finishedAt + 3_600_001L));
@@ -182,9 +187,9 @@ class TestOccupancyGate extends TestJDBCBackend {
     TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    OccupancyGate gate = new OccupancyGate(actions);
-    long policyId = 66L;
     long claimTimeoutMs = 60_000L;
+    OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
+    long policyId = 66L;
     long claimedAt = 1_700_000_400_000L;
 
     Assertions.assertTrue(

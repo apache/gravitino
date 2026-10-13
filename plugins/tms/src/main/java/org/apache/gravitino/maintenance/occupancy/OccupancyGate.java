@@ -26,6 +26,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
@@ -40,9 +41,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /**
  * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
  *
- * <p>Unbound rows ({@code job_id} null) are a short ShedLock-style claim: occupied while {@code
- * lock_until > now}. Bound rows consult {@link JobMetaService} and do <strong>not</strong> backfill
- * {@code finished_at}.
+ * <p>Unbound rows ({@code job_id} null, {@code finished_at = 0}) are a short claim: occupied while
+ * {@code now - created_at < claimTimeoutMs}. Bound rows consult {@link JobMetaService} and do
+ * <strong>not</strong> backfill {@code finished_at}.
  */
 public final class OccupancyGate {
 
@@ -50,15 +51,26 @@ public final class OccupancyGate {
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
 
   private final TableMaintenanceActionMetaService actionMetaService;
+  private final long claimTimeoutMs;
+
+  /**
+   * @param actionMetaService maintenance action DAO
+   * @param claimTimeoutMs unbound claim TTL
+   */
+  public OccupancyGate(TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
+    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
+    this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
+    this.claimTimeoutMs = claimTimeoutMs;
+  }
 
   /**
    * @param actionMetaService maintenance action DAO
    */
   public OccupancyGate(TableMaintenanceActionMetaService actionMetaService) {
-    this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
+    this(actionMetaService, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
   }
 
-  /** Uses {@link TableMaintenanceActionMetaService#getInstance()}. */
+  /** Uses {@link TableMaintenanceActionMetaService#getInstance()} and default claim timeout. */
   public OccupancyGate() {
     this(TableMaintenanceActionMetaService.getInstance());
   }
@@ -81,7 +93,7 @@ public final class OccupancyGate {
   public boolean isInFlight(long tableId, long policyId, long nowMs) {
     for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
       if (open.jobId() == null) {
-        if (open.lockUntil() != null && open.lockUntil() > nowMs) {
+        if (open.createdAt() != null && nowMs - open.createdAt() < claimTimeoutMs) {
           return true;
         }
         continue;
@@ -124,7 +136,7 @@ public final class OccupancyGate {
   }
 
   /**
-   * Prefer {@code table_maintenance_action.finished_at}; if that column is still null but a
+   * Prefer {@code table_maintenance_action.finished_at}; if that column is still {@code 0} but a
    * Gravitino job is already terminal, use {@link JobEntity#finishedAt()} without writing back.
    */
   @Nullable
@@ -142,21 +154,22 @@ public final class OccupancyGate {
       if (fromJob == null) {
         continue;
       }
-      latest = latest == null ? fromJob : Math.max(latest, fromJob);
+      if (latest == null || fromJob > latest) {
+        latest = fromJob;
+      }
     }
     return latest;
   }
 
   @Nullable
-  static JobEntity loadJob(long jobRunId, long tableId) {
+  private static JobEntity loadJob(long jobId, long tableId) {
     String metalake = metalakeNameForTable(tableId);
     if (metalake == null) {
       return null;
     }
     try {
       return JobMetaService.getInstance()
-          .getJobByIdentifier(
-              NameIdentifierUtil.ofJob(metalake, JobHandle.JOB_ID_PREFIX + jobRunId));
+          .getJobByIdentifier(NameIdentifierUtil.ofJob(metalake, JobHandle.JOB_ID_PREFIX + jobId));
     } catch (NoSuchEntityException e) {
       return null;
     }
@@ -168,7 +181,7 @@ public final class OccupancyGate {
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
             mapper -> mapper.listTablePOsByTableIds(Collections.singletonList(tableId)));
-    if (tables == null || tables.isEmpty() || tables.get(0).getMetalakeId() == null) {
+    if (tables == null || tables.isEmpty()) {
       return null;
     }
     MetalakePO metalake =

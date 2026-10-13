@@ -160,15 +160,12 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
     `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
-    `finished_at` BIGINT COMMENT 'finish timestamp in milliseconds, null while in flight',
-    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
-    `claim_token` TINYINT COMMENT '1 while unbound claim is held; NULL after bindJobId (UNIQUE soft-slot like deleted_at)',
-    `lock_until` BIGINT COMMENT 'unbound claim lease expiry in milliseconds; NULL after bindJobId',
+    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT '0 while in flight (soft exclusive slot like deleted_at); finish timestamp in milliseconds when done',
+    `created_at` BIGINT NOT NULL COMMENT 'creation / unbound claim lease start timestamp in milliseconds',
     PRIMARY KEY (`id`)
 ) COMMENT='table maintenance action occupancy and run metadata';
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_job_id` ON `table_maintenance_action`(`job_id`);
-CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_claim_token` ON `table_maintenance_action`(`table_id`, `policy_id`, `claim_token`);
-CREATE INDEX IF NOT EXISTS `idx_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
 CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tma_after_sid` ON `table_maintenance_action`(`table_id`, `after_snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tma_created_at` ON `table_maintenance_action`(`created_at`);

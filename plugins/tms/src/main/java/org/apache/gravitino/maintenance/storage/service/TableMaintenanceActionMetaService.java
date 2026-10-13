@@ -52,15 +52,18 @@ public class TableMaintenanceActionMetaService {
    * Tries to acquire an unbound occupancy claim before {@code runJob}.
    *
    * <ol>
-   *   <li>CAS-{@code UPDATE lock_until} on an expired unbound row ({@code claim_token = 1})
-   *   <li>Otherwise {@code INSERT} with {@code claim_token = 1}; unique conflict means lost race
+   *   <li>CAS-{@code UPDATE created_at} on an expired unbound row ({@code finished_at = 0})
+   *   <li>Otherwise {@code INSERT} with {@code finished_at = 0}; unique conflict means lost race
    * </ol>
+   *
+   * <p>{@code finished_at = 0} is the soft exclusive slot (like {@code deleted_at}); it stays until
+   * {@link #markFinished}. {@code created_at} is the unbound claim lease start.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param nowMs current epoch millis
    * @param claimTimeoutMs unbound claim TTL
-   * @return action id when acquired, empty when another live claim holds the slot
+   * @return action id when acquired, empty when another live claim or open run holds the slot
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -68,11 +71,11 @@ public class TableMaintenanceActionMetaService {
   public OptionalLong tryAcquireInFlight(
       long tableId, long policyId, long nowMs, long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
-    long newLockUntil = nowMs + claimTimeoutMs;
+    long expireBefore = nowMs - claimTimeoutMs;
     int reclaimed =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, newLockUntil, nowMs));
+            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, nowMs, expireBefore));
     if (reclaimed == 1) {
       TableMaintenanceActionPO unbound =
           SessionUtils.getWithoutCommit(
@@ -86,7 +89,9 @@ public class TableMaintenanceActionMetaService {
         SessionUtils.getWithoutCommit(
             TableMaintenanceActionMapper.class,
             mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
-    if (existing != null && existing.lockUntil() != null && existing.lockUntil() > nowMs) {
+    if (existing != null
+        && existing.createdAt() != null
+        && nowMs - existing.createdAt() < claimTimeoutMs) {
       return OptionalLong.empty();
     }
 
@@ -95,7 +100,7 @@ public class TableMaintenanceActionMetaService {
             .withTableId(tableId)
             .withPolicyId(policyId)
             .withCreatedAt(nowMs)
-            .withLockUntil(newLockUntil)
+            .withFinishedAt(0L)
             .build();
     try {
       SessionUtils.doWithCommit(
@@ -132,8 +137,8 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob} and releases the
-   * unbound claim slot.
+   * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob}. Does not release the
+   * soft slot ({@code finished_at} stays {@code 0} until {@link #markFinished}).
    *
    * @param id action row id
    * @param jobId Gravitino job run id
@@ -208,6 +213,7 @@ public class TableMaintenanceActionMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "markTableMaintenanceActionFinished")
   public void markFinished(long jobId, Long afterSnapshotId, long finishedAt) {
+    Preconditions.checkArgument(finishedAt > 0, "finishedAt must be positive");
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
@@ -245,7 +251,8 @@ public class TableMaintenanceActionMetaService {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return all rows with {@code finished_at IS NULL} (may include terminal jobs not yet marked)
+   * @return open rows with {@code finished_at = 0} (at most one per table/policy; may include a
+   *     terminal job not yet marked finished)
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,

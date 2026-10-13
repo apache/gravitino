@@ -43,8 +43,8 @@ public interface TableMaintenanceActionMapper {
   int reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newLockUntil") long newLockUntil,
-      @Param("nowMs") long nowMs);
+      @Param("newCreatedAt") long newCreatedAt,
+      @Param("expireBefore") long expireBefore);
 
   @Nullable
   @SelectProvider(

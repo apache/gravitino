@@ -45,5 +45,4 @@ public class TableMaintenanceActionPO {
   private Long afterSnapshotId;
   private Long finishedAt;
   private Long createdAt;
-  private Long lockUntil;
 }

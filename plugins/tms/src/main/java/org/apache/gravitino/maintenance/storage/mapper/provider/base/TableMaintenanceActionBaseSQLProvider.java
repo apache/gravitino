@@ -27,8 +27,9 @@ import org.apache.ibatis.annotations.Param;
 public class TableMaintenanceActionBaseSQLProvider {
 
   /**
-   * Inserts an unbound occupancy claim before {@code runJob}. {@code claim_token = 1} holds the
-   * exclusive soft slot; {@code lock_until} is the lease expiry.
+   * Inserts an unbound occupancy claim before {@code runJob}. {@code finished_at = 0} holds the
+   * exclusive soft slot (same pattern as {@code deleted_at}); {@code created_at} is the claim lease
+   * start.
    *
    * @param actionMeta row to insert
    * @return INSERT statement
@@ -36,32 +37,31 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, policy_id, created_at, claim_token, lock_until)"
-        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt}, 1,"
-        + " #{actionMeta.lockUntil})";
+        + " (table_id, policy_id, created_at, finished_at)"
+        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt}, 0)";
   }
 
   /**
-   * Extends an expired unbound claim lease by CAS on {@code lock_until} (ShedLock-style). Only one
+   * Extends an expired unbound claim lease by CAS on {@code created_at} (ShedLock-style). Only one
    * concurrent updater succeeds ({@code updated == 1}).
    *
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param newLockUntil new lease expiry
-   * @param nowMs current epoch millis; rows with {@code lock_until <= nowMs} are expired
+   * @param newCreatedAt new claim lease start
+   * @param expireBefore claims with {@code created_at} at or before this are expired
    * @return UPDATE statement
    */
   public String reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newLockUntil") long newLockUntil,
-      @Param("nowMs") long nowMs) {
+      @Param("newCreatedAt") long newCreatedAt,
+      @Param("expireBefore") long expireBefore) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET lock_until = #{newLockUntil}"
+        + " SET created_at = #{newCreatedAt}"
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND job_id IS NULL AND finished_at IS NULL AND claim_token = 1"
-        + " AND lock_until <= #{nowMs}";
+        + " AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at <= #{expireBefore}";
   }
 
   /**
@@ -73,11 +73,12 @@ public class TableMaintenanceActionBaseSQLProvider {
       @Param("tableId") long tableId, @Param("policyId") long policyId) {
     return selectColumns()
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND job_id IS NULL AND finished_at IS NULL AND claim_token = 1";
+        + " AND job_id IS NULL AND finished_at = 0";
   }
 
   /**
-   * Binds the Gravitino job run id after {@code runJob} and releases the unbound claim slot.
+   * Binds the Gravitino job run id after {@code runJob}. Keeps {@code finished_at = 0} so the soft
+   * slot covers the whole run.
    *
    * @param id action row id
    * @param jobId {@code job_run_meta.job_run_id}
@@ -86,8 +87,8 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET job_id = #{jobId}, claim_token = NULL, lock_until = NULL"
-        + " WHERE id = #{id} AND job_id IS NULL AND finished_at IS NULL";
+        + " SET job_id = #{jobId}"
+        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0";
   }
 
   /**
@@ -118,15 +119,15 @@ public class TableMaintenanceActionBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET before_snapshot_id = #{beforeSnapshotId}"
-        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at IS NULL";
+        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at = 0";
   }
 
   /**
-   * Sets terminal snapshot pointers when the Spark Job finishes.
+   * Sets terminal snapshot pointers when the Spark Job finishes and releases the soft slot.
    *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
-   * @param finishedAt finish time millis
+   * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
   public String markFinished(
@@ -136,7 +137,7 @@ public class TableMaintenanceActionBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
-        + " WHERE job_id = #{jobId} AND finished_at IS NULL";
+        + " WHERE job_id = #{jobId} AND finished_at = 0";
   }
 
   /**
@@ -156,10 +157,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Returns all rows with {@code finished_at IS NULL} for {@code (table_id, policy_id)}.
-   *
-   * <p>Multiple open rows can exist because {@code OccupancyGate} does not backfill {@code
-   * finished_at} when the Gravitino job is already terminal.
+   * Returns the open row ({@code finished_at = 0}) for {@code (table_id, policy_id)}, if any.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
@@ -168,11 +166,11 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String selectInFlightByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId) {
     return selectColumns()
-        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NULL";
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at = 0";
   }
 
   /**
-   * Returns {@code MAX(finished_at)} for {@code (table_id, policy_id)}.
+   * Returns {@code MAX(finished_at)} among completed rows for {@code (table_id, policy_id)}.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
@@ -182,13 +180,13 @@ public class TableMaintenanceActionBaseSQLProvider {
       @Param("tableId") long tableId, @Param("policyId") long policyId) {
     return "SELECT MAX(finished_at) FROM "
         + TABLE_NAME
-        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NOT NULL";
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at > 0";
   }
 
   private static String selectColumns() {
     return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
         + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
-        + " finished_at AS finishedAt, created_at AS createdAt, lock_until AS lockUntil FROM "
+        + " finished_at AS finishedAt, created_at AS createdAt FROM "
         + TABLE_NAME;
   }
 }

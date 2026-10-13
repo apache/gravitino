@@ -36,12 +36,14 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long actionId = actionService.insertInFlight(10L, 20L);
     long after = System.currentTimeMillis();
     Assertions.assertNull(actionService.getById(actionId).jobId());
+    Assertions.assertEquals(0L, actionService.getById(actionId).finishedAt());
     Assertions.assertTrue(actionService.getById(actionId).createdAt() >= before);
     Assertions.assertTrue(actionService.getById(actionId).createdAt() <= after);
 
     long jobId = 999L;
     actionService.bindJobId(actionId, jobId);
     Assertions.assertEquals(jobId, actionService.getByJobId(jobId).jobId());
+    Assertions.assertEquals(0L, actionService.getByJobId(jobId).finishedAt());
 
     actionService.recordBeforeSnapshot(jobId, 100L);
     Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
@@ -74,7 +76,8 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     OptionalLong first = actions.tryAcquireInFlight(tableId, policyId, t0, timeoutMs);
     Assertions.assertTrue(first.isPresent());
-    Assertions.assertEquals(t0 + timeoutMs, actions.getById(first.getAsLong()).lockUntil());
+    Assertions.assertEquals(t0, actions.getById(first.getAsLong()).createdAt());
+    Assertions.assertEquals(0L, actions.getById(first.getAsLong()).finishedAt());
     Assertions.assertTrue(
         actions.tryAcquireInFlight(tableId, policyId, t0 + 1_000L, timeoutMs).isEmpty());
 
@@ -82,8 +85,7 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     OptionalLong reclaimed = actions.tryAcquireInFlight(tableId, policyId, reclaimAt, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(first.getAsLong(), reclaimed.getAsLong());
-    Assertions.assertEquals(
-        reclaimAt + timeoutMs, actions.getById(reclaimed.getAsLong()).lockUntil());
-    Assertions.assertEquals(t0, actions.getById(reclaimed.getAsLong()).createdAt());
+    Assertions.assertEquals(reclaimAt, actions.getById(reclaimed.getAsLong()).createdAt());
+    Assertions.assertEquals(0L, actions.getById(reclaimed.getAsLong()).finishedAt());
   }
 }
