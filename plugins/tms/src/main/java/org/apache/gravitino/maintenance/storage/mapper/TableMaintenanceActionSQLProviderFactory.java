@@ -59,16 +59,14 @@ public class TableMaintenanceActionSQLProviderFactory {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param newCreatedAt new claim lease start
-   * @param expireBefore reclaim when {@code created_at <= expireBefore}
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
    * @return UPDATE statement
    */
   public static String reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newCreatedAt") long newCreatedAt,
-      @Param("expireBefore") long expireBefore) {
-    return getProvider().reclaimExpiredUnbound(tableId, policyId, newCreatedAt, expireBefore);
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    return getProvider().reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs);
   }
 
   /**
@@ -79,6 +77,19 @@ public class TableMaintenanceActionSQLProviderFactory {
   public static String selectUnboundByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId) {
     return getProvider().selectUnboundByTableAndPolicy(tableId, policyId);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
+   * @return SELECT statement
+   */
+  public static String selectLiveUnboundByTableAndPolicy(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    return getProvider().selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs);
   }
 
   /**

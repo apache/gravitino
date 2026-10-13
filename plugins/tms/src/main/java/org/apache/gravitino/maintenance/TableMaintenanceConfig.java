@@ -27,24 +27,27 @@ import org.apache.gravitino.config.ConfigEntry;
 public final class TableMaintenanceConfig {
 
   public static final ConfigEntry<Integer> SCHEDULER_EXPAND_THREADS =
-      new ConfigBuilder("gravitino.maintenance.scheduler.expand.threads")
+      new ConfigBuilder("gravitino.maintenance.scheduler.expandThreads")
           .doc("Thread count for the policy-expand db-scheduler pool")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(4);
 
   public static final ConfigEntry<Integer> SCHEDULER_CRON_THREADS =
-      new ConfigBuilder("gravitino.maintenance.scheduler.cron.threads")
+      new ConfigBuilder("gravitino.maintenance.scheduler.cronThreads")
           .doc("Thread count for the cron-job db-scheduler pool")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(8);
 
   public static final ConfigEntry<Integer> SCHEDULER_COMMIT_THREADS =
-      new ConfigBuilder("gravitino.maintenance.scheduler.commit.threads")
+      new ConfigBuilder("gravitino.maintenance.scheduler.commitThreads")
           .doc("Thread count for the commit-job db-scheduler pool")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(4);
 
   public static final ConfigEntry<Long> SCHEDULER_POLLING_INTERVAL_MS =
@@ -52,6 +55,7 @@ public final class TableMaintenanceConfig {
           .doc("db-scheduler poll interval in milliseconds")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000L);
 
   public static final ConfigEntry<Long> SCHEDULER_HEARTBEAT_INTERVAL_MS =
@@ -59,6 +63,7 @@ public final class TableMaintenanceConfig {
           .doc("Heartbeat interval while a scheduler callback runs")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60_000L);
 
   public static final ConfigEntry<Integer> SCHEDULER_MISSED_HEARTBEATS_LIMIT =
@@ -66,6 +71,7 @@ public final class TableMaintenanceConfig {
           .doc("Missed heartbeats before a picked task is considered dead")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(6);
 
   public static final ConfigEntry<Integer> EXPAND_ENQUEUE_BATCH_SIZE =
@@ -73,6 +79,7 @@ public final class TableMaintenanceConfig {
           .doc("Maximum cron-jobs enqueued per policy-expand pick")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(100);
 
   /** Default unbound claim TTL ({@code job_id} still null), matching ShedLock-style short locks. */
@@ -85,6 +92,7 @@ public final class TableMaintenanceConfig {
                   + " submitter may reclaim it")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_CLAIM_TIMEOUT_MS);
 
   private final int expandThreads;

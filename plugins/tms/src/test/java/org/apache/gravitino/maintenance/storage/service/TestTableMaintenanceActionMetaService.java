@@ -40,8 +40,9 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long after = System.currentTimeMillis();
     Assertions.assertNull(actionService.getById(claim.id()).jobId());
     Assertions.assertEquals(0L, actionService.getById(claim.id()).finishedAt());
-    Assertions.assertTrue(claim.createdAt() >= before);
-    Assertions.assertTrue(claim.createdAt() <= after);
+    // DB clock may skew slightly from the JVM; allow a small window.
+    Assertions.assertTrue(claim.createdAt() >= before - 5_000L);
+    Assertions.assertTrue(claim.createdAt() <= after + 5_000L);
     Assertions.assertEquals(claim.createdAt(), actionService.getById(claim.id()).createdAt());
 
     long jobId = 999L;
@@ -71,31 +72,25 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testTryAcquireRejectsLiveUnboundAndReclaimsExpired() {
+  void testTryAcquireRejectsLiveUnboundAndReclaimsExpired() throws Exception {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 11L;
     long policyId = 21L;
-    long timeoutMs = 60_000L;
-    long t0 = 1_700_000_300_000L;
+    long timeoutMs = 200L;
 
-    Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, t0, timeoutMs);
+    Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(first.isPresent());
-    Assertions.assertEquals(t0, first.get().createdAt());
-    Assertions.assertEquals(t0, actions.getById(first.get().id()).createdAt());
     Assertions.assertEquals(0L, actions.getById(first.get().id()).finishedAt());
-    Assertions.assertTrue(
-        actions.tryAcquireInFlight(tableId, policyId, t0 + 1_000L, timeoutMs).isEmpty());
+    Assertions.assertTrue(actions.tryAcquireInFlight(tableId, policyId, timeoutMs).isEmpty());
 
-    long reclaimAt = t0 + timeoutMs;
-    Optional<OccupancyClaim> reclaimed =
-        actions.tryAcquireInFlight(tableId, policyId, reclaimAt, timeoutMs);
+    Thread.sleep(timeoutMs + 50L);
+
+    Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(first.get().id(), reclaimed.get().id());
-    Assertions.assertEquals(reclaimAt, reclaimed.get().createdAt());
-    Assertions.assertEquals(reclaimAt, actions.getById(reclaimed.get().id()).createdAt());
+    Assertions.assertTrue(reclaimed.get().createdAt() >= first.get().createdAt());
     Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
 
-    // Stale holder must bind with the claim from acquire, not a re-read of created_at.
     Assertions.assertThrows(
         IllegalStateException.class, () -> actions.bindJobId(first.get(), 1001L));
     actions.bindJobId(reclaimed.get(), 1002L);

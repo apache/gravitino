@@ -21,47 +21,59 @@ package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper.TABLE_NAME;
 
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
-/** Portable SQL for {@code table_maintenance_action}. */
+/** Portable SQL for {@code table_maintenance_action} (MySQL / H2 {@code MODE=MYSQL}). */
 public class TableMaintenanceActionBaseSQLProvider {
+
+  /**
+   * @return SQL expression for the database clock in epoch millis
+   */
+  protected String currentTimeMillisExpr() {
+    return DatabaseTimeSQL.MYSQL;
+  }
 
   /**
    * Inserts an unbound occupancy claim before {@code runJob}. {@code finished_at = 0} holds the
    * exclusive soft slot (same pattern as {@code deleted_at}); {@code created_at} is the claim lease
-   * start.
+   * start from the database clock.
    *
-   * @param actionMeta row to insert
+   * @param actionMeta row to insert ({@code createdAt} is ignored; DB time is used)
    * @return INSERT statement
    */
   public String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return "INSERT INTO "
         + TABLE_NAME
         + " (table_id, policy_id, created_at, finished_at)"
-        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt}, 0)";
+        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, "
+        + currentTimeMillisExpr()
+        + ", 0)";
   }
 
   /**
-   * Extends an expired unbound claim lease by CAS on {@code created_at} (ShedLock-style). Only one
-   * concurrent updater succeeds ({@code updated == 1}).
+   * Extends an expired unbound claim lease by CAS on {@code created_at} (ShedLock-style). Lease age
+   * is evaluated against the database clock so every node shares one TTL timeline.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param newCreatedAt new claim lease start
-   * @param expireBefore claims with {@code created_at} at or before this are expired
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
    * @return UPDATE statement
    */
   public String reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newCreatedAt") long newCreatedAt,
-      @Param("expireBefore") long expireBefore) {
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    String now = currentTimeMillisExpr();
     return "UPDATE "
         + TABLE_NAME
-        + " SET created_at = #{newCreatedAt}"
+        + " SET created_at = "
+        + now
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
         + " AND job_id IS NULL AND finished_at = 0"
-        + " AND created_at <= #{expireBefore}";
+        + " AND created_at <= ("
+        + now
+        + ") - #{claimTimeoutMs}";
   }
 
   /**
@@ -74,6 +86,26 @@ public class TableMaintenanceActionBaseSQLProvider {
     return selectColumns()
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
         + " AND job_id IS NULL AND finished_at = 0";
+  }
+
+  /**
+   * Live unbound claim still within TTL on the database clock.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
+   * @return SELECT statement
+   */
+  public String selectLiveUnboundByTableAndPolicy(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    return selectColumns()
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at > ("
+        + currentTimeMillisExpr()
+        + ") - #{claimTimeoutMs}";
   }
 
   /**

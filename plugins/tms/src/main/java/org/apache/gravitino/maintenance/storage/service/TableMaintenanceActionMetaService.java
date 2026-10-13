@@ -52,48 +52,46 @@ public class TableMaintenanceActionMetaService {
    * Tries to acquire an unbound occupancy claim before {@code runJob}.
    *
    * <ol>
-   *   <li>CAS-{@code UPDATE created_at} on an expired unbound row ({@code finished_at = 0})
-   *   <li>Otherwise {@code INSERT} with {@code finished_at = 0}; unique conflict means lost race
+   *   <li>CAS-{@code UPDATE created_at} on an expired unbound row ({@code finished_at = 0}), using
+   *       the database clock for lease age
+   *   <li>Otherwise {@code INSERT} with {@code finished_at = 0} and DB {@code created_at}; unique
+   *       conflict means lost race
    * </ol>
    *
    * <p>{@code finished_at = 0} is the soft exclusive slot (like {@code deleted_at}); it stays until
-   * {@link #markFinished}. {@code created_at} is the unbound claim lease start.
+   * {@link #markFinished}. {@code created_at} is the unbound claim lease start from the database
+   * clock so multi-node TTL does not depend on JVM skew.
+   *
+   * <p><b>Submit contract:</b> {@link #bindJobId} only fences the DB bind. It cannot undo a {@code
+   * runJob} that already succeeded. OccupancyGate / submit follow-ups must make {@code runJob}
+   * idempotent on {@link OccupancyClaim#id()} (or use an outbox / reconcile-before-reclaim) so a
+   * reclaim after a crash between submit and bind cannot double-submit Spark work.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param nowMs current epoch millis
    * @param claimTimeoutMs unbound claim TTL
-   * @return claim ({@code id} + acquire-time {@code created_at}) when acquired, empty when another
-   *     live claim or open run holds the slot
+   * @return claim ({@code id} + DB {@code created_at}) when acquired, empty when another live claim
+   *     or open run holds the slot
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "tryAcquireTableMaintenanceAction")
   public Optional<OccupancyClaim> tryAcquireInFlight(
-      long tableId, long policyId, long nowMs, long claimTimeoutMs) {
+      long tableId, long policyId, long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
-    long expireBefore = nowMs - claimTimeoutMs;
     int reclaimed =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, nowMs, expireBefore));
+            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs));
     if (reclaimed == 1) {
-      TableMaintenanceActionPO unbound =
-          SessionUtils.getWithoutCommit(
-              TableMaintenanceActionMapper.class,
-              mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
-      Preconditions.checkState(unbound != null && unbound.id() != null, "reclaim lost unbound row");
-      // Fence with the created_at this acquire wrote (nowMs), never re-read created_at.
-      return Optional.of(new OccupancyClaim(unbound.id(), nowMs));
+      return Optional.of(readUnboundClaim(tableId, policyId));
     }
 
-    TableMaintenanceActionPO existing =
+    TableMaintenanceActionPO live =
         SessionUtils.getWithoutCommit(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
-    if (existing != null
-        && existing.createdAt() != null
-        && nowMs - existing.createdAt() < claimTimeoutMs) {
+            mapper -> mapper.selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs));
+    if (live != null) {
       return Optional.empty();
     }
 
@@ -101,7 +99,6 @@ public class TableMaintenanceActionMetaService {
         TableMaintenanceActionPO.builder()
             .withTableId(tableId)
             .withPolicyId(policyId)
-            .withCreatedAt(nowMs)
             .withFinishedAt(0L)
             .build();
     try {
@@ -114,7 +111,12 @@ public class TableMaintenanceActionMetaService {
       throw e;
     }
     Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
-    return Optional.of(new OccupancyClaim(actionMeta.id(), nowMs));
+    TableMaintenanceActionPO inserted =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class, mapper -> mapper.selectById(actionMeta.id()));
+    Preconditions.checkState(
+        inserted != null && inserted.createdAt() != null, "insert lost created_at");
+    return Optional.of(new OccupancyClaim(inserted.id(), inserted.createdAt()));
   }
 
   /**
@@ -142,8 +144,7 @@ public class TableMaintenanceActionMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertTableMaintenanceAction")
   public OccupancyClaim insertInFlight(long tableId, long policyId, long claimTimeoutMs) {
-    Optional<OccupancyClaim> acquired =
-        tryAcquireInFlight(tableId, policyId, System.currentTimeMillis(), claimTimeoutMs);
+    Optional<OccupancyClaim> acquired = tryAcquireInFlight(tableId, policyId, claimTimeoutMs);
     Preconditions.checkState(acquired.isPresent(), "failed to acquire unbound occupancy claim");
     return acquired.get();
   }
@@ -155,6 +156,9 @@ public class TableMaintenanceActionMetaService {
    * <p>Pass the {@link OccupancyClaim} from acquire / reclaim as-is. Do not re-read {@code
    * created_at} from the row: after another node reclaims, that would observe the new fence and
    * defeat reclaim fencing. The CAS matches zero rows for a stale claim.
+   *
+   * <p>This CAS does <em>not</em> prevent duplicate Spark submissions if {@code runJob} already
+   * ran; see {@link #tryAcquireInFlight} submit contract.
    *
    * @param claim claim returned by {@link #tryAcquireInFlight} / {@link #insertInFlight}
    * @param jobId Gravitino job run id
@@ -172,6 +176,17 @@ public class TableMaintenanceActionMetaService {
         updated == 1,
         "expected to bind job_id on exactly one in-flight action, updated=%s",
         updated);
+  }
+
+  private static OccupancyClaim readUnboundClaim(long tableId, long policyId) {
+    TableMaintenanceActionPO unbound =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
+    Preconditions.checkState(
+        unbound != null && unbound.id() != null && unbound.createdAt() != null,
+        "reclaim lost unbound row");
+    return new OccupancyClaim(unbound.id(), unbound.createdAt());
   }
 
   /**

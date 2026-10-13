@@ -43,8 +43,7 @@ public interface TableMaintenanceActionMapper {
   int reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newCreatedAt") long newCreatedAt,
-      @Param("expireBefore") long expireBefore);
+      @Param("claimTimeoutMs") long claimTimeoutMs);
 
   @Nullable
   @SelectProvider(
@@ -52,6 +51,15 @@ public interface TableMaintenanceActionMapper {
       method = "selectUnboundByTableAndPolicy")
   TableMaintenanceActionPO selectUnboundByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectLiveUnboundByTableAndPolicy")
+  TableMaintenanceActionPO selectLiveUnboundByTableAndPolicy(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs);
 
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "bindJobId")
   int bindJobId(

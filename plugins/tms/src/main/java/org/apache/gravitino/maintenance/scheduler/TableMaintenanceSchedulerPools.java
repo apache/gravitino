@@ -31,10 +31,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Starts and stops three isolated db-scheduler pools (§5.2, §7.2), each with its own task table.
+ * Starts and stops three isolated db-scheduler pools (§5.2, §7.2), each with its own task table
+ * ({@link #EXPAND_TASKS_TABLE}, {@link #CRON_TASKS_TABLE}, {@link #COMMIT_TASKS_TABLE}).
  *
  * <p>db-scheduler requires a dedicated {@code tableName} per Scheduler instance for multi-pool
- * isolation; sharing one table across pools is unsupported.
+ * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
  * <p>Task handlers are intentionally minimal in this change; submit and occupancy logic land in
  * follow-up PRs.

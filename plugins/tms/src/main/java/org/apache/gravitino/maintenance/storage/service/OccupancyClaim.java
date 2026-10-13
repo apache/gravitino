@@ -21,8 +21,14 @@ package org.apache.gravitino.maintenance.storage.service;
 import java.util.Objects;
 
 /**
- * Immutable occupancy claim returned by acquire. Callers must pass {@link #createdAt()} to {@link
- * TableMaintenanceActionMetaService#bindJobId} without re-reading {@code created_at} from the row.
+ * Immutable occupancy claim returned by acquire.
+ *
+ * <p>Callers must pass {@link #createdAt()} to {@link TableMaintenanceActionMetaService#bindJobId}
+ * without re-reading {@code created_at} from the row.
+ *
+ * <p>{@link #id()} is the durable claim token for OccupancyGate follow-ups: make {@code runJob}
+ * idempotent on this id (or outbox / reconcile-before-reclaim). Binding {@code job_id} alone cannot
+ * undo a submit that already succeeded after a crash between {@code runJob} and bind.
  */
 public final class OccupancyClaim {
 
