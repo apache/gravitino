@@ -43,14 +43,23 @@ configurations.all {
   }
 }
 
+// Everything packaged into the shaded runtime jar. Declaring these as `implementation` would make
+// Gradle publish them as `runtime` scoped POM dependencies and list them in the Gradle module
+// metadata, so resolving the connector coordinate would download the modules and third-party
+// libraries the jar already contains. See https://github.com/apache/gravitino/issues/13171
+val shadedDependencies by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
 dependencies {
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(project(":flink-connector:flink-2.1"))
+  shadedDependencies(project(":clients:client-java-runtime", configuration = "shadow"))
+  shadedDependencies(project(":flink-connector:flink-2.1"))
   // flink-2.1's own openlineageSqlJava21 constraint only applies to that module's compileOnly and
-  // testImplementation configurations, so it never reaches this module's runtimeClasspath (which
+  // testImplementation configurations, so it never reaches this module's shaded dependencies (which
   // shadowJar packages). Depend on it directly here so the shaded runtime jar ships the patched
   // 1.52.0 release instead of the vulnerable 1.32.0 pulled transitively by flink-connector-jdbc.
-  implementation(libs.openlineageSqlJava21)
+  shadedDependencies(libs.openlineageSqlJava21)
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -60,7 +69,7 @@ val shadowJarTask = tasks.named<ShadowJar>("shadowJar")
 
 shadowJarTask.configure {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
+  configurations = listOf(shadedDependencies)
   archiveFileName.set("$baseName-$version.jar")
   archiveClassifier.set("")
   mergeServiceFiles()

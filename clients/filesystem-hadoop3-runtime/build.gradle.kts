@@ -25,22 +25,31 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+// Everything packaged into the shaded runtime jar. Declaring these as `implementation` would make
+// Gradle publish them as `runtime` scoped POM dependencies and list them in the Gradle module
+// metadata, so resolving the coordinate would download the modules and third-party libraries the
+// jar already contains. See https://github.com/apache/gravitino/issues/13171
+val shadedDependencies by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
 dependencies {
-  implementation(project(":bundles:aliyun"))
-  implementation(project(":bundles:aws"))
-  implementation(project(":bundles:azure"))
-  implementation(project(":bundles:gcp"))
-  implementation(project(":bundles:tencent"))
-  implementation(project(":clients:filesystem-hadoop3")) {
+  shadedDependencies(project(":bundles:aliyun"))
+  shadedDependencies(project(":bundles:aws"))
+  shadedDependencies(project(":bundles:azure"))
+  shadedDependencies(project(":bundles:gcp"))
+  shadedDependencies(project(":bundles:tencent"))
+  shadedDependencies(project(":clients:filesystem-hadoop3")) {
     exclude(group = "org.slf4j")
   }
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.commons.lang3)
+  shadedDependencies(project(":clients:client-java-runtime", configuration = "shadow"))
+  shadedDependencies(libs.commons.lang3)
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
+  configurations = listOf(shadedDependencies)
   archiveClassifier.set("")
 
   // Strip shaded slf4j-api brought in by :clients:client-java-runtime — Hadoop classpaths
