@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import static io.trino.spi.StandardErrorCode.CATALOG_UNAVAILABLE;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,10 +33,15 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +72,35 @@ public class TestCatalogConnectorMetadataErrors {
     TrinoException e = assertThrows(TrinoException.class, () -> metadata.getTable("s", "t"));
     assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
     assertEquals(DENIED_MESSAGE, e.getMessage());
+  }
+
+  @Test
+  public void testDeniedMessageWithServerStackKeepsFirstLine() {
+    // The REST client appends the server stack trace to the message of a refusal.
+    String messageWithStack =
+        DENIED_MESSAGE
+            + "\n"
+            + "org.apache.gravitino.exceptions.ForbiddenException: "
+            + DENIED_MESSAGE
+            + "\n"
+            + "\tat org.apache.gravitino.server.web.rest.TableOperations.loadTable(TableOperations.java:1)";
+    TableCatalog tableCatalog = mock(TableCatalog.class);
+    when(tableCatalog.loadTable(any())).thenThrow(new ForbiddenException(messageWithStack));
+    CatalogConnectorMetadata metadata = createMetadata(tableCatalog);
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.getTable("s", "t"));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
+    assertEquals(DENIED_MESSAGE, e.getMessage());
+  }
+
+  @Test
+  public void testIllegalArgumentWithoutMessageIsIllegalArgument() {
+    TableCatalog tableCatalog = mock(TableCatalog.class);
+    when(tableCatalog.loadTable(any())).thenThrow(new IllegalNameIdentifierException());
+    CatalogConnectorMetadata metadata = createMetadata(tableCatalog);
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.getTable("s", "t"));
+    assertEquals(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
   }
 
   @Test
@@ -130,11 +165,57 @@ public class TestCatalogConnectorMetadataErrors {
     assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
   }
 
+  @Test
+  public void testLoadCatalogNotInUseIsCatalogUnavailable() {
+    String message = "Catalog m.c is not in use";
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    when(metalake.loadCatalog(anyString())).thenThrow(new CatalogNotInUseException(message));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () -> new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c")));
+    assertEquals(CATALOG_UNAVAILABLE.toErrorCode(), e.getErrorCode());
+    assertEquals(message, e.getMessage());
+  }
+
+  @Test
+  public void testCreateExistingSchemaIsSchemaAlreadyExists() {
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.createSchema(any(), any(), any()))
+        .thenThrow(new SchemaAlreadyExistsException("exists"));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> metadata.createSchema(mock(GravitinoSchema.class)));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testCreateSchemaInMissingCatalogIsCatalogNotExists() {
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.createSchema(any(), any(), any()))
+        .thenThrow(new NoSuchCatalogException("missing"));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> metadata.createSchema(mock(GravitinoSchema.class)));
+    assertEquals(GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), e.getErrorCode());
+  }
+
   private static CatalogConnectorMetadata createMetadata(TableCatalog tableCatalog) {
+    return createMetadata(mock(SupportsSchemas.class), tableCatalog);
+  }
+
+  private static CatalogConnectorMetadata createMetadata(
+      SupportsSchemas schemas, TableCatalog tableCatalog) {
     GravitinoMetalake metalake = mock(GravitinoMetalake.class);
     Catalog catalog = mock(Catalog.class);
     when(metalake.loadCatalog(anyString())).thenReturn(catalog);
-    when(catalog.asSchemas()).thenReturn(mock(SupportsSchemas.class));
+    when(catalog.asSchemas()).thenReturn(schemas);
     when(catalog.asTableCatalog()).thenReturn(tableCatalog);
     when(catalog.asFunctionCatalog()).thenThrow(new UnsupportedOperationException("unsupported"));
     return new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c"));
