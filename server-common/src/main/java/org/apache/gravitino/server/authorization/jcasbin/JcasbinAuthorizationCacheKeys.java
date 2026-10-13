@@ -39,7 +39,6 @@ final class JcasbinAuthorizationCacheKeys {
     String[] names = metadataObject.fullName().split("\\.");
     switch (metadataObject.type()) {
       case METALAKE:
-        parts.add(MetadataObject.Type.METALAKE.name());
         break;
       case CATALOG:
         parts.add(MetadataObject.Type.CATALOG.name());

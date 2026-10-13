@@ -106,6 +106,7 @@ import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -118,6 +119,8 @@ import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -3297,6 +3300,38 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testLocalMetalakeDropAndRecreateResolvesNewChildIds() throws Exception {
+    // Use a dedicated metalake so the shared MetadataIdConverter stubs do not leak into other
+    // tests.
+    String metalakeName = "local_drop_ml";
+    assertMetalakeDropAndRecreateResolvesNewChildIds(
+        metalakeName,
+        () ->
+            jcasbinAuthorizer.handleEntityNameIdMappingChange(
+                metalakeName, NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE));
+  }
+
+  @Test
+  public void testPeerMetalakeDropReplayAndRecreateResolvesNewChildIds() throws Exception {
+    JcasbinChangeListener listener =
+        new JcasbinChangeListener(
+            getMetadataIdCache(jcasbinAuthorizer), getOwnerRelCache(jcasbinAuthorizer), 1);
+    // Use a dedicated metalake so the shared MetadataIdConverter stubs do not leak into other
+    // tests.
+    String metalakeName = "peer_drop_ml";
+    EntityChangeRecord metalakeDrop =
+        new EntityChangeRecord(
+            1L,
+            metalakeName,
+            MetadataObject.Type.METALAKE.name(),
+            EntityChangeLogNameIdentifierCodec.encode(NameIdentifier.of(metalakeName)),
+            OperateType.DROP,
+            0L);
+    assertMetalakeDropAndRecreateResolvesNewChildIds(
+        metalakeName, () -> listener.onEntityChange(ImmutableList.of(metalakeDrop)));
+  }
+
+  @Test
   public void testSemanticModelCacheKeepsCaseSensitiveSchemasDistinct() throws Exception {
     CatalogManager catalogs = mock(CatalogManager.class);
     BaseCatalog<?> catalog = mock(BaseCatalog.class);
@@ -4027,5 +4062,53 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("denyEnforcer");
     field.setAccessible(true);
     return (Enforcer) field.get(authorizer);
+  }
+
+  private void assertMetalakeDropAndRecreateResolvesNewChildIds(
+      String metalakeName, Runnable invalidateMetalake) throws Exception {
+    GravitinoCache<String, Long> metadataIdCache = getMetadataIdCache(jcasbinAuthorizer);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, getOwnerRelCache(jcasbinAuthorizer));
+    String otherMetalake = metalakeName + "_other";
+    MetadataObject metalake = MetadataObjects.parse(metalakeName, MetadataObject.Type.METALAKE);
+    MetadataObject catalog = MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG);
+    MetadataObject tag = MetadataObjects.parse("tag1", MetadataObject.Type.TAG);
+    MetadataObject policy = MetadataObjects.parse("policy1", MetadataObject.Type.POLICY);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(metalake, metalakeName))
+        .thenReturn(Optional.of(1L), Optional.of(101L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(catalog, metalakeName))
+        .thenReturn(Optional.of(2L), Optional.of(102L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(tag, metalakeName))
+        .thenReturn(Optional.of(3L), Optional.of(103L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(policy, metalakeName))
+        .thenReturn(Optional.of(4L), Optional.of(104L));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(catalog, otherMetalake))
+        .thenReturn(Optional.of(5L), Optional.of(105L));
+
+    assertEquals(Optional.of(1L), resolve(lookups, metalake, metalakeName));
+    assertEquals(Optional.of(2L), resolve(lookups, catalog, metalakeName));
+    assertEquals(Optional.of(3L), resolve(lookups, tag, metalakeName));
+    assertEquals(Optional.of(4L), resolve(lookups, policy, metalakeName));
+    assertEquals(Optional.of(5L), resolve(lookups, catalog, otherMetalake));
+
+    // Drop the metalake, then recreate it with same-named children that get new IDs.
+    invalidateMetalake.run();
+
+    assertEquals(Optional.of(101L), resolve(lookups, metalake, metalakeName));
+    assertEquals(Optional.of(102L), resolve(lookups, catalog, metalakeName));
+    assertEquals(Optional.of(103L), resolve(lookups, tag, metalakeName));
+    assertEquals(Optional.of(104L), resolve(lookups, policy, metalakeName));
+    // Another metalake whose name starts with the same characters keeps its cached ID.
+    assertEquals(Optional.of(5L), resolve(lookups, catalog, otherMetalake));
+  }
+
+  private static Optional<Long> resolve(
+      JcasbinAuthorizationLookups lookups, MetadataObject metadataObject, String metalake) {
+    return lookups.resolveMetadataId(metadataObject, metalake, new AuthorizationRequestContext());
   }
 }
