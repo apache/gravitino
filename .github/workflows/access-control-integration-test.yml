@@ -2,14 +2,19 @@ name: Access Control Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
+  # Triggered by the Required CI orchestrator (workflow_call) or by pushes.
+  workflow_call:
+    inputs:
+      required_ci:
+        description: Run this suite as part of the Required CI orchestrator.
+        required: false
+        type: boolean
+        default: false
   push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
     branches: [ "main", "branch-*" ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: required-access-control-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
