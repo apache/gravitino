@@ -53,15 +53,19 @@ dependencies {
 }
 
 tasks {
+  val runtimeJars by registering(Copy::class) {
+    from(configurations.runtimeClasspath)
+    into("build/libs")
+  }
+
   val copyLibs by registering(Copy::class) {
-    dependsOn(jar)
-    from(layout.buildDirectory.dir("libs")) {
-      include("gravitino-tms-*.jar")
+    dependsOn(jar, runtimeJars)
+    from("build/libs") {
       exclude("*-javadoc.jar", "*-sources.jar")
-    }
-    // New runtime deps not already shipped via server/core libs (see LICENSE.bin).
-    from(configurations.runtimeClasspath) {
-      include("db-scheduler-*.jar", "jspecify-*.jar")
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
     }
     into("$rootDir/distribution/package/libs")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -69,8 +73,12 @@ tasks {
 
   register("copyLibAndConfigs", Copy::class) {
     group = "gravitino distribution"
-    description = "Copy tms plugin jar into distribution package libs"
+    description = "Copy tms plugin jar and runtime dependencies into distribution package libs"
     dependsOn(copyLibs)
+  }
+
+  jar {
+    dependsOn(runtimeJars)
   }
 
   test {
