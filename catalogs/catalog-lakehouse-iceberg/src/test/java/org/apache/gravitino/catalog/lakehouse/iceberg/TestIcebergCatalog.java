@@ -30,6 +30,7 @@ import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
@@ -127,6 +128,8 @@ public class TestIcebergCatalog {
     Map<String, String> conf = Maps.newHashMap();
     IcebergCatalog icebergCatalog =
         new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    Assertions.assertTrue(
+        icebergCatalog.newCapability().caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     CatalogOperations catalogOperations = icebergCatalog.ops();
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 

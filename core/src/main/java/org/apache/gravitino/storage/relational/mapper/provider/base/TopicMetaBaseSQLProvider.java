@@ -83,6 +83,33 @@ public class TopicMetaBaseSQLProvider {
         + " deleted_at = #{topicMeta.deletedAt}";
   }
 
+  /**
+   * Returns SQL that atomically restores a topic only while its retained row is soft-deleted.
+   *
+   * <p>The conditional update prevents an active topic registration from being rebound between a
+   * state check and the write. Assigning {@code last_version} first keeps both version markers on
+   * the same next value for databases that evaluate assignments from left to right as well as for
+   * databases that evaluate them from the original row.
+   *
+   * @param topicPO the replacement topic metadata
+   * @return the conditional restore SQL
+   */
+  public String restoreSoftDeletedTopicMeta(@Param("topicMeta") TopicPO topicPO) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET topic_name = #{topicMeta.topicName},"
+        + " metalake_id = #{topicMeta.metalakeId},"
+        + " catalog_id = #{topicMeta.catalogId},"
+        + " schema_id = #{topicMeta.schemaId},"
+        + " comment = #{topicMeta.comment},"
+        + " properties = #{topicMeta.properties},"
+        + " audit_info = #{topicMeta.auditInfo},"
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
+        + " deleted_at = #{topicMeta.deletedAt}"
+        + " WHERE topic_id = #{topicMeta.topicId} AND deleted_at > 0";
+  }
+
   public String listTopicPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT topic_id as topicId, topic_name as topicName, metalake_id as metalakeId,"
         + " catalog_id as catalogId, schema_id as schemaId,"

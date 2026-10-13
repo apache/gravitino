@@ -73,6 +73,37 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testRestoreSoftDeletedTopicOnly() throws IOException {
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "topic_restore_soft_deleted",
+            AUDIT_INFO);
+    backend.insert(topic, false);
+
+    Assertions.assertFalse(backend.restoreSoftDeletedEntity(topic));
+    backend.delete(NameIdentifier.of(metalakeName, catalogName), Entity.EntityType.CATALOG, true);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    TopicEntity replacement =
+        TopicEntity.builder()
+            .withId(topic.id())
+            .withName(topic.name())
+            .withNamespace(topic.namespace())
+            .withComment("restored")
+            .withProperties(topic.properties())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    Assertions.assertTrue(backend.restoreSoftDeletedEntity(replacement));
+    Assertions.assertEquals(
+        "restored",
+        TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
+    Assertions.assertFalse(backend.restoreSoftDeletedEntity(replacement));
+  }
+
+  @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     TopicEntity topic =
         createTopicEntity(

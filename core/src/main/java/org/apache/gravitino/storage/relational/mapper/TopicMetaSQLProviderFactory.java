@@ -60,6 +60,10 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().insertTopicMetaOnDuplicateKeyUpdate(topicPO);
   }
 
+  public static String restoreSoftDeletedTopicMeta(@Param("topicMeta") TopicPO topicPO) {
+    return getProvider().restoreSoftDeletedTopicMeta(topicPO);
+  }
+
   public static String listTopicPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTopicPOsBySchemaId(schemaId);
   }

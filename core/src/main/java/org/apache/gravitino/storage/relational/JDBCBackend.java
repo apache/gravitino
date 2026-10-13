@@ -39,6 +39,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -175,52 +176,24 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
-    if (e instanceof BaseMetalake) {
-      MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
-    } else if (e instanceof CatalogEntity) {
-      CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
-    } else if (e instanceof SchemaEntity) {
-      SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
-    } else if (e instanceof TableEntity) {
-      TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
-    } else if (e instanceof FilesetEntity) {
-      FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
-    } else if (e instanceof TopicEntity) {
-      TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
-    } else if (e instanceof UserEntity) {
-      UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
-    } else if (e instanceof RoleEntity) {
-      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
-    } else if (e instanceof GroupEntity) {
-      GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
-    } else if (e instanceof TagEntity) {
-      TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
-    } else if (e instanceof ModelEntity) {
-      ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
-    } else if (e instanceof ModelVersionEntity) {
-      if (overwritten) {
-        LOG.warn(
-            "'overwritten' is not supported for model version meta, ignoring this flag and "
-                + "inserting the new model version.");
+    try {
+      insertEntity(e, overwritten);
+    } catch (EntityAlreadyExistsException duplicate) {
+      if (!overwritten && isSoftDeleted(e)) {
+        throw new SoftDeletedEntityIdentifierException(duplicate, e.type(), e.id());
       }
-      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
-    } else if (e instanceof FunctionEntity) {
-      FunctionMetaService.getInstance().insertFunction((FunctionEntity) e, overwritten);
-    } else if (e instanceof PolicyEntity) {
-      PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
-    } else if (e instanceof JobTemplateEntity) {
-      JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
-    } else if (e instanceof JobEntity) {
-      JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
-    } else if (e instanceof ViewEntity) {
-      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
-    } else if (e instanceof GenericEntity) {
-      GenericEntity genericEntity = (GenericEntity) e;
-      throw new UnsupportedEntityTypeException(
-          "Unsupported entity type: %s for insert operation", genericEntity.type());
-    } else {
-      throw new UnsupportedEntityTypeException(
-          "Unsupported entity type: %s for insert operation", e.getClass());
+      throw duplicate;
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+      throws EntityAlreadyExistsException, IOException {
+    switch (e.type()) {
+      case TOPIC:
+        return TopicMetaService.getInstance().restoreSoftDeletedTopic((TopicEntity) e);
+      default:
+        return false;
     }
   }
 
@@ -839,6 +812,70 @@ public class JDBCBackend implements RelationalBackend {
         default:
           throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> void insertEntity(E e, boolean overwritten)
+      throws EntityAlreadyExistsException, IOException {
+    if (e instanceof BaseMetalake) {
+      MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
+    } else if (e instanceof CatalogEntity) {
+      CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
+    } else if (e instanceof SchemaEntity) {
+      SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
+    } else if (e instanceof TableEntity) {
+      TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
+    } else if (e instanceof FilesetEntity) {
+      FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
+    } else if (e instanceof TopicEntity) {
+      TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
+    } else if (e instanceof UserEntity) {
+      UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
+    } else if (e instanceof RoleEntity) {
+      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
+    } else if (e instanceof GroupEntity) {
+      GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
+    } else if (e instanceof TagEntity) {
+      TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
+    } else if (e instanceof ModelEntity) {
+      ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
+    } else if (e instanceof ModelVersionEntity) {
+      if (overwritten) {
+        LOG.warn(
+            "'overwritten' is not supported for model version meta, ignoring this flag and "
+                + "inserting the new model version.");
+      }
+      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
+    } else if (e instanceof FunctionEntity) {
+      FunctionMetaService.getInstance().insertFunction((FunctionEntity) e, overwritten);
+    } else if (e instanceof PolicyEntity) {
+      PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
+    } else if (e instanceof JobTemplateEntity) {
+      JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
+    } else if (e instanceof JobEntity) {
+      JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
+    } else if (e instanceof ViewEntity) {
+      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
+    } else if (e instanceof GenericEntity) {
+      GenericEntity genericEntity = (GenericEntity) e;
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for insert operation", genericEntity.type());
+    } else {
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for insert operation", e.getClass());
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> boolean isSoftDeleted(E entity) {
+    switch (entity.type()) {
+      case SCHEMA:
+        return SchemaMetaService.getInstance().isSoftDeleted(entity.id());
+      case TABLE:
+        return TableMetaService.getInstance().isSoftDeleted(entity.id());
+      case VIEW:
+        return ViewMetaService.getInstance().isSoftDeleted(entity.id());
+      default:
+        return false;
     }
   }
 

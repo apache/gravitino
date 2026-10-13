@@ -115,6 +115,10 @@ public interface ViewMetaMapper {
       @Param("schemaName") String schemaName,
       @Param("viewName") String viewName);
 
+  /** Checks whether a soft-deleted view still owns the requested primary key. */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE view_id = #{viewId} AND deleted_at > 0")
+  int countDeletedViewMetasById(@Param("viewId") Long viewId);
+
   @InsertProvider(type = ViewMetaSQLProviderFactory.class, method = "insertViewMeta")
   void insertViewMeta(@Param("viewMeta") ViewPO viewPO);
 

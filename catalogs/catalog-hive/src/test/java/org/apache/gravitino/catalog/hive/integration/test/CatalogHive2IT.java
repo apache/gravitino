@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.hive.integration.test;
 
 import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.hive.HiveConstants.EXTERNAL;
 import static org.apache.gravitino.catalog.hive.HiveConstants.FORMAT;
 import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
@@ -52,11 +53,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.hive.HiveCatalogOperations;
@@ -1416,6 +1419,172 @@ public class CatalogHive2IT extends BaseIT {
             .getMessage()
             .contains(
                 "please ensure that the type of the new column position is compatible with the old one"));
+  }
+
+  @Test
+  public void testOutOfBandRenameRequiresIdentifierCleanup() throws InterruptedException {
+    // Hive stores names in lower case, and tag operations resolve a column by its stored name.
+    String schema = schemaName.toLowerCase(Locale.ROOT);
+    NameIdentifier ident =
+        NameIdentifier.of(schema, GravitinoITUtils.genRandomName("hive_oob_rename_table"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, createColumns(), TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+    String tagName = GravitinoITUtils.genRandomName("hive_oob_rename_tag");
+    metalake.createTag(tagName, "comment", Collections.emptyMap());
+    try {
+      Arrays.stream(catalog.asTableCatalog().loadTable(ident).columns())
+          .filter(column -> column.name().equals(HIVE_COL_NAME1))
+          .findFirst()
+          .orElseThrow()
+          .supportsTags()
+          .associateTags(new String[] {tagName}, null);
+
+      // Rename the table directly in the Hive Metastore. It keeps its Gravitino id in its table
+      // parameters, but Gravitino must not automatically move the stored identity to the new path.
+      String newName = GravitinoITUtils.genRandomName("hive_oob_renamed_table");
+      HiveTable hiveTable = loadHiveTable(schema, ident.name());
+      HiveTable.Builder renamed =
+          HiveTable.builder()
+              .withName(newName)
+              .withColumns(hiveTable.columns())
+              .withProperties(hiveTable.properties())
+              .withAuditInfo(hiveTable.auditInfo())
+              .withDistribution(hiveTable.distribution())
+              .withSortOrders(hiveTable.sortOrder())
+              .withPartitioning(hiveTable.partitioning())
+              .withCatalogName(hiveTable.catalogName())
+              .withDatabaseName(hiveTable.databaseName());
+      if (hiveTable.comment() != null) {
+        renamed.withComment(hiveTable.comment());
+      }
+      hiveClientPool.run(
+          client -> {
+            client.alterTable(hmsCatalog, schema, ident.name(), renamed.build());
+            return null;
+          });
+
+      // Loading the external name now requires manual identifier cleanup. The rejected import must
+      // leave the tag relation attached to the original Gravitino identity.
+      NameIdentifier newIdent = NameIdentifier.of(schema, newName);
+      UnsupportedOperationException exception =
+          assertThrows(
+              UnsupportedOperationException.class,
+              () -> catalog.asTableCatalog().loadTable(newIdent));
+      Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+      MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(
+          String.join(".", catalogName, schema, ident.name(), HIVE_COL_NAME1)
+              .toLowerCase(Locale.ROOT),
+          objects[0].fullName().toLowerCase(Locale.ROOT));
+    } finally {
+      metalake.deleteTag(tagName);
+    }
+  }
+
+  @Test
+  public void testCatalogReregistrationRequiresExternalIdentifierCleanup()
+      throws InterruptedException {
+    String reregisteredCatalogName = GravitinoITUtils.genRandomName("hive_reregistered_catalog");
+    String externalSchemaName = GravitinoITUtils.genRandomName("hive_reregistered_schema");
+    String externalTableName = GravitinoITUtils.genRandomName("hive_reregistered_table");
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(METASTORE_URIS, hiveMetastoreUris, DEFAULT_CATALOG, hmsCatalog);
+
+    Catalog originalCatalog =
+        metalake.createCatalog(
+            reregisteredCatalogName,
+            Catalog.Type.RELATIONAL,
+            provider,
+            "comment",
+            catalogProperties);
+    originalCatalog.asSchemas().createSchema(externalSchemaName, "comment", Collections.emptyMap());
+    NameIdentifier externalTableIdentifier =
+        NameIdentifier.of(externalSchemaName, externalTableName);
+    originalCatalog
+        .asTableCatalog()
+        .createTable(
+            externalTableIdentifier,
+            createColumns(),
+            TABLE_COMMENT,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM);
+
+    Assertions.assertTrue(metalake.dropCatalog(reregisteredCatalogName, true));
+    Catalog reregisteredCatalog =
+        metalake.createCatalog(
+            reregisteredCatalogName,
+            Catalog.Type.RELATIONAL,
+            provider,
+            "comment",
+            catalogProperties);
+
+    UnsupportedOperationException exception =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () -> reregisteredCatalog.asSchemas().loadSchema(externalSchemaName));
+    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
+    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+
+    HiveSchema externalSchema = loadHiveSchema(externalSchemaName);
+    Map<String, String> cleanedProperties = new HashMap<>(externalSchema.properties());
+    cleanedProperties.remove(StringIdentifier.ID_KEY);
+    HiveSchema cleanedSchema =
+        HiveSchema.builder()
+            .withName(externalSchema.name())
+            .withComment(externalSchema.comment())
+            .withProperties(cleanedProperties)
+            .withAuditInfo(externalSchema.auditInfo())
+            .withCatalogName(externalSchema.catalogName())
+            .build();
+    hiveClientPool.run(
+        client -> {
+          client.alterDatabase(hmsCatalog, externalSchemaName, cleanedSchema);
+          return null;
+        });
+
+    Assertions.assertEquals(
+        externalSchemaName.toLowerCase(Locale.ROOT),
+        reregisteredCatalog.asSchemas().loadSchema(externalSchemaName).name());
+
+    exception =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () -> reregisteredCatalog.asTableCatalog().loadTable(externalTableIdentifier));
+    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
+    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+
+    HiveTable externalTable = loadHiveTable(externalSchemaName, externalTableName);
+    Map<String, String> cleanedTableProperties = new HashMap<>(externalTable.properties());
+    cleanedTableProperties.remove(StringIdentifier.ID_KEY);
+    HiveTable.Builder cleanedTable =
+        HiveTable.builder()
+            .withName(externalTable.name())
+            .withColumns(externalTable.columns())
+            .withProperties(cleanedTableProperties)
+            .withAuditInfo(externalTable.auditInfo())
+            .withDistribution(externalTable.distribution())
+            .withSortOrders(externalTable.sortOrder())
+            .withPartitioning(externalTable.partitioning())
+            .withCatalogName(externalTable.catalogName())
+            .withDatabaseName(externalTable.databaseName());
+    if (externalTable.comment() != null) {
+      cleanedTable.withComment(externalTable.comment());
+    }
+    hiveClientPool.run(
+        client -> {
+          client.alterTable(
+              hmsCatalog, externalSchemaName, externalTableName, cleanedTable.build());
+          return null;
+        });
+
+    Assertions.assertEquals(
+        externalTableName.toLowerCase(Locale.ROOT),
+        reregisteredCatalog.asTableCatalog().loadTable(externalTableIdentifier).name());
+    Assertions.assertTrue(reregisteredCatalog.asSchemas().dropSchema(externalSchemaName, true));
+    Assertions.assertTrue(metalake.dropCatalog(reregisteredCatalogName, true));
   }
 
   @Test

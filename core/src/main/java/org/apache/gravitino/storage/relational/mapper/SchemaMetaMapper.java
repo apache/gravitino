@@ -25,6 +25,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -81,6 +82,11 @@ public interface SchemaMetaMapper {
 
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
+
+  /** Checks whether a soft-deleted schema still owns the requested primary key. */
+  @Select(
+      "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE schema_id = #{schemaId} AND deleted_at > 0")
+  int countDeletedSchemaMetasById(@Param("schemaId") Long schemaId);
 
   @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "insertSchemaMeta")
   void insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO);

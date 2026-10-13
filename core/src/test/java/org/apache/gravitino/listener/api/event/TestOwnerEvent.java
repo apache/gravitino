@@ -24,9 +24,13 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -53,6 +57,10 @@ public class TestOwnerEvent {
 
   interface TestEntityStore extends EntityStore, RelationalBackend, SupportsRelationOperations {
     // This interface is used to mock the EntityStore for testing purposes.
+
+    @Override
+    <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+        throws IOException, EntityAlreadyExistsException;
   }
 
   @BeforeAll

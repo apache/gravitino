@@ -28,6 +28,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -46,6 +47,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
@@ -180,8 +182,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // Audit info is gotten from catalog, not from the entity store
     Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
 
-    // Case 4: Test if the fetched schema entity is matched.
+    // Case 4: An external rename or conflicting path must not overwrite the stored identity.
     reset(entityStore);
+    SchemaEntity storedBeforeConflict =
+        entityStore.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
     SchemaEntity unmatchedEntity =
         SchemaEntity.builder()
             .withId(1L)
@@ -194,16 +198,29 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                     .build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.SCHEMA), any());
-    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
-    // Succeed to import the schema entity
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile external schema renames"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("metadata-only unregister of an individual external schema"));
+    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
+
+    // The rejected import leaves the existing entity and its identity unchanged.
     reset(entityStore);
-    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
-    Assertions.assertEquals("test", schemaEntity.auditInfo().creator());
-    Assertions.assertEquals(schema.name(), loadedSchema3.name());
-    Assertions.assertEquals(schema.comment(), loadedSchema3.comment());
-    testProperties(props, loadedSchema3.properties());
-    // Audit info is gotten from catalog, not from the entity store
-    Assertions.assertEquals("test", loadedSchema3.auditInfo().creator());
+    SchemaEntity storedAfterConflict =
+        entityStore.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals(storedBeforeConflict.id(), storedAfterConflict.id());
+    Assertions.assertEquals(storedBeforeConflict.name(), storedAfterConflict.name());
   }
 
   @Test
@@ -240,6 +257,29 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Schema loadedSchema = Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
     Assertions.assertEquals(schemaIdent.name(), loadedSchema.name());
     Assertions.assertEquals("comment", loadedSchema.comment());
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
+  }
+
+  @Test
+  public void testImportSchemaWithSoftDeletedIdentifierRequiresManualCleanup() throws IOException {
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_soft_deleted_identifier");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    entityStore.delete(schemaIdent, SCHEMA);
+
+    reset(entityStore);
+    doThrow(new SoftDeletedEntityIdentifierException(SCHEMA, schemaEntity.id()))
+        .when(entityStore)
+        .put(any(SchemaEntity.class), eq(false));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
+    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("external schema and all of its tables and views"));
   }
 
   @Test
@@ -275,7 +315,12 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     UnsupportedOperationException exception =
         Assertions.assertThrows(
             UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Schema managed by multiple catalogs"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile external schema renames"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
 
   @Test

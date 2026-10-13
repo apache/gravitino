@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitiveOnName;
+
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.junit.jupiter.api.Assertions;
@@ -96,6 +98,43 @@ public class TestIcebergCatalogCapability {
     IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
 
     Assertions.assertTrue(capability.supportsHierarchicalSchema().supported());
+  }
+
+  @Test
+  public void testHiveBackendFoldsSchemaTableAndViewNamesOnly() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":", true);
+
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    Assertions.assertEquals(
+        "schema", applyCaseSensitiveOnName(Capability.Scope.SCHEMA, "Schema", capability));
+    Assertions.assertEquals(
+        "table", applyCaseSensitiveOnName(Capability.Scope.TABLE, "Table", capability));
+    Assertions.assertEquals(
+        "view", applyCaseSensitiveOnName(Capability.Scope.VIEW, "View", capability));
+
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+    Assertions.assertEquals(
+        "Column", applyCaseSensitiveOnName(Capability.Scope.COLUMN, "Column", capability));
+  }
+
+  @Test
+  public void testNonHiveBackendKeepsEntityNameCase() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":", false);
+
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+    Assertions.assertEquals(
+        "Schema", applyCaseSensitiveOnName(Capability.Scope.SCHEMA, "Schema", capability));
+    Assertions.assertEquals(
+        "Table", applyCaseSensitiveOnName(Capability.Scope.TABLE, "Table", capability));
+    Assertions.assertEquals(
+        "View", applyCaseSensitiveOnName(Capability.Scope.VIEW, "View", capability));
+    Assertions.assertEquals(
+        "Column", applyCaseSensitiveOnName(Capability.Scope.COLUMN, "Column", capability));
   }
 
   @Test

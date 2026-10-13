@@ -51,6 +51,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
@@ -162,16 +163,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
       } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this table. Reload from the
-        // entity store to pick up the entity stored by the winning node.
-        LOG.info(
-            "Table {} was concurrently imported by another node; reloading from store.", ident);
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
+        LOG.info("Table {} import conflicted with existing metadata; reloading from store.", ident);
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {
-          throw new UnsupportedOperationException(
-              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+          throw retainedExternalIdentifierConflictException(ident, TABLE);
         }
       }
     }
@@ -504,13 +503,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
+      // An external identifier may already be stored under another Gravitino path because the
+      // table was renamed outside Gravitino or because multiple catalogs expose one metastore.
+      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
+      // stored identity because doing so can silently move the table between paths. The create-only
+      // write below reports the conflict for manual identifier cleanup.
       LOG.warn(
-          "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
-          stringId);
+          "Table uid {} exists externally but is not imported at {}. Gravitino will use a "
+              + "create-only import; if this uid is already stored under another identifier, "
+              + "manual identifier cleanup is required.",
+          stringId,
+          identifier);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -535,7 +538,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
+      // Never overwrite imported table metadata. In particular, an overwrite by stable ID can
+      // silently change schema or catalog ownership and make existing privileges refer to the
+      // wrong path.
+      store.put(tableEntity, false);
+    } catch (SoftDeletedEntityIdentifierException e) {
+      throw softDeletedExternalIdentifierException(identifier, uid, TABLE);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {

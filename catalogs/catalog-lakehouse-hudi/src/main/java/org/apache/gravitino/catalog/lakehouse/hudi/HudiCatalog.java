@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
 
 /** Implementation of an Apache Hudi catalog in Apache Gravitino. */
 public class HudiCatalog extends BaseCatalog<HudiCatalog> {
@@ -52,6 +53,11 @@ public class HudiCatalog extends BaseCatalog<HudiCatalog> {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     return new HudiCatalogOperations();
+  }
+
+  @Override
+  public Capability newCapability() {
+    return new HudiCatalogCapability();
   }
 
   @Override

@@ -37,6 +37,15 @@ public interface TopicMetaMapper {
       method = "insertTopicMetaOnDuplicateKeyUpdate")
   void insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO);
 
+  /**
+   * Restores topic metadata only while the retained row is soft-deleted.
+   *
+   * @param topicPO the replacement topic metadata
+   * @return the number of restored rows
+   */
+  @UpdateProvider(type = TopicMetaSQLProviderFactory.class, method = "restoreSoftDeletedTopicMeta")
+  Integer restoreSoftDeletedTopicMeta(@Param("topicMeta") TopicPO topicPO);
+
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsBySchemaId")
   List<TopicPO> listTopicPOsBySchemaId(@Param("schemaId") Long schemaId);
 

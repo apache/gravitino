@@ -72,6 +72,90 @@ public abstract class OperationDispatcher {
     this.idGenerator = idGenerator;
   }
 
+  /**
+   * Creates the user-facing error for an external identifier retained by deleted metadata.
+   *
+   * <p>The error gives operators an explicit cleanup path that imports the external objects with
+   * new identifiers.
+   *
+   * @param ident the external entity identifier
+   * @param entityId the stable identifier read from the external system
+   * @param entityType the type of the external entity
+   * @return an exception containing manual cleanup instructions
+   */
+  protected UnsupportedOperationException softDeletedExternalIdentifierException(
+      NameIdentifier ident, long entityId, Entity.EntityType entityType) {
+    String cleanupTarget;
+    switch (entityType) {
+      case SCHEMA:
+        cleanupTarget = "the external schema and all of its tables and views";
+        break;
+      case TABLE:
+        cleanupTarget = "the external table";
+        break;
+      case VIEW:
+        cleanupTarget = "the external view";
+        break;
+      default:
+        cleanupTarget = "the external object";
+    }
+
+    return new UnsupportedOperationException(
+        String.format(
+            "%s %s cannot be imported because external identifier %s is retained by a "
+                + "soft-deleted Gravitino registration. "
+                + "Gravitino does not automatically restore or reuse deleted registrations. "
+                + "Remove `%s` from %s before retrying. The objects will be imported with new "
+                + "identifiers.",
+            entityType.name().toLowerCase(),
+            ident,
+            entityId,
+            StringIdentifier.ID_KEY,
+            cleanupTarget));
+  }
+
+  /**
+   * Creates the user-facing error for an external identifier conflict with active metadata.
+   *
+   * <p>The error describes the supported recovery choices without implying that Gravitino offers
+   * object-level metadata-only unregister operations.
+   *
+   * @param ident the external entity identifier
+   * @param entityType the type of the external entity
+   * @return an exception containing conflict recovery instructions
+   */
+  protected UnsupportedOperationException retainedExternalIdentifierConflictException(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    String entityName;
+    switch (entityType) {
+      case SCHEMA:
+        entityName = "schema";
+        break;
+      case TABLE:
+        entityName = "table";
+        break;
+      case VIEW:
+        entityName = "view";
+        break;
+      default:
+        entityName = "object";
+    }
+
+    return new UnsupportedOperationException(
+        String.format(
+            "%s %s cannot be imported because its name or external identifier is already managed "
+                + "under a different Gravitino identifier. Gravitino does not automatically "
+                + "reconcile external %s renames or stale registrations, and it does not support "
+                + "metadata-only unregister of an individual external %s. Recovery requires an "
+                + "administrator to force-drop and recreate the containing Gravitino catalog "
+                + "registration. This catalog-wide reset removes every stored registration and "
+                + "its privileges, tags, and other relationships in that Gravitino catalog. "
+                + "Follow the catalog-specific recovery guidance to confirm that external objects "
+                + "are retained, and do not remove `%s` until the conflicting catalog registration "
+                + "has been dropped.",
+            entityName, ident, entityName, entityName, StringIdentifier.ID_KEY));
+  }
+
   protected <R, E extends Throwable> R doWithTable(
       NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn, Class<E> ex)
       throws E {
