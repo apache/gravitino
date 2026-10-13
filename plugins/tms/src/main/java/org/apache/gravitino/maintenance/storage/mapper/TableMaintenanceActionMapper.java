@@ -64,4 +64,17 @@ public interface TableMaintenanceActionMapper {
 
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteByJobId")
   int deleteByJobId(@Param("jobId") long jobId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectInFlightByTableAndPolicy")
+  TableMaintenanceActionPO selectInFlightByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectMaxFinishedAt")
+  Long selectMaxFinishedAt(@Param("tableId") long tableId, @Param("policyId") long policyId);
 }

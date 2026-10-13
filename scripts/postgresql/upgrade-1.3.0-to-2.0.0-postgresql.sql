@@ -151,6 +151,93 @@ COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model prop
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
 
+CREATE TABLE IF NOT EXISTS scheduled_expand_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP(6) NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP(6),
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP(6),
+    last_failure TIMESTAMP(6),
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_expand_tasks_execution_time_idx ON scheduled_expand_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_expand_tasks_last_heartbeat_idx ON scheduled_expand_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_expand_tasks IS 'db-scheduler expand pool task queue for table maintenance';
+COMMENT ON COLUMN scheduled_expand_tasks.task_name IS 'db-scheduler task name';
+COMMENT ON COLUMN scheduled_expand_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON COLUMN scheduled_expand_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_expand_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_expand_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_expand_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_expand_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_expand_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_expand_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_expand_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_expand_tasks.last_failure IS 'last failed execution time';
+
+CREATE TABLE IF NOT EXISTS scheduled_cron_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP(6) NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP(6),
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP(6),
+    last_failure TIMESTAMP(6),
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_cron_tasks_execution_time_idx ON scheduled_cron_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_cron_tasks_last_heartbeat_idx ON scheduled_cron_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_cron_tasks IS 'db-scheduler cron pool task queue for table maintenance';
+COMMENT ON COLUMN scheduled_cron_tasks.task_name IS 'db-scheduler task name';
+COMMENT ON COLUMN scheduled_cron_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON COLUMN scheduled_cron_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_cron_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_cron_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_cron_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_cron_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_cron_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_cron_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_cron_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_cron_tasks.last_failure IS 'last failed execution time';
+
+CREATE TABLE IF NOT EXISTS scheduled_commit_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP(6) NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP(6),
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP(6),
+    last_failure TIMESTAMP(6),
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_commit_tasks_execution_time_idx ON scheduled_commit_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_commit_tasks_last_heartbeat_idx ON scheduled_commit_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_commit_tasks IS 'db-scheduler commit pool task queue for table maintenance';
+COMMENT ON COLUMN scheduled_commit_tasks.task_name IS 'db-scheduler task name';
+COMMENT ON COLUMN scheduled_commit_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON COLUMN scheduled_commit_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_commit_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_commit_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_commit_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_commit_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_commit_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_commit_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_commit_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_commit_tasks.last_failure IS 'last failed execution time';
+
 CREATE TABLE IF NOT EXISTS table_maintenance_action (
     id BIGSERIAL PRIMARY KEY,
     job_id BIGINT,

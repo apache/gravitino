@@ -120,6 +120,26 @@ public class TableMaintenanceActionSQLProviderFactory {
     return getProvider().deleteByJobId(jobId);
   }
 
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectInFlightByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return getProvider().selectInFlightByTableAndPolicy(tableId, policyId);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectMaxFinishedAt(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return getProvider().selectMaxFinishedAt(tableId, policyId);
+  }
+
   static TableMaintenanceActionBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()

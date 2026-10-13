@@ -175,4 +175,34 @@ public class TableMaintenanceActionMetaService {
     SessionUtils.doWithCommit(
         TableMaintenanceActionMapper.class, mapper -> mapper.deleteByJobId(jobId));
   }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return row with {@code finished_at IS NULL}, or null
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getInFlightTableMaintenanceAction")
+  public TableMaintenanceActionPO getInFlight(long tableId, long policyId) {
+    return SessionUtils.getWithoutCommit(
+        TableMaintenanceActionMapper.class,
+        mapper -> mapper.selectInFlightByTableAndPolicy(tableId, policyId));
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return latest {@code finished_at}, or null when none finished yet
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getMaxFinishedAtTableMaintenanceAction")
+  public Long maxFinishedAt(long tableId, long policyId) {
+    return SessionUtils.getWithoutCommit(
+        TableMaintenanceActionMapper.class,
+        mapper -> mapper.selectMaxFinishedAt(tableId, policyId));
+  }
 }

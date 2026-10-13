@@ -17,6 +17,7 @@
 # under the License.
 #
 [versions]
+db-scheduler = "14.1.0"
 awssdk = "2.31.73"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
@@ -182,6 +183,7 @@ aspectj = "1.9.24"
 ql-expression = "4.0.3"
 
 [libraries]
+db-scheduler = { group = "com.github.kagkarlsson", name = "db-scheduler", version.ref = "db-scheduler" }
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
 aws-dynamodb = { group = "software.amazon.awssdk", name = "dynamodb", version.ref = "awssdk" }
 aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }

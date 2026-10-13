@@ -119,6 +119,34 @@ public class TableMaintenanceActionBaseSQLProvider {
     return "DELETE FROM " + TABLE_NAME + " WHERE job_id = #{jobId}";
   }
 
+  /**
+   * Returns a row with {@code finished_at IS NULL} for {@code (table_id, policy_id)} if one exists.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public String selectInFlightByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return selectColumns()
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NULL"
+        + " LIMIT 1";
+  }
+
+  /**
+   * Returns {@code MAX(finished_at)} for {@code (table_id, policy_id)}.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public String selectMaxFinishedAt(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return "SELECT MAX(finished_at) FROM "
+        + TABLE_NAME
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NOT NULL";
+  }
+
   private static String selectColumns() {
     return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
         + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
