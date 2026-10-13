@@ -25,9 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import io.trino.spi.TrinoException;
+import java.io.IOException;
+import java.net.ConnectException;
 import java.util.concurrent.ExecutionException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoErrorCode {
@@ -70,6 +74,37 @@ public class TestGravitinoErrorCode {
         GravitinoErrorCode.toTrinoException(new UnsupportedOperationException("not supported"));
     assertEquals(
         GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testSourceConnectionFailureIsConnectionFailed() {
+    TrinoException e =
+        GravitinoErrorCode.toTrinoException(
+            new ConnectionFailedException("Failed to connect to Hive Metastore"));
+    assertEquals(GravitinoErrorCode.GRAVITINO_CONNECTION_FAILED.toErrorCode(), e.getErrorCode());
+    assertEquals("Failed to connect to Hive Metastore", e.getMessage());
+  }
+
+  @Test
+  public void testUnreachableServerIsConnectionFailed() {
+    TrinoException e =
+        GravitinoErrorCode.toTrinoException(
+            new RESTException(
+                new ConnectException("Connection refused"),
+                "Failed to connect to Gravitino server"));
+    assertEquals(GravitinoErrorCode.GRAVITINO_CONNECTION_FAILED.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testUnexpectedServerResponseIsInternalError() {
+    TrinoException e =
+        GravitinoErrorCode.toTrinoException(new RESTException("Unhandled error: %s", "code 9999"));
+    assertEquals(GENERIC_INTERNAL_ERROR.toErrorCode(), e.getErrorCode());
+
+    e =
+        GravitinoErrorCode.toTrinoException(
+            new RESTException(new IOException("Unexpected token"), "Failed to parse response"));
+    assertEquals(GENERIC_INTERNAL_ERROR.toErrorCode(), e.getErrorCode());
   }
 
   @Test

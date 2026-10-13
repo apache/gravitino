@@ -27,11 +27,16 @@ import io.trino.spi.ErrorCode;
 import io.trino.spi.ErrorCodeSupplier;
 import io.trino.spi.ErrorType;
 import io.trino.spi.TrinoException;
+import java.io.InterruptedIOException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.RESTException;
 
 /** Gravitino error code. */
 public enum GravitinoErrorCode implements ErrorCodeSupplier {
@@ -86,7 +91,9 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   /** Duplicated catalogs. */
   GRAVITINO_DUPLICATED_CATALOGS(24, EXTERNAL),
   /** Expression error. */
-  GRAVITINO_EXPRESSION_ERROR(25, EXTERNAL);
+  GRAVITINO_EXPRESSION_ERROR(25, EXTERNAL),
+  /** Failed to connect to the Gravitino server or to the underlying source of a catalog. */
+  GRAVITINO_CONNECTION_FAILED(26, EXTERNAL);
 
   // suppress ImmutableEnumChecker because ErrorCode is outside the project.
   @SuppressWarnings("ImmutableEnumChecker")
@@ -118,7 +125,9 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
    * cause. {@link ForbiddenException}, {@link NotInUseException}, {@link IllegalArgumentException}
    * and {@link UnsupportedOperationException} map to {@code PERMISSION_DENIED}, {@code
    * CATALOG_UNAVAILABLE}, {@link #GRAVITINO_ILLEGAL_ARGUMENT} and {@link
-   * #GRAVITINO_UNSUPPORTED_OPERATION}. Anything else maps to {@code GENERIC_INTERNAL_ERROR}.
+   * #GRAVITINO_UNSUPPORTED_OPERATION}. A {@link ConnectionFailedException}, or a {@link
+   * RESTException} caused by a network failure, maps to {@link #GRAVITINO_CONNECTION_FAILED}.
+   * Anything else maps to {@code GENERIC_INTERNAL_ERROR}.
    *
    * @param exception the exception to convert
    * @param context describes the failed operation; it prefixes the message of an exception that
@@ -139,6 +148,10 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
     if (e instanceof NotInUseException) {
       return new TrinoException(CATALOG_UNAVAILABLE, firstLineMessage(e), e);
     }
+    if (e instanceof ConnectionFailedException
+        || (e instanceof RESTException && isNetworkFailure(e.getCause()))) {
+      return new TrinoException(GRAVITINO_CONNECTION_FAILED, firstLineMessage(e), e);
+    }
     if (e instanceof IllegalArgumentException) {
       return new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, firstLineMessage(e), e);
     }
@@ -148,6 +161,14 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
     String message = firstLineMessage(e);
     return new TrinoException(
         GENERIC_INTERNAL_ERROR, context == null ? message : context + ": " + message, e);
+  }
+
+  // The REST client wraps every IOException in a RESTException, including JSON (de)serialization
+  // failures, so only socket-level causes mean the server could not be reached.
+  private static boolean isNetworkFailure(@Nullable Throwable cause) {
+    return cause instanceof SocketException
+        || cause instanceof UnknownHostException
+        || cause instanceof InterruptedIOException;
   }
 
   // Keeps the first non-blank line of the message. A failure received over REST carries the server

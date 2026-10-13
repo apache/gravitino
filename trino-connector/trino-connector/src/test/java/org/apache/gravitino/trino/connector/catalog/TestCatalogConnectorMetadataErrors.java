@@ -36,9 +36,12 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.junit.jupiter.api.Test;
 
@@ -176,11 +179,43 @@ public class TestCatalogConnectorMetadataErrors {
     assertEquals(message, e.getMessage());
   }
 
+  @Test
+  public void testCreateExistingSchemaIsSchemaAlreadyExists() {
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.createSchema(any(), any(), any()))
+        .thenThrow(new SchemaAlreadyExistsException("exists"));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> metadata.createSchema(mock(GravitinoSchema.class)));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testCreateSchemaInMissingCatalogIsCatalogNotExists() {
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.createSchema(any(), any(), any()))
+        .thenThrow(new NoSuchCatalogException("missing"));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> metadata.createSchema(mock(GravitinoSchema.class)));
+    assertEquals(GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), e.getErrorCode());
+  }
+
   private static CatalogConnectorMetadata createMetadata(TableCatalog tableCatalog) {
+    return createMetadata(mock(SupportsSchemas.class), tableCatalog);
+  }
+
+  private static CatalogConnectorMetadata createMetadata(
+      SupportsSchemas schemas, TableCatalog tableCatalog) {
     GravitinoMetalake metalake = mock(GravitinoMetalake.class);
     Catalog catalog = mock(Catalog.class);
     when(metalake.loadCatalog(anyString())).thenReturn(catalog);
-    when(catalog.asSchemas()).thenReturn(mock(SupportsSchemas.class));
+    when(catalog.asSchemas()).thenReturn(schemas);
     when(catalog.asTableCatalog()).thenReturn(tableCatalog);
     when(catalog.asFunctionCatalog()).thenThrow(new UnsupportedOperationException("unsupported"));
     return new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c"));
