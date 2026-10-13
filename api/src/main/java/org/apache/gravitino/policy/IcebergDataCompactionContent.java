@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 
 /** Built-in policy content for Iceberg compaction strategy. */
 public class IcebergDataCompactionContent extends TableMaintenanceContent {
@@ -156,6 +155,7 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
         null,
         null,
         null,
+        null,
         null);
   }
 
@@ -168,11 +168,12 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions,
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    super(schedule, minIntervalMs, jobOptions, updateOptions);
+    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -342,7 +343,8 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
 
   @Override
   public IcebergDataCompactionContent withPeerFields(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
@@ -355,7 +357,8 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
         rewriteStrategy,
         sortOrder,
         rewriteOptions,
-        schedule,
+        timeTrigger,
+        eventTrigger,
         minIntervalMs,
         jobOptions,
         updateOptions);
@@ -413,8 +416,10 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
         + '\''
         + ", rewriteOptions="
         + rewriteOptions
-        + ", schedule="
-        + schedule()
+        + ", timeTrigger="
+        + timeTrigger()
+        + ", eventTrigger="
+        + eventTrigger()
         + ", minIntervalMs="
         + minIntervalMs()
         + ", jobOptions="

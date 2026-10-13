@@ -19,8 +19,10 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.MetadataObject;
 
@@ -45,6 +47,54 @@ public interface PolicyContent {
   default Map<String, Object> rules() {
     // backward compatibility
     throw new UnsupportedOperationException("Does support get all rules.");
+  }
+
+  /**
+   * Optional time-based trigger for automated policy evaluation.
+   *
+   * @return time trigger, or {@code null} when unset
+   */
+  @Nullable
+  default TimeTrigger timeTrigger() {
+    return null;
+  }
+
+  /**
+   * Optional event-based trigger for automated policy evaluation.
+   *
+   * @return event trigger, or {@code null} when unset
+   */
+  @Nullable
+  default EventTrigger eventTrigger() {
+    return null;
+  }
+
+  /**
+   * Optional cooldown between finished automated runs for this policy.
+   *
+   * @return minimum interval in milliseconds, or {@code null} when unset
+   */
+  @Nullable
+  default Long minIntervalMs() {
+    return null;
+  }
+
+  /**
+   * Optional job / client options carried in policy content (non-secret).
+   *
+   * @return job options; never {@code null}
+   */
+  default Map<String, String> jobOptions() {
+    return Collections.emptyMap();
+  }
+
+  /**
+   * Optional updater / control-plane options carried in policy content (non-secret).
+   *
+   * @return update options; never {@code null}
+   */
+  default Map<String, String> updateOptions() {
+    return Collections.emptyMap();
   }
 
   /**

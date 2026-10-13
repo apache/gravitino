@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 
 /**
  * Placeholder built-in policy content for Iceberg snapshot expiration.
@@ -56,11 +55,12 @@ public class IcebergSnapshotExpirationContent extends TableMaintenanceContent {
   public IcebergSnapshotExpirationContent() {}
 
   IcebergSnapshotExpirationContent(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    super(schedule, minIntervalMs, jobOptions, updateOptions);
+    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   @Override
@@ -91,11 +91,13 @@ public class IcebergSnapshotExpirationContent extends TableMaintenanceContent {
 
   @Override
   public IcebergSnapshotExpirationContent withPeerFields(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    return new IcebergSnapshotExpirationContent(schedule, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergSnapshotExpirationContent(
+        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   @Override
@@ -114,8 +116,10 @@ public class IcebergSnapshotExpirationContent extends TableMaintenanceContent {
   @Override
   public String toString() {
     return "IcebergSnapshotExpirationContent{"
-        + "schedule="
-        + schedule()
+        + "timeTrigger="
+        + timeTrigger()
+        + ", eventTrigger="
+        + eventTrigger()
         + ", minIntervalMs="
         + minIntervalMs()
         + ", jobOptions="

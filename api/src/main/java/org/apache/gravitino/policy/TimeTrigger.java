@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.policy;
+package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;
@@ -25,23 +25,16 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Evaluate triggers for table maintenance: event-based {@code onCommit} and/or time-based {@code
- * cronExpression}.
+ * Time-based policy trigger expressed as a Quartz cron.
  *
- * <p>JSON property name on policy content remains {@code schedule} for design compatibility; this
- * type is named trigger because it covers both cron and commit events.
- *
- * <p>{@code cronExpression} is a <strong>Quartz cron</strong> expression with either 6 fields
- * ({@code seconds minutes hours day-of-month month day-of-week}) or 7 fields (optional trailing
- * {@code year}). Time zone is the server default; this type does not carry a zone id.
+ * <p>{@code cronExpression} has either 6 fields ({@code seconds minutes hours day-of-month month
+ * day-of-week}) or 7 fields (optional trailing {@code year}). Time zone is the server default; this
+ * type does not carry a zone id.
  *
  * <p>{@link #validateCronExpression(String)} is a <strong>shape check</strong> only: field count
- * plus allowed Quartz tokens (digits, {@code *}, {@code ,}, {@code -}, {@code /}, {@code ?}, {@code
- * L}, {@code W}, {@code #}, and month/day-of-week names). It does not enforce Quartz value ranges
- * or cross-field rules (for example {@code seconds=99} may pass here and fail when the scheduler
- * expands the expression).
+ * plus allowed Quartz tokens. It does not enforce Quartz value ranges or cross-field rules.
  */
-public final class MaintenanceTrigger {
+public final class TimeTrigger {
 
   /** Allowed charset / named tokens per Quartz cron field (shape only, not full Quartz parse). */
   private static final Pattern CRON_FIELD =
@@ -50,30 +43,20 @@ public final class MaintenanceTrigger {
               + "JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC|"
               + "SUN|MON|TUE|WED|THU|FRI|SAT)+$");
 
-  private final boolean onCommit;
-  @Nullable private final String cronExpression;
+  private final String cronExpression;
 
   /** Default constructor for Jackson field-based deserialization only. */
-  private MaintenanceTrigger() {
-    this(false, null);
+  private TimeTrigger() {
+    this(null);
   }
 
   /**
-   * Creates a maintenance trigger.
+   * Creates a time trigger.
    *
-   * @param onCommit whether IRC commit should enqueue maintenance
-   * @param cronExpression Quartz cron expression, or null / blank when unset
+   * @param cronExpression Quartz cron expression
    */
-  public MaintenanceTrigger(Boolean onCommit, @Nullable String cronExpression) {
-    this.onCommit = onCommit != null && onCommit;
+  public TimeTrigger(@Nullable String cronExpression) {
     this.cronExpression = StringUtils.isBlank(cronExpression) ? null : cronExpression.trim();
-  }
-
-  /**
-   * @return whether commit-triggered maintenance is enabled
-   */
-  public boolean onCommit() {
-    return onCommit;
   }
 
   /**
@@ -85,28 +68,14 @@ public final class MaintenanceTrigger {
   }
 
   /**
-   * Validates this trigger for the given maintenance task kind.
+   * Validates that this trigger carries a well-shaped cron expression.
    *
-   * <p>Called from {@link TableMaintenancePolicies}, not from individual policy content {@code
-   * validate()} methods.
-   *
-   * @param taskType maintenance task type
+   * @throws IllegalArgumentException if the expression is missing or malformed
    */
-  public void validate(TableMaintenanceTaskType taskType) {
-    Preconditions.checkNotNull(taskType, "taskType cannot be null");
-    if (onCommit && !taskType.onCommitAllowed()) {
-      throw new IllegalArgumentException(
-          String.format(
-              "schedule.onCommit=true is not allowed for maintenance task type %s",
-              taskType.configKey()));
-    }
-    if (!onCommit && cronExpression == null) {
-      throw new IllegalArgumentException(
-          "schedule must set onCommit and/or cronExpression for automated maintenance");
-    }
-    if (cronExpression != null) {
-      validateCronExpression(cronExpression);
-    }
+  public void validate() {
+    Preconditions.checkArgument(
+        cronExpression != null, "timeTrigger.cronExpression must be set when timeTrigger is set");
+    validateCronExpression(cronExpression);
   }
 
   /**
@@ -137,20 +106,20 @@ public final class MaintenanceTrigger {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof MaintenanceTrigger)) {
+    if (!(o instanceof TimeTrigger)) {
       return false;
     }
-    MaintenanceTrigger that = (MaintenanceTrigger) o;
-    return onCommit == that.onCommit && Objects.equals(cronExpression, that.cronExpression);
+    TimeTrigger that = (TimeTrigger) o;
+    return Objects.equals(cronExpression, that.cronExpression);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(onCommit, cronExpression);
+    return Objects.hash(cronExpression);
   }
 
   @Override
   public String toString() {
-    return "MaintenanceTrigger{onCommit=" + onCommit + ", cronExpression=" + cronExpression + '}';
+    return "TimeTrigger{cronExpression=" + cronExpression + '}';
   }
 }

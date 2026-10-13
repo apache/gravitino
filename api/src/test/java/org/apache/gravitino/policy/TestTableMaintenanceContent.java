@@ -20,7 +20,6 @@ package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +27,8 @@ public class TestTableMaintenanceContent {
 
   @Test
   void testPeerFieldsOnCompactionContent() {
-    MaintenanceTrigger schedule = new MaintenanceTrigger(true, "0 0 2 * * ?");
+    TimeTrigger timeTrigger = new TimeTrigger("0 0 2 * * ?");
+    EventTrigger eventTrigger = new EventTrigger(true);
     Long minIntervalMs = 3_600_000L;
     Map<String, String> jobOptions = ImmutableMap.of("spark.executor.memory", "4g");
     Map<String, String> updateOptions = ImmutableMap.of("metalake", "ml");
@@ -44,22 +44,24 @@ public class TestTableMaintenanceContent {
                 "binpack",
                 "",
                 ImmutableMap.of(),
-                schedule,
+                timeTrigger,
+                eventTrigger,
                 minIntervalMs,
                 jobOptions,
                 updateOptions);
 
     Assertions.assertTrue(content.hasPeerFields());
-    Assertions.assertEquals(schedule, content.schedule());
+    Assertions.assertEquals(timeTrigger, content.timeTrigger());
+    Assertions.assertEquals(eventTrigger, content.eventTrigger());
     Assertions.assertEquals(minIntervalMs, content.minIntervalMs());
     Assertions.assertEquals(jobOptions, content.jobOptions());
     Assertions.assertEquals(updateOptions, content.updateOptions());
     Assertions.assertDoesNotThrow(content::validate);
 
     IcebergDataCompactionContent copy =
-        content.withPeerFields(schedule, minIntervalMs, jobOptions, null);
+        content.withPeerFields(timeTrigger, eventTrigger, minIntervalMs, jobOptions, null);
     Assertions.assertEquals(
-        content.withPeerFields(schedule, minIntervalMs, jobOptions, null), copy);
+        content.withPeerFields(timeTrigger, eventTrigger, minIntervalMs, jobOptions, null), copy);
     Assertions.assertNotEquals(content, copy);
   }
 

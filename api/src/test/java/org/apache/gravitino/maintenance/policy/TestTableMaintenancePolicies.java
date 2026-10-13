@@ -21,9 +21,12 @@ package org.apache.gravitino.maintenance.policy;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.gravitino.policy.EventTrigger;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionFields;
+import org.apache.gravitino.policy.TimeTrigger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +52,8 @@ public class TestTableMaintenancePolicies {
 
   @Test
   void testMaintenanceFieldsIndependentOfTaskContent() {
-    MaintenanceTrigger schedule = new MaintenanceTrigger(true, "0 0 2 * * ?");
+    TimeTrigger timeTrigger = new TimeTrigger("0 0 2 * * ?");
+    EventTrigger eventTrigger = new EventTrigger(true);
     Long minIntervalMs = 3_600_000L;
     Map<String, String> jobOptions = ImmutableMap.of("spark.executor.memory", "4g");
     Map<String, String> updateOptions = ImmutableMap.of("metalake", "ml");
@@ -64,7 +68,8 @@ public class TestTableMaintenancePolicies {
             "binpack",
             "",
             ImmutableMap.of(),
-            schedule,
+            timeTrigger,
+            eventTrigger,
             minIntervalMs,
             jobOptions,
             updateOptions);
@@ -79,7 +84,8 @@ public class TestTableMaintenancePolicies {
         () ->
             TableMaintenancePolicies.validate(
                 Policy.BuiltInType.ICEBERG_COMPACTION,
-                new MaintenanceTrigger(true, "0 0 2 * * ?"),
+                new TimeTrigger("0 0 2 * * ?"),
+                new EventTrigger(true),
                 100L,
                 ImmutableMap.of("uri", "http://irc"),
                 ImmutableMap.of("metalake", "ml")));
@@ -90,7 +96,8 @@ public class TestTableMaintenancePolicies {
             () ->
                 TableMaintenancePolicies.validate(
                     Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
-                    new MaintenanceTrigger(true, null),
+                    null,
+                    new EventTrigger(true),
                     null,
                     Collections.emptyMap(),
                     Collections.emptyMap()));
@@ -99,24 +106,21 @@ public class TestTableMaintenancePolicies {
 
   @Test
   void testCronExpressionGrammar() {
-    Assertions.assertDoesNotThrow(() -> MaintenanceTrigger.validateCronExpression("0 0 2 * * ?"));
-    Assertions.assertDoesNotThrow(
-        () -> MaintenanceTrigger.validateCronExpression("0 0 2 ? * MON-FRI"));
+    Assertions.assertDoesNotThrow(() -> TimeTrigger.validateCronExpression("0 0 2 * * ?"));
+    Assertions.assertDoesNotThrow(() -> TimeTrigger.validateCronExpression("0 0 2 ? * MON-FRI"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> MaintenanceTrigger.validateCronExpression("0 2 * *"));
+        IllegalArgumentException.class, () -> TimeTrigger.validateCronExpression("0 2 * *"));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> MaintenanceTrigger.validateCronExpression("a a a a a a"));
+        IllegalArgumentException.class, () -> TimeTrigger.validateCronExpression("a a a a a a"));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> MaintenanceTrigger.validateCronExpression("0 0 2 * * foo"));
+        IllegalArgumentException.class, () -> TimeTrigger.validateCronExpression("0 0 2 * * foo"));
   }
 
   @Test
   void testMergeOptionsNearerWins() {
     Map<String, String> farther = ImmutableMap.of("a", "1", "b", "2");
     Map<String, String> nearer = ImmutableMap.of("b", "9");
-    Map<String, String> merged = TableMaintenancePolicies.mergeOptions(farther, nearer);
+    Map<String, String> merged = PolicyExecutionFields.mergeOptions(farther, nearer);
     Assertions.assertEquals("1", merged.get("a"));
     Assertions.assertEquals("9", merged.get("b"));
   }

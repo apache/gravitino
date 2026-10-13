@@ -18,71 +18,73 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 import org.apache.gravitino.maintenance.policy.TableMaintenancePolicies;
 
 /**
- * Base {@link PolicyContent} for built-in Iceberg table maintenance policies, carrying optional TMS
- * peer fields in the same JSON document as task thresholds.
+ * Base {@link PolicyContent} for built-in Iceberg table maintenance policies.
+ *
+ * <p>Carries optional shared execution peer fields ({@link TimeTrigger}, {@link EventTrigger},
+ * {@code minIntervalMs}, {@code jobOptions}, {@code updateOptions}) in the same JSON document as
+ * task thresholds.
  */
 public abstract class TableMaintenanceContent implements PolicyContent {
 
-  @Nullable private MaintenanceTrigger schedule;
+  @Nullable private TimeTrigger timeTrigger;
+
+  @Nullable private EventTrigger eventTrigger;
 
   @Nullable private Long minIntervalMs;
 
-  private Map<String, String> jobOptions = Collections.emptyMap();
+  private Map<String, String> jobOptions = PolicyExecutionFields.copyOptions(null);
 
-  private Map<String, String> updateOptions = Collections.emptyMap();
+  private Map<String, String> updateOptions = PolicyExecutionFields.copyOptions(null);
 
   /** Default constructor for Jackson deserialization only. */
   protected TableMaintenanceContent() {}
 
   /**
-   * @param schedule optional evaluate trigger
+   * @param timeTrigger optional time trigger
+   * @param eventTrigger optional event trigger
    * @param minIntervalMs optional cooldown between finished jobs
-   * @param jobOptions Spark / IRC client options
-   * @param updateOptions Gravitino updater options
+   * @param jobOptions job / client options
+   * @param updateOptions updater options
    */
   protected TableMaintenanceContent(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    setPeerFields(schedule, minIntervalMs, jobOptions, updateOptions);
+    setPeerFields(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
-  /**
-   * @return evaluate trigger, or {@code null} when unset
-   */
+  @Override
   @Nullable
-  public MaintenanceTrigger schedule() {
-    return schedule;
+  public TimeTrigger timeTrigger() {
+    return timeTrigger;
   }
 
-  /**
-   * @return minimum interval between finished jobs in milliseconds, or {@code null} when unset
-   */
+  @Override
+  @Nullable
+  public EventTrigger eventTrigger() {
+    return eventTrigger;
+  }
+
+  @Override
   @Nullable
   public Long minIntervalMs() {
     return minIntervalMs;
   }
 
-  /**
-   * @return Spark / IRC client options; never {@code null}
-   */
+  @Override
   public Map<String, String> jobOptions() {
     return jobOptions;
   }
 
-  /**
-   * @return Gravitino updater options; never {@code null}
-   */
+  @Override
   public Map<String, String> updateOptions() {
     return updateOptions;
   }
@@ -93,26 +95,28 @@ public abstract class TableMaintenanceContent implements PolicyContent {
   }
 
   /**
-   * Whether any TMS peer field is set on this content.
+   * Whether any shared execution peer field is set on this content.
    *
-   * @return {@code true} when schedule, interval, or either options map is present
+   * @return {@code true} when a trigger, interval, or either options map is present
    */
   public boolean hasPeerFields() {
-    return TableMaintenancePolicies.hasAnyMaintenanceField(
-        schedule, minIntervalMs, jobOptions, updateOptions);
+    return PolicyExecutionFields.hasAny(
+        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
    * Returns a copy of this content with the given peer fields.
    *
-   * @param schedule evaluate trigger
+   * @param timeTrigger time trigger
+   * @param eventTrigger event trigger
    * @param minIntervalMs cooldown ms
    * @param jobOptions job options map
    * @param updateOptions updater options map
    * @return content with peer fields applied
    */
   public abstract TableMaintenanceContent withPeerFields(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions);
@@ -131,7 +135,8 @@ public abstract class TableMaintenanceContent implements PolicyContent {
    * @return whether peer fields are equal
    */
   protected boolean peerFieldsEquals(TableMaintenanceContent other) {
-    return Objects.equals(schedule, other.schedule)
+    return Objects.equals(timeTrigger, other.timeTrigger)
+        && Objects.equals(eventTrigger, other.eventTrigger)
         && Objects.equals(minIntervalMs, other.minIntervalMs)
         && Objects.equals(jobOptions, other.jobOptions)
         && Objects.equals(updateOptions, other.updateOptions);
@@ -141,24 +146,19 @@ public abstract class TableMaintenanceContent implements PolicyContent {
    * @return hash code contribution from peer fields
    */
   protected int peerFieldsHashCode() {
-    return Objects.hash(schedule, minIntervalMs, jobOptions, updateOptions);
+    return Objects.hash(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   private void setPeerFields(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    this.schedule = schedule;
+    this.timeTrigger = timeTrigger;
+    this.eventTrigger = eventTrigger;
     this.minIntervalMs = minIntervalMs;
-    this.jobOptions = copyOptions(jobOptions);
-    this.updateOptions = copyOptions(updateOptions);
-  }
-
-  private static Map<String, String> copyOptions(@Nullable Map<String, String> options) {
-    if (options == null || options.isEmpty()) {
-      return Collections.emptyMap();
-    }
-    return Collections.unmodifiableMap(new LinkedHashMap<>(options));
+    this.jobOptions = PolicyExecutionFields.copyOptions(jobOptions);
+    this.updateOptions = PolicyExecutionFields.copyOptions(updateOptions);
   }
 }

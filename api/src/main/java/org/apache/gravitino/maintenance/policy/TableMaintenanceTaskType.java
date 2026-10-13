@@ -96,7 +96,7 @@ public enum TableMaintenanceTaskType {
   }
 
   /**
-   * Returns whether {@code schedule.onCommit} is allowed for this task type.
+   * Returns whether {@code eventTrigger.onCommit} is allowed for this task type.
    *
    * @return {@code true} when onCommit is supported
    */

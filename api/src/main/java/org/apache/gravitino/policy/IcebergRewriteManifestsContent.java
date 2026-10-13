@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 
 /**
  * Placeholder built-in policy content for Iceberg manifest rewrite.
@@ -56,11 +55,12 @@ public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
   public IcebergRewriteManifestsContent() {}
 
   IcebergRewriteManifestsContent(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    super(schedule, minIntervalMs, jobOptions, updateOptions);
+    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   @Override
@@ -91,11 +91,13 @@ public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
 
   @Override
   public IcebergRewriteManifestsContent withPeerFields(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    return new IcebergRewriteManifestsContent(schedule, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergRewriteManifestsContent(
+        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   @Override
@@ -114,8 +116,10 @@ public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
   @Override
   public String toString() {
     return "IcebergRewriteManifestsContent{"
-        + "schedule="
-        + schedule()
+        + "timeTrigger="
+        + timeTrigger()
+        + ", eventTrigger="
+        + eventTrigger()
         + ", minIntervalMs="
         + minIntervalMs()
         + ", jobOptions="

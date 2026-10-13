@@ -29,7 +29,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 
 /** Configuration for table-level Iceberg orphan cleanup on an optimizer invocation. */
 public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
@@ -69,18 +68,19 @@ public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
   }
 
   IcebergOrphanFileRemovalContent(long olderThanDays, @Nullable String location, boolean dryRun) {
-    this(olderThanDays, location, dryRun, null, null, null, null);
+    this(olderThanDays, location, dryRun, null, null, null, null, null);
   }
 
   IcebergOrphanFileRemovalContent(
       long olderThanDays,
       @Nullable String location,
       boolean dryRun,
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    super(schedule, minIntervalMs, jobOptions, updateOptions);
+    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
     this.olderThanDays = olderThanDays;
     this.location = location;
     this.dryRun = dryRun;
@@ -161,12 +161,20 @@ public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
 
   @Override
   public IcebergOrphanFileRemovalContent withPeerFields(
-      @Nullable MaintenanceTrigger schedule,
+      @Nullable TimeTrigger timeTrigger,
+      @Nullable EventTrigger eventTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return new IcebergOrphanFileRemovalContent(
-        olderThanDays, location, dryRun, schedule, minIntervalMs, jobOptions, updateOptions);
+        olderThanDays,
+        location,
+        dryRun,
+        timeTrigger,
+        eventTrigger,
+        minIntervalMs,
+        jobOptions,
+        updateOptions);
   }
 
   @Override
