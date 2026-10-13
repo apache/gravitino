@@ -119,8 +119,8 @@ artifacts {
 //   @CoreBackend.H2 @CoreBackend.MySQL     -> runs in coreH2Test and coreMySQLTest
 //   @CoreBackend.All                       -> runs in all three backend lanes
 //   (no CoreBackend annotation at all)     -> a plain unit test, runs in coreUnitTest
-// A class needing Docker but carrying no backend tag runs in no lane at all, and
-// TestCoreLaneMembership fails coreUnitTest for it.
+// A class needing Docker but carrying no backend tag runs in no lane task (only in legacy
+// :core:test with Docker on), and TestCoreLaneMembership fails coreUnitTest for it.
 //
 // Backend name -> JUnit tag that admits a test class to that backend's lane. Adding a backend
 // here is enough to teach the lane filtering below about it; also add it to CoreBackend.java.
@@ -151,7 +151,8 @@ fun registerCoreTestTask(
   inputs.property("coreTestBackend", backend ?: "none")
   // Distinct from the extensions.extraProperties["includeDockerTaggedTests"] flag set below,
   // which is a different mechanism (read by root build.gradle.kts's shared test-environment
-  // setup to decide JUnit tag filtering) - this is only a Gradle up-to-date-check input.
+  // setup to decide whether to exclude gravitino-docker-test) - this is only a Gradle
+  // up-to-date-check input.
   inputs.property("coreTestIncludesDockerTaggedTests", backend != null)
   reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/$taskName"))
   reports.html.outputLocation.set(

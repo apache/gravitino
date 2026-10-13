@@ -39,8 +39,8 @@ import org.junit.jupiter.api.Tag;
  *       to run under several lanes, e.g. {@code @CoreBackend.H2 @CoreBackend.MySQL}.
  *   <li>{@link All} runs a class under all three lanes.
  *   <li>A class with none of these is a unit test and runs in {@code coreUnitTest} - unless it also
- *       carries {@code @Tag("gravitino-docker-test")}, in which case it runs in no lane at all and
- *       {@code TestCoreLaneMembership} fails.
+ *       carries {@code @Tag("gravitino-docker-test")}, in which case it runs in no lane task (only
+ *       in legacy {@code :core:test} with Docker on) and {@code TestCoreLaneMembership} fails.
  * </ul>
  *
  * <p>Each is a plain JUnit composed annotation: meta-annotated with {@link Tag} and nothing else,

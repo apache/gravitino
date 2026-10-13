@@ -42,7 +42,8 @@ import org.junit.platform.commons.support.AnnotationSupport;
  * CoreBackend.PostgreSQL}, and {@link CoreBackend.All}: each must expand to exactly the tag(s)
  * {@code core/build.gradle.kts} filters on, for the annotated class and for its subclasses, using
  * the same annotation lookup the Jupiter engine runs at discovery time - and none may carry an
- * execution-time hook, since that would repeat the mistake a prior, reverted design made.
+ * execution-time hook, since lane membership must be decided at discovery so each lane's JUnit XML
+ * lists only the tests it runs.
  */
 class TestCoreDatabaseLaneAnnotations {
 
