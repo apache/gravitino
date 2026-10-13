@@ -192,11 +192,16 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 
 // :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
 // (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
-tasks.test {
-  val policiesDocument = rootProject.file("docs/policies.md")
-  inputs.file(policiesDocument)
-  systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+// TestRestrictedRegoGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
+// the legacy :core:test run it; the database lanes don't need the input.
+listOf("coreUnitTest", "test").forEach {
+  tasks.named<Test>(it) {
+    inputs.file(rootProject.file("docs/policies.md"))
+    systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+  }
+}
 
+tasks.test {
   doFirst {
     logger.warn(
       "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
