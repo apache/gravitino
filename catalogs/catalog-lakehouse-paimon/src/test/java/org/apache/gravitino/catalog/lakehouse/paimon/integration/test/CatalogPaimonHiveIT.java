@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -141,6 +142,10 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
         "paimon",
         schemaName,
         Collections.emptyMap());
+
+    View loadedView =
+        viewCatalog.loadView(NameIdentifier.of(schemaName, viewName.toUpperCase(Locale.ROOT)));
+    Assertions.assertEquals(viewName, loadedView.name());
 
     Dataset<Row> rows =
         spark.sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName));

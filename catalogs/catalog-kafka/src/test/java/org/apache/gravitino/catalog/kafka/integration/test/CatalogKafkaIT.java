@@ -41,6 +41,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -219,6 +220,40 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertTrue(reregisteredCatalog.asTopicCatalog().dropTopic(topicIdent));
     awaitTopicDeletedInKafka(topicName);
     Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+  }
+
+  @Test
+  public void testActiveTopicRegistrationCannotBeRebound()
+      throws ExecutionException, InterruptedException {
+    String originalCatalogName =
+        GravitinoITUtils.genRandomName("test_active_topic_original_catalog");
+    String conflictingCatalogName =
+        GravitinoITUtils.genRandomName("test_active_topic_conflicting_catalog");
+    String topicName = GravitinoITUtils.genRandomName("test_active_topic_registration");
+    NameIdentifier topicIdent = NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName);
+    Map<String, String> properties = ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+
+    adminClient.createTopics(ImmutableList.of(new NewTopic(topicName, 1, (short) 1))).all().get();
+
+    Catalog originalCatalog = createCatalog(originalCatalogName, "original catalog", properties);
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Catalog conflictingCatalog =
+        createCatalog(conflictingCatalogName, "conflicting catalog", properties);
+    RESTException exception =
+        Assertions.assertThrows(
+            RESTException.class, () -> conflictingCatalog.asTopicCatalog().loadTopic(topicIdent));
+    Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
+
+    // The rejected import must not move the active entity away from its original path.
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Assertions.assertTrue(metalake.dropCatalog(conflictingCatalogName, true));
+    Assertions.assertTrue(originalCatalog.asTopicCatalog().dropTopic(topicIdent));
+    awaitTopicDeletedInKafka(topicName);
+    Assertions.assertTrue(metalake.dropCatalog(originalCatalogName, true));
   }
 
   @Test

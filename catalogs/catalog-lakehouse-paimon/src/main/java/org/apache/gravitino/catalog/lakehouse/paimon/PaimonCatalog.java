@@ -71,7 +71,8 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
   @Override
   public Capability newCapability() {
-    return new PaimonCatalogCapability();
+    String backend = entity().getProperties().get(PaimonConstants.CATALOG_BACKEND);
+    return new PaimonCatalogCapability(PaimonCatalogBackend.HIVE.name().equalsIgnoreCase(backend));
   }
 
   @Override

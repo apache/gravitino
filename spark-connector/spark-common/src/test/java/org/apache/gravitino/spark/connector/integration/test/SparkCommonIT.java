@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -606,7 +607,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   @EnabledIf("supportsReplaceColumns")
   protected void testAlterTableReplaceColumns() {
+    runAlterTableReplaceColumnsTest(true);
+  }
+
+  /**
+   * Tests replacing columns and accessing the resulting table.
+   *
+   * @param useUppercaseTableName whether to use an uppercase table name after replacing columns
+   */
+  protected void runAlterTableReplaceColumnsTest(boolean useUppercaseTableName) {
     String tableName = "test_replace_columns_table";
+    String accessTableName = useUppercaseTableName ? tableName.toUpperCase(Locale.ROOT) : tableName;
     dropTableIfExists(tableName);
 
     createSimpleTable(tableName);
@@ -630,8 +641,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     tableInfo = getTableInfo(tableName);
     checkTableColumns(tableName, updateColumns, tableInfo);
-    sql(String.format("CREATE TABLE IF NOT EXISTS %s (id int, name2 string, age long)", tableName));
-    sql(String.format("INSERT INTO %s VALUES(3, 'name2', 10)", tableName));
+    sql(
+        String.format(
+            "CREATE TABLE IF NOT EXISTS %s (id int, name2 string, age long)", accessTableName));
+    sql(String.format("INSERT INTO %s VALUES(3, 'name2', 10)", accessTableName));
     List<String> data = getQueryData(String.format("SELECT * from %s ORDER BY id", tableName));
     Assertions.assertEquals(2, data.size());
     if (supportsSchemaEvolution()) {

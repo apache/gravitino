@@ -154,7 +154,8 @@ public class CatalogHiveViewIT extends BaseIT {
     Assertions.assertEquals(
         HIVE_DIALECT, ((SQLRepresentation) created.representations()[0]).dialect());
 
-    View loaded = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+    View loaded =
+        viewCatalog.loadView(NameIdentifier.of(schemaName, viewName.toUpperCase(Locale.ROOT)));
     Assertions.assertEquals(viewName, loaded.name());
     Assertions.assertEquals(VIEW_COMMENT, loaded.comment());
     Assertions.assertEquals(1, loaded.representations().length);
