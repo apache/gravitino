@@ -72,10 +72,12 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  *
  * <p>A write that fails because a statement waited on a row lock longer than the backend's lock
- * wait timeout is reported as an {@link OptimisticLockException}, so callers see a conflict they
- * can retry rather than an internal error. Writers queue on the same rows inside the database, for
- * example a table drop behind a statistic update of that table, and the backend aborts the waiting
- * statement once the timeout is reached. See {@link ExceptionUtils#isLockWaitTimeout}.
+ * wait timeout is reported as an {@link OptimisticLockException}, so callers see a conflict rather
+ * than an internal error. The store write is rolled back; retrying the whole operation also
+ * requires accounting for any preceding external side effects. Writers queue on the same rows
+ * inside the database, for example a table drop behind a statistic update of that table, and the
+ * backend aborts the waiting statement once the timeout is reached. See {@link
+ * ExceptionUtils#isLockWaitTimeout}.
  */
 public class RelationalEntityStore
     implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {

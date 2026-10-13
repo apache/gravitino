@@ -55,6 +55,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -232,6 +233,46 @@ public class TestLanceTableOperations {
                 new Index[0]));
     Assertions.assertFalse(
         Files.exists(Paths.get(location, "_versions")), "the created dataset must be dropped");
+  }
+
+  /** Verifies failed cleanup preserves the registration conflict and the cleanup failure. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTablePreservesRegistrationFailureWhenDatasetCleanupFails(boolean conflict)
+      throws IOException {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table_cleanup_conflict");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("conflict-cleanup").toString();
+    Map<String, String> properties =
+        Map.of(Table.PROPERTY_LOCATION, location, Table.PROPERTY_TABLE_FORMAT, "lance");
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(1L);
+    Mockito.doReturn(dataset).when(lanceTableOps).createDataset(eq(location), eq(columns), any());
+    when(idGenerator.nextId()).thenReturn(2L);
+    RuntimeException failure =
+        conflict
+            ? new OptimisticLockException("metadata lock timeout")
+            : new TableAlreadyExistsException("table already registered");
+    doThrow(failure).when(store).put(any(), anyBoolean());
+    // The native drop throws an IOException if the dataset disappeared before cleanup.
+    RuntimeException actual =
+        Assertions.assertThrows(
+            failure.getClass(),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), properties),
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertSame(failure, actual);
+    Assertions.assertEquals(1, actual.getSuppressed().length);
+    Assertions.assertInstanceOf(IOException.class, actual.getSuppressed()[0]);
+    Assertions.assertTrue(actual.getSuppressed()[0].getMessage().contains("Not found:"));
+    verify(dataset).close();
   }
 
   /** Verifies a conflict of the table metadata on drop reaches the caller as a conflict. */

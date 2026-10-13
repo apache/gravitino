@@ -202,8 +202,10 @@ public class ExceptionUtils {
   /**
    * Reports a write that failed on a lock wait timeout as a conflict. The statement waited behind a
    * concurrent writer of the same rows until the backend aborted it, and the store rolls the
-   * transaction back, so the caller can retry the operation. Any other failure, including one that
-   * is already an {@link OptimisticLockException}, is returned unchanged.
+   * transaction back, so the store write can be retried. Callers must account for any external side
+   * effects that occurred before the store write before retrying the whole operation. Any other
+   * failure, including one that is already an {@link OptimisticLockException}, is returned
+   * unchanged.
    *
    * @param failure The failure of the write.
    * @param target What was being written, as the subject of the message, for example "The table
