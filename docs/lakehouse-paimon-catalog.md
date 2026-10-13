@@ -82,12 +82,17 @@ Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pas
 
 #### Identifier Case Behavior
 
-When `catalog-backend` is `hive`, Gravitino normalizes schema, table, and view identifiers to lowercase.
+For `catalog-backend=hive`, schema, table, and view identifiers are case-insensitive; you can use any casing.
 
-When `catalog-backend` is `rest`, Gravitino treats those identifiers as case-sensitive because it can't infer the capabilities of the catalog behind the REST server. If the REST server uses a case-insensitive backend, use the exact identifier casing stored in Gravitino. Loading the same object through a differently cased identifier is rejected instead of being treated as an alias.
+For `catalog-backend=rest`, always use the same identifier casing that was used when the object was first registered. Loading the same object with different casing is rejected.
 
 :::caution
-Mixed-case Hive-backed registrations created by an earlier Gravitino version may no longer match their normalized names. If loading one reports a retained identifier conflict, manually delete the stale Gravitino registration and remove `gravitino.identifier` from the external object before loading it again. Gravitino doesn't automatically reconcile governance metadata onto the new registration.
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict:
+
+1. Delete the stale Gravitino registration.
+2. Remove `gravitino.identifier` from the external object.
+3. Retry loading the object.
+4. Reapply any privileges, tags, or other governance relationships that the new registration needs.
 :::
 
 #### Hadoop S3A (optional)
