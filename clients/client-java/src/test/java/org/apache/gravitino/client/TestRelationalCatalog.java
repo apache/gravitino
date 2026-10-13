@@ -817,6 +817,30 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   @Test
+  public void testLoadTableWithSpaceInName() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table 1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    // MockServer matches the raw request path, so the space must be sent as %20.
+    String tablePath =
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/table%201");
+    ColumnDTO[] columns =
+        new ColumnDTO[] {createMockColumn("col1", Types.StringType.get(), "comment1")};
+    TableDTO expectedTable =
+        createMockTable(
+            "table 1",
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            new Partitioning[0],
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT);
+    buildMockResource(Method.GET, tablePath, null, new TableResponse(expectedTable), SC_OK);
+
+    Table table = catalog.asTableCatalog().loadTable(tableId);
+    Assertions.assertEquals("table 1", table.name());
+  }
+
+  @Test
   public void testRenameTable() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =

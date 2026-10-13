@@ -687,6 +687,34 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testDropCatalogWithSchemaConnectionFailure() {
+    String message =
+        "Failed to check schemas in the underlying catalog metalake1.catalog1: "
+            + "Failed to connect to Hive Metastore: TTransportException: Connection refused. "
+            + "Use force=true to skip this check.";
+    doThrow(new ConnectionFailedException("%s", message))
+        .when(manager)
+        .dropCatalog(NameIdentifier.of("metalake1", "catalog1"), false);
+
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete()) {
+      Assertions.assertEquals(Response.Status.BAD_GATEWAY.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, error.getCode());
+      Assertions.assertEquals(ConnectionFailedException.class.getSimpleName(), error.getType());
+      Assertions.assertEquals(
+          "Failed to operate catalog(s) [catalog1] operation [DROP] under metalake [metalake1], "
+              + "reason ["
+              + message
+              + "]",
+          error.getMessage());
+    }
+  }
+
+  @Test
   public void testSetCatalog() {
     // Test enable catalog
     CatalogSetRequest req = new CatalogSetRequest(true);
