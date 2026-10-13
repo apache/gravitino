@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
@@ -116,8 +117,9 @@ public final class SparkApplicationStatusUtils {
    *   <li>The stopped states walk back through the state transition history to the last outcome.
    *   <li>A SparkApplication without any status after the timeout fails, for example if its
    *       namespace isn't watched by the operator.
-   *   <li>An unknown state, of a newer operator, keeps the job unfinished: started if the
-   *       application has reached a started state, queued otherwise.
+   *   <li>An unknown state, of a newer operator, after an outcome is a stopped state too. Before
+   *       any outcome it keeps the job unfinished: started if the application has reached a started
+   *       state, queued otherwise.
    * </ul>
    *
    * <p>The operator records a state when it observes it, which can be a while after the driver
@@ -126,7 +128,8 @@ public final class SparkApplicationStatusUtils {
    * operator keeps with some states. Without them, the job started when the application first
    * reached a started state, and finished when it reached its outcome. As the driver container
    * status is only known once the job finished, the started time of a running job is refined to the
-   * driver's when it finishes.
+   * driver's when it finishes. A job that stopped without an outcome finished when it was deleted,
+   * or else when it entered its last state.
    *
    * @param app the SparkApplication
    * @param driver the driver pod, or null if unknown
@@ -139,7 +142,11 @@ public final class SparkApplicationStatusUtils {
     List<State> history = stateHistory(app);
     State current = history.isEmpty() ? null : history.get(history.size() - 1);
     State outcome = lastOutcome(history);
-    ContainerState driverState = driver == null ? null : driverContainerState(driver);
+    Instant createdAt = parseTime(app.getMetadata().getCreationTimestamp());
+    Instant deletedAt = parseTime(app.getMetadata().getDeletionTimestamp());
+
+    ContainerState driverState =
+        driver == null ? null : driverContainerState(driver, driverContainerName(app));
     Instant driverStartedAt = null;
     Instant driverFinishedAt = null;
     if (driverState != null && driverState.getTerminated() != null) {
@@ -148,20 +155,30 @@ public final class SparkApplicationStatusUtils {
     } else if (driverState != null && driverState.getRunning() != null) {
       driverStartedAt = parseTime(driverState.getRunning().getStartedAt());
     }
-    Instant startedAt = driverStartedAt != null ? driverStartedAt : startedAt(history);
-    Instant deletedAt = parseTime(app.getMetadata().getDeletionTimestamp());
+    Instant startedAt = startedAt(history, driverStartedAt, createdAt);
+    // When the application stopped: when it reached its outcome, else when it was deleted, else
+    // when it entered its current state. A deletion time is in whole seconds, so it may read
+    // earlier than a started time of the same second, which Gravitino would then drop.
+    Instant stoppedAt;
+    if (outcome != null) {
+      stoppedAt = finishedAt(outcome, driverFinishedAt);
+    } else if (deletedAt != null) {
+      stoppedAt = startedAt != null && deletedAt.isBefore(startedAt) ? startedAt : deletedAt;
+    } else {
+      stoppedAt = current == null ? null : current.time;
+    }
 
     JobHandle.Status status;
     Instant finishedAt = null;
-    if (K8sJobResourceUtils.isCancelRequested(app) && (deletedAt != null || isStopped(current))) {
+    if (K8sJobResourceUtils.isCancelRequested(app)
+        && (deletedAt != null || isStopped(current, outcome))) {
       status = JobHandle.Status.CANCELLED;
-      finishedAt = outcome != null ? finishedAt(outcome, driverFinishedAt) : deletedAt;
-    } else if (deletedAt != null || (current != null && STOPPED_STATES.contains(current.summary))) {
-      // Deleted by someone else than Gravitino, for example by its TTL or kubectl, or stopped.
+      finishedAt = stoppedAt;
+    } else if (deletedAt != null || isStopped(current, outcome)) {
+      // Stopped, or deleted by someone else than Gravitino, for example by its TTL or kubectl.
       status = outcome == null ? JobHandle.Status.FAILED : statusOf(outcome);
-      finishedAt = outcome != null ? finishedAt(outcome, driverFinishedAt) : deletedAt;
+      finishedAt = stoppedAt;
     } else if (current == null) {
-      Instant createdAt = parseTime(app.getMetadata().getCreationTimestamp());
       if (createdAt != null && createdAt.plusMillis(noStatusTimeoutMs).isBefore(now)) {
         LOG.warn(
             "SparkApplication {} has no status after {} ms, is its namespace watched by the Spark"
@@ -174,14 +191,12 @@ public final class SparkApplicationStatusUtils {
       }
     } else if (QUEUED_STATES.contains(current.summary)) {
       status = JobHandle.Status.QUEUED;
-    } else if (isOutcome(current)) {
-      status = statusOf(current);
-      finishedAt = finishedAt(current, driverFinishedAt);
     } else if (STARTED_STATES.contains(current.summary)) {
       status = JobHandle.Status.STARTED;
     } else {
-      // A state this version doesn't know, of a newer operator. It can't be told whether it is
-      // final, so the job stays unfinished: started if it has run, queued otherwise.
+      // A state this version doesn't know, of a newer operator, before any outcome. It can't be
+      // told whether it is final, so the job stays unfinished: started if it has run, queued
+      // otherwise.
       status =
           history.stream().anyMatch(s -> STARTED_STATES.contains(s.summary))
               ? JobHandle.Status.STARTED
@@ -201,7 +216,7 @@ public final class SparkApplicationStatusUtils {
   }
 
   /**
-   * Returns whether the operator has reported any state of the SparkApplication.
+   * Returns whether the operator has reported a state of the SparkApplication that can be read.
    *
    * @param app the SparkApplication
    * @return true if the application has a state
@@ -218,11 +233,24 @@ public final class SparkApplicationStatusUtils {
    */
   public static boolean isStopped(GenericKubernetesResource app) {
     List<State> history = stateHistory(app);
-    return isStopped(history.isEmpty() ? null : history.get(history.size() - 1));
+    return isStopped(
+        history.isEmpty() ? null : history.get(history.size() - 1), lastOutcome(history));
   }
 
-  private static boolean isStopped(@Nullable State state) {
-    return state != null && (isOutcome(state) || STOPPED_STATES.contains(state.summary));
+  /**
+   * Returns whether the application stopped: its current state is an outcome or a stopped state, or
+   * a state this version doesn't know that follows an outcome. A known state after an outcome means
+   * the application runs again.
+   */
+  private static boolean isStopped(@Nullable State current, @Nullable State outcome) {
+    if (current == null) {
+      return false;
+    }
+    boolean running =
+        QUEUED_STATES.contains(current.summary) || STARTED_STATES.contains(current.summary);
+    return isOutcome(current)
+        || STOPPED_STATES.contains(current.summary)
+        || (!running && outcome != null);
   }
 
   private static boolean isOutcome(State state) {
@@ -235,16 +263,26 @@ public final class SparkApplicationStatusUtils {
         : JobHandle.Status.FAILED;
   }
 
+  /**
+   * Returns when the job started: when the driver container did, by the driver pod or else by the
+   * driver status the operator observed, or else when the application reached a started state.
+   */
   @Nullable
-  private static Instant startedAt(List<State> history) {
-    Instant driverStartedAt =
-        history.stream()
-            .map(s -> s.driverStartedAt)
-            .filter(Objects::nonNull)
-            .min(Comparator.naturalOrder())
-            .orElse(null);
-    if (driverStartedAt != null) {
-      return driverStartedAt;
+  private static Instant startedAt(
+      List<State> history, @Nullable Instant driverStartedAt, @Nullable Instant createdAt) {
+    Instant containerStartedAt =
+        driverStartedAt != null
+            ? driverStartedAt
+            : history.stream()
+                .map(s -> s.driverStartedAt)
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
+    // A container that failed to start can report a start time of the epoch. A driver can't have
+    // started before its application was created.
+    if (containerStartedAt != null
+        && (createdAt == null || !containerStartedAt.isBefore(createdAt))) {
+      return containerStartedAt;
     }
     return history.stream()
         .filter(s -> STARTED_STATES.contains(s.summary))
@@ -282,13 +320,14 @@ public final class SparkApplicationStatusUtils {
     if (!(status instanceof Map)) {
       return history;
     }
+    String driverContainer = driverContainerName(app);
 
     Object transitions = ((Map<String, Object>) status).get("stateTransitionHistory");
     if (transitions instanceof Map) {
       ((Map<String, Object>) transitions)
           .forEach(
               (id, state) -> {
-                State parsed = parseState(id, state);
+                State parsed = parseState(id, state, driverContainer);
                 if (parsed != null) {
                   history.add(parsed);
                 }
@@ -296,7 +335,8 @@ public final class SparkApplicationStatusUtils {
       history.sort(Comparator.comparingLong(s -> s.id));
     }
 
-    State current = parseState(null, ((Map<String, Object>) status).get("currentState"));
+    State current =
+        parseState(null, ((Map<String, Object>) status).get("currentState"), driverContainer);
     if (current != null
         && (history.isEmpty()
             || !current.summary.equals(history.get(history.size() - 1).summary))) {
@@ -307,7 +347,8 @@ public final class SparkApplicationStatusUtils {
 
   @Nullable
   @SuppressWarnings("unchecked")
-  private static State parseState(@Nullable String id, Object state) {
+  private static State parseState(
+      @Nullable String id, @Nullable Object state, String driverContainer) {
     if (!(state instanceof Map)) {
       return null;
     }
@@ -323,7 +364,8 @@ public final class SparkApplicationStatusUtils {
       return null;
     }
 
-    Map<String, Object> driverState = driverContainerState(fields.get("lastObservedDriverStatus"));
+    Map<String, Object> driverState =
+        observedDriverContainerState(fields.get("lastObservedDriverStatus"), driverContainer);
     return new State(
         order,
         (String) summary,
@@ -348,16 +390,30 @@ public final class SparkApplicationStatusUtils {
     return terminated == null ? null : timeOf(terminated.get("finishedAt"));
   }
 
+  /**
+   * Returns the name of the driver container: the one a job names with a pod template, or else the
+   * one Spark gives it.
+   */
+  private static String driverContainerName(GenericKubernetesResource app) {
+    Map<String, Object> spec = mapOf(app.getAdditionalProperties().get("spec"));
+    Map<String, Object> sparkConf = spec == null ? null : mapOf(spec.get("sparkConf"));
+    Object name =
+        sparkConf == null ? null : sparkConf.get(SparkApplicationUtils.SPARK_DRIVER_CONTAINER_NAME);
+    return name instanceof String && StringUtils.isNotBlank((String) name)
+        ? (String) name
+        : SparkApplicationUtils.DRIVER_CONTAINER_NAME;
+  }
+
   /** Returns the state of the driver container of the driver pod. */
   @Nullable
-  private static ContainerState driverContainerState(Pod driver) {
+  private static ContainerState driverContainerState(Pod driver, String driverContainer) {
     List<ContainerStatus> containers =
         driver.getStatus() == null ? null : driver.getStatus().getContainerStatuses();
     if (containers == null) {
       return null;
     }
     for (ContainerStatus container : containers) {
-      if (SparkApplicationUtils.DRIVER_CONTAINER_NAME.equals(container.getName())) {
+      if (driverContainer.equals(container.getName())) {
         return container.getState();
       }
     }
@@ -368,7 +424,8 @@ public final class SparkApplicationStatusUtils {
   /** Returns the state of the driver container in the observed status of the driver pod. */
   @Nullable
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> driverContainerState(Object podStatus) {
+  private static Map<String, Object> observedDriverContainerState(
+      @Nullable Object podStatus, String driverContainer) {
     Map<String, Object> status = mapOf(podStatus);
     Object containers = status == null ? null : status.get("containerStatuses");
     if (!(containers instanceof List)) {
@@ -378,8 +435,7 @@ public final class SparkApplicationStatusUtils {
     List<Object> containerStatuses = (List<Object>) containers;
     for (Object container : containerStatuses) {
       Map<String, Object> fields = mapOf(container);
-      if (fields != null
-          && SparkApplicationUtils.DRIVER_CONTAINER_NAME.equals(fields.get("name"))) {
+      if (fields != null && driverContainer.equals(fields.get("name"))) {
         return mapOf(fields.get("state"));
       }
     }
@@ -388,19 +444,19 @@ public final class SparkApplicationStatusUtils {
   }
 
   @Nullable
-  private static Map<String, Object> stateOf(Object container) {
+  private static Map<String, Object> stateOf(@Nullable Object container) {
     Map<String, Object> fields = mapOf(container);
     return fields == null ? null : mapOf(fields.get("state"));
   }
 
   @Nullable
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> mapOf(Object value) {
+  private static Map<String, Object> mapOf(@Nullable Object value) {
     return value instanceof Map ? (Map<String, Object>) value : null;
   }
 
   @Nullable
-  private static Instant timeOf(Object value) {
+  private static Instant timeOf(@Nullable Object value) {
     return value instanceof String ? parseTime((String) value) : null;
   }
 

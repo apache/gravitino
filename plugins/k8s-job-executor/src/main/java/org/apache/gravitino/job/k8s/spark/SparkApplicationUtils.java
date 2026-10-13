@@ -22,14 +22,14 @@ import com.google.common.collect.ImmutableMap;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -65,6 +65,10 @@ public final class SparkApplicationUtils {
   /** The name Spark gives the driver container, unless a pod template renames it. */
   public static final String DRIVER_CONTAINER_NAME = "spark-kubernetes-driver";
 
+  /** The Spark configuration that names the driver container of a job's driver pod template. */
+  public static final String SPARK_DRIVER_CONTAINER_NAME =
+      "spark.kubernetes.driver.podTemplateContainerName";
+
   /** The Spark configuration of the namespace a job runs in. */
   public static final String SPARK_NAMESPACE = "spark.kubernetes.namespace";
 
@@ -76,6 +80,12 @@ public final class SparkApplicationUtils {
   private static final String SPARK_JARS = "spark.jars";
   private static final String SPARK_FILES = "spark.files";
   private static final String SPARK_ARCHIVES = "spark.archives";
+
+  private static final Pattern URI_SCHEME = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*):");
+
+  private static final Pattern URI_USER_INFO = Pattern.compile("(?<=://)[^/?#@]*@");
+
+  private static final Pattern URI_QUERY_OR_FRAGMENT = Pattern.compile("[?#].*$");
 
   private SparkApplicationUtils() {}
 
@@ -111,7 +121,9 @@ public final class SparkApplicationUtils {
     sparkConf.remove(SPARK_DEPLOY_MODE);
     putIfBlank(sparkConf, SPARK_IMAGE, configs.sparkImage());
     putIfBlank(sparkConf, SPARK_DRIVER_SERVICE_ACCOUNT, configs.sparkServiceAccount());
-    String namespace = StringUtils.trimToNull(sparkConf.get(SPARK_NAMESPACE));
+    // Only a job chooses its namespace this way. A default set in the Spark configurations of
+    // the executor would silently shadow the namespace of the executor configurations.
+    String namespace = StringUtils.trimToNull(template.configs().get(SPARK_NAMESPACE));
     if (namespace == null) {
       namespace = configs.namespace();
     } else if (!K8sJobResourceUtils.isValidNamespace(namespace)) {
@@ -166,27 +178,41 @@ public final class SparkApplicationUtils {
     return app;
   }
 
-  private static void checkClusterReachable(String uri) {
-    String scheme;
-    try {
-      scheme = new URI(uri).getScheme();
-    } catch (URISyntaxException e) {
-      throw new IllegalArgumentException("Invalid resource URI of the job: " + uri, e);
+  /**
+   * Checks that a resource of the job, or each of them if it is a comma-separated list as Spark
+   * accepts, is a URI that the cluster can reach rather than a path on the Gravitino server.
+   */
+  private static void checkClusterReachable(String resource) {
+    for (String uri : resource.split(",")) {
+      Matcher scheme = URI_SCHEME.matcher(uri.trim());
+      // No scheme, a Windows drive letter, or a file URI.
+      if (!scheme.find()
+          || scheme.group(1).length() == 1
+          || "file".equalsIgnoreCase(scheme.group(1))) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Resource %s of the job is a path on the Gravitino server, which the Spark job on"
+                    + " Kubernetes can't reach. Use a URI reachable from the cluster instead, such"
+                    + " as local:// for a file in the image, https://, s3a:// or hdfs://",
+                withoutSecrets(uri.trim())));
+      }
     }
-    if (scheme == null || "file".equalsIgnoreCase(scheme)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Resource %s of the job is a path on the Gravitino server, which the Spark job on"
-                  + " Kubernetes can't reach. Use a URI reachable from the cluster instead, such"
-                  + " as local:// for a file in the image, https://, s3a:// or hdfs://",
-              uri));
-    }
+  }
+
+  /**
+   * Returns a URI without its user info, query and fragment, which may carry credentials such as a
+   * password or a signature, to put it in a message returned to the caller.
+   */
+  private static String withoutSecrets(String uri) {
+    return URI_QUERY_OR_FRAGMENT
+        .matcher(URI_USER_INFO.matcher(uri).replaceFirst(""))
+        .replaceFirst("");
   }
 
   private static boolean isPythonFile(String uri) {
     // Look at the path only, the URI may carry a query or a fragment.
-    String path = URI.create(uri).getPath();
-    return path != null && path.toLowerCase(Locale.ROOT).endsWith(".py");
+    String path = URI_QUERY_OR_FRAGMENT.matcher(uri).replaceFirst("");
+    return path.toLowerCase(Locale.ROOT).endsWith(".py");
   }
 
   private static void putIfBlank(Map<String, String> sparkConf, String key, String value) {

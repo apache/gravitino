@@ -24,6 +24,7 @@ import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
+import io.fabric8.kubernetes.client.utils.Serialization;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,7 +55,6 @@ public class TestSparkApplicationStatusUtils {
     "RunningHealthy, STARTED",
     "RunningWithPartialCapacity, STARTED",
     "RunningWithBelowThresholdExecutors, STARTED",
-    "SomeNewState, QUEUED",
     "Succeeded, SUCCEEDED",
     "Failed, FAILED",
     "SchedulingFailure, FAILED",
@@ -330,6 +330,280 @@ public class TestSparkApplicationStatusUtils {
         SparkApplicationStatusUtils.isStopped(app("Submitted", "ResourceReleased")));
   }
 
+  @Test
+  public void testUnknownStateAfterOutcome() {
+    // A newer operator may add a state after the outcome, the job must not stay unfinished.
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "Succeeded", "SomeNewState");
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, info.status());
+    Assertions.assertEquals(timeOf(2), info.finishedAt());
+    Assertions.assertTrue(SparkApplicationStatusUtils.isStopped(app));
+
+    // A known state after an outcome means the application runs again.
+    GenericKubernetesResource restarted =
+        app("Submitted", "DriverReady", "Failed", "ScheduledToRestart", "RunningHealthy");
+    Assertions.assertEquals(JobHandle.Status.STARTED, executionInfoOf(restarted).status());
+    Assertions.assertNull(executionInfoOf(restarted).finishedAt());
+    Assertions.assertFalse(SparkApplicationStatusUtils.isStopped(restarted));
+  }
+
+  @Test
+  public void testStoppedWithoutOutcome() {
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "ResourceReleased");
+    JobExecutionInfo failed = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.FAILED, failed.status());
+    Assertions.assertEquals(timeOf(2), failed.finishedAt());
+
+    cancel(app);
+    JobExecutionInfo cancelled = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelled.status());
+    Assertions.assertEquals(timeOf(2), cancelled.finishedAt());
+
+    GenericKubernetesResource stopped =
+        app("Submitted", "DriverReady", "Succeeded", "TerminatedWithoutReleaseResources");
+    cancel(stopped);
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, executionInfoOf(stopped).status());
+    Assertions.assertEquals(timeOf(2), executionInfoOf(stopped).finishedAt());
+  }
+
+  @Test
+  public void testDeletionNotBeforeStart() {
+    // The deletion time is in whole seconds, the started time of the same second isn't.
+    GenericKubernetesResource app = app("Submitted", "DriverReady");
+    cancel(app);
+    app.getMetadata().setDeletionTimestamp(CREATED_AT.plusSeconds(1).toString());
+
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, info.status());
+    Assertions.assertEquals(timeOf(1), info.startedAt());
+    Assertions.assertEquals(timeOf(1), info.finishedAt());
+  }
+
+  @Test
+  public void testContainerStartBeforeCreationIsIgnored() {
+    // A container that failed to start reports a start time of the epoch.
+    Map<String, Object> neverStarted =
+        ImmutableMap.of(
+            "terminated",
+            ImmutableMap.of(
+                "startedAt", "1970-01-01T00:00:00Z", "finishedAt", "2026-09-30T00:00:02Z"));
+
+    GenericKubernetesResource app = app("Submitted", "DriverRequested", "Failed");
+    Map<String, Map<String, Object>> history = history(app);
+    history.put("2", withDriverStatus(history.get("2"), neverStarted));
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.FAILED, info.status());
+    Assertions.assertNull(info.startedAt());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:02Z"), info.finishedAt());
+
+    // The operator saw it started, so its time is used instead.
+    GenericKubernetesResource started = app("Submitted", "DriverReady", "Failed");
+    history = history(started);
+    history.put("2", withDriverStatus(history.get("2"), neverStarted));
+    Assertions.assertEquals(timeOf(1), executionInfoOf(started).startedAt());
+
+    Pod driver = driverPod("spark-kubernetes-driver", "1970-01-01T00:00:00Z", null);
+    Assertions.assertEquals(
+        timeOf(1),
+        SparkApplicationStatusUtils.executionInfoOf(
+                app("Submitted", "DriverReady", "Succeeded"), driver, NOW, NO_STATUS_TIMEOUT_MS)
+            .startedAt());
+  }
+
+  @Test
+  public void testDriverPodStates() {
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "Failed");
+    Map<String, Map<String, Object>> history = history(app);
+    history.put(
+        "2",
+        withDriverStatus(
+            history.get("2"),
+            ImmutableMap.of(
+                "terminated",
+                ImmutableMap.of(
+                    "startedAt", "2026-09-30T00:00:10Z", "finishedAt", "2026-09-30T00:00:20Z"))));
+
+    // The driver pod wins over the driver status that the operator observed.
+    JobExecutionInfo terminated =
+        SparkApplicationStatusUtils.executionInfoOf(
+            app,
+            driverPod("spark-kubernetes-driver", "2026-09-30T00:00:11Z", "2026-09-30T00:00:21Z"),
+            NOW,
+            NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:11Z"), terminated.startedAt());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:21Z"), terminated.finishedAt());
+
+    // A running driver has a started time only, the finished time is the observed one.
+    JobExecutionInfo running =
+        SparkApplicationStatusUtils.executionInfoOf(
+            app,
+            driverPod("spark-kubernetes-driver", "2026-09-30T00:00:12Z", null),
+            NOW,
+            NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:12Z"), running.startedAt());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:20Z"), running.finishedAt());
+
+    // The only container is the driver, whatever its name.
+    JobExecutionInfo renamed =
+        SparkApplicationStatusUtils.executionInfoOf(
+            app,
+            driverPod("main", "2026-09-30T00:00:13Z", "2026-09-30T00:00:23Z"),
+            NOW,
+            NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:23Z"), renamed.finishedAt());
+  }
+
+  @Test
+  public void testDriverContainerNamedByJob() {
+    // With a sidecar, the driver container is the one the job names for its pod template.
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "Failed");
+    app.setAdditionalProperty(
+        "spec",
+        ImmutableMap.of(
+            "sparkConf",
+            ImmutableMap.of(SparkApplicationUtils.SPARK_DRIVER_CONTAINER_NAME, "main")));
+    Map<String, Object> driver =
+        ImmutableMap.of(
+            "terminated",
+            ImmutableMap.of(
+                "startedAt", "2026-09-30T00:00:10Z", "finishedAt", "2026-09-30T00:00:20Z"));
+    Map<String, Object> sidecar =
+        ImmutableMap.of(
+            "terminated",
+            ImmutableMap.of(
+                "startedAt", "2026-09-30T00:00:05Z", "finishedAt", "2026-09-30T00:00:30Z"));
+    Map<String, Map<String, Object>> history = history(app);
+    history.put(
+        "2",
+        ImmutableMap.<String, Object>builder()
+            .putAll(history.get("2"))
+            .put(
+                "lastObservedDriverStatus",
+                ImmutableMap.of(
+                    "containerStatuses",
+                    ImmutableList.of(
+                        ImmutableMap.of("name", "sidecar", "state", sidecar),
+                        ImmutableMap.of("name", "main", "state", driver))))
+            .build());
+
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:10Z"), info.startedAt());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:20Z"), info.finishedAt());
+
+    Pod pod =
+        new PodBuilder(driverPod("sidecar", "2026-09-30T00:00:05Z", "2026-09-30T00:00:30Z"))
+            .editStatus()
+            .addNewContainerStatus()
+            .withName("main")
+            .withNewState()
+            .withNewTerminated()
+            .withStartedAt("2026-09-30T00:00:11Z")
+            .withFinishedAt("2026-09-30T00:00:21Z")
+            .endTerminated()
+            .endState()
+            .endContainerStatus()
+            .endStatus()
+            .build();
+    Assertions.assertEquals(
+        Instant.parse("2026-09-30T00:00:21Z"),
+        SparkApplicationStatusUtils.executionInfoOf(app, pod, NOW, NO_STATUS_TIMEOUT_MS)
+            .finishedAt());
+  }
+
+  @Test
+  public void testHasState() {
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasState(app()));
+    Assertions.assertTrue(SparkApplicationStatusUtils.hasState(app("Submitted")));
+
+    GenericKubernetesResource unreadable = app();
+    unreadable.setAdditionalProperty("status", "not an object");
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasState(unreadable));
+    unreadable.setAdditionalProperty(
+        "status", ImmutableMap.of("currentState", ImmutableMap.of("message", "no summary")));
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasState(unreadable));
+  }
+
+  @Test
+  public void testCurrentStateWithoutHistory() {
+    GenericKubernetesResource app = app();
+    app.setAdditionalProperty(
+        "status", ImmutableMap.of("currentState", state("RunningHealthy", 3)));
+
+    Assertions.assertTrue(SparkApplicationStatusUtils.hasState(app));
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.STARTED, info.status());
+    Assertions.assertEquals(timeOf(3), info.startedAt());
+  }
+
+  @Test
+  public void testMalformedStatus() {
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "Succeeded");
+    Map<String, Map<String, Object>> history = history(app);
+    // Entries that can't be read are skipped, and a time that can't be parsed is unknown.
+    history.put("not-a-number", state("Failed", 9));
+    history.put("7", ImmutableMap.of("message", "no summary"));
+    history.put(
+        "2", ImmutableMap.of("currentStateSummary", "Succeeded", "lastTransitionTime", "soon"));
+
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, info.status());
+    Assertions.assertEquals(timeOf(1), info.startedAt());
+    Assertions.assertNull(info.finishedAt());
+
+    // Without a creation time, an application without status never times out.
+    GenericKubernetesResource noCreationTime = app();
+    noCreationTime.getMetadata().setCreationTimestamp(null);
+    Assertions.assertEquals(
+        JobHandle.Status.QUEUED,
+        SparkApplicationStatusUtils.executionInfoOf(
+                noCreationTime, null, NOW.plusSeconds(86_400), NO_STATUS_TIMEOUT_MS)
+            .status());
+  }
+
+  @Test
+  public void testStatusReportedByOperator() {
+    // The status of a failed application as operator 0.9.0 reports it, read the way the client
+    // does: the history is keyed by numbers in strings, the times have nanoseconds, and only the
+    // Failed state carries the driver status.
+    String json =
+        "{\"apiVersion\":\"spark.apache.org/v1\",\"kind\":\"SparkApplication\","
+            + "\"metadata\":{\"name\":\"gravitino-job-1\",\"namespace\":\"default\","
+            + "\"creationTimestamp\":\"2026-09-24T09:22:32Z\"},"
+            + "\"status\":{\"currentState\":{\"currentStateSummary\":\"ResourceReleased\","
+            + "\"lastTransitionTime\":\"2026-09-27T01:02:22.906216807Z\"},"
+            + "\"stateTransitionHistory\":{"
+            + "\"10\":{\"currentStateSummary\":\"ResourceReleased\","
+            + "\"lastTransitionTime\":\"2026-09-27T01:02:22.906216807Z\"},"
+            + "\"0\":{\"currentStateSummary\":\"Submitted\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:32.207220731Z\"},"
+            + "\"1\":{\"currentStateSummary\":\"DriverRequested\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:32.436928096Z\"},"
+            + "\"2\":{\"currentStateSummary\":\"DriverStarted\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:33.099430159Z\"},"
+            + "\"3\":{\"currentStateSummary\":\"DriverReady\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:33.099616659Z\"},"
+            + "\"4\":{\"currentStateSummary\":\"RunningHealthy\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:33.111225423Z\"},"
+            + "\"5\":{\"currentStateSummary\":\"Failed\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:57.002342477Z\","
+            + "\"lastObservedDriverStatus\":{\"phase\":\"Failed\",\"containerStatuses\":["
+            + "{\"name\":\"spark-kubernetes-driver\",\"state\":{\"terminated\":{\"exitCode\":101,"
+            + "\"startedAt\":\"2026-09-24T09:22:32Z\",\"finishedAt\":\"2026-09-24T09:22:33Z\"}}}]}},"
+            + "\"6\":{\"currentStateSummary\":\"TerminatedWithoutReleaseResources\","
+            + "\"lastTransitionTime\":\"2026-09-24T09:22:57.047040866Z\"}}}}";
+    GenericKubernetesResource app = Serialization.unmarshal(json, GenericKubernetesResource.class);
+
+    Assertions.assertTrue(SparkApplicationStatusUtils.hasState(app));
+    Assertions.assertTrue(SparkApplicationStatusUtils.isStopped(app));
+    Assertions.assertEquals(
+        JobExecutionInfo.builder()
+            .withStatus(JobHandle.Status.FAILED)
+            .withStartedAt(Instant.parse("2026-09-24T09:22:32Z"))
+            .withFinishedAt(Instant.parse("2026-09-24T09:22:33Z"))
+            .build(),
+        executionInfoOf(app));
+  }
+
   private static JobExecutionInfo executionInfoOf(GenericKubernetesResource app) {
     return SparkApplicationStatusUtils.executionInfoOf(app, null, NOW, NO_STATUS_TIMEOUT_MS);
   }
@@ -389,6 +663,35 @@ public class TestSparkApplicationStatusUtils {
 
   private static Instant timeOf(int index) {
     return CREATED_AT.plusSeconds(index).plusNanos(123_456_789L);
+  }
+
+  private static Pod driverPod(String container, String startedAt, String finishedAt) {
+    PodBuilder pod = new PodBuilder().withNewStatus().endStatus();
+    if (finishedAt == null) {
+      return pod.editStatus()
+          .addNewContainerStatus()
+          .withName(container)
+          .withNewState()
+          .withNewRunning()
+          .withStartedAt(startedAt)
+          .endRunning()
+          .endState()
+          .endContainerStatus()
+          .endStatus()
+          .build();
+    }
+    return pod.editStatus()
+        .addNewContainerStatus()
+        .withName(container)
+        .withNewState()
+        .withNewTerminated()
+        .withStartedAt(startedAt)
+        .withFinishedAt(finishedAt)
+        .endTerminated()
+        .endState()
+        .endContainerStatus()
+        .endStatus()
+        .build();
   }
 
   private static void cancel(GenericKubernetesResource app) {

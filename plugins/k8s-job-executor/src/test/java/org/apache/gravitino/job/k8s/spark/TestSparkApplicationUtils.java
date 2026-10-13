@@ -146,6 +146,84 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  public void testPythonApplicationWithoutMainClass() {
+    for (String className : new String[] {null, " "}) {
+      SparkJobTemplate template =
+          SparkJobTemplate.builder()
+              .withName("user-job")
+              .withExecutable("https://repo/job.py")
+              .withClassName(className)
+              .build();
+      Map<String, Object> spec =
+          (Map<String, Object>)
+              SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs)
+                  .getAdditionalProperties()
+                  .get("spec");
+      Assertions.assertEquals("https://repo/job.py", spec.get("pyFiles"));
+      Assertions.assertFalse(spec.containsKey("mainClass"));
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBlankAndExistingConfigs() {
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withFiles(ImmutableList.of("https://repo/b.conf"))
+            .withArchives(ImmutableList.of("https://repo/b.tgz"))
+            .withConfigs(
+                ImmutableMap.of(
+                    // Blank values don't override the executor configurations.
+                    "spark.kubernetes.container.image", " ",
+                    "spark.kubernetes.authenticate.driver.serviceAccountName", "",
+                    "spark.kubernetes.namespace", " ",
+                    "spark.files", "https://repo/a.conf",
+                    "spark.archives", "https://repo/a.tgz"))
+            .build();
+
+    GenericKubernetesResource app =
+        SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs);
+
+    Assertions.assertEquals("default", app.getMetadata().getNamespace());
+    Map<String, String> sparkConf =
+        (Map<String, String>)
+            ((Map<String, Object>) app.getAdditionalProperties().get("spec")).get("sparkConf");
+    Assertions.assertEquals(
+        "gravitino-spark:3.5.9", sparkConf.get("spark.kubernetes.container.image"));
+    Assertions.assertEquals(
+        "spark", sparkConf.get("spark.kubernetes.authenticate.driver.serviceAccountName"));
+    Assertions.assertEquals("default", sparkConf.get("spark.kubernetes.namespace"));
+    Assertions.assertEquals(
+        "https://repo/a.conf,https://repo/b.conf", sparkConf.get("spark.files"));
+    Assertions.assertEquals(
+        "https://repo/a.tgz,https://repo/b.tgz", sparkConf.get("spark.archives"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testDefaultSparkConfigsDoNotChooseNamespace() {
+    // Only the namespace configuration of the executor, or the job itself, chooses the namespace.
+    K8sJobExecutorConfigs withDefault =
+        newConfigs(
+            ImmutableMap.of(
+                K8sJobExecutorConfigs.NAMESPACE,
+                "jobs",
+                "spark.conf.spark.kubernetes.namespace",
+                "other"));
+
+    GenericKubernetesResource app =
+        SparkApplicationUtils.buildSparkApplication(
+            CONTEXT, newTemplate("https://repo/app.jar", ImmutableMap.of()), withDefault);
+
+    Assertions.assertEquals("jobs", app.getMetadata().getNamespace());
+    Map<String, String> sparkConf =
+        (Map<String, String>)
+            ((Map<String, Object>) app.getAdditionalProperties().get("spec")).get("sparkConf");
+    Assertions.assertEquals("jobs", sparkConf.get("spark.kubernetes.namespace"));
+  }
+
+  @Test
   public void testNamespaceOfJob() {
     Assertions.assertEquals(
         "team-a",
@@ -215,23 +293,67 @@ public class TestSparkApplicationUtils {
 
   @Test
   public void testRejectServerLocalResources() {
-    for (String uri : new String[] {"/opt/app.jar", "app.jar", "file:///opt/app.jar"}) {
-      SparkJobTemplate executable = newTemplate(uri, ImmutableMap.of());
+    String[] serverPaths = {
+      "/opt/app.jar",
+      "app.jar",
+      "file:///opt/app.jar",
+      "FILE:/opt/app.jar",
+      "C:/apps/app.jar",
+      // Spark takes several resources in one entry, each of them is checked.
+      "https://repo/a.jar,/opt/app.jar",
+    };
+    for (String uri : serverPaths) {
       Assertions.assertThrows(
           IllegalArgumentException.class,
-          () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, executable, configs));
-
-      SparkJobTemplate jar =
-          SparkJobTemplate.builder()
-              .withName("user-job")
-              .withExecutable("https://repo/app.jar")
-              .withClassName("org.example.App")
-              .withJars(ImmutableList.of(uri))
-              .build();
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, jar, configs));
+          () ->
+              SparkApplicationUtils.buildSparkApplication(
+                  CONTEXT, newTemplate(uri, ImmutableMap.of()), configs),
+          uri);
+      for (SparkJobTemplate template :
+          ImmutableList.of(
+              newTemplateBuilder().withJars(ImmutableList.of(uri)).build(),
+              newTemplateBuilder().withFiles(ImmutableList.of(uri)).build(),
+              newTemplateBuilder().withArchives(ImmutableList.of(uri)).build())) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs),
+            uri);
+      }
     }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testAcceptClusterReachableResources() {
+    // Whatever has a scheme other than file is left to Spark, even if it isn't a strict URI.
+    String[] uris = {
+      "local:///opt/app.jar",
+      "hdfs:/apps/app.jar",
+      "s3a://bucket/my app.jar",
+      "https://repo/a.jar, https://repo/b.jar",
+    };
+    for (String uri : uris) {
+      Map<String, Object> spec =
+          (Map<String, Object>)
+              SparkApplicationUtils.buildSparkApplication(
+                      CONTEXT, newTemplate(uri, ImmutableMap.of()), configs)
+                  .getAdditionalProperties()
+                  .get("spec");
+      Assertions.assertEquals(uri, spec.get("jars"));
+    }
+  }
+
+  @Test
+  public void testRejectionDoesNotLeakCredentials() {
+    SparkJobTemplate template =
+        newTemplate("file://user:secret@host/opt/app.jar?X-Signature=abc#frag", ImmutableMap.of());
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+    Assertions.assertTrue(e.getMessage().contains("file://host/opt/app.jar "), e.getMessage());
+    Assertions.assertFalse(e.getMessage().contains("secret"), e.getMessage());
+    Assertions.assertFalse(e.getMessage().contains("abc"), e.getMessage());
   }
 
   @Test
@@ -256,6 +378,13 @@ public class TestSparkApplicationUtils {
     map.put("spark.conf.spark.driver.memory", "2g");
     map.putAll(extra);
     return new K8sJobExecutorConfigs(map);
+  }
+
+  private static SparkJobTemplate.Builder newTemplateBuilder() {
+    return SparkJobTemplate.builder()
+        .withName("user-job")
+        .withExecutable("https://repo/app.jar")
+        .withClassName("org.example.App");
   }
 
   private static SparkJobTemplate newTemplate(String executable, Map<String, String> configs) {
