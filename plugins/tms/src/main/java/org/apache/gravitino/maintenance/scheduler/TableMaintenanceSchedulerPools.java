@@ -66,6 +66,9 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   /**
    * Creates and starts expand, cron, and commit scheduler pools.
    *
+   * <p>If any pool fails to start, already-started pools are stopped and this instance returns to
+   * the idle state so {@link #start} may be retried.
+   *
    * @param dataSource relational JDBC pool shared with the entity store
    * @param config maintenance scheduler settings
    */
@@ -73,21 +76,32 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     Preconditions.checkState(schedulers.isEmpty(), "scheduler pools already started");
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
 
-    schedulers.add(
-        buildScheduler(
-            dataSource,
-            config,
-            config.expandThreads(),
-            EXPAND_TASKS_TABLE,
-            noopTask(POLICY_EXPAND)));
-    schedulers.add(
-        buildScheduler(
-            dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, noopTask(CRON_JOB)));
-    schedulers.add(
-        buildScheduler(
-            dataSource, config, config.commitThreads(), COMMIT_TASKS_TABLE, noopTask(COMMIT_JOB)));
+    List<Scheduler> built =
+        List.of(
+            buildScheduler(
+                dataSource,
+                config,
+                config.expandThreads(),
+                EXPAND_TASKS_TABLE,
+                noopTask(POLICY_EXPAND)),
+            buildScheduler(
+                dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, noopTask(CRON_JOB)),
+            buildScheduler(
+                dataSource,
+                config,
+                config.commitThreads(),
+                COMMIT_TASKS_TABLE,
+                noopTask(COMMIT_JOB)));
 
-    schedulers.forEach(Scheduler::start);
+    try {
+      for (Scheduler scheduler : built) {
+        scheduler.start();
+        schedulers.add(scheduler);
+      }
+    } catch (RuntimeException e) {
+      stop();
+      throw e;
+    }
     LOG.info("Started {} table maintenance scheduler pools", schedulers.size());
   }
 

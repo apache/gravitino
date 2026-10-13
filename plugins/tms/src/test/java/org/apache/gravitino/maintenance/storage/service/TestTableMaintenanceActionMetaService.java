@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.storage.service;
 
 import java.util.OptionalLong;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -33,7 +34,9 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableSnapshotMetricsMetaService metricsService = TableSnapshotMetricsMetaService.getInstance();
 
     long before = System.currentTimeMillis();
-    long actionId = actionService.insertInFlight(10L, 20L);
+    long actionId =
+        actionService.insertInFlight(
+            10L, 20L, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
     long after = System.currentTimeMillis();
     long createdAt = actionService.getById(actionId).createdAt();
     Assertions.assertNull(actionService.getById(actionId).jobId());

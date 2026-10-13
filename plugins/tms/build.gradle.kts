@@ -29,13 +29,10 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(project(":server-common"))
 
-  implementation(libs.bundles.jersey)
   implementation(libs.db.scheduler)
   implementation(libs.guava)
   implementation(libs.mybatis)
-  implementation(libs.servlet)
 
   compileOnly(libs.lombok)
   compileOnly(libs.slf4j.api)
@@ -44,7 +41,6 @@ dependencies {
   testImplementation(project(":core", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)

@@ -116,22 +116,32 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Acquires an unbound claim with the default claim timeout or fails.
+   * Acquires an unbound claim using {@link TableMaintenanceConfig#claimTimeoutMs()} or fails.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
+   * @param config maintenance config supplying the unbound claim TTL
+   * @return generated action id
+   */
+  public long insertInFlight(long tableId, long policyId, TableMaintenanceConfig config) {
+    Preconditions.checkNotNull(config, "config must not be null");
+    return insertInFlight(tableId, policyId, config.claimTimeoutMs());
+  }
+
+  /**
+   * Acquires an unbound claim with the given claim timeout or fails.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL
    * @return generated action id
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertTableMaintenanceAction")
-  public long insertInFlight(long tableId, long policyId) {
+  public long insertInFlight(long tableId, long policyId, long claimTimeoutMs) {
     OptionalLong acquired =
-        tryAcquireInFlight(
-            tableId,
-            policyId,
-            System.currentTimeMillis(),
-            TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+        tryAcquireInFlight(tableId, policyId, System.currentTimeMillis(), claimTimeoutMs);
     Preconditions.checkState(acquired.isPresent(), "failed to acquire unbound occupancy claim");
     return acquired.getAsLong();
   }
