@@ -24,6 +24,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -133,4 +134,13 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "batchSelectTableByIdentifier")
   List<TablePO> batchSelectTableByIdentifier(
       @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames);
+
+  /**
+   * Counts soft-deleted table rows reserving the given table ID.
+   *
+   * @param tableId the table ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE table_id = #{tableId} AND deleted_at > 0")
+  int countDeletedTableMetasById(@Param("tableId") Long tableId);
 }

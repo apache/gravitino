@@ -381,7 +381,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                         .withLastModifiedTime(Instant.now())
                                         .build())
                                 .build();
-                          }),
+                          },
+                          tableId),
                   "UPDATE",
                   tableId);
 
@@ -412,42 +413,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
-                  RuntimeException.class);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+    Optional<TableEntity> observedTable =
+        isManagedTable ? Optional.empty() : getTableEntityBeforeRename(ident);
+    boolean droppedFromCatalog =
+        doWithCatalog(
+            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
-          if (isManagedTable) {
-            return droppedFromCatalog;
-          }
+    if (isManagedTable) {
+      return droppedFromCatalog;
+    }
 
-          // A false result is ambiguous: the external table may have been renamed or dropped out of
-          // band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
+    // A false result is ambiguous: the external table may have been renamed or dropped out of
+    // band. Preserve the registration because deleting it after a rename would lose
+    // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+    // registration that requires separate cleanup.
+    if (droppedFromCatalog && observedTable.isPresent()) {
+      try {
+        store.delete(ident, TABLE, false, observedTable.get().id(), null);
+      } catch (OptimisticLockException e) {
+        throw e;
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+    // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
+    // cleanup is best-effort and stops as soon as a schema still exists.
+    OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
+    return droppedFromCatalog;
   }
 
   /**
@@ -468,42 +464,39 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.purgeTable(ident)),
-                  RuntimeException.class,
-                  UnsupportedOperationException.class);
+    boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+    Optional<TableEntity> observedTable =
+        isManagedTable ? Optional.empty() : getTableEntityBeforeRename(ident);
+    boolean purgedFromCatalog =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithTableOps(t -> t.purgeTable(ident)),
+            RuntimeException.class,
+            UnsupportedOperationException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
-          if (isManagedTable) {
-            return droppedFromCatalog;
-          }
+    if (isManagedTable) {
+      return purgedFromCatalog;
+    }
 
-          // A false result is ambiguous: the external table may have been renamed or dropped out of
-          // band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band purge can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
+    // A false result is ambiguous: the external table may have been renamed or dropped out of
+    // band. Preserve the registration because deleting it after a rename would lose
+    // Gravitino-only metadata. A true out-of-band purge can therefore leave a stale
+    // registration that requires separate cleanup.
+    if (purgedFromCatalog && observedTable.isPresent()) {
+      try {
+        store.delete(ident, TABLE, false, observedTable.get().id(), null);
+      } catch (OptimisticLockException e) {
+        throw e;
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+    // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
+    // cleanup is best-effort and stops as soon as a schema still exists.
+    OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
+    return purgedFromCatalog;
   }
 
   private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {
@@ -1088,7 +1081,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                             PrincipalUtils.getCurrentPrincipal().getName())
                                         .withLastModifiedTime(Instant.now())
                                         .build())
-                                .build()),
+                                .build(),
+                        combinedTable.tableFromGravitino().id()),
                 "UPDATE",
                 combinedTable.tableFromGravitino().id()));
   }

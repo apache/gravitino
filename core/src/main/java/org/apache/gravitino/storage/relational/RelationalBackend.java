@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -104,6 +105,28 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException, NoSuchEntityException;
 
   /**
+   * Updates the entity, fenced by expected entity ID.
+   *
+   * @param <E> The entity type.
+   * @param ident The identifier of the entity which need be stored.
+   * @param entityType The type of the entity.
+   * @param updater A {@link Function} that takes the current entity instance and returns the
+   *     updated instance.
+   * @param expectedId The expected stable entity ID, or null to skip ID fencing.
+   * @return The entity after updating.
+   * @throws NoSuchEntityException If the entity does not exist.
+   * @throws IOException If the entity is failed to update.
+   */
+  default <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Function<E, E> updater,
+      @Nullable Long expectedId)
+      throws IOException, NoSuchEntityException {
+    return update(ident, entityType, updater);
+  }
+
+  /**
    * Retrieves the entity associated with the identifier and the entity type.
    *
    * @param <E> The type of the entity returned.
@@ -139,6 +162,28 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
+
+  /**
+   * Soft deletes the entity associated with the identifier and the entity type, fenced by expected
+   * entity ID and version.
+   *
+   * @param ident The identifier of the entity.
+   * @param entityType The type of the entity.
+   * @param cascade True, If you need to cascade delete entities, else false.
+   * @param expectedId The expected stable entity ID, or null to skip ID fencing.
+   * @param expectedVersion The expected entity version, or null to skip version fencing.
+   * @return True, if the entity was successfully deleted, else false.
+   * @throws IOException If the store operation fails
+   */
+  default boolean delete(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      boolean cascade,
+      @Nullable Long expectedId,
+      @Nullable Long expectedVersion)
+      throws IOException {
+    return delete(ident, entityType, cascade);
+  }
 
   /**
    * Deletes an entity and returns the snapshot used by that delete.

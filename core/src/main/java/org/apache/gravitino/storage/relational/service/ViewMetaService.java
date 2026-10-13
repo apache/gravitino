@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -136,7 +137,18 @@ public class ViewMetaService {
       baseMetricName = "updateViewByIdentifier")
   public <E extends Entity & HasIdentifier> ViewEntity updateView(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
+    return updateView(ident, updater, null);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateViewByIdentifier")
+  public <E extends Entity & HasIdentifier> ViewEntity updateView(
+      NameIdentifier ident, Function<E, E> updater, @Nullable Long expectedId) throws IOException {
     ViewPO oldViewPO = getViewPOByIdentifier(ident);
+    if (expectedId != null && !oldViewPO.getViewId().equals(expectedId)) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.VIEW, ident);
+    }
     ViewEntity oldViewEntity = fromViewPO(oldViewPO, ident.namespace());
     ViewEntity newEntity = (ViewEntity) updater.apply((E) oldViewEntity);
     Preconditions.checkArgument(
@@ -223,9 +235,33 @@ public class ViewMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteViewByIdentifier")
   public boolean deleteView(NameIdentifier ident) {
-    ViewPO viewPO = getViewPOByIdentifier(ident);
+    return deleteView(ident, null, null);
+  }
 
-    deleteViewWithVersion(ident, viewPO);
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteViewByIdentifier")
+  public boolean deleteView(
+      NameIdentifier ident, @Nullable Long expectedId, @Nullable Long expectedVersion) {
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          ViewPO viewPO = getViewPOByIdentifier(ident);
+          if (expectedId != null && !viewPO.getViewId().equals(expectedId)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.VIEW, ident);
+          }
+          if (expectedVersion != null && !viewPO.getCurrentVersion().equals(expectedVersion)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.VIEW, ident);
+          }
+          OccWriteSupport.deleteWithVersion(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      ViewMetaMapper.class,
+                      mapper ->
+                          mapper.softDeleteViewMetasByViewId(
+                              viewPO.getViewId(), viewPO.getCurrentVersion())),
+              () -> viewWriteFailure(ident, viewPO));
+          deleteViewDependents(viewPO.getViewId());
+        });
     return true;
   }
 
@@ -329,6 +365,12 @@ public class ViewMetaService {
     }
 
     ViewPO existingViewPO = findAndLockViewForOverwrite(initializedViewPO);
+    if (existingViewPO != null
+        && !existingViewPO.getViewName().equals(initializedViewPO.getViewName())) {
+      throw new EntityAlreadyExistsException(
+          "The view ID %s already belongs to a different live entity: %s",
+          initializedViewPO.getViewId(), existingViewPO.getViewName());
+    }
     if (existingViewPO == null) {
       if (SessionUtils.getWithoutCommit(
               ViewMetaMapper.class,

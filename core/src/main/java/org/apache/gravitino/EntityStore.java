@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -153,6 +154,30 @@ public interface EntityStore extends Closeable {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException;
 
   /**
+   * Update the entity into the underlying storage, fenced by expected entity ID.
+   *
+   * @param ident the name identifier of the entity
+   * @param type the detailed type of the entity
+   * @param entityType the general type of the entity
+   * @param updater the updater function to update the entity
+   * @param expectedId the expected stable entity ID, or null to skip ID fencing
+   * @param <E> the class of the entity
+   * @return E the updated entity
+   * @throws IOException if the store operation fails
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws EntityAlreadyExistsException if the updated entity already existed.
+   */
+  default <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident,
+      Class<E> type,
+      EntityType entityType,
+      Function<E, E> updater,
+      @Nullable Long expectedId)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    return update(ident, type, entityType, updater);
+  }
+
+  /**
    * Get the entity from the underlying storage.
    *
    * <p>Note. The implementation should be thread-safe, and should be able to handle concurrent
@@ -222,6 +247,28 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the delete operation fails
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
+
+  /**
+   * Delete the entity from the underlying storage by the specified {@link
+   * org.apache.gravitino.NameIdentifier}, fenced by expected entity ID and version.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity to be deleted
+   * @param cascade support cascade delete or not
+   * @param expectedId the expected stable entity ID, or null to skip ID fencing
+   * @param expectedVersion the expected entity version, or null to skip version fencing
+   * @return true if the entity exists and is deleted successfully, false otherwise
+   * @throws IOException if the delete operation fails
+   */
+  default boolean delete(
+      NameIdentifier ident,
+      EntityType entityType,
+      boolean cascade,
+      @Nullable Long expectedId,
+      @Nullable Long expectedVersion)
+      throws IOException {
+    return delete(ident, entityType, cascade);
+  }
 
   /**
    * The only post-delete action an implementation that cannot run it before commit accepts.

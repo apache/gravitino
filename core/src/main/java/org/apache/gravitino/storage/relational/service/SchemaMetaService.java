@@ -32,7 +32,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -216,6 +218,33 @@ public class SchemaMetaService {
                     SchemaPO leafPO =
                         POConverters.initializeSchemaPOWithVersion(
                             leafRow, newSchemaPOBuilder(catalogPO));
+                    if (overwrite) {
+                      SchemaPO byIdPO =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              m -> m.selectSchemaMetaByIdForUpdate(leafPO.getSchemaId()));
+                      if (byIdPO != null
+                          && !Objects.equals(byIdPO.getCatalogId(), leafPO.getCatalogId())) {
+                        throw new EntityAlreadyExistsException(
+                            "The schema ID %s already belongs to a different parent",
+                            leafPO.getSchemaId());
+                      }
+                      if (byIdPO != null
+                          && !byIdPO.getSchemaName().equals(leafPO.getSchemaName())) {
+                        throw new EntityAlreadyExistsException(
+                            "The schema ID %s already belongs to a different live entity: %s",
+                            leafPO.getSchemaId(), byIdPO.getSchemaName());
+                      }
+                      if (byIdPO == null
+                          && SessionUtils.getWithoutCommit(
+                                  SchemaMetaMapper.class,
+                                  m -> m.countDeletedSchemaMetasById(leafPO.getSchemaId()))
+                              > 0) {
+                        throw new EntityAlreadyExistsException(
+                            "The schema ID %s is reserved by a deleted schema; use a new ID",
+                            leafPO.getSchemaId());
+                      }
+                    }
                     ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), overwrite);
                   }));
     } catch (RuntimeException re) {
@@ -230,7 +259,19 @@ public class SchemaMetaService {
       baseMetricName = "updateSchema")
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    return updateSchema(identifier, updater, null);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateSchema")
+  public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
+      NameIdentifier identifier, Function<E, E> updater, @Nullable Long expectedId)
+      throws IOException {
     SchemaPO oldSchemaPO = getSchemaPOByIdentifier(identifier);
+    if (expectedId != null && !oldSchemaPO.getSchemaId().equals(expectedId)) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
+    }
     SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
     SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
     Preconditions.checkArgument(
@@ -272,19 +313,31 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
-    NameIdentifierUtil.checkSchema(identifier);
+    return deleteSchema(identifier, cascade, null, null);
+  }
 
-    SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
-    Long schemaId = schemaPO.getSchemaId();
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteSchema")
+  public boolean deleteSchema(
+      NameIdentifier identifier,
+      boolean cascade,
+      @Nullable Long expectedId,
+      @Nullable Long expectedVersion) {
+    NameIdentifierUtil.checkSchema(identifier);
 
     if (cascade) {
       AtomicReference<List<Long>> schemaIds = new AtomicReference<>();
       SessionUtils.doMultipleWithCommit(
           () -> {
-            // Take the parent catalog lock first, then delete this schema, and only then look at
-            // its descendants. Schema creation takes the same catalog lock, so once we hold it no
-            // schema can appear or disappear under us. Every overlapping drop grabs the locks in
-            // this same order, which is what keeps two cascades from deadlocking each other.
+            SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+            if (expectedId != null && !schemaPO.getSchemaId().equals(expectedId)) {
+              throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
+            }
+            if (expectedVersion != null && !schemaPO.getCurrentVersion().equals(expectedVersion)) {
+              throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
+            }
+            Long schemaId = schemaPO.getSchemaId();
             lockCatalogForSchemaDelete(identifier, schemaPO);
             deleteSchemaWithVersion(identifier, schemaPO);
             List<SchemaPO> descendants = listDescendantSchemaPOs(schemaPO);
@@ -371,13 +424,17 @@ public class SchemaMetaService {
                   SemanticModelVersionInfoMapper.class,
                   mapper -> mapper.softDeleteSemanticModelVersionsBySchemaIds(schemaIds.get())));
     } else {
+      AtomicReference<Long> schemaIdRef = new AtomicReference<>();
       SessionUtils.doMultipleWithCommit(
           () -> {
-            // Delete the schema first and check that it was empty afterwards. The order matters:
-            // the delete locks the schema row, and every child write locks that same row first, so
-            // a table or view being created either lands before this delete and shows up in the
-            // check, or it waits for this transaction. Checking first would leave a gap for a child
-            // to appear in between. A non-empty result throws, which rolls the delete back.
+            SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+            if (expectedId != null && !schemaPO.getSchemaId().equals(expectedId)) {
+              throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
+            }
+            if (expectedVersion != null && !schemaPO.getCurrentVersion().equals(expectedVersion)) {
+              throw ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
+            }
+            schemaIdRef.set(schemaPO.getSchemaId());
             lockCatalogForSchemaDelete(identifier, schemaPO);
             deleteSchemaWithVersion(identifier, schemaPO);
             checkSchemaIsEmpty(identifier, schemaPO);
@@ -387,23 +444,23 @@ public class SchemaMetaService {
                   OwnerMetaMapper.class,
                   mapper ->
                       mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                          schemaId, MetadataObject.Type.SCHEMA.name())),
+                          schemaIdRef.get(), MetadataObject.Type.SCHEMA.name())),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
                   mapper ->
                       mapper.softDeleteObjectRelsByMetadataObject(
-                          schemaId, MetadataObject.Type.SCHEMA.name())),
+                          schemaIdRef.get(), MetadataObject.Type.SCHEMA.name())),
           () ->
               SessionUtils.doWithoutCommit(
                   TagMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                          schemaId, MetadataObject.Type.SCHEMA.name())),
+                          schemaIdRef.get(), MetadataObject.Type.SCHEMA.name())),
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)));
+                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaIdRef.get())));
     }
     return true;
   }

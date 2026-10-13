@@ -24,9 +24,12 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -81,6 +84,24 @@ public class TopicMetaService {
                       TopicMetaMapper.class,
                       mapper -> {
                         if (overwrite) {
+                          TopicPO byIdPO = mapper.selectTopicMetaByIdForUpdate(po.getTopicId());
+                          if (byIdPO != null
+                              && !Objects.equals(byIdPO.getSchemaId(), po.getSchemaId())) {
+                            throw new EntityAlreadyExistsException(
+                                "The topic ID %s already belongs to a different parent",
+                                po.getTopicId());
+                          }
+                          if (byIdPO != null && !byIdPO.getTopicName().equals(po.getTopicName())) {
+                            throw new EntityAlreadyExistsException(
+                                "The topic ID %s already belongs to a different live entity: %s",
+                                po.getTopicId(), byIdPO.getTopicName());
+                          }
+                          if (byIdPO == null
+                              && mapper.countDeletedTopicMetasById(po.getTopicId()) > 0) {
+                            throw new EntityAlreadyExistsException(
+                                "The topic ID %s is reserved by a deleted topic; use a new ID",
+                                po.getTopicId());
+                          }
                           mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
                         } else {
                           mapper.insertTopicMeta(po);
@@ -107,7 +128,16 @@ public class TopicMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTopic")
   public <E extends Entity & HasIdentifier> TopicEntity updateTopic(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
+    return updateTopic(ident, updater, null);
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTopic")
+  public <E extends Entity & HasIdentifier> TopicEntity updateTopic(
+      NameIdentifier ident, Function<E, E> updater, @Nullable Long expectedId) throws IOException {
     TopicPO oldTopicPO = getTopicPOByIdentifier(ident);
+    if (expectedId != null && !oldTopicPO.getTopicId().equals(expectedId)) {
+      throw ExceptionUtils.concurrentModification(Entity.EntityType.TOPIC, ident);
+    }
     TopicEntity oldTopicEntity = POConverters.fromTopicPO(oldTopicPO, ident.namespace());
     TopicEntity newEntity = (TopicEntity) updater.apply((E) oldTopicEntity);
     Preconditions.checkArgument(
@@ -279,8 +309,33 @@ public class TopicMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
   public boolean deleteTopic(NameIdentifier identifier) {
-    TopicPO topicPO = getTopicPOByIdentifier(identifier);
-    deleteTopicWithVersion(identifier, topicPO);
+    return deleteTopic(identifier, null, null);
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
+  public boolean deleteTopic(
+      NameIdentifier identifier, @Nullable Long expectedId, @Nullable Long expectedVersion) {
+    AtomicReference<TopicPO> poRef = new AtomicReference<>();
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          TopicPO topicPO = getTopicPOByIdentifier(identifier);
+          if (expectedId != null && !topicPO.getTopicId().equals(expectedId)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.TOPIC, identifier);
+          }
+          if (expectedVersion != null && !topicPO.getCurrentVersion().equals(expectedVersion)) {
+            throw ExceptionUtils.concurrentModification(Entity.EntityType.TOPIC, identifier);
+          }
+          poRef.set(topicPO);
+          OccWriteSupport.deleteWithVersion(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper ->
+                          mapper.softDeleteTopicMetasByTopicId(
+                              topicPO.getTopicId(), topicPO.getCurrentVersion())),
+              () -> topicWriteFailure(identifier, topicPO));
+        },
+        () -> deleteTopicDependents(poRef.get().getTopicId()));
     return true;
   }
 

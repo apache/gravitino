@@ -23,6 +23,7 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -128,4 +129,13 @@ public interface TopicMetaMapper {
       @Param("catalogName") String catalogName,
       @Param("schemaName") String schemaName,
       @Param("topicNames") List<String> topicNames);
+
+  /**
+   * Counts soft-deleted topic rows reserving the given topic ID.
+   *
+   * @param topicId the topic ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE topic_id = #{topicId} AND deleted_at > 0")
+  int countDeletedTopicMetasById(@Param("topicId") Long topicId);
 }

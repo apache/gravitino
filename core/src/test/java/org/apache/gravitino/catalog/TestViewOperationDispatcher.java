@@ -26,6 +26,7 @@ import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -57,6 +58,7 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -519,6 +521,15 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, ViewEntity.class));
     // Dropping again returns false (underlying catalog reports missing).
     Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+    reset(entityStore);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean(), any(), any());
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> viewOperationDispatcher.dropView(viewIdent));
   }
 
   @Test

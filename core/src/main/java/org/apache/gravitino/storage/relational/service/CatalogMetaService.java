@@ -377,9 +377,17 @@ public class CatalogMetaService {
             List<SchemaPO> schemaPOs =
                 SessionUtils.getWithoutCommit(
                     SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-            if (!schemaPOs.isEmpty()) {
+            boolean hasUserCreatedSchemas =
+                schemaPOs.stream()
+                    .anyMatch(
+                        schemaPO ->
+                            !isBuiltInSchema(catalogPO.getProvider(), schemaPO.getSchemaName()));
+            if (hasUserCreatedSchemas) {
               throw new NonEmptyEntityException(
                   "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+            }
+            if (!schemaPOs.isEmpty()) {
+              deleteSchemasWithVersions(identifier, catalogId);
             }
           },
           () ->
@@ -524,5 +532,19 @@ public class CatalogMetaService {
   List<SchemaPO> listSchemaPOsForCascade(Long catalogId) {
     return SessionUtils.getWithoutCommit(
         SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+  }
+
+  private static boolean isBuiltInSchema(String provider, String schemaName) {
+    if (provider == null || schemaName == null) {
+      return false;
+    }
+    if ("kafka".equalsIgnoreCase(provider)) {
+      return "default".equalsIgnoreCase(schemaName);
+    } else if ("jdbc-postgresql".equalsIgnoreCase(provider)) {
+      return "public".equalsIgnoreCase(schemaName);
+    } else if ("hive".equalsIgnoreCase(provider)) {
+      return "default".equalsIgnoreCase(schemaName);
+    }
+    return false;
   }
 }

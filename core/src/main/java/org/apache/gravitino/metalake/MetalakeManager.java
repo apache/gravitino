@@ -385,7 +385,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                     "Metalake %s has catalogs, please drop them first or use force option", ident);
               }
 
-              return store.delete(ident, EntityType.METALAKE, true);
+              return store.delete(ident, EntityType.METALAKE, force);
             } catch (NoSuchMetalakeException | NoSuchEntityException e) {
               // Another server may have completed the drop after the initial existence check.
               // Dropping an already-removed metalake remains an idempotent false result.
