@@ -66,6 +66,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
@@ -3067,6 +3068,175 @@ public class TestJcasbinAuthorizer {
           .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
           .thenReturn(Optional.of(CATALOG_ID));
       restoreDefaultPrincipal();
+    }
+  }
+
+  /** Parallel list workers prefetch request membership only once, including an empty result. */
+  @Test
+  public void testParallelRequestPrefetchIsSingleFlight() throws Exception {
+    UserMetaMapper requestMapper = mock(UserMetaMapper.class);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger queries = new AtomicInteger();
+    CountDownLatch queried = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch started = new CountDownLatch(8);
+    when(requestMapper.batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList()))
+        .thenAnswer(
+            invocation -> {
+              queries.incrementAndGet();
+              queried.countDown();
+              assertTrue(release.await(10, TimeUnit.SECONDS));
+              return Collections.emptyList();
+            });
+    Method prefetch =
+        JcasbinAuthorizer.class.getDeclaredMethod(
+            "prefetchUserAndGroupInfo",
+            String.class,
+            String.class,
+            List.class,
+            AuthorizationRequestContext.class);
+    prefetch.setAccessible(true);
+    ExecutorService workers = Executors.newFixedThreadPool(8);
+    try {
+      List<Future<?>> results = new ArrayList<>();
+      for (int i = 0; i < 8; i++) {
+        results.add(
+            workers.submit(
+                () -> {
+                  // Static mocks are thread-local; each real worker needs its own mapper bridge.
+                  try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+                    sessions
+                        .when(() -> SessionUtils.getWithoutCommit(eq(UserMetaMapper.class), any()))
+                        .thenAnswer(
+                            invocation -> {
+                              Function<UserMetaMapper, ?> query = invocation.getArgument(1);
+                              return query.apply(requestMapper);
+                            });
+                    started.countDown();
+                    assertEquals(
+                        Optional.empty(),
+                        prefetch.invoke(
+                            jcasbinAuthorizer,
+                            METALAKE,
+                            USERNAME,
+                            Collections.emptyList(),
+                            context));
+                  }
+                  return null;
+                }));
+      }
+      assertTrue(started.await(10, TimeUnit.SECONDS));
+      assertTrue(queried.await(10, TimeUnit.SECONDS));
+      release.countDown();
+      for (Future<?> result : results) {
+        result.get(10, TimeUnit.SECONDS);
+      }
+      assertEquals(1, queries.get());
+      assertEquals(Collections.emptyMap(), context.getPrefetchedRoleVersions());
+    } finally {
+      release.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  /** Parallel checks share only published request membership, including inactive-role denies. */
+  @Test
+  public void testParallelNamedActiveRolesUsePublishedRequestMembership() throws Exception {
+    Enforcer allow = getAllowEnforcer(jcasbinAuthorizer);
+    Enforcer deny = getDenyEnforcer(jcasbinAuthorizer);
+    allow.addPolicy(String.valueOf(ALLOW_ROLE_ID), "TABLE", "77", "SELECT_TABLE", "allow");
+    allow.addPolicy(String.valueOf(ALLOW_ROLE_ID), "TABLE", "78", "SELECT_TABLE", "allow");
+    deny.addPolicy(String.valueOf(DENY_ROLE_ID), "TABLE", "78", "SELECT_TABLE", "allow");
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setActiveRoles(ActiveRoles.of(ImmutableList.of("parallelAllow")));
+    Field internalField = JcasbinAuthorizer.class.getDeclaredField("allowInternalAuthorizer");
+    internalField.setAccessible(true);
+    Object internal = internalField.get(jcasbinAuthorizer);
+    Method authorize =
+        internal
+            .getClass()
+            .getDeclaredMethod(
+                "authorizeByJcasbin",
+                long.class,
+                String.class,
+                MetadataObject.class,
+                Long.class,
+                String.class,
+                AuthorizationRequestContext.class);
+    authorize.setAccessible(true);
+    ExecutorService workers = Executors.newFixedThreadPool(9);
+    CountDownLatch loading = new CountDownLatch(1);
+    CountDownLatch publish = new CountDownLatch(1);
+    CountDownLatch checking = new CountDownLatch(8);
+    try {
+      Future<?> loader =
+          workers.submit(
+              () ->
+                  context.loadRole(
+                      () -> {
+                        loading.countDown();
+                        try {
+                          assertTrue(publish.await(10, TimeUnit.SECONDS));
+                        } catch (InterruptedException e) {
+                          Thread.currentThread().interrupt();
+                          throw new AssertionError(e);
+                        }
+                        context.setPrefetchedRoleVersions(
+                            ImmutableMap.of(
+                                ALLOW_ROLE_ID,
+                                    new RoleUpdatedAt(ALLOW_ROLE_ID, "parallelAllow", 1L),
+                                DENY_ROLE_ID, new RoleUpdatedAt(DENY_ROLE_ID, "parallelDeny", 1L)));
+                        context.setBoundRoleIds(ImmutableList.of(ALLOW_ROLE_ID, DENY_ROLE_ID));
+                      }));
+      assertTrue(loading.await(10, TimeUnit.SECONDS));
+      List<Future<?>> checks = new ArrayList<>();
+      for (int i = 0; i < 8; i++) {
+        checks.add(
+            workers.submit(
+                () -> {
+                  checking.countDown();
+                  context.loadRole(
+                      () -> {
+                        throw new AssertionError("Role loading must be single-flight");
+                      });
+                  for (int n = 0; n < 25; n++) {
+                    assertTrue(
+                        (boolean)
+                            authorize.invoke(
+                                internal,
+                                1L,
+                                METALAKE,
+                                MetadataObjects.of(
+                                    "testCatalog.testSchema", "visible", MetadataObject.Type.TABLE),
+                                77L,
+                                "SELECT_TABLE",
+                                context));
+                    assertFalse(
+                        (boolean)
+                            authorize.invoke(
+                                internal,
+                                1L,
+                                METALAKE,
+                                MetadataObjects.of(
+                                    "testCatalog.testSchema", "hidden", MetadataObject.Type.TABLE),
+                                78L,
+                                "SELECT_TABLE",
+                                context));
+                  }
+                  return null;
+                }));
+      }
+      assertTrue(checking.await(10, TimeUnit.SECONDS));
+      publish.countDown();
+      loader.get(10, TimeUnit.SECONDS);
+      for (Future<?> check : checks) {
+        check.get(10, TimeUnit.SECONDS);
+      }
+    } finally {
+      publish.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
     }
   }
 

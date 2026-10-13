@@ -52,6 +52,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -126,7 +127,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Field index of {@code sub} (the role/user/group id) in a jcasbin {@code p} policy row. See the
-   * {@code policy_definition} in {@code jcasbin_request_model.conf}: {@code p = sub, metadataType,
+   * {@code policy_definition} in {@code jcasbin_model.conf}: {@code p = sub, metadataType,
    * metadataId, act, eft}.
    */
   private static final int POLICY_SUBJECT_FIELD_INDEX = 0;
@@ -279,13 +280,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     maxRoleClearGenerations = roleCacheSize;
 
     // Initialize enforcers before caches that reference them in removal listeners
-    allowEnforcer =
-        new SyncedEnforcer(getModel("/jcasbin_request_model.conf"), new GravitinoAdapter());
-    allowEnforcer.addFunction("hasRole", new RequestRoleFunction());
+    allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer, true, false);
-    denyEnforcer =
-        new SyncedEnforcer(getModel("/jcasbin_request_model.conf"), new GravitinoAdapter());
-    denyEnforcer.addFunction("hasRole", new RequestRoleFunction());
+    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer, false, true);
 
     // loadedRoles: roleId -> updated_at.
@@ -499,7 +496,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               // listed objects. The match is intentionally scope-agnostic (no metadataType filter):
               // a parent-scope deny hides the whole subtree and an object-scope deny hides one
               // object, and both must disable the short-circuit.
-              for (String roleId : requestContext.getBoundRoleSubjects(false)) {
+              for (String roleId : roleSubjects(requestContext, false)) {
                 // getFilteredNamedPolicy returns every "p" row (p = sub, metadataType, metadataId,
                 // act, eft) whose field at POLICY_SUBJECT_FIELD_INDEX (sub) equals roleId, i.e. all
                 // rules carried by this role. denyEnforcer is a dedicated enforcer that is only
@@ -1006,14 +1003,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metadataType = String.valueOf(metadataObject.type());
       String metadataIdStr = String.valueOf(metadataId);
 
-      // Evaluate the request's immutable role union in one policy scan. Shared g(user, role)
+      // Evaluate the request's role union in one policy scan. Shared g(user, role)
       // rows cannot represent concurrent requests carrying different IdP group claims.
       boolean allowed =
           evaluateWithLoadedRolePolicies(
                   metalake,
                   requestContext,
                   () -> {
-                    Set<String> subjects = requestContext.getBoundRoleSubjects(narrowByActiveRoles);
+                    Set<String> subjects = roleSubjects(requestContext, narrowByActiveRoles);
                     if (subjects.isEmpty()) {
                       return false;
                     }
@@ -1021,7 +1018,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     if (narrowByActiveRoles
                         && !requestContext.getActiveRoles().isAll()
                         && denyEnforcer.enforce(
-                            requestContext.getBoundRoleSubjects(false),
+                            roleSubjects(requestContext, false),
                             metadataType,
                             metadataIdStr,
                             privilege)) {
@@ -1036,6 +1033,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       return allowed;
     }
+  }
+
+  /** Builds subjects from this request only, without publishing derived shared state. */
+  private static Set<String> roleSubjects(
+      AuthorizationRequestContext requestContext, boolean activeOnly) {
+    ActiveRoles activeRoles = requestContext.getActiveRoles();
+    if (activeOnly && activeRoles.isNone()) {
+      return Collections.emptySet();
+    }
+    Map<Long, RoleUpdatedAt> versions = requestContext.getPrefetchedRoleVersions();
+    Set<String> subjects = new HashSet<>();
+    for (Long roleId : requestContext.getBoundRoleIds()) {
+      if (!activeOnly || activeRoles.isAll()) {
+        subjects.add(String.valueOf(roleId));
+      } else if (versions != null) {
+        RoleUpdatedAt role = versions.get(roleId);
+        if (role != null && activeRoles.roleNames().contains(role.getRoleName())) {
+          subjects.add(String.valueOf(roleId));
+        }
+      }
+    }
+    return subjects;
   }
 
   // ---------------------------------------------------------------------------
@@ -1084,6 +1103,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       List<String> groupNames,
       AuthorizationRequestContext requestContext) {
 
+    if (requestContext.getPrefetchedRoleVersions() != null) {
+      return loadUserInfo(metalake, username, requestContext);
+    }
+    // List workers share a request. Serialize initial prefetch with role loading so only one
+    // worker publishes the role-name/version map and primes the shared membership caches.
+    synchronized (requestContext) {
+      return prefetchUserAndGroupInfoOnce(metalake, username, groupNames, requestContext);
+    }
+  }
+
+  private Optional<UserUpdatedAt> prefetchUserAndGroupInfoOnce(
+      String metalake,
+      String username,
+      List<String> groupNames,
+      AuthorizationRequestContext requestContext) {
     String userKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     if (requestContext.getPrefetchedRoleVersions() != null) {
       return loadUserInfo(metalake, username, requestContext);
@@ -1880,7 +1914,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Map<String, Integer> rolePolicyCounts = new HashMap<>();
       rolePolicyLock.readLock().lock();
       try {
-        Set<String> boundRoles = requestContext.getBoundRoleSubjects(false);
+        Set<String> boundRoles = roleSubjects(requestContext, false);
         if (boundRoles.isEmpty()) {
           LOG.debug(
               "Denied [{}, {}, {}, {}]: no role is bound to this request",

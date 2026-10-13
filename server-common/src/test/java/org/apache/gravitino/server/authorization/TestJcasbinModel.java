@@ -15,7 +15,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization.jcasbin;
+package org.apache.gravitino.server.authorization;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -31,7 +31,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.server.authorization.jcasbin.GravitinoAdapter;
+import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.casbin.jcasbin.main.Enforcer;
+import org.casbin.jcasbin.main.SyncedEnforcer;
 import org.casbin.jcasbin.model.Model;
 import org.casbin.jcasbin.persist.file_adapter.FileAdapter;
 import org.junit.jupiter.api.Assertions;
@@ -68,7 +71,7 @@ public class TestJcasbinModel {
             .filter(line -> !line.startsWith("#"))
             .collect(Collectors.joining("\n"));
     try (InputStream modelStream =
-            TestJcasbinModel.class.getResourceAsStream("/jcasbin_request_model.conf");
+            TestJcasbinModel.class.getResourceAsStream("/jcasbin_model.conf");
         InputStream policyInputStream =
             new ByteArrayInputStream(policy.getBytes(StandardCharsets.UTF_8))) {
       Assertions.assertNotNull(modelStream);
@@ -77,7 +80,6 @@ public class TestJcasbinModel {
       model.loadModelFromText(modelString);
       FileAdapter fileAdapter = new FileAdapter(policyInputStream);
       enforcer = new Enforcer(model, fileAdapter);
-      enforcer.addFunction("hasRole", new RequestRoleFunction());
     }
   }
 
@@ -596,5 +598,42 @@ public class TestJcasbinModel {
             MetadataObject.Type.TABLE.name(),
             "table1",
             Privilege.Name.SELECT_TABLE.name()));
+  }
+
+  /** Verifies role-set isolation and global deny precedence with the built-in matcher. */
+  @Test
+  public void testRequestRolesAndDenyPrecedence() throws Exception {
+    Enforcer enforcer = newEnforcer();
+    enforcer.addPolicy("allow-role", "TABLE", "42", "SELECT_TABLE", "allow");
+    enforcer.addPolicy("deny-role", "TABLE", "42", "SELECT_TABLE", "deny");
+    Assertions.assertTrue(enforcer.enforce(Set.of("allow-role"), "TABLE", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(
+        enforcer.enforce(Set.of("allow-role", "deny-role"), "TABLE", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(enforcer.enforce(Set.of("unheld-role"), "TABLE", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(enforcer.enforce(Set.of(), "TABLE", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(enforcer.enforce("allow-role", "TABLE", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(enforcer.enforce(Set.of("allow-role"), "TABLE", "43", "SELECT_TABLE"));
+    Assertions.assertFalse(enforcer.enforce(Set.of("allow-role"), "SCHEMA", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(enforcer.enforce(Set.of("allow-role"), "TABLE", "42", "MODIFY_TABLE"));
+  }
+
+  /** Verifies the deny-only enforcer evaluates the request role set. */
+  @Test
+  public void testDenyEnforcerUsesRoleSet() throws Exception {
+    Enforcer deny = newEnforcer();
+    // The deny enforcer represents DENY policies with the allow effect to answer existence checks.
+    deny.addPolicy("deny-role", "TABLE", "42", "SELECT_TABLE", "allow");
+    Assertions.assertTrue(
+        deny.enforce(Set.of("allow-role", "deny-role"), "TABLE", "42", "SELECT_TABLE"));
+    Assertions.assertFalse(deny.enforce(Set.of("allow-role"), "TABLE", "42", "SELECT_TABLE"));
+  }
+
+  private Enforcer newEnforcer() throws Exception {
+    Model model = new Model();
+    try (InputStream input = getClass().getResourceAsStream("/jcasbin_model.conf")) {
+      model.loadModelFromText(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+    }
+    Enforcer enforcer = new SyncedEnforcer(model, new GravitinoAdapter());
+    return enforcer;
   }
 }
