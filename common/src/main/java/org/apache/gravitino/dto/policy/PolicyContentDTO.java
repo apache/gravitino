@@ -105,6 +105,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("maxPartitionNum")
     private Long maxPartitionNum;
 
+    @JsonProperty("rewriteStrategy")
+    private String rewriteStrategy;
+
+    @JsonProperty("sortOrder")
+    private String sortOrder;
+
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
@@ -167,6 +173,26 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Returns the Iceberg rewrite_data_files top-level strategy.
+     *
+     * @return rewrite strategy
+     */
+    public String rewriteStrategy() {
+      return rewriteStrategy == null
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+          : rewriteStrategy;
+    }
+
+    /**
+     * Returns the Iceberg rewrite_data_files top-level sort_order.
+     *
+     * @return sort order expression
+     */
+    public String sortOrder() {
+      return sortOrder == null ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER : sortOrder;
+    }
+
+    /**
      * Returns rewrite options expanded to job.options.* during rule generation.
      *
      * @return rewrite options map
@@ -205,6 +231,8 @@ public interface PolicyContentDTO extends PolicyContent {
           dataFileMseWeight(),
           deleteFileNumberWeight(),
           maxPartitionNum(),
+          rewriteStrategy(),
+          sortOrder(),
           rewriteOptions());
     }
   }
@@ -273,6 +301,84 @@ public interface PolicyContentDTO extends PolicyContent {
 
     private PolicyContent toDomainContent() {
       return PolicyContents.icebergOrphanFileRemoval(olderThanDays(), location(), dryRun());
+    }
+  }
+
+  /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
+  @EqualsAndHashCode
+  @ToString
+  class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+    private IcebergRewriteManifestsContentDTO() {}
+
+    /**
+     * @return empty rewrite-manifests content DTO
+     */
+    public static IcebergRewriteManifestsContentDTO instance() {
+      return new IcebergRewriteManifestsContentDTO();
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergRewriteManifests();
+    }
+  }
+
+  /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
+  @EqualsAndHashCode
+  @ToString
+  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    private IcebergSnapshotExpirationContentDTO() {}
+
+    /**
+     * @return empty snapshot-expiration content DTO
+     */
+    public static IcebergSnapshotExpirationContentDTO instance() {
+      return new IcebergSnapshotExpirationContentDTO();
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergSnapshotExpiration();
     }
   }
 

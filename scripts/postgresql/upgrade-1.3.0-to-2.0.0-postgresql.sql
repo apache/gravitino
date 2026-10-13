@@ -151,6 +151,49 @@ COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model prop
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
 
+CREATE TABLE IF NOT EXISTS table_maintenance_action (
+    id BIGSERIAL PRIMARY KEY,
+    job_id BIGINT,
+    table_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    before_snapshot_id BIGINT,
+    after_snapshot_id BIGINT,
+    finished_at BIGINT,
+    created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
+CREATE INDEX IF NOT EXISTS idx_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
+CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
+COMMENT ON TABLE table_maintenance_action IS 'table maintenance action occupancy and run metadata';
+COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_action.job_id IS 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob';
+COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
+COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish timestamp in milliseconds, null while in flight';
+COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
+
+CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    table_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    snapshot_id BIGINT NOT NULL,
+    metrics_value TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
+COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
+COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'metrics value as JSON';
+COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'creation timestamp in milliseconds';
+
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
 -- (largest id) wins, and older ones are soft-deleted.
 UPDATE owner_meta

@@ -37,6 +37,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -1141,6 +1143,63 @@ public class TestMysqlTableOperations extends TestMysql {
     Assertions.assertNull(
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
+  }
+
+  @Test
+  public void testLoadDatetimePrecisionWithoutDriverSupport() throws Exception {
+    // MySQL Connector/J before 8.0.16 reports a COLUMN_SIZE the fractional seconds precision
+    // cannot be derived from, which calculateDatetimePrecision signals by returning null. The
+    // precision must then be recovered from information_schema instead of being left unset.
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_datetime_precision_table";
+    DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
+    try {
+      try (Connection connection = dataSource.getConnection()) {
+        connection.setCatalog(TEST_DB_NAME.toString());
+        try (Statement statement = connection.createStatement()) {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE `%s` ("
+                      + "c_int INT, "
+                      + "c_time TIME(3), "
+                      + "c_time_no_precision TIME, "
+                      + "c_datetime DATETIME(6), "
+                      + "c_datetime_no_precision DATETIME, "
+                      + "c_timestamp TIMESTAMP(3) NULL)",
+                  tableName));
+        }
+      }
+
+      MysqlTableOperations tableOperations =
+          new MysqlTableOperations() {
+            @Override
+            public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+              return null;
+            }
+          };
+      tableOperations.initialize(
+          dataSource,
+          JDBC_EXCEPTION_CONVERTER,
+          new MysqlTypeConverter(),
+          new MysqlColumnDefaultValueConverter(),
+          Collections.emptyMap());
+
+      JdbcTable table = tableOperations.load(TEST_DB_NAME.toString(), tableName);
+      Map<String, Type> typeByColumn =
+          Arrays.stream(table.columns()).collect(Collectors.toMap(Column::name, Column::dataType));
+
+      // A column without a precision must be left untouched by the correction.
+      Assertions.assertEquals(Types.IntegerType.get(), typeByColumn.get("c_int"));
+      Assertions.assertEquals(Types.TimeType.of(3), typeByColumn.get("c_time"));
+      Assertions.assertEquals(Types.TimeType.of(0), typeByColumn.get("c_time_no_precision"));
+      Assertions.assertEquals(
+          Types.TimestampType.withoutTimeZone(6), typeByColumn.get("c_datetime"));
+      Assertions.assertEquals(
+          Types.TimestampType.withoutTimeZone(0), typeByColumn.get("c_datetime_no_precision"));
+      Assertions.assertEquals(Types.TimestampType.withTimeZone(3), typeByColumn.get("c_timestamp"));
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
+      DataSourceUtils.closeDataSource(dataSource);
+    }
   }
 
   @Test
