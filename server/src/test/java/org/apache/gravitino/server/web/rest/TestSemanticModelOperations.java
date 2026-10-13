@@ -61,6 +61,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.SemanticModelOperationDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
@@ -144,7 +145,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     }
   }
 
-  private final SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+  private final SemanticModelDispatcher dispatcher = mock(SemanticModelOperationDispatcher.class);
   private final EventBus eventBus = mock(EventBus.class);
   private final TableDispatcher tables = mock(TableDispatcher.class);
   private final ViewDispatcher views = mock(ViewDispatcher.class);
@@ -206,7 +207,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     when(dispatcher.loadSemanticModel(any())).thenReturn(semanticModel("sales", null));
     doCallRealMethod().when(dispatcher).exportOssieDocument(any(), any());
     doCallRealMethod().when(dispatcher).importOssieDocument(any(), any(), any());
-    doCallRealMethod().when(dispatcher).importSemanticModel(any(), any());
+    doCallRealMethod().when(dispatcher).importSemanticModel(any(), any(), any(), any());
   }
 
   @Test
@@ -1093,8 +1094,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version")));
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.json(json)), any());
-    verify(dispatcher).importSemanticModel(eq(salesIdent), any());
-    verify(dispatcher).importSemanticModel(eq(inventoryIdent), any());
+    verify(dispatcher).importSemanticModel(eq(salesIdent), any(), any(), any());
+    verify(dispatcher).importSemanticModel(eq(inventoryIdent), any(), any(), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1131,7 +1132,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             any(SemanticModelDefinition.class),
             eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
-    verify(dispatcher).importSemanticModel(eq(ident), any());
+    verify(dispatcher).importSemanticModel(eq(ident), any(), any(), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1179,7 +1180,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             any(SemanticModelDefinition.class),
             eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
-    verify(dispatcher).importSemanticModel(eq(ident), any());
+    verify(dispatcher).importSemanticModel(eq(ident), any(), any(), any());
     verifyNoMoreInteractions(dispatcher);
   }
 

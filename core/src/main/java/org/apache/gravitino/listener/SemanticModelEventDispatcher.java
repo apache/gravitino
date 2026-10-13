@@ -165,6 +165,16 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
+  public SemanticModel importSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties) {
+    throw new UnsupportedOperationException(
+        "Parsed imports are internal; use importOssieDocument with a source validator");
+  }
+
+  @Override
   public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
     String user = PrincipalUtils.getCurrentUserName();
     try {

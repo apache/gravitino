@@ -24,9 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -52,6 +54,7 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.SemanticModelOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -103,7 +106,9 @@ class TestSemanticModelImportExportEvent {
   void setUp() {
     authorizationEnabled = true;
     owners = mock(OwnerDispatcher.class);
-    operation = mock(SemanticModelDispatcher.class, CALLS_REAL_METHODS);
+    operation = mock(SemanticModelOperationDispatcher.class);
+    doCallRealMethod().when(operation).importSemanticModel(any(), any(), any(), any());
+    doCallRealMethod().when(operation).exportOssieDocument(any(), any());
     model = mock(SemanticModel.class);
     when(model.name()).thenReturn(IDENT.name());
     when(model.definition()).thenReturn(definition());
@@ -142,6 +147,7 @@ class TestSemanticModelImportExportEvent {
       converter.verify(() -> OssieDocumentConverter.importDocument(document));
     }
     assertEquals(1, validations.get());
+    verify(operation).importSemanticModel(eq(NORMALIZED_IDENT), any(), eq(definition()), any());
     verify(operation).createSemanticModel(eq(NORMALIZED_IDENT), any(), eq(definition()), any());
     ArgumentCaptor<MetadataObject> object = ArgumentCaptor.forClass(MetadataObject.class);
     verify(owners).setOwner(eq("metalake"), object.capture(), any(), eq(Owner.Type.USER));
@@ -163,10 +169,16 @@ class TestSemanticModelImportExportEvent {
   }
 
   @Test
-  void testTwoArgumentImportUsesTheSameEventAndHookPipeline() {
-    assertSame(model, dispatcher.importOssieDocument(NAMESPACE, document()));
-    assertEvents(ImportSemanticModelPreEvent.class, ImportSemanticModelEvent.class);
-    verify(owners).setOwner(any(), any(), any(), eq(Owner.Type.USER));
+  void testDirectParsedImportIsRejectedWithoutEventsOrSideEffects() {
+    UnsupportedOperationException failure =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () -> dispatcher.importSemanticModel(IDENT, null, definition(), Map.of()));
+
+    assertTrue(failure.getMessage().contains("importOssieDocument"));
+    verifyNoInteractions(normalizer, hook, operation, owners);
+    assertEquals(0, listener.getPreEvents().size());
+    assertEquals(0, listener.getPostEvents().size());
   }
 
   @Test
@@ -242,7 +254,7 @@ class TestSemanticModelImportExportEvent {
         new SemanticModelEventDispatcher(new EventBus(List.of(rejecting)), normalizer);
     Runnable action =
         importing
-            ? () -> rejectedDispatcher.importOssieDocument(NAMESPACE, document())
+            ? () -> rejectedDispatcher.importOssieDocument(NAMESPACE, document(), definition -> {})
             : () -> rejectedDispatcher.exportOssieDocument(IDENT, OssieFormat.YAML);
     assertSame(denied, assertThrows(ForbiddenException.class, action::run));
     verifyNoInteractions(normalizer, operation, owners);
@@ -257,7 +269,9 @@ class TestSemanticModelImportExportEvent {
 
   @Test
   void testNullImportDocumentStillEmitsFailure() {
-    assertThrows(NullPointerException.class, () -> dispatcher.importOssieDocument(NAMESPACE, null));
+    assertThrows(
+        NullPointerException.class,
+        () -> dispatcher.importOssieDocument(NAMESPACE, null, definition -> {}));
     ImportSemanticModelFailureEvent event =
         assertEvents(ImportSemanticModelPreEvent.class, ImportSemanticModelFailureEvent.class);
     assertNull(event.format());
@@ -333,7 +347,7 @@ class TestSemanticModelImportExportEvent {
         principal.when(PrincipalUtils::getCurrentUserName).thenReturn("initiator", "changed");
         Runnable action =
             importing
-                ? () -> dispatcher.importOssieDocument(NAMESPACE, document())
+                ? () -> dispatcher.importOssieDocument(NAMESPACE, document(), definition -> {})
                 : () -> dispatcher.exportOssieDocument(IDENT, OssieFormat.JSON);
         if (fail) assertThrows(IllegalArgumentException.class, action::run);
         else action.run();
