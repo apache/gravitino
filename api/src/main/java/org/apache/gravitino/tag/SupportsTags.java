@@ -55,9 +55,9 @@ public interface SupportsTags {
 
   /**
    * Associate tags with no value to the specific object. The tagsToAdd will be added to the object,
-   * and the tagsToRemove will be removed from the object. Missing tags are ignored. If the same tag
-   * is in both tagsToAdd and tagsToRemove, it will be ignored. Repeated existing assignments are
-   * idempotent.
+   * and the tagsToRemove will be removed from the object. Missing tags are ignored, including tags
+   * dropped or renamed while the call runs. If the same tag is in both tagsToAdd and tagsToRemove,
+   * it will be ignored. Repeated existing assignments are idempotent.
    *
    * @param tagsToAdd The array of tag names to be added to the object.
    * @param tagsToRemove The array of tag names to be removed from the object.

@@ -549,6 +549,37 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
 
+CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
+    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
+    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after maintenance, null while pending',
+    `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'finish timestamp in milliseconds, null while in flight',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_tma_job_id` (`job_id`),
+    KEY `idx_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
+    KEY `idx_tma_before_sid` (`table_id`, `before_snapshot_id`),
+    KEY `idx_tma_after_sid` (`table_id`, `after_snapshot_id`),
+    KEY `idx_tma_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'table maintenance action occupancy and run metadata';
+
+CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
+    `snapshot_id` BIGINT(20) NOT NULL COMMENT 'Iceberg snapshot id',
+    `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'metrics value as JSON',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
+    KEY `idx_tsm_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'table snapshot metrics metadata';
+
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
 -- (largest id) wins, and older ones are soft-deleted.
 UPDATE `owner_meta` o

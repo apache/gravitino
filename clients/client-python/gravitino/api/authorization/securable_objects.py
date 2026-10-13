@@ -41,6 +41,7 @@ class SecurableObject(MetadataObject, ABC):
         - FILESET
         - TOPIC
         - FUNCTION
+        - SEMANTIC_MODEL
         - METALAKE
 
     Use the helper class `SecurableObjects` to construct the securable object you need.
@@ -348,6 +349,29 @@ class SecurableObjects:
         names = [*schema.full_name().split("."), model]
         return SecurableObjects.of(
             MetadataObject.Type.MODEL,
+            names,
+            privileges,
+        )
+
+    @staticmethod
+    def of_semantic_model(
+        schema: SecurableObject,
+        semantic_model: str,
+        privileges: list[Privilege],
+    ) -> SecurableObjectImpl:
+        """Create a Semantic Model securable object.
+
+        Args:
+            schema (SecurableObject): The schema securable object.
+            semantic_model (str): The Semantic Model name.
+            privileges (list[Privilege]): The privileges of the Semantic Model.
+
+        Returns:
+            SecurableObjectImpl: The created Semantic Model securable object.
+        """
+        names = [*schema.full_name().split("."), semantic_model]
+        return SecurableObjects.of(
+            MetadataObject.Type.SEMANTIC_MODEL,
             names,
             privileges,
         )

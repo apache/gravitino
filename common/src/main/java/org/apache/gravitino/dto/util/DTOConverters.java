@@ -107,6 +107,8 @@ import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
@@ -685,6 +687,12 @@ public class DTOConverters {
           .withLocation(content.location())
           .withDryRun(content.dryRun())
           .build();
+    }
+    if (policyContent instanceof IcebergRewriteManifestsContent) {
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.instance();
+    }
+    if (policyContent instanceof IcebergSnapshotExpirationContent) {
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.instance();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
@@ -1564,6 +1572,12 @@ public class DTOConverters {
           (PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO;
       return PolicyContents.icebergOrphanFileRemoval(
           content.olderThanDays(), content.location(), content.dryRun());
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
+      return PolicyContents.icebergRewriteManifests();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
+      return PolicyContents.icebergSnapshotExpiration();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =

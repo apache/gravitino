@@ -102,6 +102,35 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB COMMENT 'semantic model version information';
 
+CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
+    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `job_id` BIGINT COMMENT 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob',
+    `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
+    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
+    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
+    `finished_at` BIGINT COMMENT 'finish timestamp in milliseconds, null while in flight',
+    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`)
+) COMMENT='table maintenance action occupancy and run metadata';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_job_id` ON `table_maintenance_action`(`job_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
+CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_after_sid` ON `table_maintenance_action`(`table_id`, `after_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_created_at` ON `table_maintenance_action`(`created_at`);
+
+CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
+    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
+    `snapshot_id` BIGINT NOT NULL COMMENT 'Iceberg snapshot id',
+    `metrics_value` CLOB NOT NULL COMMENT 'metrics value as JSON',
+    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`id`)
+) COMMENT='table snapshot metrics metadata';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
+
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
 -- (largest id) wins, and older ones are soft-deleted.
 UPDATE `owner_meta`
