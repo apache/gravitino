@@ -135,6 +135,11 @@ final class RestrictedRegoSourceParser {
     int notCount = 0;
     while (match(TokenType.NOT)) {
       notCount++;
+      if (notCount >= RestrictedRegoLimits.MAX_SOURCE_DEPTH) {
+        throw error(
+            "restricted-rego-v1 source depth must not exceed "
+                + RestrictedRegoLimits.MAX_SOURCE_DEPTH);
+      }
     }
 
     CanonicalExpression result = parseComparisonExpression();

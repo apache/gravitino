@@ -142,6 +142,34 @@ public class TestRestrictedRegoSourceParser {
             RestrictedRegoTestUtils.parseFilterExpression(
                 "col(\"emoji\") == \"" + escapedPair + "\"");
     Assertions.assertEquals("😀", ((Literal) unicode.right()).value());
+
+    String delEscape = RestrictedRegoTestUtils.unicodeEscape('0', '0', '7', 'f');
+    Comparison controls =
+        (Comparison)
+            RestrictedRegoTestUtils.parseFilterExpression(
+                "col(\"line\\nname\") == \"a" + delEscape + "b\"");
+    Assertions.assertEquals("line\nname", ((Column) controls.left()).name());
+    Assertions.assertEquals("a" + (char) 0x7F + "b", ((Literal) controls.right()).value());
+
+    GroupMembership controlGroup =
+        (GroupMembership)
+            RestrictedRegoTestUtils.parseFilterExpression("is_group_member(\"a\\tb\")");
+    Assertions.assertEquals("a\tb", controlGroup.group());
+  }
+
+  @Test
+  void testRejectsExcessiveNotDepthDuringParsing() {
+    String source = "filter := " + "not ".repeat(4090) + "true";
+
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new RestrictedRegoSourceParser(source).parseProgram());
+
+    Assertions.assertTrue(
+        error
+            .getMessage()
+            .contains("source depth must not exceed " + RestrictedRegoLimits.MAX_SOURCE_DEPTH));
   }
 
   @ParameterizedTest

@@ -291,9 +291,12 @@ call.
 `filter` and `mask` are Gravitino restricted-syntax keywords, not standard Rego keywords. `filter`
 is valid only as the row-filter rule head, and `mask` is valid only as the column-mask rule head.
 
-Column names, group names, and string values appear only as JSON string literals. A name equal to a
-keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
-single quotes, SQL delimited identifiers, and backslash escaping outside a JSON string are invalid.
+Column names, group names, and string values appear only as JSON string literals. Raw U+0000 through
+U+001F characters and decoded NUL are invalid. Valid JSON escapes for control characters other than
+NUL, such as `\n`, are decoded and preserved. U+007F is also preserved in literal or escaped form. A
+name equal to a keyword needs no special keyword escape: `col("and")` references the column named
+`and`. Backticks, single quotes, SQL delimited identifiers, and backslash escaping outside a JSON
+string are invalid.
 
 For example, this expression is valid and unambiguous:
 

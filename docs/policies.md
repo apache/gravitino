@@ -118,10 +118,12 @@ Keywords and built-in function names are case-sensitive. For example, only lower
 operator; `In`, `IN`, and `iN` are invalid.
 
 Strings use JSON double-quoted syntax and are decoded exactly once after the enclosing HTTP JSON is
-decoded. Raw control characters, NUL, isolated Unicode surrogates, single-quoted strings, and invalid
-JSON escapes are rejected. Gravitino does not normalize, trim, or case-fold decoded column names,
-group names, or values. Numbers are exact decimals; exponent notation, a leading `+`, leading zeroes,
-and a trailing decimal point are invalid.
+decoded. Raw U+0000 through U+001F characters, decoded NUL, isolated Unicode surrogates,
+single-quoted strings, and invalid JSON escapes are rejected. Valid JSON escapes for control
+characters other than NUL, such as `\n`, are decoded and preserved. U+007F is also preserved in
+literal or escaped form. Gravitino does not normalize, trim, or case-fold decoded column names,
+group names, or values. Numbers are exact decimals; exponent notation, a leading `+`, leading
+zeroes, and a trailing decimal point are invalid.
 
 Supported operand shapes are:
 
