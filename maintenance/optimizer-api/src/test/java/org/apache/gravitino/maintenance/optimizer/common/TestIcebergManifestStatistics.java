@@ -26,7 +26,8 @@ import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestIcebergManifestStatistics {
+/** Tests validation and per-spec lookup of manifest statistics. */
+public class TestIcebergManifestStatistics {
   @Test
   void testMissingAndEmptyMeasurements() {
     Map<String, StatisticValue<?>> values = new HashMap<>();

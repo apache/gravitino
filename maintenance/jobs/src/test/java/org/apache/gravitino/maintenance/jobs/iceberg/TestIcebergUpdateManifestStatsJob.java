@@ -24,16 +24,26 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJobTemplateProvider;
+import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
+import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Test;
 
 /** Tests the standalone manifest statistics template and argument validation. */
@@ -80,6 +90,74 @@ public class TestIcebergUpdateManifestStatsJob {
     assertThrows(
         IllegalArgumentException.class,
         () -> IcebergUpdateManifestStatsJob.main(new String[] {"--table", "db.table"}));
+  }
+
+  /** Verifies short auth options reach HTTP requests made by the real statistics updater. */
+  @Test
+  public void testUpdaterSendsBasicAuthFromAliases() throws Exception {
+    AtomicReference<String> authorization = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+          exchange.sendResponseHeaders(401, -1);
+          exchange.close();
+        });
+    server.start();
+    try (GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater()) {
+      Map<String, String> options = new HashMap<>();
+      options.put("gravitino_uri", "http://127.0.0.1:" + server.getAddress().getPort());
+      options.put("metalake", "test");
+      options.put("auth_type", "basic");
+      options.put("username", "alice");
+      options.put("password", "test-password");
+      updater.initialize(
+          new OptimizerEnv(
+              new OptimizerConfig(
+                  IcebergUpdateManifestStatsJob.buildOptimizerProperties(options))));
+      // Stop at the HTTP boundary after capturing the credentials sent by the updater.
+      assertThrows(
+          RuntimeException.class,
+          () ->
+              updater.updateTableStatistics(
+                  NameIdentifier.of("catalog", "db", "table"),
+                  Collections.singletonList(
+                      new StatisticEntryImpl<>("custom-count", StatisticValues.longValue(1)))));
+      assertEquals(
+          "Basic "
+              + Base64.getEncoder()
+                  .encodeToString("alice:test-password".getBytes(StandardCharsets.UTF_8)),
+          authorization.get());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  /** Verifies auth aliases are promoted without overriding canonical settings. */
+  @Test
+  public void testAuthAliases() {
+    Map<String, String> options = new HashMap<>();
+    options.put("gravitino_uri", "http://localhost:8090");
+    options.put("metalake", "test");
+    options.put("auth_type", "oauth");
+    options.put("oauth_server_uri", "http://localhost:9000");
+    options.put("oauth_path", "token");
+    options.put("oauth_credential", "client:secret");
+    options.put("oauth_scope", "catalog");
+    Map<String, String> properties =
+        IcebergUpdateManifestStatsJob.buildOptimizerProperties(options);
+    assertEquals("oauth", properties.get(OptimizerConfig.AUTH_TYPE));
+    assertEquals("http://localhost:9000", properties.get(OptimizerConfig.AUTH_OAUTH_SERVER_URI));
+    assertEquals("token", properties.get(OptimizerConfig.AUTH_OAUTH_PATH));
+    assertEquals("client:secret", properties.get(OptimizerConfig.AUTH_OAUTH_CREDENTIAL));
+    assertEquals("catalog", properties.get(OptimizerConfig.AUTH_OAUTH_SCOPE));
+    assertFalse(options.containsKey(OptimizerConfig.AUTH_TYPE));
+    options.put(OptimizerConfig.AUTH_TYPE, "none");
+    assertEquals(
+        "none",
+        IcebergUpdateManifestStatsJob.buildOptimizerProperties(options)
+            .get(OptimizerConfig.AUTH_TYPE));
   }
 
   /** Verifies updater configuration aliases and required properties. */

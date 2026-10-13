@@ -63,8 +63,9 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
   @TempDir static File tempDir;
   private static SparkSession spark;
 
+  /** Starts Spark with a local Iceberg catalog for the tests. */
   @BeforeAll
-  static void setUp() {
+  public static void setUp() {
     spark =
         SparkSession.builder()
             .master("local[2]")
@@ -81,8 +82,9 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
     spark.sql("CREATE NAMESPACE " + CATALOG_NAME + ".db");
   }
 
+  /** Stops the shared Spark session. */
   @AfterAll
-  static void tearDown() {
+  public static void tearDown() {
     if (spark != null) {
       spark.stop();
     }

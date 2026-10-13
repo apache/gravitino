@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
@@ -46,6 +47,7 @@ import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatisti
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValue;
@@ -264,7 +266,8 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       properties.put(key, value.trim());
     }
     // A retried PUT can hide an older request that is still executing after a connection failure.
-    properties.put("gravitino.client.disableAutomaticRetries", "true");
+    properties.put(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "true");
+    GravitinoAuthSettings.copyAliases(properties);
     return properties;
   }
 
