@@ -24,11 +24,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Runs an ordered chain of {@link MaintenanceTypeHandler}s inside one Spark Job.
+ * Runs an ordered chain of {@link MaintenanceTypeHandler}s for one table.
  *
  * <p>Per type: optional S0 sample → drift check → {@link MaintenanceTypeHandler#shouldExecute} →
  * {@link MaintenanceTypeHandler#execute} → optional sampleAfter. Drift or {@link
  * MaintenanceGateDecision#SKIP_TYPE} ends that type only; the chain continues.
+ *
+ * <p>Multi-table Spark Jobs (for example batched snapshot-expiry) loop tables in {@link
+ * MaintenanceJobRunner}; this class stays single-table.
  */
 public final class MaintenanceTypeOrchestrator {
 
