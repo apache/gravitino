@@ -111,6 +111,31 @@ public class IsolatedClassLoader implements Closeable {
     }
   }
 
+  /**
+   * Executes the provided function within the isolated class loading context and rethrows any
+   * exception matching one of the given classes unchanged, wrapping the rest; for more, please
+   * refer to {@link #withClassLoader(ThrowableFunction)}.
+   *
+   * @param fn The function to be executed within the isolated class loading context.
+   * @param exceptionClass1 The first exception class to be rethrown unchanged.
+   * @param exceptionClass2 The second exception class to be rethrown unchanged.
+   * @param <T> The type of value return by this method
+   * @return The return value of the fn that executed within the classloader.
+   */
+  public <T> T withClassLoader(
+      ThrowableFunction<ClassLoader, T> fn,
+      Class<? extends RuntimeException> exceptionClass1,
+      Class<? extends RuntimeException> exceptionClass2) {
+    try {
+      return withClassLoader(fn);
+    } catch (Exception e) {
+      if (exceptionClass1.isInstance(e) || exceptionClass2.isInstance(e)) {
+        throw (RuntimeException) e;
+      }
+      throw new RuntimeException(e);
+    }
+  }
+
   public static IsolatedClassLoader buildClassLoader(List<String> libAndResourcesPaths) {
     // Listing all the classPath under the package path and build the isolated class loader.
     List<URL> classPathContents = Lists.newArrayList();

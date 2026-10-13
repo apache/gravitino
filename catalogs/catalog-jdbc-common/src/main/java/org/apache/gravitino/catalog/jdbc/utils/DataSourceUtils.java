@@ -123,6 +123,12 @@ public class DataSourceUtils {
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
     basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
+    // Apply the driver-aware connect timeout as a DBCP connection property (not a pool key, so the
+    // pool stays lazy). It bounds a single connection and takes effect on the first real connection
+    // — i.e. create-time verification — so an unreachable backend fails fast instead of hanging.
+    // Operator-set values are preserved.
+    JdbcConnectionTimeouts.connectionProperties(jdbcConfig, jdbcUrl)
+        .forEach(basicDataSource::addConnectionProperty);
     return basicDataSource;
   }
 

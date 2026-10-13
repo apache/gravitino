@@ -213,6 +213,30 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops;
   }
 
+  /**
+   * Whether to validate this catalog against its backend at create time rather than on first use.
+   *
+   * @return {@code true} to validate at create; {@code false} (default) to defer
+   */
+  public boolean shouldValidateOnCreate() {
+    return false;
+  }
+
+  /**
+   * Validates this catalog at create time when {@link #shouldValidateOnCreate()} returns true. The
+   * default eagerly initializes {@link #ops()}, which preserves the current behavior for every
+   * existing opt-in (for example Iceberg REST, which only needs eager initialization). Subclasses
+   * that can cheaply probe their backend — such as JDBC — override this to run a real connection
+   * check and throw a connection-failed error when the backend is unreachable.
+   *
+   * <p>This is {@code public} rather than {@code protected} because {@code CatalogManager}, in a
+   * different package, invokes it on the create-time validation path (mirroring {@link #ops()} and
+   * {@link #shouldValidateOnCreate()}).
+   */
+  public void validateOnCreate() {
+    ops();
+  }
+
   public void checkMetalakeAndCatalogInUse() {
     Map<String, String> catalogProperties = entity.getProperties();
     if (catalogProperties == null) {

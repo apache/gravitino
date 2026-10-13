@@ -91,6 +91,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -931,7 +932,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
+      // Validate the properties (reserved/required/hidden-mask checks) but do NOT run the
+      // create-time backend probe here: this standalone path performs its own explicit probe
+      // below, and letting the wrapper validate as well would probe the backend twice.
+      CatalogWrapper wrapper =
+          createCatalogWrapper(dummyEntity, mergedConfig, false /* validateBackend */);
       try {
         wrapper.doWithCatalogOps(
             c -> {
@@ -1633,6 +1638,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   CatalogWrapper createCatalogWrapper(
       CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
+    // Default: when properties are validated at create, also verify the backend. The standalone
+    // testConnection path uses the overload below to keep property validation but skip the probe.
+    return createCatalogWrapper(entity, propsToValidate, true /* validateBackend */);
+  }
+
+  /**
+   * Create a catalog wrapper, optionally running the create-time backend probe. {@code
+   * propsToValidate} always drives property validation when non-null; {@code validateBackend}
+   * additionally controls whether {@link BaseCatalog#validateOnCreate()} runs. The standalone
+   * {@code testConnection} path passes {@code validateBackend = false} so it still rejects invalid
+   * properties while performing its own single explicit probe.
+   *
+   * @param entity The catalog entity.
+   * @param propsToValidate The properties to validate; may be null to skip property validation.
+   * @param validateBackend Whether to run the create-time backend probe.
+   * @return The created catalog wrapper.
+   */
+  CatalogWrapper createCatalogWrapper(
+      CatalogEntity entity,
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
@@ -1652,9 +1678,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // so that AppClassLoader can get the value of properties.
           wrapper.catalog.properties();
           wrapper.catalog.capability();
+
+          // Validate opted-in catalogs so a misconfiguration fails at create rather than on
+          // first use. The default validation eagerly initializes ops(); JDBC overrides it to
+          // run a real backend probe. The backend translates failures into the caller-error vs
+          // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
+          // The backend probe is gated by validateBackend so the standalone testConnection path
+          // can keep property validation while running its own explicit probe instead.
+          if (validateBackend && propsToValidate != null && catalog.shouldValidateOnCreate()) {
+            catalog.validateOnCreate();
+          }
           return null;
         },
-        IllegalArgumentException.class);
+        IllegalArgumentException.class,
+        ConnectionFailedException.class);
 
     return wrapper;
   }
