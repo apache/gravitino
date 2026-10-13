@@ -351,15 +351,24 @@ The collector must be the sole writer of these statistic names.
 The job locks a persistent file keyed by metalake and table before refreshing the Iceberg table
 or choosing a snapshot, and holds it through the PUT. Concurrent runs for that table fail;
 other tables can proceed. Snapshot IDs are recorded for provenance, not compared numerically.
-The job forces `gravitino.client.disableAutomaticRetries=true` for its Gravitino client.
+The job forces `gravitino.client.retryTimes=0` for its Gravitino client.
 Custom statistics updaters and any intervening proxies must likewise avoid retrying PUT requests;
 an automatic resend could hide an original request that is still executing. There are no expiring
 leases, automatic retries, scheduling, or cooldowns.
 
-Before collection, the job durably writes an in-progress marker. It clears the marker only after
-a successful PUT. A crash, collection error, or ambiguous PUT failure therefore blocks later
-cycles, even after the operating system releases the lock. This prevents a timed-out write from
-completing after a newer cycle publishes. The error reports the recovery file path.
+Collection failures can be rerun normally: the lock is released without leaving a recovery marker.
+After collection and immediately before calling the updater, the job durably writes an in-progress
+marker. It clears the marker only after a successful update. A crash after the marker is written or
+an update failure leaves the marker in place, even after the operating system releases the lock.
+The updater interface cannot distinguish a failed request from a request still executing on the
+server, so these failures require recovery. The error reports the recovery file path.
+
+For example, run A sends a PUT and loses its connection while the server is still processing it.
+An immediate rerun B could publish newer measurements before A's delayed PUT overwrites them.
+The file lock prevents concurrent collection across hosts; the marker prevents this overlap after
+an ambiguous failure. Snapshot IDs provide provenance, but the existing PUT does not enforce
+snapshot ordering or fencing. Automatic reruns after ambiguous writes would require server-side
+conditional publication or an equivalent guarantee that the earlier request has ended.
 
 For recovery, stop all runners for that table and verify the previous process has terminated
 and any outstanding Gravitino PUT has completed or been definitively cancelled. While holding

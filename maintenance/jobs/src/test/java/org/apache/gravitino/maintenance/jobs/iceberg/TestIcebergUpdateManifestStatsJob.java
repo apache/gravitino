@@ -166,11 +166,10 @@ public class TestIcebergUpdateManifestStatsJob {
     Map<String, String> options = new HashMap<>();
     options.put("gravitino_uri", " http://localhost:8090 ");
     options.put("metalake", " test ");
-    options.put(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "false");
+    options.put(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, "2");
     Map<String, String> properties =
         IcebergUpdateManifestStatsJob.buildOptimizerProperties(options);
-    assertEquals(
-        "true", properties.get(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES));
+    assertEquals("0", properties.get(GravitinoClientConfiguration.CLIENT_RETRY_TIMES));
     assertEquals("http://localhost:8090", properties.get(OptimizerConfig.GRAVITINO_URI));
     assertEquals("test", properties.get(OptimizerConfig.GRAVITINO_METALAKE));
     assertEquals(" test ", options.get("metalake"));

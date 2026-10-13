@@ -26,21 +26,25 @@ import org.junit.jupiter.api.Test;
 public class TestGravitinoClientConfiguration {
   @Test
   void testAutomaticRetryConfiguration() {
-    Assertions.assertFalse(
-        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of())
-            .isAutomaticRetriesDisabled());
-    Assertions.assertTrue(
-        GravitinoClientConfiguration.buildFromProperties(
-                ImmutableMap.of(
-                    GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "true"))
-            .isAutomaticRetriesDisabled());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            GravitinoClientConfiguration.buildFromProperties(
-                    ImmutableMap.of(
-                        GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "invalid"))
-                .isAutomaticRetriesDisabled());
+    Assertions.assertEquals(
+        1,
+        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of()).getClientRetryTimes());
+    for (int count : new int[] {0, 1, 3}) {
+      Assertions.assertEquals(
+          count,
+          GravitinoClientConfiguration.buildFromProperties(
+                  ImmutableMap.of(
+                      GravitinoClientConfiguration.CLIENT_RETRY_TIMES, Integer.toString(count)))
+              .getClientRetryTimes());
+    }
+    for (String invalid : new String[] {"-1", "invalid", "1.5", "2147483648"}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              GravitinoClientConfiguration.buildFromProperties(
+                      ImmutableMap.of(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, invalid))
+                  .getClientRetryTimes());
+    }
   }
 
   @Test

@@ -66,12 +66,10 @@ public final class GravitinoClientUtils {
     String metalake = config.get(OptimizerConfig.GRAVITINO_METALAKE_CONFIG);
     GravitinoClient.ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
 
-    String disableRetries =
-        config.getRawString(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES);
-    if (disableRetries != null) {
+    String retryTimes = config.getRawString(GravitinoClientConfiguration.CLIENT_RETRY_TIMES);
+    if (retryTimes != null) {
       builder.withClientConfig(
-          Collections.singletonMap(
-              GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, disableRetries));
+          Collections.singletonMap(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, retryTimes));
     }
 
     OptimizerConfig authConfig = config;

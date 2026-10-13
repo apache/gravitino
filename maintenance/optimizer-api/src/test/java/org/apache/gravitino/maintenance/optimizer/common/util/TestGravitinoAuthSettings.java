@@ -36,14 +36,14 @@ class TestGravitinoAuthSettings {
     Map<String, String> properties = new HashMap<>();
     properties.put(OptimizerConfig.GRAVITINO_URI, "http://localhost:1");
     properties.put(OptimizerConfig.GRAVITINO_METALAKE, "test");
-    properties.put(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "invalid");
+    properties.put(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, "invalid");
     IllegalArgumentException error =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 GravitinoClientUtils.createClient(
                     new OptimizerEnv(new OptimizerConfig(properties))));
-    Assertions.assertTrue(error.getMessage().contains("disableAutomaticRetries"));
+    Assertions.assertTrue(error.getMessage().contains("retryTimes"));
   }
 
   @Test

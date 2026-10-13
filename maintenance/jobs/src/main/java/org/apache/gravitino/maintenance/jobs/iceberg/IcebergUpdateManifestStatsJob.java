@@ -226,6 +226,8 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
         throw new IllegalStateException(
             "Unfinished manifest collection requires recovery: " + lockPath);
       }
+      List<StatisticEntry<?>> measurements =
+          collectManifestStatistics(spark, catalogName, tableIdentifier);
       byte[] marker =
           ("In-progress manifest collection for "
                   + metalake
@@ -238,8 +240,6 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
         channel.write(buffer);
       }
       channel.force(true);
-      List<StatisticEntry<?>> measurements =
-          collectManifestStatistics(spark, catalogName, tableIdentifier);
       updater.updateTableStatistics(identifier, measurements);
       // A failed or ambiguous PUT leaves the marker intact, preventing an unsafe automatic retry.
       channel.truncate(0);
@@ -266,7 +266,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       properties.put(key, value.trim());
     }
     // A retried PUT can hide an older request that is still executing after a connection failure.
-    properties.put(GravitinoClientConfiguration.CLIENT_DISABLE_AUTOMATIC_RETRIES, "true");
+    properties.put(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, "0");
     GravitinoAuthSettings.copyAliases(properties);
     return properties;
   }

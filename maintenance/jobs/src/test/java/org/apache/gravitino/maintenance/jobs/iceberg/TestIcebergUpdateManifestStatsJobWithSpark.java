@@ -186,6 +186,27 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
     }
   }
 
+  /** Verifies a collection failure can be rerun without manually recovering the lock file. */
+  @Test
+  public void testCollectionFailureCanBeRerun() throws Exception {
+    Path directory = Files.createDirectory(tempDir.toPath().resolve("collection-failure"));
+    RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            IcebergUpdateManifestStatsJob.updateStatistics(
+                spark, updater, CATALOG_NAME, "db.retry_collection", "test", directory));
+    assertEquals(0, updater.updateCalls);
+    spark.sql("CREATE TABLE " + CATALOG_NAME + ".db.retry_collection (id INT) USING iceberg");
+    try {
+      IcebergUpdateManifestStatsJob.updateStatistics(
+          spark, updater, CATALOG_NAME, "db.retry_collection", "test", directory);
+      assertEquals(1, updater.updateCalls);
+    } finally {
+      spark.sql("DROP TABLE " + CATALOG_NAME + ".db.retry_collection");
+    }
+  }
+
   /** Verifies separate job processes share the lock and failed writes block later cycles. */
   @Test
   public void testSharedCoordinationAndFailedWriteRecovery() throws Exception {

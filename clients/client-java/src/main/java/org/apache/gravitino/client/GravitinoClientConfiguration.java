@@ -66,13 +66,12 @@ public class GravitinoClientConfiguration {
   public static final String CLIENT_SOCKET_TIMEOUT_MS =
       GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs";
 
-  /** Disables automatic transport retries, so ambiguous writes are surfaced to the caller. */
-  public static final String CLIENT_DISABLE_AUTOMATIC_RETRIES =
-      GRAVITINO_CLIENT_CONFIG_PREFIX + "disableAutomaticRetries";
+  /** Maximum automatic HTTP retries after the initial request; zero disables retries. */
+  public static final String CLIENT_RETRY_TIMES = GRAVITINO_CLIENT_CONFIG_PREFIX + "retryTimes";
 
   private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
       ImmutableSet.of(
-          CLIENT_DISABLE_AUTOMATIC_RETRIES,
+          CLIENT_RETRY_TIMES,
           CLIENT_CONNECTION_TIMEOUT_MS,
           CLIENT_SOCKET_TIMEOUT_MS,
           CLIENT_MAX_CONNECTIONS,
@@ -102,17 +101,14 @@ public class GravitinoClientConfiguration {
   }
 
   /**
-   * Returns whether automatic transport retries are disabled.
+   * Returns the maximum automatic HTTP retries after the initial request.
    *
-   * @return true to issue each HTTP request only once; false by default
+   * @return nonnegative retry count, defaulting to one as in Apache HttpClient
    */
-  public boolean isAutomaticRetriesDisabled() {
-    String value = properties.getOrDefault(CLIENT_DISABLE_AUTOMATIC_RETRIES, "false");
-    if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
-      throw new IllegalArgumentException(
-          CLIENT_DISABLE_AUTOMATIC_RETRIES + " must be true or false");
-    }
-    return Boolean.parseBoolean(value);
+  public int getClientRetryTimes() {
+    int retryTimes = MapUtils.propertyAsInt(properties, CLIENT_RETRY_TIMES, 1);
+    checkValue(value -> value >= 0, CLIENT_RETRY_TIMES, retryTimes, POSITIVE_NUMBER_ERROR_MSG);
+    return retryTimes;
   }
 
   /**
