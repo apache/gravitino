@@ -405,8 +405,7 @@ public class CatalogConnectorManager {
     // Report the root cause: the actual reason a registration failed, such as "Access Denied:
     // Cannot create catalog", is wrapped in several layers of TrinoException by the time it gets
     // here, and the outer messages say nothing a user can act on. The outermost message is kept
-    // as a prefix because it names the subsystem that failed. Do not use
-    // GravitinoErrorCode.toSimpleErrorMessage(), it throws on an exception with no message.
+    // as a prefix because it names the subsystem that failed.
     Throwable rootCause;
     try {
       rootCause = Throwables.getRootCause(e);
