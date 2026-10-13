@@ -788,7 +788,10 @@ public class TestMetadataAuthzHelper {
   @Test
   public void testListShortCircuitTopicViaSchemaGrant() {
     EntityStore store = mock(EntityStore.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
     when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
     when(gravitinoEnv.cacheEnabled()).thenReturn(true);
     when(gravitinoEnv.internalAccessControlDispatcher())
         .thenReturn(mock(AccessControlDispatcher.class));
@@ -813,11 +816,12 @@ public class TestMetadataAuthzHelper {
                     argThat(object -> object.type() == MetadataObject.Type.TOPIC),
                     any(),
                     any());
-            verifyNoInteractions(store);
+            verifyNoInteractions(store, schemaDispatcher);
           });
     } finally {
       when(gravitinoEnv.cacheEnabled()).thenReturn(false);
       when(gravitinoEnv.entityStore()).thenReturn(null);
+      when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(null);
       when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
     }
   }
