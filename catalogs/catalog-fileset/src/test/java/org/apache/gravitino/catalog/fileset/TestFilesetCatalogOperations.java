@@ -3869,88 +3869,6 @@ public class TestFilesetCatalogOperations {
       Assertions.assertNull(result3.get("endpoint"));
     }
   }
-<<<<<<< HEAD
-=======
-
-  @Test
-  public void testMergeResolvesSecrets() throws Exception {
-    long entityId = idGenerator.nextId();
-    SecretUrn urn =
-        SecretUrn.buildWriteThrough(
-            "memory",
-            Map.of(
-                SecretConstants.ATTR_ENTITY_TYPE, "schema",
-                SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
-                SecretConstants.ATTR_PROPERTY_KEY, "aws-sk"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "super-secret")));
-
-    String schemaName = "schema_secret_" + generateTestId();
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(
-          Maps.newHashMap(Map.of(LOCATION, TEST_ROOT_PATH)),
-          randomCatalogInfo("m1", "c1"),
-          FILESET_PROPERTIES_METADATA);
-
-      NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-      Map<String, String> schemaProps =
-          Maps.newHashMap(
-              StringIdentifier.newPropertiesWithId(
-                  StringIdentifier.fromId(entityId),
-                  Map.of(LOCATION, schemaPath, "aws-sk", urn.toString())));
-      Schema schema = ops.createSchema(schemaIdent, "comment", schemaProps);
-      Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
-
-      Map<String, String> merged =
-          ops.mergeUpLevelConfigurations(schemaIdent, schema.properties(), new Path(schemaPath));
-      Assertions.assertEquals("super-secret", merged.get("aws-sk"));
-      Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
-    }
-  }
-
-  @Test
-  public void testDropCascadeSecrets() throws Exception {
-    long schemaId = idGenerator.nextId();
-    long filesetId = idGenerator.nextId();
-    SecretUrn schemaUrn = writeThroughUrn("schema", schemaId, "schema-sk");
-    SecretUrn filesetUrn = writeThroughUrn("fileset", filesetId, "fileset-sk");
-    secretManager.writeSecrets(
-        List.of(
-            new SecretMaterial(schemaUrn, "schema-secret"),
-            new SecretMaterial(filesetUrn, "fileset-secret")));
-
-    String schemaName = "schema_cascade_" + generateTestId();
-    String catalogPath = TEST_ROOT_PATH + "/catalog_cascade_" + generateTestId();
-    String schemaPath = catalogPath + "/" + schemaName;
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(
-          Maps.newHashMap(Map.of(LOCATION, catalogPath)),
-          randomCatalogInfo("m1", "c1"),
-          FILESET_PROPERTIES_METADATA);
-      NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-      ops.createSchema(
-          schemaIdent,
-          "comment",
-          Maps.newHashMap(
-              StringIdentifier.newPropertiesWithId(
-                  StringIdentifier.fromId(schemaId),
-                  Map.of(LOCATION, schemaPath, "schema-sk", schemaUrn.toString()))));
-      ops.createFileset(
-          NameIdentifierUtil.ofFileset("m1", "c1", schemaName, "fs_cascade"),
-          "comment",
-          Fileset.Type.MANAGED,
-          null,
-          Maps.newHashMap(
-              StringIdentifier.newPropertiesWithId(
-                  StringIdentifier.fromId(filesetId),
-                  Map.of("fileset-sk", filesetUrn.toString()))));
-
-      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
-      Assertions.assertEquals("schema-secret", secretManager.readSecret(schemaUrn));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secretManager.readSecret(filesetUrn));
-    }
-  }
 
   private static Stream<Arguments> validLocations() {
     return Stream.of(
@@ -4000,58 +3918,8 @@ public class TestFilesetCatalogOperations {
 
   private FilesetCatalogOperations pathValidationOperations(Fileset fileset) {
     FilesetCatalogOperations operations =
-        Mockito.spy(
-            new FilesetCatalogOperations(
-                Mockito.mock(EntityStore.class), Mockito.mock(SecretManager.class)));
+        Mockito.spy(new FilesetCatalogOperations(Mockito.mock(EntityStore.class)));
     doReturn(fileset).when(operations).loadFileset(PATH_VALIDATION_FILESET);
     return operations;
   }
-
-  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
-    return SecretUrn.buildWriteThrough(
-        "memory",
-        Map.of(
-            SecretConstants.ATTR_ENTITY_TYPE, entityType,
-            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
-            SecretConstants.ATTR_PROPERTY_KEY, key));
-  }
-
-  private EntityStore independentNodeStore(NameIdentifier ident, CountDownLatch checkedAbsent)
-      throws Exception {
-    RelationalEntityStore node = new RelationalEntityStore();
-    FieldUtils.writeField(node, "backend", FieldUtils.readField(store, "backend", true), true);
-    FieldUtils.writeField(node, "cache", new NoOpsCache(Mockito.mock(Config.class)), true);
-    EntityStore racingStore = Mockito.spy(node);
-    Mockito.doAnswer(
-            invocation -> {
-              boolean exists = (boolean) invocation.callRealMethod();
-              Assertions.assertFalse(exists);
-              checkedAbsent.countDown();
-              Assertions.assertTrue(checkedAbsent.await(30, TimeUnit.SECONDS));
-              return exists;
-            })
-        .when(racingStore)
-        .exists(ident, Entity.EntityType.FILESET);
-    return racingStore;
-  }
-
-  private boolean createConcurrentFileset(
-      FilesetCatalogOperations ops,
-      NameIdentifier ident,
-      String location,
-      String comment,
-      long id) {
-    try {
-      ops.createMultipleLocationFileset(
-          ident,
-          comment,
-          Fileset.Type.MANAGED,
-          ImmutableMap.of("default", location),
-          ImmutableMap.of(StringIdentifier.ID_KEY, StringIdentifier.fromId(id).toString()));
-      return true;
-    } catch (FilesetAlreadyExistsException expected) {
-      return false;
-    }
-  }
->>>>>>> 878240b75 ([MINOR] fix(fileset): validate sub-path resolution (#13721))
 }
