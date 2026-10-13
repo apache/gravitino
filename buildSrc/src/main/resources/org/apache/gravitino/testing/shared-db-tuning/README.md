@@ -60,9 +60,9 @@ Measured on `apache/gravitino#13553` with `-PcoreDatabaseForks=2`:
 | ------------------------- | ----------------- | ---------------------- | ------- |
 | `core:coreMySQLTest`      | 26m25s            | 7m04s                  | 3.74x   |
 | `core:corePostgreSQLTest` | 7m10s             | 2m11s                  | 3.28x   |
-| `core:coreH2Test`         | 1m27s             | 1m21s                  | ~1.0x (control) |
+| `core:test (H2)`         | 1m27s             | 1m21s                  | ~1.0x (control) |
 
-`coreH2Test` uses no container and is flat across every run, which is what
+The H2 run (`:core:test`) uses no container and is flat across every run, which is what
 confirms the speedup is database I/O rather than a faster host.
 
 ### Attribution: the tmpfs data dir did most of the work

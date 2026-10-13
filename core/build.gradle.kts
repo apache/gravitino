@@ -112,8 +112,9 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Core's tests run in four lanes: coreUnitTest, plus coreH2Test/coreMySQLTest/corePostgreSQLTest.
-// A class joins a backend lane through its @CoreBackend.* annotation; see CoreBackend.java.
+// Core's tests run in three tasks: `test` (unit tests and H2, no Docker), coreMySQLTest and
+// corePostgreSQLTest. A class joins a backend through its @CoreBackend.* annotation; see
+// CoreBackend.java.
 // Backend name -> the JUnit tag that admits a class to that lane. Keep in sync with CoreBackend.
 val coreBackendTestTags =
   linkedMapOf(
@@ -123,13 +124,19 @@ val coreBackendTestTags =
   )
 val coreTestBackendProperty = "gravitino.core.test.backend"
 val coreDatabaseTaskNames =
-  setOf("coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
+  setOf("coreMySQLTest", "corePostgreSQLTest")
+// How many database tasks this build may run at once: those named explicitly, or both when
+// `check`/`build` pulls them in with Docker tests on.
+val coreDatabaseRequestedTasks = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }
 val coreDatabaseActiveLaneCount =
-  gradle.startParameter.taskNames
-    .map { it.substringAfterLast(':') }
-    .distinct()
-    .count { it in coreDatabaseTaskNames }
-    .coerceAtLeast(1)
+  if (
+    rootProject.extra["dockerTest"] == true &&
+    coreDatabaseRequestedTasks.any { it == "check" || it == "build" }
+  ) {
+    coreDatabaseTaskNames.size
+  } else {
+    coreDatabaseRequestedTasks.distinct().count { it in coreDatabaseTaskNames }.coerceAtLeast(1)
+  }
 val coreDatabaseTotalMemoryBytes =
   runCatching {
     (ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean)?.totalMemorySize ?: 0L
@@ -178,15 +185,10 @@ val sharedDbTestConnectionPoolSize = 20
 
 fun registerCoreTestTask(
   taskName: String,
-  backend: String? = null
+  backend: String
 ) = tasks.register<Test>(taskName) {
   group = "verification"
-  description =
-    if (backend == null) {
-      "Runs core unit tests."
-    } else {
-      "Runs core database tests against $backend."
-    }
+  description = "Runs core database tests against $backend."
 
   testClassesDirs = sourceSets["test"].output.classesDirs
   classpath = sourceSets["test"].runtimeClasspath
@@ -196,186 +198,174 @@ fun registerCoreTestTask(
   )
 
   useJUnitPlatform {
-    if (backend == null) {
-      // Whatever carries no backend tag (and no Docker tag) is the unit suite.
-      excludeTags(*coreBackendTestTags.values.toTypedArray(), "gravitino-docker-test")
-    } else {
-      val ownBackendTag =
-        coreBackendTestTags[backend]
-          ?: throw GradleException("Unsupported core test backend: $backend")
-      // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
-      // backend never show up in this lane's JUnit XML. A class tagged for several backends
-      // runs under each of them.
-      includeTags(ownBackendTag)
+    // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
+    // backend never show up in this task's JUnit XML. A class tagged for several backends runs
+    // under each of them.
+    includeTags(
+      coreBackendTestTags[backend] ?: throw GradleException("Unsupported core test backend: $backend")
+    )
+  }
+
+  val shardTelemetryDirectory =
+    layout.buildDirectory.dir("test-results/$taskName/shard-telemetry")
+  val laneMaximum = CoreDatabaseConcurrency.laneMaximum(true, macDockerConnectorFixedNetwork)
+  val concurrencyResolution =
+    CoreDatabaseConcurrency.resolve(
+      providers.gradleProperty(CoreDatabaseConcurrency.FORKS_PROPERTY).orNull,
+      providers.environmentVariable(CoreDatabaseConcurrency.FORKS_ENVIRONMENT_VARIABLE).orNull,
+      coreDatabaseDetectedCapacity,
+      coreDatabaseConcurrencyBudget,
+      laneMaximum
+    )
+
+  systemProperty(coreTestBackendProperty, backend)
+  // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
+  // configuration action has run - so it doesn't depend on register/configureEach ordering.
+  extensions.extraProperties["includeDockerTaggedTests"] = true
+
+  // Each Gradle worker owns its database server. JUnit execution remains serial inside it.
+  maxParallelForks = concurrencyResolution.forks()
+  systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+  systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+  systemProperty(
+    "gravitino.core.database.shard.telemetry.directory",
+    shardTelemetryDirectory.get().asFile.absolutePath
+  )
+  outputs.dir(shardTelemetryDirectory)
+
+  doFirst {
+    project.delete(shardTelemetryDirectory)
+    logger.lifecycle(
+      "[CORE-DB-CONCURRENCY] task={} forks={} source={} limitingFactor={} " +
+        "safeMaximum={} allowedMaximum={} processors={} totalMemoryBytes={} " +
+        "availableTestMemoryBytes={} memoryBasis={} buildReserveBytes={} " +
+        "buildReserveSource={} memoryBytesPerFork={} testWorkerMaxHeapBytes={} " +
+        "forkOverheadBytes={} forkOverheadSource={} gradleMaxWorkers={} " +
+        "activeDatabaseLanes={} rolloutCap={} laneMaximum={} " +
+        "macDockerConnectorFixedNetwork={} junitParallel=false",
+      path,
+      concurrencyResolution.forks(),
+      concurrencyResolution.source(),
+      concurrencyResolution.limitingFactor(),
+      concurrencyResolution.safeMaximum(),
+      concurrencyResolution.allowedMaximum(),
+      coreDatabaseDetectedCapacity.processors(),
+      coreDatabaseTotalMemoryBytes,
+      coreDatabaseAvailableMemoryBytes,
+      coreDatabaseMemoryBasis,
+      coreDatabaseMemoryConfiguration.buildReserveBytes(),
+      coreDatabaseMemoryConfiguration.buildReserveSource(),
+      coreDatabaseConcurrencyBudget.memoryBytesPerFork(),
+      CoreDatabaseConcurrency.TEST_WORKER_MAX_HEAP_BYTES,
+      coreDatabaseMemoryConfiguration.forkOverheadBytes(),
+      coreDatabaseMemoryConfiguration.forkOverheadSource(),
+      coreDatabaseDetectedCapacity.gradleMaxWorkers(),
+      coreDatabaseDetectedCapacity.activeDatabaseLanes(),
+      coreDatabaseConcurrencyBudget.rolloutCap(),
+      laneMaximum,
+      macDockerConnectorFixedNetwork
+    )
+  }
+
+  doLast {
+    val shardRecords =
+      shardTelemetryDirectory
+        .get()
+        .asFile
+        .walkTopDown()
+        .filter { it.isFile && it.extension == "log" }
+        .flatMap { it.readLines().asSequence() }
+        .filter { it.startsWith("[CORE-DB-SHARD]") }
+        .sorted()
+        .toList()
+    if (shardRecords.isEmpty()) {
+      throw GradleException("The $backend core database lane emitted no shard telemetry.")
+    }
+    shardRecords.forEach { logger.lifecycle(it) }
+  }
+
+  doFirst {
+    if (rootProject.extra["dockerTest"] != true) {
+      throw GradleException(
+        "$path requires Docker; use -PskipDockerTests=false with Docker running."
+      )
     }
   }
 
-  if (backend != null) {
-    val shardTelemetryDirectory =
-      layout.buildDirectory.dir("test-results/$taskName/shard-telemetry")
-    val laneMaximum =
-      CoreDatabaseConcurrency.laneMaximum(
-        backend != "h2",
-        macDockerConnectorFixedNetwork
-      )
-    val concurrencyResolution =
-      CoreDatabaseConcurrency.resolve(
-        providers.gradleProperty(CoreDatabaseConcurrency.FORKS_PROPERTY).orNull,
-        providers.environmentVariable(CoreDatabaseConcurrency.FORKS_ENVIRONMENT_VARIABLE).orNull,
-        coreDatabaseDetectedCapacity,
-        coreDatabaseConcurrencyBudget,
-        laneMaximum
-      )
+  // Contract with SharedCoreDatabaseProvisioner (core/src/test/java/.../storage/relational)
+  // and its ADMIN_PROPERTY_PREFIX/POOL_MAX_CONNECTIONS_PROPERTY constants - kept as literal
+  // strings on both sides rather than importing that class here, since a main build script
+  // cannot see a project's own test-source classes at configuration time (they are compiled
+  // by a task, not on the script's own classpath).
+  val sharedDbAdminPropertyPrefix = "gravitino.test.db."
+  systemProperty(sharedDbAdminPropertyPrefix + "pool.maxConnections", sharedDbTestConnectionPoolSize)
 
-    systemProperty(coreTestBackendProperty, backend)
-    // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
-    // configuration action has run - so it doesn't depend on register/configureEach ordering.
-    extensions.extraProperties["includeDockerTaggedTests"] = true
-
-    // Each Gradle worker owns its database server. JUnit execution remains serial inside it.
-    maxParallelForks = concurrencyResolution.forks()
-    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
-    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
-    systemProperty(
-      "gravitino.core.database.shard.telemetry.directory",
-      shardTelemetryDirectory.get().asFile.absolutePath
-    )
-    outputs.dir(shardTelemetryDirectory)
+  // Must match root build.gradle.kts's own dockerTest wiring exactly (rootProject.extra
+  // only, not e.g. System.getenv("dockerTest")): it unconditionally sets this task's
+  // dockerTest environment variable from rootProject.extra["dockerTest"], overriding
+  // anything a developer exported in their shell, which is what BackendTestExtension
+  // actually reads at test-JVM runtime. Gating shared-container startup on anything looser
+  // here could start it even when the forked test JVM will never see dockerTest=true and so
+  // never use it.
+  if (rootProject.extra["dockerTest"] == true) {
+    @Suppress("UNCHECKED_CAST")
+    val sharedDbContainerService =
+      rootProject.extra["sharedDbContainerService"] as Provider<SharedDbContainerService>
+    usesService(sharedDbContainerService)
 
     doFirst {
-      project.delete(shardTelemetryDirectory)
-      logger.lifecycle(
-        "[CORE-DB-CONCURRENCY] task={} forks={} source={} limitingFactor={} " +
-          "safeMaximum={} allowedMaximum={} processors={} totalMemoryBytes={} " +
-          "availableTestMemoryBytes={} memoryBasis={} buildReserveBytes={} " +
-          "buildReserveSource={} memoryBytesPerFork={} testWorkerMaxHeapBytes={} " +
-          "forkOverheadBytes={} forkOverheadSource={} gradleMaxWorkers={} " +
-          "activeDatabaseLanes={} rolloutCap={} laneMaximum={} " +
-          "macDockerConnectorFixedNetwork={} junitParallel=false",
-        path,
-        concurrencyResolution.forks(),
-        concurrencyResolution.source(),
-        concurrencyResolution.limitingFactor(),
-        concurrencyResolution.safeMaximum(),
-        concurrencyResolution.allowedMaximum(),
-        coreDatabaseDetectedCapacity.processors(),
-        coreDatabaseTotalMemoryBytes,
-        coreDatabaseAvailableMemoryBytes,
-        coreDatabaseMemoryBasis,
-        coreDatabaseMemoryConfiguration.buildReserveBytes(),
-        coreDatabaseMemoryConfiguration.buildReserveSource(),
-        coreDatabaseConcurrencyBudget.memoryBytesPerFork(),
-        CoreDatabaseConcurrency.TEST_WORKER_MAX_HEAP_BYTES,
-        coreDatabaseMemoryConfiguration.forkOverheadBytes(),
-        coreDatabaseMemoryConfiguration.forkOverheadSource(),
-        coreDatabaseDetectedCapacity.gradleMaxWorkers(),
-        coreDatabaseDetectedCapacity.activeDatabaseLanes(),
-        coreDatabaseConcurrencyBudget.rolloutCap(),
-        laneMaximum,
-        macDockerConnectorFixedNetwork
-      )
-    }
-
-    doLast {
-      val shardRecords =
-        shardTelemetryDirectory
-          .get()
-          .asFile
-          .walkTopDown()
-          .filter { it.isFile && it.extension == "log" }
-          .flatMap { it.readLines().asSequence() }
-          .filter { it.startsWith("[CORE-DB-SHARD]") }
-          .sorted()
-          .toList()
-      if (shardRecords.isEmpty()) {
-        throw GradleException("The $backend core database lane emitted no shard telemetry.")
-      }
-      shardRecords.forEach { logger.lifecycle(it) }
-    }
-
-    if (backend != "h2") {
-      doFirst {
-        if (rootProject.extra["dockerTest"] != true) {
-          throw GradleException(
-            "$path requires Docker; use -PskipDockerTests=false with Docker running."
-          )
-        }
-      }
-
-      // Contract with SharedCoreDatabaseProvisioner (core/src/test/java/.../storage/relational)
-      // and its ADMIN_PROPERTY_PREFIX/POOL_MAX_CONNECTIONS_PROPERTY constants - kept as literal
-      // strings on both sides rather than importing that class here, since a main build script
-      // cannot see a project's own test-source classes at configuration time (they are compiled
-      // by a task, not on the script's own classpath).
-      val sharedDbAdminPropertyPrefix = "gravitino.test.db."
-      systemProperty(sharedDbAdminPropertyPrefix + "pool.maxConnections", sharedDbTestConnectionPoolSize)
-
-      // Must match root build.gradle.kts's own dockerTest wiring exactly (rootProject.extra
-      // only, not e.g. System.getenv("dockerTest")): it unconditionally sets this task's
-      // dockerTest environment variable from rootProject.extra["dockerTest"], overriding
-      // anything a developer exported in their shell, which is what BackendTestExtension
-      // actually reads at test-JVM runtime. Gating shared-container startup on anything looser
-      // here could start it even when the forked test JVM will never see dockerTest=true and so
-      // never use it.
-      if (rootProject.extra["dockerTest"] == true) {
-        @Suppress("UNCHECKED_CAST")
-        val sharedDbContainerService =
-          rootProject.extra["sharedDbContainerService"] as Provider<SharedDbContainerService>
-        usesService(sharedDbContainerService)
-
-        doFirst {
-          val connectionInfo: DbConnectionInfo = sharedDbContainerService.get().connectionInfo(backend)
-          systemProperty(sharedDbAdminPropertyPrefix + backend + ".adminUrl", connectionInfo.adminJdbcUrl)
-          systemProperty(sharedDbAdminPropertyPrefix + backend + ".user", connectionInfo.user)
-          systemProperty(sharedDbAdminPropertyPrefix + backend + ".password", connectionInfo.password)
-        }
-      }
+      val connectionInfo: DbConnectionInfo = sharedDbContainerService.get().connectionInfo(backend)
+      systemProperty(sharedDbAdminPropertyPrefix + backend + ".adminUrl", connectionInfo.adminJdbcUrl)
+      systemProperty(sharedDbAdminPropertyPrefix + backend + ".user", connectionInfo.user)
+      systemProperty(sharedDbAdminPropertyPrefix + backend + ".password", connectionInfo.password)
     }
   }
 }
 
-registerCoreTestTask("coreUnitTest")
-registerCoreTestTask("coreH2Test", "h2")
 registerCoreTestTask("coreMySQLTest", "mysql")
 registerCoreTestTask("corePostgreSQLTest", "postgresql")
 
-val coreSuiteCoverage =
-  providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)
-val coreSuiteTaskNames =
-  listOf("coreUnitTest", "coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
-val coreSuiteExecutionData =
-  coreSuiteTaskNames.map { layout.buildDirectory.file("jacoco/$it.exec") }
-tasks.named<JacocoReport>("jacocoTestReport") {
-  if (coreSuiteCoverage.get()) {
-    dependsOn(tasks.named("classes"))
-    executionData.setFrom(coreSuiteExecutionData)
-  }
-}
-
-// :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
-// (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
-// TestRestrictedRegoGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
-// the legacy :core:test run it; the database lanes don't need the input.
-listOf("coreUnitTest", "test").forEach {
-  tasks.named<Test>(it) {
-    inputs.file(rootProject.file("docs/policies.md"))
-    systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
-  }
-}
-
+// `test` runs everything core can run without Docker: unit tests (no backend tag) and classes
+// tagged for H2, against H2. Classes tagged only for MySQL or PostgreSQL, and Docker-tagged
+// classes with no backend tag (see TestCoreLaneMembership), stay out. One JVM, as before the split.
 tasks.test {
-  doFirst {
-    logger.warn(
-      "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
-        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead."
+  // TestRestrictedRegoGoldenFile reads docs/policies.md.
+  inputs.file(rootProject.file("docs/policies.md"))
+  systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+  systemProperty(coreTestBackendProperty, "h2")
+  // Read by the root setTestEnvironment inside doFirst; lets H2 run the Docker-tagged backend
+  // classes, which need no container on H2.
+  extensions.extraProperties["includeDockerTaggedTests"] = true
+  useJUnitPlatform {
+    includeTags(
+      "${coreBackendTestTags.getValue("h2")} | " +
+        "!(${coreBackendTestTags.getValue("mysql")} | " +
+        "${coreBackendTestTags.getValue("postgresql")} | gravitino-docker-test)"
     )
   }
-  val testMode = project.properties["testMode"] as? String ?: "embedded"
-  if (testMode == "embedded") {
-    environment("GRAVITINO_HOME", project.rootDir.path)
-  } else {
-    environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+  maxParallelForks = 1
+  systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+}
+
+val coreDatabaseTestTasks = listOf("coreMySQLTest", "corePostgreSQLTest")
+// `check` (and so `build`) also runs the database tasks when Docker tests are on. They run no
+// tests under -PskipTests, which selects integration tests only and core has none.
+tasks.check {
+  if (rootProject.extra["dockerTest"] == true) {
+    dependsOn(coreDatabaseTestTasks)
   }
+}
+coreDatabaseTestTasks.forEach {
+  tasks.named(it) { onlyIf("-PskipTests selects integration tests only") { !rootProject.hasProperty("skipTests") } }
+}
+
+// One core report from the three tasks' exec files; missing ones (e.g. no Docker run) are skipped.
+tasks.named<JacocoReport>("jacocoTestReport") {
+  // `build` with Docker runs the database tasks too; report only after they finish.
+  mustRunAfter(coreDatabaseTestTasks)
+  executionData.setFrom(
+    (listOf("test") + coreDatabaseTestTasks).map { layout.buildDirectory.file("jacoco/$it.exec") }
+  )
 }
 
 tasks.withType<JavaCompile>().configureEach {

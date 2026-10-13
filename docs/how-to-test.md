@@ -35,28 +35,27 @@ To run the unit tests, run the following command:
 
 This command runs all the unit tests and skips the integration tests.
 
-### Core test lanes
+### Core tests
 
-`core` tests run in four lanes, one CI job each:
+`core` tests run in three tasks, one CI job each:
 
-| Lane | Runs | Needs Docker |
+| Command | Runs | Needs Docker |
 | --- | --- | --- |
-| `./gradlew :core:coreUnitTest` | tests with no database backend | no |
-| `./gradlew :core:coreH2Test` | classes tagged for H2 | no |
+| `./gradlew :core:test` | unit tests and classes tagged for H2, against H2 | no |
 | `./gradlew :core:coreMySQLTest -PskipDockerTests=false` | classes tagged for MySQL | yes |
 | `./gradlew :core:corePostgreSQLTest -PskipDockerTests=false` | classes tagged for PostgreSQL | yes |
 
-A class joins a database lane through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these runs in `coreUnitTest`. A class tagged `gravitino-docker-test` with none of these runs in no lane, and `TestCoreLaneMembership` fails until you add one.
+`./gradlew build` runs `:core:test`, and also the MySQL and PostgreSQL tasks when you pass `-PskipDockerTests=false`; skip those with `-x :core:coreMySQLTest -x :core:corePostgreSQLTest`. From the IDE, run a class tagged only for MySQL or PostgreSQL through its task, for example `./gradlew :core:coreMySQLTest --tests ...`.
 
-When you add or move a core test, check that it runs in the lane you expect:
+A class joins a database backend through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these is a unit test and runs in `:core:test`. A class tagged `gravitino-docker-test` with none of these runs nowhere, and `TestCoreLaneMembership` fails until you add one.
+
+To check where a class runs, run it with `--tests`:
 
 ```shell
-./gradlew :core:coreH2Test --tests 'org.apache.gravitino.storage.relational.service.TestYourService'
+./gradlew :core:test --tests 'org.apache.gravitino.storage.relational.service.TestYourService'
 ```
 
-If the class is not in that lane, Gradle fails with "No tests found for given includes".
-
-In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
+If the class does not run in that task, Gradle fails with "No tests found for given includes". In CI, `build (17)` skips `:core:test`; each core task reports under its own `core-test (17, <backend>)` check.
 
 ## Run the Integration Tests
 

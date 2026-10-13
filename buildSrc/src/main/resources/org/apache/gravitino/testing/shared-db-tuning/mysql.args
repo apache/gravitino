@@ -35,7 +35,7 @@
 # data dir; these flags add roughly a further 6%. See README.md next to this
 # file for the full attribution table.
 # All runs: 520 tests, 0 failures, 0 deadlocks / lock-wait timeouts.
-# core:coreH2Test is unchanged across all runs (1m27s -> 1m21s), the control
+# core:test (H2) is unchanged across all runs (1m27s -> 1m21s), the control
 # confirming the speedup is database I/O and not the host.
 #
 # NOTE: --performance-schema is deliberately NOT disabled here, even though

@@ -27,11 +27,11 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 
 /**
- * Annotations that choose which core database test lane(s) a class runs in. Each lane task ({@code
- * coreH2Test}, {@code coreMySQLTest}, {@code corePostgreSQLTest}) includes only classes with its
- * tag; stack annotations to join several lanes, or use {@link All}. A class with none of them is a
- * unit test and runs in {@code coreUnitTest}. {@code TestCoreLaneMembership} fails if a class
- * carries {@code gravitino-docker-test} but no backend tag, since it would run in no lane.
+ * Annotations that choose which core database backends a class runs against. {@code test} runs
+ * classes with no backend tag and classes tagged for H2; {@code coreMySQLTest} and {@code
+ * corePostgreSQLTest} run only classes tagged for their backend. Stack annotations to join several
+ * backends, or use {@link All}. {@code TestCoreLaneMembership} fails if a class carries {@code
+ * gravitino-docker-test} but no backend tag, since it would run in no task.
  *
  * <p>The lane, not the class, decides whether Docker is needed: MySQL and PostgreSQL require it and
  * H2 does not, so a class tagged for H2 must not need a container itself. The tag strings must stay
@@ -50,7 +50,7 @@ public final class CoreBackend {
 
   private CoreBackend() {}
 
-  /** Pins a core database test class to the H2 lane ({@code coreH2Test}). */
+  /** Runs a core database test class against H2, in {@code test}. */
   @Documented
   @Inherited
   @Retention(RetentionPolicy.RUNTIME)
