@@ -32,6 +32,7 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.types.Types;
@@ -147,6 +148,15 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
         viewCatalog.loadView(NameIdentifier.of(schemaName, viewName.toUpperCase(Locale.ROOT)));
     Assertions.assertEquals(viewName, loadedView.name());
 
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(
+                NameIdentifier.of(
+                    schemaName.toUpperCase(Locale.ROOT),
+                    baseTableIdentifier.name().toUpperCase(Locale.ROOT)));
+    Assertions.assertEquals(baseTableIdentifier.name(), loadedTable.name());
+
     Dataset<Row> rows =
         spark.sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName));
     List<Row> results = rows.collectAsList();
@@ -171,7 +181,7 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
     Assertions.assertEquals(createdSchema.properties().get("key"), "hive");
 
     // load schema check.
-    Schema schema = schemas.loadSchema(schemaIdent.name());
+    Schema schema = schemas.loadSchema(schemaIdent.name().toUpperCase(Locale.ROOT));
     Assertions.assertEquals(schema.properties().get("key"), "hive");
     Map<String, String> loadedProps = paimonCatalog.getDatabase(schemaIdent.name()).options();
     Assertions.assertEquals(loadedProps.get("key"), "hive");

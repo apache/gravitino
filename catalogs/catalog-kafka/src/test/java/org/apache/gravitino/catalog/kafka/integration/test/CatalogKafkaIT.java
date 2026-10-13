@@ -41,7 +41,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -241,9 +240,10 @@ public class CatalogKafkaIT extends BaseIT {
 
     Catalog conflictingCatalog =
         createCatalog(conflictingCatalogName, "conflicting catalog", properties);
-    RESTException exception =
+    UnsupportedOperationException exception =
         Assertions.assertThrows(
-            RESTException.class, () -> conflictingCatalog.asTopicCatalog().loadTopic(topicIdent));
+            UnsupportedOperationException.class,
+            () -> conflictingCatalog.asTopicCatalog().loadTopic(topicIdent));
     Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
 
     // The rejected import must not move the active entity away from its original path.
