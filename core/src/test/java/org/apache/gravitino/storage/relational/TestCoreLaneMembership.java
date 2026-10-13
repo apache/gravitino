@@ -20,20 +20,27 @@ package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Modifier;
 import java.net.URL;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.commons.annotation.Testable;
+import org.junit.platform.commons.support.AnnotationSupport;
+import org.junit.platform.commons.support.HierarchyTraversalMode;
 import org.junit.platform.commons.support.ReflectionSupport;
 
 /**
  * Fails when a core test class runs in no lane: it carries {@code gravitino-docker-test}, which
  * keeps it out of {@code coreUnitTest}, but no {@link CoreBackend} tag, which keeps it out of every
- * database lane. {@code core_test_identity.py reconcile} only compares the database lanes with each
- * other, so a class that leaves all three at once would otherwise go unnoticed.
+ * database lane. Nothing else notices a class that leaves every lane at once.
  */
 class TestCoreLaneMembership {
+
+  private static final String DOCKER_TAG = "gravitino-docker-test";
 
   private static final Set<String> BACKEND_TAGS =
       Set.of(CoreBackend.H2_TAG, CoreBackend.MYSQL_TAG, CoreBackend.POSTGRESQL_TAG);
@@ -44,13 +51,13 @@ class TestCoreLaneMembership {
     List<String> orphans =
         ReflectionSupport.findAllClassesInPackage(
                 "org.apache.gravitino",
-                c -> coreTestClasses.equals(codeLocation(c)) && CoreTestLaneOf.declaresTests(c),
+                c -> coreTestClasses.equals(codeLocation(c)) && declaresTests(c),
                 name -> true)
             .stream()
             .filter(
                 c -> {
-                  Set<String> tags = CoreTestLaneOf.effectiveTags(c);
-                  return tags.contains(CoreTestLaneOf.DOCKER_TAG)
+                  Set<String> tags = effectiveTags(c);
+                  return tags.contains(DOCKER_TAG)
                       && tags.stream().noneMatch(BACKEND_TAGS::contains);
                 })
             .map(Class::getName)
@@ -62,6 +69,34 @@ class TestCoreLaneMembership {
         "These classes carry gravitino-docker-test but no @CoreBackend.* tag, so they run in no "
             + "core test lane. Add @CoreBackend.H2/MySQL/PostgreSQL or @CoreBackend.All: "
             + orphans);
+  }
+
+  /**
+   * Whether JUnit would run {@code c}: concrete, with at least one {@code @Test}-style method (all
+   * meta-annotated with {@link Testable}), own or inherited.
+   */
+  private static boolean declaresTests(Class<?> c) {
+    return !Modifier.isAbstract(c.getModifiers())
+        && !ReflectionSupport.findMethods(
+                c,
+                m -> AnnotationSupport.isAnnotated(m, Testable.class),
+                HierarchyTraversalMode.TOP_DOWN)
+            .isEmpty();
+  }
+
+  /**
+   * Own and inherited tags, plus the enclosing classes' tags for non-static {@code @Nested}
+   * classes, which JUnit applies to them. Static member classes are discovered as top-level classes
+   * and don't inherit their enclosing class's tags.
+   */
+  private static Set<String> effectiveTags(Class<?> c) {
+    Set<String> tags = new HashSet<>();
+    for (Class<?> k = c;
+        k != null;
+        k = Modifier.isStatic(k.getModifiers()) ? null : k.getEnclosingClass()) {
+      AnnotationSupport.findRepeatableAnnotations(k, Tag.class).forEach(t -> tags.add(t.value()));
+    }
+    return tags;
   }
 
   private static URL codeLocation(Class<?> c) {

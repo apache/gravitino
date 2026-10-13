@@ -119,8 +119,8 @@ artifacts {
 //   @CoreBackend.H2 @CoreBackend.MySQL     -> runs in coreH2Test and coreMySQLTest
 //   @CoreBackend.All                       -> runs in all three backend lanes
 //   (no CoreBackend annotation at all)     -> a plain unit test, runs in coreUnitTest
-// A class needing Docker but carrying no backend tag runs in no lane at all - check locally
-// with `./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName>`.
+// A class needing Docker but carrying no backend tag runs in no lane at all, and
+// TestCoreLaneMembership fails coreUnitTest for it.
 //
 // Backend name -> JUnit tag that admits a test class to that backend's lane. Adding a backend
 // here is enough to teach the lane filtering below about it; also add it to CoreBackend.java.
@@ -204,22 +204,6 @@ registerCoreTestTask("coreH2Test", "h2")
 registerCoreTestTask("coreMySQLTest", "mysql")
 registerCoreTestTask("corePostgreSQLTest", "postgresql")
 
-tasks.register<JavaExec>("coreTestLaneOf") {
-  group = "verification"
-  description = "Prints which core database test lane(s) a class runs in, from its tags, " +
-    "without running anything. Usage: -PclassName=<fully.qualified.ClassName>"
-  dependsOn(tasks.named("testClasses"))
-  classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("org.apache.gravitino.storage.relational.CoreTestLaneOf")
-  doFirst {
-    val className = project.findProperty("className") as? String
-      ?: throw GradleException(
-        "Usage: ./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName>"
-      )
-    args(className)
-  }
-}
-
 val coreSuiteCoverage =
   providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)
 val coreSuiteTaskNames =
@@ -254,8 +238,7 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 // deprecated in place, not removed:
 //  - Dev CUJ: a contributor running tests locally should target one of the four lanes registered
 //    above (coreUnitTest / coreH2Test / coreMySQLTest / corePostgreSQLTest), never :core:test -
-//    it predates the lane split and does not correspond to any CI lane. Check where a class runs
-//    with `./gradlew :core:coreTestLaneOf -PclassName=...` instead of guessing.
+//    it predates the lane split and does not correspond to any CI lane.
 //  - CI CUJ: no change needed here. build.yml's `build` job passes `-x :core:test` and runs each
 //    lane in its own `core-test` job. Backend IT still realizes it via the root `test` task under
 //    -PskipTests, where the `**/integration/test/**` filter matches nothing in core, so the
@@ -268,9 +251,7 @@ tasks.test {
   doFirst {
     logger.warn(
       "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
-        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead - run " +
-        "./gradlew :core:coreTestLaneOf -PclassName=<fully.qualified.ClassName> to check which " +
-        "one(s) a class belongs to."
+        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead."
     )
   }
   val testMode = project.properties["testMode"] as? String ?: "embedded"

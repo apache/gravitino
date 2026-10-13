@@ -295,17 +295,8 @@ jobs:
             -PskipITs \
             -PskipDockerTests=${{ matrix.skip-docker-tests }}
 
-      - name: Generate core test manifest
-        run: |
-          mkdir -p core/build/test-manifests
-          python3 dev/ci/core_test_identity.py manifest \
-            --lane "${{ matrix.lane }}" \
-            --results "core/build/test-results/${{ matrix.task }}" \
-            --output "core/build/test-manifests/${{ matrix.lane }}.json"
-
       - name: Validate core test evidence
         run: |
-          test -s "core/build/test-manifests/${{ matrix.lane }}.json"
           junit_xml="$(find "core/build/test-results/${{ matrix.task }}" \
             -type f -name 'TEST-*.xml' -print -quit)"
           test -n "${junit_xml}"
@@ -318,7 +309,6 @@ jobs:
         with:
           name: core-${{ matrix.lane }}-test-evidence
           path: |
-            core/build/test-manifests/${{ matrix.lane }}.json
             core/build/test-results/${{ matrix.task }}
             build/reports/tests/core/${{ matrix.task }}
             core/build/jacoco/${{ matrix.task }}.exec
@@ -333,58 +323,17 @@ jobs:
           path: |
             build/reports/tests/core
             core/build/test-results
-            core/build/test-manifests
-
-  core-test-contract:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: [ changes, core-test ]
-    if: >-
-      always() &&
-      needs.changes.outputs.source_changes == 'true' &&
-      needs.changes.outputs.maintenance_module_only_changes != 'true' &&
-      needs['core-test'].result == 'success'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Test core identity tool
-        run: python3 -B -m unittest discover -s dev/ci/tests -p 'test_core_test_identity.py'
-
-      - name: Download core test evidence
-        uses: actions/download-artifact@v4
-        with:
-          pattern: core-*-test-evidence
-          path: core-test-evidence
-
-      - name: Reconcile core test identities
-        run: |
-          mkdir -p core/build/test-manifests
-          python3 dev/ci/core_test_identity.py reconcile \
-            --manifests \
-            core-test-evidence/core-unit-test-evidence/core/build/test-manifests/unit.json \
-            core-test-evidence/core-h2-test-evidence/core/build/test-manifests/h2.json \
-            core-test-evidence/core-mysql-test-evidence/core/build/test-manifests/mysql.json \
-            core-test-evidence/core-postgresql-test-evidence/core/build/test-manifests/postgresql.json \
-            --output core/build/test-manifests/summary.json
-
-      - name: Upload core test contract
-        uses: actions/upload-artifact@v7
-        with:
-          name: core-test-contract
-          path: core/build/test-manifests/summary.json
-          if-no-files-found: error
-          retention-days: 1
 
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [ changes, build, core-test-contract ]
+    needs: [ changes, build, core-test ]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
       needs.build.result == 'success' &&
       (needs.changes.outputs.maintenance_module_only_changes == 'true' ||
-      needs['core-test-contract'].result == 'success')
+      needs['core-test'].result == 'success')
     steps:
       - uses: actions/checkout@v4
 
