@@ -19,11 +19,19 @@
 package org.apache.gravitino.trino.connector;
 
 import static io.trino.spi.ErrorType.EXTERNAL;
+import static io.trino.spi.StandardErrorCode.CATALOG_UNAVAILABLE;
+import static io.trino.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 
 import io.trino.spi.ErrorCode;
 import io.trino.spi.ErrorCodeSupplier;
 import io.trino.spi.ErrorType;
-import java.util.List;
+import io.trino.spi.TrinoException;
+import java.util.concurrent.ExecutionException;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NotInUseException;
 
 /** Gravitino error code. */
 public enum GravitinoErrorCode implements ErrorCodeSupplier {
@@ -94,15 +102,59 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   }
 
   /**
-   * Converts an exception's message to a simplified error message. If the message contains multiple
-   * lines, returns the first two lines concatenated. If the message contains only one line, returns
-   * that line.
+   * Converts an exception into a Trino exception. See {@link #toTrinoException(Exception, String)}.
    *
-   * @param e the exception whose message should be simplified
-   * @return the simplified error message
+   * @param e the exception to convert
+   * @return the Trino exception to throw
    */
-  public static String toSimpleErrorMessage(Exception e) {
-    List<String> lines = e.getMessage().lines().toList();
-    return lines.size() > 1 ? lines.get(0) + lines.get(1) : lines.get(0);
+  public static TrinoException toTrinoException(Exception e) {
+    return toTrinoException(e, null);
+  }
+
+  /**
+   * Converts an exception into a Trino exception. A {@link TrinoException} is returned as is, and
+   * an {@link ExecutionException} is classified by its cause. {@link ForbiddenException}, {@link
+   * NotInUseException}, {@link IllegalArgumentException} and {@link UnsupportedOperationException}
+   * map to {@code PERMISSION_DENIED}, {@code CATALOG_UNAVAILABLE}, {@link
+   * #GRAVITINO_ILLEGAL_ARGUMENT} and {@link #GRAVITINO_UNSUPPORTED_OPERATION}. Anything else maps
+   * to {@code GENERIC_INTERNAL_ERROR}.
+   *
+   * @param exception the exception to convert
+   * @param context describes the failed operation; it prefixes the message of an exception that
+   *     maps to {@code GENERIC_INTERNAL_ERROR}, whose own message may not say what failed
+   * @return the Trino exception to throw
+   */
+  public static TrinoException toTrinoException(Exception exception, @Nullable String context) {
+    Exception e =
+        exception instanceof ExecutionException && exception.getCause() instanceof Exception
+            ? (Exception) exception.getCause()
+            : exception;
+    if (e instanceof TrinoException) {
+      return (TrinoException) e;
+    }
+    if (e instanceof ForbiddenException) {
+      return new TrinoException(PERMISSION_DENIED, firstLineMessage(e), e);
+    }
+    if (e instanceof NotInUseException) {
+      return new TrinoException(CATALOG_UNAVAILABLE, firstLineMessage(e), e);
+    }
+    if (e instanceof IllegalArgumentException) {
+      return new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, firstLineMessage(e), e);
+    }
+    if (e instanceof UnsupportedOperationException) {
+      return new TrinoException(GRAVITINO_UNSUPPORTED_OPERATION, firstLineMessage(e), e);
+    }
+    String message = firstLineMessage(e);
+    return new TrinoException(
+        GENERIC_INTERNAL_ERROR, context == null ? message : context + ": " + message, e);
+  }
+
+  // Keeps the first non-blank line of the message. A failure received over REST carries the server
+  // stack trace after it, and other failures may add details there as well; the full text stays
+  // available in the cause.
+  private static String firstLineMessage(Exception e) {
+    return StringUtils.isBlank(e.getMessage())
+        ? e.toString()
+        : e.getMessage().lines().filter(StringUtils::isNotBlank).findFirst().orElse(e.toString());
   }
 }

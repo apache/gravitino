@@ -291,11 +291,7 @@ public class GravitinoConnector implements Connector {
       Throwable cause = e.getCause() == null ? e : e.getCause();
       LOG.warn(
           cause, "Failed to create per-user Gravitino client for user '%s'", session.getUser());
-      if (cause instanceof TrinoException) {
-        // Already carries a specific Trino error code (e.g. from buildForSession); re-wrapping
-        // would swallow it.
-        throw (TrinoException) cause;
-      }
+      // buildAuthClient raises these for an invalid or unsupported credential.
       if (cause instanceof IllegalArgumentException
           || cause instanceof UnsupportedOperationException) {
         throw new TrinoException(
@@ -305,6 +301,11 @@ public class GravitinoConnector implements Connector {
                 + "' with Gravitino: "
                 + cause.getMessage(),
             cause);
+      }
+      if (cause instanceof Exception) {
+        throw GravitinoErrorCode.toTrinoException(
+            (Exception) cause,
+            "Failed to create per-user Gravitino client for user '" + session.getUser() + "'");
       }
       throw new TrinoException(
           GENERIC_INTERNAL_ERROR,

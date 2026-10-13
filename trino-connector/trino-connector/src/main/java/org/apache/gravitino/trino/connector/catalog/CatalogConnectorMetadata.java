@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
-import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
-
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
@@ -35,8 +33,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -93,8 +91,8 @@ public class CatalogConnectorMetadata {
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
           "Catalog does not support schema or table operations." + e.getMessage(),
           e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -109,8 +107,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -119,7 +117,7 @@ public class CatalogConnectorMetadata {
    *
    * @param schemaName the name of the schema
    * @return the Gravitino schema
-   * @throws TrinoException if the schema is not found
+   * @throws TrinoException if the schema is not found or the request fails
    */
   public GravitinoSchema getSchema(String schemaName) {
     try {
@@ -128,8 +126,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -139,7 +137,7 @@ public class CatalogConnectorMetadata {
    * @param schemaName the name of the schema
    * @param tableName the name of the table
    * @return the Gravitino table
-   * @throws TrinoException if the table is not found
+   * @throws TrinoException if the table is not found or the request fails
    */
   public GravitinoTable getTable(String schemaName, String tableName) {
     try {
@@ -148,8 +146,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchTableException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist", e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -166,8 +164,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -181,8 +179,8 @@ public class CatalogConnectorMetadata {
   public boolean tableExists(String schemaName, String tableName) {
     try {
       return tableCatalog.tableExists(NameIdentifier.of(schemaName, tableName));
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -212,8 +210,8 @@ public class CatalogConnectorMetadata {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
       }
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -231,8 +229,8 @@ public class CatalogConnectorMetadata {
     } catch (TableAlreadyExistsException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS, "Schema already exists", e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -254,8 +252,8 @@ public class CatalogConnectorMetadata {
     } catch (NonEmptySchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -270,8 +268,8 @@ public class CatalogConnectorMetadata {
       dropped =
           tableCatalog.dropTable(
               NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()));
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
     if (!dropped) {
       throw new TrinoException(
@@ -296,8 +294,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchTableException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -460,8 +458,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -472,6 +470,7 @@ public class CatalogConnectorMetadata {
    * @param functionName the name of the function
    * @return the function
    * @throws UnsupportedOperationException if the catalog does not support functions
+   * @throws NoSuchFunctionException if the function does not exist
    */
   public Function getFunction(String schemaName, String functionName) {
     if (!supportsFunctions()) {
@@ -479,31 +478,11 @@ public class CatalogConnectorMetadata {
     }
     try {
       return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
-    } catch (ForbiddenException | IllegalArgumentException e) {
-      throw toTrinoException(e);
+    } catch (NoSuchFunctionException e) {
+      // Callers treat a missing function as an empty result.
+      throw e;
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
-  }
-
-  /**
-   * Converts a refusal reported by the Gravitino server into a Trino exception that classifies it
-   * as a user-facing error instead of an internal one.
-   */
-  private static TrinoException toTrinoException(RuntimeException e) {
-    if (e instanceof ForbiddenException) {
-      // A refusal received over REST carries the server stack trace after the first line, and the
-      // first line already holds the complete reason.
-      String message =
-          e.getMessage() == null
-              ? e.toString()
-              : e.getMessage().lines().findFirst().orElse(e.toString());
-      return new TrinoException(PERMISSION_DENIED, message, e);
-    }
-    // Server-side validation failures, such as an illegal object name or a policy refusal.
-    // TODO yuhui need improve get the error message. From IllegalArgumentException.
-    // At present, the IllegalArgumentException cannot get the error information clearly from the
-    // Gravitino server.
-    String message =
-        e.getMessage() == null ? e.toString() : GravitinoErrorCode.toSimpleErrorMessage(e);
-    return new TrinoException(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, message, e);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import static io.trino.spi.StandardErrorCode.CATALOG_UNAVAILABLE;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -158,6 +160,20 @@ public class TestCatalogConnectorMetadataErrors {
                 metadata.renameTable(
                     new SchemaTableName("s", "t"), new SchemaTableName("s", "t2")));
     assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testLoadCatalogNotInUseIsCatalogUnavailable() {
+    String message = "Catalog m.c is not in use";
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    when(metalake.loadCatalog(anyString())).thenThrow(new CatalogNotInUseException(message));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () -> new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c")));
+    assertEquals(CATALOG_UNAVAILABLE.toErrorCode(), e.getErrorCode());
+    assertEquals(message, e.getMessage());
   }
 
   private static CatalogConnectorMetadata createMetadata(TableCatalog tableCatalog) {
