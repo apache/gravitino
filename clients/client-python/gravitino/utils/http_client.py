@@ -168,7 +168,10 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
-        if data:
+        if isinstance(data, (str, bytes)):
+            request_data = data.encode("utf-8") if isinstance(data, str) else data
+            self._update_headers(self.JSON_HEADER)
+        elif data:
             request_data = urlencode(data.to_dict()).encode()
             self._update_headers(self.FORMDATA_HEADER)
         else:
