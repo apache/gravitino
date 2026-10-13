@@ -304,6 +304,84 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
+  /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
+  @EqualsAndHashCode
+  @ToString
+  class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+    private IcebergRewriteManifestsContentDTO() {}
+
+    /**
+     * @return empty rewrite-manifests content DTO
+     */
+    public static IcebergRewriteManifestsContentDTO instance() {
+      return new IcebergRewriteManifestsContentDTO();
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergRewriteManifests();
+    }
+  }
+
+  /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
+  @EqualsAndHashCode
+  @ToString
+  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    private IcebergSnapshotExpirationContentDTO() {}
+
+    /**
+     * @return empty snapshot-expiration content DTO
+     */
+    public static IcebergSnapshotExpirationContentDTO instance() {
+      return new IcebergSnapshotExpirationContentDTO();
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergSnapshotExpiration();
+    }
+  }
+
   /** Represents typed row-filter policy content. */
   @EqualsAndHashCode
   @ToString
