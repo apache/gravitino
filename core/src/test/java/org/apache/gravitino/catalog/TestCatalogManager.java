@@ -1001,7 +1001,63 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCatalogChangeLogListenerSkipsInvalidationForLocalMutation() throws Exception {
+  void testPollBeforeLocalMutationReturnsDoesNotMaskRemoteMutation() throws Exception {
+    ChangeLogAwareEntityStore store = Mockito.spy(new ChangeLogAwareEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of("metalake", "late_local_marker");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+    try {
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+      Mockito.doAnswer(
+              invocation -> {
+                Object result = invocation.callRealMethod();
+                // The transaction has completed but CatalogManager's mutation caller has not
+                // returned.
+                store
+                    .listener
+                    .get()
+                    .onEntityChange(
+                        List.of(
+                            new EntityChangeRecord(
+                                1L,
+                                "metalake",
+                                "CATALOG",
+                                ident.toString(),
+                                OperateType.ALTER,
+                                0L)));
+                return result;
+              })
+          .when(store)
+          .update(
+              Mockito.eq(ident),
+              Mockito.eq(CatalogEntity.class),
+              Mockito.eq(EntityType.CATALOG),
+              Mockito.any());
+      manager.alterCatalog(ident, CatalogChange.updateComment("changed"));
+      Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
+      Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
+      store
+          .listener
+          .get()
+          .onEntityChange(
+              List.of(
+                  new EntityChangeRecord(
+                      2L, "metalake", "CATALOG", ident.toString(), OperateType.ALTER, 0L)));
+      Assertions.assertNull(
+          manager.getCatalogCache().getIfPresent(ident),
+          "A late local marker must not suppress the next remote mutation");
+    } finally {
+      manager.close();
+    }
+  }
+
+  @Test
+  void testCatalogChangeLogListenerInvalidatesLocalMutation() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "change_log_local");
     Map<String, String> props =
         ImmutableMap.of(
@@ -1018,21 +1074,15 @@ public class TestCatalogManager {
     Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
     Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
 
-    // Enable local-mutation tracking, which a CatalogManager backed by a change-log-aware store
-    // would have turned on in its constructor. The in-memory store used here does not support a
-    // change log, so set it explicitly.
-    catalogManager.setTrackLocalMutations(true);
-    catalogManager.markLocalMutation(ident);
-
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
     listener.onEntityChange(
         List.of(
             new EntityChangeRecord(
                 1L, "metalake", "CATALOG", "metalake.change_log_local", OperateType.ALTER, 0L)));
 
-    Assertions.assertNotNull(
+    Assertions.assertNull(
         catalogManager.getCatalogCache().getIfPresent(ident),
-        "Cache should NOT be invalidated for local mutations");
+        "Local events must not suppress catalog invalidation");
   }
 
   @Test
@@ -1159,7 +1209,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testFailedCreateCatalogCleanupMarksLocalMutation() throws Exception {
+  void testFailedCreateCleanupAndSubsequentAlterInvalidateRecreatedCatalog() throws Exception {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
     store.initialize(config);
     store.put(metalakeEntity, true);
@@ -1194,13 +1244,8 @@ public class TestCatalogManager {
     Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
     Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Simulate a subsequent local mutation (e.g. disableCatalog) that writes an ALTER record.
-    manager.markLocalMutation(ident);
-
-    // The poller delivers both records in one batch: the DROP from the failed-create cleanup and
-    // the ALTER from the local mutation. The cleanup DROP must carry its own local-mutation token
-    // (the fix); otherwise it consumes the ALTER's token, the ALTER is treated as remote, and the
-    // in-use cached wrapper is spuriously invalidated and asynchronously closed.
+    // Cleanup DROP and subsequent ALTER both invalidate the recreated entry. No local marker
+    // may suppress either record; active operations remain protected by CatalogLease.
     store
         .listener
         .get()
@@ -1221,10 +1266,9 @@ public class TestCatalogManager {
                     OperateType.ALTER,
                     0L)));
 
-    Assertions.assertNotNull(
+    Assertions.assertNull(
         manager.getCatalogCache().getIfPresent(ident),
-        "Cache should NOT be invalidated: the failed-create cleanup DROP must be tracked as a "
-            + "local mutation so it does not steal the token meant for the later ALTER");
+        "Cleanup and alter records must conservatively invalidate a recreated catalog");
     manager.close();
   }
 

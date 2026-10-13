@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -54,6 +56,14 @@ import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.AbstractConfiguration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -65,12 +75,353 @@ public class TestEntityChangeLogPoller {
   private static final int MAX_ROWS = 2000;
 
   @Test
+  void testReplayRecoversLateLowerIdWithoutMovingCursorBackOrRedelivering() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord late =
+        new EntityChangeRecord(1, "ml1", "TABLE", "ml1.cat.schema.late", OperateType.DROP, 100);
+    EntityChangeRecord fast =
+        new EntityChangeRecord(2, "ml1", "TABLE", "ml1.cat.schema.fast", OperateType.ALTER, 200);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(List.of(fast));
+    when(mapper.selectEntityChanges(2, 2)).thenReturn(List.of());
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2))
+        .thenReturn(List.of(fast), List.of(late, fast), List.of(late, fast));
+    when(mapper.selectRecentEntityChanges(200, 2, 2, 60000, 2)).thenReturn(List.of());
+    List<EntityChangeRecord> received = new ArrayList<>();
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, 2, metrics);
+      poller.registerListener(replayListener(received));
+      Assertions.assertFalse(poller.pollChanges());
+      Assertions.assertTrue(poller.pollChanges());
+      Assertions.assertFalse(poller.pollChanges());
+      Assertions.assertTrue(poller.pollChanges());
+      Assertions.assertEquals(List.of(2L, 1L), ids(received));
+      Assertions.assertEquals(
+          2L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+    }
+  }
+
+  @Test
+  void testReplayPagesEqualTimestampsAndRestartsForLaterVisibleRows() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(4, 4));
+    when(mapper.selectEntityChanges(4, 2)).thenReturn(List.of());
+    when(mapper.selectRecentEntityChanges(-1, 0, 4, 60000, 2))
+        .thenReturn(changes(2, 3), changes(1, 2));
+    when(mapper.selectRecentEntityChanges(0, 3, 4, 60000, 2)).thenReturn(changes(4, 4));
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource());
+      poller.registerListener(replayListener(received));
+      Assertions.assertTrue(poller.pollChanges());
+      Assertions.assertFalse(poller.pollChanges());
+      Assertions.assertTrue(poller.pollChanges());
+      Assertions.assertEquals(List.of(4L, 2L, 3L, 1L), ids(received));
+      verify(mapper).selectRecentEntityChanges(0, 3, 4, 60000, 2);
+    }
+  }
+
+  @Test
+  void testReplayFailureDoesNotBlockIncrementalDeliveryOrRetryNewRows() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 1));
+    when(mapper.selectEntityChanges(1, 2)).thenReturn(changes(2, 2));
+    when(mapper.selectRecentEntityChanges(-1, 0, 1, 60000, 2))
+        .thenThrow(new IllegalStateException("replay unavailable"))
+        .thenReturn(changes(1, 1));
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      AtomicLong clock = new AtomicLong();
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+      poller.registerListener(replayListener(received));
+      Assertions.assertFalse(poller.pollChanges());
+      clock.set(TimeUnit.SECONDS.toNanos(1));
+      Assertions.assertFalse(poller.pollChanges());
+      Assertions.assertEquals(List.of(1L, 2L), ids(received));
+      verify(mapper, times(2)).selectRecentEntityChanges(-1, 0, 1, 60000, 2);
+    }
+  }
+
+  @Test
+  void testReplayFailureIsRateLimitedWhileIncrementalBacklogDrains() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 2));
+    when(mapper.selectEntityChanges(2, 2)).thenReturn(changes(3, 4));
+    when(mapper.selectEntityChanges(4, 2)).thenReturn(List.of());
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2))
+        .thenThrow(new IllegalStateException("replay unavailable"));
+    AtomicLong clock = new AtomicLong();
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+      poller.registerListener(replayListener(received));
+      Assertions.assertTrue(poller.pollChanges());
+      Assertions.assertTrue(poller.pollChanges());
+      verify(mapper).selectRecentEntityChanges(-1, 0, 2, 60000, 2);
+      Assertions.assertEquals(List.of(1L, 2L, 3L, 4L), ids(received));
+      clock.set(TimeUnit.SECONDS.toNanos(1));
+      Assertions.assertFalse(poller.pollChanges());
+      verify(mapper, times(2)).selectRecentEntityChanges(-1, 0, 2, 60000, 2);
+    }
+  }
+
+  @Test
+  void testCapacityWarningsAreRateLimitedAndCountSuppressedEvictions() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 2));
+    when(mapper.selectEntityChanges(2, 2)).thenReturn(changes(3, 4));
+    when(mapper.selectEntityChanges(4, 2)).thenReturn(changes(5, 6));
+    AtomicLong clock = new AtomicLong();
+    List<LogEvent> logs =
+        captureReplayLogs(
+            () -> {
+              try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+                mockSessionUtils(sessions, mapper);
+                EntityChangeLogPoller poller =
+                    spy(new EntityChangeLogPoller(1, 2, 60, 1, new EntityChangeLogMetricsSource()));
+                doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+                poller.pollChanges();
+                poller.pollChanges();
+                clock.set(TimeUnit.SECONDS.toNanos(1));
+                poller.pollChanges();
+              }
+            });
+    List<String> warnings =
+        logs.stream()
+            .map(e -> e.getMessage().getFormattedMessage())
+            .filter(m -> m.contains("dedup capacity reached"))
+            .toList();
+    Assertions.assertEquals(2, warnings.size());
+    Assertions.assertTrue(warnings.get(0).contains("evictedIds=1"));
+    Assertions.assertTrue(warnings.get(1).contains("evictedIds=4"));
+  }
+
+  @Test
+  void testDisabledReplayDoesNotQueryRecentHistory() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 1));
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          new EntityChangeLogPoller(1, 2, 0, 1, new EntityChangeLogMetricsSource());
+      Assertions.assertFalse(poller.pollChanges());
+      verify(mapper, never())
+          .selectRecentEntityChanges(anyLong(), anyLong(), anyLong(), anyLong(), anyInt());
+    }
+  }
+
+  @Test
+  void testCapacityEvictionAllowsRedeliveryWithoutSkippingUnknownEvents() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 2));
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2)).thenReturn(changes(1, 1));
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          new EntityChangeLogPoller(1, 2, 60, 1, new EntityChangeLogMetricsSource());
+      poller.registerListener(replayListener(received));
+      Assertions.assertTrue(poller.pollChanges());
+      Assertions.assertEquals(List.of(1L, 2L, 1L), ids(received));
+    }
+  }
+
+  @Test
+  void testDedupExpiresUsingMonotonicClock() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 1));
+    when(mapper.selectRecentEntityChanges(-1, 0, 1, 1000, 2)).thenReturn(changes(1, 1));
+    AtomicLong clock = new AtomicLong();
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(1, 2, 1, 2, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+      poller.registerListener(replayListener(received));
+      poller.pollChanges();
+      clock.set(TimeUnit.SECONDS.toNanos(2));
+      poller.pollChanges();
+      Assertions.assertEquals(List.of(1L, 1L), ids(received));
+    }
+  }
+
+  @Test
+  void testReplayDiagnosticsExposeEventAndFailureContext() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(2, 2));
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2))
+        .thenReturn(changes(1, 1))
+        .thenThrow(new IllegalStateException("replay database unavailable"));
+    List<LogEvent> logs =
+        captureReplayLogs(
+            () -> {
+              try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+                mockSessionUtils(sessions, mapper);
+                EntityChangeLogPoller poller =
+                    new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource());
+                poller.pollChanges();
+                poller.pollChanges();
+              }
+            });
+    String diagnostics =
+        logs.stream()
+            .map(e -> e.getMessage().getFormattedMessage())
+            .collect(Collectors.joining("\n"));
+    Assertions.assertTrue(diagnostics.contains("cursor=2"), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("changeId=1"), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("entityType=TABLE"), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("fullName=ml1.cat1.schema1.table1"), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("operation=ALTER"), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("createdAt=0"), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("approximateAgeMs="), diagnostics);
+    Assertions.assertTrue(diagnostics.contains("windowMs=60000"), diagnostics);
+    Assertions.assertTrue(
+        diagnostics.contains("possible late commit, startup history, or dedup eviction"),
+        diagnostics);
+    Assertions.assertTrue(diagnostics.contains("replay failed cursor=2"), diagnostics);
+    Assertions.assertTrue(
+        logs.stream().anyMatch(e -> e.getThrown() instanceof IllegalStateException));
+  }
+
+  @Test
+  void testReplayStartupIncludesLowerIdsAndCapacityWarning() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectMaxChangeId()).thenReturn(3L);
+    when(mapper.selectRecentEntityChanges(-1, 0, 3, 60000, 2)).thenReturn(changes(1, 2));
+    ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+    List<EntityChangeRecord> received = new ArrayList<>();
+    List<LogEvent> logs =
+        captureReplayLogs(
+            () -> {
+              try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+                mockSessionUtils(sessions, mapper);
+                EntityChangeLogPoller poller =
+                    spy(new EntityChangeLogPoller(1, 2, 60, 1, new EntityChangeLogMetricsSource()));
+                doReturn(scheduler).when(poller).createScheduler();
+                poller.registerListener(replayListener(received));
+                try {
+                  poller.start();
+                  Assertions.assertTrue(poller.pollChanges());
+                  Assertions.assertEquals(List.of(1L, 2L), ids(received));
+                } finally {
+                  poller.close();
+                }
+              }
+            });
+    String diagnostics =
+        logs.stream()
+            .map(e -> e.getMessage().getFormattedMessage())
+            .collect(Collectors.joining("\n"));
+    Assertions.assertTrue(diagnostics.contains("startupCursor=3"), diagnostics);
+    Assertions.assertTrue(
+        diagnostics.contains("dedup capacity reached cursor=3 evictedIds=1 maxEntries=1"),
+        diagnostics);
+  }
+
+  @Test
+  void testReplayOptInPreservesExistingListenersAndIsolatesCapabilityFailure() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    List<EntityChangeRecord> incremental = changes(2, 2);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(incremental);
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2)).thenReturn(changes(1, 1));
+    List<EntityChangeRecord> legacyReceived = new ArrayList<>();
+    List<EntityChangeRecord> replayReceived = new ArrayList<>();
+    EntityChangeLogListener broken = mock(EntityChangeLogListener.class);
+    when(broken.supportsReplay()).thenThrow(new AssertionError("capability unavailable"));
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource());
+      poller.registerListener(legacyReceived::addAll);
+      poller.registerListener(broken);
+      poller.registerListener(replayListener(replayReceived));
+      Assertions.assertFalse(poller.pollChanges());
+      Assertions.assertEquals(List.of(2L), ids(legacyReceived));
+      Assertions.assertEquals(List.of(2L, 1L), ids(replayReceived));
+      verify(broken).onEntityChange(incremental);
+    }
+  }
+
+  private static EntityChangeLogListener replayListener(List<EntityChangeRecord> received) {
+    return new EntityChangeLogListener() {
+      /** {@inheritDoc} */
+      @Override
+      public void onEntityChange(List<EntityChangeRecord> changes) {
+        received.addAll(changes);
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public boolean supportsReplay() {
+        return true;
+      }
+    };
+  }
+
+  private static List<LogEvent> captureReplayLogs(Runnable action) {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(EntityChangeLogPoller.class.getClassLoader(), false);
+    AbstractConfiguration configuration = (AbstractConfiguration) context.getConfiguration();
+    ReplayLogCollector collector = new ReplayLogCollector();
+    collector.start();
+    configuration.addAppender(collector);
+    String name = EntityChangeLogPoller.class.getName();
+    LoggerConfig previous = configuration.getLoggers().get(name);
+    LoggerConfig logger = new LoggerConfig(name, Level.DEBUG, false);
+    logger.addAppender(collector, Level.DEBUG, null);
+    configuration.addLogger(name, logger);
+    context.updateLoggers();
+    try {
+      action.run();
+    } finally {
+      configuration.removeLogger(name);
+      if (previous != null) {
+        configuration.addLogger(name, previous);
+      }
+      collector.stop();
+      configuration.removeAppender(collector.getName());
+      context.updateLoggers();
+    }
+    return List.copyOf(collector.events);
+  }
+
+  private static class ReplayLogCollector extends AbstractAppender {
+    private final List<LogEvent> events = new ArrayList<>();
+
+    private ReplayLogCollector() {
+      super("entityChangeReplayDiagnostics", null, PatternLayout.createDefaultLayout(), true, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void append(LogEvent event) {
+      events.add(event.toImmutable());
+    }
+  }
+
+  @Test
   void testRejectsInvalidConfiguration() {
     Assertions.assertThrows(IllegalArgumentException.class, () -> new EntityChangeLogPoller(0));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new EntityChangeLogPoller(-1));
     EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new EntityChangeLogPoller(1, 0, metrics));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new EntityChangeLogPoller(1, 2, -1, 1, metrics));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new EntityChangeLogPoller(1, 2, 86401, 1, metrics));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new EntityChangeLogPoller(1, 2, 60, 0, metrics));
   }
 
   @Test
