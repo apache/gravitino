@@ -131,6 +131,9 @@ public class TableMaintenanceActionBaseSQLProvider {
   /**
    * Sets terminal snapshot pointers when the Spark Job finishes and releases the soft slot.
    *
+   * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
+   * so finish timestamps do not contend across concurrent submitters.
+   *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish time millis; must be {@code > 0}

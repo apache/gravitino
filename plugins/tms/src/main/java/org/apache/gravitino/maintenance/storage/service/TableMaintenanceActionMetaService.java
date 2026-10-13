@@ -211,6 +211,11 @@ public class TableMaintenanceActionMetaService {
   /**
    * Marks the action finished with the terminal snapshot id.
    *
+   * <p>The soft slot ({@code finished_at = 0}) admits only one in-flight action per {@code
+   * (table_id, policy_id)}, so only one submitter can finish that pair at a time. Concurrent
+   * duplicate {@code finished_at} values are not a concern; {@code UNIQUE(table_id, policy_id,
+   * finished_at)} primarily enforces the soft slot.
+   *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish timestamp millis
