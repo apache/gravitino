@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from unittest.mock import AsyncMock
+
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
@@ -29,6 +31,7 @@ from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.partition_operation import PartitionOperation
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.statistic_operation import StatisticOperation
 from mcp_server.client.view_operation import ViewOperation
 
@@ -72,6 +75,9 @@ class MockOperation(GravitinoOperation):
 
     def as_view_operation(self) -> ViewOperation:
         return MockViewOperation()
+
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        return AsyncMock(spec=SemanticModelOperation)
 
     def as_metalake_operation(self) -> MetalakeOperation:
         return MockMetalakeOperation()
