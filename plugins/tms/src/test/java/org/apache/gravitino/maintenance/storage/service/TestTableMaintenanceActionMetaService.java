@@ -74,14 +74,16 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     OptionalLong first = actions.tryAcquireInFlight(tableId, policyId, t0, timeoutMs);
     Assertions.assertTrue(first.isPresent());
+    Assertions.assertEquals(t0 + timeoutMs, actions.getById(first.getAsLong()).lockUntil());
     Assertions.assertTrue(
         actions.tryAcquireInFlight(tableId, policyId, t0 + 1_000L, timeoutMs).isEmpty());
 
-    OptionalLong reclaimed =
-        actions.tryAcquireInFlight(tableId, policyId, t0 + timeoutMs + 1L, timeoutMs);
+    long reclaimAt = t0 + timeoutMs;
+    OptionalLong reclaimed = actions.tryAcquireInFlight(tableId, policyId, reclaimAt, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(first.getAsLong(), reclaimed.getAsLong());
     Assertions.assertEquals(
-        t0 + timeoutMs + 1L, actions.getById(reclaimed.getAsLong()).createdAt());
+        reclaimAt + timeoutMs, actions.getById(reclaimed.getAsLong()).lockUntil());
+    Assertions.assertEquals(t0, actions.getById(reclaimed.getAsLong()).createdAt());
   }
 }

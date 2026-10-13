@@ -1271,9 +1271,12 @@ CREATE TABLE IF NOT EXISTS table_maintenance_action (
     before_snapshot_id BIGINT,
     after_snapshot_id BIGINT,
     finished_at BIGINT,
-    created_at BIGINT NOT NULL
+    created_at BIGINT NOT NULL,
+    claim_token SMALLINT,
+    lock_until BIGINT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_claim_token ON table_maintenance_action (table_id, policy_id, claim_token);
 CREATE INDEX IF NOT EXISTS idx_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
 CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
@@ -1286,7 +1289,9 @@ COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_m
 COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
 COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
 COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish timestamp in milliseconds, null while in flight';
-COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation/claim timestamp in milliseconds';
+COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
+COMMENT ON COLUMN table_maintenance_action.claim_token IS '1 while unbound claim is held; NULL after bindJobId (UNIQUE soft-slot like deleted_at)';
+COMMENT ON COLUMN table_maintenance_action.lock_until IS 'unbound claim lease expiry in milliseconds; NULL after bindJobId';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
     id BIGSERIAL PRIMARY KEY,

@@ -26,7 +26,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
-import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
@@ -41,9 +40,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /**
  * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
  *
- * <p>Unbound rows ({@code job_id} null) are a short ShedLock-style claim: occupied only until
- * {@code created_at + claimTimeoutMs}. Bound rows consult {@link JobMetaService} and do
- * <strong>not</strong> backfill {@code finished_at}.
+ * <p>Unbound rows ({@code job_id} null) are a short ShedLock-style claim: occupied while {@code
+ * lock_until > now}. Bound rows consult {@link JobMetaService} and do <strong>not</strong> backfill
+ * {@code finished_at}.
  */
 public final class OccupancyGate {
 
@@ -51,26 +50,15 @@ public final class OccupancyGate {
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
 
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final long claimTimeoutMs;
-
-  /**
-   * @param actionMetaService maintenance action DAO
-   * @param claimTimeoutMs unbound claim TTL
-   */
-  public OccupancyGate(TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
-    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
-    this.actionMetaService = actionMetaService;
-    this.claimTimeoutMs = claimTimeoutMs;
-  }
 
   /**
    * @param actionMetaService maintenance action DAO
    */
   public OccupancyGate(TableMaintenanceActionMetaService actionMetaService) {
-    this(actionMetaService, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
   }
 
-  /** Uses {@link TableMaintenanceActionMetaService#getInstance()} and default claim timeout. */
+  /** Uses {@link TableMaintenanceActionMetaService#getInstance()}. */
   public OccupancyGate() {
     this(TableMaintenanceActionMetaService.getInstance());
   }
@@ -93,7 +81,7 @@ public final class OccupancyGate {
   public boolean isInFlight(long tableId, long policyId, long nowMs) {
     for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
       if (open.jobId() == null) {
-        if (open.createdAt() != null && nowMs - open.createdAt() < claimTimeoutMs) {
+        if (open.lockUntil() != null && open.lockUntil() > nowMs) {
           return true;
         }
         continue;

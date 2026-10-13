@@ -21,9 +21,10 @@ package org.apache.gravitino.maintenance.storage.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.OptionalLong;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
@@ -48,12 +49,11 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Tries to acquire an unbound occupancy claim before {@code runJob} (ShedLock-style, no extra
-   * columns).
+   * Tries to acquire an unbound occupancy claim before {@code runJob}.
    *
    * <ol>
-   *   <li>CAS-{@code UPDATE} expired unbound rows ({@code created_at < now - timeout})
-   *   <li>Otherwise {@code INSERT}, then keep a single winner among concurrent inserts
+   *   <li>CAS-{@code UPDATE lock_until} on an expired unbound row ({@code claim_token = 1})
+   *   <li>Otherwise {@code INSERT} with {@code claim_token = 1}; unique conflict means lost race
    * </ol>
    *
    * @param tableId table entity id
@@ -68,24 +68,26 @@ public class TableMaintenanceActionMetaService {
   public OptionalLong tryAcquireInFlight(
       long tableId, long policyId, long nowMs, long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
-    long expireBefore = nowMs - claimTimeoutMs;
+    long newLockUntil = nowMs + claimTimeoutMs;
     int reclaimed =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, nowMs, expireBefore));
-    if (reclaimed >= 1) {
-      TableMaintenanceActionPO winner = selectFreshUnboundWinner(tableId, policyId, expireBefore);
-      if (winner != null) {
-        deleteLosingUnboundRows(tableId, policyId, winner.id());
-        return OptionalLong.of(winner.id());
-      }
+            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, newLockUntil, nowMs));
+    if (reclaimed == 1) {
+      TableMaintenanceActionPO unbound =
+          SessionUtils.getWithoutCommit(
+              TableMaintenanceActionMapper.class,
+              mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
+      Preconditions.checkState(unbound != null && unbound.id() != null, "reclaim lost unbound row");
+      return OptionalLong.of(unbound.id());
     }
 
-    List<TableMaintenanceActionPO> existing = listUnbound(tableId, policyId);
-    for (TableMaintenanceActionPO row : existing) {
-      if (row.createdAt() != null && row.createdAt() >= expireBefore) {
-        return OptionalLong.empty();
-      }
+    TableMaintenanceActionPO existing =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
+    if (existing != null && existing.lockUntil() != null && existing.lockUntil() > nowMs) {
+      return OptionalLong.empty();
     }
 
     TableMaintenanceActionPO actionMeta =
@@ -93,19 +95,19 @@ public class TableMaintenanceActionMetaService {
             .withTableId(tableId)
             .withPolicyId(policyId)
             .withCreatedAt(nowMs)
+            .withLockUntil(newLockUntil)
             .build();
-    SessionUtils.doWithCommit(
-        TableMaintenanceActionMapper.class, mapper -> mapper.insertAction(actionMeta));
-    Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
-
-    TableMaintenanceActionPO winner = selectFreshUnboundWinner(tableId, policyId, expireBefore);
-    if (winner == null || !actionMeta.id().equals(winner.id())) {
+    try {
       SessionUtils.doWithCommit(
-          TableMaintenanceActionMapper.class, mapper -> mapper.deleteById(actionMeta.id()));
-      return OptionalLong.empty();
+          TableMaintenanceActionMapper.class, mapper -> mapper.insertAction(actionMeta));
+    } catch (RuntimeException e) {
+      if (isUniqueViolation(e)) {
+        return OptionalLong.empty();
+      }
+      throw e;
     }
-    deleteLosingUnboundRows(tableId, policyId, winner.id());
-    return OptionalLong.of(winner.id());
+    Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
+    return OptionalLong.of(actionMeta.id());
   }
 
   /**
@@ -130,7 +132,8 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob}.
+   * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob} and releases the
+   * unbound claim slot.
    *
    * @param id action row id
    * @param jobId Gravitino job run id
@@ -270,31 +273,19 @@ public class TableMaintenanceActionMetaService {
         mapper -> mapper.selectMaxFinishedAt(tableId, policyId));
   }
 
-  private static List<TableMaintenanceActionPO> listUnbound(long tableId, long policyId) {
-    List<TableMaintenanceActionPO> unbound =
-        SessionUtils.getWithoutCommit(
-            TableMaintenanceActionMapper.class,
-            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
-    return unbound == null ? Collections.emptyList() : unbound;
-  }
-
-  @Nullable
-  private static TableMaintenanceActionPO selectFreshUnboundWinner(
-      long tableId, long policyId, long expireBefore) {
-    return listUnbound(tableId, policyId).stream()
-        .filter(row -> row.createdAt() != null && row.createdAt() >= expireBefore)
-        .max(
-            Comparator.comparingLong(TableMaintenanceActionPO::createdAt)
-                .thenComparingLong(TableMaintenanceActionPO::id))
-        .orElse(null);
-  }
-
-  private static void deleteLosingUnboundRows(long tableId, long policyId, long winnerId) {
-    for (TableMaintenanceActionPO row : listUnbound(tableId, policyId)) {
-      if (row.id() != null && row.id() != winnerId) {
-        SessionUtils.doWithCommit(
-            TableMaintenanceActionMapper.class, mapper -> mapper.deleteById(row.id()));
+  private static boolean isUniqueViolation(Throwable throwable) {
+    for (Throwable t = throwable; t != null; t = t.getCause()) {
+      if (t instanceof SQLIntegrityConstraintViolationException) {
+        return true;
+      }
+      String message = t.getMessage();
+      if (message != null) {
+        String lower = message.toLowerCase(Locale.ROOT);
+        if (lower.contains("unique") || lower.contains("duplicate")) {
+          return true;
+        }
       }
     }
+    return false;
   }
 }

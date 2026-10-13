@@ -59,16 +59,16 @@ public class TableMaintenanceActionSQLProviderFactory {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param newCreatedAt new claim timestamp
-   * @param expireBefore expire threshold
+   * @param newLockUntil new lease end timestamp
+   * @param nowMs current time; reclaim when {@code lock_until <= nowMs}
    * @return UPDATE statement
    */
   public static String reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newCreatedAt") long newCreatedAt,
-      @Param("expireBefore") long expireBefore) {
-    return getProvider().reclaimExpiredUnbound(tableId, policyId, newCreatedAt, expireBefore);
+      @Param("newLockUntil") long newLockUntil,
+      @Param("nowMs") long nowMs) {
+    return getProvider().reclaimExpiredUnbound(tableId, policyId, newLockUntil, nowMs);
   }
 
   /**

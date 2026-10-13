@@ -182,9 +182,9 @@ class TestOccupancyGate extends TestJDBCBackend {
     TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    long claimTimeoutMs = 60_000L;
-    OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
+    OccupancyGate gate = new OccupancyGate(actions);
     long policyId = 66L;
+    long claimTimeoutMs = 60_000L;
     long claimedAt = 1_700_000_400_000L;
 
     Assertions.assertTrue(

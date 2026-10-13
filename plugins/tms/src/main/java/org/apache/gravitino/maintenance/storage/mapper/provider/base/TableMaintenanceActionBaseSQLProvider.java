@@ -27,8 +27,8 @@ import org.apache.ibatis.annotations.Param;
 public class TableMaintenanceActionBaseSQLProvider {
 
   /**
-   * Inserts an in-flight occupancy row before {@code runJob}. {@code job_id} stays null until bound
-   * after submission (§5.2).
+   * Inserts an unbound occupancy claim before {@code runJob}. {@code claim_token = 1} holds the
+   * exclusive soft slot; {@code lock_until} is the lease expiry.
    *
    * @param actionMeta row to insert
    * @return INSERT statement
@@ -36,48 +36,48 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, policy_id, created_at)"
-        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt})";
+        + " (table_id, policy_id, created_at, claim_token, lock_until)"
+        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt}, 1,"
+        + " #{actionMeta.lockUntil})";
   }
 
   /**
-   * Reclaims an expired unbound claim by CAS on {@code created_at} (ShedLock-style). Only one
+   * Extends an expired unbound claim lease by CAS on {@code lock_until} (ShedLock-style). Only one
    * concurrent updater succeeds ({@code updated == 1}).
    *
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param newCreatedAt new claim timestamp
-   * @param expireBefore claims with {@code created_at} strictly before this are expired
+   * @param newLockUntil new lease expiry
+   * @param nowMs current epoch millis; rows with {@code lock_until <= nowMs} are expired
    * @return UPDATE statement
    */
   public String reclaimExpiredUnbound(
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("newCreatedAt") long newCreatedAt,
-      @Param("expireBefore") long expireBefore) {
+      @Param("newLockUntil") long newLockUntil,
+      @Param("nowMs") long nowMs) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET created_at = #{newCreatedAt}"
+        + " SET lock_until = #{newLockUntil}"
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND job_id IS NULL AND finished_at IS NULL"
-        + " AND created_at < #{expireBefore}";
+        + " AND job_id IS NULL AND finished_at IS NULL AND claim_token = 1"
+        + " AND lock_until <= #{nowMs}";
   }
 
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return SELECT statement for unbound open claim rows
+   * @return SELECT statement for the unbound claim row
    */
   public String selectUnboundByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId) {
     return selectColumns()
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND job_id IS NULL AND finished_at IS NULL"
-        + " ORDER BY id ASC";
+        + " AND job_id IS NULL AND finished_at IS NULL AND claim_token = 1";
   }
 
   /**
-   * Binds the Gravitino job run id after {@code runJob} succeeds.
+   * Binds the Gravitino job run id after {@code runJob} and releases the unbound claim slot.
    *
    * @param id action row id
    * @param jobId {@code job_run_meta.job_run_id}
@@ -86,7 +86,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET job_id = #{jobId}"
+        + " SET job_id = #{jobId}, claim_token = NULL, lock_until = NULL"
         + " WHERE id = #{id} AND job_id IS NULL AND finished_at IS NULL";
   }
 
@@ -188,7 +188,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   private static String selectColumns() {
     return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
         + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
-        + " finished_at AS finishedAt, created_at AS createdAt FROM "
+        + " finished_at AS finishedAt, created_at AS createdAt, lock_until AS lockUntil FROM "
         + TABLE_NAME;
   }
 }
