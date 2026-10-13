@@ -245,13 +245,13 @@ export const genSemanticModelUpdates = (originalData, newData) => {
   const originalProperties = originalData.properties || {}
   const newProperties = newData.properties || {}
 
-  for (const key in originalProperties) {
-    if (!(key in newProperties)) {
+  for (const key of Object.keys(originalProperties)) {
+    if (!Object.hasOwn(newProperties, key)) {
       updates.push({ '@type': 'removeProperty', property: key })
     }
   }
 
-  for (const key in newProperties) {
+  for (const key of Object.keys(newProperties)) {
     if (originalProperties[key] !== newProperties[key]) {
       updates.push({ '@type': 'setProperty', property: key, value: newProperties[key] })
     }
@@ -267,3 +267,17 @@ export const genSemanticModelUpdates = (originalData, newData) => {
 /** Returns the tree key for a Semantic Model, distinct from other schema entities. */
 export const semanticModelNodeKey = ({ metalake, catalog, schema, semanticModel }) =>
   `{{${metalake}}}{{${catalog}}}{{relational}}{{${schema}}}{{semanticModel}}{{${semanticModel}}}`
+
+/** Extracts API validation errors, including text responses from OSSIE downloads. */
+export const semanticModelErrorMessage = (error, fallback) => {
+  let data = error?.response?.data
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data)
+    } catch {
+      data = null
+    }
+  }
+
+  return data?.error?.message || data?.message || error?.message || fallback
+}

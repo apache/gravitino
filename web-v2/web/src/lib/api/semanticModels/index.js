@@ -67,3 +67,26 @@ export const deleteSemanticModelApi = ({ metalake, catalog, schema, semanticMode
     url: `${Apis.GET_DETAIL({ metalake, catalog, schema, semanticModel })}`
   })
 }
+
+export const importSemanticModelApi = ({ metalake, catalog, schema, document, format }) => {
+  return defHttp.post(
+    {
+      url: `${Apis.GET({ metalake, catalog, schema })}/ossie`,
+      data: document,
+      headers: { 'Content-Type': format === 'json' ? 'application/json' : 'application/yaml' },
+      transformRequest: [data => data]
+    },
+    { errorMessageMode: 'none' }
+  )
+}
+
+export const exportSemanticModelApi = ({ metalake, catalog, schema, semanticModel, format }) => {
+  return defHttp.get(
+    {
+      url: `${Apis.GET_DETAIL({ metalake, catalog, schema, semanticModel })}/ossie`,
+      params: { format },
+      responseType: 'text'
+    },
+    { errorMessageMode: 'none' }
+  )
+}

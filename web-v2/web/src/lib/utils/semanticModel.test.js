@@ -21,6 +21,7 @@ import { describe, expect, test } from 'vitest'
 import {
   formatSemanticModelDefinition,
   genSemanticModelUpdates,
+  semanticModelErrorMessage,
   parseSemanticModelDefinition,
   validateSemanticModelDefinition
 } from './semanticModel'
@@ -263,6 +264,21 @@ describe('genSemanticModelUpdates', () => {
     ])
   })
 
+  test.each(['constructor', 'toString', '__proto__'])('removes the own property %s', key => {
+    expect(
+      genSemanticModelUpdates({ ...original, properties: { [key]: 'value' } }, { ...original, properties: {} })
+    ).toEqual([{ '@type': 'removeProperty', property: key }])
+  })
+
+  test('ignores inherited properties', () => {
+    expect(
+      genSemanticModelUpdates(
+        { ...original, properties: Object.create({ old: 'value' }) },
+        { ...original, properties: Object.create({ next: 'value' }) }
+      )
+    ).toEqual([])
+  })
+
   test('emits setProperty only for values that actually changed', () => {
     const updates = genSemanticModelUpdates(original, {
       ...original,
@@ -305,5 +321,20 @@ describe('genSemanticModelUpdates', () => {
       'setProperty',
       'replaceDefinition'
     ])
+  })
+})
+
+describe('semanticModelErrorMessage', () => {
+  test.each([
+    [{ response: { data: { error: { message: 'Invalid source' } } } }, 'Invalid source'],
+    [{ response: { data: '{"message":"Model not found"}' } }, 'Model not found'],
+    [{ message: 'Network Error' }, 'Network Error'],
+    [
+      { response: { data: '<html>Proxy error</html>' }, message: 'Request failed with status code 502' },
+      'Request failed with status code 502'
+    ],
+    [null, 'Import failed']
+  ])('preserves a readable API or transport error', (error, message) => {
+    expect(semanticModelErrorMessage(error, 'Import failed')).toBe(message)
   })
 })

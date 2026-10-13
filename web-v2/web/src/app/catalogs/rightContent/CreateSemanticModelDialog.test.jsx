@@ -141,6 +141,20 @@ describe('semantic model editor', () => {
     })
   })
 
+  it.each(['constructor', 'toString'])('removes a property named %s through the editor', async name => {
+    defHttp.get.mockResolvedValueOnce({ semanticModel: { ...model, properties: { [name]: 'value' } } })
+    defHttp.put.mockResolvedValue({ semanticModel: model })
+    await renderDialog(true)
+    await act(async () =>
+      document.querySelector('.ant-modal .lucide-minus').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    )
+    await submit()
+    expect(defHttp.put.mock.calls[0]?.[0].data).toEqual({
+      updates: [{ '@type': 'removeProperty', property: name }]
+    })
+    expect(close).toHaveBeenCalledWith(false)
+  })
+
   it('disables saving when the model could not be loaded', async () => {
     defHttp.get.mockRejectedValue(new Error('Permission denied'))
     await renderDialog(true)

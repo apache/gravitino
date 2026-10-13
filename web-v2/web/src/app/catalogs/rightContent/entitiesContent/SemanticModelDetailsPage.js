@@ -32,6 +32,8 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 import { copyToClipboard } from '@/lib/utils'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 import { formatSemanticModelDefinition } from '@/lib/utils/semanticModel'
+import SemanticModelAIContext from './SemanticModelAIContext'
+import SemanticModelExport from './SemanticModelExport'
 
 const { Title, Paragraph } = Typography
 
@@ -293,14 +295,23 @@ export default function SemanticModelDetailsPage() {
   }, [metricColumns])
 
   const expandedFieldsRow = dataset => (
-    <Table
-      data-refer='semantic-model-fields-grid'
-      size='small'
-      rowKey={field => field.name}
-      dataSource={dataset.fields || []}
-      columns={fieldColumns}
-      pagination={false}
-    />
+    <div>
+      <SemanticModelAIContext context={dataset.aiContext} label={`${dataset.name} AI Context`} />
+      <Table
+        data-refer='semantic-model-fields-grid'
+        size='small'
+        rowKey={field => field.name}
+        dataSource={dataset.fields || []}
+        columns={fieldColumns}
+        pagination={false}
+        expandable={{
+          expandedRowRender: field => (
+            <SemanticModelAIContext context={field.aiContext} label={`${field.name} AI Context`} />
+          ),
+          rowExpandable: field => !!field.aiContext
+        }}
+      />
+    </div>
   )
 
   return (
@@ -353,7 +364,9 @@ export default function SemanticModelDetailsPage() {
           )}
           <Space size={4}>
             <Tooltip title='Created' placement='top'>
-              <Icons.iconify icon='mdi:clock-outline' className='size-4' props={{ color: 'grey' }} />
+              <span className='inline-flex'>
+                <Icons.iconify icon='mdi:clock-outline' className='size-4' props={{ color: 'grey' }} />
+              </span>
             </Tooltip>
             <span>{createdAtText}</span>
           </Space>
@@ -383,6 +396,15 @@ export default function SemanticModelDetailsPage() {
           </Space>
         </Space>
       </Spin>
+      <SemanticModelExport
+        key={metadataObjectFullName}
+        metalake={metalake}
+        catalog={catalog}
+        schema={schema}
+        semanticModel={semanticModelName}
+        disabled={store.activatedDetailsLoading || !definition}
+      />
+      <SemanticModelAIContext context={definition?.aiContext} label='Model AI Context' />
       <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={setTabKey} items={tabOptions} />
       <Spin spinning={store.activatedDetailsLoading}>
         {tabKey === 'Datasets' && (
@@ -396,7 +418,7 @@ export default function SemanticModelDetailsPage() {
             components={datasetComponents}
             expandable={{
               expandedRowRender: expandedFieldsRow,
-              rowExpandable: dataset => (dataset.fields || []).length > 0
+              rowExpandable: dataset => (dataset.fields || []).length > 0 || !!dataset.aiContext
             }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
@@ -410,6 +432,12 @@ export default function SemanticModelDetailsPage() {
             dataSource={relationships}
             columns={relationshipResizableColumns}
             components={relationshipComponents}
+            expandable={{
+              expandedRowRender: relationship => (
+                <SemanticModelAIContext context={relationship.aiContext} label={`${relationship.name} AI Context`} />
+              ),
+              rowExpandable: relationship => !!relationship.aiContext
+            }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
         )}
@@ -422,6 +450,12 @@ export default function SemanticModelDetailsPage() {
             dataSource={metrics}
             columns={metricResizableColumns}
             components={metricComponents}
+            expandable={{
+              expandedRowRender: metric => (
+                <SemanticModelAIContext context={metric.aiContext} label={`${metric.name} AI Context`} />
+              ),
+              rowExpandable: metric => !!metric.aiContext
+            }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
         )}

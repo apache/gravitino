@@ -72,6 +72,7 @@ import RegisterModelDialog from '../RegisterModelDialog'
 import CreateTopicDialog from '../CreateTopicDialog'
 import CreateTableDialog from '../CreateTableDialog'
 import CreateSemanticModelDialog from '../CreateSemanticModelDialog'
+import ImportSemanticModelDialog from '../ImportSemanticModelDialog'
 import Functions from './Functions'
 
 const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
@@ -92,6 +93,7 @@ export default function SchemaDetailsPage() {
   const [openOwner, setOpenOwner] = useState(false)
   const [openModel, setOpenModel] = useState(false)
   const [openSemanticModel, setOpenSemanticModel] = useState(false)
+  const [openImportSemanticModel, setOpenImportSemanticModel] = useState(false)
   const [editSemanticModel, setEditSemanticModel] = useState('')
   const [editTable, setEditTable] = useState('')
   const [editFileset, setEditFileset] = useState('')
@@ -897,9 +899,16 @@ export default function SchemaDetailsPage() {
         </>
       ) : tabKey === 'Semantic Models' ? (
         <>
-          <Flex justify='flex-end' className='mb-4'>
-            <div className='flex w-1/2 gap-4'>
-              <Search name='searchSemanticModelInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+          <Flex justify='flex-end' className='mb-4' gap='middle' wrap>
+            <Search
+              className='w-full sm:w-64'
+              name='searchSemanticModelInput'
+              placeholder='Search...'
+              value={search}
+              onChange={onSearchTable}
+            />
+            <Space wrap>
+              <Button onClick={() => setOpenImportSemanticModel(true)}>Import OSSIE</Button>
               <Button
                 data-refer='create-semantic-model-btn'
                 type='primary'
@@ -911,7 +920,7 @@ export default function SchemaDetailsPage() {
               >
                 Create Semantic Model
               </Button>
-            </div>
+            </Space>
           </Flex>
           <Spin spinning={store.tableLoading}>
             <Table
@@ -925,6 +934,15 @@ export default function SchemaDetailsPage() {
               components={semanticModelComponents}
             />
           </Spin>
+          {openImportSemanticModel && (
+            <ImportSemanticModelDialog
+              open={openImportSemanticModel}
+              setOpen={setOpenImportSemanticModel}
+              metalake={currentMetalake}
+              catalog={catalog}
+              schema={schema}
+            />
+          )}
           {openSemanticModel && (
             <CreateSemanticModelDialog
               open={openSemanticModel}

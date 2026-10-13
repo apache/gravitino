@@ -45,6 +45,8 @@ export default defineConfig({
     }
   },
   resolve: {
+    // Some browser dependencies publish only a module entry, without a main entry.
+    mainFields: ['module', 'main'],
     alias: {
       '@': resolve(__dirname, './src')
     }
