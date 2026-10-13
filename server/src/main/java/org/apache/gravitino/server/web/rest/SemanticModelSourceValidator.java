@@ -19,11 +19,12 @@
 package org.apache.gravitino.server.web.rest;
 
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.inject.Inject;
 import org.apache.gravitino.Entity;
@@ -33,10 +34,12 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.Relationship;
@@ -51,7 +54,7 @@ public class SemanticModelSourceValidator {
   private final TableDispatcher tables;
   private final ViewDispatcher views;
   private final Supplier<GravitinoAuthorizer> authorizer;
-  private final Predicate<NameIdentifier> supportsViews;
+  private final Function<NameIdentifier, Set<Entity.EntityType>> supportedSourceTypes;
 
   /**
    * Creates a validator using the server's authorizer, including its disabled-mode pass-through.
@@ -75,15 +78,25 @@ public class SemanticModelSourceValidator {
                 .catalogManager()
                 .doWithCatalog(
                     NameIdentifierUtil.getCatalogIdentifier(ident),
-                    catalog -> catalog.ops() instanceof ViewCatalog));
+                    catalog -> {
+                      CatalogOperations ops = catalog.ops();
+                      Set<Entity.EntityType> types = EnumSet.noneOf(Entity.EntityType.class);
+                      if (ops instanceof TableCatalog) {
+                        types.add(Entity.EntityType.TABLE);
+                      }
+                      if (ops instanceof ViewCatalog) {
+                        types.add(Entity.EntityType.VIEW);
+                      }
+                      return types;
+                    }));
   }
 
   SemanticModelSourceValidator(
       TableDispatcher tables,
       ViewDispatcher views,
       Supplier<GravitinoAuthorizer> authorizer,
-      Predicate<NameIdentifier> supportsViews) {
-    this.supportsViews = supportsViews;
+      Function<NameIdentifier, Set<Entity.EntityType>> supportedSourceTypes) {
+    this.supportedSourceTypes = supportedSourceTypes;
     this.tables = tables;
     this.views = views;
     this.authorizer = authorizer;
@@ -144,13 +157,6 @@ public class SemanticModelSourceValidator {
             AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
             currentAuthorizer,
             context);
-    if (tableAllowed) {
-      try {
-        return columnNames(ident, tables.loadTable(ident).columns());
-      } catch (NotFoundException missing) {
-        // The untyped source can also refer to a logical view. Authorize that lookup separately.
-      }
-    }
     boolean viewAllowed =
         canLoad(
             ident,
@@ -158,18 +164,27 @@ public class SemanticModelSourceValidator {
             AuthorizationExpressionConstants.LOAD_VIEW_AUTHORIZATION_EXPRESSION,
             currentAuthorizer,
             context);
-    boolean viewSupported = true;
-    if (tableAllowed || viewAllowed) {
-      try {
-        viewSupported = supportsViews.test(ident);
-        if (viewAllowed && viewSupported) {
-          return columnNames(ident, views.loadView(ident).columns());
-        }
-      } catch (NotFoundException missing) {
-        // Do not disclose whether the other, inaccessible object type exists.
-      }
+    if (!tableAllowed && !viewAllowed) {
+      throw new ForbiddenException("Not authorized to resolve Semantic Model source %s", ident);
     }
-    if (!tableAllowed || (viewSupported && !viewAllowed)) {
+    Set<Entity.EntityType> supported = EnumSet.of(Entity.EntityType.TABLE, Entity.EntityType.VIEW);
+    try {
+      supported = supportedSourceTypes.apply(ident);
+      if (tableAllowed && supported.contains(Entity.EntityType.TABLE)) {
+        try {
+          return columnNames(ident, tables.loadTable(ident).columns());
+        } catch (NotFoundException missing) {
+          // An untyped source can also refer to a view.
+        }
+      }
+      if (viewAllowed && supported.contains(Entity.EntityType.VIEW)) {
+        return columnNames(ident, views.loadView(ident).columns());
+      }
+    } catch (NotFoundException missing) {
+      // Do not disclose whether the other, inaccessible object type exists.
+    }
+    if ((supported.contains(Entity.EntityType.TABLE) && !tableAllowed)
+        || (supported.contains(Entity.EntityType.VIEW) && !viewAllowed)) {
       throw new ForbiddenException("Not authorized to resolve Semantic Model source %s", ident);
     }
     throw new IllegalSemanticModelException("Semantic Model source %s does not exist", ident);
