@@ -252,7 +252,8 @@ public class RelationalEntityStore
 
           long epochBeforeRead = cacheInvalidationEpoch.get();
           E entity = backend.get(ident, entityType);
-          cacheIfEpochUnchanged(entity, epochBeforeRead);
+          // The SPI does not require reentrant locks. Publish under the lock already held here.
+          publishIfEpochUnchanged(entity, epochBeforeRead);
           return entity;
         });
   }
@@ -582,16 +583,23 @@ public class RelationalEntityStore
     }
     cache.withCacheLock(
         EntityCacheKey.of(entity.nameIdentifier(), entity.type()),
-        () -> {
-          if (cacheInvalidationEpoch.get() == epoch) {
-            cache.put(entity);
-            // The key lock excludes same-key invalidation, but an ancestor can advance the epoch
-            // while put runs on another segment. Remove a raced publication before releasing it.
-            if (cacheInvalidationEpoch.get() != epoch) {
-              cache.invalidate(entity.nameIdentifier(), entity.type());
-            }
-          }
-        });
+        () -> publishIfEpochUnchanged(entity, epoch));
+  }
+
+  // The caller holds the entry's cache lock; do not acquire it again here.
+  private <E extends Entity & HasIdentifier> void publishIfEpochUnchanged(E entity, long epoch) {
+    if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
+      cache.put(entity);
+      return;
+    }
+    if (cacheInvalidationEpoch.get() == epoch) {
+      cache.put(entity);
+      // The key lock excludes same-key invalidation, but an ancestor can advance the epoch
+      // while put runs on another segment. Remove a raced publication before releasing it.
+      if (cacheInvalidationEpoch.get() != epoch) {
+        cache.invalidate(entity.nameIdentifier(), entity.type());
+      }
+    }
   }
 
   private void invalidateCache(NameIdentifier ident, Entity.EntityType type) {

@@ -26,6 +26,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Config;
@@ -44,6 +45,21 @@ import org.mockito.Mockito;
 
 /** Deterministic regression probes for cache invalidation races. */
 public class TestEntityCachePublicationRace {
+  @Test
+  void testPointReadDoesNotReacquireSpiLockForPublication() throws Exception {
+    NonReentrantCache cache = new NonReentrantCache();
+    RelationalEntityStore store = new RelationalEntityStore();
+    RelationalBackend backend = Mockito.mock(RelationalBackend.class);
+    setField(store, RelationalEntityStore.class, "cache", cache);
+    setField(store, RelationalEntityStore.class, "backend", backend);
+    TableEntity entity = table("non_reentrant");
+    Mockito.when(backend.get(entity.nameIdentifier(), EntityType.TABLE)).thenReturn(entity);
+    Assertions.assertSame(
+        entity, store.get(entity.nameIdentifier(), EntityType.TABLE, TableEntity.class));
+    Assertions.assertEquals(1, cache.acquisitions);
+    Mockito.verify(backend).get(entity.nameIdentifier(), EntityType.TABLE);
+  }
+
   @Test
   void testParentDropMustFenceAnInflightChildPointRead() throws Exception {
     CaffeineEntityCache cache = new CaffeineEntityCache(new Config() {});
@@ -194,6 +210,41 @@ public class TestEntityCachePublicationRace {
     Field field = clazz.getDeclaredField(name);
     field.setAccessible(true);
     field.set(instance, value);
+  }
+
+  private static class NonReentrantCache extends NoOpsCache {
+    private final Semaphore lock = new Semaphore(1);
+    private int acquisitions;
+
+    private NonReentrantCache() {
+      super(new Config() {});
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public <T, E extends Exception> T withCacheLock(
+        EntityCacheKey key, ThrowingSupplier<T, E> action) throws E {
+      // Fail immediately rather than hanging the suite when the caller tries to reenter.
+      Assertions.assertTrue(lock.tryAcquire(), "EntityCache SPI lock was acquired recursively");
+      acquisitions++;
+      try {
+        return action.get();
+      } finally {
+        lock.release();
+      }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public <E extends Exception> void withCacheLock(EntityCacheKey key, ThrowingRunnable<E> action)
+        throws E {
+      withCacheLock(
+          key,
+          () -> {
+            action.run();
+            return null;
+          });
+    }
   }
 
   private static class PublicationHookCache extends CaffeineEntityCache {
