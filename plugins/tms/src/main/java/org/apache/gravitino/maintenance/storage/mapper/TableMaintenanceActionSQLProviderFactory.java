@@ -84,10 +84,14 @@ public class TableMaintenanceActionSQLProviderFactory {
   /**
    * @param id action id
    * @param jobId job run id
+   * @param expectedCreatedAt claim lease start observed at acquire time
    * @return UPDATE statement
    */
-  public static String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
-    return getProvider().bindJobId(id, jobId);
+  public static String bindJobId(
+      @Param("id") long id,
+      @Param("jobId") long jobId,
+      @Param("expectedCreatedAt") long expectedCreatedAt) {
+    return getProvider().bindJobId(id, jobId, expectedCreatedAt);
   }
 
   /**

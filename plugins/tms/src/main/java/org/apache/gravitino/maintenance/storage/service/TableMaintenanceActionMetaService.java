@@ -140,16 +140,22 @@ public class TableMaintenanceActionMetaService {
    * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob}. Does not release the
    * soft slot ({@code finished_at} stays {@code 0} until {@link #markFinished}).
    *
+   * <p>{@code expectedCreatedAt} must be the {@code created_at} observed when the caller acquired
+   * the claim. After another node reclaims via CAS on {@code created_at}, this update matches zero
+   * rows so the stale holder cannot bind.
+   *
    * @param id action row id
    * @param jobId Gravitino job run id
+   * @param expectedCreatedAt claim lease start from acquire / reclaim
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "bindTableMaintenanceActionJobId")
-  public void bindJobId(long id, long jobId) {
+  public void bindJobId(long id, long jobId, long expectedCreatedAt) {
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
-            TableMaintenanceActionMapper.class, mapper -> mapper.bindJobId(id, jobId));
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.bindJobId(id, jobId, expectedCreatedAt));
     Preconditions.checkState(
         updated == 1,
         "expected to bind job_id on exactly one in-flight action, updated=%s",

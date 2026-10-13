@@ -54,7 +54,10 @@ public interface TableMaintenanceActionMapper {
       @Param("tableId") long tableId, @Param("policyId") long policyId);
 
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "bindJobId")
-  int bindJobId(@Param("id") long id, @Param("jobId") long jobId);
+  int bindJobId(
+      @Param("id") long id,
+      @Param("jobId") long jobId,
+      @Param("expectedCreatedAt") long expectedCreatedAt);
 
   @Nullable
   @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectById")

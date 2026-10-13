@@ -35,13 +35,14 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long before = System.currentTimeMillis();
     long actionId = actionService.insertInFlight(10L, 20L);
     long after = System.currentTimeMillis();
+    long createdAt = actionService.getById(actionId).createdAt();
     Assertions.assertNull(actionService.getById(actionId).jobId());
     Assertions.assertEquals(0L, actionService.getById(actionId).finishedAt());
-    Assertions.assertTrue(actionService.getById(actionId).createdAt() >= before);
-    Assertions.assertTrue(actionService.getById(actionId).createdAt() <= after);
+    Assertions.assertTrue(createdAt >= before);
+    Assertions.assertTrue(createdAt <= after);
 
     long jobId = 999L;
-    actionService.bindJobId(actionId, jobId);
+    actionService.bindJobId(actionId, jobId, createdAt);
     Assertions.assertEquals(jobId, actionService.getByJobId(jobId).jobId());
     Assertions.assertEquals(0L, actionService.getByJobId(jobId).finishedAt());
 
@@ -87,5 +88,11 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     Assertions.assertEquals(first.getAsLong(), reclaimed.getAsLong());
     Assertions.assertEquals(reclaimAt, actions.getById(reclaimed.getAsLong()).createdAt());
     Assertions.assertEquals(0L, actions.getById(reclaimed.getAsLong()).finishedAt());
+
+    // Stale holder still has the old created_at; bind must fail after reclaim.
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> actions.bindJobId(first.getAsLong(), 1001L, t0));
+    actions.bindJobId(reclaimed.getAsLong(), 1002L, reclaimAt);
+    Assertions.assertEquals(1002L, actions.getById(reclaimed.getAsLong()).jobId());
   }
 }

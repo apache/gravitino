@@ -78,17 +78,23 @@ public class TableMaintenanceActionBaseSQLProvider {
 
   /**
    * Binds the Gravitino job run id after {@code runJob}. Keeps {@code finished_at = 0} so the soft
-   * slot covers the whole run.
+   * slot covers the whole run. {@code expectedCreatedAt} fences against a concurrent reclaim that
+   * CAS-updated {@code created_at}.
    *
    * @param id action row id
    * @param jobId {@code job_run_meta.job_run_id}
+   * @param expectedCreatedAt claim lease start observed at acquire time
    * @return UPDATE statement
    */
-  public String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
+  public String bindJobId(
+      @Param("id") long id,
+      @Param("jobId") long jobId,
+      @Param("expectedCreatedAt") long expectedCreatedAt) {
     return "UPDATE "
         + TABLE_NAME
         + " SET job_id = #{jobId}"
-        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0";
+        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at = #{expectedCreatedAt}";
   }
 
   /**
