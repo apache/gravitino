@@ -171,6 +171,30 @@ public class TestTableAuthorizationExpression {
   }
 
   @Test
+  public void testLoadTableExistenceProbe() throws NoSuchMethodException, OgnlException {
+    Method method =
+        TableOperations.class.getMethod(
+            "loadTable", String.class, String.class, String.class, String.class, String.class);
+    AuthorizationExpression authorizationExpressionAnnotation =
+        method.getAnnotation(AuthorizationExpression.class);
+    String expression = authorizationExpressionAnnotation.allowCheckExistence();
+    MockAuthorizationExpressionEvaluator mockEvaluator =
+        new MockAuthorizationExpressionEvaluator(expression);
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_TABLE")));
+    assertTrue(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::CREATE_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
+    assertTrue(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::SELECT_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
+    assertTrue(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::MODIFY_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
+  }
+
+  @Test
   public void testAlterTable() throws NoSuchMethodException, OgnlException {
     Method method =
         TableOperations.class.getMethod(

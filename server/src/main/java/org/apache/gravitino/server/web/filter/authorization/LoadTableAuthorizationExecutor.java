@@ -22,7 +22,9 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -42,6 +44,8 @@ import org.apache.gravitino.server.web.filter.ParameterUtil;
  * Legacy clients without the `privileges` parameter will use default authorization.
  */
 public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
+  private final AuthorizationExpressionEvaluator allowCheckExistenceEvaluator;
+
   public LoadTableAuthorizationExecutor(
       Parameter[] parameters,
       Object[] args,
@@ -50,8 +54,13 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       Map<String, Object> pathParams,
       Optional<String> entityType,
       String secondaryExpression,
-      ExpressionCondition secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition,
+      String allowCheckExistenceExpression) {
     super(expression, metadataContext, pathParams, entityType);
+    this.allowCheckExistenceEvaluator =
+        StringUtils.isBlank(allowCheckExistenceExpression)
+            ? null
+            : new AuthorizationExpressionEvaluator(allowCheckExistenceExpression);
 
     if (!shouldCheckModifyTablePrivilege(secondaryExpression, secondaryExpressionCondition)) {
       return;
@@ -63,6 +72,23 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       this.authorizationExpressionEvaluator =
           new AuthorizationExpressionEvaluator(secondaryExpression);
     }
+  }
+
+  @Override
+  public boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception {
+    if (super.execute(authorizationRequestContext)) {
+      return true;
+    }
+
+    if (allowCheckExistenceEvaluator == null
+        || !allowCheckExistenceEvaluator.evaluate(
+            metadataContext, pathParams, authorizationRequestContext, entityType)) {
+      return false;
+    }
+
+    NameIdentifier tableIdentifier = metadataContext.get(Entity.EntityType.TABLE);
+    return tableIdentifier != null
+        && !GravitinoEnv.getInstance().tableDispatcher().tableExists(tableIdentifier);
   }
 
   private static boolean shouldCheckModifyTablePrivilege(

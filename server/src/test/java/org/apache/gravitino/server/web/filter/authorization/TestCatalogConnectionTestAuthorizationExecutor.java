@@ -97,7 +97,8 @@ public class TestCatalogConnectionTestAuthorizationExecutor {
             method.getParameters(),
             new Object[] {proposedChanges()},
             SECONDARY_EXPRESSION,
-            ExpressionCondition.HAS_PROPOSED_CHANGES);
+            ExpressionCondition.HAS_PROPOSED_CHANGES,
+            "");
 
     assertTrue(executor instanceof CatalogConnectionTestAuthorizationExecutor);
     assertEquals(
