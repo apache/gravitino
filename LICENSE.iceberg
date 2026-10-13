@@ -210,7 +210,6 @@
    Apache Directory LDAP API Utilities
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
-   Aviator
    AWS Java SDK annotations
    AWS SDK for Java 2.0
    RoaringBitmap
@@ -284,7 +283,6 @@
    Javax JDO API
    JBoss Logging
    JBoss Threads
-   JCasbin
    JCIP Annotations
    Apache Java Data Objects (JDO)
    JetS3t

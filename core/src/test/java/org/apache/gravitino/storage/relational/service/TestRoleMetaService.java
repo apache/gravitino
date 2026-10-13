@@ -85,6 +85,7 @@ import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.CollectionUtils;
@@ -438,6 +439,14 @@ class TestRoleMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> RoleMetaService.getInstance().getRoleByIdentifier(role.nameIdentifier()));
+  }
+
+  private long queryRoleVersion(long roleId) {
+    List<RoleUpdatedAt> versions =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class, mapper -> mapper.batchGetRoleUpdatedAt(List.of(roleId)));
+    assertEquals(1, versions.size());
+    return versions.get(0).getVersion();
   }
 
   private long queryRoleUpdatedAt(long roleId) {
@@ -1046,6 +1055,7 @@ class TestRoleMetaService extends TestJDBCBackend {
             "catalog");
     roleMetaService.insertRole(roleEntity, false);
     long updatedAtBeforeGrant = queryRoleUpdatedAt(roleEntity.id());
+    long versionBeforeGrant = queryRoleVersion(roleEntity.id());
 
     // grant privileges to the role
     Function<RoleEntity, RoleEntity> grantUpdater =
@@ -1075,6 +1085,8 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     Assertions.assertNotNull(roleMetaService.updateRole(roleEntity.nameIdentifier(), grantUpdater));
     Assertions.assertTrue(queryRoleUpdatedAt(roleEntity.id()) > updatedAtBeforeGrant);
+    // Authorization caches use current_version as the role's policy version.
+    assertEquals(versionBeforeGrant + 1, queryRoleVersion(roleEntity.id()));
     RoleEntity grantRole = roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
 
     assertEquals(grantRole.id(), roleEntity.id());
@@ -1118,6 +1130,7 @@ class TestRoleMetaService extends TestJDBCBackend {
               .build();
         };
     roleMetaService.updateRole(roleEntity.nameIdentifier(), revokeUpdater);
+    assertEquals(versionBeforeGrant + 2, queryRoleVersion(roleEntity.id()));
 
     RoleEntity revokeRole = roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
     assertEquals(revokeRole.id(), roleEntity.id());

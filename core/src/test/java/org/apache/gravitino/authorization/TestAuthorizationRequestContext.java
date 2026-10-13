@@ -47,9 +47,60 @@ import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationRequestContext {
+
+  /** Replacing the view drops decisions cached under the old one and moves the epoch twice. */
+  @Test
+  public void testReplacingRolePolicyViewAdvancesEpochAndDropsDecisions() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AuthorizationRequestContext.RolePolicyView first = () -> 1L;
+    AuthorizationRequestContext.RolePolicyView second = () -> 2L;
+    UserPrincipal principal = new UserPrincipal("user");
+    MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    AtomicInteger allowLoads = new AtomicInteger();
+    AtomicInteger denyLoads = new AtomicInteger();
+
+    context.setRolePolicyView(first);
+    assertEquals(0L, context.getRolePolicyEpoch(), "the first view replaces nothing");
+    for (int i = 0; i < 2; i++) {
+      context.authorizeAllow(
+          principal,
+          "metalake",
+          catalog,
+          Privilege.Name.USE_CATALOG,
+          key -> allowLoads.incrementAndGet() > 0);
+      context.authorizeDeny(
+          principal,
+          "metalake",
+          catalog,
+          Privilege.Name.USE_CATALOG,
+          key -> denyLoads.incrementAndGet() < 0);
+    }
+    context.setRolePolicyView(first);
+    assertEquals(0L, context.getRolePolicyEpoch(), "republishing the same view changes nothing");
+
+    context.setRolePolicyView(second);
+    assertEquals(2L, context.getRolePolicyEpoch());
+    assertTrue(
+        context.authorizeAllow(
+            principal,
+            "metalake",
+            catalog,
+            Privilege.Name.USE_CATALOG,
+            key -> allowLoads.incrementAndGet() > 0));
+    assertFalse(
+        context.authorizeDeny(
+            principal,
+            "metalake",
+            catalog,
+            Privilege.Name.USE_CATALOG,
+            key -> denyLoads.incrementAndGet() < 0));
+    assertEquals(2, allowLoads.get(), "an allow decision of the old view was reused");
+    assertEquals(2, denyLoads.get(), "a deny decision of the old view was reused");
+  }
 
   @Test
   public void testLoadRoleRunsOnceEvenWhenInvokedConcurrently() throws Exception {
@@ -546,5 +597,17 @@ public class TestAuthorizationRequestContext {
     assertThrows(UnsupportedOperationException.class, () -> context.getBoundRoleIds().add(4L));
     assertThrows(NullPointerException.class, () -> context.setBoundRoleIds(null));
     assertEquals(7L, context.getRolePolicyGeneration());
+  }
+
+  /** Publishes the immutable policy view and rejects null publication. */
+  @Test
+  public void testRolePolicyViewIsPublishedAndCannotBeNull() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Assertions.assertNull(context.getRolePolicyView());
+    AuthorizationRequestContext.RolePolicyView view = () -> 17L;
+    context.setRolePolicyView(view);
+    Assertions.assertSame(view, context.getRolePolicyView());
+    Assertions.assertEquals(17L, context.getRolePolicyView().generation());
+    Assertions.assertThrows(NullPointerException.class, () -> context.setRolePolicyView(null));
   }
 }

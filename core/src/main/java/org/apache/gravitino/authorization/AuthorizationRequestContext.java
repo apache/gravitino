@@ -68,11 +68,27 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public class AuthorizationRequestContext {
 
-  /** Used to cache the results of metadata authorization. */
-  private final Map<AuthorizationKey, Boolean> allowAuthorizerCache = new ConcurrentHashMap<>();
+  /**
+   * Used to cache the results of metadata authorization. Replaced, never cleared, when a refreshed
+   * role-policy view replaces an earlier one, so an in-flight computation cannot write a decision
+   * of the old view into the new cache.
+   */
+  private volatile Map<AuthorizationKey, Boolean> allowAuthorizerCache = new ConcurrentHashMap<>();
 
-  /** Used to cache the results of metadata authorization. */
-  private final Map<AuthorizationKey, Boolean> denyAuthorizerCache = new ConcurrentHashMap<>();
+  /** Used to cache the results of metadata authorization. Replaced like the allow cache. */
+  private volatile Map<AuthorizationKey, Boolean> denyAuthorizerCache = new ConcurrentHashMap<>();
+
+  /**
+   * Sequence counter of role-policy view replacements. It is odd while a replacement is in progress
+   * and even otherwise. See {@link #getRolePolicyEpoch()}.
+   */
+  private final AtomicLong rolePolicyEpoch = new AtomicLong();
+
+  /**
+   * Serializes view replacement. It is a dedicated innermost lock: authorizers publish views while
+   * holding their own locks, and other request paths synchronize on this context.
+   */
+  private final Object rolePolicyViewLock = new Object();
 
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
@@ -120,6 +136,68 @@ public class AuthorizationRequestContext {
 
   /** Roles whose entities could not be read during this request's initial role load. */
   private volatile Set<Long> unreadableRoleIds = Collections.emptySet();
+
+  /** Immutable role-policy view owned by this request's authorizer. */
+  @Nullable private volatile RolePolicyView rolePolicyView;
+
+  /**
+   * An authorizer-defined view of the caller's immutable role policies. Implementations must pin
+   * their policy data independently of shared cache eviction.
+   */
+  public interface RolePolicyView {
+    /**
+     * Returns the policy generation most recently validated for this view.
+     *
+     * @return the authorizer's generation
+     */
+    long generation();
+  }
+
+  /**
+   * Returns this request's immutable role-policy view, or null before role loading.
+   *
+   * @return the policy view
+   */
+  @Nullable
+  public RolePolicyView getRolePolicyView() {
+    return rolePolicyView;
+  }
+
+  /**
+   * Publishes a complete immutable role-policy view to all workers in this request. Replacing an
+   * earlier view also discards the decisions cached under it and advances {@link
+   * #getRolePolicyEpoch()}, so that no evaluation combines decisions from the two views.
+   *
+   * @param view the authorizer's policy view
+   */
+  public void setRolePolicyView(RolePolicyView view) {
+    Objects.requireNonNull(view, "Role policy view must not be null");
+    synchronized (rolePolicyViewLock) {
+      RolePolicyView previous = rolePolicyView;
+      if (previous == null || previous == view) {
+        rolePolicyView = view;
+        return;
+      }
+      // Seqlock: an evaluation that observes anything of the new view also sees the epoch change.
+      rolePolicyEpoch.incrementAndGet();
+      rolePolicyView = view;
+      allowAuthorizerCache = new ConcurrentHashMap<>();
+      denyAuthorizerCache = new ConcurrentHashMap<>();
+      rolePolicyEpoch.incrementAndGet();
+    }
+  }
+
+  /**
+   * Returns the role-policy epoch. An evaluation that combines several decisions, such as an
+   * authorization expression, reads it before and after: the decisions all come from one
+   * role-policy view only if both reads return the same even value. Otherwise it must evaluate
+   * again.
+   *
+   * @return the current epoch; odd while a view replacement is in progress
+   */
+  public long getRolePolicyEpoch() {
+    return rolePolicyEpoch.get();
+  }
 
   /**
    * The roles the caller has declared active for this request (role assumption). Read from the

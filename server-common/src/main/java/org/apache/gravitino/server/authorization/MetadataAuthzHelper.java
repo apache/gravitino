@@ -286,6 +286,9 @@ public class MetadataAuthzHelper {
    * the matching filter expression is granted at a parent scope, the whole list is visible unless
    * an object-level deny may exist. Returns {@code true} only when it is safe to return every
    * identifier without per-object authorization.
+   *
+   * <p>The parent grant and the deny check must come from one role-policy view. If the request's
+   * view is replaced in between, the short-circuit is skipped and every object is checked.
    */
   private static boolean allVisibleViaParentScope(
       String metalake,
@@ -332,6 +335,7 @@ public class MetadataAuthzHelper {
     Map<Entity.EntityType, NameIdentifier> metadataNames =
         NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifiers[0]);
 
+    long epoch = requestContext.getRolePolicyEpoch();
     for (ParentScopeAccessPath accessPath : accessPaths) {
       requestContext.setOriginalAuthorizationExpression(accessPath.expression);
       boolean parentGrantsAccess =
@@ -346,6 +350,14 @@ public class MetadataAuthzHelper {
               && authorizer.hasDenyPolicy(
                   principal, metalake, accessPath.denyPrivileges, requestContext);
       if (!hasDeny) {
+        if ((epoch & 1L) != 0L || epoch != requestContext.getRolePolicyEpoch()) {
+          LOG.debug(
+              "Parent-scope short-circuit skipped for entity type {} under metalake {}: role "
+                  + "policies changed while it was evaluated.",
+              entityType,
+              metalake);
+          return false;
+        }
         return true;
       }
 

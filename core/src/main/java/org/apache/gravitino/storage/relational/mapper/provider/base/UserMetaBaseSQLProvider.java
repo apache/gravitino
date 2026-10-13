@@ -315,7 +315,7 @@ public class UserMetaBaseSQLProvider {
     // 'USER' branch → AuthPrefetchRow.Kind.USER.
     String userBranch =
         "SELECT 'USER' AS subjectType, um.user_id AS entityId, um.user_name AS entityName,"
-            + " um.updated_at AS updatedAt, NULL AS bindingOwnerId"
+            + " um.updated_at AS updatedAt, NULL AS bindingOwnerId, NULL AS version"
             + " FROM "
             + USER_TABLE_NAME
             + " um"
@@ -330,7 +330,8 @@ public class UserMetaBaseSQLProvider {
     String userRoleBranch =
         " UNION ALL "
             + "SELECT 'USER_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
-            + " rm.updated_at AS updatedAt, ur.user_id AS bindingOwnerId"
+            + " rm.updated_at AS updatedAt, ur.user_id AS bindingOwnerId,"
+            + " rm.current_version AS version"
             + " FROM "
             + USER_TABLE_NAME
             + " um"
@@ -355,7 +356,7 @@ public class UserMetaBaseSQLProvider {
     String groupBranch =
         " UNION ALL "
             + "SELECT 'GROUP' AS subjectType, gm.group_id AS entityId, gm.group_name AS entityName,"
-            + " gm.updated_at AS updatedAt, NULL AS bindingOwnerId"
+            + " gm.updated_at AS updatedAt, NULL AS bindingOwnerId, NULL AS version"
             + " FROM "
             + GROUP_TABLE_NAME
             + " gm"
@@ -372,7 +373,8 @@ public class UserMetaBaseSQLProvider {
     String groupRoleBranch =
         " UNION ALL "
             + "SELECT 'GROUP_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
-            + " rm.updated_at AS updatedAt, gr.group_id AS bindingOwnerId"
+            + " rm.updated_at AS updatedAt, gr.group_id AS bindingOwnerId,"
+            + " rm.current_version AS version"
             + " FROM "
             + GROUP_TABLE_NAME
             + " gm"

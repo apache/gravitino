@@ -61,6 +61,12 @@ public class AuthorizationExpressionEvaluator {
    */
   private static final Map<String, Object> PARSED_EXPRESSION_CACHE = new ConcurrentHashMap<>();
 
+  /**
+   * How many times one expression is evaluated when the request's role-policy view changes during
+   * evaluation. Beyond this the expression fails closed.
+   */
+  @VisibleForTesting static final int MAX_EVALUATION_ATTEMPTS = 3;
+
   private final Object ognlAuthorizationExpressionTree;
   private final GravitinoAuthorizer authorizer;
 
@@ -192,10 +198,27 @@ public class AuthorizationExpressionEvaluator {
     NameIdentifier nameIdentifier = metadataNames.get(Entity.EntityType.METALAKE);
     ognlContext.put(
         "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
-    try {
-      return (boolean) Ognl.getValue(ognlAuthorizationExpressionTree, ognlContext);
-    } catch (OgnlException e) {
-      throw new RuntimeException(e);
+    // The expression combines several probes and cached decisions. They must all come from one
+    // role-policy view, so evaluate again if the view was replaced in between.
+    for (int attempt = 1; ; attempt++) {
+      long epoch = requestContext == null ? 0L : requestContext.getRolePolicyEpoch();
+      boolean result;
+      try {
+        result = (boolean) Ognl.getValue(ognlAuthorizationExpressionTree, ognlContext);
+      } catch (OgnlException e) {
+        throw new RuntimeException(e);
+      }
+      if (requestContext == null
+          || ((epoch & 1L) == 0L && epoch == requestContext.getRolePolicyEpoch())) {
+        return result;
+      }
+      if (attempt == MAX_EVALUATION_ATTEMPTS) {
+        LOGGER.warn(
+            "Role policies changed during all {} evaluations of an authorization expression; "
+                + "denying. Retry the request after role updates settle",
+            MAX_EVALUATION_ATTEMPTS);
+        return false;
+      }
     }
   }
 

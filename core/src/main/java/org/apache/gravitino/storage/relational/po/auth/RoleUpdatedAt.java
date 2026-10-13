@@ -23,7 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Role identity and privilege-list staleness sentinel. */
+/** Role identity and privilege-list version. */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,6 +32,13 @@ public class RoleUpdatedAt {
   private long roleId;
   private String roleName;
   private long updatedAt;
+
+  /**
+   * {@code role_meta.current_version}. Every role update advances it by one with a compare-and-set
+   * in the same transaction as the privilege changes, so unlike {@code updatedAt} it strictly
+   * increases with each committed change of the role's privileges.
+   */
+  private long version;
 
   public RoleUpdatedAt(long roleId, long updatedAt) {
     this.roleId = roleId;

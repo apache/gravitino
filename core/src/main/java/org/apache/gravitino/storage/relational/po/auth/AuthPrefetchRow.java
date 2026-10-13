@@ -174,6 +174,13 @@ public class AuthPrefetchRow {
   private Long bindingOwnerId;
 
   /**
+   * {@code role_meta.current_version} for {@link Kind#USER_ROLE} and {@link Kind#GROUP_ROLE} rows;
+   * {@code null} for identity rows. Role policy caches use it as the role's version, because it
+   * strictly increases with each committed role update while {@code updatedAt} may repeat.
+   */
+  private Long version;
+
+  /**
    * Builds a {@link Kind#USER} row.
    *
    * @param userId {@code user_meta.user_id}
@@ -182,7 +189,7 @@ public class AuthPrefetchRow {
    * @return a populated row
    */
   public static AuthPrefetchRow forUser(long userId, String userName, long updatedAt) {
-    return new AuthPrefetchRow(Kind.USER, userId, userName, updatedAt, null);
+    return new AuthPrefetchRow(Kind.USER, userId, userName, updatedAt, null, null);
   }
 
   /**
@@ -194,7 +201,7 @@ public class AuthPrefetchRow {
    * @return a populated row
    */
   public static AuthPrefetchRow forGroup(long groupId, String groupName, long updatedAt) {
-    return new AuthPrefetchRow(Kind.GROUP, groupId, groupName, updatedAt, null);
+    return new AuthPrefetchRow(Kind.GROUP, groupId, groupName, updatedAt, null, null);
   }
 
   /**
@@ -203,12 +210,13 @@ public class AuthPrefetchRow {
    * @param roleId {@code role_meta.role_id}
    * @param roleName {@code role_meta.role_name}
    * @param updatedAt {@code role_meta.updated_at}
+   * @param version {@code role_meta.current_version}
    * @param ownerUserId the {@code user_id} that owns this direct role binding
    * @return a populated row
    */
   public static AuthPrefetchRow forUserRole(
-      long roleId, String roleName, long updatedAt, long ownerUserId) {
-    return new AuthPrefetchRow(Kind.USER_ROLE, roleId, roleName, updatedAt, ownerUserId);
+      long roleId, String roleName, long updatedAt, long version, long ownerUserId) {
+    return new AuthPrefetchRow(Kind.USER_ROLE, roleId, roleName, updatedAt, ownerUserId, version);
   }
 
   /**
@@ -217,11 +225,12 @@ public class AuthPrefetchRow {
    * @param roleId {@code role_meta.role_id}
    * @param roleName {@code role_meta.role_name}
    * @param updatedAt {@code role_meta.updated_at}
+   * @param version {@code role_meta.current_version}
    * @param ownerGroupId the {@code group_id} that owns this inherited role binding
    * @return a populated row
    */
   public static AuthPrefetchRow forGroupRole(
-      long roleId, String roleName, long updatedAt, long ownerGroupId) {
-    return new AuthPrefetchRow(Kind.GROUP_ROLE, roleId, roleName, updatedAt, ownerGroupId);
+      long roleId, String roleName, long updatedAt, long version, long ownerGroupId) {
+    return new AuthPrefetchRow(Kind.GROUP_ROLE, roleId, roleName, updatedAt, ownerGroupId, version);
   }
 }
