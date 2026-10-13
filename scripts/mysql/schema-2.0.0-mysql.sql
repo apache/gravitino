@@ -729,7 +729,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
     `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after maintenance, null while pending',
-    `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 while in flight (soft exclusive slot like deleted_at; one in-flight submitter per table/policy so completed finished_at values do not contend); finish timestamp in milliseconds when done',
+    `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 while in flight (soft exclusive slot like deleted_at, one submitter per table/policy so finished_at values do not contend), finish timestamp in milliseconds when done',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation / unbound claim lease start timestamp in milliseconds',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tma_job_id` (`job_id`),

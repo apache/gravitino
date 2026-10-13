@@ -1285,7 +1285,7 @@ COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
 COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
-COMMENT ON COLUMN table_maintenance_action.finished_at IS '0 while in flight (soft exclusive slot like deleted_at; one in-flight submitter per table/policy so completed finished_at values do not contend); finish timestamp in milliseconds when done';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS '0 while in flight (soft exclusive slot like deleted_at, one submitter per table/policy so finished_at values do not contend), finish timestamp in milliseconds when done';
 COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation / unbound claim lease start timestamp in milliseconds';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
