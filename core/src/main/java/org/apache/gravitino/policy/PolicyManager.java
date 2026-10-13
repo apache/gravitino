@@ -116,7 +116,9 @@ public class PolicyManager implements PolicyDispatcher {
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
+    content.validate();
     validateReadRestrictionContent(type, content);
+
     PolicyEntity policyEntity =
         PolicyEntity.builder()
             .withId(idGenerator.nextId())
@@ -335,11 +337,13 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
-        validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
+
+    newContent.validate();
+    validateReadRestrictionContent(policyEntity.policyType(), newContent);
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);

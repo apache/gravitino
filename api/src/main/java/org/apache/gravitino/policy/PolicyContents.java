@@ -169,6 +169,24 @@ public class PolicyContents {
   }
 
   /**
+   * Creates placeholder Iceberg rewrite-manifests policy content.
+   *
+   * @return rewrite-manifests policy content
+   */
+  public static PolicyContent icebergRewriteManifests() {
+    return new IcebergRewriteManifestsContent();
+  }
+
+  /**
+   * Creates placeholder Iceberg snapshot-expiration policy content.
+   *
+   * @return snapshot-expiration policy content
+   */
+  public static PolicyContent icebergSnapshotExpiration() {
+    return new IcebergSnapshotExpirationContent();
+  }
+
+  /**
    * Creates a row-filter policy for tagged tables.
    *
    * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
