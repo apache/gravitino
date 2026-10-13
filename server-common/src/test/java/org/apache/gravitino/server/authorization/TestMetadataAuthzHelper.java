@@ -663,6 +663,7 @@ public class TestMetadataAuthzHelper {
                     argThat(object -> object.type() == MetadataObject.Type.FILESET),
                     any(),
                     any());
+            verifyNoInteractions(store);
           });
     } finally {
       when(gravitinoEnv.cacheEnabled()).thenReturn(false);
@@ -812,6 +813,7 @@ public class TestMetadataAuthzHelper {
                     argThat(object -> object.type() == MetadataObject.Type.TOPIC),
                     any(),
                     any());
+            verifyNoInteractions(store);
           });
     } finally {
       when(gravitinoEnv.cacheEnabled()).thenReturn(false);
@@ -820,11 +822,14 @@ public class TestMetadataAuthzHelper {
     }
   }
 
-  /** A possible CONSUME_TOPIC deny disables the schema-grant path and each topic is checked. */
+  /**
+   * A possible PRODUCE_TOPIC deny disables the schema-grant path and each topic is checked; the
+   * PRODUCE_TOPIC path is the second parent-scope path of the topic entry.
+   */
   @Test
   public void testListShortCircuitTopicFallsBackWhenDenyMayExist() {
     GravitinoAuthorizer authorizer =
-        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.CONSUME_TOPIC);
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.PRODUCE_TOPIC);
     when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
     when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
         .thenAnswer(
@@ -844,10 +849,10 @@ public class TestMetadataAuthzHelper {
                   identifiers);
           Assertions.assertArrayEquals(
               new NameIdentifier[] {identifiers[0], identifiers[2]}, filtered);
-          // The granted path gates on exactly the CONSUME_TOPIC deny.
+          // The granted path gates on exactly the PRODUCE_TOPIC deny.
           verify(authorizer)
               .hasDenyPolicy(
-                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.CONSUME_TOPIC)), any());
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.PRODUCE_TOPIC)), any());
         });
   }
 
