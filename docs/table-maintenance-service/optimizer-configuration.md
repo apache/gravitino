@@ -9,11 +9,11 @@ license: "This software is licensed under the Apache License version 2."
 
 Three layers of configuration apply, and they are set in different places for different lifetimes. Server configuration governs how jobs run at all, CLI configuration governs how the commands reach Gravitino, and `jobConf` governs a single job submission.
 
-| Layer               | Where it lives                  | Lifetime            |
-|---------------------|----------------------------------|---------------------|
-| Server              | `gravitino.conf`                 | Until server restart |
-| CLI                 | `conf/gravitino-optimizer.conf`  | Per command          |
-| Job submission      | `jobConf` in the request body    | One job run          |
+| Layer          | Where it lives                     | Lifetime             |
+| -------------- | ---------------------------------- | -------------------- |
+| Server         | `gravitino.conf`                   | Until server restart |
+| CLI            | `conf/gravitino-optimizer.conf`    | Per command          |
+| Job submission | `jobConf` in the request body      | One job run          |
 
 ## Server Configuration
 
@@ -26,6 +26,106 @@ gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
 `gravitino.job.statusPullIntervalInMs` defaults to five minutes. Job status is polled rather than pushed, so REST status can lag the real Spark process by a full interval, which makes a working job look hung. Lower it to `10000` for local work and restart the server.
+
+### TMS cluster-static client auth
+
+For in-process Table Maintenance Service (TMS), client credentials are **cluster-static**: set them under
+the prefixes below in `gravitino.conf`. Do not store passwords, OAuth secrets, or keytab paths in policy
+content. Values may be plaintext or secret-manager references when the deployment supports them.
+
+#### Gravitino client auth (`gravitino.maintenance.gravitinoAuth.`)
+
+Configuration for the Gravitino control-plane client (expand, submit, RBAC, and jobs that call Gravitino
+APIs).
+
+| Key suffix (after prefix) | Used when `authType` is | Meaning                                        |
+| ------------------------- | ----------------------- | ---------------------------------------------- |
+| `authType`                | all modes               | `none`, `basic`, `oauth2`, or `kerberos`      |
+| `username`                | `basic`                 | User principal for HTTP basic                  |
+| `password`                | `basic`                 | Password or secret reference                   |
+| `oauth2ServerUri`         | `oauth2`                | OAuth2 token endpoint URL                      |
+| `oauthCredential`         | `oauth2`                | Client credential, often `client_id:secret`    |
+| `oauthScope`              | `oauth2`                | Token scope (IdP-specific)                     |
+| `kerberosPrincipal`       | `kerberos`              | Service principal, for example `tms/_HOST@REALM` |
+| `keytab`                  | `kerberos`              | Keytab path or secret reference                |
+
+`authType = none` — Gravitino authorization disabled; omit the prefix or set:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = none
+```
+
+`authType = basic`:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = basic
+gravitino.maintenance.gravitinoAuth.username = tms-control
+gravitino.maintenance.gravitinoAuth.password = YourSecureGravitinoPassword
+```
+
+`authType = oauth2`:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = oauth2
+gravitino.maintenance.gravitinoAuth.oauth2ServerUri = https://idp.example.com/realms/demo/protocol/openid-connect/token
+gravitino.maintenance.gravitinoAuth.oauthCredential = gravitino-client-id:gravitino-client-secret
+gravitino.maintenance.gravitinoAuth.oauthScope = openid profile email
+```
+
+`authType = kerberos`:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = kerberos
+gravitino.maintenance.gravitinoAuth.kerberosPrincipal = tms/_HOST@EXAMPLE.COM
+gravitino.maintenance.gravitinoAuth.keytab = /etc/security/keytabs/tms-gravitino.keytab
+```
+
+#### Iceberg REST client auth (`gravitino.maintenance.ircAuth.`)
+
+Configuration for Spark jobs that call Iceberg REST (IRC). The suffix keys match Gravitino client auth;
+only the prefix differs.
+
+| Key suffix (after prefix) | Used when `authType` is | Meaning                                        |
+| ------------------------- | ----------------------- | ---------------------------------------------- |
+| `authType`                | all modes               | `none`, `basic`, `oauth2`, or `kerberos`      |
+| `username`                | `basic`                 | User principal for HTTP basic                   |
+| `password`                | `basic`                 | Password or secret reference                    |
+| `oauth2ServerUri`         | `oauth2`                | OAuth2 token endpoint URL                       |
+| `oauthCredential`         | `oauth2`                | Client credential, often `client_id:secret`     |
+| `oauthScope`              | `oauth2`                | Token scope (IdP-specific)                      |
+| `kerberosPrincipal`       | `kerberos`              | Service principal, for example `tms/_HOST@REALM` |
+| `keytab`                  | `kerberos`              | Keytab path or secret reference                 |
+
+`authType = none` — IRC does not require authentication; omit the prefix or set:
+
+```properties
+gravitino.maintenance.ircAuth.authType = none
+```
+
+`authType = basic`:
+
+```properties
+gravitino.maintenance.ircAuth.authType = basic
+gravitino.maintenance.ircAuth.username = tms-irc
+gravitino.maintenance.ircAuth.password = YourSecureIcebergRestPassword
+```
+
+`authType = oauth2`:
+
+```properties
+gravitino.maintenance.ircAuth.authType = oauth2
+gravitino.maintenance.ircAuth.oauth2ServerUri = https://idp.example.com/realms/demo/protocol/openid-connect/token
+gravitino.maintenance.ircAuth.oauthCredential = iceberg-client-id:iceberg-client-secret
+gravitino.maintenance.ircAuth.oauthScope = api://iceberg-rest/.default
+```
+
+`authType = kerberos`:
+
+```properties
+gravitino.maintenance.ircAuth.authType = kerberos
+gravitino.maintenance.ircAuth.kerberosPrincipal = tms/_HOST@EXAMPLE.COM
+gravitino.maintenance.ircAuth.keytab = /etc/security/keytabs/tms-irc.keytab
+```
 
 ## CLI Configuration
 
@@ -57,11 +157,11 @@ When the Gravitino server has authentication enabled, `builtin-iceberg-update-st
 credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
 updater and `submit-update-stats-job` `runJob` calls):
 
-| `auth_type`      | Fields                                                                                         |
-|------------------|------------------------------------------------------------------------------------------------|
-| `none` (default) | (none)                                                                                         |
-| `simple`         | `username` (optional)                                                                          |
-| `basic`          | `username`, `password`                                                                         |
+| `auth_type`      | Fields                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| `none` (default) | (none)                                                                                       |
+| `simple`         | `username` (optional)                                                                        |
+| `basic`          | `username`, `password`                                                                       |
 | `oauth`          | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
 
 Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in

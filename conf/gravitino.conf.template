@@ -144,6 +144,31 @@ gravitino.lance-rest.namespace-backend = gravitino
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
 # gravitino.lance-rest.gravitino-metalake = metalake
 
+# THE CONFIGURATION FOR Table Maintenance Service (TMS) cluster-static client auth
+# Optional. Do not put these values in policy content. See MaintenanceAuthConfigs for keys.
+# gravitino.maintenance.gravitinoAuth.authType = none
+# gravitino.maintenance.gravitinoAuth.authType = basic
+# gravitino.maintenance.gravitinoAuth.username = tms-control
+# gravitino.maintenance.gravitinoAuth.password = YourSecureGravitinoPassword
+# gravitino.maintenance.gravitinoAuth.authType = oauth2
+# gravitino.maintenance.gravitinoAuth.oauth2ServerUri = https://idp.example.com/realms/demo/protocol/openid-connect/token
+# gravitino.maintenance.gravitinoAuth.oauthCredential = gravitino-client-id:gravitino-client-secret
+# gravitino.maintenance.gravitinoAuth.oauthScope = openid profile email
+# gravitino.maintenance.gravitinoAuth.authType = kerberos
+# gravitino.maintenance.gravitinoAuth.kerberosPrincipal = tms/_HOST@EXAMPLE.COM
+# gravitino.maintenance.gravitinoAuth.keytab = /etc/security/keytabs/tms-gravitino.keytab
+# gravitino.maintenance.ircAuth.authType = none
+# gravitino.maintenance.ircAuth.authType = basic
+# gravitino.maintenance.ircAuth.username = tms-irc
+# gravitino.maintenance.ircAuth.password = YourSecureIcebergRestPassword
+# gravitino.maintenance.ircAuth.authType = oauth2
+# gravitino.maintenance.ircAuth.oauth2ServerUri = https://idp.example.com/realms/demo/protocol/openid-connect/token
+# gravitino.maintenance.ircAuth.oauthCredential = iceberg-client-id:iceberg-client-secret
+# gravitino.maintenance.ircAuth.oauthScope = api://iceberg-rest/.default
+# gravitino.maintenance.ircAuth.authType = kerberos
+# gravitino.maintenance.ircAuth.kerberosPrincipal = tms/_HOST@EXAMPLE.COM
+# gravitino.maintenance.ircAuth.keytab = /etc/security/keytabs/tms-irc.keytab
+
 # THE CONFIGURATION FOR sensitive property key matching
 # Comma-separated keywords. Each entry is a literal substring, not a regular expression.
 # This list replaces the default (secret,password,token,credential,access,account).
