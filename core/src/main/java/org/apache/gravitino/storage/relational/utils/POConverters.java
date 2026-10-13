@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -47,6 +48,7 @@ import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -853,7 +855,7 @@ public class POConverters {
           JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()),
           newPolicy.comment(),
           newPolicy.enabled(),
-          JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()));
+          serializePolicyEntityContent(newPolicy));
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
@@ -1558,6 +1560,13 @@ public class POConverters {
   public static PolicyEntity fromPolicyPO(PolicyPO policyPO, Namespace namespace) {
     try {
       Policy.BuiltInType policyType = Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType());
+      ObjectMapper mapper = JsonUtils.anyFieldMapper();
+      String contentJson = policyPO.getPolicyVersionPO().getContent();
+      PolicyMaintenanceContentSerde.SplitResult split =
+          PolicyMaintenanceContentSerde.splitFromContentJson(contentJson, mapper);
+      PolicyContent content = mapper.treeToValue(split.taskContent(), policyType.contentClass());
+      MaintenancePeerFields peerFields =
+          split.peerFields().hasAnyField() ? split.peerFields() : null;
       return PolicyEntity.builder()
           .withId(policyPO.getPolicyId())
           .withName(policyPO.getPolicyName())
@@ -1565,11 +1574,9 @@ public class POConverters {
           .withPolicyType(policyType)
           .withComment(policyPO.getPolicyVersionPO().getPolicyComment())
           .withEnabled(policyPO.getPolicyVersionPO().isEnabled())
-          .withContent(
-              JsonUtils.anyFieldMapper()
-                  .readValue(policyPO.getPolicyVersionPO().getContent(), policyType.contentClass()))
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
+          .withContent(content)
+          .withMaintenancePeerFields(peerFields)
+          .withAuditInfo(mapper.readValue(policyPO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
@@ -1583,7 +1590,7 @@ public class POConverters {
   public static PolicyPO initializePolicyPOWithVersion(
       PolicyEntity policyEntity, PolicyPO.Builder builder) {
     try {
-      String content = JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.content());
+      String content = serializePolicyEntityContent(policyEntity);
       PolicyVersionPO policyVersionPO =
           PolicyVersionPO.builder()
               .withMetalakeId(builder.getMetalakeId())
@@ -1926,16 +1933,29 @@ public class POConverters {
     }
 
     // Sets in policy content can serialize in a different order after a read/write round trip.
-    // Compare the content objects so an audit-only update does not allocate a redundant snapshot.
+    // Compare task content and TMS peer fields separately so an audit-only update does not
+    // allocate a redundant snapshot.
     try {
+      ObjectMapper mapper = JsonUtils.anyFieldMapper();
       Class<? extends PolicyContent> contentClass =
           Policy.BuiltInType.fromPolicyType(policyType).contentClass();
-      return Objects.equals(
-          JsonUtils.anyFieldMapper().readValue(storedContent, contentClass),
-          JsonUtils.anyFieldMapper().readValue(newContent, contentClass));
+      PolicyMaintenanceContentSerde.SplitResult storedSplit =
+          PolicyMaintenanceContentSerde.splitFromContentJson(storedContent, mapper);
+      PolicyMaintenanceContentSerde.SplitResult newSplit =
+          PolicyMaintenanceContentSerde.splitFromContentJson(newContent, mapper);
+      PolicyContent storedTask = mapper.treeToValue(storedSplit.taskContent(), contentClass);
+      PolicyContent newTask = mapper.treeToValue(newSplit.taskContent(), contentClass);
+      return Objects.equals(storedTask, newTask)
+          && Objects.equals(storedSplit.peerFields(), newSplit.peerFields());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize policy content:", e);
     }
+  }
+
+  private static String serializePolicyEntityContent(PolicyEntity policyEntity)
+      throws JsonProcessingException {
+    return PolicyMaintenanceContentSerde.serializePolicyEntityContent(
+        policyEntity, JsonUtils.anyFieldMapper());
   }
 
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {

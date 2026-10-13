@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.listener;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
@@ -50,6 +51,7 @@ import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadata
 import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosPreEvent;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -142,7 +144,8 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
       Policy.BuiltInType type,
       String comment,
       boolean enabled,
-      PolicyContent content) {
+      PolicyContent content,
+      @Nullable MaintenancePeerFields maintenancePeerFields) {
     PolicyInfo policyInfo = new PolicyInfo(name, type.name(), comment, enabled, content, null);
     eventBus.dispatchEvent(
         new CreatePolicyPreEvent(
@@ -151,7 +154,8 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
             policyInfo));
     try {
       PolicyEntity policy =
-          dispatcher.createPolicy(metalake, name, type, comment, enabled, content);
+          dispatcher.createPolicy(
+              metalake, name, type, comment, enabled, content, maintenancePeerFields);
       eventBus.dispatchEvent(
           new CreatePolicyEvent(
               PrincipalUtils.getCurrentUserName(),

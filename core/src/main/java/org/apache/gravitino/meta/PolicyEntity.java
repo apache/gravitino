@@ -34,6 +34,8 @@ import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicies;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -67,6 +69,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   private String comment;
   private boolean enabled;
   private PolicyContent content;
+  @Nullable private MaintenancePeerFields maintenancePeerFields;
   @Nullable private Boolean inherited;
   private AuditInfo auditInfo;
 
@@ -127,6 +130,16 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     return content;
   }
 
+  /**
+   * Optional TMS peer fields stored in the policy content JSON alongside {@link #content()}.
+   *
+   * @return peer fields, or {@code null} when unset
+   */
+  @Nullable
+  public MaintenancePeerFields maintenancePeerFields() {
+    return maintenancePeerFields;
+  }
+
   public Optional<Boolean> inherited() {
     return Optional.ofNullable(inherited);
   }
@@ -151,6 +164,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
             .withComment(comment)
             .withEnabled(enabled)
             .withContent(content)
+            .withMaintenancePeerFields(maintenancePeerFields)
             .withAuditInfo(auditInfo)
             .build();
     copy.inherited = inherited;
@@ -174,12 +188,22 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(policyType, that.policyType)
         && Objects.equals(comment, that.comment)
         && Objects.equals(content, that.content)
+        && Objects.equals(maintenancePeerFields, that.maintenancePeerFields)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, namespace, policyType, comment, enabled, content, auditInfo);
+    return Objects.hash(
+        id,
+        name,
+        namespace,
+        policyType,
+        comment,
+        enabled,
+        content,
+        maintenancePeerFields,
+        auditInfo);
   }
 
   private void validatePolicy() {
@@ -199,6 +223,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         policyType.name(),
         content().getClass().getName());
     content().validate();
+    TableMaintenancePolicies.validate(policyType, maintenancePeerFields);
   }
 
   public static class Builder {
@@ -209,6 +234,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     private String comment;
     private boolean enabled = true;
     private PolicyContent content;
+    @Nullable private MaintenancePeerFields maintenancePeerFields;
     private AuditInfo auditInfo;
 
     public Builder withId(Long id) {
@@ -246,6 +272,18 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
+    /**
+     * Sets optional TMS peer fields for maintenance policies.
+     *
+     * @param maintenancePeerFields peer fields from JSON / DTO
+     * @return this builder
+     */
+    public Builder withMaintenancePeerFields(
+        @Nullable MaintenancePeerFields maintenancePeerFields) {
+      this.maintenancePeerFields = maintenancePeerFields;
+      return this;
+    }
+
     public Builder withAuditInfo(AuditInfo auditInfo) {
       this.auditInfo = auditInfo;
       return this;
@@ -260,6 +298,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       policyEntity.comment = comment;
       policyEntity.enabled = enabled;
       policyEntity.content = content;
+      policyEntity.maintenancePeerFields = maintenancePeerFields;
       policyEntity.auditInfo = auditInfo;
       policyEntity.validate();
 

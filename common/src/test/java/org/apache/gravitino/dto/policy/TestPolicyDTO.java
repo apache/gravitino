@@ -177,4 +177,64 @@ public class TestPolicyDTO {
         IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
+
+  @Test
+  public void testIcebergCompactionMaintenancePeerFieldsSerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withSchedule(
+                PolicyContentDTO.MaintenanceTriggerDTO.builder()
+                    .withOnCommit(true)
+                    .withCronExpression("0 0 2 * * ?")
+                    .build())
+            .withMinIntervalMs(3_600_000L)
+            .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
+            .withUpdateOptions(ImmutableMap.of("metalake", "ml"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction-tms")
+            .withComment("tms peers")
+            .withPolicyType("system_iceberg_compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
+    Assertions.assertTrue(content.schedule().toDomain().onCommit());
+    Assertions.assertEquals("0 0 2 * * ?", content.schedule().toDomain().cronExpression());
+    Assertions.assertEquals(3_600_000L, content.minIntervalMs());
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updateOptions().get("metalake"));
+    Assertions.assertDoesNotThrow(content::validate);
+  }
+
+  @Test
+  public void testMaintenancePeerValidateOnDto() {
+    PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
+        PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+            .withSchedule(
+                PolicyContentDTO.MaintenanceTriggerDTO.builder().withOnCommit(true).build())
+            .build();
+    IllegalArgumentException orphanEx =
+        Assertions.assertThrows(IllegalArgumentException.class, orphanOnCommit::validate);
+    Assertions.assertTrue(orphanEx.getMessage().contains("onCommit"));
+
+    PolicyContentDTO.IcebergCompactionContentDTO badCron =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withSchedule(
+                PolicyContentDTO.MaintenanceTriggerDTO.builder()
+                    .withCronExpression("a a a a a a")
+                    .build())
+            .build();
+    Assertions.assertThrows(IllegalArgumentException.class, badCron::validate);
+  }
 }

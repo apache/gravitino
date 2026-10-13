@@ -20,11 +20,13 @@
 package org.apache.gravitino.policy;
 
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
@@ -74,13 +76,38 @@ public interface PolicyDispatcher {
    * @return The created policy
    * @throws PolicyAlreadyExistsException If the policy already exists
    */
-  PolicyEntity createPolicy(
+  default PolicyEntity createPolicy(
       String metalake,
       String name,
       Policy.BuiltInType type,
       String comment,
       boolean enabled,
       PolicyContent content)
+      throws PolicyAlreadyExistsException {
+    return createPolicy(metalake, name, type, comment, enabled, content, null);
+  }
+
+  /**
+   * Create a built-in type policy under a metalake.
+   *
+   * @param metalake the name of the metalake
+   * @param name The name of the policy
+   * @param type The type of the policy
+   * @param comment The comment of the policy
+   * @param enabled Whether the policy is enabled or not
+   * @param content The content of the policy
+   * @param maintenancePeerFields Optional TMS peer fields stored in the content JSON document
+   * @return The created policy
+   * @throws PolicyAlreadyExistsException If the policy already exists
+   */
+  PolicyEntity createPolicy(
+      String metalake,
+      String name,
+      Policy.BuiltInType type,
+      String comment,
+      boolean enabled,
+      PolicyContent content,
+      @Nullable MaintenancePeerFields maintenancePeerFields)
       throws PolicyAlreadyExistsException;
 
   /**

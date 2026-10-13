@@ -19,7 +19,9 @@
 package org.apache.gravitino.policy;
 
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 
 /**
  * Interface for supporting policy changes. This interface will be used to provide policy
@@ -56,7 +58,22 @@ public interface PolicyChange {
    * @return The policy change.
    */
   static PolicyChange updateContent(String policyType, PolicyContent content) {
-    return new UpdateContent(policyType, content);
+    return updateContent(policyType, content, null);
+  }
+
+  /**
+   * Creates a new policy change to update the content of the policy.
+   *
+   * @param policyType The type of the policy, used for validation.
+   * @param content The new content for the policy.
+   * @param maintenancePeerFields Optional TMS peer fields stored alongside content JSON.
+   * @return The policy change.
+   */
+  static PolicyChange updateContent(
+      String policyType,
+      PolicyContent content,
+      @Nullable MaintenancePeerFields maintenancePeerFields) {
+    return new UpdateContent(policyType, content, maintenancePeerFields);
   }
 
   /** A policy change to rename the policy. */
@@ -163,10 +180,15 @@ public interface PolicyChange {
   final class UpdateContent implements PolicyChange {
     private final String policyType;
     private final PolicyContent content;
+    @Nullable private final MaintenancePeerFields maintenancePeerFields;
 
-    private UpdateContent(String policyType, PolicyContent content) {
+    private UpdateContent(
+        String policyType,
+        PolicyContent content,
+        @Nullable MaintenancePeerFields maintenancePeerFields) {
       this.policyType = policyType;
       this.content = content;
+      this.maintenancePeerFields = maintenancePeerFields;
     }
 
     /**
@@ -187,16 +209,28 @@ public interface PolicyChange {
       return content;
     }
 
+    /**
+     * Optional TMS peer fields for maintenance policies.
+     *
+     * @return peer fields, or {@code null} when unset
+     */
+    @Nullable
+    public MaintenancePeerFields getMaintenancePeerFields() {
+      return maintenancePeerFields;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof UpdateContent)) return false;
       UpdateContent that = (UpdateContent) o;
-      return Objects.equals(policyType, that.policyType) && Objects.equals(content, that.content);
+      return Objects.equals(policyType, that.policyType)
+          && Objects.equals(content, that.content)
+          && Objects.equals(maintenancePeerFields, that.maintenancePeerFields);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(policyType, content);
+      return Objects.hash(policyType, content, maintenancePeerFields);
     }
 
     @Override

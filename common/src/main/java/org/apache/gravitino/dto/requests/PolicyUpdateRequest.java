@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
+import static org.apache.gravitino.dto.util.DTOConverters.maintenancePeerFieldsFromDTO;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -180,7 +181,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
     @Override
     public PolicyChange policyChange() {
-      return PolicyChange.updateContent(policyType, fromDTO(newContent));
+      return PolicyChange.updateContent(
+          policyType, fromDTO(newContent), maintenancePeerFieldsFromDTO(newContent));
     }
 
     @Override

@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
+import static org.apache.gravitino.dto.util.DTOConverters.maintenancePeerFieldsFromDTO;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -170,7 +171,8 @@ public class PolicyOperations {
                     Policy.BuiltInType.fromPolicyType(request.getPolicyType()),
                     request.getComment(),
                     request.getEnabled(),
-                    fromDTO(request.getPolicyContent()));
+                    fromDTO(request.getPolicyContent()),
+                    maintenancePeerFieldsFromDTO(request.getPolicyContent()));
 
             LOG.info("Created policy: {} under metalake: {}", policy.name(), metalake);
             return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
@@ -382,7 +384,7 @@ public class PolicyOperations {
             .withComment(policy.comment())
             .withPolicyType(policyType)
             .withEnabled(policy.enabled())
-            .withContent(DTOConverters.toDTO(policy.content()))
+            .withContent(DTOConverters.toDTO(policy.content(), policy.maintenancePeerFields()))
             .withInherited(inherited)
             .withAudit(DTOConverters.toDTO(policy.auditInfo()));
 

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -101,6 +102,7 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -663,6 +665,18 @@ public class DTOConverters {
    * @return The policy content DTO.
    */
   public static PolicyContentDTO toDTO(PolicyContent policyContent) {
+    return toDTO(policyContent, null);
+  }
+
+  /**
+   * Converts policy content and optional TMS peer fields to a policy content DTO.
+   *
+   * @param policyContent task policy content
+   * @param maintenancePeerFields optional TMS peer fields stored alongside content JSON
+   * @return policy content DTO
+   */
+  public static PolicyContentDTO toDTO(
+      PolicyContent policyContent, @Nullable MaintenancePeerFields maintenancePeerFields) {
     if (policyContent == null) {
       return null;
     }
@@ -680,19 +694,36 @@ public class DTOConverters {
           .build();
     }
 
+    MaintenancePeerFields peers =
+        maintenancePeerFields == null ? MaintenancePeerFields.empty() : maintenancePeerFields;
+
     if (policyContent instanceof IcebergOrphanFileRemovalContent) {
       IcebergOrphanFileRemovalContent content = (IcebergOrphanFileRemovalContent) policyContent;
       return PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
           .withOlderThanDays(content.olderThanDays())
           .withLocation(content.location())
           .withDryRun(content.dryRun())
+          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(peers.schedule()))
+          .withMinIntervalMs(peers.minIntervalMs())
+          .withJobOptions(emptyToNull(peers.jobOptions()))
+          .withUpdateOptions(emptyToNull(peers.updateOptions()))
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
-      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.instance();
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(peers.schedule()))
+          .withMinIntervalMs(peers.minIntervalMs())
+          .withJobOptions(emptyToNull(peers.jobOptions()))
+          .withUpdateOptions(emptyToNull(peers.updateOptions()))
+          .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
-      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.instance();
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(peers.schedule()))
+          .withMinIntervalMs(peers.minIntervalMs())
+          .withJobOptions(emptyToNull(peers.jobOptions()))
+          .withUpdateOptions(emptyToNull(peers.updateOptions()))
+          .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
@@ -706,6 +737,10 @@ public class DTOConverters {
           .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
           .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(peers.schedule()))
+          .withMinIntervalMs(peers.minIntervalMs())
+          .withJobOptions(emptyToNull(peers.jobOptions()))
+          .withUpdateOptions(emptyToNull(peers.updateOptions()))
           .build();
     }
 
@@ -1548,6 +1583,25 @@ public class DTOConverters {
   }
 
   /**
+   * Extracts optional TMS peer fields from a policy content DTO.
+   *
+   * @param policyContentDTO policy content DTO
+   * @return peer fields, or {@code null} when absent
+   */
+  @Nullable
+  public static MaintenancePeerFields maintenancePeerFieldsFromDTO(
+      PolicyContentDTO policyContentDTO) {
+    if (policyContentDTO == null) {
+      return null;
+    }
+    MaintenancePeerFields peerFields = policyContentDTO.toMaintenancePeerFields();
+    if (peerFields == null || !peerFields.hasAnyField()) {
+      return null;
+    }
+    return peerFields;
+  }
+
+  /**
    * Converts a PolicyContentDTO to a PolicyContent.
    *
    * @param policyContentDTO The policy content DTO to be converted.
@@ -1568,29 +1622,19 @@ public class DTOConverters {
     }
 
     if (policyContentDTO instanceof PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) {
-      PolicyContentDTO.IcebergOrphanFileRemovalContentDTO content =
-          (PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO;
-      return PolicyContents.icebergOrphanFileRemoval(
-          content.olderThanDays(), content.location(), content.dryRun());
+      return ((PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
-      return PolicyContents.icebergRewriteManifests();
+      return ((PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
-      return PolicyContents.icebergSnapshotExpiration();
+      return ((PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
-      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
-          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
-      return PolicyContents.icebergDataCompaction(
-          icebergCompactionContentDTO.minDataFileMse(),
-          icebergCompactionContentDTO.minDeleteFileNumber(),
-          icebergCompactionContentDTO.dataFileMseWeight(),
-          icebergCompactionContentDTO.deleteFileNumberWeight(),
-          icebergCompactionContentDTO.maxPartitionNum(),
-          icebergCompactionContentDTO.rewriteStrategy(),
-          icebergCompactionContentDTO.sortOrder(),
-          icebergCompactionContentDTO.rewriteOptions());
+      return ((PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO).toDomainContent();
     }
 
     if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {
@@ -1607,5 +1651,10 @@ public class DTOConverters {
 
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
+  }
+
+  @Nullable
+  private static Map<String, String> emptyToNull(Map<String, String> options) {
+    return options == null || options.isEmpty() ? null : options;
   }
 }

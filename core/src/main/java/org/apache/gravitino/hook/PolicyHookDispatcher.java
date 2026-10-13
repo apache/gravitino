@@ -18,6 +18,7 @@
 package org.apache.gravitino.hook;
 
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -27,6 +28,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -65,9 +67,12 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
       Policy.BuiltInType type,
       String comment,
       boolean enabled,
-      PolicyContent content)
+      PolicyContent content,
+      @Nullable MaintenancePeerFields maintenancePeerFields)
       throws PolicyAlreadyExistsException {
-    PolicyEntity policy = dispatcher.createPolicy(metalake, name, type, comment, enabled, content);
+    PolicyEntity policy =
+        dispatcher.createPolicy(
+            metalake, name, type, comment, enabled, content, maintenancePeerFields);
 
     // Set the creator as the owner of the policy.
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();

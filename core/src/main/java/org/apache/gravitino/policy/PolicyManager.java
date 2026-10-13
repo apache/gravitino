@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -37,6 +38,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.maintenance.policy.MaintenancePeerFields;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.IdGenerator;
@@ -111,7 +113,8 @@ public class PolicyManager implements PolicyDispatcher {
       Policy.BuiltInType type,
       String comment,
       boolean enabled,
-      PolicyContent content)
+      PolicyContent content,
+      @Nullable MaintenancePeerFields maintenancePeerFields)
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
@@ -126,6 +129,7 @@ public class PolicyManager implements PolicyDispatcher {
             .withPolicyType(type)
             .withEnabled(enabled)
             .withContent(content)
+            .withMaintenancePeerFields(maintenancePeerFields)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -277,6 +281,7 @@ public class PolicyManager implements PolicyDispatcher {
         .withPolicyType(policyEntity.policyType())
         .withEnabled(policyEntity.enabled())
         .withContent(policyEntity.content())
+        .withMaintenancePeerFields(policyEntity.maintenancePeerFields())
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(policyEntity.auditInfo().creator())
@@ -306,6 +311,7 @@ public class PolicyManager implements PolicyDispatcher {
     String newName = policyEntity.name();
     String newComment = policyEntity.comment();
     PolicyContent newContent = policyEntity.content();
+    MaintenancePeerFields newMaintenancePeerFields = policyEntity.maintenancePeerFields();
 
     for (PolicyChange change : changes) {
       if (change instanceof PolicyChange.RenamePolicy) {
@@ -335,6 +341,7 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        newMaintenancePeerFields = updateContent.getMaintenancePeerFields();
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
@@ -346,6 +353,7 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withName(newName);
     builder.withComment(newComment);
     builder.withContent(newContent);
+    builder.withMaintenancePeerFields(newMaintenancePeerFields);
 
     return builder.build();
   }
