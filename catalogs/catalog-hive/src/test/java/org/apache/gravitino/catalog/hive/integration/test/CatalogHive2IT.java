@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.hive.integration.test;
 
 import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.hive.HiveConstants.EXTERNAL;
 import static org.apache.gravitino.catalog.hive.HiveConstants.FORMAT;
 import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
@@ -1482,7 +1483,8 @@ public class CatalogHive2IT extends BaseIT {
       throws InterruptedException {
     String reregisteredCatalogName = GravitinoITUtils.genRandomName("hive_reregistered_catalog");
     String externalSchemaName = GravitinoITUtils.genRandomName("hive_reregistered_schema");
-    Map<String, String> catalogProperties = ImmutableMap.of(METASTORE_URIS, hiveMetastoreUris);
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(METASTORE_URIS, hiveMetastoreUris, DEFAULT_CATALOG, hmsCatalog);
 
     Catalog originalCatalog =
         metalake.createCatalog(
