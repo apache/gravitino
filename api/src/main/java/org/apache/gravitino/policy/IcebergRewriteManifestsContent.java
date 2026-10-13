@@ -24,7 +24,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 
 /**
  * Placeholder built-in policy content for Iceberg manifest rewrite.
@@ -32,7 +34,7 @@ import org.apache.gravitino.MetadataObject;
  * <p>Configurable thresholds will be added when the rewrite-manifests policy lands; this class
  * registers the built-in type for TMS task mapping.
  */
-public class IcebergRewriteManifestsContent implements PolicyContent {
+public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -52,6 +54,14 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
 
   /** Default constructor for Jackson deserialization only. */
   public IcebergRewriteManifestsContent() {}
+
+  IcebergRewriteManifestsContent(
+      @Nullable MaintenanceTrigger schedule,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updateOptions) {
+    super(schedule, minIntervalMs, jobOptions, updateOptions);
+  }
 
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
@@ -74,17 +84,44 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
   }
 
   @Override
+  public void validate() {
+    super.validate();
+    validatePolicyContentDefaults(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS);
+  }
+
+  @Override
+  public IcebergRewriteManifestsContent withPeerFields(
+      @Nullable MaintenanceTrigger schedule,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updateOptions) {
+    return new IcebergRewriteManifestsContent(schedule, minIntervalMs, jobOptions, updateOptions);
+  }
+
+  @Override
   public boolean equals(Object other) {
-    return other instanceof IcebergRewriteManifestsContent;
+    if (!(other instanceof IcebergRewriteManifestsContent)) {
+      return false;
+    }
+    return peerFieldsEquals((IcebergRewriteManifestsContent) other);
   }
 
   @Override
   public int hashCode() {
-    return IcebergRewriteManifestsContent.class.hashCode();
+    return peerFieldsHashCode();
   }
 
   @Override
   public String toString() {
-    return "IcebergRewriteManifestsContent{}";
+    return "IcebergRewriteManifestsContent{"
+        + "schedule="
+        + schedule()
+        + ", minIntervalMs="
+        + minIntervalMs()
+        + ", jobOptions="
+        + jobOptions()
+        + ", updateOptions="
+        + updateOptions()
+        + '}';
   }
 }
