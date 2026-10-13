@@ -47,6 +47,15 @@ public interface Policy extends Auditable {
         BUILT_IN_TYPE_PREFIX + "iceberg_orphan_file_removal",
         IcebergOrphanFileRemovalContent.class),
 
+    /** Iceberg manifest rewrite policy. */
+    ICEBERG_REWRITE_MANIFESTS(
+        BUILT_IN_TYPE_PREFIX + "iceberg_rewrite_manifests", IcebergRewriteManifestsContent.class),
+
+    /** Iceberg snapshot expiration policy. */
+    ICEBERG_SNAPSHOT_EXPIRATION(
+        BUILT_IN_TYPE_PREFIX + "iceberg_snapshot_expiration",
+        IcebergSnapshotExpirationContent.class),
+
     /** Built-in policy type for filtering rows of tagged tables. */
     ROW_FILTER(BUILT_IN_TYPE_PREFIX + "row_filter", RowFilterContent.class),
 
