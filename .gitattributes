@@ -1,1 +1,3 @@
 text eol=lf
+docs/open-api/default/openapi.json linguist-generated=true
+docs/open-api/default/openapi.yaml linguist-generated=true
