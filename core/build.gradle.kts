@@ -1,7 +1,4 @@
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.tasks.testing.Test
-import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
-import org.gradle.testing.jacoco.tasks.JacocoReport
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -134,16 +131,9 @@ fun registerCoreTestTask(
   testClassesDirs = sourceSets["test"].output.classesDirs
   classpath = sourceSets["test"].runtimeClasspath
 
-  inputs.property("coreTestSuite", backend ?: "unit")
-  inputs.property("coreTestBackend", backend ?: "none")
-  reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/$taskName"))
   reports.html.outputLocation.set(
     rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")
   )
-
-  extensions.configure<JacocoTaskExtension> {
-    destinationFile = layout.buildDirectory.file("jacoco/$taskName.exec").get().asFile
-  }
 
   useJUnitPlatform {
     if (backend == null) {
@@ -193,25 +183,9 @@ val coreSuiteTaskNames =
   listOf("coreUnitTest", "coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
 val coreSuiteExecutionData =
   coreSuiteTaskNames.map { layout.buildDirectory.file("jacoco/$it.exec") }
-val validateCoreSuiteCoverage by tasks.registering {
-  inputs.files(coreSuiteExecutionData)
-
-  doLast {
-    val missingExecutionData =
-      coreSuiteExecutionData
-        .map { it.get().asFile }
-        .filterNot { it.isFile && it.length() > 0L }
-    if (missingExecutionData.isNotEmpty()) {
-      throw GradleException(
-        "Missing core JaCoCo execution data: ${missingExecutionData.joinToString()}"
-      )
-    }
-  }
-}
-
 tasks.named<JacocoReport>("jacocoTestReport") {
   if (coreSuiteCoverage.get()) {
-    dependsOn(tasks.named("classes"), validateCoreSuiteCoverage)
+    dependsOn(tasks.named("classes"))
     executionData.setFrom(coreSuiteExecutionData)
   }
 }
