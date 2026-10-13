@@ -172,4 +172,24 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(
         gate.shouldSkip(table.id(), policyId, 3_600_000L, finishedAt + 3_600_001L));
   }
+
+  @TestTemplate
+  void testExpiredUnboundClaimIsNotInFlight() throws IOException {
+    String metalakeName = "tms_occ_ml4";
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "cat");
+    createAndInsertSchema(metalakeName, "cat", "sch");
+    TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
+
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    long claimTimeoutMs = 60_000L;
+    OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
+    long policyId = 66L;
+    long claimedAt = 1_700_000_400_000L;
+
+    Assertions.assertTrue(
+        actions.tryAcquireInFlight(table.id(), policyId, claimedAt, claimTimeoutMs).isPresent());
+    Assertions.assertTrue(gate.isInFlight(table.id(), policyId, claimedAt + 1_000L));
+    Assertions.assertFalse(gate.isInFlight(table.id(), policyId, claimedAt + claimTimeoutMs));
+  }
 }

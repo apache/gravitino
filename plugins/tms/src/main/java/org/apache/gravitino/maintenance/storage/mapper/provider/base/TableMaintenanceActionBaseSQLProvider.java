@@ -36,12 +36,48 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, policy_id, created_at)"
-        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt})";
+        + " (table_id, policy_id, created_at, unbound_slot)"
+        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt}, 1)";
   }
 
   /**
-   * Binds the Gravitino job run id after {@code runJob} succeeds.
+   * Reclaims an expired unbound claim by CAS on {@code created_at} (ShedLock-style). Only one
+   * concurrent updater succeeds ({@code updated == 1}).
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param newCreatedAt new claim timestamp
+   * @param expireBefore claims with {@code created_at} strictly before this are expired
+   * @return UPDATE statement
+   */
+  public String reclaimExpiredUnbound(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("newCreatedAt") long newCreatedAt,
+      @Param("expireBefore") long expireBefore) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET created_at = #{newCreatedAt}"
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND job_id IS NULL AND finished_at IS NULL AND unbound_slot = 1"
+        + " AND created_at < #{expireBefore}";
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement for the unbound open claim row
+   */
+  public String selectUnboundByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return selectColumns()
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND job_id IS NULL AND finished_at IS NULL AND unbound_slot = 1";
+  }
+
+  /**
+   * Binds the Gravitino job run id after {@code runJob} succeeds and releases the unbound claim
+   * slot.
    *
    * @param id action row id
    * @param jobId {@code job_run_meta.job_run_id}
@@ -50,7 +86,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET job_id = #{jobId}"
+        + " SET job_id = #{jobId}, unbound_slot = NULL"
         + " WHERE id = #{id} AND job_id IS NULL AND finished_at IS NULL";
   }
 

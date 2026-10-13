@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.storage.service;
 
+import java.util.OptionalLong;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -61,5 +62,26 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
         "{\"mse\":1}", metricsService.getMetrics(10L, 20L, 100L).metricsValue());
     Assertions.assertEquals(
         "{\"mse\":2}", metricsService.getMetrics(10L, 20L, 200L).metricsValue());
+  }
+
+  @TestTemplate
+  void testTryAcquireRejectsLiveUnboundAndReclaimsExpired() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    long tableId = 11L;
+    long policyId = 21L;
+    long timeoutMs = 60_000L;
+    long t0 = 1_700_000_300_000L;
+
+    OptionalLong first = actions.tryAcquireInFlight(tableId, policyId, t0, timeoutMs);
+    Assertions.assertTrue(first.isPresent());
+    Assertions.assertTrue(
+        actions.tryAcquireInFlight(tableId, policyId, t0 + 1_000L, timeoutMs).isEmpty());
+
+    OptionalLong reclaimed =
+        actions.tryAcquireInFlight(tableId, policyId, t0 + timeoutMs + 1L, timeoutMs);
+    Assertions.assertTrue(reclaimed.isPresent());
+    Assertions.assertEquals(first.getAsLong(), reclaimed.getAsLong());
+    Assertions.assertEquals(
+        t0 + timeoutMs + 1L, actions.getById(reclaimed.getAsLong()).createdAt());
   }
 }

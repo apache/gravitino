@@ -740,10 +740,12 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
     `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
     `finished_at` BIGINT COMMENT 'finish timestamp in milliseconds, null while in flight',
-    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
+    `created_at` BIGINT NOT NULL COMMENT 'creation/claim timestamp in milliseconds',
+    `unbound_slot` TINYINT COMMENT '1 while job_id is null (exclusive unbound claim); NULL after bindJobId',
     PRIMARY KEY (`id`)
 ) COMMENT='table maintenance action occupancy and run metadata';
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_job_id` ON `table_maintenance_action`(`job_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_unbound_slot` ON `table_maintenance_action`(`table_id`, `policy_id`, `unbound_slot`);
 CREATE INDEX IF NOT EXISTS `idx_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
 CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tma_after_sid` ON `table_maintenance_action`(`table_id`, `after_snapshot_id`);

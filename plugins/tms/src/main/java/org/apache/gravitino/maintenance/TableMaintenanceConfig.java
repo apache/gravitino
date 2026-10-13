@@ -75,6 +75,18 @@ public final class TableMaintenanceConfig {
           .intConf()
           .createWithDefault(100);
 
+  /** Default unbound claim TTL ({@code job_id} still null), matching ShedLock-style short locks. */
+  public static final long DEFAULT_CLAIM_TIMEOUT_MS = 120_000L;
+
+  public static final ConfigEntry<Long> OCCUPANCY_CLAIM_TIMEOUT_MS =
+      new ConfigBuilder("gravitino.maintenance.occupancy.claimTimeoutMs")
+          .doc(
+              "Max age of an unbound table_maintenance_action claim (job_id null) before another"
+                  + " submitter may reclaim it")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .createWithDefault(DEFAULT_CLAIM_TIMEOUT_MS);
+
   private final int expandThreads;
   private final int cronThreads;
   private final int commitThreads;
@@ -82,6 +94,7 @@ public final class TableMaintenanceConfig {
   private final long heartbeatIntervalMs;
   private final int missedHeartbeatsLimit;
   private final int expandEnqueueBatchSize;
+  private final long claimTimeoutMs;
 
   private TableMaintenanceConfig(
       int expandThreads,
@@ -90,7 +103,8 @@ public final class TableMaintenanceConfig {
       long pollingIntervalMs,
       long heartbeatIntervalMs,
       int missedHeartbeatsLimit,
-      int expandEnqueueBatchSize) {
+      int expandEnqueueBatchSize,
+      long claimTimeoutMs) {
     this.expandThreads = expandThreads;
     this.cronThreads = cronThreads;
     this.commitThreads = commitThreads;
@@ -98,6 +112,7 @@ public final class TableMaintenanceConfig {
     this.heartbeatIntervalMs = heartbeatIntervalMs;
     this.missedHeartbeatsLimit = missedHeartbeatsLimit;
     this.expandEnqueueBatchSize = expandEnqueueBatchSize;
+    this.claimTimeoutMs = claimTimeoutMs;
   }
 
   /**
@@ -114,7 +129,8 @@ public final class TableMaintenanceConfig {
         config.get(SCHEDULER_POLLING_INTERVAL_MS),
         config.get(SCHEDULER_HEARTBEAT_INTERVAL_MS),
         config.get(SCHEDULER_MISSED_HEARTBEATS_LIMIT),
-        config.get(EXPAND_ENQUEUE_BATCH_SIZE));
+        config.get(EXPAND_ENQUEUE_BATCH_SIZE),
+        config.get(OCCUPANCY_CLAIM_TIMEOUT_MS));
   }
 
   /**
@@ -167,6 +183,13 @@ public final class TableMaintenanceConfig {
   }
 
   /**
+   * @return unbound occupancy claim timeout in milliseconds
+   */
+  public long claimTimeoutMs() {
+    return claimTimeoutMs;
+  }
+
+  /**
    * Test-only factory with explicit values.
    *
    * @param expandThreads expand pool threads
@@ -186,6 +209,39 @@ public final class TableMaintenanceConfig {
       long heartbeatIntervalMs,
       int missedHeartbeatsLimit,
       int expandEnqueueBatchSize) {
+    return forTest(
+        expandThreads,
+        cronThreads,
+        commitThreads,
+        pollingIntervalMs,
+        heartbeatIntervalMs,
+        missedHeartbeatsLimit,
+        expandEnqueueBatchSize,
+        DEFAULT_CLAIM_TIMEOUT_MS);
+  }
+
+  /**
+   * Test-only factory with explicit values including claim timeout.
+   *
+   * @param expandThreads expand pool threads
+   * @param cronThreads cron pool threads
+   * @param commitThreads commit pool threads
+   * @param pollingIntervalMs poll interval
+   * @param heartbeatIntervalMs heartbeat interval
+   * @param missedHeartbeatsLimit missed heartbeat limit
+   * @param expandEnqueueBatchSize expand batch size
+   * @param claimTimeoutMs unbound claim timeout
+   * @return config instance
+   */
+  public static TableMaintenanceConfig forTest(
+      int expandThreads,
+      int cronThreads,
+      int commitThreads,
+      long pollingIntervalMs,
+      long heartbeatIntervalMs,
+      int missedHeartbeatsLimit,
+      int expandEnqueueBatchSize,
+      long claimTimeoutMs) {
     return new TableMaintenanceConfig(
         expandThreads,
         cronThreads,
@@ -193,6 +249,7 @@ public final class TableMaintenanceConfig {
         pollingIntervalMs,
         heartbeatIntervalMs,
         missedHeartbeatsLimit,
-        expandEnqueueBatchSize);
+        expandEnqueueBatchSize,
+        claimTimeoutMs);
   }
 }

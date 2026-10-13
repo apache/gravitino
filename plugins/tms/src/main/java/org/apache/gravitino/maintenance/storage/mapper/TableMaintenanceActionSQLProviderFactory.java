@@ -57,6 +57,31 @@ public class TableMaintenanceActionSQLProviderFactory {
   }
 
   /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param newCreatedAt new claim timestamp
+   * @param expireBefore expire threshold
+   * @return UPDATE statement
+   */
+  public static String reclaimExpiredUnbound(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("newCreatedAt") long newCreatedAt,
+      @Param("expireBefore") long expireBefore) {
+    return getProvider().reclaimExpiredUnbound(tableId, policyId, newCreatedAt, expireBefore);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectUnboundByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return getProvider().selectUnboundByTableAndPolicy(tableId, policyId);
+  }
+
+  /**
    * @param id action id
    * @param jobId job run id
    * @return UPDATE statement

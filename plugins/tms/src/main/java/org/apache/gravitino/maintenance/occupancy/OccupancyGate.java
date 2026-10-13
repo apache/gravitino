@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.occupancy;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
@@ -39,11 +41,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /**
  * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
  *
- * <p>When {@code finished_at} is null, this gate treats a null {@code job_id} as occupied (row
- * reserved before {@code runJob}). Once {@code job_id} is bound, it loads the Gravitino job via
- * {@link JobMetaService#getJobByIdentifier} to decide whether it is still running. It does
- * <strong>not</strong> backfill {@code finished_at}, so multiple open rows may exist for the same
- * {@code (table_id, policy_id)}; the gate inspects all of them.
+ * <p>Unbound rows ({@code job_id} null) are a short ShedLock-style claim: occupied only until
+ * {@code created_at + claimTimeoutMs}. Bound rows consult {@link JobMetaService} and do
+ * <strong>not</strong> backfill {@code finished_at}.
  */
 public final class OccupancyGate {
 
@@ -51,15 +51,26 @@ public final class OccupancyGate {
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
 
   private final TableMaintenanceActionMetaService actionMetaService;
+  private final long claimTimeoutMs;
+
+  /**
+   * @param actionMetaService maintenance action DAO
+   * @param claimTimeoutMs unbound claim TTL
+   */
+  public OccupancyGate(TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
+    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
+    this.actionMetaService = actionMetaService;
+    this.claimTimeoutMs = claimTimeoutMs;
+  }
 
   /**
    * @param actionMetaService maintenance action DAO
    */
   public OccupancyGate(TableMaintenanceActionMetaService actionMetaService) {
-    this.actionMetaService = actionMetaService;
+    this(actionMetaService, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
   }
 
-  /** Uses {@link TableMaintenanceActionMetaService#getInstance()}. */
+  /** Uses {@link TableMaintenanceActionMetaService#getInstance()} and default claim timeout. */
   public OccupancyGate() {
     this(TableMaintenanceActionMetaService.getInstance());
   }
@@ -67,12 +78,25 @@ public final class OccupancyGate {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return true when any open row is unbound or still maps to an active Gravitino job
+   * @return true when any open row is a live unbound claim or an active Gravitino job
    */
   public boolean isInFlight(long tableId, long policyId) {
+    return isInFlight(tableId, policyId, System.currentTimeMillis());
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param nowMs current epoch millis
+   * @return true when any open row is a live unbound claim or an active Gravitino job
+   */
+  public boolean isInFlight(long tableId, long policyId, long nowMs) {
     for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
       if (open.jobId() == null) {
-        return true;
+        if (open.createdAt() != null && nowMs - open.createdAt() < claimTimeoutMs) {
+          return true;
+        }
+        continue;
       }
       JobEntity job = loadJob(open.jobId(), tableId);
       if (job != null && ACTIVE.contains(job.status())) {
@@ -107,7 +131,7 @@ public final class OccupancyGate {
    * @return true when enqueue / submit must be skipped
    */
   public boolean shouldSkip(long tableId, long policyId, long minIntervalMs, long nowMs) {
-    return isInFlight(tableId, policyId)
+    return isInFlight(tableId, policyId, nowMs)
         || withinMinInterval(tableId, policyId, minIntervalMs, nowMs);
   }
 

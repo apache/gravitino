@@ -37,6 +37,22 @@ public interface TableMaintenanceActionMapper {
   @Options(useGeneratedKeys = true, keyProperty = "actionMeta.id", keyColumn = "id")
   void insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta);
 
+  @UpdateProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "reclaimExpiredUnbound")
+  int reclaimExpiredUnbound(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("newCreatedAt") long newCreatedAt,
+      @Param("expireBefore") long expireBefore);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectUnboundByTableAndPolicy")
+  TableMaintenanceActionPO selectUnboundByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId);
+
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "bindJobId")
   int bindJobId(@Param("id") long id, @Param("jobId") long jobId);
 

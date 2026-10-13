@@ -21,9 +21,13 @@ package org.apache.gravitino.maintenance.storage.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.OptionalLong;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.metrics.Monitored;
@@ -45,8 +49,62 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Inserts an in-flight occupancy row before {@code runJob}. {@code job_id} is bound later via
-   * {@link #bindJobId(long, long)}.
+   * Tries to acquire an unbound occupancy claim before {@code runJob} (ShedLock-style).
+   *
+   * <ol>
+   *   <li>CAS-{@code UPDATE} an expired unbound row ({@code created_at < now - timeout})
+   *   <li>Otherwise {@code INSERT} a new unbound row ({@code unbound_slot = 1})
+   * </ol>
+   *
+   * Concurrent acquirers: only one reclaim {@code UPDATE} or unique {@code INSERT} succeeds.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param nowMs current epoch millis
+   * @param claimTimeoutMs unbound claim TTL
+   * @return action id when acquired, empty when another live claim holds the slot
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "tryAcquireTableMaintenanceAction")
+  public OptionalLong tryAcquireInFlight(
+      long tableId, long policyId, long nowMs, long claimTimeoutMs) {
+    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
+    long expireBefore = nowMs - claimTimeoutMs;
+    int reclaimed =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, nowMs, expireBefore));
+    if (reclaimed == 1) {
+      TableMaintenanceActionPO unbound =
+          SessionUtils.getWithoutCommit(
+              TableMaintenanceActionMapper.class,
+              mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
+      Preconditions.checkState(unbound != null && unbound.id() != null, "reclaim lost unbound row");
+      return OptionalLong.of(unbound.id());
+    }
+
+    TableMaintenanceActionPO actionMeta =
+        TableMaintenanceActionPO.builder()
+            .withTableId(tableId)
+            .withPolicyId(policyId)
+            .withCreatedAt(nowMs)
+            .build();
+    try {
+      SessionUtils.doWithCommit(
+          TableMaintenanceActionMapper.class, mapper -> mapper.insertAction(actionMeta));
+    } catch (RuntimeException e) {
+      if (isUniqueViolation(e)) {
+        return OptionalLong.empty();
+      }
+      throw e;
+    }
+    Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
+    return OptionalLong.of(actionMeta.id());
+  }
+
+  /**
+   * Acquires an unbound claim with the default claim timeout or fails.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
@@ -56,20 +114,19 @@ public class TableMaintenanceActionMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertTableMaintenanceAction")
   public long insertInFlight(long tableId, long policyId) {
-    TableMaintenanceActionPO actionMeta =
-        TableMaintenanceActionPO.builder()
-            .withTableId(tableId)
-            .withPolicyId(policyId)
-            .withCreatedAt(System.currentTimeMillis())
-            .build();
-    SessionUtils.doWithCommit(
-        TableMaintenanceActionMapper.class, mapper -> mapper.insertAction(actionMeta));
-    Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
-    return actionMeta.id();
+    OptionalLong acquired =
+        tryAcquireInFlight(
+            tableId,
+            policyId,
+            System.currentTimeMillis(),
+            TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    Preconditions.checkState(acquired.isPresent(), "failed to acquire unbound occupancy claim");
+    return acquired.getAsLong();
   }
 
   /**
-   * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob}.
+   * Binds {@code job_run_meta.job_run_id} after a successful {@code runJob} and releases {@code
+   * unbound_slot}.
    *
    * @param id action row id
    * @param jobId Gravitino job run id
@@ -207,5 +264,21 @@ public class TableMaintenanceActionMetaService {
     return SessionUtils.getWithoutCommit(
         TableMaintenanceActionMapper.class,
         mapper -> mapper.selectMaxFinishedAt(tableId, policyId));
+  }
+
+  private static boolean isUniqueViolation(Throwable throwable) {
+    for (Throwable t = throwable; t != null; t = t.getCause()) {
+      if (t instanceof SQLIntegrityConstraintViolationException) {
+        return true;
+      }
+      String message = t.getMessage();
+      if (message != null) {
+        String lower = message.toLowerCase(Locale.ROOT);
+        if (lower.contains("unique") || lower.contains("duplicate")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }
