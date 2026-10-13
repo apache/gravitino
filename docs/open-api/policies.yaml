@@ -594,7 +594,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "VIEW", "FUNCTION" ]
+            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "SEMANTIC_MODEL", "VIEW", "FUNCTION" ]
         properties:
           type: object
           description: A map of string-to-string properties for the policy content.
