@@ -55,6 +55,8 @@ httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
+# 7.3.x moves to Jackson 2.19, which isn't audited in dev/release/maven/dependencies.txt yet.
+fabric8-kubernetes = "7.2.0"
 commons-configuration2 = "2.10.1"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
@@ -271,6 +273,9 @@ micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.r
 
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+fabric8-kubernetes-client = { group = "io.fabric8", name = "kubernetes-client", version.ref = "fabric8-kubernetes" }
+fabric8-kubernetes-httpclient-jdk = { group = "io.fabric8", name = "kubernetes-httpclient-jdk", version.ref = "fabric8-kubernetes" }
+fabric8-kubernetes-server-mock = { group = "io.fabric8", name = "kubernetes-server-mock", version.ref = "fabric8-kubernetes" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
