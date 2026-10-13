@@ -252,7 +252,7 @@ const RightContent = () => {
                       className='inline-block min-w-10 truncate'
                       style={{ maxWidth: `calc((${width}px - 160px)/4)` }}
                     >
-                      {decodeURIComponent(entity)}
+                      {entity}
                     </Link>
                   ) : (
                     <span
@@ -260,7 +260,7 @@ const RightContent = () => {
                       className='inline-block min-w-10 truncate'
                       style={{ maxWidth: `calc((${width}px - 160px)/4)` }}
                     >
-                      {decodeURIComponent(entity)}
+                      {entity}
                     </span>
                   )
                 }

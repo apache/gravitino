@@ -110,6 +110,30 @@ const renderDialog = async edit => {
 }
 
 describe('semantic model editor', () => {
+  it.each([false, true])('rejects the reserved name ossie (edit=%s)', async edit => {
+    await renderDialog(edit)
+    await fill('name', 'ossie')
+    if (!edit) await fill('definition', JSON.stringify(definition))
+    await submit()
+    expect(document.body.textContent).toContain('The name "ossie" is reserved for OSSIE import.')
+    expect(defHttp.post).not.toHaveBeenCalled()
+    expect(defHttp.put).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('blocks a nested expression error before submission', async () => {
+    await renderDialog(false)
+    await fill('name', 'orders')
+    await fill(
+      'definition',
+      JSON.stringify({ datasets: [{ ...definition.datasets[0], fields: [{ name: 'amount' }] }] })
+    )
+    await submit()
+    expect(document.body.textContent).toContain('datasets[0].fields[0].expression must have non-empty dialects.')
+    expect(defHttp.post).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+  })
+
   it.each([false, true])('retains input on failed save and supports retry (edit=%s)', async edit => {
     const write = edit ? defHttp.put : defHttp.post
     write.mockRejectedValueOnce(new Error('Invalid dataset source')).mockResolvedValue({ semanticModel: model })

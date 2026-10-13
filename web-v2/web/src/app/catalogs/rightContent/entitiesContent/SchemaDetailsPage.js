@@ -690,25 +690,29 @@ export default function SchemaDetailsPage() {
         width: 100,
         render: (_, record) => (
           <Space size={4}>
-            <a data-refer={`edit-semantic-model-${record.name}`}>
-              <Tooltip title='Edit'>
-                <Icons.Pencil
-                  className='size-4 hover:cursor-pointer hover:text-defaultPrimary'
-                  onClick={() => {
-                    setEditSemanticModel(record.name)
-                    setOpenSemanticModel(true)
-                  }}
-                />
-              </Tooltip>
-            </a>
-            <a data-refer={`delete-semantic-model-${record.name}`}>
-              <Tooltip title='Delete'>
-                <Icons.Trash2Icon
-                  className='size-4 hover:cursor-pointer hover:text-defaultPrimary'
-                  onClick={() => showDeleteConfirm(record, 'semanticModel')}
-                />
-              </Tooltip>
-            </a>
+            <Tooltip title='Edit'>
+              <Button
+                type='text'
+                size='small'
+                aria-label='Edit Semantic Model'
+                data-refer={`edit-semantic-model-${record.name}`}
+                icon={<Icons.Pencil className='size-4' />}
+                onClick={() => {
+                  setEditSemanticModel(record.name)
+                  setOpenSemanticModel(true)
+                }}
+              />
+            </Tooltip>
+            <Tooltip title='Delete'>
+              <Button
+                type='text'
+                size='small'
+                aria-label='Delete Semantic Model'
+                data-refer={`delete-semantic-model-${record.name}`}
+                icon={<Icons.Trash2Icon className='size-4' />}
+                onClick={() => showDeleteConfirm(record, 'semanticModel')}
+              />
+            </Tooltip>
             {anthEnable && (
               <Tooltip title='Set Owner'>
                 <Button

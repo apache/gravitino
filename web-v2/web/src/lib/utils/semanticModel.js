@@ -58,6 +58,65 @@ const validateSource = (dataset, errors) => {
   }
 }
 
+const validateStringArray = (values, path, errors, nonBlank = true) => {
+  if (values == null) return
+
+  if (
+    !Array.isArray(values) ||
+    !values.every(value => (nonBlank ? isNonBlankString(value) : typeof value === 'string'))
+  ) {
+    errors.push(`${path} must be an array of ${nonBlank ? 'non-empty ' : ''}strings.`)
+  }
+}
+
+const validateExpression = (expression, path, errors) => {
+  const dialects = expression?.dialects
+  if (!isPlainObject(expression) || !Array.isArray(dialects) || !dialects.length) {
+    errors.push(`${path}.expression must have non-empty dialects.`)
+
+    return
+  }
+
+  dialects.forEach((dialect, index) => {
+    if (!isPlainObject(dialect) || !isNonBlankString(dialect.dialect) || !isNonBlankString(dialect.expression)) {
+      errors.push(`${path}.expression.dialects[${index}] must have a non-empty dialect and expression.`)
+    }
+  })
+
+  const duplicates = duplicatesOf(dialects.map(dialect => dialect?.dialect).filter(isNonBlankString))
+  if (duplicates.length) {
+    errors.push(`${path}.expression must have unique dialect names: ${duplicates.join(', ')}.`)
+  }
+}
+
+const validateMetadata = (entity, path, errors) => {
+  const { customExtensions, aiContext } = entity
+  if (customExtensions != null) {
+    if (!Array.isArray(customExtensions)) {
+      errors.push(`${path}.customExtensions must be an array.`)
+    } else {
+      customExtensions.forEach((extension, index) => {
+        if (
+          !isPlainObject(extension) ||
+          typeof extension.vendorName !== 'string' ||
+          typeof extension.data !== 'string'
+        ) {
+          errors.push(`${path}.customExtensions[${index}] must have vendorName and data strings.`)
+        }
+      })
+    }
+  }
+
+  if (aiContext != null && typeof aiContext !== 'string') {
+    if (!isPlainObject(aiContext)) {
+      errors.push(`${path}.aiContext must be a string or object.`)
+    } else {
+      validateStringArray(aiContext.synonyms, `${path}.aiContext.synonyms`, errors, false)
+      validateStringArray(aiContext.examples, `${path}.aiContext.examples`, errors, false)
+    }
+  }
+}
+
 const validateDatasets = (datasets, errors) => {
   datasets.forEach((dataset, index) => {
     if (!isPlainObject(dataset) || !isNonBlankString(dataset.name)) {
@@ -67,9 +126,26 @@ const validateDatasets = (datasets, errors) => {
     }
 
     validateSource(dataset, errors)
+    validateMetadata(dataset, `datasets[${index}]`, errors)
+    validateStringArray(dataset.primaryKey, `datasets[${index}].primaryKey`, errors)
+
+    if (dataset.uniqueKeys != null) {
+      if (!Array.isArray(dataset.uniqueKeys)) {
+        errors.push(`datasets[${index}].uniqueKeys must be an array.`)
+      } else {
+        dataset.uniqueKeys.forEach((key, keyIndex) => {
+          const path = `datasets[${index}].uniqueKeys[${keyIndex}]`
+          if (!Array.isArray(key) || !key.length) {
+            errors.push(`${path} must be a non-empty array.`)
+          } else {
+            validateStringArray(key, path, errors)
+          }
+        })
+      }
+    }
 
     const fields = dataset.fields
-    if (fields !== undefined && !Array.isArray(fields)) {
+    if (fields != null && !Array.isArray(fields)) {
       errors.push(`Dataset "${dataset.name}" must declare fields as an array.`)
 
       return
@@ -78,7 +154,12 @@ const validateDatasets = (datasets, errors) => {
     ;(fields || []).forEach((field, fieldIndex) => {
       if (!isPlainObject(field) || !isNonBlankString(field.name)) {
         errors.push(`datasets[${index}].fields[${fieldIndex}] must have a non-empty name.`)
+
+        return
       }
+      const path = `datasets[${index}].fields[${fieldIndex}]`
+      validateExpression(field.expression, path, errors)
+      validateMetadata(field, path, errors)
     })
 
     const duplicateFields = duplicatesOf((fields || []).map(field => field?.name).filter(isNonBlankString))
@@ -102,7 +183,7 @@ const validateRelationships = (relationships, datasetNames, errors) => {
     }
 
     const { name, from, to, fromColumns, toColumns } = relationship
-
+    validateMetadata(relationship, `relationships[${index}]`, errors)
     ;[from, to].forEach(endpoint => {
       if (!datasetNames.has(endpoint)) {
         errors.push(`Relationship "${name}" references an unknown dataset "${endpoint}".`)
@@ -118,6 +199,8 @@ const validateRelationships = (relationships, datasetNames, errors) => {
     if (fromColumns.length !== toColumns.length) {
       errors.push(`Relationship "${name}" must have the same number of fromColumns and toColumns.`)
     }
+    validateStringArray(fromColumns, `relationships[${index}].fromColumns`, errors)
+    validateStringArray(toColumns, `relationships[${index}].toColumns`, errors)
   })
 
   const duplicates = duplicatesOf(relationships.map(relationship => relationship?.name).filter(isNonBlankString))
@@ -130,7 +213,11 @@ const validateMetrics = (metrics, errors) => {
   metrics.forEach((metric, index) => {
     if (!isPlainObject(metric) || !isNonBlankString(metric.name)) {
       errors.push(`metrics[${index}] must have a non-empty name.`)
+
+      return
     }
+    validateExpression(metric.expression, `metrics[${index}]`, errors)
+    validateMetadata(metric, `metrics[${index}]`, errors)
   })
 
   const duplicates = duplicatesOf(metrics.map(metric => metric?.name).filter(isNonBlankString))
@@ -161,10 +248,11 @@ export const validateSemanticModelDefinition = definition => {
   }
 
   validateDatasets(datasets, errors)
+  validateMetadata(definition, 'definition', errors)
 
   const datasetNames = new Set(datasets.map(dataset => dataset?.name).filter(isNonBlankString))
 
-  if (relationships !== undefined) {
+  if (relationships != null) {
     if (Array.isArray(relationships)) {
       validateRelationships(relationships, datasetNames, errors)
     } else {
@@ -172,7 +260,7 @@ export const validateSemanticModelDefinition = definition => {
     }
   }
 
-  if (metrics !== undefined) {
+  if (metrics != null) {
     if (Array.isArray(metrics)) {
       validateMetrics(metrics, errors)
     } else {

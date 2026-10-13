@@ -22,6 +22,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import toast from 'react-hot-toast'
 import { defHttp } from '@/lib/utils/axios'
 import reducer, {
+  deleteSemanticModel,
   fetchSemanticModels,
   fetchTables,
   fetchViews,
@@ -31,7 +32,7 @@ import reducer, {
   setMetalakeTree
 } from './index'
 
-vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn() } }))
+vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), delete: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
 
 const namespace = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
@@ -113,5 +114,27 @@ describe('semantic model load errors', () => {
     const result = await store.dispatch(fetch({ ...namespace, semanticModel: 'orders' }))
     expect(result.meta.requestStatus).toBe('rejected')
     expect(result.error.message).toMatch(/empty response/i)
+  })
+})
+
+describe('semantic model deletion errors', () => {
+  it.each([new Error('Permission denied'), { message: 'Permission denied' }])(
+    'preserves a deletion error: %j',
+    async error => {
+      defHttp.delete.mockRejectedValue(error)
+      const result = await store.dispatch(deleteSemanticModel({ ...namespace, semanticModel: 'orders' }))
+      expect(result.meta.requestStatus).toBe('rejected')
+      expect(result.error.message).toBe('Permission denied')
+      expect(store.getState().metalakes.tableLoading).toBe(false)
+      expect(defHttp.get).not.toHaveBeenCalled()
+    }
+  )
+
+  it('reports an empty deletion response', async () => {
+    defHttp.delete.mockResolvedValue(undefined)
+    const result = await store.dispatch(deleteSemanticModel({ ...namespace, semanticModel: 'orders' }))
+    expect(result.meta.requestStatus).toBe('rejected')
+    expect(result.error.message).toMatch(/empty response/i)
+    expect(defHttp.get).not.toHaveBeenCalled()
   })
 })

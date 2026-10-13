@@ -184,6 +184,123 @@ describe('validateSemanticModelDefinition', () => {
   })
 })
 
+describe('nested Semantic Model contract validation', () => {
+  const expression = { dialects: [{ dialect: 'ANSI_SQL', expression: 'amount' }] }
+  const relationship = { name: 'self', from: 'orders', to: 'orders', fromColumns: ['id'], toColumns: ['id'] }
+
+  test.each([
+    undefined,
+    null,
+    {},
+    { dialects: [] },
+    { dialects: [null] },
+    { dialects: [{ dialect: '', expression: 'amount' }] },
+    { dialects: [{ dialect: 'ANSI_SQL', expression: '' }] },
+    {
+      dialects: [
+        { dialect: 'ANSI_SQL', expression: 'amount' },
+        { dialect: 'ANSI_SQL', expression: 'amount + 1' }
+      ]
+    }
+  ])('rejects malformed field and metric expressions: %j', expression => {
+    for (const definition of [
+      { datasets: [{ ...orders, fields: [{ name: 'amount', expression }] }] },
+      definitionOf({ metrics: [{ name: 'revenue', expression }] })
+    ]) {
+      expect(validateSemanticModelDefinition(definition).join(' ')).toMatch(/expression|dialect/)
+    }
+  })
+
+  test.each(['', ' ', null, 42])('rejects invalid relationship column %j on either side', column => {
+    for (const side of ['fromColumns', 'toColumns']) {
+      const errors = validateSemanticModelDefinition(
+        definitionOf({ relationships: [{ ...relationship, [side]: [column] }] })
+      )
+      expect(errors.join(' ')).toContain(side)
+    }
+  })
+
+  test.each([
+    { primaryKey: [null] },
+    { primaryKey: [''] },
+    { primaryKey: 'id' },
+    { uniqueKeys: [null] },
+    { uniqueKeys: [[]] },
+    { uniqueKeys: [['']] },
+    { uniqueKeys: [['id', null]] },
+    { uniqueKeys: 'id' }
+  ])('rejects malformed dataset keys: %j', keys => {
+    expect(validateSemanticModelDefinition({ datasets: [{ ...orders, ...keys }] }).join(' ')).toMatch(
+      /primaryKey|uniqueKeys/
+    )
+  })
+
+  const withMetadata = (level, metadata) => {
+    if (level === 'model') return definitionOf(metadata)
+    if (level === 'dataset') return { datasets: [{ ...orders, ...metadata }] }
+    if (level === 'field') return { datasets: [{ ...orders, fields: [{ name: 'amount', expression, ...metadata }] }] }
+    if (level === 'relationship') return definitionOf({ relationships: [{ ...relationship, ...metadata }] })
+
+    return definitionOf({ metrics: [{ name: 'revenue', expression, ...metadata }] })
+  }
+
+  test.each(['model', 'dataset', 'field', 'relationship', 'metric'])(
+    'checks extensions and AI context at %s level',
+    level => {
+      for (const metadata of [
+        { customExtensions: {} },
+        { customExtensions: [null] },
+        { customExtensions: [{ vendorName: 'vendor' }] },
+        { customExtensions: [{ data: '{}' }] },
+        { aiContext: [] },
+        { aiContext: 42 },
+        { aiContext: { synonyms: [null] } },
+        { aiContext: { examples: [null] } }
+      ]) {
+        expect(validateSemanticModelDefinition(withMetadata(level, metadata)).length).toBeGreaterThan(0)
+      }
+      for (const aiContext of [
+        null,
+        '',
+        {},
+        { instructions: 'guide', synonyms: [''], examples: [], extra: { a: 1 } }
+      ]) {
+        expect(
+          validateSemanticModelDefinition(
+            withMetadata(level, {
+              aiContext,
+              customExtensions: [{ vendorName: '', data: '' }]
+            })
+          )
+        ).toEqual([])
+      }
+    }
+  )
+
+  test('allows optional null arrays and valid nested structures', () => {
+    expect(
+      validateSemanticModelDefinition({
+        datasets: [{ ...orders, fields: null, primaryKey: null, uniqueKeys: null }],
+        relationships: null,
+        metrics: null,
+        customExtensions: null
+      })
+    ).toEqual([])
+    expect(
+      validateSemanticModelDefinition({
+        datasets: [{ ...orders, primaryKey: ['order_id'], uniqueKeys: [['amount'], ['id', 'region']] }],
+        relationships: [relationship],
+        metrics: [
+          {
+            name: 'revenue',
+            expression: { dialects: [...expression.dialects, { dialect: 'SPARK_SQL', expression: 'sum(amount)' }] }
+          }
+        ]
+      })
+    ).toEqual([])
+  })
+})
+
 describe('parseSemanticModelDefinition', () => {
   test('returns the parsed definition when the text is valid', () => {
     const { definition, errors } = parseSemanticModelDefinition(JSON.stringify(definitionOf()))

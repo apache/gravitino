@@ -105,6 +105,16 @@ describe('Semantic Model ownership action', () => {
     await act(async () =>
       [...document.querySelectorAll('[role="tab"]')].find(tab => tab.textContent === 'Semantic Models').click()
     )
+    for (const [prefix, label] of [
+      ['edit', 'Edit Semantic Model'],
+      ['delete', 'Delete Semantic Model']
+    ]) {
+      const button = document.querySelector(`[data-refer="${prefix}-semantic-model-orders"]`)
+      expect(button.tagName).toBe('BUTTON')
+      expect(button.getAttribute('aria-label')).toBe(label)
+      button.focus()
+      expect(document.activeElement).toBe(button)
+    }
     const action = document.querySelector('[data-refer="set-owner-semantic-model-orders"]')
     if (anthEnable) {
       expect(action).not.toBeNull()

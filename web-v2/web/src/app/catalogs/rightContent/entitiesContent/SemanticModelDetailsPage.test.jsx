@@ -357,3 +357,17 @@ describe('editing from Semantic Model details', () => {
     }
   )
 })
+
+describe('Semantic Model accessible details', () => {
+  it.each(['sales%20model', 'margin%'])('preserves the already decoded name %s', async name => {
+    navigation.name = name
+    await renderDetails({ datasets: [] })
+    expect(container.querySelector('h3 span[title]').textContent).toBe(name)
+  })
+
+  it('labels the copy action', async () => {
+    await renderDetails({ datasets: [] })
+    await selectTab('Definition')
+    expect(container.querySelector('button[aria-label="Copy definition"]')).not.toBeNull()
+  })
+})

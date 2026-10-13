@@ -381,7 +381,7 @@ export default function SemanticModelDetailsPage() {
                   className='min-w-10 truncate'
                   style={{ maxWidth: `calc(${width}px - 90px)`, display: 'inherit' }}
                 >
-                  {decodeURIComponent(semanticModelName || '')}
+                  {semanticModelName || ''}
                 </span>
                 <Tooltip title='Edit'>
                   <Button
@@ -541,6 +541,7 @@ export default function SemanticModelDetailsPage() {
               <Tooltip title='Copy definition' placement='top'>
                 <button
                   type='button'
+                  aria-label='Copy definition'
                   className='absolute right-3 top-3 inline-flex cursor-pointer items-center rounded border border-borderColor bg-transparent p-1 text-textSecondary transition-colors hover:text-defaultPrimary'
                   onClick={onCopyDefinition}
                 >

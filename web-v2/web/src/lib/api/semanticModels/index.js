@@ -35,7 +35,9 @@ export const getSemanticModelsApi = (params, options) => {
     {
       url: `${Apis.GET(params)}`
     },
-    options
+
+    // The schema tab and tree load this list independently and must not cancel each other.
+    { ...options, ignoreCancelToken: true }
   )
 }
 

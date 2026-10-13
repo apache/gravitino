@@ -2502,8 +2502,12 @@ export const deleteSemanticModel = createAsyncThunk(
     const [err, res] = await to(deleteSemanticModelApi({ metalake, catalog, schema, semanticModel }))
     await dispatch(setTableLoading(false))
 
-    if (err || !res) {
-      throw new Error(err)
+    if (err) {
+      throw err instanceof Error ? err : new Error(err?.message ?? String(err))
+    }
+
+    if (!res) {
+      throw new Error('Semantic Model deletion returned an empty response')
     }
 
     await dispatch(fetchSemanticModels({ metalake, catalog, schema, init: true }))
