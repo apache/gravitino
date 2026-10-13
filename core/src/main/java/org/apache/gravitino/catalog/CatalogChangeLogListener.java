@@ -111,8 +111,8 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       try {
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
-        // This batch will never be sent again, so giving up here would keep serving the old
-        // catalog until it expires on its own. Clear the whole cache instead; active operation
+        // Failed callbacks have no guaranteed retry; bounded replay may not redeliver this row.
+        // Clear the whole cache instead of serving an old catalog until expiry; active operation
         // leases defer resource cleanup until those operations finish.
         LOG.error(
             "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "

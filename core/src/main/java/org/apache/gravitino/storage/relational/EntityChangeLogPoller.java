@@ -79,9 +79,9 @@ import org.slf4j.LoggerFactory;
  * EntityChangeLogListener#supportsReplay()}. Their callbacks must be idempotent because bounded
  * deduplication may evict IDs and startup replay can include historical rows.
  *
- * <p>Each incremental query reads at most one batch. A full batch means more rows may be waiting,
- * so the next cycle starts right away instead of after the poll interval; an empty or partial
- * batch, or a failed cycle, waits the full interval. A backlog is therefore drained as fast as
+ * <p>A full incremental batch or replay page means more rows may be waiting, so the next cycle
+ * starts right away instead of after the poll interval. When both reads are empty or partial, or
+ * the cycle fails, the poller waits the full interval. A backlog is therefore drained as fast as
  * batches can be read and delivered, while an idle or failing poller still polls only once per
  * interval.
  */
@@ -511,6 +511,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
     long now = nanoTime();
     int evicted = 0;
     for (EntityChangeRecord change : changes) {
+      // Keep first-delivery time and insertion order aligned with prefix expiry. Seeing an ID
+      // again in a replay query does not deliver it again or extend its deduplication lifetime.
       rememberedIds.putIfAbsent(change.getId(), now);
       if (rememberedIds.size() > replayMaxEntries) {
         Iterator<Long> ids = rememberedIds.keySet().iterator();
