@@ -19,7 +19,8 @@
 
 package org.apache.gravitino.maintenance.injob;
 
-import org.apache.gravitino.maintenance.storage.service.TableMaintenanceJobMetaService;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
@@ -30,16 +31,16 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
 
   private static final String METRICS_JSON = "{\"mse\":1}";
 
-  private TableMaintenanceJobMetaService jobMetaService;
+  private TableMaintenanceActionMetaService actionMetaService;
   private TableMaintenanceInJobPipeline maintainPipeline;
   private TableMaintenanceInJobPipeline skipPipeline;
 
   @BeforeEach
   void setUp() {
-    jobMetaService = TableMaintenanceJobMetaService.getInstance();
+    actionMetaService = TableMaintenanceActionMetaService.getInstance();
     TableMaintenanceInJobSampler sampler =
         new TableMaintenanceInJobSampler(
-            TableSnapshotMetricsMetaService.getInstance(), jobMetaService);
+            TableSnapshotMetricsMetaService.getInstance(), actionMetaService);
     maintainPipeline =
         new TableMaintenanceInJobPipeline(
             sampler, (tableId, policyId, snapshotId, metricsJson) -> RecommendDecision.MAINTAIN);
@@ -51,7 +52,7 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
   @TestTemplate
   void testContinuesWhenNoDriftAndRecommenderMaintains() {
     long jobId = 2001L;
-    jobMetaService.insertJob(jobId, 10L, 20L);
+    insertBoundAction(jobId, 10L, 20L);
     InJobGateOutcome outcome =
         maintainPipeline.gateCronJob(jobId, 10L, 20L, 100L, METRICS_JSON, () -> 100L);
     Assertions.assertTrue(outcome.continueMaintenance());
@@ -61,7 +62,7 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
   @TestTemplate
   void testStopsOnDriftBeforeRecommend() {
     long jobId = 2002L;
-    jobMetaService.insertJob(jobId, 11L, 21L);
+    insertBoundAction(jobId, 11L, 21L);
     InJobGateOutcome outcome =
         maintainPipeline.gateCronJob(jobId, 11L, 21L, 200L, METRICS_JSON, () -> 201L);
     Assertions.assertFalse(outcome.continueMaintenance());
@@ -71,7 +72,7 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
   @TestTemplate
   void testStopsWhenRecommenderSkips() {
     long jobId = 2003L;
-    jobMetaService.insertJob(jobId, 12L, 22L);
+    insertBoundAction(jobId, 12L, 22L);
     InJobGateOutcome outcome =
         skipPipeline.gateCronJob(jobId, 12L, 22L, 300L, METRICS_JSON, () -> 300L);
     Assertions.assertFalse(outcome.continueMaintenance());
@@ -87,5 +88,13 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
     InJobGateOutcome skip =
         skipPipeline.gateCommitChainType(1L, 2L, 401L, METRICS_JSON, () -> 401L);
     Assertions.assertEquals(InJobGateOutcome.StopReason.RECOMMENDER_SKIP, skip.stopReason());
+  }
+
+  private void insertBoundAction(long jobId, long tableId, long policyId) {
+    long actionId =
+        actionMetaService.insertInFlight(
+            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    long createdAt = actionMetaService.getById(actionId).createdAt();
+    actionMetaService.bindJobId(actionId, jobId, createdAt);
   }
 }

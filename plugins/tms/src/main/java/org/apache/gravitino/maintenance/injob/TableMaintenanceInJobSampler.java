@@ -19,7 +19,7 @@
 package org.apache.gravitino.maintenance.injob;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.maintenance.storage.service.TableMaintenanceJobMetaService;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 
 /**
@@ -29,28 +29,28 @@ import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMeta
 public class TableMaintenanceInJobSampler {
 
   private final TableSnapshotMetricsMetaService metricsMetaService;
-  private final TableMaintenanceJobMetaService jobMetaService;
+  private final TableMaintenanceActionMetaService actionMetaService;
 
   /** Creates a sampler using the default relational meta services. */
   public TableMaintenanceInJobSampler() {
     this(
         TableSnapshotMetricsMetaService.getInstance(),
-        TableMaintenanceJobMetaService.getInstance());
+        TableMaintenanceActionMetaService.getInstance());
   }
 
   /**
    * @param metricsMetaService metrics DAO
-   * @param jobMetaService maintenance job DAO
+   * @param actionMetaService maintenance action DAO
    */
   public TableMaintenanceInJobSampler(
       TableSnapshotMetricsMetaService metricsMetaService,
-      TableMaintenanceJobMetaService jobMetaService) {
+      TableMaintenanceActionMetaService actionMetaService) {
     this.metricsMetaService = Preconditions.checkNotNull(metricsMetaService);
-    this.jobMetaService = Preconditions.checkNotNull(jobMetaService);
+    this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
   }
 
   /**
-   * Persists metrics for {@code S0}, sets {@code before_snapshot_id} on the maintenance job row,
+   * Persists metrics for {@code S0}, sets {@code before_snapshot_id} on the maintenance action row,
    * and returns whether the cron Spark Job should continue.
    *
    * <p>If HEAD has drifted after the sample, the caller must end the job early and must not
@@ -75,7 +75,7 @@ public class TableMaintenanceInJobSampler {
     Preconditions.checkNotNull(head, "head");
 
     metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
-    jobMetaService.recordBeforeSnapshot(jobId, sampledSnapshotId);
+    actionMetaService.recordBeforeSnapshot(jobId, sampledSnapshotId);
 
     long headSnapshotId = head.currentSnapshotId();
     if (sampledSnapshotId != headSnapshotId) {
