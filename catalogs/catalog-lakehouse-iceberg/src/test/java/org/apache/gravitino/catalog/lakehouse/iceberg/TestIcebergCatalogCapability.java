@@ -99,13 +99,15 @@ public class TestIcebergCatalogCapability {
   }
 
   @Test
-  public void testHiveBackendFoldsSchemaAndTableNamesOnly() {
+  public void testHiveBackendFoldsSchemaTableAndViewNamesOnly() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability(":", true);
 
     Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
     Assertions.assertEquals("schema", capability.normalizeName(Capability.Scope.SCHEMA, "Schema"));
     Assertions.assertEquals("table", capability.normalizeName(Capability.Scope.TABLE, "Table"));
+    Assertions.assertEquals("view", capability.normalizeName(Capability.Scope.VIEW, "View"));
 
     Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
     Assertions.assertEquals("Column", capability.normalizeName(Capability.Scope.COLUMN, "Column"));
@@ -117,9 +119,11 @@ public class TestIcebergCatalogCapability {
 
     Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
     Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
     Assertions.assertEquals("Schema", capability.normalizeName(Capability.Scope.SCHEMA, "Schema"));
     Assertions.assertEquals("Table", capability.normalizeName(Capability.Scope.TABLE, "Table"));
+    Assertions.assertEquals("View", capability.normalizeName(Capability.Scope.VIEW, "View"));
     Assertions.assertEquals("Column", capability.normalizeName(Capability.Scope.COLUMN, "Column"));
   }
 

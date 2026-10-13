@@ -31,6 +31,11 @@ import org.junit.jupiter.api.Tag;
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
 
   @Override
+  protected boolean supportsCaseInsensitiveTableNameAliases() {
+    return true;
+  }
+
+  @Override
   protected Map<String, String> getExtraSparkConfigs() {
     // This class deliberately exercises the legacy Hive backend without a discoverable Iceberg
     // REST endpoint (useDynamicIcebergRestConfigProvider() is false), so routing must be disabled

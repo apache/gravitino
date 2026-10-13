@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -119,6 +120,11 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected abstract boolean supportsSchemaEvolution();
 
   protected abstract boolean supportsReplaceColumns();
+
+  /** Returns whether the catalog accepts table references that differ only by letter case. */
+  protected boolean supportsCaseInsensitiveTableNameAliases() {
+    return false;
+  }
 
   protected abstract boolean supportsSchemaAndTableProperties();
 
@@ -630,8 +636,12 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     tableInfo = getTableInfo(tableName);
     checkTableColumns(tableName, updateColumns, tableInfo);
-    sql(String.format("CREATE TABLE IF NOT EXISTS %S (id int)", tableName));
-    sql(String.format("INSERT INTO %S VALUES(3, 'name2', 10)", tableName));
+    String tableAlias =
+        supportsCaseInsensitiveTableNameAliases() ? tableName.toUpperCase(Locale.ROOT) : tableName;
+    sql(
+        String.format(
+            "CREATE TABLE IF NOT EXISTS %s (id int, name2 string, age long)", tableAlias));
+    sql(String.format("INSERT INTO %s VALUES(3, 'name2', 10)", tableAlias));
     List<String> data = getQueryData(String.format("SELECT * from %s ORDER BY id", tableName));
     Assertions.assertEquals(2, data.size());
     if (supportsSchemaEvolution()) {

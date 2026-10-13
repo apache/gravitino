@@ -193,6 +193,35 @@ public class CatalogKafkaIT extends BaseIT {
   }
 
   @Test
+  public void testCatalogReregistrationLoadsExistingTopic()
+      throws ExecutionException, InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog_reregistration");
+    String topicName = GravitinoITUtils.genRandomName("test_topic_reregistration");
+    NameIdentifier topicIdent = NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName);
+    Map<String, String> properties = ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+
+    adminClient.createTopics(ImmutableList.of(new NewTopic(topicName, 1, (short) 1))).all().get();
+
+    Catalog originalCatalog = createCatalog(catalogName, "original catalog", properties);
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+    Assertions.assertTrue(topicExistsInKafka(topicName));
+
+    Catalog reregisteredCatalog = createCatalog(catalogName, "re-registered catalog", properties);
+    Topic restoredTopic =
+        Assertions.assertDoesNotThrow(
+            () -> reregisteredCatalog.asTopicCatalog().loadTopic(topicIdent));
+    Assertions.assertEquals(topicName, restoredTopic.name());
+    checkTopicReadWrite(topicName);
+
+    Assertions.assertTrue(reregisteredCatalog.asTopicCatalog().dropTopic(topicIdent));
+    awaitTopicDeletedInKafka(topicName);
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+  }
+
+  @Test
   public void testCatalogException() {
     String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog1 =

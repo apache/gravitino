@@ -62,9 +62,9 @@ public class IcebergCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult caseSensitiveOnName(Scope scope) {
-    if (hiveBackend && (scope == Scope.SCHEMA || scope == Scope.TABLE)) {
+    if (hiveBackend && (scope == Scope.SCHEMA || scope == Scope.TABLE || scope == Scope.VIEW)) {
       return CapabilityResult.unsupported(
-          "The Iceberg Hive backend is case insensitive for schemas and tables.");
+          "The Iceberg Hive backend is case insensitive for schemas, tables, and views.");
     }
     return Capability.super.caseSensitiveOnName(scope);
   }
