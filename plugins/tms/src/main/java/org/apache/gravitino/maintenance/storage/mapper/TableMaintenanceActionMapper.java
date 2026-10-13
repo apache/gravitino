@@ -46,11 +46,10 @@ public interface TableMaintenanceActionMapper {
       @Param("newCreatedAt") long newCreatedAt,
       @Param("expireBefore") long expireBefore);
 
-  @Nullable
   @SelectProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
       method = "selectUnboundByTableAndPolicy")
-  TableMaintenanceActionPO selectUnboundByTableAndPolicy(
+  List<TableMaintenanceActionPO> selectUnboundByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId);
 
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "bindJobId")

@@ -1271,11 +1271,9 @@ CREATE TABLE IF NOT EXISTS table_maintenance_action (
     before_snapshot_id BIGINT,
     after_snapshot_id BIGINT,
     finished_at BIGINT,
-    created_at BIGINT NOT NULL,
-    unbound_slot SMALLINT
+    created_at BIGINT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_unbound_slot ON table_maintenance_action (table_id, policy_id, unbound_slot);
 CREATE INDEX IF NOT EXISTS idx_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
 CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
@@ -1289,7 +1287,6 @@ COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapsh
 COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
 COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish timestamp in milliseconds, null while in flight';
 COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation/claim timestamp in milliseconds';
-COMMENT ON COLUMN table_maintenance_action.unbound_slot IS '1 while job_id is null (exclusive unbound claim); NULL after bindJobId';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
     id BIGSERIAL PRIMARY KEY,
