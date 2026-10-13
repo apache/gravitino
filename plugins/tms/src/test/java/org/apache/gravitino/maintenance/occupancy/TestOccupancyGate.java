@@ -119,4 +119,57 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(
         gate.withinMinInterval(table.id(), policyId, 3_600_000L, finishedAt + 1_000L));
   }
+
+  @TestTemplate
+  void testInFlightScansAllOpenRowsWhenStaleTerminalExists() throws IOException {
+    String metalakeName = "tms_occ_ml3";
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "cat");
+    createAndInsertSchema(metalakeName, "cat", "sch");
+    TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
+    JobTemplateEntity template =
+        createAndInsertShellJobTemplateEntity("occ-template-3", "comment", metalakeName);
+
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    OccupancyGate gate = new OccupancyGate(actions);
+    long policyId = 55L;
+    long finishedAt = 1_700_000_200_000L;
+
+    JobEntity succeeded =
+        JobEntity.builder()
+            .withId(7003L)
+            .withJobExecutionId("exec-7003")
+            .withNamespace(NamespaceUtil.ofJob(metalakeName))
+            .withJobTemplateName(template.name())
+            .withStatus(JobHandle.Status.SUCCEEDED)
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(finishedAt - 1_000L)
+            .withFinishedAt(finishedAt)
+            .build();
+    backend.insert(succeeded, false);
+    long staleActionId = actions.insertInFlight(table.id(), policyId);
+    actions.bindJobId(staleActionId, succeeded.id());
+    Assertions.assertNull(actions.getByJobId(succeeded.id()).finishedAt());
+    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+
+    JobEntity started =
+        JobEntity.builder()
+            .withId(7004L)
+            .withJobExecutionId("exec-7004")
+            .withNamespace(NamespaceUtil.ofJob(metalakeName))
+            .withJobTemplateName(template.name())
+            .withStatus(JobHandle.Status.STARTED)
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(System.currentTimeMillis())
+            .withFinishedAt(0L)
+            .build();
+    backend.insert(started, false);
+    long activeActionId = actions.insertInFlight(table.id(), policyId);
+    actions.bindJobId(activeActionId, started.id());
+
+    Assertions.assertEquals(2, actions.listInFlight(table.id(), policyId).size());
+    Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
+    Assertions.assertTrue(
+        gate.shouldSkip(table.id(), policyId, 3_600_000L, finishedAt + 3_600_001L));
+  }
 }

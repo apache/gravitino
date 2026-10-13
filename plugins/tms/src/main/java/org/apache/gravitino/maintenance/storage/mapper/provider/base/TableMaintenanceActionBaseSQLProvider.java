@@ -120,7 +120,10 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Returns a row with {@code finished_at IS NULL} for {@code (table_id, policy_id)} if one exists.
+   * Returns all rows with {@code finished_at IS NULL} for {@code (table_id, policy_id)}.
+   *
+   * <p>Multiple open rows can exist because {@code OccupancyGate} does not backfill {@code
+   * finished_at} when the Gravitino job is already terminal.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
@@ -129,8 +132,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   public String selectInFlightByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId) {
     return selectColumns()
-        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NULL"
-        + " LIMIT 1";
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at IS NULL";
   }
 
   /**

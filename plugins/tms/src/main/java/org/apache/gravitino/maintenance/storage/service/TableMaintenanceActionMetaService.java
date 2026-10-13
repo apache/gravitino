@@ -21,6 +21,8 @@ package org.apache.gravitino.maintenance.storage.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
@@ -179,16 +181,17 @@ public class TableMaintenanceActionMetaService {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return row with {@code finished_at IS NULL}, or null
+   * @return all rows with {@code finished_at IS NULL} (may include terminal jobs not yet marked)
    */
-  @Nullable
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getInFlightTableMaintenanceAction")
-  public TableMaintenanceActionPO getInFlight(long tableId, long policyId) {
-    return SessionUtils.getWithoutCommit(
-        TableMaintenanceActionMapper.class,
-        mapper -> mapper.selectInFlightByTableAndPolicy(tableId, policyId));
+      baseMetricName = "listInFlightTableMaintenanceActions")
+  public List<TableMaintenanceActionPO> listInFlight(long tableId, long policyId) {
+    List<TableMaintenanceActionPO> open =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.selectInFlightByTableAndPolicy(tableId, policyId));
+    return open == null ? Collections.emptyList() : open;
   }
 
   /**

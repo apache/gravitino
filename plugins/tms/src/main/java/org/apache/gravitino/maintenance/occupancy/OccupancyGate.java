@@ -42,7 +42,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * <p>When {@code finished_at} is null, this gate treats a null {@code job_id} as occupied (row
  * reserved before {@code runJob}). Once {@code job_id} is bound, it loads the Gravitino job via
  * {@link JobMetaService#getJobByIdentifier} to decide whether it is still running. It does
- * <strong>not</strong> backfill {@code finished_at}.
+ * <strong>not</strong> backfill {@code finished_at}, so multiple open rows may exist for the same
+ * {@code (table_id, policy_id)}; the gate inspects all of them.
  */
 public final class OccupancyGate {
 
@@ -66,19 +67,19 @@ public final class OccupancyGate {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return true when a row with null {@code finished_at} is unbound or still maps to an active
-   *     Gravitino job
+   * @return true when any open row is unbound or still maps to an active Gravitino job
    */
   public boolean isInFlight(long tableId, long policyId) {
-    TableMaintenanceActionPO open = actionMetaService.getInFlight(tableId, policyId);
-    if (open == null) {
-      return false;
+    for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
+      if (open.jobId() == null) {
+        return true;
+      }
+      JobEntity job = loadJob(open.jobId(), tableId);
+      if (job != null && ACTIVE.contains(job.status())) {
+        return true;
+      }
     }
-    if (open.jobId() == null) {
-      return true;
-    }
-    JobEntity job = loadJob(open.jobId(), tableId);
-    return job != null && ACTIVE.contains(job.status());
+    return false;
   }
 
   /**
@@ -111,28 +112,27 @@ public final class OccupancyGate {
   }
 
   /**
-   * Prefer {@code table_maintenance_action.finished_at}; if that column is still null but the
+   * Prefer {@code table_maintenance_action.finished_at}; if that column is still null but a
    * Gravitino job is already terminal, use {@link JobEntity#finishedAt()} without writing back.
    */
   @Nullable
   private Long lastFinishedAt(long tableId, long policyId) {
-    Long marked = actionMetaService.maxFinishedAt(tableId, policyId);
-    TableMaintenanceActionPO open = actionMetaService.getInFlight(tableId, policyId);
-    if (open == null || open.jobId() == null) {
-      return marked;
+    Long latest = actionMetaService.maxFinishedAt(tableId, policyId);
+    for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
+      if (open.jobId() == null) {
+        continue;
+      }
+      JobEntity job = loadJob(open.jobId(), tableId);
+      if (job == null || ACTIVE.contains(job.status())) {
+        continue;
+      }
+      Long fromJob = job.finishedAt() != null && job.finishedAt() > 0 ? job.finishedAt() : null;
+      if (fromJob == null) {
+        continue;
+      }
+      latest = latest == null ? fromJob : Math.max(latest, fromJob);
     }
-    JobEntity job = loadJob(open.jobId(), tableId);
-    if (job == null || ACTIVE.contains(job.status())) {
-      return marked;
-    }
-    Long fromJob = job.finishedAt() != null && job.finishedAt() > 0 ? job.finishedAt() : null;
-    if (marked == null) {
-      return fromJob;
-    }
-    if (fromJob == null) {
-      return marked;
-    }
-    return Math.max(marked, fromJob);
+    return latest;
   }
 
   @Nullable
