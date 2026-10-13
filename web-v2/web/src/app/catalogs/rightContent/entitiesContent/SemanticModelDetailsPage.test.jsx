@@ -19,6 +19,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
+import { Simulate } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
@@ -26,11 +27,20 @@ import { defHttp } from '@/lib/utils/axios'
 import reducer, { getSemanticModelDetails } from '@/lib/store/metalakes'
 import SemanticModelDetailsPage from './SemanticModelDetailsPage'
 
-vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn() } }))
+const navigation = vi.hoisted(() => ({ replace: vi.fn(), name: 'sales model' }))
+
+vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), put: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
 vi.mock('next/navigation', () => ({
+  useRouter: () => navigation,
   useSearchParams: () =>
-    new URLSearchParams({ metalake: 'demo', catalog: 'sales', schema: 'mart', semanticModel: 'sales model' })
+    new URLSearchParams({
+      metalake: 'demo',
+      catalog: 'sales',
+      schema: 'mart',
+      semanticModel: navigation.name,
+      catalogType: 'relational'
+    })
 }))
 vi.mock('@/components/GetOwner', () => ({ default: () => null }))
 vi.mock('@/components/CustomTags', () => ({ default: () => null }))
@@ -42,6 +52,7 @@ let downloads
 
 beforeEach(() => {
   vi.clearAllMocks()
+  navigation.name = 'sales model'
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const getComputedStyle = window.getComputedStyle
 
@@ -97,10 +108,10 @@ const definitionWith = context => ({
   metrics: [{ name: 'revenue', aiContext: context('metric') }]
 })
 
-const renderDetails = async definition => {
+const renderDetails = async (definition, details = {}) => {
   store.dispatch(
     getSemanticModelDetails.fulfilled(
-      { semanticModel: { name: 'sales model', definition, properties: {} }, init: true },
+      { semanticModel: { name: navigation.name, definition, properties: {}, ...details }, init: true },
       'load'
     )
   )
@@ -220,4 +231,123 @@ describe('OSSIE downloads', () => {
     expect(downloads).toHaveLength(1)
     expect(document.querySelector('.ant-alert')).toBeNull()
   })
+})
+
+describe('Semantic Model metadata', () => {
+  it('keeps composite unique keys grouped and shows labels alongside field names', async () => {
+    await renderDetails({
+      datasets: [
+        {
+          name: 'orders',
+          uniqueKeys: [['customer_id', 'order_id'], ['external_id']],
+          fields: [{ name: 'amount', label: 'Order Amount (USD)' }, { name: 'id' }]
+        }
+      ]
+    })
+    const tags = document.querySelectorAll('[data-refer="semantic-model-datasets-grid"] .ant-table-tbody .ant-tag')
+    expect([...tags].map(tag => tag.textContent)).toEqual(['customer_id, order_id', 'external_id'])
+    await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    const fields = document.querySelector('[data-refer="semantic-model-fields-grid"]')
+    expect(fields.textContent).toContain('amount')
+    expect(fields.textContent).toContain('Order Amount (USD)')
+    expect(fields.textContent).toContain('id')
+    expect(fields.textContent).not.toContain('undefined')
+  })
+
+  it('exposes complete vendor extensions at all levels, independently of AI context', async () => {
+    const extension = name => [
+      { vendorName: `${name} vendor`, data: `line 1\n{"private":"${name}","nested":{"flag":true}}` }
+    ]
+    const definition = definitionWith(() => undefined)
+    definition.customExtensions = extension('model')
+    definition.datasets[0].customExtensions = extension('dataset')
+    definition.datasets[0].fields[0].customExtensions = extension('field')
+    definition.relationships[0].customExtensions = extension('relationship')
+    definition.metrics[0].customExtensions = extension('metric')
+    await renderDetails(definition)
+    const verify = async name => {
+      await expandContext(`${name} vendor`)
+      expect([...document.querySelectorAll('pre')].some(pre => pre.textContent === extension(name)[0].data)).toBe(true)
+    }
+    await verify('model')
+    await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    await verify('dataset')
+    await click(document.querySelector('[data-refer="semantic-model-fields-grid"] button.ant-table-row-expand-icon'))
+    await verify('field')
+    await selectTab('Relationships')
+    await click(
+      document.querySelector('[data-refer="semantic-model-relationships-grid"] button.ant-table-row-expand-icon')
+    )
+    await verify('relationship')
+    await selectTab('Metrics')
+    await click(document.querySelector('[data-refer="semantic-model-metrics-grid"] button.ant-table-row-expand-icon'))
+    await verify('metric')
+  })
+
+  it('displays modification audit values when present', async () => {
+    await renderDetails(
+      { datasets: [] },
+      { audit: { lastModifier: 'editor', lastModifiedTime: '2026-10-13T05:00:00Z' } }
+    )
+    expect(document.querySelector('[data-refer="semantic-model-last-modifier"]').textContent).toBe('editor')
+    expect(document.querySelector('[data-refer="semantic-model-last-modified-time"]').textContent).not.toBe('-')
+  })
+
+  it('omits absent modification audit values', async () => {
+    await renderDetails({ datasets: [] })
+    expect(document.querySelector('[data-refer="semantic-model-last-modifier"]')).toBeNull()
+    expect(document.querySelector('[data-refer="semantic-model-last-modified-time"]')).toBeNull()
+  })
+})
+
+describe('editing from Semantic Model details', () => {
+  it.each([false, true])(
+    'preserves failed edits, then refreshes or navigates after saving (rename=%s)',
+    async rename => {
+      navigation.name = 'orders'
+      const definition = { datasets: [{ name: 'orders', source: { namespace: ['sales', 'mart'], name: 'orders' } }] }
+      let model = { name: 'orders', definition, properties: {}, comment: 'original' }
+      const updated = {
+        ...model,
+        name: rename ? 'orders_v2' : 'orders',
+        comment: 'saved comment',
+        audit: { lastModifier: 'editor' }
+      }
+      defHttp.get.mockImplementation(({ url }) =>
+        Promise.resolve(url.endsWith('/semantic-models') ? { identifiers: [] } : { semanticModel: model })
+      )
+      defHttp.put.mockRejectedValueOnce(new Error('Invalid source')).mockImplementation(() => {
+        model = updated
+        return Promise.resolve({ semanticModel: updated })
+      })
+      await renderDetails(definition, model)
+      await click(document.querySelector('[aria-label="Edit Semantic Model"]'))
+      await act(async () => {
+        Simulate.change(document.querySelector('[data-refer="semantic-model-comment-field"]'), {
+          target: { value: 'saved comment' }
+        })
+        if (rename)
+          Simulate.change(document.querySelector('[data-refer="semantic-model-name-field"]'), {
+            target: { value: 'orders_v2' }
+          })
+      })
+      await click(document.querySelector('[data-refer="handle-submit-semantic-model"]'))
+      expect(document.querySelector('[data-refer="semantic-model-comment-field"]').value).toBe('saved comment')
+      expect(navigation.replace).not.toHaveBeenCalled()
+      expect(store.getState().metalakes.activatedDetails.comment).toBe('original')
+      await click(document.querySelector('[data-refer="handle-submit-semantic-model"]'))
+      expect(defHttp.put).toHaveBeenCalledTimes(2)
+      if (rename) {
+        const destination = new URL(navigation.replace.mock.calls[0][0], 'http://localhost')
+        expect(destination.searchParams.get('semanticModel')).toBe('orders_v2')
+        expect(destination.searchParams.get('catalogType')).toBe('relational')
+        expect(destination.searchParams.get('schema')).toBe('mart')
+      } else {
+        expect(navigation.replace).not.toHaveBeenCalled()
+        expect(store.getState().metalakes.activatedDetails.comment).toBe('saved comment')
+        expect(document.querySelector('[data-refer="semantic-model-last-modifier"]').textContent).toBe('editor')
+      }
+      expect(document.querySelector('[data-refer="handle-submit-semantic-model"]')).toBeNull()
+    }
+  )
 })

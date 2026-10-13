@@ -709,11 +709,23 @@ export default function SchemaDetailsPage() {
                 />
               </Tooltip>
             </a>
+            {anthEnable && (
+              <Tooltip title='Set Owner'>
+                <Button
+                  type='text'
+                  size='small'
+                  aria-label='Set Owner'
+                  data-refer={`set-owner-semantic-model-${record.name}`}
+                  icon={<Icons.UserPen className='size-4' />}
+                  onClick={() => handleSetOwner('semantic_model', `${catalog}.${schema}.${record.name}`)}
+                />
+              </Tooltip>
+            )}
           </Space>
         )
       }
     ],
-    [currentMetalake, catalogType, catalog, schema]
+    [currentMetalake, catalogType, catalog, schema, anthEnable]
   )
 
   const subSchemaColumns = useMemo(() => {

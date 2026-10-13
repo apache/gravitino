@@ -56,7 +56,7 @@ const defaultValues = {
 }
 
 export default function CreateSemanticModelDialog({ ...props }) {
-  const { open, setOpen, metalake, catalog, schema, editSemanticModel } = props
+  const { open, setOpen, metalake, catalog, schema, editSemanticModel, onSaved } = props
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [cacheData, setCacheData] = useState()
@@ -175,6 +175,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
 
         if (!result?.payload?.err && !result?.error) {
           setOpen(false)
+          if (result) await onSaved?.(result.payload)
         }
       })
       .catch(info => {

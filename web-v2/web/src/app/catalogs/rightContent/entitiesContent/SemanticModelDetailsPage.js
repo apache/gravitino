@@ -20,20 +20,23 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Divider, Flex, Popover, Space, Spin, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd'
+import { Button, Divider, Flex, Popover, Space, Spin, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import useResizeObserver from 'use-resize-observer'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Tags from '@/components/CustomTags'
 import GetOwner from '@/components/GetOwner'
 import Icons from '@/components/Icons'
 import PropertiesContent from '@/components/PropertiesContent'
-import { useAppSelector } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { getSemanticModelDetails } from '@/lib/store/metalakes'
 import { copyToClipboard } from '@/lib/utils'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 import { formatSemanticModelDefinition } from '@/lib/utils/semanticModel'
 import SemanticModelAIContext from './SemanticModelAIContext'
 import SemanticModelExport from './SemanticModelExport'
+import SemanticModelExtensions from './SemanticModelExtensions'
+import CreateSemanticModelDialog from '../CreateSemanticModelDialog'
 
 const { Title, Paragraph } = Typography
 
@@ -66,8 +69,19 @@ const renderExpression = expression => {
 
 const renderColumns = columns => <span className='font-mono text-xs'>{(columns || []).join(', ') || '-'}</span>
 
+const hasMetadata = entity => !!entity.aiContext || entity.customExtensions?.length > 0
+
+const renderMetadata = (entity, label) => (
+  <>
+    <SemanticModelAIContext context={entity?.aiContext} label={`${label} AI Context`} />
+    <SemanticModelExtensions extensions={entity?.customExtensions} label={`${label} Vendor Extensions`} />
+  </>
+)
+
 export default function SemanticModelDetailsPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const dispatch = useAppDispatch()
   const metalake = searchParams.get('metalake')
   const catalog = searchParams.get('catalog')
   const schema = searchParams.get('schema')
@@ -77,12 +91,15 @@ export default function SemanticModelDetailsPage() {
   const store = useAppSelector(state => state.metalakes)
   const semanticModel = store.activatedDetails
   const [tabKey, setTabKey] = useState('Datasets')
+  const [openEdit, setOpenEdit] = useState(false)
   const { ref, width } = useResizeObserver()
 
   const definition = semanticModel?.definition
   const properties = semanticModel?.properties
   const createdAt = semanticModel?.audit?.createTime
   const createdAtText = !createdAt || !isValidDate(createdAt) ? '-' : formatToDateTime(createdAt)
+  const lastModifiedAt = semanticModel?.audit?.lastModifiedTime
+  const lastModifiedText = !lastModifiedAt || !isValidDate(lastModifiedAt) ? '-' : formatToDateTime(lastModifiedAt)
   const metadataObjectFullName = `${catalog}.${schema}.${semanticModelName}`
 
   const datasets = useMemo(
@@ -109,6 +126,16 @@ export default function SemanticModelDetailsPage() {
   )
 
   const propertyContent = <PropertiesContent properties={properties} />
+
+  const onSaved = async updated => {
+    if (updated.name !== semanticModelName) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('semanticModel', updated.name)
+      router.replace(`/catalogs?${params.toString()}`)
+    } else {
+      await dispatch(getSemanticModelDetails({ metalake, catalog, schema, semanticModel: updated.name, init: true }))
+    }
+  }
 
   const onCopyDefinition = async () => {
     try {
@@ -147,6 +174,22 @@ export default function SemanticModelDetailsPage() {
         render: renderColumns
       },
       {
+        title: 'Unique Keys',
+        dataIndex: 'uniqueKeys',
+        key: 'uniqueKeys',
+        width: 220,
+        render: keys =>
+          keys?.length ? (
+            <Space direction='vertical' size={4}>
+              {keys.map((columns, index) => (
+                <Tag key={index}>{renderColumns(columns)}</Tag>
+              ))}
+            </Space>
+          ) : (
+            <span>-</span>
+          )
+      },
+      {
         title: 'Fields',
         dataIndex: 'fields',
         key: 'fields',
@@ -166,7 +209,18 @@ export default function SemanticModelDetailsPage() {
 
   const fieldColumns = useMemo(
     () => [
-      { title: 'Field Name', dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
+      {
+        title: 'Field Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 220,
+        render: (name, field) => (
+          <div className='break-words'>
+            <div>{name}</div>
+            {field.label && <Typography.Text type='secondary'>{field.label}</Typography.Text>}
+          </div>
+        )
+      },
       {
         title: 'Data Type',
         dataIndex: 'datatype',
@@ -296,7 +350,7 @@ export default function SemanticModelDetailsPage() {
 
   const expandedFieldsRow = dataset => (
     <div>
-      <SemanticModelAIContext context={dataset.aiContext} label={`${dataset.name} AI Context`} />
+      {renderMetadata(dataset, dataset.name)}
       <Table
         data-refer='semantic-model-fields-grid'
         size='small'
@@ -305,10 +359,8 @@ export default function SemanticModelDetailsPage() {
         columns={fieldColumns}
         pagination={false}
         expandable={{
-          expandedRowRender: field => (
-            <SemanticModelAIContext context={field.aiContext} label={`${field.name} AI Context`} />
-          ),
-          rowExpandable: field => !!field.aiContext
+          expandedRowRender: field => renderMetadata(field, field.name),
+          rowExpandable: hasMetadata
         }}
       />
     </div>
@@ -323,13 +375,25 @@ export default function SemanticModelDetailsPage() {
           </div>
           <div className='grow-1 relative bottom-1'>
             <Title level={3} style={{ marginBottom: '0.125rem' }}>
-              <span
-                title={semanticModelName}
-                className='min-w-10 truncate'
-                style={{ maxWidth: `calc(${width}px - 56px)`, display: 'inherit' }}
-              >
-                {decodeURIComponent(semanticModelName || '')}
-              </span>
+              <Space>
+                <span
+                  title={semanticModelName}
+                  className='min-w-10 truncate'
+                  style={{ maxWidth: `calc(${width}px - 90px)`, display: 'inherit' }}
+                >
+                  {decodeURIComponent(semanticModelName || '')}
+                </span>
+                <Tooltip title='Edit'>
+                  <Button
+                    type='text'
+                    size='small'
+                    aria-label='Edit Semantic Model'
+                    icon={<Icons.Pencil className='size-4' />}
+                    disabled={store.activatedDetailsLoading || !definition}
+                    onClick={() => setOpenEdit(true)}
+                  />
+                </Tooltip>
+              </Space>
             </Title>
             <Paragraph
               type='secondary'
@@ -394,6 +458,22 @@ export default function SemanticModelDetailsPage() {
               <a className='text-defaultPrimary'>0</a>
             )}
           </Space>
+          {semanticModel?.audit?.lastModifier && (
+            <Space size={4} data-refer='semantic-model-last-modifier'>
+              <Tooltip title='Last modified by'>
+                <Icons.UserPen className='size-4' color='grey' />
+              </Tooltip>
+              <span>{semanticModel.audit.lastModifier}</span>
+            </Space>
+          )}
+          {lastModifiedAt && (
+            <Space size={4} data-refer='semantic-model-last-modified-time'>
+              <Tooltip title='Last modified'>
+                <Icons.History className='size-4' color='grey' />
+              </Tooltip>
+              <span>{lastModifiedText}</span>
+            </Space>
+          )}
         </Space>
       </Spin>
       <SemanticModelExport
@@ -404,7 +484,7 @@ export default function SemanticModelDetailsPage() {
         semanticModel={semanticModelName}
         disabled={store.activatedDetailsLoading || !definition}
       />
-      <SemanticModelAIContext context={definition?.aiContext} label='Model AI Context' />
+      {renderMetadata(definition, 'Model')}
       <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={setTabKey} items={tabOptions} />
       <Spin spinning={store.activatedDetailsLoading}>
         {tabKey === 'Datasets' && (
@@ -418,7 +498,7 @@ export default function SemanticModelDetailsPage() {
             components={datasetComponents}
             expandable={{
               expandedRowRender: expandedFieldsRow,
-              rowExpandable: dataset => (dataset.fields || []).length > 0 || !!dataset.aiContext
+              rowExpandable: dataset => (dataset.fields || []).length > 0 || hasMetadata(dataset)
             }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
@@ -433,10 +513,8 @@ export default function SemanticModelDetailsPage() {
             columns={relationshipResizableColumns}
             components={relationshipComponents}
             expandable={{
-              expandedRowRender: relationship => (
-                <SemanticModelAIContext context={relationship.aiContext} label={`${relationship.name} AI Context`} />
-              ),
-              rowExpandable: relationship => !!relationship.aiContext
+              expandedRowRender: relationship => renderMetadata(relationship, relationship.name),
+              rowExpandable: hasMetadata
             }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
@@ -451,10 +529,8 @@ export default function SemanticModelDetailsPage() {
             columns={metricResizableColumns}
             components={metricComponents}
             expandable={{
-              expandedRowRender: metric => (
-                <SemanticModelAIContext context={metric.aiContext} label={`${metric.name} AI Context`} />
-              ),
-              rowExpandable: metric => !!metric.aiContext
+              expandedRowRender: metric => renderMetadata(metric, metric.name),
+              rowExpandable: hasMetadata
             }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
@@ -483,6 +559,17 @@ export default function SemanticModelDetailsPage() {
             <Paragraph type='secondary'>No definition available.</Paragraph>
           ))}
       </Spin>
+      {openEdit && (
+        <CreateSemanticModelDialog
+          open={openEdit}
+          setOpen={setOpenEdit}
+          metalake={metalake}
+          catalog={catalog}
+          schema={schema}
+          editSemanticModel={semanticModelName}
+          onSaved={onSaved}
+        />
+      )}
     </>
   )
 }
