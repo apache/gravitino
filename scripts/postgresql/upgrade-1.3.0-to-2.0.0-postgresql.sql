@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS table_maintenance_action (
     created_at BIGINT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
--- Soft slot: finished_at=0 exclusive per table/policy; completed rows cannot collide on finish millis (one in-flight finish).
+-- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
 CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
@@ -261,7 +261,7 @@ COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
 COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
-COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis; 0 = soft in-flight slot (only one per table/policy)';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
 COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
