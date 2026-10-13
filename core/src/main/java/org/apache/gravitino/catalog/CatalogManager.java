@@ -65,6 +65,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -113,6 +114,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -1284,9 +1286,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
             List<SchemaEntity> schemaEntities =
                 store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
-            if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
-              throw new NonEmptyCatalogException(
-                  "Catalog %s has schemas, please drop them first or use force option", ident);
+            if (!force) {
+              checkCatalogSchemasBeforeDrop(ident, schemaEntities, catalogWrapper);
             }
 
             if (isManagedStorageCatalog(catalogWrapper)) {
@@ -1335,6 +1336,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  private void checkCatalogSchemasBeforeDrop(
+      NameIdentifier ident, List<SchemaEntity> schemaEntities, CatalogWrapper catalogWrapper)
+      throws Exception {
+    try {
+      if (containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
+        throw new NonEmptyCatalogException(
+            "Catalog %s has schemas, please drop them first or use force option", ident);
+      }
+    } catch (Exception e) {
+      // Some catalogs wrap connection failures, so inspect the cause chain as well.
+      if (ExceptionUtils.indexOfType(e, ConnectionFailedException.class) >= 0) {
+        throw new ConnectionFailedException(
+            e,
+            "%s. Use force=true to skip this check.",
+            ExceptionMessages.withCause(
+                "Failed to check schemas in the underlying catalog " + ident, e));
+      }
+      throw e;
+    }
   }
 
   /**

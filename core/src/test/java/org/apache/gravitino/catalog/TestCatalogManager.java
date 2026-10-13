@@ -60,12 +60,14 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -93,6 +95,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -1116,6 +1120,90 @@ public class TestCatalogManager {
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
   }
 
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testDropCatalogExplainsSchemaConnectionFailure(boolean failOnLoad, boolean wrapped)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "unreachable_catalog");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.disableCatalog(ident);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
+
+    Namespace schemaNs = Namespace.of("metalake", ident.name());
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("test_schema")
+            .withNamespace(schemaNs)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(schemaEntity);
+
+    ConnectionFailedException connectionFailure =
+        new ConnectionFailedException(
+            new IOException("Connection refused"), "Failed to connect to Hive Metastore");
+    RuntimeException failure =
+        wrapped
+            ? new GravitinoRuntimeException(
+                new RuntimeException(connectionFailure), "Failed to connect to Hive Metastore")
+            : connectionFailure;
+    SupportsSchemas schemaOps = Mockito.mock(SupportsSchemas.class);
+    if (failOnLoad) {
+      Mockito.when(schemaOps.listSchemas(schemaNs))
+          .thenReturn(new NameIdentifier[] {schemaEntity.nameIdentifier()});
+      Mockito.when(schemaOps.loadSchema(schemaEntity.nameIdentifier())).thenThrow(failure);
+    } else {
+      Mockito.when(schemaOps.listSchemas(schemaNs)).thenThrow(failure);
+    }
+
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
+    Mockito.when(wrapper.catalog()).thenReturn(catalog);
+    Mockito.when(wrapper.capabilities()).thenReturn(capability);
+    Mockito.when(capability.managedStorage(any()))
+        .thenReturn(CapabilityResult.unsupported("Not managed"));
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<SupportsSchemas, ?> function = invocation.getArgument(0);
+              return function.apply(schemaOps);
+            })
+        .when(wrapper)
+        .doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, wrapper);
+
+    ConnectionFailedException exception =
+        Assertions.assertThrows(
+            ConnectionFailedException.class, () -> catalogManager.dropCatalog(ident, false));
+    Assertions.assertEquals(
+        "Failed to check schemas in the underlying catalog metalake.unreachable_catalog: "
+            + "Failed to connect to Hive Metastore: Connection refused. "
+            + "Use force=true to skip this check.",
+        exception.getMessage());
+    Assertions.assertSame(failure, exception.getCause());
+    Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
+    Assertions.assertTrue(entityStore.exists(schemaEntity.nameIdentifier(), EntityType.SCHEMA));
+    Mockito.verify(schemaOps).listSchemas(schemaNs);
+    Mockito.verify(schemaOps, Mockito.times(failOnLoad ? 1 : 0))
+        .loadSchema(schemaEntity.nameIdentifier());
+
+    Mockito.clearInvocations(schemaOps);
+    Assertions.assertTrue(catalogManager.dropCatalog(ident, true));
+    Mockito.verifyNoInteractions(schemaOps);
+    Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+  }
+
   @Test
   public void testDropCatalogFailsOnSchemaClassificationError() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
@@ -1156,8 +1244,9 @@ public class TestCatalogManager {
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
+    RuntimeException failure = new RuntimeException("Failed connect");
     Mockito.doReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "test41", "test_schema1")})
-        .doThrow(new RuntimeException("Failed connect"))
+        .doThrow(failure)
         .when(wrapper)
         .doWithSchemaOps(any());
     catalogManager.getCatalogCache().put(ident, wrapper);
@@ -1165,7 +1254,10 @@ public class TestCatalogManager {
     // Unexpected errors during schema classification should propagate (fail-closed).
     RuntimeException ex =
         Assertions.assertThrows(RuntimeException.class, () -> catalogManager.dropCatalog(ident));
-    Assertions.assertTrue(ex.getCause().getMessage().contains("Failed connect"));
+    Assertions.assertSame(failure, ex.getCause());
+    Assertions.assertFalse(ex instanceof ConnectionFailedException);
+    Assertions.assertFalse(ex.getMessage().contains("force=true"));
+    Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
   }
 
   @Test
@@ -1209,6 +1301,7 @@ public class TestCatalogManager {
         .doWithSchemaOps(any());
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
     Assertions.assertTrue(catalogManager.dropCatalog(ident, true));
+    Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
   }
 
   @Test
