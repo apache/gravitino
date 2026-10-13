@@ -344,6 +344,79 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  public void testResourcesInSparkConfigs() {
+    String[] keys = {"spark.jars", "spark.files", "spark.archives"};
+    String[] serverPaths = {
+      "/opt/local.jar", "file:///opt/local.jar", "https://repo/a.jar,/opt/local.jar"
+    };
+    for (String key : keys) {
+      for (String value : serverPaths) {
+        // Set by the job.
+        SparkJobTemplate template =
+            newTemplate("https://repo/app.jar", ImmutableMap.of(key, value));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs),
+            key + "=" + value);
+
+        // Set by the default Spark configurations of the executor.
+        K8sJobExecutorConfigs withDefault = newConfigs(ImmutableMap.of("spark.conf." + key, value));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                SparkApplicationUtils.buildSparkApplication(
+                    CONTEXT, newTemplate("https://repo/app.jar", ImmutableMap.of()), withDefault),
+            key + "=" + value);
+      }
+
+      // Resources that the cluster can reach are kept, from both sources. The job's value
+      // overrides the default one, and an empty element is ignored like Spark does.
+      K8sJobExecutorConfigs withDefault =
+          newConfigs(ImmutableMap.of("spark.conf." + key, "local:///opt/default.jar"));
+      Map<String, String> defaults =
+          (Map<String, String>)
+              ((Map<String, Object>)
+                      SparkApplicationUtils.buildSparkApplication(
+                              CONTEXT,
+                              newTemplate("https://repo/app.jar", ImmutableMap.of()),
+                              withDefault)
+                          .getAdditionalProperties()
+                          .get("spec"))
+                  .get("sparkConf");
+      Assertions.assertEquals("local:///opt/default.jar", defaults.get(key));
+
+      String value = "https://repo/a.jar,, s3a://bucket/b.jar";
+      Map<String, String> overridden =
+          (Map<String, String>)
+              ((Map<String, Object>)
+                      SparkApplicationUtils.buildSparkApplication(
+                              CONTEXT,
+                              newTemplate("https://repo/app.jar", ImmutableMap.of(key, value)),
+                              withDefault)
+                          .getAdditionalProperties()
+                          .get("spec"))
+                  .get("sparkConf");
+      Assertions.assertEquals(value, overridden.get(key));
+    }
+  }
+
+  @Test
+  public void testServerPathInSparkConfigsDoesNotLeakCredentials() {
+    SparkJobTemplate template =
+        newTemplate(
+            "https://repo/app.jar",
+            ImmutableMap.of("spark.files", "https://repo/a.conf,file://u:secret@h/b.conf?sig=abc"));
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+    Assertions.assertTrue(e.getMessage().contains("file://h/b.conf "), e.getMessage());
+    Assertions.assertFalse(e.getMessage().contains("secret"), e.getMessage());
+    Assertions.assertFalse(e.getMessage().contains("abc"), e.getMessage());
+  }
+
+  @Test
   public void testRejectionDoesNotLeakCredentials() {
     SparkJobTemplate template =
         newTemplate("file://user:secret@host/opt/app.jar?X-Signature=abc#frag", ImmutableMap.of());

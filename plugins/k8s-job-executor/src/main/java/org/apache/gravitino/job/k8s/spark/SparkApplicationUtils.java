@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.job.k8s.spark;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
@@ -136,6 +137,13 @@ public final class SparkApplicationUtils {
     appendList(sparkConf, SPARK_JARS, template.jars());
     appendList(sparkConf, SPARK_FILES, template.files());
     appendList(sparkConf, SPARK_ARCHIVES, template.archives());
+    // The resources may also come from the Spark configurations, of the job or of the executor.
+    for (String key : ImmutableList.of(SPARK_JARS, SPARK_FILES, SPARK_ARCHIVES)) {
+      String resources = sparkConf.get(key);
+      if (StringUtils.isNotBlank(resources)) {
+        checkClusterReachable(resources);
+      }
+    }
 
     Map<String, Object> spec = new LinkedHashMap<>();
     if (StringUtils.isNotBlank(template.className())) {
@@ -183,7 +191,12 @@ public final class SparkApplicationUtils {
    * accepts, is a URI that the cluster can reach rather than a path on the Gravitino server.
    */
   private static void checkClusterReachable(String resource) {
-    for (String uri : resource.split(",")) {
+    String[] uris = resource.split(",");
+    for (String uri : uris) {
+      // Spark ignores an empty element of a list.
+      if (uris.length > 1 && StringUtils.isBlank(uri)) {
+        continue;
+      }
       Matcher scheme = URI_SCHEME.matcher(uri.trim());
       // No scheme, a Windows drive letter, or a file URI.
       if (!scheme.find()
