@@ -601,10 +601,9 @@ public class JobManager implements JobOperationDispatcher {
           jobTemplateName,
           metalake);
     } catch (OptimisticLockException e) {
-      // The registration conflicted with a concurrent writer, e.g. a lock wait timeout, and the
-      // conflict tells the caller to retry. A retry submits the job again, so cancel this
-      // execution rather than leave it running untracked.
-      LOG.error(
+      // Cancellation is asynchronous and cannot undo work that already finished. Request it
+      // best-effort, but do not expose a retryable conflict after submitting an execution.
+      LOG.warn(
           "Job {} was submitted as execution {} but could not be registered because of a "
               + "concurrent operation, cancelling the execution",
           jobEntity.name(),
@@ -620,7 +619,12 @@ public class JobManager implements JobOperationDispatcher {
             cancelFailure);
         e.addSuppressed(cancelFailure);
       }
-      throw e;
+      throw new RuntimeException(
+          String.format(
+              "Failed to register job %s after submitting execution %s; cancellation was attempted "
+                  + "but the execution may already have run. Check the execution before retrying",
+              jobEntity.name(), jobExecutionId),
+          e);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }

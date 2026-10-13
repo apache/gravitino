@@ -86,11 +86,14 @@ public class TestRelationalEntityStoreLockWaitTimeout {
   void tearDown() throws Exception {
     // Only the H2 store owns resources; a store over a failing mock backend is just dropped.
     if (dbPath != null) {
-      store.close();
-      FileUtils.deleteQuietly(new File(dbPath));
-      dbPath = null;
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+      try {
+        store.close();
+      } finally {
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+        FileUtils.deleteDirectory(new File(dbPath));
+        dbPath = null;
+      }
     }
     store = null;
   }
@@ -401,7 +404,7 @@ public class TestRelationalEntityStoreLockWaitTimeout {
 
   private String initH2Store() throws IOException, IllegalAccessException {
     dbPath = Files.createTempDirectory("gravitino_lock_wait_timeout_").toString();
-    String jdbcUrl = String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", dbPath);
+    String jdbcUrl = String.format("jdbc:h2:file:%s;MODE=MYSQL", new File(dbPath, "db").getPath());
 
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_STORE)).thenReturn(Configs.RELATIONAL_ENTITY_STORE);

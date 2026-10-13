@@ -20,8 +20,13 @@ package org.apache.gravitino.storage.relational.utils;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -38,6 +43,12 @@ public class ExceptionUtils {
   /** PostgreSQL SQLState of a lock that is not available within lock_timeout. */
   private static final String POSTGRESQL_LOCK_NOT_AVAILABLE = "55P03";
 
+  private static final Set<String> LOCK_WAIT_TIMEOUT_SQL_STATES =
+      Set.of(POSTGRESQL_LOCK_NOT_AVAILABLE);
+
+  private static final Set<Integer> LOCK_WAIT_TIMEOUT_VENDOR_CODES =
+      Set.of(MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT);
+
   private ExceptionUtils() {}
 
   /**
@@ -51,6 +62,7 @@ public class ExceptionUtils {
    * @param type The type of the entity being written.
    * @param entityName The name of the entity being written.
    * @throws IOException If the SQL error has no more specific mapping.
+   * @throws OptimisticLockException If the failure contains a lock wait timeout.
    */
   public static void checkSQLException(
       RuntimeException re, Entity.EntityType type, String entityName) throws IOException {
@@ -123,34 +135,50 @@ public class ExceptionUtils {
    * <p>Deadlocks are deliberately not included: a deadlock on a write path points at an
    * inconsistent lock order, which should be fixed on that path rather than reported as a conflict.
    *
-   * @param failure The failure to inspect, including its causes.
-   * @return {@code true} if a lock wait timeout is found in the cause chain.
+   * @param failure The failure to inspect, including its causes and chained SQL exceptions, or
+   *     null.
+   * @return {@code true} if a lock wait timeout is found.
    */
-  public static boolean isLockWaitTimeout(Throwable failure) {
-    return hasSqlException(
-        failure,
-        Set.of(POSTGRESQL_LOCK_NOT_AVAILABLE),
-        Set.of(MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT));
+  public static boolean isLockWaitTimeout(@Nullable Throwable failure) {
+    return hasSqlException(failure, LOCK_WAIT_TIMEOUT_SQL_STATES, LOCK_WAIT_TIMEOUT_VENDOR_CODES);
   }
 
   /**
-   * Returns whether the cause chain of a failure contains a {@link SQLException} with one of the
-   * given SQLStates or vendor error codes.
+   * Returns whether a failure contains a {@link SQLException} with one of the given SQLStates or
+   * vendor error codes. Both causes and {@link SQLException#getNextException()} are inspected;
+   * repeated exceptions are visited only once, even when the chains contain cycles.
    *
-   * @param failure The failure to inspect, including its causes.
+   * @param failure The failure to inspect, including its causes and chained SQL exceptions, or
+   *     null.
    * @param sqlStates The SQLStates to match.
    * @param vendorErrorCodes The vendor error codes to match.
    * @return {@code true} if a matching {@link SQLException} is found.
    */
   public static boolean hasSqlException(
-      Throwable failure, Set<String> sqlStates, Set<Integer> vendorErrorCodes) {
-    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      @Nullable Throwable failure, Set<String> sqlStates, Set<Integer> vendorErrorCodes) {
+    if (failure == null) {
+      return false;
+    }
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    Deque<Throwable> pending = new ArrayDeque<>();
+    pending.add(failure);
+    while (!pending.isEmpty()) {
+      Throwable cause = pending.removeLast();
+      if (!visited.add(cause)) {
+        continue;
+      }
       if (cause instanceof SQLException) {
         SQLException sql = (SQLException) cause;
-        if (sqlStates.contains(sql.getSQLState())
+        if ((sql.getSQLState() != null && sqlStates.contains(sql.getSQLState()))
             || vendorErrorCodes.contains(sql.getErrorCode())) {
           return true;
         }
+        if (sql.getNextException() != null) {
+          pending.add(sql.getNextException());
+        }
+      }
+      if (cause.getCause() != null) {
+        pending.add(cause.getCause());
       }
     }
     return false;

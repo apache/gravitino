@@ -57,6 +57,7 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
@@ -71,11 +72,10 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  *
  * <p>A write that fails because a statement waited on a row lock longer than the backend's lock
- * wait timeout is reported as an {@link org.apache.gravitino.exceptions.OptimisticLockException},
- * so callers see a conflict they can retry rather than an internal error. Writers queue on the same
- * rows inside the database, for example a table drop behind a statistic update of that table, and
- * the backend aborts the waiting statement once the timeout is reached. See {@link
- * ExceptionUtils#isLockWaitTimeout}.
+ * wait timeout is reported as an {@link OptimisticLockException}, so callers see a conflict they
+ * can retry rather than an internal error. Writers queue on the same rows inside the database, for
+ * example a table drop behind a statistic update of that table, and the backend aborts the waiting
+ * statement once the timeout is reached. See {@link ExceptionUtils#isLockWaitTimeout}.
  */
 public class RelationalEntityStore
     implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {

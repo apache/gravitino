@@ -23,10 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.sql.BatchUpdateException;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -127,5 +131,71 @@ public class TestExceptionUtils {
     assertTrue(
         conflict.getMessage().startsWith("The table m1.c1.s1.t1 could not be changed"),
         conflict.getMessage());
+  }
+
+  @Test
+  void testLockWaitTimeoutInBatchExceptionChain() {
+    BatchUpdateException batch = new BatchUpdateException("batch failed", new int[0]);
+    batch.setNextException(new SQLException("statement failed"));
+    batch.setNextException(new SQLException("MySQL lock wait timeout", null, 1205));
+    PersistenceException failure = new PersistenceException(batch);
+
+    assertTrue(ExceptionUtils.isLockWaitTimeout(failure));
+    OptimisticLockException conflict =
+        assertThrows(
+            OptimisticLockException.class,
+            () ->
+                ExceptionUtils.checkSQLException(failure, Entity.EntityType.TABLE, "m1.c1.s1.t1"));
+    assertSame(failure, conflict.getCause());
+    assertTrue(conflict.getMessage().contains("m1.c1.s1.t1"));
+  }
+
+  @Test
+  void testCauseOfChainedSqlExceptionIsInspected() {
+    SQLException batch = new SQLException("batch failed");
+    SQLException chained =
+        new SQLException(
+            "statement failed", new RuntimeException(new SQLException("lock timeout", "55P03")));
+    batch.setNextException(chained);
+
+    assertTrue(ExceptionUtils.isLockWaitTimeout(new PersistenceException(batch)));
+  }
+
+  @Test
+  void testOtherSqlClassificationsInspectNextExceptions() {
+    SQLException batch = new SQLException("batch failed");
+    batch.setNextException(new SQLException("duplicate key", "23505"));
+    assertTrue(ExceptionUtils.hasSqlException(batch, Set.of("23505"), Set.of(1062)));
+    assertFalse(ExceptionUtils.isLockWaitTimeout(batch));
+
+    SQLException deadlock = new SQLException("batch failed");
+    deadlock.setNextException(new SQLException("MySQL deadlock", "40001", 1213));
+    assertTrue(ExceptionUtils.hasSqlException(deadlock, Set.of("40P01"), Set.of(1213)));
+    assertFalse(ExceptionUtils.isLockWaitTimeout(deadlock));
+  }
+
+  @Test
+  void testExceptionCyclesTerminateWithoutMatch() {
+    SQLException first = new SQLException("first");
+    SQLException second = new SQLException("second");
+    first.setNextException(second);
+    second.setNextException(first);
+    first.initCause(new RuntimeException(second));
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(5), () -> assertFalse(ExceptionUtils.isLockWaitTimeout(first)));
+  }
+
+  @Test
+  void testSharedCauseDoesNotHideChainedTimeout() {
+    SQLException first = new SQLException("first");
+    SQLException second = new SQLException("second");
+    first.initCause(second);
+    first.setNextException(second);
+    second.setNextException(new SQLException("H2 lock timeout", "HYT00", 50200));
+
+    assertTrue(ExceptionUtils.isLockWaitTimeout(first));
+    assertFalse(ExceptionUtils.isLockWaitTimeout(null));
+    assertFalse(ExceptionUtils.isLockWaitTimeout(new SQLException("no SQLState")));
   }
 }
