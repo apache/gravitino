@@ -80,6 +80,16 @@ connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
+#### Identifier Case Behavior
+
+When `catalog-backend` is `hive`, Gravitino normalizes schema, table, and view identifiers to lowercase.
+
+When `catalog-backend` is `rest`, Gravitino treats those identifiers as case-sensitive because it can't infer the capabilities of the catalog behind the REST server. If the REST server uses a case-insensitive backend, use the exact identifier casing stored in Gravitino. Loading the same object through a differently cased identifier is rejected instead of being treated as an alias.
+
+:::caution
+Mixed-case Hive-backed registrations created by an earlier Gravitino version may no longer match their normalized names. If loading one reports a retained identifier conflict, manually delete the stale Gravitino registration and remove `gravitino.identifier` from the external object before loading it again. Gravitino doesn't automatically reconcile governance metadata onto the new registration.
+:::
+
 #### Hadoop S3A (optional)
 
 Paimon's native S3 filesystem uses an `s3://` warehouse and the `paimon-s3` dependency. As an
