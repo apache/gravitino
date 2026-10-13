@@ -115,6 +115,8 @@ public class PolicyManager implements PolicyDispatcher {
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
+    content.validate();
+
     PolicyEntity policyEntity =
         PolicyEntity.builder()
             .withId(idGenerator.nextId())
@@ -337,6 +339,8 @@ public class PolicyManager implements PolicyDispatcher {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
+
+    newContent.validate();
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);

@@ -119,6 +119,32 @@ public class TestDataSourceValidation {
     }
   }
 
+  /**
+   * Verifies that for an unknown driver family (SQLite) no connect/socket timeout connection
+   * property is injected and the datasource still builds and borrows a connection. This guards the
+   * "unknown driver -> no-op" contract of {@link JdbcConnectionTimeouts}: SQLite does not
+   * understand {@code connectTimeout}/{@code socketTimeout}, so injecting them would make the
+   * connection fail.
+   */
+  @Test
+  public void testUnknownDriverInjectsNoConnectionTimeout() throws SQLException {
+    // JdbcConnectionTimeouts emits nothing for the SQLite driver family.
+    Map<String, String> props = new HashMap<>();
+    props.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC");
+    props.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    Assertions.assertTrue(
+        JdbcConnectionTimeouts.connectionProperties(
+                new JdbcConfig(props), props.get(JdbcConfig.JDBC_URL.getKey()))
+            .isEmpty());
+
+    // And the datasource built from it still borrows a working connection (no leak, no failure).
+    try (BasicDataSource dataSource = createDataSource(Map.of())) {
+      try (Connection connection = dataSource.getConnection()) {
+        Assertions.assertTrue(connection.isValid(1));
+      }
+    }
+  }
+
   /** A driver fixture whose connections do not implement JDBC connection validation. */
   public static class UnsupportedValidationDriver extends JDBC {
     /**

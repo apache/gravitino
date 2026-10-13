@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import os
 import shutil
 import tempfile
@@ -117,6 +118,19 @@ class TestSemanticModelTagsAndOwner(AuthorizationIntegrationTestEnv):
         self.assertEqual(["reviewed"], renamed.list_tags())
         self.assertEqual([], renamed.associate_tags([], ["reviewed"]))
         self.assertEqual([], renamed.list_tags_info())
+
+    def test_imported_model_tag_context(self):
+        document = json.loads(self._models.export_ossie_document(self._ident, "json"))
+        document["name"] = "imported"
+        imported = self._models.import_ossie_document(
+            self._ident.namespace(), json.dumps(document), "json"
+        )
+        tags = imported.supports_tags()
+        self.assertEqual(["reviewed"], tags.associate_tags(["reviewed"], []))
+        self.assertEqual(["reviewed"], tags.list_tags())
+        self.assertEqual("reviewed", tags.get_tag("reviewed").name())
+        self.assertEqual([], self._model.supports_tags().list_tags())
+        self.assertEqual([], tags.associate_tags([], ["reviewed"]))
 
     def test_tag_values(self):
         tags = self._model.supports_tags()

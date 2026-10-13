@@ -67,7 +67,7 @@ class TestSemanticModelTagsAndOwner(unittest.TestCase):
         with self.assertRaises(UnsupportedOperationException):
             self.dto.supports_tags()
 
-    def test_create_load_and_alter_preserve_tag_context(self):
+    def test_model_operations_preserve_tag_context(self):
         catalog = SemanticModelCatalogOperations(
             self.rest, Namespace.of("lake /"), "catalog /"
         )
@@ -76,6 +76,12 @@ class TestSemanticModelTagsAndOwner(unittest.TestCase):
         for verb, operation in (
             ("post", lambda: catalog.create_semantic_model(ident, "", self.definition)),
             ("get", lambda: catalog.load_semantic_model(ident)),
+            (
+                "post",
+                lambda: catalog.import_ossie_document(
+                    Namespace.of("schema /"), '{"name":"returned /"}', "json"
+                ),
+            ),
             (
                 "put",
                 lambda: catalog.alter_semantic_model(

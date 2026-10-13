@@ -147,6 +147,12 @@ public interface PolicyUpdateRequest extends RESTRequest {
           value = PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.class,
           name = "system_iceberg_orphan_file_removal"),
       @JsonSubTypes.Type(
+          value = PolicyContentDTO.IcebergRewriteManifestsContentDTO.class,
+          name = "system_iceberg_rewrite_manifests"),
+      @JsonSubTypes.Type(
+          value = PolicyContentDTO.IcebergSnapshotExpirationContentDTO.class,
+          name = "system_iceberg_snapshot_expiration"),
+      @JsonSubTypes.Type(
           value = PolicyContentDTO.RowFilterContentDTO.class,
           name = "system_row_filter"),
       @JsonSubTypes.Type(
