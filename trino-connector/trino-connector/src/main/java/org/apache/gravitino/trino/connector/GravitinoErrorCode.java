@@ -112,12 +112,13 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   }
 
   /**
-   * Converts an exception into a Trino exception. A {@link TrinoException} is returned as is, and
-   * an {@link ExecutionException} is classified by its cause. {@link ForbiddenException}, {@link
-   * NotInUseException}, {@link IllegalArgumentException} and {@link UnsupportedOperationException}
-   * map to {@code PERMISSION_DENIED}, {@code CATALOG_UNAVAILABLE}, {@link
-   * #GRAVITINO_ILLEGAL_ARGUMENT} and {@link #GRAVITINO_UNSUPPORTED_OPERATION}. Anything else maps
-   * to {@code GENERIC_INTERNAL_ERROR}.
+   * Converts an exception into a Trino exception. A {@link TrinoException} is returned as is, so a
+   * caller may route every failure of a guarded block through this method, including a {@link
+   * TrinoException} it throws inside that block. An {@link ExecutionException} is classified by its
+   * cause. {@link ForbiddenException}, {@link NotInUseException}, {@link IllegalArgumentException}
+   * and {@link UnsupportedOperationException} map to {@code PERMISSION_DENIED}, {@code
+   * CATALOG_UNAVAILABLE}, {@link #GRAVITINO_ILLEGAL_ARGUMENT} and {@link
+   * #GRAVITINO_UNSUPPORTED_OPERATION}. Anything else maps to {@code GENERIC_INTERNAL_ERROR}.
    *
    * @param exception the exception to convert
    * @param context describes the failed operation; it prefixes the message of an exception that

@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
@@ -223,10 +224,10 @@ public class CatalogConnectorMetadata {
   public void createSchema(GravitinoSchema schema) {
     try {
       schemaCatalog.createSchema(schema.getName(), schema.getComment(), schema.getProperties());
-    } catch (NoSuchSchemaException e) {
+    } catch (NoSuchCatalogException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
-    } catch (TableAlreadyExistsException e) {
+    } catch (SchemaAlreadyExistsException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS, "Schema already exists", e);
     } catch (RuntimeException e) {
@@ -241,19 +242,18 @@ public class CatalogConnectorMetadata {
    * @param cascade whether to cascade drop the schema
    */
   public void dropSchema(String schemaName, boolean cascade) {
+    boolean success;
     try {
-      boolean success = schemaCatalog.dropSchema(schemaName, cascade);
-
-      if (!success) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
-      }
-
+      success = schemaCatalog.dropSchema(schemaName, cascade);
     } catch (NonEmptySchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
     } catch (RuntimeException e) {
       throw GravitinoErrorCode.toTrinoException(e);
+    }
+    if (!success) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
     }
   }
 
