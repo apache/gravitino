@@ -49,7 +49,7 @@ public class TestSparkApplicationStatusUtils {
     "Submitted, QUEUED",
     "ScheduledToRestart, QUEUED",
     "DriverRequested, QUEUED",
-    "DriverStarted, QUEUED",
+    "DriverStarted, STARTED",
     "DriverReady, STARTED",
     "InitializedBelowThresholdExecutors, STARTED",
     "RunningHealthy, STARTED",
@@ -328,6 +328,72 @@ public class TestSparkApplicationStatusUtils {
         SparkApplicationStatusUtils.isStopped(app("Submitted", "DriverStartTimedOut")));
     Assertions.assertTrue(
         SparkApplicationStatusUtils.isStopped(app("Submitted", "ResourceReleased")));
+  }
+
+  @Test
+  public void testDriverStartedIsStarted() {
+    // The driver container runs from DriverStarted on, even if the pod never gets ready.
+    GenericKubernetesResource app = app("Submitted", "DriverRequested", "DriverStarted");
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.STARTED, info.status());
+    Assertions.assertEquals(timeOf(2), info.startedAt());
+
+    Pod running = driverPod("spark-kubernetes-driver", "2026-09-30T00:00:01Z", null);
+    JobExecutionInfo withPod =
+        SparkApplicationStatusUtils.executionInfoOf(app, running, NOW, NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(JobHandle.Status.STARTED, withPod.status());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:01Z"), withPod.startedAt());
+
+    // Cancelled before DriverReady, the job still has its started time.
+    cancel(app);
+    app.getMetadata().setDeletionTimestamp(CREATED_AT.plusSeconds(10).toString());
+    JobExecutionInfo cancelled = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelled.status());
+    Assertions.assertEquals(timeOf(2), cancelled.startedAt());
+    Assertions.assertEquals(CREATED_AT.plusSeconds(10), cancelled.finishedAt());
+
+    // An unknown state after DriverStarted is a started one.
+    Assertions.assertEquals(
+        JobHandle.Status.STARTED,
+        executionInfoOf(app("Submitted", "DriverStarted", "SomeNewState")).status());
+  }
+
+  @Test
+  public void testDriverTerminationTimeWithoutOutcome() {
+    // The driver terminated after the deletion was requested, and the operator recorded no
+    // outcome. The time the driver actually terminated is the finished time.
+    Pod terminated =
+        driverPod("spark-kubernetes-driver", "2026-09-30T00:00:02Z", "2026-09-30T00:00:25Z");
+
+    GenericKubernetesResource cancelled = app("Submitted", "DriverReady", "RunningHealthy");
+    cancel(cancelled);
+    cancelled.getMetadata().setDeletionTimestamp(CREATED_AT.plusSeconds(20).toString());
+    JobExecutionInfo info =
+        SparkApplicationStatusUtils.executionInfoOf(
+            cancelled, terminated, NOW, NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, info.status());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:25Z"), info.finishedAt());
+
+    // Deleted by someone else: the job failed, a terminated driver doesn't make it succeed.
+    GenericKubernetesResource deleted = app("Submitted", "DriverReady", "RunningHealthy");
+    deleted.getMetadata().setDeletionTimestamp(CREATED_AT.plusSeconds(20).toString());
+    info =
+        SparkApplicationStatusUtils.executionInfoOf(deleted, terminated, NOW, NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(JobHandle.Status.FAILED, info.status());
+    Assertions.assertEquals(Instant.parse("2026-09-30T00:00:25Z"), info.finishedAt());
+
+    // Without the driver pod, the deletion time is the best known one.
+    Assertions.assertEquals(CREATED_AT.plusSeconds(20), executionInfoOf(deleted).finishedAt());
+
+    // A running job isn't finished because a driver pod terminated.
+    info =
+        SparkApplicationStatusUtils.executionInfoOf(
+            app("Submitted", "DriverReady", "RunningHealthy"),
+            terminated,
+            NOW,
+            NO_STATUS_TIMEOUT_MS);
+    Assertions.assertEquals(JobHandle.Status.STARTED, info.status());
+    Assertions.assertNull(info.finishedAt());
   }
 
   @Test

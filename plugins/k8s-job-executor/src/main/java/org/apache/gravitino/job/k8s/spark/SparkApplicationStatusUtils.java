@@ -79,10 +79,14 @@ public final class SparkApplicationStatusUtils {
   private static final Logger LOG = LoggerFactory.getLogger(SparkApplicationStatusUtils.class);
 
   private static final Set<String> QUEUED_STATES =
-      ImmutableSet.of("Submitted", "ScheduledToRestart", "DriverRequested", "DriverStarted");
+      ImmutableSet.of("Submitted", "ScheduledToRestart", "DriverRequested");
 
+  // The operator enters DriverStarted when the driver container is ready, so the job is running
+  // from then on. DriverReady only adds that the whole driver pod is ready, which a sidecar that
+  // isn't ready can hold back.
   private static final Set<String> STARTED_STATES =
       ImmutableSet.of(
+          "DriverStarted",
           "DriverReady",
           "InitializedBelowThresholdExecutors",
           "RunningHealthy",
@@ -128,8 +132,9 @@ public final class SparkApplicationStatusUtils {
    * operator keeps with some states. Without them, the job started when the application first
    * reached a started state, and finished when it reached its outcome. As the driver container
    * status is only known once the job finished, the started time of a running job is refined to the
-   * driver's when it finishes. A job that stopped without an outcome finished when it was deleted,
-   * or else when it entered its last state.
+   * driver's when it finishes. A job that stopped without an outcome finished when its driver
+   * container terminated if that is known, else when it was deleted, or else when it entered its
+   * last state.
    *
    * @param app the SparkApplication
    * @param driver the driver pod, or null if unknown
@@ -156,12 +161,16 @@ public final class SparkApplicationStatusUtils {
       driverStartedAt = parseTime(driverState.getRunning().getStartedAt());
     }
     Instant startedAt = startedAt(history, driverStartedAt, createdAt);
-    // When the application stopped: when it reached its outcome, else when it was deleted, else
-    // when it entered its current state. A deletion time is in whole seconds, so it may read
-    // earlier than a started time of the same second, which Gravitino would then drop.
+    // When the application stopped: when the driver container terminated if that is known, even
+    // before the operator records an outcome, else when the application reached its outcome, else
+    // when it was deleted, else when it entered its current state. A deletion time is in whole
+    // seconds, so it may read earlier than a started time of the same second, which Gravitino
+    // would then drop.
     Instant stoppedAt;
-    if (outcome != null) {
-      stoppedAt = finishedAt(outcome, driverFinishedAt);
+    if (driverFinishedAt != null) {
+      stoppedAt = driverFinishedAt;
+    } else if (outcome != null) {
+      stoppedAt = outcome.driverFinishedAt != null ? outcome.driverFinishedAt : outcome.time;
     } else if (deletedAt != null) {
       stoppedAt = startedAt != null && deletedAt.isBefore(startedAt) ? startedAt : deletedAt;
     } else {
@@ -289,14 +298,6 @@ public final class SparkApplicationStatusUtils {
         .findFirst()
         .map(s -> s.time)
         .orElse(null);
-  }
-
-  @Nullable
-  private static Instant finishedAt(State outcome, @Nullable Instant driverFinishedAt) {
-    if (driverFinishedAt != null) {
-      return driverFinishedAt;
-    }
-    return outcome.driverFinishedAt != null ? outcome.driverFinishedAt : outcome.time;
   }
 
   @Nullable
