@@ -22,6 +22,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
 import { isUnsupportedOperationError } from '@/lib/utils/axios/unsupportedOperation'
 import toast from 'react-hot-toast'
+import { semanticModelNodeKey } from '@/lib/utils/semanticModel'
 
 import _ from 'lodash-es'
 
@@ -421,8 +422,8 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
               return {
                 ...semanticModelItem,
                 node: 'semanticModel',
-                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${semanticModelItem.name}}}`,
-                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${semanticModelItem.name}}}`,
+                id: semanticModelNodeKey({ metalake, catalog, schema, semanticModel: semanticModelItem.name }),
+                key: semanticModelNodeKey({ metalake, catalog, schema, semanticModel: semanticModelItem.name }),
                 path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, semanticModel: semanticModelItem.name }).toString()}`,
                 name: semanticModelItem.name,
                 title: semanticModelItem.name,
@@ -2380,16 +2381,18 @@ export const fetchSemanticModels = createAsyncThunk(
   async ({ init, metalake, catalog, schema }, { getState, dispatch }) => {
     const [err, res] = await to(getSemanticModelsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
 
-    if (err || !res) {
+    if (err) {
       // The catalog doesn't support semantic models (405), or the server predates the endpoint and
-      // has no route for it (404). Both mean "this schema has none" — return empty silently rather
+      // has no route for it (404). Both mean "this schema has none" - return empty silently rather
       // than failing every schema page against an older server.
       if ([404, 405].includes(err?.response?.status)) {
         return { semanticModels: [], init }
       }
-      if (init) {
-        throw new Error(err)
-      }
+      throw err instanceof Error ? err : new Error(err?.message ?? String(err))
+    }
+
+    if (!res) {
+      throw new Error('Semantic Model list returned an empty response')
     }
 
     const { identifiers = [] } = res || {}
@@ -2398,8 +2401,8 @@ export const fetchSemanticModels = createAsyncThunk(
       return {
         ...semanticModelItem,
         node: 'semanticModel',
-        id: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${semanticModelItem.name}}}`,
-        key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${semanticModelItem.name}}}`,
+        id: semanticModelNodeKey({ metalake, catalog, schema, semanticModel: semanticModelItem.name }),
+        key: semanticModelNodeKey({ metalake, catalog, schema, semanticModel: semanticModelItem.name }),
         path: `?${new URLSearchParams({
           metalake,
           catalog,
@@ -2442,12 +2445,16 @@ export const getSemanticModelDetails = createAsyncThunk(
       getSemanticModelDetailsApi({ metalake, catalog, schema, semanticModel }, { errorMessageMode: 'none' })
     )
 
-    if (err || !res) {
-      // Catalog doesn't support semantic models (HTTP 405) — return empty result silently
+    if (err) {
+      // Catalog doesn't support semantic models (HTTP 405) - return empty result silently
       if (err?.response?.status === 405) {
         return { semanticModel: null, init }
       }
-      throw new Error(err)
+      throw err instanceof Error ? err : new Error(err?.message ?? String(err))
+    }
+
+    if (!res) {
+      throw new Error('Semantic Model details returned an empty response')
     }
 
     return { semanticModel: res.semanticModel || res, init }
@@ -3265,7 +3272,7 @@ export const appMetalakesSlice = createSlice({
       state.semanticModels = action.payload.semanticModels
     })
     builder.addCase(fetchSemanticModels.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3275,7 +3282,7 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(getSemanticModelDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })

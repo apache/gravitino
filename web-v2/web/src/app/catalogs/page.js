@@ -22,6 +22,7 @@
 import { useEffect, createContext, useRef } from 'react'
 
 import RightContent from './rightContent/RightContent'
+import { semanticModelNodeKey } from '@/lib/utils/semanticModel'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
@@ -73,6 +74,10 @@ const CatalogsListPage = () => {
   const treeRef = useRef()
 
   const buildNodePath = routeParams => {
+    if (routeParams.semanticModel) {
+      return semanticModelNodeKey(routeParams)
+    }
+
     const keys = [
       'metalake',
       'catalog',

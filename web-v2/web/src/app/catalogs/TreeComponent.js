@@ -22,6 +22,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import { semanticModelNodeKey } from '@/lib/utils/semanticModel'
 
 import { Empty, Input, Spin, Tabs, Tooltip, Tree } from 'antd'
 
@@ -381,7 +382,9 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
           nextSelectedKey = schemaKey
 
           if (entity) {
-            nextSelectedKey = `${schemaKey}{{${entity}}}`
+            nextSelectedKey = semanticModel
+              ? semanticModelNodeKey({ metalake, catalog, schema, semanticModel })
+              : `${schemaKey}{{${entity}}}`
           }
         }
       }

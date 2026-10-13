@@ -75,7 +75,13 @@ const validateDatasets = (datasets, errors) => {
       return
     }
 
-    const duplicateFields = duplicatesOf((fields || []).map(field => field?.name))
+    ;(fields || []).forEach((field, fieldIndex) => {
+      if (!isPlainObject(field) || !isNonBlankString(field.name)) {
+        errors.push(`datasets[${index}].fields[${fieldIndex}] must have a non-empty name.`)
+      }
+    })
+
+    const duplicateFields = duplicatesOf((fields || []).map(field => field?.name).filter(isNonBlankString))
     if (duplicateFields.length) {
       errors.push(`Field names must be unique within dataset "${dataset.name}": ${duplicateFields.join(', ')}.`)
     }
@@ -257,3 +263,7 @@ export const genSemanticModelUpdates = (originalData, newData) => {
 
   return updates
 }
+
+/** Returns the tree key for a Semantic Model, distinct from other schema entities. */
+export const semanticModelNodeKey = ({ metalake, catalog, schema, semanticModel }) =>
+  `{{${metalake}}}{{${catalog}}}{{relational}}{{${schema}}}{{semanticModel}}{{${semanticModel}}}`

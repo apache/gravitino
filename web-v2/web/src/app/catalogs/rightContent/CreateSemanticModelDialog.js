@@ -66,7 +66,6 @@ export default function CreateSemanticModelDialog({ ...props }) {
   const [bottomShadow, setBottomShadow] = useState(false)
   const [topShadow, setTopShadow] = useState(false)
   const [form] = Form.useForm()
-  const values = Form.useWatch([], form)
   const dispatch = useAppDispatch()
 
   useResetFormOnCloseModal({
@@ -129,14 +128,22 @@ export default function CreateSemanticModelDialog({ ...props }) {
   const validateDefinition = (rule, value) => {
     const { errors } = parseSemanticModelDefinition(value)
 
-    return errors.length ? Promise.reject(new Error(errors.join(' '))) : Promise.resolve()
+    return errors.length
+      ? Promise.reject(
+          <ul className='list-disc pl-4'>
+            {errors.map(error => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        )
+      : Promise.resolve()
   }
 
   const handleSubmit = e => {
     e.preventDefault()
     form
       .validateFields()
-      .then(async () => {
+      .then(async values => {
         const { definition } = parseSemanticModelDefinition(values.definition)
 
         setConfirmLoading(true)
@@ -145,17 +152,14 @@ export default function CreateSemanticModelDialog({ ...props }) {
           name: values.name.trim(),
           comment: values.comment,
           definition,
-          properties: (values.properties || []).reduce((acc, item) => {
-            acc[item.key] = values[item.key] || item.value
-
-            return acc
-          }, {})
+          properties: Object.fromEntries((values.properties || []).map(({ key, value }) => [key, value]))
         }
 
+        let result
         if (editSemanticModel) {
           const updates = genSemanticModelUpdates(cacheData, submitData)
           if (updates.length) {
-            await dispatch(
+            result = await dispatch(
               updateSemanticModel({
                 metalake,
                 catalog,
@@ -166,16 +170,21 @@ export default function CreateSemanticModelDialog({ ...props }) {
             )
           }
         } else {
-          await dispatch(createSemanticModel({ data: submitData, metalake, catalog, schema }))
+          result = await dispatch(createSemanticModel({ data: submitData, metalake, catalog, schema }))
         }
 
-        setConfirmLoading(false)
-        setOpen(false)
+        if (!result?.payload?.err && !result?.error) {
+          setOpen(false)
+        }
       })
       .catch(info => {
-        console.error(info)
-        form.scrollToField(info?.errorFields?.[0]?.name?.[0])
+        if (info?.errorFields?.length) {
+          form.scrollToField(info.errorFields[0].name)
+        } else {
+          console.error(info)
+        }
       })
+      .finally(() => setConfirmLoading(false))
   }
 
   const handleCancel = () => {
@@ -189,7 +198,10 @@ export default function CreateSemanticModelDialog({ ...props }) {
         open={open}
         onOk={handleSubmit}
         okText='Submit'
-        okButtonProps={{ 'data-refer': 'handle-submit-semantic-model' }}
+        okButtonProps={{
+          'data-refer': 'handle-submit-semantic-model',
+          disabled: isLoading || (!!editSemanticModel && !cacheData)
+        }}
         maskClosable={false}
         keyboard={false}
         width={800}

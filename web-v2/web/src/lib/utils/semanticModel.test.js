@@ -85,6 +85,21 @@ describe('validateSemanticModelDefinition', () => {
     expect(errors).toEqual(['Dataset names must be unique within the semantic model: orders.'])
   })
 
+  test.each([null, 'field', {}, { name: '' }, { name: '  ' }, { name: 42 }])('rejects an invalid field %j', field => {
+    const errors = validateSemanticModelDefinition({ datasets: [{ ...orders, fields: [field] }] })
+    expect(errors).toEqual(['datasets[0].fields[0] must have a non-empty name.'])
+  })
+
+  test('reports invalid field names without calling them duplicates', () => {
+    const errors = validateSemanticModelDefinition({
+      datasets: [{ ...orders, fields: [{}, {}, { name: '' }, { name: '' }, ...orders.fields, ...orders.fields] }]
+    })
+    expect(errors).toEqual([
+      ...[0, 1, 2, 3].map(index => `datasets[0].fields[${index}] must have a non-empty name.`),
+      'Field names must be unique within dataset "orders": order_id.'
+    ])
+  })
+
   test('rejects duplicate field names within one dataset', () => {
     const errors = validateSemanticModelDefinition({
       datasets: [{ ...orders, fields: [...orders.fields, ...orders.fields] }]

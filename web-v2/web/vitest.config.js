@@ -21,6 +21,7 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
 export default defineConfig({
+  esbuild: { loader: 'tsx', include: /src\/.*\.[jt]sx?$/, exclude: [], jsx: 'automatic' },
   test: {
     globals: true,
     environment: 'jsdom',
