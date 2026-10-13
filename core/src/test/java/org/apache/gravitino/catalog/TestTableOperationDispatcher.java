@@ -291,6 +291,11 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             () -> tableOperationDispatcher.loadTable(tableIdent1));
     Assertions.assertTrue(
         exception.getMessage().contains("does not automatically reconcile external table renames"));
+    Assertions.assertTrue(exception.getMessage().contains("manually resolve the conflict"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Do not only remove `gravitino.identifier`"));
     verify(entityStore).put(any(TableEntity.class), eq(false));
 
     // The rejected import leaves the existing entity and its identity unchanged.
@@ -542,7 +547,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             () -> tableOperationDispatcher.loadTable(tableIdent));
     Assertions.assertTrue(
         exception.getMessage().contains("does not automatically reconcile external table renames"));
-    Assertions.assertTrue(exception.getMessage().contains("through multiple paths"));
+    Assertions.assertTrue(exception.getMessage().contains("manually resolve the conflict"));
     verify(entityStore).put(any(TableEntity.class), eq(false));
   }
 

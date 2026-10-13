@@ -66,10 +66,12 @@ For `catalog-backend=rest`, always use the same identifier casing that was used 
 :::caution
 After upgrading, if loading an existing mixed-case object reports a retained identifier conflict:
 
-1. Delete the stale Gravitino registration.
-2. Remove `gravitino.identifier` from the external object.
+1. Either restore the external object to match its existing Gravitino registration, or have an administrator safely clean up the stale registration and its privileges, tags, and other relationships.
+2. Only after the stale registration is removed, remove `gravitino.identifier` from the external object.
 3. Retry loading the object.
 4. Reapply any privileges, tags, or other governance relationships that the new registration needs.
+
+Do not only remove the external identifier while the conflicting registration remains. Gravitino may otherwise associate the external object with that registration.
 :::
 
 #### JDBC Backend

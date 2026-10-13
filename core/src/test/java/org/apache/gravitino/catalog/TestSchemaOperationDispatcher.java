@@ -217,6 +217,11 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         exception
             .getMessage()
             .contains("does not automatically reconcile external schema renames"));
+    Assertions.assertTrue(exception.getMessage().contains("manually resolve the conflict"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Do not only remove `gravitino.identifier`"));
     verify(entityStore).put(any(SchemaEntity.class), eq(false));
 
     // The rejected import leaves the existing entity and its identity unchanged.
@@ -323,7 +328,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         exception
             .getMessage()
             .contains("does not automatically reconcile external schema renames"));
-    Assertions.assertTrue(exception.getMessage().contains("through multiple catalogs"));
+    Assertions.assertTrue(exception.getMessage().contains("manually resolve the conflict"));
     verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
 
