@@ -34,7 +34,6 @@ import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.maintenance.policy.TableMaintenancePolicies;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -200,7 +199,6 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         policyType.name(),
         content().getClass().getName());
     content().validate();
-    TableMaintenancePolicies.validate(policyType, content());
   }
 
   public static class Builder {

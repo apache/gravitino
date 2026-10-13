@@ -134,54 +134,6 @@ public class PolicyContents {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
-    return icebergDataCompaction(
-        minDataFileMse,
-        minDeleteFileNumber,
-        dataFileMseWeight,
-        deleteFileNumberWeight,
-        maxPartitionNum,
-        rewriteStrategy,
-        sortOrder,
-        rewriteOptions,
-        null,
-        null,
-        null,
-        null,
-        null);
-  }
-
-  /**
-   * Creates an iceberg compaction policy content with optional execution peer fields.
-   *
-   * @param minDataFileMse minimum threshold for custom-data-file-mse
-   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
-   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
-   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
-   * @param maxPartitionNum maximum partition number selected for compaction
-   * @param rewriteStrategy Iceberg rewrite_data_files strategy
-   * @param sortOrder Iceberg rewrite_data_files sort_order
-   * @param rewriteOptions rewrite options forwarded as job.options.*
-   * @param timeTrigger optional time trigger
-   * @param eventTrigger optional event trigger
-   * @param minIntervalMs optional cooldown between finished jobs
-   * @param jobOptions Spark / IRC client options
-   * @param updateOptions Gravitino updater options
-   * @return iceberg compaction policy content
-   */
-  public static PolicyContent icebergDataCompaction(
-      long minDataFileMse,
-      long minDeleteFileNumber,
-      long dataFileMseWeight,
-      long deleteFileNumberWeight,
-      long maxPartitionNum,
-      String rewriteStrategy,
-      String sortOrder,
-      Map<String, String> rewriteOptions,
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
     return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
@@ -190,12 +142,7 @@ public class PolicyContents {
         maxPartitionNum,
         rewriteStrategy,
         sortOrder,
-        rewriteOptions,
-        timeTrigger,
-        eventTrigger,
-        minIntervalMs,
-        jobOptions,
-        updateOptions);
+        rewriteOptions);
   }
 
   /**
@@ -218,40 +165,7 @@ public class PolicyContents {
    */
   public static PolicyContent icebergOrphanFileRemoval(
       long olderThanDays, @Nullable String location, boolean dryRun) {
-    return icebergOrphanFileRemoval(olderThanDays, location, dryRun, null, null, null, null, null);
-  }
-
-  /**
-   * Creates orphan cleanup policy content with optional execution peer fields.
-   *
-   * @param olderThanDays minimum file age in days
-   * @param location optional scan location within the table
-   * @param dryRun whether to list candidates without deleting them
-   * @param timeTrigger optional time trigger
-   * @param eventTrigger optional event trigger
-   * @param minIntervalMs optional cooldown between finished jobs
-   * @param jobOptions Spark / IRC client options
-   * @param updateOptions Gravitino updater options
-   * @return orphan cleanup policy content
-   */
-  public static PolicyContent icebergOrphanFileRemoval(
-      long olderThanDays,
-      @Nullable String location,
-      boolean dryRun,
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergOrphanFileRemovalContent(
-        olderThanDays,
-        location,
-        dryRun,
-        timeTrigger,
-        eventTrigger,
-        minIntervalMs,
-        jobOptions,
-        updateOptions);
+    return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
   }
 
   /**
@@ -260,27 +174,7 @@ public class PolicyContents {
    * @return rewrite-manifests policy content
    */
   public static PolicyContent icebergRewriteManifests() {
-    return icebergRewriteManifests(null, null, null, null, null);
-  }
-
-  /**
-   * Creates placeholder rewrite-manifests policy content with optional execution peer fields.
-   *
-   * @param timeTrigger optional time trigger
-   * @param eventTrigger optional event trigger
-   * @param minIntervalMs optional cooldown between finished jobs
-   * @param jobOptions Spark / IRC client options
-   * @param updateOptions Gravitino updater options
-   * @return rewrite-manifests policy content
-   */
-  public static PolicyContent icebergRewriteManifests(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergRewriteManifestsContent(
-        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergRewriteManifestsContent();
   }
 
   /**
@@ -289,27 +183,7 @@ public class PolicyContents {
    * @return snapshot-expiration policy content
    */
   public static PolicyContent icebergSnapshotExpiration() {
-    return icebergSnapshotExpiration(null, null, null, null, null);
-  }
-
-  /**
-   * Creates placeholder snapshot-expiration policy content with optional execution peer fields.
-   *
-   * @param timeTrigger optional time trigger
-   * @param eventTrigger optional event trigger
-   * @param minIntervalMs optional cooldown between finished jobs
-   * @param jobOptions Spark / IRC client options
-   * @param updateOptions Gravitino updater options
-   * @return snapshot-expiration policy content
-   */
-  public static PolicyContent icebergSnapshotExpiration(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergSnapshotExpirationContent(
-        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergSnapshotExpirationContent();
   }
 
   /**

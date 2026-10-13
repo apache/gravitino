@@ -28,12 +28,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Built-in policy content for Iceberg compaction strategy. */
-public class IcebergDataCompactionContent extends TableMaintenanceContent {
+public class IcebergDataCompactionContent implements PolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Strategy type value for iceberg data compaction. */
@@ -143,37 +142,6 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
-    this(
-        minDataFileMse,
-        minDeleteFileNumber,
-        dataFileMseWeight,
-        deleteFileNumberWeight,
-        maxPartitionNum,
-        rewriteStrategy,
-        sortOrder,
-        rewriteOptions,
-        null,
-        null,
-        null,
-        null,
-        null);
-  }
-
-  IcebergDataCompactionContent(
-      Long minDataFileMse,
-      Long minDeleteFileNumber,
-      Long dataFileMseWeight,
-      Long deleteFileNumberWeight,
-      Long maxPartitionNum,
-      String rewriteStrategy,
-      String sortOrder,
-      Map<String, String> rewriteOptions,
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -299,7 +267,7 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    super.validate();
+    PolicyContent.super.validate();
     // All fields are defaulted in the constructor, so only range checks are needed here.
     Preconditions.checkArgument(minDataFileMse >= 0, "minDataFileMse must be >= 0");
     Preconditions.checkArgument(minDeleteFileNumber >= 0, "minDeleteFileNumber must be >= 0");
@@ -338,30 +306,6 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
           Preconditions.checkArgument(
               StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
         });
-    validatePolicyContentDefaults(Policy.BuiltInType.ICEBERG_COMPACTION);
-  }
-
-  @Override
-  public IcebergDataCompactionContent withPeerFields(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergDataCompactionContent(
-        minDataFileMse,
-        minDeleteFileNumber,
-        dataFileMseWeight,
-        deleteFileNumberWeight,
-        maxPartitionNum,
-        rewriteStrategy,
-        sortOrder,
-        rewriteOptions,
-        timeTrigger,
-        eventTrigger,
-        minIntervalMs,
-        jobOptions,
-        updateOptions);
   }
 
   @Override
@@ -377,8 +321,7 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
         && Objects.equals(maxPartitionNum, that.maxPartitionNum)
         && Objects.equals(rewriteStrategy, that.rewriteStrategy)
         && Objects.equals(sortOrder, that.sortOrder)
-        && Objects.equals(rewriteOptions, that.rewriteOptions)
-        && peerFieldsEquals(that);
+        && Objects.equals(rewriteOptions, that.rewriteOptions);
   }
 
   @Override
@@ -391,8 +334,7 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
         maxPartitionNum,
         rewriteStrategy,
         sortOrder,
-        rewriteOptions,
-        peerFieldsHashCode());
+        rewriteOptions);
   }
 
   @Override
@@ -416,16 +358,6 @@ public class IcebergDataCompactionContent extends TableMaintenanceContent {
         + '\''
         + ", rewriteOptions="
         + rewriteOptions
-        + ", timeTrigger="
-        + timeTrigger()
-        + ", eventTrigger="
-        + eventTrigger()
-        + ", minIntervalMs="
-        + minIntervalMs()
-        + ", jobOptions="
-        + jobOptions()
-        + ", updateOptions="
-        + updateOptions()
         + '}';
   }
 }

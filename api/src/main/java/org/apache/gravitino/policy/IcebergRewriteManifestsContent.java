@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /**
@@ -33,7 +32,7 @@ import org.apache.gravitino.MetadataObject;
  * <p>Configurable thresholds will be added when the rewrite-manifests policy lands; this class
  * registers the built-in type for TMS task mapping.
  */
-public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
+public class IcebergRewriteManifestsContent implements PolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -53,15 +52,6 @@ public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
 
   /** Default constructor for Jackson deserialization only. */
   public IcebergRewriteManifestsContent() {}
-
-  IcebergRewriteManifestsContent(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
-  }
 
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
@@ -84,48 +74,17 @@ public class IcebergRewriteManifestsContent extends TableMaintenanceContent {
   }
 
   @Override
-  public void validate() {
-    super.validate();
-    validatePolicyContentDefaults(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS);
-  }
-
-  @Override
-  public IcebergRewriteManifestsContent withPeerFields(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergRewriteManifestsContent(
-        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
-  }
-
-  @Override
   public boolean equals(Object other) {
-    if (!(other instanceof IcebergRewriteManifestsContent)) {
-      return false;
-    }
-    return peerFieldsEquals((IcebergRewriteManifestsContent) other);
+    return other instanceof IcebergRewriteManifestsContent;
   }
 
   @Override
   public int hashCode() {
-    return peerFieldsHashCode();
+    return IcebergRewriteManifestsContent.class.hashCode();
   }
 
   @Override
   public String toString() {
-    return "IcebergRewriteManifestsContent{"
-        + "timeTrigger="
-        + timeTrigger()
-        + ", eventTrigger="
-        + eventTrigger()
-        + ", minIntervalMs="
-        + minIntervalMs()
-        + ", jobOptions="
-        + jobOptions()
-        + ", updateOptions="
-        + updateOptions()
-        + '}';
+    return "IcebergRewriteManifestsContent{}";
   }
 }

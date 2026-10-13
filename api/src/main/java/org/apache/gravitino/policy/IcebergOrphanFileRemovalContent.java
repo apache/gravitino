@@ -31,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Configuration for table-level Iceberg orphan cleanup on an optimizer invocation. */
-public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
+public class IcebergOrphanFileRemovalContent implements PolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -68,19 +68,6 @@ public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
   }
 
   IcebergOrphanFileRemovalContent(long olderThanDays, @Nullable String location, boolean dryRun) {
-    this(olderThanDays, location, dryRun, null, null, null, null, null);
-  }
-
-  IcebergOrphanFileRemovalContent(
-      long olderThanDays,
-      @Nullable String location,
-      boolean dryRun,
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
     this.olderThanDays = olderThanDays;
     this.location = location;
     this.dryRun = dryRun;
@@ -149,32 +136,13 @@ public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
 
   @Override
   public void validate() {
-    super.validate();
+    PolicyContent.super.validate();
     validateOlderThanDays(olderThanDays);
     Preconditions.checkArgument(
         location == null || StringUtils.isNotBlank(location), "location must not be blank");
     Preconditions.checkArgument(
         location == null || location.equals(StringUtils.strip(location.trim())),
         "location must not have leading or trailing whitespace");
-    validatePolicyContentDefaults(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL);
-  }
-
-  @Override
-  public IcebergOrphanFileRemovalContent withPeerFields(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergOrphanFileRemovalContent(
-        olderThanDays,
-        location,
-        dryRun,
-        timeTrigger,
-        eventTrigger,
-        minIntervalMs,
-        jobOptions,
-        updateOptions);
   }
 
   @Override
@@ -185,12 +153,11 @@ public class IcebergOrphanFileRemovalContent extends TableMaintenanceContent {
     IcebergOrphanFileRemovalContent that = (IcebergOrphanFileRemovalContent) other;
     return olderThanDays == that.olderThanDays
         && dryRun == that.dryRun
-        && Objects.equals(location, that.location)
-        && peerFieldsEquals(that);
+        && Objects.equals(location, that.location);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(olderThanDays, location, dryRun, peerFieldsHashCode());
+    return Objects.hash(olderThanDays, location, dryRun);
   }
 }

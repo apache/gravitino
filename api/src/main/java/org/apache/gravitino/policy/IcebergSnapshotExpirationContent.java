@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /**
@@ -33,7 +32,7 @@ import org.apache.gravitino.MetadataObject;
  * <p>Configurable thresholds will be added when the expire-snapshots policy lands; this class
  * registers the built-in type for TMS task mapping.
  */
-public class IcebergSnapshotExpirationContent extends TableMaintenanceContent {
+public class IcebergSnapshotExpirationContent implements PolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -53,15 +52,6 @@ public class IcebergSnapshotExpirationContent extends TableMaintenanceContent {
 
   /** Default constructor for Jackson deserialization only. */
   public IcebergSnapshotExpirationContent() {}
-
-  IcebergSnapshotExpirationContent(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    super(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
-  }
 
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
@@ -84,48 +74,17 @@ public class IcebergSnapshotExpirationContent extends TableMaintenanceContent {
   }
 
   @Override
-  public void validate() {
-    super.validate();
-    validatePolicyContentDefaults(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION);
-  }
-
-  @Override
-  public IcebergSnapshotExpirationContent withPeerFields(
-      @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    return new IcebergSnapshotExpirationContent(
-        timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions);
-  }
-
-  @Override
   public boolean equals(Object other) {
-    if (!(other instanceof IcebergSnapshotExpirationContent)) {
-      return false;
-    }
-    return peerFieldsEquals((IcebergSnapshotExpirationContent) other);
+    return other instanceof IcebergSnapshotExpirationContent;
   }
 
   @Override
   public int hashCode() {
-    return peerFieldsHashCode();
+    return IcebergSnapshotExpirationContent.class.hashCode();
   }
 
   @Override
   public String toString() {
-    return "IcebergSnapshotExpirationContent{"
-        + "timeTrigger="
-        + timeTrigger()
-        + ", eventTrigger="
-        + eventTrigger()
-        + ", minIntervalMs="
-        + minIntervalMs()
-        + ", jobOptions="
-        + jobOptions()
-        + ", updateOptions="
-        + updateOptions()
-        + '}';
+    return "IcebergSnapshotExpirationContent{}";
   }
 }
