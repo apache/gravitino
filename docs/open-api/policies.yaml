@@ -334,51 +334,98 @@ components:
           items:
             $ref: "#/components/schemas/TagForPolicyAssociation"
 
-    IcebergCompactionContent:
+    MaintenanceTrigger:
       type: object
-      description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
+      description: >
+        Evaluate triggers for table maintenance (event and/or cron). At least one of onCommit or
+        cronExpression should be set when the schedule object is present.
       properties:
-        minDataFileMse:
-          type: integer
-          format: int64
-          minimum: 0
-          default: 405323966463344
-        minDeleteFileNumber:
-          type: integer
-          format: int64
-          minimum: 0
-          default: 1
-        dataFileMseWeight:
-          type: integer
-          format: int64
-          minimum: 0
-          default: 1
-        deleteFileNumberWeight:
-          type: integer
-          format: int64
-          minimum: 0
-          default: 100
-        maxPartitionNum:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 50
-        rewriteStrategy:
+        onCommit:
+          type: boolean
+          description: Whether IRC commit should enqueue maintenance. Not allowed for orphan-cleanup.
+        cronExpression:
           type: string
-          enum: [binpack, sort]
-          default: binpack
-          description: Iceberg rewrite_data_files top-level strategy.
-        sortOrder:
-          type: string
-          default: ""
-          description: Iceberg rewrite_data_files top-level sort_order. Required when rewriteStrategy is sort; must be empty for binpack.
-        rewriteOptions:
+          description: >
+            Quartz cron with 6 fields (seconds minutes hours day-of-month month day-of-week) or 7
+            fields (optional year). Server validates field count and allowed tokens only; Quartz
+            value ranges and cross-field rules are enforced when the scheduler expands the expression.
+
+    TableMaintenancePeerFields:
+      type: object
+      description: >
+        Optional TMS peer fields shared by built-in table-maintenance policy contents
+        (schedule, minIntervalMs, jobOptions, updateOptions). Stored on all four maintenance
+        types for schema symmetry. For placeholder types whose generated trigger-expr is false
+        (rewrite-manifests, snapshot-expiration), peers are accepted and persisted but are not
+        evaluated for enqueue until that type is fully wired.
+      properties:
+        schedule:
+          $ref: '#/components/schemas/MaintenanceTrigger'
+        minIntervalMs:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Cooldown after last finished job for this policy type.
+        jobOptions:
           type: object
-          default: {}
-          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
+          description: Spark / IRC client options merged into runJob conf (separate from rewriteOptions).
           additionalProperties:
             type: string
             minLength: 1
+        updateOptions:
+          type: object
+          description: Gravitino updater options merged into runJob updateOptions.
+          additionalProperties:
+            type: string
+            minLength: 1
+
+    IcebergCompactionContent:
+      allOf:
+        - $ref: '#/components/schemas/TableMaintenancePeerFields'
+        - type: object
+          description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
+          properties:
+            minDataFileMse:
+              type: integer
+              format: int64
+              minimum: 0
+              default: 405323966463344
+            minDeleteFileNumber:
+              type: integer
+              format: int64
+              minimum: 0
+              default: 1
+            dataFileMseWeight:
+              type: integer
+              format: int64
+              minimum: 0
+              default: 1
+            deleteFileNumberWeight:
+              type: integer
+              format: int64
+              minimum: 0
+              default: 100
+            maxPartitionNum:
+              type: integer
+              format: int64
+              minimum: 1
+              default: 50
+            rewriteStrategy:
+              type: string
+              enum: [binpack, sort]
+              default: binpack
+              description: Iceberg rewrite_data_files top-level strategy.
+            sortOrder:
+              type: string
+              default: ""
+              description: Iceberg rewrite_data_files top-level sort_order. Required when rewriteStrategy is sort; must be empty for binpack.
+            rewriteOptions:
+              type: object
+              default: {}
+              description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
+              additionalProperties:
+                type: string
+                minLength: 1
 
     IcebergCompactionPolicy:
       allOf:
@@ -405,24 +452,26 @@ components:
               $ref: '#/components/schemas/IcebergCompactionContent'
 
     IcebergOrphanFileRemovalContent:
-      type: object
-      description: Table-level orphan cleanup options. Scheduling is configured separately.
-      properties:
-        olderThanDays:
-          type: integer
-          format: int64
-          minimum: 1
-          maximum: 36500
-          default: 3
-          description: Minimum age of orphan files in days, including for dry runs.
-        location:
-          type: string
-          nullable: true
-          description: Optional scan location within the target table's storage root.
-        dryRun:
-          type: boolean
-          default: false
-          description: List candidates without deleting them.
+      allOf:
+        - $ref: '#/components/schemas/TableMaintenancePeerFields'
+        - type: object
+          description: Table-level orphan cleanup options plus optional TMS peer fields.
+          properties:
+            olderThanDays:
+              type: integer
+              format: int64
+              minimum: 1
+              maximum: 36500
+              default: 3
+              description: Minimum age of orphan files in days, including for dry runs.
+            location:
+              type: string
+              nullable: true
+              description: Optional scan location within the target table's storage root.
+            dryRun:
+              type: boolean
+              default: false
+              description: List candidates without deleting them.
 
     IcebergOrphanFileRemovalPolicy:
       allOf:
@@ -449,9 +498,13 @@ components:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
 
     IcebergRewriteManifestsContent:
-      type: object
-      description: Placeholder content for system_iceberg_rewrite_manifests. Configurable thresholds land in a follow-up.
-      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/TableMaintenancePeerFields'
+        - type: object
+          description: >
+            Placeholder content for system_iceberg_rewrite_manifests. Configurable thresholds land
+            in a follow-up. Peer fields may be stored now; trigger-expr remains false so schedule
+            does not enqueue until the type is wired.
 
     IcebergRewriteManifestsPolicy:
       allOf:
@@ -478,9 +531,13 @@ components:
               $ref: '#/components/schemas/IcebergRewriteManifestsContent'
 
     IcebergSnapshotExpirationContent:
-      type: object
-      description: Placeholder content for system_iceberg_snapshot_expiration. Configurable thresholds land in a follow-up.
-      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/TableMaintenancePeerFields'
+        - type: object
+          description: >
+            Placeholder content for system_iceberg_snapshot_expiration. Configurable thresholds land
+            in a follow-up. Peer fields may be stored now; trigger-expr remains false so schedule
+            does not enqueue until the type is wired.
 
     IcebergSnapshotExpirationPolicy:
       allOf:

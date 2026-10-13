@@ -29,15 +29,86 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
+import org.apache.gravitino.maintenance.policy.TableMaintenancePolicies;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
 public interface PolicyContentDTO extends PolicyContent {
+
+  /**
+   * Validates optional TMS fields on a maintenance policy content DTO.
+   *
+   * @param policyType built-in policy type
+   * @param schedule schedule DTO
+   * @param minIntervalMs minimum interval ms
+   * @param jobOptions job options map
+   * @param updateOptions update options map
+   */
+  static void validateMaintenanceFields(
+      Policy.BuiltInType policyType,
+      @Nullable MaintenanceTriggerDTO schedule,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updateOptions) {
+    TableMaintenancePolicies.validate(
+        policyType,
+        schedule == null ? null : schedule.toDomain(),
+        minIntervalMs,
+        jobOptions == null ? Collections.emptyMap() : jobOptions,
+        updateOptions == null ? Collections.emptyMap() : updateOptions);
+  }
+
+  /** JSON DTO for {@link MaintenanceTrigger} (serialized as content {@code schedule}). */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class MaintenanceTriggerDTO {
+    @JsonProperty("onCommit")
+    private Boolean onCommit;
+
+    @JsonProperty("cronExpression")
+    private String cronExpression;
+
+    private MaintenanceTriggerDTO() {}
+
+    /**
+     * Converts to domain trigger.
+     *
+     * @return domain object, or {@code null} when unset
+     */
+    @Nullable
+    public MaintenanceTrigger toDomain() {
+      if (onCommit == null && cronExpression == null) {
+        return null;
+      }
+      return new MaintenanceTrigger(onCommit, cronExpression);
+    }
+
+    /**
+     * Creates a DTO from a domain trigger.
+     *
+     * @param trigger domain trigger
+     * @return DTO, or {@code null} when trigger is null
+     */
+    @Nullable
+    public static MaintenanceTriggerDTO fromDomain(@Nullable MaintenanceTrigger trigger) {
+      if (trigger == null) {
+        return null;
+      }
+      return MaintenanceTriggerDTO.builder()
+          .withOnCommit(trigger.onCommit())
+          .withCronExpression(trigger.cronExpression())
+          .build();
+    }
+  }
 
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode
@@ -113,6 +184,22 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
+
+    @JsonProperty("schedule")
+    @Nullable
+    private MaintenanceTriggerDTO schedule;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
 
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
@@ -203,6 +290,38 @@ public interface PolicyContentDTO extends PolicyContent {
           : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
+    /**
+     * @return schedule DTO, or null
+     */
+    @Nullable
+    public MaintenanceTriggerDTO schedule() {
+      return schedule;
+    }
+
+    /**
+     * @return min interval ms, or null
+     */
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    /**
+     * @return job options, or null
+     */
+    @Nullable
+    public Map<String, String> jobOptions() {
+      return jobOptions;
+    }
+
+    /**
+     * @return update options, or null
+     */
+    @Nullable
+    public Map<String, String> updateOptions() {
+      return updateOptions;
+    }
+
     @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
@@ -221,10 +340,15 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public void validate() throws IllegalArgumentException {
       PolicyContentDTO.super.validate();
-      toDomainContent().validate();
+      PolicyContent content = toDomainContent();
+      content.validate();
+      TableMaintenancePolicies.validate(Policy.BuiltInType.ICEBERG_COMPACTION, content);
     }
 
-    private PolicyContent toDomainContent() {
+    /**
+     * @return domain policy content including TMS peer fields
+     */
+    public PolicyContent toDomainContent() {
       return PolicyContents.icebergDataCompaction(
           minDataFileMse(),
           minDeleteFileNumber(),
@@ -233,7 +357,11 @@ public interface PolicyContentDTO extends PolicyContent {
           maxPartitionNum(),
           rewriteStrategy(),
           sortOrder(),
-          rewriteOptions());
+          rewriteOptions(),
+          schedule == null ? null : schedule.toDomain(),
+          minIntervalMs,
+          jobOptions,
+          updateOptions);
     }
   }
 
@@ -251,6 +379,22 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("dryRun")
     private Boolean dryRun;
+
+    @JsonProperty("schedule")
+    @Nullable
+    private MaintenanceTriggerDTO schedule;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
 
     private IcebergOrphanFileRemovalContentDTO() {}
 
@@ -278,6 +422,38 @@ public interface PolicyContentDTO extends PolicyContent {
       return dryRun == null ? IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN : dryRun;
     }
 
+    /**
+     * @return schedule DTO, or null
+     */
+    @Nullable
+    public MaintenanceTriggerDTO schedule() {
+      return schedule;
+    }
+
+    /**
+     * @return min interval ms, or null
+     */
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    /**
+     * @return job options, or null
+     */
+    @Nullable
+    public Map<String, String> jobOptions() {
+      return jobOptions;
+    }
+
+    /**
+     * @return update options, or null
+     */
+    @Nullable
+    public Map<String, String> updateOptions() {
+      return updateOptions;
+    }
+
     @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
@@ -296,18 +472,48 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public void validate() {
       PolicyContentDTO.super.validate();
-      toDomainContent().validate();
+      PolicyContent content = toDomainContent();
+      content.validate();
+      TableMaintenancePolicies.validate(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, content);
     }
 
-    private PolicyContent toDomainContent() {
-      return PolicyContents.icebergOrphanFileRemoval(olderThanDays(), location(), dryRun());
+    /**
+     * @return domain policy content including TMS peer fields
+     */
+    public PolicyContent toDomainContent() {
+      return PolicyContents.icebergOrphanFileRemoval(
+          olderThanDays(),
+          location(),
+          dryRun(),
+          schedule == null ? null : schedule.toDomain(),
+          minIntervalMs,
+          jobOptions,
+          updateOptions);
     }
   }
 
   /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+    @JsonProperty("schedule")
+    @Nullable
+    private MaintenanceTriggerDTO schedule;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
+
     private IcebergRewriteManifestsContentDTO() {}
 
     /**
@@ -317,6 +523,38 @@ public interface PolicyContentDTO extends PolicyContent {
       return new IcebergRewriteManifestsContentDTO();
     }
 
+    /**
+     * @return schedule DTO, or null
+     */
+    @Nullable
+    public MaintenanceTriggerDTO schedule() {
+      return schedule;
+    }
+
+    /**
+     * @return min interval ms, or null
+     */
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    /**
+     * @return job options, or null
+     */
+    @Nullable
+    public Map<String, String> jobOptions() {
+      return jobOptions;
+    }
+
+    /**
+     * @return update options, or null
+     */
+    @Nullable
+    public Map<String, String> updateOptions() {
+      return updateOptions;
+    }
+
     @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
@@ -335,18 +573,42 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public void validate() {
       PolicyContentDTO.super.validate();
-      toDomainContent().validate();
+      PolicyContent content = toDomainContent();
+      content.validate();
+      TableMaintenancePolicies.validate(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS, content);
     }
 
-    private PolicyContent toDomainContent() {
-      return PolicyContents.icebergRewriteManifests();
+    /**
+     * @return domain policy content including TMS peer fields
+     */
+    public PolicyContent toDomainContent() {
+      return PolicyContents.icebergRewriteManifests(
+          schedule == null ? null : schedule.toDomain(), minIntervalMs, jobOptions, updateOptions);
     }
   }
 
   /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    @JsonProperty("schedule")
+    @Nullable
+    private MaintenanceTriggerDTO schedule;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
+
     private IcebergSnapshotExpirationContentDTO() {}
 
     /**
@@ -356,6 +618,38 @@ public interface PolicyContentDTO extends PolicyContent {
       return new IcebergSnapshotExpirationContentDTO();
     }
 
+    /**
+     * @return schedule DTO, or null
+     */
+    @Nullable
+    public MaintenanceTriggerDTO schedule() {
+      return schedule;
+    }
+
+    /**
+     * @return min interval ms, or null
+     */
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    /**
+     * @return job options, or null
+     */
+    @Nullable
+    public Map<String, String> jobOptions() {
+      return jobOptions;
+    }
+
+    /**
+     * @return update options, or null
+     */
+    @Nullable
+    public Map<String, String> updateOptions() {
+      return updateOptions;
+    }
+
     @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
@@ -374,11 +668,17 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public void validate() {
       PolicyContentDTO.super.validate();
-      toDomainContent().validate();
+      PolicyContent content = toDomainContent();
+      content.validate();
+      TableMaintenancePolicies.validate(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, content);
     }
 
-    private PolicyContent toDomainContent() {
-      return PolicyContents.icebergSnapshotExpiration();
+    /**
+     * @return domain policy content including TMS peer fields
+     */
+    public PolicyContent toDomainContent() {
+      return PolicyContents.icebergSnapshotExpiration(
+          schedule == null ? null : schedule.toDomain(), minIntervalMs, jobOptions, updateOptions);
     }
   }
 
