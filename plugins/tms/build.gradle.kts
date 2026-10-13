@@ -59,6 +59,10 @@ tasks {
       include("gravitino-tms-*.jar")
       exclude("*-javadoc.jar", "*-sources.jar")
     }
+    // New runtime deps not already shipped via server/core libs (see LICENSE.bin).
+    from(configurations.runtimeClasspath) {
+      include("db-scheduler-*.jar", "jspecify-*.jar")
+    }
     into("$rootDir/distribution/package/libs")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   }
