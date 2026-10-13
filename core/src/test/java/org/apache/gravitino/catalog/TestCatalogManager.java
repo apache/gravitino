@@ -60,11 +60,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.SupportsSchemas;
->>>>>>> 9223348fc ([#13809] fix(core): Clarify catalog drop errors for unreachable backends (#13810))
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;

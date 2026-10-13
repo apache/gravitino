@@ -114,12 +114,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.utils.ClassLoaderKey;
-import org.apache.gravitino.utils.ClassLoaderPool;
 import org.apache.gravitino.utils.ExceptionMessages;
->>>>>>> 9223348fc ([#13809] fix(core): Clarify catalog drop errors for unreachable backends (#13810))
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -1343,14 +1338,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         });
   }
 
-<<<<<<< HEAD
-=======
-  private static Map<String, String> copyProperties(Map<String, String> properties) {
-    return properties == null || properties.isEmpty()
-        ? Collections.emptyMap()
-        : new HashMap<>(properties);
-  }
-
   private void checkCatalogSchemasBeforeDrop(
       NameIdentifier ident, List<SchemaEntity> schemaEntities, CatalogWrapper catalogWrapper)
       throws Exception {
@@ -1372,7 +1359,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
->>>>>>> 9223348fc ([#13809] fix(core): Clarify catalog drop errors for unreachable backends (#13810))
   /**
    * Check if the given list of schema entities contains any currently existing user-created
    * schemas.
