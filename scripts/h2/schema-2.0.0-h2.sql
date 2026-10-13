@@ -682,8 +682,8 @@ CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);
 
 CREATE TABLE IF NOT EXISTS `scheduled_expand_tasks` (
-    `task_name` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task name',
-    `task_instance` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task instance',
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
     `task_data` BLOB COMMENT 'serialized task data',
     `execution_time` TIMESTAMP(6) NOT NULL COMMENT 'next execution time',
     `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
@@ -694,13 +694,13 @@ CREATE TABLE IF NOT EXISTS `scheduled_expand_tasks` (
     `last_success` TIMESTAMP(6) COMMENT 'last successful execution time',
     `last_failure` TIMESTAMP(6) COMMENT 'last failed execution time',
     PRIMARY KEY (`task_name`, `task_instance`)
-) COMMENT='db-scheduler expand pool task queue for table maintenance';
+) COMMENT='table maintenance expand schedule metadata';
 CREATE INDEX IF NOT EXISTS `scheduled_expand_tasks_execution_time_idx` ON `scheduled_expand_tasks`(`execution_time`);
 CREATE INDEX IF NOT EXISTS `scheduled_expand_tasks_last_heartbeat_idx` ON `scheduled_expand_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `scheduled_cron_tasks` (
-    `task_name` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task name',
-    `task_instance` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task instance',
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
     `task_data` BLOB COMMENT 'serialized task data',
     `execution_time` TIMESTAMP(6) NOT NULL COMMENT 'next execution time',
     `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
@@ -711,13 +711,13 @@ CREATE TABLE IF NOT EXISTS `scheduled_cron_tasks` (
     `last_success` TIMESTAMP(6) COMMENT 'last successful execution time',
     `last_failure` TIMESTAMP(6) COMMENT 'last failed execution time',
     PRIMARY KEY (`task_name`, `task_instance`)
-) COMMENT='db-scheduler cron pool task queue for table maintenance';
+) COMMENT='table maintenance cron schedule metadata';
 CREATE INDEX IF NOT EXISTS `scheduled_cron_tasks_execution_time_idx` ON `scheduled_cron_tasks`(`execution_time`);
 CREATE INDEX IF NOT EXISTS `scheduled_cron_tasks_last_heartbeat_idx` ON `scheduled_cron_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `scheduled_commit_tasks` (
-    `task_name` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task name',
-    `task_instance` VARCHAR(100) NOT NULL COMMENT 'db-scheduler task instance',
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
     `task_data` BLOB COMMENT 'serialized task data',
     `execution_time` TIMESTAMP(6) NOT NULL COMMENT 'next execution time',
     `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
@@ -728,21 +728,21 @@ CREATE TABLE IF NOT EXISTS `scheduled_commit_tasks` (
     `last_success` TIMESTAMP(6) COMMENT 'last successful execution time',
     `last_failure` TIMESTAMP(6) COMMENT 'last failed execution time',
     PRIMARY KEY (`task_name`, `task_instance`)
-) COMMENT='db-scheduler commit pool task queue for table maintenance';
+) COMMENT='table maintenance commit schedule metadata';
 CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_execution_time_idx` ON `scheduled_commit_tasks`(`execution_time`);
 CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_last_heartbeat_idx` ON `scheduled_commit_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
-    `job_id` BIGINT COMMENT 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob',
+    `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
     `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
     `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
-    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT '0 while in flight (soft exclusive slot like deleted_at, one submitter per table/policy so finished_at values do not contend), finish timestamp in milliseconds when done',
-    `created_at` BIGINT NOT NULL COMMENT 'creation / unbound claim lease start timestamp in milliseconds',
+    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'finish timestamp in milliseconds, 0 while in flight',
+    `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`)
-) COMMENT='table maintenance action occupancy and run metadata';
+) COMMENT='table maintenance action metadata';
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_job_id` ON `table_maintenance_action`(`job_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
 CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);

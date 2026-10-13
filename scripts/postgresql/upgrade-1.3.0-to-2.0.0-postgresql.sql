@@ -167,9 +167,9 @@ CREATE TABLE IF NOT EXISTS scheduled_expand_tasks (
 );
 CREATE INDEX IF NOT EXISTS scheduled_expand_tasks_execution_time_idx ON scheduled_expand_tasks (execution_time);
 CREATE INDEX IF NOT EXISTS scheduled_expand_tasks_last_heartbeat_idx ON scheduled_expand_tasks (last_heartbeat);
-COMMENT ON TABLE scheduled_expand_tasks IS 'db-scheduler expand pool task queue for table maintenance';
-COMMENT ON COLUMN scheduled_expand_tasks.task_name IS 'db-scheduler task name';
-COMMENT ON COLUMN scheduled_expand_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON TABLE scheduled_expand_tasks IS 'table maintenance expand schedule metadata';
+COMMENT ON COLUMN scheduled_expand_tasks.task_name IS 'task name';
+COMMENT ON COLUMN scheduled_expand_tasks.task_instance IS 'task instance';
 COMMENT ON COLUMN scheduled_expand_tasks.task_data IS 'serialized task data';
 COMMENT ON COLUMN scheduled_expand_tasks.execution_time IS 'next execution time';
 COMMENT ON COLUMN scheduled_expand_tasks.picked IS 'whether the task is currently picked';
@@ -196,9 +196,9 @@ CREATE TABLE IF NOT EXISTS scheduled_cron_tasks (
 );
 CREATE INDEX IF NOT EXISTS scheduled_cron_tasks_execution_time_idx ON scheduled_cron_tasks (execution_time);
 CREATE INDEX IF NOT EXISTS scheduled_cron_tasks_last_heartbeat_idx ON scheduled_cron_tasks (last_heartbeat);
-COMMENT ON TABLE scheduled_cron_tasks IS 'db-scheduler cron pool task queue for table maintenance';
-COMMENT ON COLUMN scheduled_cron_tasks.task_name IS 'db-scheduler task name';
-COMMENT ON COLUMN scheduled_cron_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON TABLE scheduled_cron_tasks IS 'table maintenance cron schedule metadata';
+COMMENT ON COLUMN scheduled_cron_tasks.task_name IS 'task name';
+COMMENT ON COLUMN scheduled_cron_tasks.task_instance IS 'task instance';
 COMMENT ON COLUMN scheduled_cron_tasks.task_data IS 'serialized task data';
 COMMENT ON COLUMN scheduled_cron_tasks.execution_time IS 'next execution time';
 COMMENT ON COLUMN scheduled_cron_tasks.picked IS 'whether the task is currently picked';
@@ -225,9 +225,9 @@ CREATE TABLE IF NOT EXISTS scheduled_commit_tasks (
 );
 CREATE INDEX IF NOT EXISTS scheduled_commit_tasks_execution_time_idx ON scheduled_commit_tasks (execution_time);
 CREATE INDEX IF NOT EXISTS scheduled_commit_tasks_last_heartbeat_idx ON scheduled_commit_tasks (last_heartbeat);
-COMMENT ON TABLE scheduled_commit_tasks IS 'db-scheduler commit pool task queue for table maintenance';
-COMMENT ON COLUMN scheduled_commit_tasks.task_name IS 'db-scheduler task name';
-COMMENT ON COLUMN scheduled_commit_tasks.task_instance IS 'db-scheduler task instance';
+COMMENT ON TABLE scheduled_commit_tasks IS 'table maintenance commit schedule metadata';
+COMMENT ON COLUMN scheduled_commit_tasks.task_name IS 'task name';
+COMMENT ON COLUMN scheduled_commit_tasks.task_instance IS 'task instance';
 COMMENT ON COLUMN scheduled_commit_tasks.task_data IS 'serialized task data';
 COMMENT ON COLUMN scheduled_commit_tasks.execution_time IS 'next execution time';
 COMMENT ON COLUMN scheduled_commit_tasks.picked IS 'whether the task is currently picked';
@@ -253,15 +253,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintena
 CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
-COMMENT ON TABLE table_maintenance_action IS 'table maintenance action occupancy and run metadata';
+COMMENT ON TABLE table_maintenance_action IS 'table maintenance action metadata';
 COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
-COMMENT ON COLUMN table_maintenance_action.job_id IS 'optional job run id mapped to job_run_meta.job_run_id, null until bound after runJob';
+COMMENT ON COLUMN table_maintenance_action.job_id IS 'job run id, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
 COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
-COMMENT ON COLUMN table_maintenance_action.finished_at IS '0 while in flight (soft exclusive slot like deleted_at, one submitter per table/policy so finished_at values do not contend), finish timestamp in milliseconds when done';
-COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation / unbound claim lease start timestamp in milliseconds';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish timestamp in milliseconds, 0 while in flight';
+COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
     id BIGSERIAL PRIMARY KEY,
