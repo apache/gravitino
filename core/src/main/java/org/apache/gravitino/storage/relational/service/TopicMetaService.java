@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -87,6 +88,40 @@ public class TopicMetaService {
                         }
                       }));
       // TODO: insert topic dataLayout version after supporting it
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.TOPIC, topicEntity.nameIdentifier().toString());
+      throw re;
+    }
+  }
+
+  /**
+   * Restores a retained topic row only if it is still soft-deleted.
+   *
+   * @param topicEntity the topic metadata to restore
+   * @return true if the soft-deleted row was restored, false if the ID is absent or active
+   * @throws IOException if the restore operation fails
+   */
+  public boolean restoreSoftDeletedTopic(TopicEntity topicEntity) throws IOException {
+    try {
+      NameIdentifierUtil.checkTopic(topicEntity.nameIdentifier());
+
+      TopicPO.Builder builder = TopicPO.builder();
+      fillTopicPOBuilderParentEntityId(builder, topicEntity.namespace());
+      TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
+      AtomicBoolean restored = new AtomicBoolean(false);
+
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              topicEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper -> restored.set(mapper.restoreSoftDeletedTopicMeta(po) == 1)));
+      return restored.get();
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, topicEntity.nameIdentifier().toString());

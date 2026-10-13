@@ -88,6 +88,19 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws EntityAlreadyExistsException, IOException;
 
   /**
+   * Atomically restores an entity only if its stable ID belongs to a soft-deleted row.
+   *
+   * @param <E> the entity type
+   * @param e the entity metadata to restore
+   * @return true if the soft-deleted row was restored, false if it is absent or active
+   * @throws EntityAlreadyExistsException if restoring the entity conflicts with another active
+   *     entity
+   * @throws IOException if the restore operation fails
+   */
+  <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+      throws EntityAlreadyExistsException, IOException;
+
+  /**
    * Updates the entity.
    *
    * @param <E> The entity type.

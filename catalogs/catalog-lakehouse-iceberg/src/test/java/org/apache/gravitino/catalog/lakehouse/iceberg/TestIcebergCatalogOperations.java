@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -32,10 +34,12 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -148,6 +152,61 @@ public class TestIcebergCatalogOperations {
     Assertions.assertEquals(2, result.length);
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
+  }
+
+  @Test
+  public void testResolveHiveTableNameUsingStoredCase() {
+    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "hive"));
+    when(mockWrapper.getIcebergConfig()).thenReturn(config);
+    when(mockWrapper.listTable(any()))
+        .thenReturn(ListTablesResponse.builder().add(TableIdentifier.parse("db.orders")).build());
+
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    Namespace namespace = Namespace.of(METALAKE, CATALOG, "db");
+
+    Assertions.assertEquals(
+        NameIdentifier.of(namespace, "orders"),
+        catalogOperations.resolveTableName(NameIdentifier.of(namespace, "ORDERS")));
+  }
+
+  @Test
+  public void testResolveHiveTableNameKeepsExactAndAmbiguousNames() {
+    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "hive"));
+    when(mockWrapper.getIcebergConfig()).thenReturn(config);
+    when(mockWrapper.listTable(any()))
+        .thenReturn(
+            ListTablesResponse.builder()
+                .add(TableIdentifier.parse("db.orders"))
+                .add(TableIdentifier.parse("db.ORDERS"))
+                .build());
+
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    Namespace namespace = Namespace.of(METALAKE, CATALOG, "db");
+    NameIdentifier exact = NameIdentifier.of(namespace, "ORDERS");
+    NameIdentifier ambiguous = NameIdentifier.of(namespace, "OrDeRs");
+
+    Assertions.assertSame(exact, catalogOperations.resolveTableName(exact));
+    Assertions.assertSame(ambiguous, catalogOperations.resolveTableName(ambiguous));
+  }
+
+  @Test
+  public void testResolveTableNameDoesNotFoldNonHiveBackend() {
+    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    when(mockWrapper.getIcebergConfig()).thenReturn(config);
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "db", "ORDERS");
+
+    Assertions.assertSame(ident, catalogOperations.resolveTableName(ident));
+    verify(mockWrapper, never()).listTable(any());
   }
 
   @Test

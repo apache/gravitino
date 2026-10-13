@@ -91,6 +91,29 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testRestoreSoftDeletedTopicOnly() throws IOException {
+    TopicEntity topic = createTopic("topic_restore_soft_deleted", "original");
+    backend.insert(topic, false);
+
+    Assertions.assertFalse(
+        backend.restoreSoftDeletedEntity(copyTopic(topic, topic.name(), "active")));
+    Assertions.assertEquals(
+        "original",
+        TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
+
+    backend.delete(NameIdentifier.of(metalakeName, catalogName), Entity.EntityType.CATALOG, true);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    TopicEntity replacement = copyTopic(topic, topic.name(), "restored");
+    Assertions.assertTrue(backend.restoreSoftDeletedEntity(replacement));
+    Assertions.assertEquals(
+        "restored",
+        TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
+    Assertions.assertFalse(backend.restoreSoftDeletedEntity(replacement));
+  }
+
+  @TestTemplate
   public void testInsertWaitsForConcurrentSchemaDelete() throws Exception {
     SchemaPO observedSchemaPO =
         SessionUtils.getWithoutCommit(

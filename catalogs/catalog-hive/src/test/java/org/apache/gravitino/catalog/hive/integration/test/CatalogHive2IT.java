@@ -1483,6 +1483,7 @@ public class CatalogHive2IT extends BaseIT {
       throws InterruptedException {
     String reregisteredCatalogName = GravitinoITUtils.genRandomName("hive_reregistered_catalog");
     String externalSchemaName = GravitinoITUtils.genRandomName("hive_reregistered_schema");
+    String externalTableName = GravitinoITUtils.genRandomName("hive_reregistered_table");
     Map<String, String> catalogProperties =
         ImmutableMap.of(METASTORE_URIS, hiveMetastoreUris, DEFAULT_CATALOG, hmsCatalog);
 
@@ -1494,6 +1495,16 @@ public class CatalogHive2IT extends BaseIT {
             "comment",
             catalogProperties);
     originalCatalog.asSchemas().createSchema(externalSchemaName, "comment", Collections.emptyMap());
+    NameIdentifier externalTableIdentifier =
+        NameIdentifier.of(externalSchemaName, externalTableName);
+    originalCatalog
+        .asTableCatalog()
+        .createTable(
+            externalTableIdentifier,
+            createColumns(),
+            TABLE_COMMENT,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM);
 
     Assertions.assertTrue(metalake.dropCatalog(reregisteredCatalogName, true));
     Catalog reregisteredCatalog =
@@ -1531,6 +1542,41 @@ public class CatalogHive2IT extends BaseIT {
     Assertions.assertEquals(
         externalSchemaName.toLowerCase(Locale.ROOT),
         reregisteredCatalog.asSchemas().loadSchema(externalSchemaName).name());
+
+    exception =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () -> reregisteredCatalog.asTableCatalog().loadTable(externalTableIdentifier));
+    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
+    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+
+    HiveTable externalTable = loadHiveTable(externalSchemaName, externalTableName);
+    Map<String, String> cleanedTableProperties = new HashMap<>(externalTable.properties());
+    cleanedTableProperties.remove(StringIdentifier.ID_KEY);
+    HiveTable.Builder cleanedTable =
+        HiveTable.builder()
+            .withName(externalTable.name())
+            .withColumns(externalTable.columns())
+            .withProperties(cleanedTableProperties)
+            .withAuditInfo(externalTable.auditInfo())
+            .withDistribution(externalTable.distribution())
+            .withSortOrders(externalTable.sortOrder())
+            .withPartitioning(externalTable.partitioning())
+            .withCatalogName(externalTable.catalogName())
+            .withDatabaseName(externalTable.databaseName());
+    if (externalTable.comment() != null) {
+      cleanedTable.withComment(externalTable.comment());
+    }
+    hiveClientPool.run(
+        client -> {
+          client.alterTable(
+              hmsCatalog, externalSchemaName, externalTableName, cleanedTable.build());
+          return null;
+        });
+
+    Assertions.assertEquals(
+        externalTableName.toLowerCase(Locale.ROOT),
+        reregisteredCatalog.asTableCatalog().loadTable(externalTableIdentifier).name());
     Assertions.assertTrue(reregisteredCatalog.asSchemas().dropSchema(externalSchemaName, true));
     Assertions.assertTrue(metalake.dropCatalog(reregisteredCatalogName, true));
   }

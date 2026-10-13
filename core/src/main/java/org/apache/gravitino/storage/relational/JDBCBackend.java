@@ -226,6 +226,40 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+      throws EntityAlreadyExistsException, IOException {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+
+    boolean committed = false;
+    try {
+      boolean restored;
+      switch (e.type()) {
+        case TOPIC:
+          restored = TopicMetaService.getInstance().restoreSoftDeletedTopic((TopicEntity) e);
+          break;
+        default:
+          restored = false;
+      }
+
+      if (restored) {
+        EntityChangeLogWriter.append(e.nameIdentifier(), e.type(), OperateType.ALTER);
+      }
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return restored;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {

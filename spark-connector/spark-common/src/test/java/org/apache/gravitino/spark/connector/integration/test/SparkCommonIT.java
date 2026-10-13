@@ -630,7 +630,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     tableInfo = getTableInfo(tableName);
     checkTableColumns(tableName, updateColumns, tableInfo);
-    sql(String.format("INSERT INTO %s VALUES(3, 'name2', 10)", tableName));
+    sql(String.format("CREATE TABLE IF NOT EXISTS %S (id int)", tableName));
+    sql(String.format("INSERT INTO %S VALUES(3, 'name2', 10)", tableName));
     List<String> data = getQueryData(String.format("SELECT * from %s ORDER BY id", tableName));
     Assertions.assertEquals(2, data.size());
     if (supportsSchemaEvolution()) {

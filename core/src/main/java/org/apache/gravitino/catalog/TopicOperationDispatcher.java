@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -107,14 +108,22 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the topic
-      TreeLockUtils.doWithTreeLock(
-          schemaIdent,
-          LockType.WRITE,
-          () -> {
-            importTopic(ident);
-            return null;
-          });
+      try {
+        topic = TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTopic(ident));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the Kafka UUID is actively registered under another Gravitino path.
+        LOG.info("Topic {} import conflicted with existing metadata; reloading from store.", ident);
+        topic = TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTopic(ident));
+        if (!topic.imported()) {
+          throw new UnsupportedOperationException(
+              "Topic "
+                  + ident
+                  + " cannot be imported because its immutable Kafka topic UUID is already "
+                  + "managed under another active Gravitino path. Use the existing path or "
+                  + "remove its active Gravitino registration before retrying.");
+        }
+      }
     }
 
     return topic;
@@ -264,12 +273,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         });
   }
 
-  private void importTopic(NameIdentifier identifier) {
+  private EntityCombinedTopic importTopic(NameIdentifier identifier) {
 
     EntityCombinedTopic topic = internalLoadTopic(identifier);
 
     if (topic.imported()) {
-      return;
+      return topic;
     }
 
     StringIdentifier stringId = null;
@@ -309,15 +318,32 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      // Kafka does not persist a removable Gravitino identifier. Its immutable topic UUID is
-      // converted to the entity ID on every load, so catalog re-registration must rebind that ID
-      // to the current Gravitino path. Overwrite is safe for this Kafka-specific identity model:
-      // Kafka does not support topic rename, and deleting a topic gives a replacement a new UUID.
-      store.put(topicEntity, true);
+      store.put(topicEntity, false);
+    } catch (EntityAlreadyExistsException e) {
+      try {
+        // Kafka does not persist a removable Gravitino identifier. Restore the retained row only
+        // while it remains soft-deleted, which supports catalog re-registration without allowing
+        // an active registration for the same Kafka UUID to be rebound from another path.
+        if (!store.restoreSoftDeletedEntity(topicEntity)) {
+          throw e;
+        }
+      } catch (EntityAlreadyExistsException restoreConflict) {
+        throw restoreConflict;
+      } catch (Exception restoreFailure) {
+        LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "restore", identifier, restoreFailure);
+        throw new RuntimeException("Failed to restore soft-deleted topic entity", restoreFailure);
+      }
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);
     }
+
+    return EntityCombinedTopic.of(topic, topicEntity)
+        .withHiddenProperties(
+            getMaskAndOmitKeys(
+                getCatalogIdentifier(identifier),
+                HasPropertyMetadata::topicPropertiesMetadata,
+                topic.properties()));
   }
 
   private EntityCombinedTopic internalLoadTopic(NameIdentifier ident) {

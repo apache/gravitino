@@ -43,6 +43,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -95,7 +96,12 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog, CatalogDropAware {
+    implements CatalogOperations,
+        SupportsSchemas,
+        SupportsTableNameResolution,
+        TableCatalog,
+        ViewCatalog,
+        CatalogDropAware {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -431,6 +437,41 @@ public class IcebergCatalogOperations
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException("Schema (database) does not exist %s in Iceberg", namespace);
+    }
+  }
+
+  @Override
+  public NameIdentifier resolveTableName(NameIdentifier normalizedIdent) {
+    String backend = icebergCatalogWrapper.getIcebergConfig().get(IcebergConfig.CATALOG_BACKEND);
+    if (!IcebergCatalogBackend.HIVE.name().equalsIgnoreCase(backend)) {
+      return normalizedIdent;
+    }
+
+    try {
+      List<TableIdentifier> identifiers =
+          icebergCatalogWrapper
+              .listTable(
+                  IcebergCatalogWrapperHelper.getIcebergNamespace(normalizedIdent.namespace()))
+              .identifiers();
+      Optional<TableIdentifier> exactMatch =
+          identifiers.stream()
+              .filter(identifier -> identifier.name().equals(normalizedIdent.name()))
+              .findFirst();
+      if (exactMatch.isPresent()) {
+        return normalizedIdent;
+      }
+
+      List<TableIdentifier> caseInsensitiveMatches =
+          identifiers.stream()
+              .filter(identifier -> identifier.name().equalsIgnoreCase(normalizedIdent.name()))
+              .collect(Collectors.toList());
+      if (caseInsensitiveMatches.size() != 1) {
+        return normalizedIdent;
+      }
+
+      return NameIdentifier.of(normalizedIdent.namespace(), caseInsensitiveMatches.get(0).name());
+    } catch (NoSuchNamespaceException e) {
+      return normalizedIdent;
     }
   }
 
