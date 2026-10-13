@@ -331,7 +331,7 @@ Nothing changes for users or administrators:
 
 1. An administrator creates roles, grants privileges, and grants roles to users and groups through the existing REST API.
 2. A user sends a request; groups, if any, come from the authentication token as before.
-3. The server allows or denies the request with the same rules as today. Role and grant changes take effect for new decisions on the node that made the change immediately, and on other nodes through the existing version checks and change-log poller.
+3. The server allows or denies the request with the same rules as today. A role or grant change takes effect for every request that starts after it commits, on any node. Requests already running follow the rules in [Freshness and consistency](#freshness-and-consistency).
 
 ### Implementation process
 
