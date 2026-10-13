@@ -99,8 +99,12 @@ public class TestCacheCommitOrdering extends TestJDBCBackend {
     } finally {
       commitSlow.countDown();
       writer.shutdownNow();
-      poller.close();
-      peer.clear();
+      try {
+        Assertions.assertTrue(writer.awaitTermination(15, TimeUnit.SECONDS));
+      } finally {
+        poller.close();
+        peer.clear();
+      }
     }
   }
 }

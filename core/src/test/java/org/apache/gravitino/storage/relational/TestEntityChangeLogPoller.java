@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,8 +62,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
-import org.apache.logging.log4j.core.config.AbstractConfiguration;
-import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -371,32 +370,27 @@ public class TestEntityChangeLogPoller {
   private static List<LogEvent> captureReplayLogs(Runnable action) {
     LoggerContext context =
         (LoggerContext) LogManager.getContext(EntityChangeLogPoller.class.getClassLoader(), false);
-    AbstractConfiguration configuration = (AbstractConfiguration) context.getConfiguration();
+    var logger = context.getLogger(EntityChangeLogPoller.class.getName());
     ReplayLogCollector collector = new ReplayLogCollector();
     collector.start();
-    configuration.addAppender(collector);
-    String name = EntityChangeLogPoller.class.getName();
-    LoggerConfig previous = configuration.getLoggers().get(name);
-    LoggerConfig logger = new LoggerConfig(name, Level.DEBUG, false);
-    logger.addAppender(collector, Level.DEBUG, null);
-    configuration.addLogger(name, logger);
-    context.updateLoggers();
-    try {
-      action.run();
-    } finally {
-      configuration.removeLogger(name);
-      if (previous != null) {
-        configuration.addLogger(name, previous);
+    // Attach to this logger without replacing its configuration or its existing appenders.
+    synchronized (logger) {
+      Level previous = logger.getLevel();
+      logger.addAppender(collector);
+      logger.setLevel(Level.DEBUG);
+      try {
+        action.run();
+      } finally {
+        logger.removeAppender(collector);
+        logger.setLevel(previous);
+        collector.stop();
       }
-      collector.stop();
-      configuration.removeAppender(collector.getName());
-      context.updateLoggers();
     }
     return List.copyOf(collector.events);
   }
 
   private static class ReplayLogCollector extends AbstractAppender {
-    private final List<LogEvent> events = new ArrayList<>();
+    private final List<LogEvent> events = new CopyOnWriteArrayList<>();
 
     private ReplayLogCollector() {
       super("entityChangeReplayDiagnostics", null, PatternLayout.createDefaultLayout(), true, null);

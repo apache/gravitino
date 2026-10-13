@@ -111,7 +111,11 @@ public class TestEntityCachePublicationRace {
     } finally {
       finishRead.countDown();
       readers.shutdownNow();
-      cache.clear();
+      try {
+        Assertions.assertTrue(readers.awaitTermination(10, TimeUnit.SECONDS));
+      } finally {
+        cache.clear();
+      }
     }
   }
 
@@ -151,7 +155,11 @@ public class TestEntityCachePublicationRace {
     } finally {
       returnFromInsert.countDown();
       writer.shutdownNow();
-      cache.clear();
+      try {
+        Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
+      } finally {
+        cache.clear();
+      }
     }
   }
 
