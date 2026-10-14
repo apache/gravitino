@@ -192,7 +192,7 @@ class TestOccupancyGate extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testExpiredUnboundClaimIsNotInFlight() throws IOException {
+  void testExpiredUnboundClaimIsNotInFlightOnDbClock() throws Exception {
     String metalakeName = "tms_occ_ml4";
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, "cat");
@@ -200,13 +200,22 @@ class TestOccupancyGate extends TestJDBCBackend {
     TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    long claimTimeoutMs = 60_000L;
+    long claimTimeoutMs = 200L;
     OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
     long policyId = 66L;
 
     OccupancyClaim claim = actions.insertInFlight(table.id(), policyId, claimTimeoutMs);
-    Assertions.assertTrue(gate.isInFlight(table.id(), policyId, claim.createdAt() + 1_000L));
-    Assertions.assertFalse(
-        gate.isInFlight(table.id(), policyId, claim.createdAt() + claimTimeoutMs));
+    Assertions.assertTrue(actions.hasLiveUnboundClaim(table.id(), policyId, claimTimeoutMs));
+    Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
+
+    Thread.sleep(claimTimeoutMs + 50L);
+
+    // Unbound TTL is evaluated in the DAO against the database clock, so OccupancyGate agrees with
+    // acquire/reclaim even when the JVM clock would disagree (multi-node skew).
+    Assertions.assertFalse(actions.hasLiveUnboundClaim(table.id(), policyId, claimTimeoutMs));
+    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertTrue(
+        actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).isPresent());
+    Assertions.assertEquals(claim.id(), actions.getById(claim.id()).id());
   }
 }

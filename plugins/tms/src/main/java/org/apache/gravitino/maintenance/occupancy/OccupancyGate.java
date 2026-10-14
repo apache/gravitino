@@ -42,8 +42,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
  *
  * <p>Unbound rows ({@code job_id} null, {@code finished_at = 0}) are a short claim: occupied while
- * {@code now - created_at < claimTimeoutMs}. Bound rows consult {@link JobMetaService} and do
- * <strong>not</strong> backfill {@code finished_at}.
+ * still within TTL on the <strong>database</strong> clock (same timeline as acquire/reclaim). Bound
+ * rows consult {@link JobMetaService} and do <strong>not</strong> backfill {@code finished_at}.
  */
 public final class OccupancyGate {
 
@@ -81,21 +81,11 @@ public final class OccupancyGate {
    * @return true when any open row is a live unbound claim or an active Gravitino job
    */
   public boolean isInFlight(long tableId, long policyId) {
-    return isInFlight(tableId, policyId, System.currentTimeMillis());
-  }
-
-  /**
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param nowMs current epoch millis
-   * @return true when any open row is a live unbound claim or an active Gravitino job
-   */
-  public boolean isInFlight(long tableId, long policyId, long nowMs) {
+    if (actionMetaService.hasLiveUnboundClaim(tableId, policyId, claimTimeoutMs)) {
+      return true;
+    }
     for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
       if (open.jobId() == null) {
-        if (open.createdAt() != null && nowMs - open.createdAt() < claimTimeoutMs) {
-          return true;
-        }
         continue;
       }
       JobEntity job = loadJob(open.jobId(), tableId);
@@ -110,7 +100,7 @@ public final class OccupancyGate {
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param minIntervalMs resolved minimum interval
-   * @param nowMs current epoch millis
+   * @param nowMs current epoch millis used only for cooldown (not unbound TTL)
    * @return true when the last known finish is still inside the cooldown window
    */
   public boolean withinMinInterval(long tableId, long policyId, long minIntervalMs, long nowMs) {
@@ -127,11 +117,11 @@ public final class OccupancyGate {
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param minIntervalMs resolved minimum interval
-   * @param nowMs current epoch millis
+   * @param nowMs current epoch millis used only for cooldown (not unbound TTL)
    * @return true when enqueue / submit must be skipped
    */
   public boolean shouldSkip(long tableId, long policyId, long minIntervalMs, long nowMs) {
-    return isInFlight(tableId, policyId, nowMs)
+    return isInFlight(tableId, policyId)
         || withinMinInterval(tableId, policyId, minIntervalMs, nowMs);
   }
 

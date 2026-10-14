@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.web.rest.feature;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import javax.ws.rs.core.Feature;
@@ -29,6 +30,10 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.glassfish.jersey.server.monitoring.ApplicationEvent;
+import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
+import org.glassfish.jersey.server.monitoring.RequestEvent;
+import org.glassfish.jersey.server.monitoring.RequestEventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +42,8 @@ import org.slf4j.LoggerFactory;
  * enabled (§7.1).
  *
  * <p>TMS does not register public REST resources in this change; the feature only owns server
- * lifecycle for in-process scheduling.
+ * lifecycle for in-process scheduling. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs
+ * during Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
  */
 @Provider
 public class TableMaintenanceRESTFeature implements Feature {
@@ -49,9 +55,15 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
       new AtomicReference<>();
+  private static final AtomicBoolean SHUTDOWN_REGISTERED = new AtomicBoolean(false);
 
   @Override
   public boolean configure(FeatureContext context) {
+    if (SCHEDULER_POOLS.get() != null) {
+      LOG.warn("Table maintenance scheduler pools are already running; skipping reconfigure");
+      return true;
+    }
+
     Config config = GravitinoEnv.getInstance().config();
     if (!Configs.RELATIONAL_ENTITY_STORE.equals(config.get(Configs.ENTITY_STORE))) {
       throw new IllegalStateException(
@@ -61,19 +73,25 @@ public class TableMaintenanceRESTFeature implements Feature {
     DataSource dataSource = resolveEntityStoreDataSource();
     TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
     pools.start(dataSource, TableMaintenanceConfig.from(config));
-    SCHEDULER_POOLS.set(pools);
+    if (!SCHEDULER_POOLS.compareAndSet(null, pools)) {
+      pools.stop();
+      LOG.warn("Table maintenance scheduler pools were started concurrently; discarded duplicate");
+      return true;
+    }
+
+    if (SHUTDOWN_REGISTERED.compareAndSet(false, true)) {
+      context.register(new SchedulerShutdownListener());
+    }
     LOG.info("Table maintenance scheduler pools are running");
     return true;
   }
 
-  /**
-   * Stops scheduler pools. Intended for tests; production shutdown relies on db-scheduler shutdown
-   * hooks.
-   */
+  /** Stops scheduler pools. Invoked from Jersey destroy and tests. */
   public static void stopSchedulers() {
     TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
     if (pools != null) {
       pools.stop();
+      LOG.info("Table maintenance scheduler pools stopped");
     }
   }
 
@@ -88,5 +106,24 @@ public class TableMaintenanceRESTFeature implements Feature {
       throw new IllegalStateException("Entity store data source is not available");
     }
     return (DataSource) dataSource;
+  }
+
+  /**
+   * Stops TMS scheduler pools when the Jersey application is destroyed (Jetty stop), before the
+   * relational entity store shuts down.
+   */
+  static final class SchedulerShutdownListener implements ApplicationEventListener {
+
+    @Override
+    public void onEvent(ApplicationEvent event) {
+      if (event.getType() == ApplicationEvent.Type.DESTROY_FINISHED) {
+        stopSchedulers();
+      }
+    }
+
+    @Override
+    public RequestEventListener onRequest(RequestEvent requestEvent) {
+      return null;
+    }
   }
 }

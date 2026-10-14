@@ -303,6 +303,29 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
+   * Whether an unbound claim is still within TTL on the <strong>database</strong> clock.
+   *
+   * <p>Must not be evaluated with {@code System.currentTimeMillis()} against {@code created_at}:
+   * acquire/reclaim already use DB time, and JVM skew would disagree with that lease.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL
+   * @return true when a live unbound claim holds the soft slot
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "hasLiveUnboundTableMaintenanceAction")
+  public boolean hasLiveUnboundClaim(long tableId, long policyId, long claimTimeoutMs) {
+    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
+    TableMaintenanceActionPO live =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs));
+    return live != null;
+  }
+
+  /**
    * @param tableId table entity id
    * @param policyId policy entity id
    * @return latest {@code finished_at}, or null when none finished yet
