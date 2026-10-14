@@ -18,12 +18,17 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.junit.jupiter.api.Test;
 
@@ -92,5 +97,25 @@ public class TestFilesetMetadataCache {
 
     // If we got here without exceptions, the test passes
     assertTrue(true, "Cache close completed successfully");
+  }
+
+  @Test
+  public void testNonFilesetCatalogIsNotCached() throws IOException {
+    GravitinoClient client = mock(GravitinoClient.class);
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.asFilesetCatalog())
+        .thenThrow(
+            new UnsupportedOperationException("Catalog does not support fileset operations"));
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+    NameIdentifier catalogIdent = NameIdentifier.of("ml", "catalog");
+
+    try (FilesetMetadataCache cache = new FilesetMetadataCache(client)) {
+      assertThrows(
+          UnsupportedOperationException.class, () -> cache.getFilesetCatalog(catalogIdent));
+      assertThrows(
+          UnsupportedOperationException.class, () -> cache.getFilesetCatalog(catalogIdent));
+    }
+    // The failed load is not cached, so the second call loads the catalog again.
+    verify(client, times(2)).loadCatalog("catalog");
   }
 }

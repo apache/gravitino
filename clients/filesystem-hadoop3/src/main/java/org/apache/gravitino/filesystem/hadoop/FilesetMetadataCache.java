@@ -56,13 +56,21 @@ public class FilesetMetadataCache implements Closeable {
   }
 
   /**
-   * Gets the catalog by the given catalog identifier.
+   * Gets the fileset catalog by the given catalog identifier as a {@link Catalog}.
    *
    * @param catalogIdent the catalog identifier.
    * @return the catalog.
    */
   public Catalog getCatalog(NameIdentifier catalogIdent) {
-    Catalog catalog = catalogCache.get(catalogIdent, ident -> client.loadCatalog(ident.name()));
+    Catalog catalog =
+        catalogCache.get(
+            catalogIdent,
+            ident -> {
+              Catalog loaded = client.loadCatalog(ident.name());
+              // Throw inside the loader so that a non-fileset catalog is not cached.
+              loaded.asFilesetCatalog();
+              return loaded;
+            });
 
     Preconditions.checkArgument(
         catalog != null, String.format("Loaded catalog: %s is null.", catalogIdent));
