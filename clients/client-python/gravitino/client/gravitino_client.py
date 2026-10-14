@@ -100,7 +100,7 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
 
         Args:
             include_properties: Whether to resolve catalog properties. Defaults to True.
-                False returns lightweight descriptors with empty properties, retaining
+                False returns lightweight descriptors retaining only the in-use property and
                 name, type, provider, comment, and audit information.
 
         Returns:

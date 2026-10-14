@@ -200,8 +200,9 @@ class GravitinoMetalake(
         Args:
             include_properties: Whether to resolve catalog properties. Defaults to True.
                 False returns lightweight descriptors without initializing server-side
-                catalog wrappers. Their properties are an empty map, including no
-                in-use property; name, type, provider, comment, and audit information
+                catalog wrappers. Their properties retain only in-use, read from stored
+                metadata and defaulting to "true" when absent; name, type, provider,
+                comment, and audit information
                 remain populated. Load a catalog to retrieve its full information.
 
         Raises:

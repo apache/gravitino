@@ -64,9 +64,9 @@ public interface SupportsCatalogs {
    * List all catalogs with their information in the metalake under the namespace {@link Namespace}.
    *
    * <p>When {@code includeProperties} is {@code false}, catalog properties are omitted and {@link
-   * Catalog#properties()} returns an empty map, never {@code null}. All properties, including
-   * {@code in-use}, are absent, so the result cannot be distinguished from a catalog with no
-   * properties. Name, type, provider, comment, and audit information are still populated.
+   * Catalog#properties()} contains only {@code in-use}, read directly from stored metadata and
+   * defaulting to {@code "true"} when absent. Other properties are omitted, and catalog wrappers
+   * are not initialized. Name, type, provider, comment, and audit information are still populated.
    *
    * <p>The default implementation throws {@link UnsupportedOperationException}.
    *

@@ -213,6 +213,14 @@ public class TestCatalogOperations extends BaseOperationsTest {
 
     verify(manager).listCatalogsInfo(any(), eq(true));
 
+    when(manager.listCatalogsInfo(any(), eq(false)))
+        .thenReturn(
+            new Catalog[] {
+              buildCatalogWithProperties(
+                  "metalake1", "catalog1", ImmutableMap.of(PROPERTY_IN_USE, "true")),
+              buildCatalogWithProperties(
+                  "metalake1", "catalog2", ImmutableMap.of(PROPERTY_IN_USE, "false"))
+            });
     Response lightweightResp =
         target("/metalakes/metalake1/catalogs")
             .queryParam("details", "true")
@@ -222,6 +230,9 @@ public class TestCatalogOperations extends BaseOperationsTest {
             .get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), lightweightResp.getStatus());
     verify(manager).listCatalogsInfo(any(), eq(false));
+    CatalogDTO[] descriptors = lightweightResp.readEntity(CatalogListResponse.class).getCatalogs();
+    Assertions.assertEquals(ImmutableMap.of(PROPERTY_IN_USE, "true"), descriptors[0].properties());
+    Assertions.assertEquals(ImmutableMap.of(PROPERTY_IN_USE, "false"), descriptors[1].properties());
 
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)

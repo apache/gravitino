@@ -375,7 +375,7 @@ components:
     includeProperties:
       name: includeProperties
       in: query
-      description: Include resolved catalog properties when details is true
+      description: Include resolved catalog properties when details is true. When false, retain only in-use from stored metadata (defaults to "true").
       required: false
       schema:
         type: boolean

@@ -40,7 +40,9 @@ class TestMetalake(unittest.TestCase):
         for include_properties in (None, True, False):
             with self.subTest(include_properties=include_properties):
                 rest_client = MagicMock()
-                properties = {} if include_properties is False else {"in-use": "true"}
+                properties = {"in-use": "false"}
+                if include_properties is not False:
+                    properties["key"] = "value"
                 rest_client.get.return_value.body = json.dumps(
                     {
                         "code": 0,

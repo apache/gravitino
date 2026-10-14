@@ -179,8 +179,9 @@ public class GravitinoCatalogManager {
 
   /**
    * Returns lightweight descriptors loaded by {@link #loadRelationalCatalogs()} for the catalogs
-   * the application identity can see. These descriptors have an empty properties map; complete
-   * catalog information is loaded through {@link #getGravitinoCatalogInfo(String)} on first use.
+   * the application identity can see. These descriptors retain only the {@code in-use} property;
+   * complete catalog information is loaded through {@link #getGravitinoCatalogInfo(String)} on
+   * first use.
    *
    * @return the lightweight catalog descriptors registered at driver startup, keyed by catalog name
    */

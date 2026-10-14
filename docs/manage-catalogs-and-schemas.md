@@ -224,8 +224,10 @@ Detailed catalog listing includes resolved properties by default. To retrieve li
 descriptors without resolving properties or initializing server-side catalog wrappers, use
 `details=true&includeProperties=false` in REST, `listCatalogsInfo(false)` in Java, or
 `list_catalogs_info(include_properties=False)` in Python. Descriptors retain
-the name, type, provider, comment, and audit information, but their properties are an empty map,
-including no `in-use` property. Load a catalog to retrieve its complete information when needed.
+the name, type, provider, comment, and audit information. Their properties retain only `in-use`,
+read directly from stored metadata and defaulting to `"true"` when absent, so enabled and disabled
+catalogs remain distinguishable without initializing catalog wrappers. Load a catalog to retrieve
+its complete information when needed.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

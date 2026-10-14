@@ -36,6 +36,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -657,7 +658,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testListCatalogsInfo() {
+  public void testListCatalogsInfo() throws IOException {
     NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
     NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
     Map<String, String> props =
@@ -681,10 +682,45 @@ public class TestCatalogManager {
       Assertions.assertEquals(provider, catalog.provider());
       Assertions.assertEquals("comment", catalog.comment());
       Assertions.assertNotNull(catalog.auditInfo());
-      Assertions.assertTrue(catalog.properties().isEmpty());
+      Assertions.assertEquals(
+          ImmutableMap.of(Catalog.PROPERTY_IN_USE, "true"), catalog.properties());
     }
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+
+    catalogManager.disableCatalog(fileIdent);
+    CatalogEntity legacy = entityStore.get(relIdent, EntityType.CATALOG, CatalogEntity.class);
+    Map<String, String> legacyProperties = Maps.newHashMap(legacy.getProperties());
+    legacyProperties.remove(Catalog.PROPERTY_IN_USE);
+    for (Map<String, String> descriptorProperties : Arrays.asList(legacyProperties, null)) {
+      entityStore.update(
+          relIdent,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          old ->
+              CatalogEntity.builder()
+                  .withId(old.id())
+                  .withName(old.name())
+                  .withNamespace(old.namespace())
+                  .withType(old.getType())
+                  .withProvider(old.getProvider())
+                  .withComment(old.getComment())
+                  .withProperties(descriptorProperties)
+                  .withAuditInfo((AuditInfo) old.auditInfo())
+                  .build());
+      Catalog[] stateDescriptors = catalogManager.listCatalogsInfo(relIdent.namespace(), false);
+      for (Catalog catalog : stateDescriptors) {
+        Assertions.assertEquals(
+            ImmutableMap.of(
+                Catalog.PROPERTY_IN_USE,
+                catalog.name().equals(fileIdent.name()) ? "false" : "true"),
+            catalog.properties());
+      }
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+    }
+    entityStore.update(relIdent, CatalogEntity.class, EntityType.CATALOG, old -> legacy);
+    catalogManager.enableCatalog(fileIdent);
 
     Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
     Assertions.assertEquals(2, catalogs.length);

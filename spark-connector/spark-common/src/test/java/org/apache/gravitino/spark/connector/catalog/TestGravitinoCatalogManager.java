@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -156,6 +157,7 @@ public class TestGravitinoCatalogManager {
     when(relationalDescriptor.name()).thenReturn(CATALOG_NAME);
     when(relationalDescriptor.type()).thenReturn(Catalog.Type.RELATIONAL);
     when(relationalDescriptor.provider()).thenReturn("hive");
+    when(relationalDescriptor.properties()).thenReturn(Map.of(Catalog.PROPERTY_IN_USE, "false"));
     Catalog filesetDescriptor = mock(Catalog.class);
     when(filesetDescriptor.name()).thenReturn("fileset_catalog");
     when(filesetDescriptor.type()).thenReturn(Catalog.Type.FILESET);
@@ -170,6 +172,9 @@ public class TestGravitinoCatalogManager {
     assertEquals(0, clientFactory.loadCount());
     assertEquals(1, manager.getCatalogs().size());
     assertSame(relationalDescriptor, manager.getCatalogs().get(CATALOG_NAME));
+    assertEquals(
+        Map.of(Catalog.PROPERTY_IN_USE, "false"),
+        manager.getCatalogs().get(CATALOG_NAME).properties());
 
     Catalog loaded = manager.getGravitinoCatalogInfo(CATALOG_NAME);
     Catalog cached = manager.getGravitinoCatalogInfo(CATALOG_NAME);

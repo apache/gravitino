@@ -776,7 +776,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           .map(
               e ->
                   e.toCatalogInfoWithResolvedProps(
-                      includeProperties ? getResolvedProperties(e) : Collections.emptyMap()))
+                      includeProperties
+                          ? getResolvedProperties(e)
+                          : Collections.singletonMap(
+                              PROPERTY_IN_USE,
+                              Optional.ofNullable(e.getProperties())
+                                  .orElse(Collections.emptyMap())
+                                  .getOrDefault(PROPERTY_IN_USE, "true"))))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
