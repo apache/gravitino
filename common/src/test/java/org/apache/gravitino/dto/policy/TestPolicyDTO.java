@@ -215,6 +215,24 @@ public class TestPolicyDTO {
   }
 
   @Test
+  public void testExecutionPeerOptionMapsAreUnmodifiableCopies() {
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
+            .withUpdateOptions(ImmutableMap.of("metalake", "ml"))
+            .build();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> content.jobOptions().put("spark.executor.memory", "8g"));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> content.updateOptions().put("metalake", "other"));
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updateOptions().get("metalake"));
+  }
+
+  @Test
   public void testMaintenancePeerValidateOnDto() {
     PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
         PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()

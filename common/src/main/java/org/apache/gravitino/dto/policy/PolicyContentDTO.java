@@ -35,10 +35,58 @@ import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionFields;
 import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
 public interface PolicyContentDTO extends PolicyContent {
+
+  /**
+   * Optional maintenance execution peers on Iceberg TMS policy content DTOs.
+   *
+   * <p>Option maps always return unmodifiable defensive copies so callers cannot mutate DTO state
+   * after validation or change Lombok equality/hash state through the returned map.
+   */
+  interface ExecutionPeersDTO {
+
+    /**
+     * Optional cron expression for automated evaluation.
+     *
+     * @return cron string, or {@code null} when unset
+     */
+    @Nullable
+    String timeTrigger();
+
+    /**
+     * Optional flag to evaluate the policy after an Iceberg commit.
+     *
+     * @return {@code true} when enabled; {@code null} or {@code false} when unset or disabled
+     */
+    @Nullable
+    Boolean commitTrigger();
+
+    /**
+     * Optional cooldown between finished automated runs.
+     *
+     * @return milliseconds, or {@code null} when unset
+     */
+    @Nullable
+    Long minIntervalMs();
+
+    /**
+     * Optional non-secret job / client options.
+     *
+     * @return unmodifiable defensive copy; never {@code null} (empty when unset)
+     */
+    Map<String, String> jobOptions();
+
+    /**
+     * Optional non-secret updater / control-plane options.
+     *
+     * @return unmodifiable defensive copy; never {@code null} (empty when unset)
+     */
+    Map<String, String> updateOptions();
+  }
 
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode
@@ -89,7 +137,7 @@ public interface PolicyContentDTO extends PolicyContent {
   @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-  class IcebergCompactionContentDTO implements PolicyContentDTO {
+  class IcebergCompactionContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
 
     @JsonProperty("minDataFileMse")
     private Long minDataFileMse;
@@ -224,27 +272,32 @@ public interface PolicyContentDTO extends PolicyContent {
           : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
+    @Override
     @Nullable
     public String timeTrigger() {
       return timeTrigger;
     }
 
+    @Override
     @Nullable
     public Boolean commitTrigger() {
       return commitTrigger;
     }
 
+    @Override
     @Nullable
     public Long minIntervalMs() {
       return minIntervalMs;
     }
 
+    @Override
     public Map<String, String> jobOptions() {
-      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+      return PolicyExecutionFields.copyOptions(jobOptions);
     }
 
+    @Override
     public Map<String, String> updateOptions() {
-      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+      return PolicyExecutionFields.copyOptions(updateOptions);
     }
 
     @Override
@@ -294,7 +347,7 @@ public interface PolicyContentDTO extends PolicyContent {
   @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-  class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO {
+  class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("olderThanDays")
     private Long olderThanDays;
 
@@ -350,27 +403,32 @@ public interface PolicyContentDTO extends PolicyContent {
       return dryRun == null ? IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN : dryRun;
     }
 
+    @Override
     @Nullable
     public String timeTrigger() {
       return timeTrigger;
     }
 
+    @Override
     @Nullable
     public Boolean commitTrigger() {
       return commitTrigger;
     }
 
+    @Override
     @Nullable
     public Long minIntervalMs() {
       return minIntervalMs;
     }
 
+    @Override
     public Map<String, String> jobOptions() {
-      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+      return PolicyExecutionFields.copyOptions(jobOptions);
     }
 
+    @Override
     public Map<String, String> updateOptions() {
-      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+      return PolicyExecutionFields.copyOptions(updateOptions);
     }
 
     @Override
@@ -418,7 +476,7 @@ public interface PolicyContentDTO extends PolicyContent {
   @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-  class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+  class IcebergRewriteManifestsContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("timeTrigger")
     @Nullable
     private String timeTrigger;
@@ -448,27 +506,32 @@ public interface PolicyContentDTO extends PolicyContent {
       return new IcebergRewriteManifestsContentDTO();
     }
 
+    @Override
     @Nullable
     public String timeTrigger() {
       return timeTrigger;
     }
 
+    @Override
     @Nullable
     public Boolean commitTrigger() {
       return commitTrigger;
     }
 
+    @Override
     @Nullable
     public Long minIntervalMs() {
       return minIntervalMs;
     }
 
+    @Override
     public Map<String, String> jobOptions() {
-      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+      return PolicyExecutionFields.copyOptions(jobOptions);
     }
 
+    @Override
     public Map<String, String> updateOptions() {
-      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+      return PolicyExecutionFields.copyOptions(updateOptions);
     }
 
     @Override
@@ -506,7 +569,7 @@ public interface PolicyContentDTO extends PolicyContent {
   @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("timeTrigger")
     @Nullable
     private String timeTrigger;
@@ -536,27 +599,32 @@ public interface PolicyContentDTO extends PolicyContent {
       return new IcebergSnapshotExpirationContentDTO();
     }
 
+    @Override
     @Nullable
     public String timeTrigger() {
       return timeTrigger;
     }
 
+    @Override
     @Nullable
     public Boolean commitTrigger() {
       return commitTrigger;
     }
 
+    @Override
     @Nullable
     public Long minIntervalMs() {
       return minIntervalMs;
     }
 
+    @Override
     public Map<String, String> jobOptions() {
-      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+      return PolicyExecutionFields.copyOptions(jobOptions);
     }
 
+    @Override
     public Map<String, String> updateOptions() {
-      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+      return PolicyExecutionFields.copyOptions(updateOptions);
     }
 
     @Override
