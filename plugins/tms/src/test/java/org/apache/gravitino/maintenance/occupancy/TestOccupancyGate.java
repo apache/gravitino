@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.function.Function;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -51,7 +53,9 @@ class TestOccupancyGate extends TestJDBCBackend {
 
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
 
-    long actionId = actions.insertInFlight(table.id(), policyId);
+    OccupancyClaim claim =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
 
     JobEntity started =
@@ -66,7 +70,7 @@ class TestOccupancyGate extends TestJDBCBackend {
             .withFinishedAt(0L)
             .build();
     backend.insert(started, false);
-    actions.bindJobId(actionId, started.id());
+    actions.bindJobId(claim, started.id());
 
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
     Assertions.assertTrue(
@@ -112,8 +116,10 @@ class TestOccupancyGate extends TestJDBCBackend {
     long jobId = 7002L;
     long finishedAt = 1_700_000_100_000L;
 
-    long actionId = actions.insertInFlight(table.id(), policyId);
-    actions.bindJobId(actionId, jobId);
+    OccupancyClaim claim =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(claim, jobId);
     actions.markFinished(jobId, 200L, finishedAt);
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
     Assertions.assertTrue(
@@ -147,12 +153,17 @@ class TestOccupancyGate extends TestJDBCBackend {
             .withFinishedAt(finishedAt)
             .build();
     backend.insert(succeeded, false);
-    long staleActionId = actions.insertInFlight(table.id(), policyId);
-    actions.bindJobId(staleActionId, succeeded.id());
+    OccupancyClaim stale =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(stale, succeeded.id());
     Assertions.assertEquals(0L, actions.getByJobId(succeeded.id()).finishedAt());
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
     Assertions.assertThrows(
-        IllegalStateException.class, () -> actions.insertInFlight(table.id(), policyId));
+        IllegalStateException.class,
+        () ->
+            actions.insertInFlight(
+                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS));
 
     actions.markFinished(succeeded.id(), 200L, finishedAt);
     Assertions.assertEquals(0, actions.listInFlight(table.id(), policyId).size());
@@ -169,8 +180,10 @@ class TestOccupancyGate extends TestJDBCBackend {
             .withFinishedAt(0L)
             .build();
     backend.insert(started, false);
-    long activeActionId = actions.insertInFlight(table.id(), policyId);
-    actions.bindJobId(activeActionId, started.id());
+    OccupancyClaim active =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(active, started.id());
 
     Assertions.assertEquals(1, actions.listInFlight(table.id(), policyId).size());
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
@@ -190,11 +203,10 @@ class TestOccupancyGate extends TestJDBCBackend {
     long claimTimeoutMs = 60_000L;
     OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
     long policyId = 66L;
-    long claimedAt = 1_700_000_400_000L;
 
-    Assertions.assertTrue(
-        actions.tryAcquireInFlight(table.id(), policyId, claimedAt, claimTimeoutMs).isPresent());
-    Assertions.assertTrue(gate.isInFlight(table.id(), policyId, claimedAt + 1_000L));
-    Assertions.assertFalse(gate.isInFlight(table.id(), policyId, claimedAt + claimTimeoutMs));
+    OccupancyClaim claim = actions.insertInFlight(table.id(), policyId, claimTimeoutMs);
+    Assertions.assertTrue(gate.isInFlight(table.id(), policyId, claim.createdAt() + 1_000L));
+    Assertions.assertFalse(
+        gate.isInFlight(table.id(), policyId, claim.createdAt() + claimTimeoutMs));
   }
 }

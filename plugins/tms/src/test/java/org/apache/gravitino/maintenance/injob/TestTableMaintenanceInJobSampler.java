@@ -83,10 +83,9 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
   }
 
   private void insertBoundAction(long jobId, long tableId, long policyId) {
-    long actionId =
+    actionMetaService.bindJobId(
         actionMetaService.insertInFlight(
-            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
-    long createdAt = actionMetaService.getById(actionId).createdAt();
-    actionMetaService.bindJobId(actionId, jobId, createdAt);
+            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS),
+        jobId);
   }
 }
