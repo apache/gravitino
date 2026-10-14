@@ -40,6 +40,16 @@ public class TestIcebergUpdateManifestStatsJobMain {
   /** Verifies a missing Iceberg runtime fails with an actionable classpath error. */
   @Test
   public void testMissingRuntimeHasActionableError() throws Exception {
+    checkMissingRuntime(false);
+  }
+
+  /** Verifies an explicitly blank coordination directory reaches normal job startup. */
+  @Test
+  public void testBlankCoordinationDirectory() throws Exception {
+    checkMissingRuntime(true);
+  }
+
+  private void checkMissingRuntime(boolean blankCoordination) throws Exception {
     String classpath =
         Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
             .filter(entry -> !entry.contains("iceberg-spark-runtime"))
@@ -56,14 +66,15 @@ public class TestIcebergUpdateManifestStatsJobMain {
             "cli",
             "--table",
             "db.cli",
-            "--coordination-dir",
-            tempDir.toAbsolutePath().toString(),
             "--updater-options",
             "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
             "--spark-conf",
             "{\"spark.master\":\"local[1]\",\"spark.ui.enabled\":\"false\","
                 + "\"spark.sql.extensions\":"
                 + "\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}"));
+    if (blankCoordination) {
+      command.addAll(Arrays.asList("--coordination-dir", " "));
+    }
     Path log = tempDir.resolve("missing-runtime.log");
     Process process =
         new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();

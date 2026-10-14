@@ -304,9 +304,8 @@ including a table without a snapshot, produces count `0` and average `0.0`.
 The job also publishes `custom-manifest-snapshot-id` in the same update (`-1` without a snapshot).
 Snapshot IDs identify measurements; they are not monotonically increasing version numbers.
 
-The template accepts `catalog_name`, `table_identifier`, `coordination_directory`,
-`updater_options`, and optional
-`spark_conf`, alongside the standard Spark template settings. There is no `spec_id` filter:
+The template accepts `catalog_name`, `table_identifier`, `updater_options`, and optional
+`coordination_directory` and `spark_conf`, alongside the standard Spark template settings. There is no `spec_id` filter:
 collection always replaces the complete maps for the table.
 `updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
 a `statistics_updater` implementing the existing table statistics update operation.
@@ -320,7 +319,6 @@ curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
     "jobConf": {
       "catalog_name": "rest_catalog",
       "table_identifier": "db.t1",
-      "coordination_directory": "/mnt/gravitino-maintenance-locks",
       "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
       "spark_master": "local[2]",
       "spark_executor_instances": "1",
@@ -339,14 +337,23 @@ For example, one collection can produce complete maps `{"0": 620, "1": 120}` and
 them together with the snapshot ID in one existing PUT/update call. Old map entries are
 replaced, not merged. Other statistic names are unchanged. No PATCH or merge API is needed.
 
-### Shared coordination and recovery
+By default, `coordination_directory` is omitted or blank and publications use last-write-wins
+semantics. Each update contains the complete maps and snapshot ID; a concurrent older collection
+may overwrite newer measurements. Failed jobs can simply be rerun, with no lock files or recovery.
+Consumers requiring fresh statistics must compare `custom-manifest-snapshot-id` with the table's
+current snapshot ID (`-1` if none) and skip/recollect on a mismatch. This is a consumer requirement,
+not a freshness check enforced by this collector. Snapshot IDs must be compared for equality,
+not numerical ordering.
 
-Provision `coordination_directory` (`--coordination-dir` for direct Spark invocation) as an
+### Optional shared coordination and recovery
+
+For stricter serialization, provision `coordination_directory` (`--coordination-dir` for direct Spark invocation) as an
 existing absolute directory on a shared filesystem that supports durable files and cross-host
 Java/POSIX file locks. Every runner for a destination table must use the same shared directory,
 metalake, and canonical catalog/schema/table names. A host-local directory, object-store mount,
 or filesystem without reliable cross-host locking does not satisfy this requirement.
-The collector must be the sole writer of these statistic names.
+All writers of these statistic names must opt into this mode and use the same directory;
+mixing coordinated and uncoordinated writers does not provide serialization.
 
 The job locks a persistent file keyed by metalake and table before refreshing the Iceberg table
 or choosing a snapshot, and holds it through the PUT. Concurrent runs for that table fail;

@@ -186,6 +186,40 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
     }
   }
 
+  /** Verifies uncoordinated publications replace complete measurements and can be rerun. */
+  @Test
+  public void testPublicationWithoutCoordination() throws Exception {
+    String name = CATALOG_NAME + ".db.uncoordinated";
+    spark.sql("CREATE TABLE " + name + " (id INT) USING iceberg");
+    RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
+    try {
+      IcebergUpdateManifestStatsJob.updateStatistics(
+          spark, updater, CATALOG_NAME, "db.uncoordinated", "test", null);
+      assertEquals(1, updater.updateCalls);
+      assertEquals(3, updater.manifestStatistics.size());
+      spark.sql("INSERT INTO " + name + " VALUES (1)");
+      updater.fail = true;
+      assertThrows(
+          IllegalStateException.class,
+          () ->
+              IcebergUpdateManifestStatsJob.updateStatistics(
+                  spark, updater, CATALOG_NAME, "db.uncoordinated", "test", null));
+      updater.fail = false;
+      IcebergUpdateManifestStatsJob.updateStatistics(
+          spark, updater, CATALOG_NAME, "db.uncoordinated", "test", null);
+      assertEquals(3, updater.updateCalls);
+      Map<String, StatisticValue<?>> values = new HashMap<>();
+      updater.manifestStatistics.forEach(stat -> values.put(stat.name(), stat.value()));
+      assertEquals(3, values.size());
+      assertEquals(
+          Spark3Util.loadIcebergTable(spark, name).currentSnapshot().snapshotId(),
+          values.get(IcebergManifestStatistics.SNAPSHOT_ID).value());
+      assertEquals(1L, IcebergManifestStatistics.fromStatistics(values, 0).get().count());
+    } finally {
+      spark.sql("DROP TABLE " + name);
+    }
+  }
+
   /** Verifies a collection failure can be rerun without manually recovering the lock file. */
   @Test
   public void testCollectionFailureCanBeRerun() throws Exception {

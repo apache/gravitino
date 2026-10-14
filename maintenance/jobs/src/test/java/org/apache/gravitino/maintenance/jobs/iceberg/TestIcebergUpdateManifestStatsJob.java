@@ -62,6 +62,7 @@ public class TestIcebergUpdateManifestStatsJob {
     assertEquals(10, template.arguments().size());
     assertFalse(template.arguments().contains("--spec-id"));
     assertTrue(template.arguments().contains("{{spark_conf:-}}"));
+    assertTrue(template.arguments().contains("{{coordination_directory:-}}"));
     assertFalse(template.arguments().contains("--update-mode"));
     assertEquals("v1", template.customFields().get("version"));
     assertTrue(template.configs().containsKey("spark.sql.extensions"));

@@ -81,7 +81,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
                 "--table",
                 "{{table_identifier}}",
                 "--coordination-dir",
-                "{{coordination_directory}}",
+                "{{coordination_directory:-}}",
                 "--updater-options",
                 "{{updater_options}}",
                 "--spark-conf",
@@ -94,7 +94,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
   /**
    * Collects and persists manifest statistics using the configured Spark catalog and updater.
    *
-   * @param args catalog, table, shared coordination directory, updater options, and Spark
+   * @param args catalog, table, optional shared coordination directory, updater options, and Spark
    *     configuration
    * @throws Exception if collection, persistence, or resource cleanup fails
    */
@@ -104,7 +104,12 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
             args,
             ImmutableSet.of(
                 "catalog", "table", "updater-options", "spark-conf", "coordination-dir"),
-            ImmutableSet.of("catalog", "table", "updater-options", "coordination-dir"));
+            ImmutableSet.of("catalog", "table", "updater-options"));
+    String coordinationDirectory = arguments.get("coordination-dir");
+    Path coordinationPath =
+        coordinationDirectory == null || coordinationDirectory.trim().isEmpty()
+            ? null
+            : Paths.get(coordinationDirectory);
     String catalog = arguments.get("catalog");
     String table = arguments.get("table");
     tableIdentifier(catalog, table);
@@ -130,7 +135,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
             catalog,
             table,
             properties.get(OptimizerConfig.GRAVITINO_METALAKE),
-            Paths.get(arguments.get("coordination-dir")));
+            coordinationPath);
       } finally {
         spark.stop();
       }
@@ -198,9 +203,15 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       String catalogName,
       String tableIdentifier,
       String metalake,
-      Path coordinationDirectory)
+      @Nullable Path coordinationDirectory)
       throws IOException {
     NameIdentifier identifier = tableIdentifier(catalogName, tableIdentifier);
+    if (coordinationDirectory == null) {
+      updater.updateTableStatistics(
+          identifier, collectManifestStatistics(spark, catalogName, tableIdentifier));
+      LOG.info("Updated complete manifest statistics for {}", identifier);
+      return;
+    }
     if (!coordinationDirectory.isAbsolute() || !Files.isDirectory(coordinationDirectory)) {
       throw new IllegalArgumentException(
           "coordination-dir must be an existing absolute shared directory");
