@@ -138,6 +138,27 @@ public class TestNamespacedResourceCache {
     Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
   }
 
+  @Test
+  public void testInvalidationOfAnotherNamespace() {
+    AtomicReference<NamespacedResourceCache<ConfigMap>> cache = new AtomicReference<>();
+    cache.set(
+        new NamespacedResourceCache<>(
+            100L,
+            namespace -> {
+              listed.add(namespace);
+              // Another namespace changes while this one is being listed.
+              cache.get().invalidate("other");
+              return ImmutableList.of(resource(namespace, "a"));
+            },
+            e -> false,
+            now::get));
+
+    Assertions.assertTrue(cache.get().find("ns1", "a").isPresent());
+    // The listing of ns1 is still cached.
+    Assertions.assertTrue(cache.get().find("ns1", "a").isPresent());
+    Assertions.assertEquals(ImmutableList.of("ns1"), listed);
+  }
+
   private static ConfigMap resource(String namespace, String name) {
     return new ConfigMapBuilder()
         .withNewMetadata()

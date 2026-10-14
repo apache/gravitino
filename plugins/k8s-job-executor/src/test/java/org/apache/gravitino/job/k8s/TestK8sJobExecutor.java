@@ -18,9 +18,13 @@
  */
 package org.apache.gravitino.job.k8s;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.api.model.OwnerReference;
+import io.fabric8.kubernetes.api.model.OwnerReferenceBuilder;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.StatusBuilder;
 import io.fabric8.kubernetes.client.Config;
@@ -157,6 +161,7 @@ public class TestK8sJobExecutor {
         .resource(
             new PodBuilder()
                 .withNewMetadata()
+                .addToOwnerReferences(ownerReference("gravitino-job-1"))
                 .withName("driver")
                 .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
                 .addToLabels(SparkApplicationUtils.LABEL_SPARK_ROLE, "driver")
@@ -220,17 +225,21 @@ public class TestK8sJobExecutor {
 
   @Test
   public void testRejectedByKubernetes() {
-    server
-        .expect()
-        .post()
-        .withPath(APPS_PATH)
-        .andReturn(404, new StatusBuilder().withCode(404).withMessage("no such namespace").build())
-        .once();
+    for (int code : new int[] {400, 403, 404, 422}) {
+      server
+          .expect()
+          .post()
+          .withPath(APPS_PATH)
+          .andReturn(
+              code, new StatusBuilder().withCode(code).withMessage("rejected " + code).build())
+          .once();
 
-    IllegalArgumentException e =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
-    Assertions.assertTrue(e.getMessage().contains("no such namespace"), e.getMessage());
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> executor.submitJob(context(1L), sparkTemplate()));
+      Assertions.assertTrue(e.getMessage().contains("rejected " + code), e.getMessage());
+    }
 
     // Other failures aren't the job's fault. The client retries server errors, so use another.
     server
@@ -293,6 +302,7 @@ public class TestK8sJobExecutor {
         .resource(
             new PodBuilder()
                 .withNewMetadata()
+                .addToOwnerReferences(ownerReference("gravitino-job-1"))
                 .withName("driver")
                 .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
                 .addToLabels(SparkApplicationUtils.LABEL_SPARK_ROLE, "driver")
@@ -323,6 +333,11 @@ public class TestK8sJobExecutor {
         K8sJobExecutor.isUnreachable(
             new KubernetesClientException(new StatusBuilder().withCode(503).build())));
     Assertions.assertFalse(K8sJobExecutor.isUnreachable(new KubernetesClientException("failed")));
+    // A response came back, only not a JSON one, for example the login page of a proxy.
+    Assertions.assertFalse(
+        K8sJobExecutor.isUnreachable(
+            new KubernetesClientException(
+                "failed", new JsonParseException((JsonParser) null, "<html>"))));
     Assertions.assertFalse(
         K8sJobExecutor.isUnreachable(
             new KubernetesClientException("failed", new IllegalStateException())));
@@ -390,6 +405,220 @@ public class TestK8sJobExecutor {
         KubernetesClientException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
     Assertions.assertEquals(
         JobHandle.Status.QUEUED, executor.getJobExecutionInfo(jobExecutionId).status());
+  }
+
+  @Test
+  public void testDriverLookupFailureKeepsFailedJob() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    setStates(
+        "gravitino-job-1",
+        "Submitted",
+        "DriverRequested",
+        "DriverStartTimedOut",
+        "TerminatedWithoutReleaseResources");
+    createDriverPod("driver", "spark-kubernetes-driver");
+    // Listing the pods fails once, it can't be told whether the driver still runs.
+    server
+        .expect()
+        .get()
+        .withPath(
+            "/api/v1/namespaces/default/pods?labelSelector="
+                + "spark.operator%2Fspark-app-name%3Dgravitino-job-1%2Cspark-role%3Ddriver")
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .once();
+
+    // The job isn't failed while its pending driver could still run.
+    Assertions.assertThrows(
+        KubernetesClientException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+    Assertions.assertNotNull(client.pods().inNamespace("default").withName("driver").get());
+
+    Assertions.assertEquals(
+        JobHandle.Status.FAILED, executor.getJobExecutionInfo(jobExecutionId).status());
+    Assertions.assertNull(client.pods().inNamespace("default").withName("driver").get());
+  }
+
+  @Test
+  public void testKeepDriverWithSidecarOfFailedJob() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    setStates("gravitino-job-1", "Submitted", "DriverReady", "Failed");
+    // The driver exited, a sidecar keeps the pod running.
+    client
+        .pods()
+        .inNamespace("default")
+        .resource(
+            new PodBuilder()
+                .withNewMetadata()
+                .addToOwnerReferences(ownerReference("gravitino-job-1"))
+                .withName("driver")
+                .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
+                .addToLabels(SparkApplicationUtils.LABEL_SPARK_ROLE, "driver")
+                .endMetadata()
+                .withNewStatus()
+                .withPhase("Running")
+                .addNewContainerStatus()
+                .withName("spark-kubernetes-driver")
+                .withNewState()
+                .withNewTerminated()
+                .withExitCode(1)
+                .endTerminated()
+                .endState()
+                .endContainerStatus()
+                .addNewContainerStatus()
+                .withName("istio-proxy")
+                .withNewState()
+                .withNewRunning()
+                .endRunning()
+                .endState()
+                .endContainerStatus()
+                .endStatus()
+                .build())
+        .create();
+
+    Assertions.assertEquals(
+        JobHandle.Status.FAILED, executor.getJobExecutionInfo(jobExecutionId).status());
+    // Kept, so that its output can still be read.
+    Assertions.assertNotNull(client.pods().inNamespace("default").withName("driver").get());
+  }
+
+  @Test
+  public void testDriverPodOfAnotherSparkApplicationIsIgnored() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    setStates("gravitino-job-1", "Submitted", "DriverRequested", "DriverStartTimedOut");
+    // A pending pod with the same labels, owned by another SparkApplication.
+    client
+        .pods()
+        .inNamespace("default")
+        .resource(
+            new PodBuilder()
+                .withNewMetadata()
+                .addToOwnerReferences(
+                    new OwnerReferenceBuilder()
+                        .withApiVersion("spark.apache.org/v1")
+                        .withKind("SparkApplication")
+                        .withName("gravitino-job-1")
+                        .withUid("another-uid")
+                        .build())
+                .withName("other-driver")
+                .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
+                .addToLabels(SparkApplicationUtils.LABEL_SPARK_ROLE, "driver")
+                .endMetadata()
+                .withNewStatus()
+                .withPhase("Pending")
+                .endStatus()
+                .build())
+        .create();
+
+    Assertions.assertEquals(
+        JobHandle.Status.FAILED, executor.getJobExecutionInfo(jobExecutionId).status());
+    Assertions.assertNotNull(client.pods().inNamespace("default").withName("other-driver").get());
+  }
+
+  @Test
+  public void testJobWithoutStatusCancelledMeanwhile() {
+    executor.initialize(
+        TestSparkApplicationUtils.newConfigs(
+            ImmutableMap.of(K8sJobExecutorConfigs.STATUS_CACHE_TTL_MS, "3600000")),
+        client);
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    Assertions.assertEquals(
+        JobHandle.Status.QUEUED, executor.getJobExecutionInfo(jobExecutionId).status());
+
+    // Another server cancels it, while this one still has it without status in its cache.
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    app.getMetadata()
+        .setAnnotations(ImmutableMap.of(K8sJobResourceUtils.ANNOTATION_CANCEL_REQUESTED, "true"));
+    app.getMetadata().setFinalizers(ImmutableList.of("foregroundDeletion"));
+    app.getMetadata().setDeletionTimestamp(Instant.now().toString());
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(app)
+        .update();
+    now.set(now.get().plusSeconds(601));
+
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLED, executor.getJobExecutionInfo(jobExecutionId).status());
+  }
+
+  @Test
+  public void testAdoptNoResourceBeingDeleted() {
+    // A SparkApplication of the same job, but being deleted.
+    GenericKubernetesResource deleting =
+        SparkApplicationUtils.buildSparkApplication(
+            context(1L), sparkTemplate(), TestSparkApplicationUtils.newConfigs(ImmutableMap.of()));
+    deleting.getMetadata().setFinalizers(ImmutableList.of("foregroundDeletion"));
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(deleting)
+        .create();
+    GenericKubernetesResource created = sparkApplication("gravitino-job-1");
+    created.getMetadata().setDeletionTimestamp(Instant.now().toString());
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(created)
+        .update();
+
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+  }
+
+  @Test
+  public void testSubmitWithoutResponse() {
+    // Whether the SparkApplication was created can't be told, the submission fails anyway.
+    try (KubernetesClient unreachable =
+        new KubernetesClientBuilder()
+            .withConfig(
+                new ConfigBuilder(Config.empty())
+                    .withMasterUrl("http://127.0.0.1:1")
+                    .withRequestRetryBackoffLimit(0)
+                    .build())
+            .build()) {
+      executor.initialize(TestSparkApplicationUtils.newConfigs(ImmutableMap.of()), unreachable);
+      KubernetesClientException e =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.submitJob(context(1L), sparkTemplate()));
+      Assertions.assertTrue(K8sJobExecutor.isUnreachable(e), e.toString());
+    }
+  }
+
+  @Test
+  public void testStdoutOfRenamedDriverContainer() throws InterruptedException {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    Map<String, Object> spec =
+        new HashMap<>((Map<String, Object>) app.getAdditionalProperties().get("spec"));
+    Map<String, Object> sparkConf = new HashMap<>((Map<String, Object>) spec.get("sparkConf"));
+    sparkConf.put(SparkApplicationUtils.SPARK_DRIVER_CONTAINER_NAME, "main");
+    spec.put("sparkConf", sparkConf);
+    app.setAdditionalProperty("spec", spec);
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(app)
+        .update();
+    createDriverPod("driver", "main", "sidecar");
+
+    executor.getJobStdout(jobExecutionId, 10, 1024);
+
+    RecordedRequest log = null;
+    RecordedRequest request;
+    while ((request = server.takeRequest(10, TimeUnit.MILLISECONDS)) != null) {
+      if (request.getPath().contains("/pods/driver/log")) {
+        log = request;
+      }
+    }
+    Assertions.assertNotNull(log);
+    Assertions.assertTrue(log.getPath().contains("container=main"), log.getPath());
+  }
+
+  @Test
+  public void testStdoutBeforeInitialize() {
+    Assertions.assertEquals(
+        ImmutableList.of(),
+        new K8sJobExecutor().getJobStdout("default/sparkapp/default/gravitino-job-1", 10, 1024));
   }
 
   @Test
@@ -528,6 +757,7 @@ public class TestK8sJobExecutor {
         .resource(
             new PodBuilder()
                 .withNewMetadata()
+                .addToOwnerReferences(ownerReference("gravitino-job-1"))
                 .withName("driver")
                 .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
                 .addToLabels(SparkApplicationUtils.LABEL_SPARK_ROLE, "driver")
@@ -564,9 +794,12 @@ public class TestK8sJobExecutor {
         .andReturn(403, new StatusBuilder().withCode(403).build())
         .once();
 
-    // The cancellation fails, and the job keeps running.
+    // The cancellation fails, and the job keeps running, without the cancel mark, so that it
+    // isn't reported as cancelled once it finishes by itself.
     Assertions.assertThrows(
         KubernetesClientException.class, () -> executor.cancelJob(jobExecutionId));
+    Assertions.assertFalse(
+        K8sJobResourceUtils.isCancelRequested(sparkApplication("gravitino-job-1")));
     Assertions.assertEquals(
         JobHandle.Status.STARTED, executor.getJobExecutionInfo(jobExecutionId).status());
 
@@ -575,6 +808,22 @@ public class TestK8sJobExecutor {
     Assertions.assertNull(sparkApplication("gravitino-job-1"));
     Assertions.assertThrows(
         NoSuchJobException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+  }
+
+  @Test
+  public void testCancelJobThatJustStopped() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    // The job succeeds between the read of the cancellation and its mark.
+    GenericKubernetesResource running = sparkApplication("gravitino-job-1");
+    setStates("gravitino-job-1", "Submitted", "DriverReady", "Succeeded");
+    server.expect().get().withPath(APPS_PATH + "/gravitino-job-1").andReturn(200, running).once();
+
+    executor.cancelJob(jobExecutionId);
+
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    Assertions.assertFalse(K8sJobResourceUtils.isCancelRequested(app));
+    Assertions.assertEquals(
+        JobHandle.Status.SUCCEEDED, executor.getJobExecutionInfo(jobExecutionId).status());
   }
 
   @Test
@@ -602,6 +851,7 @@ public class TestK8sJobExecutor {
           .resource(
               new PodBuilder()
                   .withNewMetadata()
+                  .addToOwnerReferences(ownerReference("gravitino-job-1"))
                   .withName(name)
                   .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
                   .addToLabels(
@@ -661,6 +911,7 @@ public class TestK8sJobExecutor {
     PodBuilder pod =
         new PodBuilder()
             .withNewMetadata()
+            .addToOwnerReferences(ownerReference("gravitino-job-1"))
             .withName(name)
             .addToLabels(SparkApplicationUtils.LABEL_SPARK_APP_NAME, "gravitino-job-1")
             .addToLabels(SparkApplicationUtils.LABEL_SPARK_ROLE, "driver")
@@ -671,6 +922,17 @@ public class TestK8sJobExecutor {
       pod.editSpec().addNewContainer().withName(container).endContainer().endSpec();
     }
     client.pods().inNamespace("default").resource(pod.build()).create();
+  }
+
+  /** The owner reference the operator sets on the driver pod of a SparkApplication. */
+  private OwnerReference ownerReference(String appName) {
+    GenericKubernetesResource app = sparkApplication(appName);
+    return new OwnerReferenceBuilder()
+        .withApiVersion("spark.apache.org/v1")
+        .withKind("SparkApplication")
+        .withName(appName)
+        .withUid(app.getMetadata().getUid())
+        .build();
   }
 
   private GenericKubernetesResource sparkApplication(String name) {

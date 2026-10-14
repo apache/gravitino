@@ -151,7 +151,7 @@ public final class SparkApplicationStatusUtils {
     Instant deletedAt = parseTime(app.getMetadata().getDeletionTimestamp());
 
     ContainerState driverState =
-        driver == null ? null : driverContainerState(driver, driverContainerName(app));
+        driver == null ? null : driverContainerState(driver, getDriverContainerName(app));
     Instant driverStartedAt = null;
     Instant driverFinishedAt = null;
     if (driverState != null && driverState.getTerminated() != null) {
@@ -222,6 +222,24 @@ public final class SparkApplicationStatusUtils {
         .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
         .build();
+  }
+
+  /**
+   * Returns whether the driver of a SparkApplication is still pending or running. It is decided by
+   * the driver container, as a sidecar can keep the pod running after the driver exited, and by the
+   * pod only if the driver container can't be told.
+   *
+   * @param app the SparkApplication
+   * @param driver the driver pod
+   * @return true if the driver hasn't terminated
+   */
+  public static boolean isDriverRunning(GenericKubernetesResource app, Pod driver) {
+    ContainerState state = driverContainerState(driver, getDriverContainerName(app));
+    if (state != null) {
+      return state.getTerminated() == null;
+    }
+    String phase = driver.getStatus() == null ? null : driver.getStatus().getPhase();
+    return !"Succeeded".equals(phase) && !"Failed".equals(phase);
   }
 
   /**
@@ -321,7 +339,7 @@ public final class SparkApplicationStatusUtils {
     if (!(status instanceof Map)) {
       return history;
     }
-    String driverContainer = driverContainerName(app);
+    String driverContainer = getDriverContainerName(app);
 
     Object transitions = ((Map<String, Object>) status).get("stateTransitionHistory");
     if (transitions instanceof Map) {
@@ -392,10 +410,13 @@ public final class SparkApplicationStatusUtils {
   }
 
   /**
-   * Returns the name of the driver container: the one a job names with a pod template, or else the
-   * one Spark gives it.
+   * Returns the name of the driver container of a SparkApplication: the one the job names for its
+   * driver pod template, or else the one Spark gives it.
+   *
+   * @param app the SparkApplication
+   * @return the name of the driver container
    */
-  private static String driverContainerName(GenericKubernetesResource app) {
+  public static String getDriverContainerName(GenericKubernetesResource app) {
     Map<String, Object> spec = mapOf(app.getAdditionalProperties().get("spec"));
     Map<String, Object> sparkConf = spec == null ? null : mapOf(spec.get("sparkConf"));
     Object name =

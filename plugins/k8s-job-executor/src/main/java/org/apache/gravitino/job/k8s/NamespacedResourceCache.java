@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -71,8 +70,9 @@ final class NamespacedResourceCache<T extends HasMetadata> {
   // the snapshot map, which must never block.
   private final Map<String, Object> listLocks = new ConcurrentHashMap<>();
 
-  // Bumped by every invalidation, so that a listing started before it isn't cached.
-  private final AtomicLong invalidations = new AtomicLong();
+  // Bumped by every invalidation of a namespace, so that a listing of it started before isn't
+  // cached.
+  private final Map<String, Long> invalidations = new ConcurrentHashMap<>();
 
   /**
    * Creates a cache.
@@ -116,10 +116,14 @@ final class NamespacedResourceCache<T extends HasMetadata> {
       synchronized (listLocks.computeIfAbsent(namespace, ns -> new Object())) {
         snapshot = snapshots.get(namespace);
         if (isExpired(snapshot)) {
-          long invalidationsBefore = invalidations.get();
+          // Drop the expired listings, also of the namespaces whose jobs are all done.
+          snapshots.values().removeIf(this::isExpired);
+          long invalidationsBefore = invalidations.getOrDefault(namespace, 0L);
           snapshot = snapshotOf(namespace);
-          if (invalidations.get() == invalidationsBefore) {
-            snapshots.put(namespace, snapshot);
+          snapshots.put(namespace, snapshot);
+          // Invalidated meanwhile, the listing may predate the change.
+          if (invalidations.getOrDefault(namespace, 0L) != invalidationsBefore) {
+            snapshots.remove(namespace, snapshot);
           }
         }
       }
@@ -133,7 +137,7 @@ final class NamespacedResourceCache<T extends HasMetadata> {
    * @param namespace the namespace
    */
   void invalidate(String namespace) {
-    invalidations.incrementAndGet();
+    invalidations.merge(namespace, 1L, Long::sum);
     snapshots.remove(namespace);
   }
 
