@@ -147,6 +147,8 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 ### Semantic Models
 
 Semantic Model tools manage schema-scoped semantic metadata through the Gravitino REST API.
+For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
+and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
 Use the `semantic_model` tag with `--include-tool-tags` to expose these five tools.
 They use the same per-call `metalake` selection and authentication as other tools;
 Gravitino filters listings and enforces authorization, including access to referenced source tables.
