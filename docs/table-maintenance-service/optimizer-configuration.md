@@ -215,16 +215,16 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
   "content": {
     "olderThanDays": 3,
     "dryRun": true,
-    "schedule": { "cronExpression": "0 0 3 * * ?" },
+    "timeTrigger": "0 0 3 * * ?",
     "minIntervalMs": 86400000
   }
 }
 ```
 
-Optional TMS peer fields on content (`schedule`, `minIntervalMs`, `jobOptions`, `updateOptions`)
-are shared with compaction and other maintenance policy types. `schedule.onCommit` is not allowed
-for orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md) for peer-field
-semantics.
+Optional TMS peer fields on content (`timeTrigger`, `commitTrigger`, `minIntervalMs`, `jobOptions`,
+`updateOptions`) are shared with compaction and other maintenance policy types. `commitTrigger` is
+not allowed for orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md) for
+peer-field semantics.
 
 Associate the policy with a tag and attach that tag to the target table, schema,
 or catalog, following the [policy setup walkthrough](./optimizer.md).

@@ -29,7 +29,8 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `rewriteStrategy`        | No       | `binpack`           | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                       |
 | `sortOrder`              | No       | `""`                | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`.        |
 | `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                        |
-| `schedule`               | No       | unset               | TMS trigger: `onCommit` and/or Quartz `cronExpression` (6 or 7 fields). Shape-checked at create/update.        |
+| `timeTrigger`            | No       | unset               | Cron string for scheduled evaluation (e.g. `0 0 2 * * ?`). Not shape-checked at create/update.                |
+| `commitTrigger`          | No       | unset               | When `true`, evaluate after an Iceberg commit. `null` / `false` means unset / disabled.                       |
 | `minIntervalMs`          | No       | unset               | Cooldown in milliseconds after the last finished job for this policy type. Must be `>= 0` when set.           |
 | `jobOptions`             | No       | unset               | Spark / IRC client options merged into `runJob` conf. Separate from `rewriteOptions`.                         |
 | `updateOptions`          | No       | unset               | Gravitino updater options merged into `runJob` `updateOptions`.                                               |

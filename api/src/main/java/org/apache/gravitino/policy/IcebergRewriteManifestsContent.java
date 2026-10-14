@@ -32,7 +32,7 @@ import org.apache.gravitino.MetadataObject;
  * <p>Configurable thresholds will be added when the rewrite-manifests policy lands; this class
  * registers the built-in type for TMS task mapping.
  */
-public class IcebergRewriteManifestsContent implements PolicyContent {
+public class IcebergRewriteManifestsContent extends AbstractPolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -75,16 +75,20 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
 
   @Override
   public boolean equals(Object other) {
-    return other instanceof IcebergRewriteManifestsContent;
+    return other instanceof IcebergRewriteManifestsContent
+        && peersEqual((IcebergRewriteManifestsContent) other);
   }
 
   @Override
   public int hashCode() {
-    return IcebergRewriteManifestsContent.class.hashCode();
+    return peersHashCode();
   }
 
   @Override
   public String toString() {
-    return "IcebergRewriteManifestsContent{}";
+    StringBuilder sb = new StringBuilder("IcebergRewriteManifestsContent{");
+    appendPeerFields(sb, false);
+    sb.append('}');
+    return sb.toString();
   }
 }

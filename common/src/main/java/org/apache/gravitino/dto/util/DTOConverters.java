@@ -102,7 +102,6 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.policy.MaintenanceTrigger;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -114,7 +113,6 @@ import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
-import org.apache.gravitino.policy.TableMaintenanceContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -674,17 +672,13 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
-    MaintenanceTrigger schedule = null;
-    Long minIntervalMs = null;
-    Map<String, String> jobOptions = null;
-    Map<String, String> updateOptions = null;
-    if (policyContent instanceof TableMaintenanceContent) {
-      TableMaintenanceContent maintenanceContent = (TableMaintenanceContent) policyContent;
-      schedule = maintenanceContent.schedule();
-      minIntervalMs = maintenanceContent.minIntervalMs();
-      jobOptions = emptyToNull(maintenanceContent.jobOptions());
-      updateOptions = emptyToNull(maintenanceContent.updateOptions());
-    }
+    // Peer fields come from PolicyContent accessors. Concrete Iceberg*Content classes still use
+    // interface defaults (null/empty) until domain wiring lands; DTO SerDe already carries peers.
+    String timeTrigger = policyContent.timeTrigger();
+    Boolean commitTrigger = policyContent.commitTrigger();
+    Long minIntervalMs = policyContent.minIntervalMs();
+    Map<String, String> jobOptions = emptyToNull(policyContent.jobOptions());
+    Map<String, String> updateOptions = emptyToNull(policyContent.updateOptions());
 
     if (policyContent instanceof PolicyContents.CustomContent) {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
@@ -701,26 +695,29 @@ public class DTOConverters {
           .withOlderThanDays(content.olderThanDays())
           .withLocation(content.location())
           .withDryRun(content.dryRun())
-          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(schedule))
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(emptyToNull(jobOptions))
-          .withUpdateOptions(emptyToNull(updateOptions))
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
       return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
-          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(schedule))
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(emptyToNull(jobOptions))
-          .withUpdateOptions(emptyToNull(updateOptions))
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
           .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
       return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
-          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(schedule))
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(emptyToNull(jobOptions))
-          .withUpdateOptions(emptyToNull(updateOptions))
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
           .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
@@ -735,10 +732,11 @@ public class DTOConverters {
           .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
           .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
-          .withSchedule(PolicyContentDTO.MaintenanceTriggerDTO.fromDomain(schedule))
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(emptyToNull(jobOptions))
-          .withUpdateOptions(emptyToNull(updateOptions))
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
           .build();
     }
 

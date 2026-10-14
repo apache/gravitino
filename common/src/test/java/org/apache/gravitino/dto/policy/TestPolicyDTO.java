@@ -183,11 +183,8 @@ public class TestPolicyDTO {
     AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
     PolicyContentDTO.IcebergCompactionContentDTO typedContent =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withSchedule(
-                PolicyContentDTO.MaintenanceTriggerDTO.builder()
-                    .withOnCommit(true)
-                    .withCronExpression("0 0 2 * * ?")
-                    .build())
+            .withTimeTrigger("0 0 2 * * ?")
+            .withCommitTrigger(true)
             .withMinIntervalMs(3_600_000L)
             .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
             .withUpdateOptions(ImmutableMap.of("metalake", "ml"))
@@ -209,8 +206,8 @@ public class TestPolicyDTO {
 
     PolicyContentDTO.IcebergCompactionContentDTO content =
         (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
-    Assertions.assertTrue(content.schedule().toDomain().onCommit());
-    Assertions.assertEquals("0 0 2 * * ?", content.schedule().toDomain().cronExpression());
+    Assertions.assertEquals("0 0 2 * * ?", content.timeTrigger());
+    Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
     Assertions.assertEquals(3_600_000L, content.minIntervalMs());
     Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
     Assertions.assertEquals("ml", content.updateOptions().get("metalake"));
@@ -221,20 +218,17 @@ public class TestPolicyDTO {
   public void testMaintenancePeerValidateOnDto() {
     PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
         PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
-            .withSchedule(
-                PolicyContentDTO.MaintenanceTriggerDTO.builder().withOnCommit(true).build())
+            .withCommitTrigger(true)
             .build();
     IllegalArgumentException orphanEx =
         Assertions.assertThrows(IllegalArgumentException.class, orphanOnCommit::validate);
-    Assertions.assertTrue(orphanEx.getMessage().contains("onCommit"));
+    Assertions.assertTrue(orphanEx.getMessage().contains("commitTrigger"));
 
-    PolicyContentDTO.IcebergCompactionContentDTO badCron =
+    // Cron syntax is not validated on the policy API; scheduler registration parses it.
+    PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withSchedule(
-                PolicyContentDTO.MaintenanceTriggerDTO.builder()
-                    .withCronExpression("a a a a a a")
-                    .build())
+            .withTimeTrigger("a a a a a a")
             .build();
-    Assertions.assertThrows(IllegalArgumentException.class, badCron::validate);
+    Assertions.assertDoesNotThrow(opaqueCron::validate);
   }
 }

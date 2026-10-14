@@ -37,7 +37,7 @@ policy. A table with only `data_domain=risk` does not.
 
 | Type                                   | Rules                                                                 | Consumer                  |
 |----------------------------------------|-----------------------------------------------------------------------|---------------------------|
-| `system_iceberg_compaction`            | Compaction thresholds plus optional TMS peers (`schedule`, …)         | Table maintenance service |
+| `system_iceberg_compaction`            | Compaction thresholds plus optional TMS peers (`timeTrigger`, …)      | Table maintenance service |
 | `system_iceberg_orphan_file_removal`   | Orphan-file cleanup options plus optional TMS peers                   | Table maintenance service |
 | `system_iceberg_rewrite_manifests`     | Placeholder; peers may be stored; `trigger-expr` is false until wired | Table maintenance service |
 | `system_iceberg_snapshot_expiration`   | Placeholder; peers may be stored; `trigger-expr` is false until wired | Table maintenance service |

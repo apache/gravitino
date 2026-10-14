@@ -334,33 +334,26 @@ components:
           items:
             $ref: "#/components/schemas/TagForPolicyAssociation"
 
-    MaintenanceTrigger:
-      type: object
-      description: >
-        Evaluate triggers for table maintenance (event and/or cron). At least one of onCommit or
-        cronExpression should be set when the schedule object is present.
-      properties:
-        onCommit:
-          type: boolean
-          description: Whether IRC commit should enqueue maintenance. Not allowed for orphan-cleanup.
-        cronExpression:
-          type: string
-          description: >
-            Quartz cron with 6 fields (seconds minutes hours day-of-month month day-of-week) or 7
-            fields (optional year). Server validates field count and allowed tokens only; Quartz
-            value ranges and cross-field rules are enforced when the scheduler expands the expression.
-
     TableMaintenancePeerFields:
       type: object
       description: >
         Optional TMS peer fields shared by built-in table-maintenance policy contents
-        (schedule, minIntervalMs, jobOptions, updateOptions). Stored on all four maintenance
-        types for schema symmetry. For placeholder types whose generated trigger-expr is false
-        (rewrite-manifests, snapshot-expiration), peers are accepted and persisted but are not
-        evaluated for enqueue until that type is fully wired.
+        (timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions). Present on all
+        four maintenance types for schema symmetry. For placeholder types whose generated
+        trigger-expr is false (rewrite-manifests, snapshot-expiration), peers are accepted on the
+        wire but are not evaluated for enqueue until that type is fully wired. Cron syntax for
+        timeTrigger is not validated on the policy API; the scheduler registration path parses it.
       properties:
-        schedule:
-          $ref: '#/components/schemas/MaintenanceTrigger'
+        timeTrigger:
+          type: string
+          description: >
+            Optional cron expression for scheduled evaluation (e.g. "0 0 2 * * ?").
+            Stored as a plain string; not shape-checked at create/update.
+        commitTrigger:
+          type: boolean
+          description: >
+            When true, evaluate after an Iceberg commit. Not allowed for orphan-cleanup.
+            null or false means unset / disabled.
         minIntervalMs:
           type: integer
           format: int64
@@ -503,8 +496,8 @@ components:
         - type: object
           description: >
             Placeholder content for system_iceberg_rewrite_manifests. Configurable thresholds land
-            in a follow-up. Peer fields may be stored now; trigger-expr remains false so schedule
-            does not enqueue until the type is wired.
+            in a follow-up. Peer fields may be accepted on the wire; trigger-expr remains false so
+            peers do not enqueue until the type is wired.
 
     IcebergRewriteManifestsPolicy:
       allOf:
@@ -536,8 +529,8 @@ components:
         - type: object
           description: >
             Placeholder content for system_iceberg_snapshot_expiration. Configurable thresholds land
-            in a follow-up. Peer fields may be stored now; trigger-expr remains false so schedule
-            does not enqueue until the type is wired.
+            in a follow-up. Peer fields may be accepted on the wire; trigger-expr remains false so
+            peers do not enqueue until the type is wired.
 
     IcebergSnapshotExpirationPolicy:
       allOf:
