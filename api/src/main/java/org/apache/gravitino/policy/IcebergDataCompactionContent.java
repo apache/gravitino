@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Built-in policy content for Iceberg compaction strategy. */
-public class IcebergDataCompactionContent extends AbstractPolicyContent {
+public class IcebergDataCompactionContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Strategy type value for iceberg data compaction. */

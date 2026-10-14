@@ -31,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Configuration for table-level Iceberg orphan cleanup on an optimizer invocation. */
-public class IcebergOrphanFileRemovalContent extends AbstractPolicyContent {
+public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */

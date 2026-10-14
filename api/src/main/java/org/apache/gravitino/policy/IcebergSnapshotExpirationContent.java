@@ -32,7 +32,7 @@ import org.apache.gravitino.MetadataObject;
  * <p>Configurable thresholds will be added when the expire-snapshots policy lands; this class
  * registers the built-in type for TMS task mapping.
  */
-public class IcebergSnapshotExpirationContent extends AbstractPolicyContent {
+public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */

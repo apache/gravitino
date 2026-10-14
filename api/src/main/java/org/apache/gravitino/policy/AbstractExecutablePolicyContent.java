@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
  *
  * <p>Subclasses keep strategy-only constructors. Callers attach peers through {@link #peers}.
  */
-public abstract class AbstractPolicyContent implements PolicyContent {
+public abstract class AbstractExecutablePolicyContent implements PolicyContent {
 
   @Nullable private String timeTrigger;
   @Nullable private Boolean commitTrigger;
@@ -37,7 +37,7 @@ public abstract class AbstractPolicyContent implements PolicyContent {
   private Map<String, String> updateOptions = PolicyExecutionFields.copyOptions(null);
 
   /** Creates content with unset peer fields. */
-  protected AbstractPolicyContent() {}
+  protected AbstractExecutablePolicyContent() {}
 
   /**
    * Attaches optional execution peer fields. Strategy subclasses do not take these in constructors.
@@ -51,7 +51,7 @@ public abstract class AbstractPolicyContent implements PolicyContent {
    * @return this instance
    */
   @SuppressWarnings("unchecked")
-  public <T extends AbstractPolicyContent> T peers(
+  public <T extends AbstractExecutablePolicyContent> T peers(
       @Nullable String timeTrigger,
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
@@ -104,7 +104,7 @@ public abstract class AbstractPolicyContent implements PolicyContent {
    * @param that other content
    * @return true when peers are equal
    */
-  protected boolean peersEqual(AbstractPolicyContent that) {
+  protected boolean peersEqual(AbstractExecutablePolicyContent that) {
     return Objects.equals(timeTrigger, that.timeTrigger)
         && Objects.equals(commitTrigger, that.commitTrigger)
         && Objects.equals(minIntervalMs, that.minIntervalMs)
