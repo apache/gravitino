@@ -159,20 +159,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         entityCombinedView =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
         if (!entityCombinedView.imported()) {
-          throw new UnsupportedOperationException(
-              "View "
-                  + ident
-                  + " cannot be imported because its name or external identifier is already "
-                  + "managed under a different Gravitino identifier. Gravitino does not "
-                  + "automatically reconcile external view renames or stale registrations. "
-                  + "Before retrying, manually resolve the conflict: either restore the external "
-                  + "view name and identifier to match its Gravitino registration, or have an "
-                  + "administrator safely remove the stale Gravitino registration and its "
-                  + "privileges, tags, and other relationships. Do not only remove "
-                  + "`gravitino.identifier` while the conflicting registration remains, because "
-                  + "Gravitino may associate the external view with that registration. After the "
-                  + "stale registration is removed, clear `gravitino.identifier` from the external "
-                  + "view and load it again.");
+          throw retainedExternalIdentifierConflictException(ident, VIEW);
         }
       }
     }

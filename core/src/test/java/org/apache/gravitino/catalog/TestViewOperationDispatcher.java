@@ -418,11 +418,12 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
             UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
     Assertions.assertTrue(
         exception.getMessage().contains("does not automatically reconcile external view renames"));
-    Assertions.assertTrue(exception.getMessage().contains("manually resolve the conflict"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("metadata-only unregister of an individual external view"));
+    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
     Assertions.assertTrue(
         exception.getMessage().contains("privileges, tags, and other relationships"));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Do not only remove `gravitino.identifier`"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
     verify(entityStore).put(any(ViewEntity.class), eq(false));
   }
 

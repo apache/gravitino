@@ -185,20 +185,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {
-          throw new UnsupportedOperationException(
-              "Table "
-                  + ident
-                  + " cannot be imported because its name or external identifier is already "
-                  + "managed under a different Gravitino identifier. Gravitino does not "
-                  + "automatically reconcile external table renames or stale registrations. "
-                  + "Before retrying, manually resolve the conflict: either restore the external "
-                  + "table name and identifier to match its Gravitino registration, or have an "
-                  + "administrator safely remove the stale Gravitino registration and its "
-                  + "privileges, tags, and other relationships. Do not only remove "
-                  + "`gravitino.identifier` while the conflicting registration remains, because "
-                  + "Gravitino may associate the external table with that registration. After the "
-                  + "stale registration is removed, clear `gravitino.identifier` from the external "
-                  + "table and load it again.");
+          throw retainedExternalIdentifierConflictException(ident, TABLE);
         }
       }
     }

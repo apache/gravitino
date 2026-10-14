@@ -125,6 +125,48 @@ public abstract class OperationDispatcher {
             cleanupTarget));
   }
 
+  /**
+   * Creates the user-facing error for an external identifier conflict with active metadata.
+   *
+   * <p>The error describes the supported recovery choices without implying that Gravitino offers
+   * object-level metadata-only unregister operations.
+   *
+   * @param ident the external entity identifier
+   * @param entityType the type of the external entity
+   * @return an exception containing conflict recovery instructions
+   */
+  protected UnsupportedOperationException retainedExternalIdentifierConflictException(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    String entityName;
+    switch (entityType) {
+      case SCHEMA:
+        entityName = "schema";
+        break;
+      case TABLE:
+        entityName = "table";
+        break;
+      case VIEW:
+        entityName = "view";
+        break;
+      default:
+        entityName = "object";
+    }
+
+    return new UnsupportedOperationException(
+        String.format(
+            "%s %s cannot be imported because its name or external identifier is already managed "
+                + "under a different Gravitino identifier. Gravitino does not automatically "
+                + "reconcile external %s renames or stale registrations, and it does not support "
+                + "metadata-only unregister of an individual external %s. Recovery requires an "
+                + "administrator to force-drop and recreate the containing Gravitino catalog "
+                + "registration. This catalog-wide reset removes every stored registration and "
+                + "its privileges, tags, and other relationships in that Gravitino catalog. "
+                + "Follow the catalog-specific recovery guidance to confirm that external objects "
+                + "are retained, and do not remove `%s` until the conflicting catalog registration "
+                + "has been dropped.",
+            entityName, ident, entityName, entityName, StringIdentifier.ID_KEY));
+  }
+
   protected <R, E extends Throwable> R doWithTable(
       NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn, Class<E> ex)
       throws E {

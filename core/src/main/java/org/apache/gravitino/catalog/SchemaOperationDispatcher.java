@@ -282,20 +282,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         EntityCombinedSchema reloaded =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {
-          throw new UnsupportedOperationException(
-              "Schema "
-                  + ident
-                  + " cannot be imported because its name or external identifier is already "
-                  + "managed under a different Gravitino identifier. Gravitino does not "
-                  + "automatically reconcile external schema renames or stale registrations. "
-                  + "Before retrying, manually resolve the conflict: either restore the external "
-                  + "schema name and identifier to match its Gravitino registration, or have an "
-                  + "administrator safely remove the stale Gravitino registration and its "
-                  + "privileges, tags, and other relationships. Do not only remove "
-                  + "`gravitino.identifier` while the conflicting registration remains, because "
-                  + "Gravitino may associate the external schema with that registration. After the "
-                  + "stale registration is removed, clear `gravitino.identifier` from the external "
-                  + "schema and its affected tables and views, then load them again.");
+          throw retainedExternalIdentifierConflictException(ident, SCHEMA);
         }
       }
     }
