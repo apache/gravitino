@@ -130,7 +130,7 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
-    this(null, null, null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null, PolicyExecutionSpec.empty());
   }
 
   IcebergDataCompactionContent(
@@ -142,6 +142,29 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
+    this(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
+        rewriteOptions,
+        PolicyExecutionSpec.empty());
+  }
+
+  IcebergDataCompactionContent(
+      Long minDataFileMse,
+      Long minDeleteFileNumber,
+      Long dataFileMseWeight,
+      Long deleteFileNumberWeight,
+      Long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions,
+      PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =

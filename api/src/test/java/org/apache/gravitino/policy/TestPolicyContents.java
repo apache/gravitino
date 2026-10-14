@@ -176,8 +176,20 @@ public class TestPolicyContents {
   @Test
   void testValidateRejectsNegativeMinIntervalMsOnExecutableContent() {
     PolicyContent content =
-        ((AbstractExecutablePolicyContent) PolicyContents.icebergDataCompaction())
-            .withExecutionFields(null, null, -1L, null, null);
+        PolicyContents.icebergDataCompaction(
+            IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+            IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+            IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+            IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+            IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+            null,
+            null,
+            null,
+            -1L,
+            null,
+            null);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
@@ -185,15 +197,15 @@ public class TestPolicyContents {
   }
 
   @Test
-  void testExecutionPeersOnlyOnAbstractExecutablePolicyContent() {
+  void testExecutionPeersOnlyOnExecutablePolicyContent() {
     Assertions.assertInstanceOf(
-        AbstractExecutablePolicyContent.class, PolicyContents.icebergDataCompaction());
+        ExecutablePolicyContent.class, PolicyContents.icebergDataCompaction());
     Assertions.assertInstanceOf(
-        AbstractExecutablePolicyContent.class, PolicyContents.icebergOrphanFileRemoval());
+        ExecutablePolicyContent.class, PolicyContents.icebergOrphanFileRemoval());
     Assertions.assertFalse(
         PolicyContents.custom(
                 ImmutableMap.of("rule", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null)
-            instanceof AbstractExecutablePolicyContent);
+            instanceof ExecutablePolicyContent);
   }
 
   @Test
@@ -210,8 +222,15 @@ public class TestPolicyContents {
   @Test
   void testOrphanFileRemovalRejectsCommitTrigger() {
     PolicyContent content =
-        ((AbstractExecutablePolicyContent) PolicyContents.icebergOrphanFileRemoval())
-            .withExecutionFields(null, true, null, null, null);
+        PolicyContents.icebergOrphanFileRemoval(
+            IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
+            null,
+            IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN,
+            null,
+            true,
+            null,
+            null,
+            null);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);

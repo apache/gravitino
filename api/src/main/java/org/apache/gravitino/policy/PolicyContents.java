@@ -184,15 +184,16 @@ public class PolicyContents {
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return new IcebergDataCompactionContent(
-            minDataFileMse,
-            minDeleteFileNumber,
-            dataFileMseWeight,
-            deleteFileNumberWeight,
-            maxPartitionNum,
-            rewriteStrategy,
-            sortOrder,
-            rewriteOptions)
-        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
+        rewriteOptions,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
   }
 
   /**
@@ -240,8 +241,12 @@ public class PolicyContents {
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun)
-        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergOrphanFileRemovalContent(
+        olderThanDays,
+        location,
+        dryRun,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
   }
 
   /**
@@ -269,8 +274,9 @@ public class PolicyContents {
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    return new IcebergRewriteManifestsContent()
-        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergRewriteManifestsContent(
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
   }
 
   /**
@@ -298,8 +304,9 @@ public class PolicyContents {
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    return new IcebergSnapshotExpirationContent()
-        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+    return new IcebergSnapshotExpirationContent(
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
   }
 
   /**

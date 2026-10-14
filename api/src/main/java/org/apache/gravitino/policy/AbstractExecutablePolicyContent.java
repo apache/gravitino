@@ -18,97 +18,38 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 
 /**
- * Base for built-in Iceberg maintenance policy contents that may carry optional execution peer
- * fields.
+ * Base for built-in Iceberg maintenance policy contents that carry optional execution peers.
  *
- * <p>These peers are intentionally not on {@link PolicyContent}: row-filter, column-mask, and
- * custom contents have no meaningful time/commit triggers, cooldown, or job/update option bags.
- * Callers that need peers should use {@code instanceof AbstractExecutablePolicyContent} (or a
- * concrete maintenance content type).
- *
- * <p>Subclasses keep strategy-only constructors. Callers attach execution fields through {@link
- * #withExecutionFields}.
+ * <p>Peers are supplied at construction as an immutable {@link PolicyExecutionSpec}. Subclasses
+ * keep strategy fields separate and pass the spec through {@link
+ * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}.
  */
-public abstract class AbstractExecutablePolicyContent implements PolicyContent {
+public abstract class AbstractExecutablePolicyContent implements ExecutablePolicyContent {
 
-  @Nullable private String timeTrigger;
-  @Nullable private Boolean commitTrigger;
-  @Nullable private Long minIntervalMs;
-  private Map<String, String> jobOptions = PolicyExecutionFields.copyOptions(null);
-  private Map<String, String> updateOptions = PolicyExecutionFields.copyOptions(null);
-
-  /** Creates content with unset execution fields. */
-  protected AbstractExecutablePolicyContent() {}
+  private final PolicyExecutionSpec executionSpec;
 
   /**
-   * Attaches optional execution fields. Strategy subclasses do not take these in constructors.
+   * Creates content with the given execution peers.
    *
-   * @param timeTrigger optional cron expression
-   * @param commitTrigger optional commit-trigger flag
-   * @param minIntervalMs optional cooldown ms
-   * @param jobOptions optional job options
-   * @param updateOptions optional update options
-   * @param <T> concrete content type
-   * @return this instance
+   * @param executionSpec immutable peers; {@code null} is treated as {@link
+   *     PolicyExecutionSpec#empty()}
    */
-  @SuppressWarnings("unchecked")
-  public <T extends AbstractExecutablePolicyContent> T withExecutionFields(
-      @Nullable String timeTrigger,
-      @Nullable Boolean commitTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    this.timeTrigger = StringUtils.isBlank(timeTrigger) ? null : timeTrigger;
-    this.commitTrigger = commitTrigger;
-    this.minIntervalMs = minIntervalMs;
-    this.jobOptions = PolicyExecutionFields.copyOptions(jobOptions);
-    this.updateOptions = PolicyExecutionFields.copyOptions(updateOptions);
-    return (T) this;
+  protected AbstractExecutablePolicyContent(@Nullable PolicyExecutionSpec executionSpec) {
+    this.executionSpec = executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
   }
 
-  /**
-   * @return cron expression, or {@code null} when unset
-   */
-  @Nullable
-  public String timeTrigger() {
-    return timeTrigger;
+  /** Creates content with unset execution peers. */
+  protected AbstractExecutablePolicyContent() {
+    this(PolicyExecutionSpec.empty());
   }
 
-  /**
-   * @return {@code true} when commit-triggered evaluation is enabled, otherwise {@code null} or
-   *     {@code false}
-   */
-  @Nullable
-  public Boolean commitTrigger() {
-    return commitTrigger;
-  }
-
-  /**
-   * @return minimum interval in milliseconds, or {@code null} when unset
-   */
-  @Nullable
-  public Long minIntervalMs() {
-    return minIntervalMs;
-  }
-
-  /**
-   * @return job options; never {@code null}
-   */
-  public Map<String, String> jobOptions() {
-    return jobOptions;
-  }
-
-  /**
-   * @return update options; never {@code null}
-   */
-  public Map<String, String> updateOptions() {
-    return updateOptions;
+  @Override
+  public PolicyExecutionSpec executionSpec() {
+    return executionSpec;
   }
 
   /**
@@ -120,9 +61,8 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    PolicyContent.super.validate();
-    PolicyExecutionFields.validate(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+    ExecutablePolicyContent.super.validate();
+    executionSpec.validate();
   }
 
   /**
@@ -132,22 +72,21 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
    * @return true when execution fields are equal
    */
   protected boolean executionFieldsEqual(AbstractExecutablePolicyContent that) {
-    return Objects.equals(timeTrigger, that.timeTrigger)
-        && Objects.equals(commitTrigger, that.commitTrigger)
-        && Objects.equals(minIntervalMs, that.minIntervalMs)
-        && Objects.equals(jobOptions, that.jobOptions)
-        && Objects.equals(updateOptions, that.updateOptions);
+    return Objects.equals(executionSpec, that.executionSpec);
   }
 
   /**
    * @return hash of execution fields
    */
   protected int executionFieldsHashCode() {
-    return Objects.hash(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+    return Objects.hashCode(executionSpec);
   }
 
   /**
    * Appends execution fields to a subclass {@code toString} body.
+   *
+   * <p>Option map <em>values</em> are never rendered (keys only) so accidental credentials are not
+   * exposed through logs or exception messages.
    *
    * <p>Callers that already wrote subclass fields should append {@code ", "} before invoking this
    * method.
@@ -156,15 +95,15 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
    */
   protected void appendExecutionFields(StringBuilder sb) {
     sb.append("timeTrigger='")
-        .append(timeTrigger)
+        .append(executionSpec.timeTrigger())
         .append('\'')
         .append(", commitTrigger=")
-        .append(commitTrigger)
+        .append(executionSpec.commitTrigger())
         .append(", minIntervalMs=")
-        .append(minIntervalMs)
-        .append(", jobOptions=")
-        .append(jobOptions)
-        .append(", updateOptions=")
-        .append(updateOptions);
+        .append(executionSpec.minIntervalMs())
+        .append(", jobOptionsKeys=")
+        .append(executionSpec.jobOptions().keySet())
+        .append(", updateOptionsKeys=")
+        .append(executionSpec.updateOptions().keySet());
   }
 }

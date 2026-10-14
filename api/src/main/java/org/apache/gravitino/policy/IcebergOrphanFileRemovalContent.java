@@ -64,10 +64,19 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
   private final boolean dryRun;
 
   private IcebergOrphanFileRemovalContent() {
-    this(DEFAULT_OLDER_THAN_DAYS, null, DEFAULT_DRY_RUN);
+    this(DEFAULT_OLDER_THAN_DAYS, null, DEFAULT_DRY_RUN, PolicyExecutionSpec.empty());
   }
 
   IcebergOrphanFileRemovalContent(long olderThanDays, @Nullable String location, boolean dryRun) {
+    this(olderThanDays, location, dryRun, PolicyExecutionSpec.empty());
+  }
+
+  IcebergOrphanFileRemovalContent(
+      long olderThanDays,
+      @Nullable String location,
+      boolean dryRun,
+      @Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
     this.olderThanDays = olderThanDays;
     this.location = location;
     this.dryRun = dryRun;

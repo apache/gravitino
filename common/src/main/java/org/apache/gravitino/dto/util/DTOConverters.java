@@ -105,8 +105,8 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
-import org.apache.gravitino.policy.AbstractExecutablePolicyContent;
 import org.apache.gravitino.policy.ColumnMaskContent;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
@@ -673,14 +673,14 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
-    // Execution peers live on AbstractExecutablePolicyContent, not universal PolicyContent.
+    // Execution peers live on ExecutablePolicyContent, not universal PolicyContent.
     String timeTrigger = null;
     Boolean commitTrigger = null;
     Long minIntervalMs = null;
     Map<String, String> jobOptions = null;
     Map<String, String> updateOptions = null;
-    if (policyContent instanceof AbstractExecutablePolicyContent) {
-      AbstractExecutablePolicyContent executable = (AbstractExecutablePolicyContent) policyContent;
+    if (policyContent instanceof ExecutablePolicyContent) {
+      ExecutablePolicyContent executable = (ExecutablePolicyContent) policyContent;
       timeTrigger = executable.timeTrigger();
       commitTrigger = executable.commitTrigger();
       minIntervalMs = executable.minIntervalMs();

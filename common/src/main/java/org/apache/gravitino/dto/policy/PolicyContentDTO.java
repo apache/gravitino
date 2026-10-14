@@ -86,7 +86,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Represents a typed iceberg compaction policy content DTO. */
   @EqualsAndHashCode
-  @ToString
+  @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergCompactionContentDTO implements PolicyContentDTO {
@@ -291,7 +291,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Typed orphan cleanup policy content for REST requests and responses. */
   @EqualsAndHashCode
-  @ToString
+  @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO {
@@ -415,7 +415,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
   @EqualsAndHashCode
-  @ToString
+  @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
@@ -503,7 +503,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
   @EqualsAndHashCode
-  @ToString
+  @ToString(exclude = {"jobOptions", "updateOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {

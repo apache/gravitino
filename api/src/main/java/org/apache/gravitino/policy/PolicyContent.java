@@ -29,7 +29,7 @@ import org.apache.gravitino.MetadataObject;
  *
  * <p>Execution peers ({@code timeTrigger}, {@code commitTrigger}, {@code minIntervalMs}, {@code
  * jobOptions}, {@code updateOptions}) are not part of this universal interface. Built-in Iceberg
- * maintenance contents carry them via {@link AbstractExecutablePolicyContent}.
+ * maintenance contents carry them via {@link ExecutablePolicyContent}/{@link PolicyExecutionSpec}.
  */
 public interface PolicyContent {
 
@@ -57,7 +57,7 @@ public interface PolicyContent {
    * Validates the policy content.
    *
    * <p>Checks universal fields such as {@link #supportedObjectTypes()}. Maintenance execution-field
-   * validation lives on {@link AbstractExecutablePolicyContent}.
+   * validation lives on {@link ExecutablePolicyContent} implementations.
    *
    * @throws IllegalArgumentException if the content is invalid.
    */

@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /**
@@ -51,7 +52,13 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
           MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
 
   /** Default constructor for Jackson deserialization only. */
-  public IcebergSnapshotExpirationContent() {}
+  public IcebergSnapshotExpirationContent() {
+    this(PolicyExecutionSpec.empty());
+  }
+
+  IcebergSnapshotExpirationContent(@Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
+  }
 
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
