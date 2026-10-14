@@ -19,7 +19,14 @@
 package org.apache.gravitino.maintenance.storage.mapper.provider.postgresql;
 
 import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceActionBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 
 /** PostgreSQL SQL provider for {@code table_maintenance_action}. */
 public class TableMaintenanceActionPostgreSQLProvider
-    extends TableMaintenanceActionBaseSQLProvider {}
+    extends TableMaintenanceActionBaseSQLProvider {
+
+  @Override
+  protected String currentTimeMillisExpr() {
+    return DatabaseTimeSQL.POSTGRESQL;
+  }
+}

@@ -18,25 +18,46 @@
 from typing import Optional
 
 from gravitino.api.audit import Audit
+from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.api.tag.tag import Tag
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.semantic.semantic_model_dto import SemanticModelDTO
+from gravitino.namespace import Namespace
+from gravitino.utils import HTTPClient
 
 
-class GenericSemanticModel(SemanticModel):
+class GenericSemanticModel(SemanticModel, SupportsTags):
     """An immutable client-side Semantic Model returned by the Gravitino REST API."""
 
-    def __init__(self, semantic_model_dto: SemanticModelDTO):
+    def __init__(
+        self,
+        semantic_model_dto: SemanticModelDTO,
+        rest_client: HTTPClient,
+        semantic_model_ns: Namespace,
+    ):
         """Create a GenericSemanticModel from a SemanticModelDTO.
 
         Args:
             semantic_model_dto (SemanticModelDTO): The Semantic Model DTO.
+            rest_client (HTTPClient): The REST client for tag operations.
+            semantic_model_ns (Namespace): The full metalake.catalog.schema namespace.
         """
         self._name = semantic_model_dto.name()
         self._comment = semantic_model_dto.comment()
         self._definition = semantic_model_dto.definition()
         self._properties = dict(semantic_model_dto.properties())
         self._audit = semantic_model_dto.audit_info()
+        model_object = MetadataObjects.of(
+            [semantic_model_ns.level(1), semantic_model_ns.level(2), self._name],
+            MetadataObject.Type.SEMANTIC_MODEL,
+        )
+        self._model_tag_operations = MetadataObjectTagOperations(
+            semantic_model_ns.level(0), model_object, rest_client
+        )
 
     def name(self) -> str:
         return self._name
@@ -73,3 +94,27 @@ class GenericSemanticModel(SemanticModel):
             f"definition={self._definition!r}, properties={self._properties!r}, "
             f"audit={self._audit!r})"
         )
+
+    def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_tags(self) -> list[str]:
+        return self._model_tag_operations.list_tags()
+
+    def list_tags_info(self) -> list[Tag]:
+        return self._model_tag_operations.list_tags_info()
+
+    def get_tag(self, name: str) -> Tag:
+        return self._model_tag_operations.get_tag(name)
+
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._model_tag_operations.assign_tags(tags_to_add, tags_to_remove)
+
+    def associate_tags(
+        self, tags_to_add: list[str], tags_to_remove: list[str]
+    ) -> list[str]:
+        return self._model_tag_operations.associate_tags(tags_to_add, tags_to_remove)
