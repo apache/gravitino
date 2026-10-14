@@ -21,13 +21,11 @@ package org.apache.gravitino.job.k8s;
 import com.google.common.collect.ImmutableList;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -190,22 +188,53 @@ public class TestNamespacedResourceCache {
             e -> false,
             now::get);
 
-    ExecutorService pool = Executors.newFixedThreadPool(2);
-    try {
-      Future<Optional<ConfigMap>> first = pool.submit(() -> cache.find("ns1", "a"));
-      Assertions.assertTrue(listing.await(10, TimeUnit.SECONDS));
-      // The second find waits for the listing being made instead of listing again.
-      Future<Optional<ConfigMap>> second = pool.submit(() -> cache.find("ns1", "a"));
-      // Another namespace isn't held up by it.
-      Assertions.assertFalse(cache.find("ns2", "b").isPresent());
-      release.countDown();
+    AtomicReference<Optional<ConfigMap>> first = new AtomicReference<>();
+    AtomicReference<Optional<ConfigMap>> second = new AtomicReference<>();
+    Thread firstFind = new Thread(() -> first.set(cache.find("ns1", "a")));
+    firstFind.start();
+    Assertions.assertTrue(listing.await(10, TimeUnit.SECONDS));
 
-      Assertions.assertTrue(first.get(10, TimeUnit.SECONDS).isPresent());
-      Assertions.assertTrue(second.get(10, TimeUnit.SECONDS).isPresent());
-      Assertions.assertEquals(2, lists.get());
-    } finally {
-      pool.shutdownNow();
+    // The second find waits for the listing being made, instead of listing again. Release the
+    // listing only once it is waiting, so that it can't find a listing already made.
+    Thread secondFind = new Thread(() -> second.set(cache.find("ns1", "a")));
+    secondFind.start();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (secondFind.getState() != Thread.State.WAITING && System.nanoTime() < deadline) {
+      Thread.sleep(10);
     }
+    Assertions.assertEquals(Thread.State.WAITING, secondFind.getState());
+    // Another namespace isn't held up by it.
+    Assertions.assertFalse(cache.find("ns2", "b").isPresent());
+    release.countDown();
+
+    firstFind.join(10_000);
+    secondFind.join(10_000);
+    Assertions.assertTrue(first.get().isPresent());
+    Assertions.assertTrue(second.get().isPresent());
+    // ns1 once, and ns2.
+    Assertions.assertEquals(2, lists.get());
+  }
+
+  @Test
+  public void testErrorWhileListing() {
+    AtomicInteger lists = new AtomicInteger();
+    NamespacedResourceCache<ConfigMap> cache =
+        new NamespacedResourceCache<>(
+            100L,
+            namespace -> {
+              if (lists.incrementAndGet() == 1) {
+                throw new NoClassDefFoundError("boom");
+              }
+              return ImmutableList.of(resource(namespace, "a"));
+            },
+            e -> false,
+            now::get);
+
+    Assertions.assertThrows(NoClassDefFoundError.class, () -> cache.find("ns1", "a"));
+    // The failed listing isn't left behind, the next query lists again instead of waiting.
+    Assertions.assertTimeoutPreemptively(
+        Duration.ofSeconds(10), () -> Assertions.assertTrue(cache.find("ns1", "a").isPresent()));
+    Assertions.assertEquals(2, lists.get());
   }
 
   private static ConfigMap resource(String namespace, String name) {

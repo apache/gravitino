@@ -118,11 +118,13 @@ final class NamespacedResourceCache<T extends HasMetadata> {
       if (snapshot == listing) {
         try {
           listing.complete(snapshotOf(namespace));
-        } catch (RuntimeException e) {
-          // A fatal failure isn't cached, the waiting callers get it too.
+        } catch (Throwable t) {
+          // Whatever the failure, even an error, the listing must be completed and isn't cached,
+          // otherwise the next queries of the namespace would wait for it forever. The waiting
+          // callers get the failure too.
           snapshots.remove(namespace, listing);
-          listing.completeExceptionally(e);
-          throw e;
+          listing.completeExceptionally(t);
+          throw t;
         }
       }
     }
@@ -130,6 +132,9 @@ final class NamespacedResourceCache<T extends HasMetadata> {
     try {
       return Optional.ofNullable(snapshot.join().resources.get(name));
     } catch (CompletionException e) {
+      if (e.getCause() instanceof Error) {
+        throw (Error) e.getCause();
+      }
       throw e.getCause() instanceof RuntimeException ? (RuntimeException) e.getCause() : e;
     }
   }
