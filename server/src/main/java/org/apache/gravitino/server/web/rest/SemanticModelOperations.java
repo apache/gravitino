@@ -53,8 +53,6 @@ import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
-import org.apache.gravitino.semantic.OssieDocumentConverter;
-import org.apache.gravitino.semantic.OssieDocumentConverter.ImportedSemanticModel;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
@@ -240,14 +238,11 @@ public class SemanticModelOperations {
                 MediaType.APPLICATION_JSON_TYPE.isCompatible(headers.getMediaType())
                     ? OssieDocument.json(document)
                     : OssieDocument.yaml(document);
-            ImportedSemanticModel imported = OssieDocumentConverter.importDocument(ossieDocument);
-            sourceValidator.validate(metalake, imported.definition());
             SemanticModel semanticModel =
-                dispatcher.createSemanticModel(
-                    NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, imported.name()),
-                    imported.comment(),
-                    imported.definition(),
-                    imported.properties());
+                dispatcher.importOssieDocument(
+                    NamespaceUtil.ofSemanticModel(metalake, catalog, schema),
+                    ossieDocument,
+                    definition -> sourceValidator.validate(metalake, definition));
             LOG.info(
                 "Apache Ossie Semantic Model imported: {}.{}.{}.{}",
                 metalake,
