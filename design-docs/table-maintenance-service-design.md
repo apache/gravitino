@@ -172,30 +172,37 @@ policy first, then scheduling.
 
 TMS reuses the existing metalake Policy APIs and does **not** add
 `/api/maintenance/table/policies`. Each policy covers **one** maintenance type. The same
-policy may enable both `onCommit` and `crontab`.
+policy may enable both commit and time triggers (`commitTrigger` and `timeTrigger`).
 
-#### 5.1.1 Evaluate triggers (`onCommit` + `crontab`)
+#### 5.1.1 Evaluate triggers (`commitTrigger` + `timeTrigger`)
 
-Triggers live in **`policy_version_info.content.schedule`**, next to `jobOptions`,
-`rewriteOptions`, and `minIntervalMs`. Operators edit that versioned content through Policy
-APIs. `policy_meta` only holds identity and attachment. `scheduled_tasks` is runtime state for db-scheduler — not where operators set triggers.
+Triggers are **flat** peers on policy content (same JSON object as `jobOptions` /
+`rewriteOptions` / `minIntervalMs`): `commitTrigger` (boolean) and `timeTrigger` (cron
+string). Operators edit that versioned content through Policy APIs. `policy_meta` only holds
+identity and attachment. `scheduled_tasks` is runtime state for db-scheduler — not where
+operators set triggers.
 
 TMS has two trigger modes. They never feed each other's queues:
 
-| Trigger    | Path                                     | Which types                                     |
-| ---------- | ---------------------------------------- | ----------------------------------------------- |
-| `onCommit` | IRC → **commit-job** only (skips expand) | Compaction / manifest-rewrite / snapshot-expiry |
-| `crontab`  | **policy-expand** → cron-job             | All four types                                  |
+| Wire field       | Runtime path                              | Which types                                     |
+| ---------------- | ----------------------------------------- | ----------------------------------------------- |
+| `commitTrigger`  | IRC → **commit-job** only (skips expand)  | Compaction / manifest-rewrite / snapshot-expiry |
+| `timeTrigger`    | **policy-expand** → cron-job              | All four types                                  |
 
-**`onCommit`** runs after a successful Iceberg commit through IRC. That fits types that
+**`commitTrigger`** runs after a successful Iceberg commit through IRC. That fits types that
 rewrite or expire data and metadata from the commit stream. **`orphan-cleanup` does not:**
 it scans storage for unreferenced files on a schedule. Running it on every commit would be
-too heavy. Create/alter rejects `schedule.onCommit = true` for orphan-cleanup; that type is
-**crontab-only**.
+too heavy. Create/alter rejects `commitTrigger = true` for orphan-cleanup; that type is
+**timeTrigger-only** when automation is enabled.
 
-**`minIntervalMs`** sits in policy content **beside** `schedule` (not inside it). It is the
-cooldown for **that policy's type** after `MAX(finished_at)` on `table_maintenance_job` for
-`(table, policy)`. Server conf and code defaults are lower-priority fallbacks.
+**`minIntervalMs`** is the cooldown for **that policy's type** after `MAX(finished_at)` on
+`table_maintenance_job` for `(table, policy)`. Server conf and code defaults are
+lower-priority fallbacks.
+
+**`timeTrigger` cron:** the string is stored as-is on the policy API. Syntax and time-zone
+rules are owned by the TMS / db-scheduler registration path (not re-validated with a second
+parser in `api`). Examples below use a typical six-field Quartz-style form; align examples
+with the scheduler contract when registration validation is wired.
 
 Example content:
 
@@ -207,28 +214,26 @@ Example content:
     "uri": "http://host:9001/iceberg",
     "type": "rest"
   },
-  "schedule": { "onCommit": true, "crontab": "0 2 * * *" },
+  "commitTrigger": true,
+  "timeTrigger": "0 0 2 * * ?",
   "minIntervalMs": 3600000
 }
 ```
 
-| Field               | Runtime effect                                                    |
-| ------------------- | ----------------------------------------------------------------- |
-| `schedule.onCommit` | IRC upserts commit-job; commit pool submits one chained Job       |
-| `schedule.crontab`  | Sets / refreshes next `policy-expand` due time                    |
-| `minIntervalMs`     | Cooldown for this policy's type; highest when set                 |
-| `jobOptions`        | Non-sensitive Spark / IRC client props (`uri`, `type`, memory, …) |
-
-Automated maintenance should set at least one of `onCommit` or `crontab` (orphan-cleanup:
-**`crontab` only**).
+| Field            | Runtime effect                                                    |
+| ---------------- | ----------------------------------------------------------------- |
+| `commitTrigger`  | IRC upserts commit-job; commit pool submits one chained Job       |
+| `timeTrigger`    | Sets / refreshes next `policy-expand` due time                    |
+| `minIntervalMs`  | Cooldown for this policy's type; highest when set                 |
+| `jobOptions`     | Non-sensitive Spark / IRC client props (`uri`, `type`, memory, …) |
 
 #### 5.1.2 Sensitive credentials
 
 Policy content is versioned, edited through Policy APIs, and readable with `VIEW_POLICY`.
 **Secrets must not live there.** Put credential-shaped keys in `jobOptions` /
-`rewriteOptions` and create/alter **rejects** them. Non-sensitive Spark / IRC client props
-(`uri`, `type`, memory, …) stay on the nearest policy; auth is cluster-static in
-`gravitino.conf` (values may be SecretManager references). Conf keys: §7.4.
+`rewriteOptions` / `updateOptions` and create/alter **rejects** them. Non-sensitive Spark /
+IRC client props (`uri`, `type`, memory, …) stay on the nearest policy; auth is
+cluster-static in `gravitino.conf` (values may be SecretManager references). Conf keys: §7.4.
 
 TMS talks to **two** backends with **two** identities, so there are two prefixes:
 
@@ -347,7 +352,7 @@ flowchart TD
   B --> C[Keep expand row; set next crontab]
 ```
 
-Example with crontab `0 2 * * *`: create inserts expand due next 02:00; at 02:00 expand inserts
+Example with `timeTrigger` `0 0 2 * * ?`: create inserts expand due next 02:00; at 02:00 expand inserts
 many cron-jobs due now, then schedules itself for the next 02:00. Expand's due time is when
 **enqueue** happens — not when Spark runs.
 
