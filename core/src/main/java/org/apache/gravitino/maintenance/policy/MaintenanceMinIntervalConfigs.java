@@ -134,12 +134,17 @@ public final class MaintenanceMinIntervalConfigs {
    * @param builtInType built-in policy type
    * @param policyMinIntervalMs value from effective policy content, or null
    * @return resolved interval in milliseconds
+   * @throws IllegalArgumentException if {@code policyMinIntervalMs} is negative
    */
   public static long resolve(
       Config config, Policy.BuiltInType builtInType, @Nullable Long policyMinIntervalMs) {
     Preconditions.checkNotNull(config, "config cannot be null");
     Preconditions.checkNotNull(builtInType, "builtInType cannot be null");
     if (policyMinIntervalMs != null) {
+      Preconditions.checkArgument(
+          policyMinIntervalMs >= 0,
+          "policy minIntervalMs must be >= 0, got %s",
+          policyMinIntervalMs);
       return policyMinIntervalMs;
     }
     return config.get(forBuiltInType(builtInType));

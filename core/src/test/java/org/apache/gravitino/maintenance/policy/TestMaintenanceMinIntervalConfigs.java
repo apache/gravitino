@@ -92,6 +92,16 @@ public class TestMaintenanceMinIntervalConfigs {
   }
 
   @Test
+  void testResolveRejectsNegativePolicyMinInterval() {
+    Config config = new Config(false) {};
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MaintenanceMinIntervalConfigs.resolve(
+                config, Policy.BuiltInType.ICEBERG_COMPACTION, -1L));
+  }
+
+  @Test
   void testRejectsNonMaintenanceBuiltInType() {
     Assertions.assertThrows(
         IllegalArgumentException.class,

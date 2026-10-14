@@ -107,10 +107,18 @@ public interface PolicyContent {
   /**
    * Validates the policy content.
    *
+   * <p>Checks {@link #supportedObjectTypes()} and the shared execution peer fields ({@link
+   * #timeTrigger()}, {@link #commitTrigger()}, {@link #minIntervalMs()}, {@link #jobOptions()},
+   * {@link #updateOptions()}). Implementations that override this method must call {@code
+   * PolicyContent.super.validate()} (or equivalent) so peer validation stays on the persistence
+   * path.
+   *
    * @throws IllegalArgumentException if the content is invalid.
    */
   default void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         CollectionUtils.isNotEmpty(supportedObjectTypes()), "supportedObjectTypes cannot be empty");
+    PolicyExecutionFields.validate(
+        timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updateOptions());
   }
 }
