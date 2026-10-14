@@ -52,6 +52,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -78,8 +79,8 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -95,21 +96,26 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.storage.relational.BackendTestSelector;
+import org.apache.gravitino.storage.relational.CoreBackend;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
+import org.apache.gravitino.storage.relational.SharedCoreDatabaseProvisioner;
 import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@CoreBackend.All
+@ExtendWith(CloseContainerExtension.class)
 abstract class AbstractEntityStorageTest {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractEntityStorageTest.class);
 
@@ -119,21 +125,18 @@ abstract class AbstractEntityStorageTest {
   protected static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[][] storageProvider() {
-    return new Object[][] {
-      {"h2", true},
-      {"h2", false},
-      {"mysql", true},
-      {"mysql", false},
-      {"postgresql", true},
-      {"postgresql", false}
-    };
-  }
-
-  @AfterEach
-  void closeSuit() throws IOException {
-    // todo: refactor TestEntityStorage to extend TestJDBCBackend, otherwise, each test will start
-    // and stop the container suite.
-    ContainerSuite.getInstance().close();
+    Object[][] backends =
+        new Object[][] {
+          {"h2", true},
+          {"h2", false},
+          {"mysql", true},
+          {"mysql", false},
+          {"postgresql", true},
+          {"postgresql", false}
+        };
+    return Arrays.stream(backends)
+        .filter(arguments -> BackendTestSelector.isSelected((String) arguments[0]))
+        .toArray(Object[][]::new);
   }
 
   protected void init(String type, Config config) throws IllegalAccessException {
@@ -187,10 +190,16 @@ abstract class AbstractEntityStorageTest {
             SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
 
       } else if (type.equalsIgnoreCase("mysql")) {
-        String mysqlJdbcUrl = baseIT.startAndInitMySQLBackend();
+        boolean shared = SharedCoreDatabaseProvisioner.isEnabled("mysql");
+        String mysqlJdbcUrl =
+            shared
+                ? SharedCoreDatabaseProvisioner.provision("mysql")
+                : baseIT.startAndInitMySQLBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlJdbcUrl);
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.user("mysql") : "root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.password("mysql") : "root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("com.mysql.cj.jdbc.Driver");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
@@ -201,10 +210,16 @@ abstract class AbstractEntityStorageTest {
             SQLExceptionConverterFactory.class, "converter", new MySQLExceptionConverter(), true);
 
       } else if (type.equalsIgnoreCase("postgresql")) {
-        String postgreSQLJdbcUrl = baseIT.startAndInitPGBackend();
+        boolean shared = SharedCoreDatabaseProvisioner.isEnabled("postgresql");
+        String postgreSQLJdbcUrl =
+            shared
+                ? SharedCoreDatabaseProvisioner.provision("postgresql")
+                : baseIT.startAndInitPGBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(postgreSQLJdbcUrl);
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.user("postgresql") : "root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.password("postgresql") : "root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("org.postgresql.Driver");
 
