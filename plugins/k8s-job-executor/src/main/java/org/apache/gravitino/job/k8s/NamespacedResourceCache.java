@@ -23,10 +23,13 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,15 +67,10 @@ final class NamespacedResourceCache<T extends HasMetadata> {
 
   private final LongSupplier clock;
 
-  private final Map<String, Snapshot<T>> snapshots = new ConcurrentHashMap<>();
-
-  // Listing a namespace is a network call, so it is guarded by a lock of its own rather than by
-  // the snapshot map, which must never block.
-  private final Map<String, Object> listLocks = new ConcurrentHashMap<>();
-
-  // Bumped by every invalidation of a namespace, so that a listing of it started before isn't
-  // cached.
-  private final Map<String, Long> invalidations = new ConcurrentHashMap<>();
+  // The listing of each namespace, being made or made. Only one thread lists a namespace at a
+  // time, the others wait for its listing. A listing is a network call, so it is made outside of
+  // the map, which only holds the namespaces listed within the TTL or being listed.
+  private final Map<String, CompletableFuture<Snapshot<T>>> snapshots = new ConcurrentHashMap<>();
 
   /**
    * Creates a cache.
@@ -110,39 +108,50 @@ final class NamespacedResourceCache<T extends HasMetadata> {
       return Optional.empty();
     }
 
-    Snapshot<T> snapshot = snapshots.get(namespace);
+    CompletableFuture<Snapshot<T>> snapshot = snapshots.get(namespace);
     if (isExpired(snapshot)) {
-      // Only one thread lists a namespace at a time, the others wait for its listing.
-      synchronized (listLocks.computeIfAbsent(namespace, ns -> new Object())) {
-        snapshot = snapshots.get(namespace);
-        if (isExpired(snapshot)) {
-          // Drop the expired listings, also of the namespaces whose jobs are all done.
-          snapshots.values().removeIf(this::isExpired);
-          long invalidationsBefore = invalidations.getOrDefault(namespace, 0L);
-          snapshot = snapshotOf(namespace);
-          snapshots.put(namespace, snapshot);
-          // Invalidated meanwhile, the listing may predate the change.
-          if (invalidations.getOrDefault(namespace, 0L) != invalidationsBefore) {
-            snapshots.remove(namespace, snapshot);
-          }
+      // Drop the expired listings, also of the namespaces whose jobs are all done.
+      snapshots.values().removeIf(this::isExpired);
+      CompletableFuture<Snapshot<T>> listing = new CompletableFuture<>();
+      snapshot =
+          snapshots.compute(namespace, (ns, current) -> isExpired(current) ? listing : current);
+      if (snapshot == listing) {
+        try {
+          listing.complete(snapshotOf(namespace));
+        } catch (RuntimeException e) {
+          // A fatal failure isn't cached, the waiting callers get it too.
+          snapshots.remove(namespace, listing);
+          listing.completeExceptionally(e);
+          throw e;
         }
       }
     }
-    return Optional.ofNullable(snapshot.resources.get(name));
+
+    try {
+      return Optional.ofNullable(snapshot.join().resources.get(name));
+    } catch (CompletionException e) {
+      throw e.getCause() instanceof RuntimeException ? (RuntimeException) e.getCause() : e;
+    }
   }
 
   /**
-   * Drops the cached listing of a namespace, after a resource in it is changed.
+   * Drops the cached listing of a namespace, after a resource in it is changed. A listing of it
+   * being made isn't cached either, as it may predate the change.
    *
    * @param namespace the namespace
    */
   void invalidate(String namespace) {
-    invalidations.merge(namespace, 1L, Long::sum);
     snapshots.remove(namespace);
   }
 
-  private boolean isExpired(Snapshot<T> snapshot) {
-    return snapshot == null || clock.getAsLong() - snapshot.listedAtMs >= ttlMs;
+  /** Whether a listing must be made again: there is none, it failed, or it is too old. */
+  private boolean isExpired(@Nullable CompletableFuture<Snapshot<T>> snapshot) {
+    if (snapshot == null || snapshot.isCompletedExceptionally()) {
+      return true;
+    }
+    // A listing being made is waited for.
+    Snapshot<T> made = snapshot.getNow(null);
+    return made != null && clock.getAsLong() - made.listedAtMs >= ttlMs;
   }
 
   private Snapshot<T> snapshotOf(String namespace) {

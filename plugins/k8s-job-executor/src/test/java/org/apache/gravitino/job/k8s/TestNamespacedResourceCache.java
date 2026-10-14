@@ -23,6 +23,13 @@ import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assertions;
@@ -157,6 +164,48 @@ public class TestNamespacedResourceCache {
     // The listing of ns1 is still cached.
     Assertions.assertTrue(cache.get().find("ns1", "a").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1"), listed);
+  }
+
+  @Test
+  public void testConcurrentFindsListOnce() throws Exception {
+    CountDownLatch listing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicInteger lists = new AtomicInteger();
+    NamespacedResourceCache<ConfigMap> cache =
+        new NamespacedResourceCache<>(
+            100L,
+            namespace -> {
+              lists.incrementAndGet();
+              // Only the listing of ns1 takes a while.
+              if ("ns1".equals(namespace)) {
+                listing.countDown();
+                try {
+                  release.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                }
+              }
+              return ImmutableList.of(resource(namespace, "a"));
+            },
+            e -> false,
+            now::get);
+
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      Future<Optional<ConfigMap>> first = pool.submit(() -> cache.find("ns1", "a"));
+      Assertions.assertTrue(listing.await(10, TimeUnit.SECONDS));
+      // The second find waits for the listing being made instead of listing again.
+      Future<Optional<ConfigMap>> second = pool.submit(() -> cache.find("ns1", "a"));
+      // Another namespace isn't held up by it.
+      Assertions.assertFalse(cache.find("ns2", "b").isPresent());
+      release.countDown();
+
+      Assertions.assertTrue(first.get(10, TimeUnit.SECONDS).isPresent());
+      Assertions.assertTrue(second.get(10, TimeUnit.SECONDS).isPresent());
+      Assertions.assertEquals(2, lists.get());
+    } finally {
+      pool.shutdownNow();
+    }
   }
 
   private static ConfigMap resource(String namespace, String name) {
