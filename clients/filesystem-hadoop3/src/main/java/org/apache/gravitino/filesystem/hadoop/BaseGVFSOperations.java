@@ -694,7 +694,7 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the schema.
    */
   protected Schema getSchema(NameIdentifier schemaIdent) {
-    return getFilesetMetadataCache()
+    return filesetMetadataCache
         .map(cache -> cache.getSchema(schemaIdent))
         .orElseGet(
             () -> {
@@ -971,12 +971,8 @@ public abstract class BaseGVFSOperations implements Closeable {
   Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
     String catalogName = filesetIdent.namespace().level(1);
     String schemaName = filesetIdent.namespace().level(2);
-    // Resolve the catalog, schema, and fileset through the metadata cache when it is enabled, so
-    // a filesystem resolution does not re-load them from the server on every operation. Secrets
-    // and credentials below are still fetched per call, so credential rotation is honored. With
-    // the cache disabled these are the same three loads as before. Property updates share the
-    // staleness tradeoff the cache already documents for fileset metadata: a changed property is
-    // only observed after cache eviction or restart.
+    // Go through the metadata cache when it is enabled, so that an operation does not reload the
+    // catalog, schema and fileset. Secrets are not cached and are still fetched on every call.
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     NameIdentifier schemaIdent =
