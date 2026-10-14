@@ -60,6 +60,7 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.gravitino.storage.relational.CoreBackend;
+import org.apache.gravitino.storage.relational.SharedCoreDatabaseProvisioner;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -588,7 +589,7 @@ public class TestJdbcPartitionStatisticStorageIT {
     }
   }
 
-  /** MySQL-specific tests using Docker container. */
+  /** MySQL-specific tests, on the shared or injected server, or else a Docker container. */
   @Nested
   @CoreBackend.MySQL
   @Tag("gravitino-docker-test")
@@ -596,25 +597,37 @@ public class TestJdbcPartitionStatisticStorageIT {
 
     private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
     private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT;
-    private MySQLContainer mySQLContainer;
+    private String jdbcUrl;
+    private String username;
+    private String password;
+    private String driver;
 
     @Override
     protected void setupStorage() throws Exception {
-      LOG.info("Starting MySQL container for partition statistics integration tests");
-
-      // Start MySQL container
-      containerSuite.startMySQLContainer(TEST_DB_NAME);
-      mySQLContainer = containerSuite.getMySQLContainer();
+      if (SharedCoreDatabaseProvisioner.isEnabled("mysql")) {
+        LOG.info("Using the shared MySQL server for partition statistics integration tests");
+        jdbcUrl = SharedCoreDatabaseProvisioner.createDatabase("mysql");
+        username = SharedCoreDatabaseProvisioner.user("mysql");
+        password = SharedCoreDatabaseProvisioner.password("mysql");
+        driver = "com.mysql.cj.jdbc.Driver";
+      } else {
+        LOG.info("Starting MySQL container for partition statistics integration tests");
+        containerSuite.startMySQLContainer(TEST_DB_NAME);
+        MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
+        jdbcUrl = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
+        username = mySQLContainer.getUsername();
+        password = mySQLContainer.getPassword();
+        driver = mySQLContainer.getDriverClassName(TEST_DB_NAME);
+      }
 
       // Create database schema
       createMySQLSchema();
 
-      // Create storage factory with MySQL container connection
       Map<String, String> properties = Maps.newHashMap();
-      properties.put("jdbcUrl", mySQLContainer.getJdbcUrl(TEST_DB_NAME));
-      properties.put("jdbcUser", mySQLContainer.getUsername());
-      properties.put("jdbcPassword", mySQLContainer.getPassword());
-      properties.put("jdbcDriver", mySQLContainer.getDriverClassName(TEST_DB_NAME));
+      properties.put("jdbcUrl", jdbcUrl);
+      properties.put("jdbcUser", username);
+      properties.put("jdbcPassword", password);
+      properties.put("jdbcDriver", driver);
 
       JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
       storage = (JdbcPartitionStatisticStorage) factory.create(properties);
@@ -632,10 +645,6 @@ public class TestJdbcPartitionStatisticStorageIT {
 
     /** Creates the partition_statistic_meta table in the MySQL test database. */
     private void createMySQLSchema() throws SQLException {
-      String jdbcUrl = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
-      String username = mySQLContainer.getUsername();
-      String password = mySQLContainer.getPassword();
-
       try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
           Statement stmt = conn.createStatement()) {
 
@@ -659,7 +668,7 @@ public class TestJdbcPartitionStatisticStorageIT {
     }
   }
 
-  /** PostgreSQL-specific tests using Docker container. */
+  /** PostgreSQL-specific tests, on the shared or injected server, or else a Docker container. */
   @Nested
   @CoreBackend.PostgreSQL
   @Tag("gravitino-docker-test")
@@ -667,25 +676,38 @@ public class TestJdbcPartitionStatisticStorageIT {
 
     private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
     private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_PARTITION_STATS;
-    private PostgreSQLContainer postgreSQLContainer;
+    private String jdbcUrl;
+    private String username;
+    private String password;
+    private String driver;
 
     @Override
     protected void setupStorage() throws Exception {
-      LOG.info("Starting PostgreSQL container for partition statistics integration tests");
-
-      // Start PostgreSQL container
-      containerSuite.startPostgreSQLContainer(TEST_DB_NAME, PGImageName.VERSION_13);
-      postgreSQLContainer = containerSuite.getPostgreSQLContainer(PGImageName.VERSION_13);
+      if (SharedCoreDatabaseProvisioner.isEnabled("postgresql")) {
+        LOG.info("Using the shared PostgreSQL server for partition statistics integration tests");
+        jdbcUrl = SharedCoreDatabaseProvisioner.createDatabase("postgresql");
+        username = SharedCoreDatabaseProvisioner.user("postgresql");
+        password = SharedCoreDatabaseProvisioner.password("postgresql");
+        driver = "org.postgresql.Driver";
+      } else {
+        LOG.info("Starting PostgreSQL container for partition statistics integration tests");
+        containerSuite.startPostgreSQLContainer(TEST_DB_NAME, PGImageName.VERSION_13);
+        PostgreSQLContainer postgreSQLContainer =
+            containerSuite.getPostgreSQLContainer(PGImageName.VERSION_13);
+        jdbcUrl = postgreSQLContainer.getJdbcUrl(TEST_DB_NAME);
+        username = postgreSQLContainer.getUsername();
+        password = postgreSQLContainer.getPassword();
+        driver = postgreSQLContainer.getDriverClassName(TEST_DB_NAME);
+      }
 
       // Create database schema
       createPostgreSQLSchema();
 
-      // Create storage factory with PostgreSQL container connection
       Map<String, String> properties = Maps.newHashMap();
-      properties.put("jdbcUrl", postgreSQLContainer.getJdbcUrl(TEST_DB_NAME));
-      properties.put("jdbcUser", postgreSQLContainer.getUsername());
-      properties.put("jdbcPassword", postgreSQLContainer.getPassword());
-      properties.put("jdbcDriver", postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
+      properties.put("jdbcUrl", jdbcUrl);
+      properties.put("jdbcUser", username);
+      properties.put("jdbcPassword", password);
+      properties.put("jdbcDriver", driver);
 
       JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
       storage = (JdbcPartitionStatisticStorage) factory.create(properties);
@@ -703,10 +725,6 @@ public class TestJdbcPartitionStatisticStorageIT {
 
     /** Creates the partition_statistic_meta table in the PostgreSQL test database. */
     private void createPostgreSQLSchema() throws SQLException {
-      String jdbcUrl = postgreSQLContainer.getJdbcUrl(TEST_DB_NAME);
-      String username = postgreSQLContainer.getUsername();
-      String password = postgreSQLContainer.getPassword();
-
       try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
           Statement stmt = conn.createStatement()) {
 

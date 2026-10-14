@@ -34,11 +34,12 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.integration.test.container.DatabaseProvisioning;
 
 /**
- * Provisions an isolated database for one Core database test-JVM fork on a shared, build-wide
- * MySQL/PostgreSQL container, instead of that fork starting its own container.
+ * Provisions an isolated database for one Core database test-JVM fork on a shared MySQL/PostgreSQL
+ * server, instead of that fork starting its own container. The server is either one injected by the
+ * environment ({@code GRAVITINO_TEST_MYSQL_URL} and friends, see {@code core/build.gradle.kts}) or
+ * the build-wide container that {@code SharedDbContainerService} (buildSrc) starts.
  *
- * <p>Active only when the Gradle {@code core} test task's shared-container {@code
- * SharedDbContainerService} (buildSrc) has published admin connection info as system properties
+ * <p>Active only when the Gradle task has published admin connection info as system properties
  * under {@link #ADMIN_PROPERTY_PREFIX}; {@link #isEnabled(String)} returns {@code false} otherwise,
  * e.g. when this test class is run directly from an IDE outside the Gradle task, and the caller is
  * expected to fall back to starting a fresh, per-fork container as before.
@@ -51,7 +52,7 @@ import org.apache.gravitino.integration.test.container.DatabaseProvisioning;
  * individually dropped; they are discarded together with the shared container when the build ends
  * (see {@code SharedDbContainerService#close()} in buildSrc).
  */
-final class SharedCoreDatabaseProvisioner {
+public final class SharedCoreDatabaseProvisioner {
 
   /** System property prefix under which the shared-container BuildService publishes info. */
   static final String ADMIN_PROPERTY_PREFIX = "gravitino.test.db.";
@@ -67,7 +68,7 @@ final class SharedCoreDatabaseProvisioner {
    * Returns whether the shared-container BuildService has published admin connection info for
    * {@code backendType} ({@code "mysql"} or {@code "postgresql"}).
    */
-  static boolean isEnabled(String backendType) {
+  public static boolean isEnabled(String backendType) {
     return adminUrl(backendType) != null;
   }
 
@@ -78,24 +79,41 @@ final class SharedCoreDatabaseProvisioner {
    * @throws IllegalStateException if {@link #isEnabled(String)} is {@code false} for {@code
    *     backendType}
    */
-  static String provision(String backendType) throws IOException {
+  public static String provision(String backendType) throws IOException {
+    String dbUrl = createDatabase(backendType);
+    runSchemaMigration(backendType, dbUrl, user(backendType), password(backendType));
+    return dbUrl;
+  }
+
+  /**
+   * Creates a brand-new, empty, uniquely-named database on the shared server for {@code
+   * backendType} and returns its JDBC URL, for tests that create their own tables.
+   *
+   * @throws IllegalStateException if {@link #isEnabled(String)} is {@code false} for {@code
+   *     backendType}
+   */
+  public static String createDatabase(String backendType) {
     String adminUrl = adminUrl(backendType);
     if (adminUrl == null) {
-      throw new IllegalStateException(
-          "Shared-container mode is not enabled for backend " + backendType);
+      throw new IllegalStateException("No shared database server is set for " + backendType);
     }
-    String adminUser = System.getProperty(ADMIN_PROPERTY_PREFIX + backendType + ".user");
-    String adminPassword = System.getProperty(ADMIN_PROPERTY_PREFIX + backendType + ".password");
-
     if ("mysql".equals(backendType)) {
       loadMySQLDriver();
     }
-
     String dbName = nextDatabaseName();
-    DatabaseProvisioning.createDatabaseIfAbsent(adminUrl, adminUser, adminPassword, dbName);
-    String dbUrl = buildJdbcUrlForDatabase(adminUrl, dbName);
-    runSchemaMigration(backendType, dbUrl, adminUser, adminPassword);
-    return dbUrl;
+    DatabaseProvisioning.createDatabaseIfAbsent(
+        adminUrl, user(backendType), password(backendType), dbName);
+    return buildJdbcUrlForDatabase(adminUrl, dbName);
+  }
+
+  /** The user for databases on the shared server for {@code backendType}. */
+  public static String user(String backendType) {
+    return System.getProperty(ADMIN_PROPERTY_PREFIX + backendType + ".user");
+  }
+
+  /** The password for databases on the shared server for {@code backendType}. */
+  public static String password(String backendType) {
+    return System.getProperty(ADMIN_PROPERTY_PREFIX + backendType + ".password");
   }
 
   /**

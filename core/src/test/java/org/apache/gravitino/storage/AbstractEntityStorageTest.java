@@ -101,6 +101,7 @@ import org.apache.gravitino.storage.relational.CoreBackend;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
+import org.apache.gravitino.storage.relational.SharedCoreDatabaseProvisioner;
 import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
@@ -189,10 +190,16 @@ abstract class AbstractEntityStorageTest {
             SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
 
       } else if (type.equalsIgnoreCase("mysql")) {
-        String mysqlJdbcUrl = baseIT.startAndInitMySQLBackend();
+        boolean shared = SharedCoreDatabaseProvisioner.isEnabled("mysql");
+        String mysqlJdbcUrl =
+            shared
+                ? SharedCoreDatabaseProvisioner.provision("mysql")
+                : baseIT.startAndInitMySQLBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlJdbcUrl);
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.user("mysql") : "root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.password("mysql") : "root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("com.mysql.cj.jdbc.Driver");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
@@ -203,10 +210,16 @@ abstract class AbstractEntityStorageTest {
             SQLExceptionConverterFactory.class, "converter", new MySQLExceptionConverter(), true);
 
       } else if (type.equalsIgnoreCase("postgresql")) {
-        String postgreSQLJdbcUrl = baseIT.startAndInitPGBackend();
+        boolean shared = SharedCoreDatabaseProvisioner.isEnabled("postgresql");
+        String postgreSQLJdbcUrl =
+            shared
+                ? SharedCoreDatabaseProvisioner.provision("postgresql")
+                : baseIT.startAndInitPGBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(postgreSQLJdbcUrl);
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.user("postgresql") : "root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.password("postgresql") : "root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("org.postgresql.Driver");
 

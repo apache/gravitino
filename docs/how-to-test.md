@@ -49,6 +49,16 @@ This command runs all the unit tests and skips the integration tests.
 
 A class joins a database backend through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these is a unit test and runs in `:core:test`. A class tagged `gravitino-docker-test` with none of these runs nowhere, and `TestCoreLaneMembership` fails until you add one.
 
+To run the MySQL or PostgreSQL tests against a database you already have (for example a service container on a Kubernetes CI runner), set its admin connection in the environment. The task then starts no container and creates a new database on that server for each test fixture:
+
+```shell
+export GRAVITINO_TEST_MYSQL_URL='jdbc:mysql://mysql:3306/?useSSL=false&allowPublicKeyRetrieval=true'
+export GRAVITINO_TEST_MYSQL_USER=root GRAVITINO_TEST_MYSQL_PASSWORD=secret
+./gradlew :core:coreMySQLTest
+```
+
+`GRAVITINO_TEST_POSTGRESQL_URL`, `_USER` and `_PASSWORD` work the same way. The user needs permission to create databases. Without these variables the tasks start Docker containers as before.
+
 To check where a class runs, run it with `--tests`:
 
 ```shell

@@ -237,15 +237,18 @@ public class BackendTestExtension
                   + backendType
                   + " Gradle task.");
         }
+        boolean shared = SharedCoreDatabaseProvisioner.isEnabled(backendType);
         String url =
-            SharedCoreDatabaseProvisioner.isEnabled(backendType)
+            shared
                 ? SharedCoreDatabaseProvisioner.provision(backendType)
                 : "mysql".equals(backendType)
                     ? baseIT.startAndInitMySQLBackend()
                     : baseIT.startAndInitPGBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(url);
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.user(backendType) : "root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+            .thenReturn(shared ? SharedCoreDatabaseProvisioner.password(backendType) : "root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn(
                 "mysql".equals(backendType) ? "com.mysql.cj.jdbc.Driver" : "org.postgresql.Driver");

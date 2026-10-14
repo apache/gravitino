@@ -183,6 +183,22 @@ val macDockerConnectorFixedNetwork =
 // classes active concurrently, while remaining far larger than any single test actually needs.
 val sharedDbTestConnectionPoolSize = 20
 
+// A database the environment injects for a backend, e.g. a service container on a Kubernetes
+// runner: GRAVITINO_TEST_MYSQL_URL / _USER / _PASSWORD (or POSTGRESQL). The URL is an admin JDBC
+// URL; each test fixture gets its own new database on that server. When set, the task uses it
+// and starts no container; otherwise it falls back to Docker.
+data class InjectedDatabase(val url: String, val user: String, val password: String)
+
+fun injectedDatabase(backend: String): InjectedDatabase? {
+  val prefix = "GRAVITINO_TEST_${backend.uppercase()}_"
+  val url = providers.environmentVariable(prefix + "URL").orNull?.takeIf { it.isNotBlank() } ?: return null
+  return InjectedDatabase(
+    url,
+    providers.environmentVariable(prefix + "USER").orNull ?: "root",
+    providers.environmentVariable(prefix + "PASSWORD").orNull ?: ""
+  )
+}
+
 fun registerCoreTestTask(
   taskName: String,
   backend: String
@@ -284,10 +300,12 @@ fun registerCoreTestTask(
     shardRecords.forEach { logger.lifecycle(it) }
   }
 
+  val injected = injectedDatabase(backend)
   doFirst {
-    if (rootProject.extra["dockerTest"] != true) {
+    if (injected == null && rootProject.extra["dockerTest"] != true) {
       throw GradleException(
-        "$path requires Docker; use -PskipDockerTests=false with Docker running."
+        "$path requires Docker or an injected database; use -PskipDockerTests=false with " +
+          "Docker running, or set GRAVITINO_TEST_${backend.uppercase()}_URL."
       )
     }
   }
@@ -307,7 +325,14 @@ fun registerCoreTestTask(
   // actually reads at test-JVM runtime. Gating shared-container startup on anything looser
   // here could start it even when the forked test JVM will never see dockerTest=true and so
   // never use it.
-  if (rootProject.extra["dockerTest"] == true) {
+  if (injected != null) {
+    // Set at execution time so credentials stay out of the task's cache key.
+    doFirst {
+      systemProperty(sharedDbAdminPropertyPrefix + backend + ".adminUrl", injected.url)
+      systemProperty(sharedDbAdminPropertyPrefix + backend + ".user", injected.user)
+      systemProperty(sharedDbAdminPropertyPrefix + backend + ".password", injected.password)
+    }
+  } else if (rootProject.extra["dockerTest"] == true) {
     @Suppress("UNCHECKED_CAST")
     val sharedDbContainerService =
       rootProject.extra["sharedDbContainerService"] as Provider<SharedDbContainerService>
@@ -348,12 +373,16 @@ tasks.test {
 }
 
 val coreDatabaseTestTasks = listOf("coreMySQLTest", "corePostgreSQLTest")
-// `check` (and so `build`) also runs the database tasks when Docker tests are on. They run no
+// `check` (and so `build`) also runs a database task when Docker tests are on or its database is
+// injected. They run no
 // tests under -PskipTests, which selects integration tests only and core has none.
 tasks.check {
-  if (rootProject.extra["dockerTest"] == true) {
-    dependsOn(coreDatabaseTestTasks)
-  }
+  dependsOn(
+    coreDatabaseTestTasks.filter {
+      rootProject.extra["dockerTest"] == true ||
+        injectedDatabase(it.removePrefix("core").removeSuffix("Test").lowercase()) != null
+    }
+  )
 }
 coreDatabaseTestTasks.forEach {
   tasks.named(it) { onlyIf("-PskipTests selects integration tests only") { !rootProject.hasProperty("skipTests") } }
