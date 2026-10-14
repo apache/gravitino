@@ -96,7 +96,7 @@ public class TestSharedCoreDatabaseProvisioner {
 
     assertTrue(first.matches("^[a-zA-Z0-9_$]+$"), "name must match the allowed character set");
     assertTrue(first.length() <= 63, "name must not exceed the 63-character cap");
-    assertTrue(first.startsWith("gravitino_core_1_"));
+    assertTrue(first.matches("^gravitino_core_[0-9a-f]+_1_\\d+$"), first);
     assertNotEquals(first, second, "consecutive calls must never collide");
   }
 

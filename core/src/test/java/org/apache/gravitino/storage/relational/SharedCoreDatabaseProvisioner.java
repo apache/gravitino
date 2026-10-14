@@ -28,6 +28,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.gravitino.config.ConfigConstants;
@@ -61,6 +62,11 @@ public final class SharedCoreDatabaseProvisioner {
   static final String POOL_MAX_CONNECTIONS_PROPERTY = ADMIN_PROPERTY_PREFIX + "pool.maxConnections";
 
   private static final AtomicLong DATABASE_COUNTER = new AtomicLong();
+
+  // Differs per test JVM, so a later run on a long-lived injected server never reuses an earlier
+  // run's database (and its rows) under the same name.
+  private static final String RUN_TOKEN =
+      Long.toHexString(ThreadLocalRandom.current().nextLong() & 0xffffffffL);
 
   private SharedCoreDatabaseProvisioner() {}
 
@@ -138,16 +144,18 @@ public final class SharedCoreDatabaseProvisioner {
   }
 
   /**
-   * Computes a fresh database name: {@code "gravitino_core_" + sanitize(worker) + "_" + counter},
-   * where {@code worker} is {@code System.getProperty("org.gradle.test.worker", "local")} and
-   * {@code counter} is a per-JVM monotonically increasing value - unlike a name derived only from a
-   * test class name, this can never collide within one fork no matter how many databases that fork
-   * ends up provisioning, and the worker prefix keeps distinct forks apart from each other.
+   * Computes a fresh database name: {@code "gravitino_core_" + token + "_" + sanitize(worker) + "_"
+   * + counter}, where {@code token} is random per JVM, where {@code worker} is {@code
+   * System.getProperty("org.gradle.test.worker", "local")} and {@code counter} is a per-JVM
+   * monotonically increasing value - unlike a name derived only from a test class name, this can
+   * never collide within one fork no matter how many databases that fork ends up provisioning, and
+   * the worker prefix keeps distinct forks apart from each other.
    */
   static String nextDatabaseName() {
     String worker =
         System.getProperty("org.gradle.test.worker", "local").replaceAll("[^a-zA-Z0-9_$]", "_");
-    String name = "gravitino_core_" + worker + "_" + DATABASE_COUNTER.incrementAndGet();
+    String name =
+        "gravitino_core_" + RUN_TOKEN + "_" + worker + "_" + DATABASE_COUNTER.incrementAndGet();
     if (!DatabaseProvisioning.isValidDatabaseName(name)) {
       // Only reachable for an absurdly long worker id - fail loudly instead of silently
       // colliding or truncating into an unrelated name.
