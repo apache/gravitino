@@ -371,6 +371,17 @@ public class HiveShimV3 extends HiveShim {
         .toList();
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public List<String> getTableNamesByInputFormatPrefix(
+      String catalogName, String databaseName, List<String> allTables, String inputFormatPrefix) {
+    return tableNamesByInputFormatPrefix(
+        invoke(
+            ExceptionTarget.schema(databaseName),
+            () -> client.getTableObjectsByName(catalogName, databaseName, allTables)),
+        inputFormatPrefix);
+  }
+
   @Override
   public List<String> getCatalogs() {
     return invoke(ExceptionTarget.other(""), client::getCatalogs);

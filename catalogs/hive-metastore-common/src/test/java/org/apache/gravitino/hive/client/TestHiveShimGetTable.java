@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
@@ -143,8 +144,9 @@ class TestHiveShimGetTable {
     when(client.getFields(DB, TABLE))
         .thenThrow(new MetaException("Storage schema reading not supported"));
 
-    RuntimeException failure =
-        Assertions.assertThrows(RuntimeException.class, () -> shim.getTable(CATALOG, DB, TABLE));
+    GravitinoRuntimeException failure =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> shim.getTable(CATALOG, DB, TABLE));
 
     Assertions.assertTrue(failure.getMessage().contains("Metastore classpath"));
     Assertions.assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
@@ -171,6 +173,61 @@ class TestHiveShimGetTable {
                       hiveTable(HiveShim.TYPE_FROM_DESERIALIZER), fields));
       Assertions.assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
     }
+  }
+
+  @Test
+  void testGetTableRejectsUnresolvedSchemaAfterExceptionConversion() throws Exception {
+    MockHiveShim shim = new MockHiveShim();
+    when(shim.metaStoreClient().getTable(DB, TABLE))
+        .thenReturn(hiveTable(HiveShim.TYPE_FROM_DESERIALIZER));
+    when(shim.metaStoreClient().getFields(DB, TABLE))
+        .thenReturn(List.of(new FieldSchema("value", HiveShim.TYPE_FROM_DESERIALIZER, null)));
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> shim.getTable(CATALOG, DB, TABLE));
+    Assertions.assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+  }
+
+  @Test
+  void testMetadataListingDoesNotResolveUnrelatedDerivedSchemas() throws Exception {
+    MockHiveShim shim = new MockHiveShim();
+    Table derived = hiveTable(HiveShim.TYPE_FROM_DESERIALIZER);
+    derived.getSd().setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
+    Table hudi = hiveTable("int");
+    hudi.setTableName("hudi");
+    hudi.getSd().setInputFormat("org.apache.hudi.hadoop.HoodieParquetInputFormat");
+    Table missingFormat = hiveTable("int");
+    missingFormat.getSd().setInputFormat(null);
+    Table missingStorage = hiveTable("int");
+    missingStorage.setSd(null);
+    when(shim.metaStoreClient().getTableObjectsByName(DB, List.of(TABLE, "hudi")))
+        .thenReturn(List.of(derived, hudi, missingFormat, missingStorage));
+    when(shim.metaStoreClient().getFields(DB, TABLE)).thenThrow(new MetaException("SerDe missing"));
+    Assertions.assertEquals(
+        List.of("hudi"),
+        shim.getTableNamesByInputFormatPrefix(
+            CATALOG, DB, List.of(TABLE, "hudi"), "org.apache.hudi"));
+    verify(shim.metaStoreClient(), never()).getFields(anyString(), anyString());
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> shim.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "hudi")));
+  }
+
+  @Test
+  void testAlterMarkerCompatibilityFailureProvidesServerGuidance() {
+    MetaException cause =
+        new MetaException(
+            "java.lang.IllegalArgumentException: Error: type expected at the position 0 of '<derived from deserializer>' but '<' is found.");
+    RuntimeException failure =
+        HiveExceptionConverter.toGravitinoException(
+            cause, HiveExceptionConverter.ExceptionTarget.table(TABLE));
+    Assertions.assertInstanceOf(GravitinoRuntimeException.class, failure);
+    Assertions.assertSame(cause, failure.getCause());
+    Assertions.assertTrue(
+        failure
+            .getMessage()
+            .contains("hive.metastore.disallow.incompatible.col.type.changes=false"));
+    Assertions.assertTrue(failure.getMessage().contains("all tables"));
   }
 
   private static Table hiveTable(String columnType) {

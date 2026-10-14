@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.meta.AuditInfo;
@@ -399,9 +400,51 @@ class TestHiveShimV3 {
     when(client.getFields(CATALOG, DB, TABLE))
         .thenThrow(new MetaException("Storage schema reading not supported"));
 
-    RuntimeException failure =
-        assertThrows(RuntimeException.class, () -> shim.getTable(CATALOG, DB, TABLE));
+    GravitinoRuntimeException failure =
+        assertThrows(GravitinoRuntimeException.class, () -> shim.getTable(CATALOG, DB, TABLE));
 
+    assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+    verify(client, never()).getNotNullConstraints(any());
+  }
+
+  @Test
+  void testMetadataListingUsesCatalogWithoutResolvingSchemas() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table derived =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+    derived.getSd().setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
+    Table hudi =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.IntegerType.get())));
+    hudi.setTableName("hudi");
+    hudi.getSd().setInputFormat("org.apache.hudi.hadoop.HoodieParquetInputFormat");
+    when(client.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "hudi")))
+        .thenReturn(List.of(derived, hudi));
+    when(client.getFields(CATALOG, DB, TABLE)).thenThrow(new MetaException("SerDe missing"));
+    assertEquals(
+        List.of("hudi"),
+        shim.getTableNamesByInputFormatPrefix(
+            CATALOG, DB, List.of(TABLE, "hudi"), "org.apache.hudi"));
+    verify(client, never()).getFields(anyString(), anyString(), anyString());
+    verify(client, never()).getNotNullConstraints(any());
+    verify(client, never()).getDefaultConstraints(any());
+    assertThrows(
+        GravitinoRuntimeException.class,
+        () -> shim.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "hudi")));
+  }
+
+  @Test
+  void testGetTableRejectsUnresolvedSchemaAfterExceptionConversion() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table derived =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(derived);
+    when(client.getFields(CATALOG, DB, TABLE)).thenReturn(derived.getSd().getCols());
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> shim.getTable(CATALOG, DB, TABLE));
     assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
     verify(client, never()).getNotNullConstraints(any());
   }

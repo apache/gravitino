@@ -323,6 +323,27 @@ public abstract class HiveShim {
     }
   }
 
+  /**
+   * Returns names of tables whose storage input format starts with the supplied prefix.
+   *
+   * <p>This metadata-only operation does not resolve column schemas or load constraints.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param allTables The table names to inspect.
+   * @param inputFormatPrefix The required input format prefix.
+   * @return Matching table names.
+   */
+  public List<String> getTableNamesByInputFormatPrefix(
+      String catalogName, String databaseName, List<String> allTables, String inputFormatPrefix) {
+    try {
+      return tableNamesByInputFormatPrefix(
+          client.getTableObjectsByName(databaseName, allTables), inputFormatPrefix);
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
+    }
+  }
+
   public List<String> getCatalogs() {
     return List.of();
   }
@@ -438,6 +459,22 @@ public abstract class HiveShim {
       throw new IllegalArgumentException(derivedSchemaError(table));
     }
     table.getSd().setCols(resolvedColumns);
+  }
+
+  /**
+   * Filters raw metastore tables by their input format without converting their schemas.
+   *
+   * @param tables The metastore tables.
+   * @param inputFormatPrefix The required input format prefix.
+   * @return Matching table names.
+   */
+  protected static List<String> tableNamesByInputFormatPrefix(
+      List<Table> tables, String inputFormatPrefix) {
+    return tables.stream()
+        .filter(table -> table.getSd() != null && table.getSd().getInputFormat() != null)
+        .filter(table -> table.getSd().getInputFormat().startsWith(inputFormatPrefix))
+        .map(Table::getTableName)
+        .toList();
   }
 
   private static String derivedSchemaError(Table table) {

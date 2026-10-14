@@ -169,6 +169,19 @@ public class HiveExceptionConverter {
       return new IllegalArgumentException(cause.getMessage(), cause);
     }
 
+    if (exceptionClassName.contains("MetaException")
+        && lowerMessage.contains("type expected")
+        && lowerMessage.contains("<derived from deserializer>")) {
+      return new GravitinoRuntimeException(
+          cause,
+          "Hive Metastore cannot alter table %s while preserving its SerDe-derived storage schema. "
+              + "The HMS server's column type compatibility check cannot parse "
+              + "<derived from deserializer>. Ask the metastore administrator to evaluate "
+              + "hive.metastore.disallow.incompatible.col.type.changes=false on the HMS server; "
+              + "this disables column type compatibility checks for all tables.",
+          target.name());
+    }
+
     if (exceptionClassName.contains("MetaException")) {
       if (lowerMessage.contains("invalid partition key")) {
         return new NoSuchPartitionException(
