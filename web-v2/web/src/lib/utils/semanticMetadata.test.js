@@ -112,6 +112,19 @@ describe('focused metadata updates', () => {
     ).toEqual({ instructions: 'Text guidance', synonyms: [], examples: [] })
   })
 
+  it.each([targets[2], targets[4]])('clears an optional $kind data type without changing other metadata', target => {
+    for (const cleared of ['', undefined, null]) {
+      const definition = makeDefinition()
+      const entity = getSemanticMetadataEntity(definition, target)
+      entity.datatype = 'Decimal'
+      const values = { ...semanticMetadataFormValues(entity), datatype: cleared }
+      const expected = structuredClone(definition)
+      getSemanticMetadataEntity(expected, target).datatype = null
+      expect(updateSemanticMetadata(definition, target, values)).toEqual(expected)
+      expect(entity.datatype).toBe('Decimal')
+    }
+  })
+
   it('adds context only when the guidance is edited', () => {
     const definition = makeDefinition()
     delete definition.aiContext

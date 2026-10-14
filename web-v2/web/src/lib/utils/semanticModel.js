@@ -22,6 +22,20 @@ import { isEqual, isPlainObject } from 'lodash-es'
 const SOURCE_NAMESPACE_LENGTH = 2
 const DEFINITION_INDENT = 2
 
+// Wire names accepted by SemanticDTOUtils.DataTypeDeserializer.
+export const semanticDataTypes = [
+  'String',
+  'Integer',
+  'Decimal',
+  'Float',
+  'Boolean',
+  'Date',
+  'Time',
+  'DateTime',
+  'DateTimeTz',
+  'Opaque'
+]
+
 const isNonBlankString = value => typeof value === 'string' && value.trim() !== ''
 
 const duplicatesOf = names => {
@@ -117,6 +131,12 @@ const validateMetadata = (entity, path, errors) => {
   }
 }
 
+const validateDataType = (datatype, path, errors) => {
+  if (datatype != null && !semanticDataTypes.includes(datatype)) {
+    errors.push(`${path}.datatype must be null or one of: ${semanticDataTypes.join(', ')}.`)
+  }
+}
+
 const validateDatasets = (datasets, errors) => {
   datasets.forEach((dataset, index) => {
     if (!isPlainObject(dataset) || !isNonBlankString(dataset.name)) {
@@ -159,6 +179,7 @@ const validateDatasets = (datasets, errors) => {
       }
       const path = `datasets[${index}].fields[${fieldIndex}]`
       validateExpression(field.expression, path, errors)
+      validateDataType(field.datatype, path, errors)
       validateMetadata(field, path, errors)
     })
 
@@ -217,6 +238,7 @@ const validateMetrics = (metrics, errors) => {
       return
     }
     validateExpression(metric.expression, `metrics[${index}]`, errors)
+    validateDataType(metric.datatype, `metrics[${index}]`, errors)
     validateMetadata(metric, `metrics[${index}]`, errors)
   })
 

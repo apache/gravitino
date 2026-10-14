@@ -395,6 +395,94 @@ describe('Semantic Model accessible details', () => {
 })
 
 describe('focused semantic metadata editing', () => {
+  const selectOption = async (id, label) => {
+    await act(async () => Simulate.mouseDown(document.querySelector(id).closest('.ant-select-selector')))
+    await click(findText('.ant-select-item-option-content', label))
+  }
+
+  it.each(['field', 'metric'])('selects and clears the optional %s data type', async kind => {
+    const definition = definitionWith(() => null)
+    const entity = kind === 'field' ? definition.datasets[0].fields[0] : definition.metrics[0]
+    entity.datatype = 'Decimal'
+    await renderDetails(definition)
+    if (kind === 'field') {
+      await click(
+        document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon')
+      )
+      await click(document.querySelector('[aria-label="Edit field amount"]'))
+    } else {
+      await selectTab('Metrics')
+      await click(document.querySelector('[aria-label="Edit metric revenue"]'))
+    }
+    await selectOption('#semanticMetadata_datatype', 'DateTimeTz')
+    const selector = document.querySelector('#semanticMetadata_datatype').closest('.ant-select')
+    expect(selector.textContent).toContain('DateTimeTz')
+    const expected = structuredClone(definition)
+    const updatedEntity = kind === 'field' ? expected.datasets[0].fields[0] : expected.metrics[0]
+    updatedEntity.datatype = 'DateTimeTz'
+
+    // Keep the editor open after a failed request so the same draft can also be cleared.
+    defHttp.put.mockRejectedValueOnce(new Error('Save rejected'))
+    await click(findText('.ant-modal button', 'Save'))
+    expect(defHttp.put.mock.lastCall[0].data).toEqual({
+      updates: [{ '@type': 'replaceDefinition', definition: expected }]
+    })
+    await act(async () => Simulate.mouseDown(selector.querySelector('.ant-select-clear')))
+    updatedEntity.datatype = null
+    const model = { name: navigation.name, definition: expected, properties: {} }
+    defHttp.put.mockResolvedValue({ semanticModel: model })
+    defHttp.get.mockResolvedValue({ semanticModel: model, identifiers: [] })
+    await click(findText('.ant-modal button', 'Save'))
+    expect(defHttp.put.mock.lastCall[0].data).toEqual({
+      updates: [{ '@type': 'replaceDefinition', definition: expected }]
+    })
+    expect(document.querySelector('.ant-modal')).toBeNull()
+  })
+
+  it('preserves text and structured drafts through repeated format switches before saving', async () => {
+    const definition = definitionWith(() => 'Original guidance')
+    await renderDetails(definition)
+    await click(findText('button', 'Edit Model AI Context'))
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_contextText'), {
+        target: { value: 'Text draft before conversion' }
+      })
+    )
+    await selectOption('#semanticMetadata_contextFormat', 'Structured')
+    expect(document.querySelector('#semanticMetadata_instructions').value).toBe('Text draft before conversion')
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_instructions'), {
+        target: { value: 'Edited structured instructions' }
+      })
+    )
+    await click(findText('.ant-modal button', 'Add example'))
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_examples_0'), {
+        target: { value: 'Keep my example' }
+      })
+    )
+    for (let i = 0; i < 2; i++) {
+      await selectOption('#semanticMetadata_contextFormat', 'Text')
+      expect(document.querySelector('#semanticMetadata_contextText').value).toBe('Text draft before conversion')
+      await selectOption('#semanticMetadata_contextFormat', 'Structured')
+      expect(document.querySelector('#semanticMetadata_instructions').value).toBe('Edited structured instructions')
+      expect(document.querySelector('#semanticMetadata_examples_0').value).toBe('Keep my example')
+    }
+
+    const expected = {
+      ...definition,
+      aiContext: { instructions: 'Edited structured instructions', synonyms: [], examples: ['Keep my example'] }
+    }
+    const model = { name: navigation.name, definition: expected, properties: {} }
+    defHttp.put.mockResolvedValue({ semanticModel: model })
+    defHttp.get.mockResolvedValue({ semanticModel: model, identifiers: [] })
+    await click(findText('.ant-modal button', 'Save'))
+    expect(defHttp.put.mock.lastCall[0].data).toEqual({
+      updates: [{ '@type': 'replaceDefinition', definition: expected }]
+    })
+    expect(document.querySelector('.ant-modal')).toBeNull()
+  })
+
   it.each(['model', 'dataset', 'field', 'relationship', 'metric'])(
     'edits only the selected %s metadata and preserves unknown keys',
     async kind => {

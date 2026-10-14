@@ -17,12 +17,12 @@
  * under the License.
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Modal, Select, Space, Typography } from 'antd'
 import { isEqual } from 'lodash-es'
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { updateSemanticModel } from '@/lib/store/metalakes'
-import { validateSemanticModelDefinition } from '@/lib/utils/semanticModel'
+import { semanticDataTypes, validateSemanticModelDefinition } from '@/lib/utils/semanticModel'
 import {
   getSemanticMetadataEntity,
   semanticMetadataFormValues,
@@ -48,6 +48,7 @@ export default function SemanticMetadataEditor({
   const [original] = useState(definition)
   const entity = getSemanticMetadataEntity(original, target)
   const [initial] = useState(() => semanticMetadataFormValues(entity))
+  const structuredContextInitialized = useRef(initial.contextFormat === 'structured')
   const contextFormat = Form.useWatch('contextFormat', form) || initial.contextFormat
   const hasExpression = ['field', 'metric'].includes(target.kind)
   const title = target.kind === 'model' ? 'Edit Model AI Context' : `Edit ${target.kind} ${target.name}`
@@ -134,7 +135,7 @@ export default function SemanticMetadataEditor({
           {hasExpression && (
             <>
               <Form.Item name='datatype' label='Data type'>
-                <Input />
+                <Select allowClear placeholder='Not specified' options={semanticDataTypes.map(value => ({ value }))} />
               </Form.Item>
               <Typography.Title level={5}>Dialect expressions</Typography.Title>
               <Form.List name='dialects'>
@@ -203,8 +204,10 @@ export default function SemanticMetadataEditor({
                 { value: 'structured', label: 'Structured' }
               ]}
               onChange={value => {
-                if (value === 'structured' && initial.contextFormat === 'text')
+                if (value === 'structured' && !structuredContextInitialized.current) {
                   form.setFieldValue('instructions', form.getFieldValue('contextText'))
+                  structuredContextInitialized.current = true
+                }
               }}
             />
           </Form.Item>

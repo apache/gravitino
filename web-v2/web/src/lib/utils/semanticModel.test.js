@@ -188,6 +188,35 @@ describe('nested Semantic Model contract validation', () => {
   const expression = { dialects: [{ dialect: 'ANSI_SQL', expression: 'amount' }] }
   const relationship = { name: 'self', from: 'orders', to: 'orders', fromColumns: ['id'], toColumns: ['id'] }
 
+  test.each(['field', 'metric'])('accepts only the server-supported optional %s data types', kind => {
+    const withType = datatype =>
+      kind === 'field'
+        ? { datasets: [{ ...orders, fields: [{ ...orders.fields[0], datatype }] }] }
+        : definitionOf({ metrics: [{ name: 'revenue', expression, datatype }] })
+    for (const datatype of [
+      undefined,
+      null,
+      'String',
+      'Integer',
+      'Decimal',
+      'Float',
+      'Boolean',
+      'Date',
+      'Time',
+      'DateTime',
+      'DateTimeTz',
+      'Opaque'
+    ]) {
+      expect(validateSemanticModelDefinition(withType(datatype))).toEqual([])
+    }
+    for (const datatype of ['', ' ', 'decimal', 'Decimal(10,2)', 'Unsupported', 42, {}, []]) {
+      const { definition, errors } = parseSemanticModelDefinition(JSON.stringify(withType(datatype)))
+      expect(definition).toBeNull()
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toContain(kind === 'field' ? 'datasets[0].fields[0].datatype' : 'metrics[0].datatype')
+    }
+  })
+
   test.each([
     undefined,
     null,

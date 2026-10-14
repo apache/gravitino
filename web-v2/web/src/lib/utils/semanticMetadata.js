@@ -57,7 +57,8 @@ export const updateSemanticMetadata = (definition, target, values) => {
   if (!entity) throw new Error('The selected metadata no longer exists. Reload the model and try again.')
   const initial = semanticMetadataFormValues(entity)
   for (const key of editableProperties[target.kind]) {
-    if (!isEqual(initial[key], values[key])) entity[key] = values[key] ?? null
+    const value = key === 'datatype' && values[key] === '' ? null : values[key]
+    if (!isEqual(initial[key], value)) entity[key] = value ?? null
   }
   if (['field', 'metric'].includes(target.kind) && !isEqual(initial.dialects, values.dialects)) {
     entity.expression = { ...entity.expression, dialects: cloneDeep(values.dialects) }

@@ -942,8 +942,7 @@ export default function SchemaDetailsPage() {
             <Table
               data-refer='semantic-model-list-grid'
               size='small'
-              style={{ maxHeight: 'calc(100vh - 30rem)' }}
-              scroll={{ x: semanticModelTableWidth, y: 'calc(100vh - 37rem)' }}
+              scroll={{ x: semanticModelTableWidth, y: 'max(20rem, calc(100vh - 37rem))' }}
               dataSource={semanticModelData}
               pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
               columns={semanticModelResizableColumns}
