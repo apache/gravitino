@@ -26,7 +26,8 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Base for built-in policy contents that may carry optional execution peer fields.
  *
- * <p>Subclasses keep strategy-only constructors. Callers attach peers through {@link #peers}.
+ * <p>Subclasses keep strategy-only constructors. Callers attach execution fields through {@link
+ * #withExecutionFields}.
  */
 public abstract class AbstractExecutablePolicyContent implements PolicyContent {
 
@@ -36,11 +37,11 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
   private Map<String, String> jobOptions = PolicyExecutionFields.copyOptions(null);
   private Map<String, String> updateOptions = PolicyExecutionFields.copyOptions(null);
 
-  /** Creates content with unset peer fields. */
+  /** Creates content with unset execution fields. */
   protected AbstractExecutablePolicyContent() {}
 
   /**
-   * Attaches optional execution peer fields. Strategy subclasses do not take these in constructors.
+   * Attaches optional execution fields. Strategy subclasses do not take these in constructors.
    *
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
@@ -51,7 +52,7 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
    * @return this instance
    */
   @SuppressWarnings("unchecked")
-  public <T extends AbstractExecutablePolicyContent> T peers(
+  public <T extends AbstractExecutablePolicyContent> T withExecutionFields(
       @Nullable String timeTrigger,
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,

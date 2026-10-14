@@ -192,7 +192,7 @@ public class PolicyContents {
             rewriteStrategy,
             sortOrder,
             rewriteOptions)
-        .peers(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
@@ -241,7 +241,7 @@ public class PolicyContents {
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun)
-        .peers(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
@@ -270,7 +270,7 @@ public class PolicyContents {
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return new IcebergRewriteManifestsContent()
-        .peers(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
@@ -299,7 +299,7 @@ public class PolicyContents {
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return new IcebergSnapshotExpirationContent()
-        .peers(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        .withExecutionFields(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
