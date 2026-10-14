@@ -17,26 +17,49 @@
  * under the License.
  */
 
-import { Collapse, Typography } from 'antd'
+import { useState } from 'react'
+import { Button, Typography } from 'antd'
+import SemanticMetadataSection from './SemanticMetadataSection'
+
+function ExtensionData({ data }) {
+  const [raw, setRaw] = useState(false)
+  let formatted
+  try {
+    const parsed = JSON.parse(data)
+    if (parsed && typeof parsed === 'object') formatted = JSON.stringify(parsed, null, 2)
+  } catch {
+    // Vendor data may be arbitrary text.
+  }
+
+  return (
+    <>
+      {formatted && (
+        <Button size='small' className='mb-2' onClick={() => setRaw(!raw)}>
+          {raw ? 'Show formatted JSON' : 'Show raw value'}
+        </Button>
+      )}
+      <pre className='m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs'>
+        {formatted && !raw ? formatted : data}
+      </pre>
+    </>
+  )
+}
 
 export default function SemanticModelExtensions({ extensions, label }) {
   if (!extensions?.length) return null
 
   return (
-    <section aria-label={label} className='mb-3'>
-      <Typography.Title level={5}>{label}</Typography.Title>
-      <Collapse
-        size='small'
-        items={extensions.map((extension, index) => ({
-          key: String(index),
-          label: extension.vendorName,
-          children: (
-            <pre className='m-0 max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-xs'>
-              {extension.data}
-            </pre>
-          )
-        }))}
-      />
-    </section>
+    <SemanticMetadataSection label={label}>
+      <div className='space-y-3'>
+        {extensions.map((extension, index) => (
+          <section key={index} aria-label={extension.vendorName}>
+            <Typography.Text type='secondary' className='mb-2 block text-xs font-medium'>
+              {extension.vendorName}
+            </Typography.Text>
+            <ExtensionData data={extension.data} />
+          </section>
+        ))}
+      </div>
+    </SemanticMetadataSection>
   )
 }

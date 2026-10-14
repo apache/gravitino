@@ -22,7 +22,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
 import { isUnsupportedOperationError } from '@/lib/utils/axios/unsupportedOperation'
 import toast from 'react-hot-toast'
-import { semanticModelNodeKey } from '@/lib/utils/semanticModel'
+import { semanticModelErrorMessage, semanticModelNodeKey } from '@/lib/utils/semanticModel'
 
 import _ from 'lodash-es'
 
@@ -2493,8 +2493,8 @@ export const updateSemanticModel = createAsyncThunk(
     const [err, res] = await to(updateSemanticModelApi({ metalake, catalog, schema, semanticModel, data }))
     await dispatch(setTableLoading(false))
 
-    if (err || !res) {
-      return { err: true }
+    if (err || !res?.semanticModel) {
+      return { err: true, message: semanticModelErrorMessage(err, 'Failed to update the Semantic Model.') }
     }
 
     await dispatch(fetchSemanticModels({ metalake, catalog, schema, init: true }))

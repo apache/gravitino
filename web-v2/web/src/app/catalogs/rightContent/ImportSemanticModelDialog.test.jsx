@@ -107,6 +107,9 @@ describe('OSSIE import', () => {
     await renderDialog()
     expect(document.querySelector('[data-refer="import-semantic-model-submit"]').disabled).toBe(true)
     await selectFile(name, text)
+    expect(document.body.textContent).toContain('Import preview')
+    expect(document.body.textContent).toContain('demo / sales / mart')
+    expect(document.body.textContent).toContain('imported')
     await submit()
     expect(defHttp.post).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,7 +130,7 @@ describe('OSSIE import', () => {
       .mockRejectedValueOnce({ response: { data: { message: 'datasets[0].source is invalid' } } })
       .mockResolvedValue({ semanticModel: { name: 'imported' } })
     await renderDialog()
-    await selectFile('model.json', '{ invalid }')
+    await selectFile('model.json', '{"name":"imported"}')
     await submit()
     expect(document.querySelector('.ant-alert-description').textContent).toBe('datasets[0].source is invalid')
     expect(document.body.textContent).toContain('model.json')
@@ -136,6 +139,32 @@ describe('OSSIE import', () => {
     await submit()
     expect(defHttp.post).toHaveBeenCalledTimes(2)
     expect(close).toHaveBeenCalledWith(false)
+  })
+
+  it('rejects malformed JSON at preview time without submitting it', async () => {
+    await renderDialog()
+    await selectFile('model.json', '{ invalid }')
+    expect(document.querySelector('.ant-alert')).not.toBeNull()
+    expect(document.querySelector('[data-refer="import-semantic-model-submit"]').disabled).toBe(true)
+    expect(defHttp.post).not.toHaveBeenCalled()
+  })
+
+  it('ignores a previous file read that finishes after the next selection', async () => {
+    await renderDialog()
+    let finish
+
+    const text = new Promise(resolve => {
+      finish = resolve
+    })
+    const file = new File([''], 'old.yaml')
+    file.text = () => text
+    const input = document.querySelector('input[type="file"]')
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
+    await selectFile('new.json', '{"name":"new"}')
+    await act(async () => finish('name: old'))
+    expect(document.querySelector('.ant-descriptions').textContent).toContain('new')
+    expect(document.querySelector('.ant-descriptions').textContent).not.toContain('old')
   })
 
   it.each([

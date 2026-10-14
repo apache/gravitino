@@ -155,7 +155,7 @@ const click = async element => {
 
 const findText = (selector, text) =>
   [...document.querySelectorAll(selector)].find(element => element.textContent === text)
-const expandContext = async label => click(findText('.ant-collapse-header', label))
+const expandContext = async label => click(findText('.ant-collapse-header-text', label))
 const selectTab = async name => click(findText('[role="tab"]', name))
 
 const exportDocument = async format => {
@@ -191,8 +191,10 @@ describe('Semantic Model AI guidance', () => {
         expect(document.body.textContent).toContain(`"scope": "${label}"`)
       }
     }
+    await selectTab('Overview')
     await expandContext('Model AI Context')
     verify('model')
+    await selectTab('Datasets')
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
     await expandContext('orders AI Context')
     verify('dataset')
@@ -292,10 +294,19 @@ describe('Semantic Model metadata', () => {
     await renderDetails(definition)
 
     const verify = async name => {
-      await expandContext(`${name} vendor`)
+      const label = {
+        model: 'Model',
+        dataset: 'orders',
+        field: 'amount',
+        relationship: 'customers',
+        metric: 'revenue'
+      }[name]
+      await expandContext(`${label} Vendor Extensions`)
       expect([...document.querySelectorAll('pre')].some(pre => pre.textContent === extension(name)[0].data)).toBe(true)
     }
+    await selectTab('Overview')
     await verify('model')
+    await selectTab('Datasets')
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
     await verify('dataset')
     await click(document.querySelector('[data-refer="semantic-model-fields-grid"] button.ant-table-row-expand-icon'))
@@ -315,12 +326,14 @@ describe('Semantic Model metadata', () => {
       { datasets: [] },
       { audit: { lastModifier: 'editor', lastModifiedTime: '2026-10-13T05:00:00Z' } }
     )
+    await selectTab('Overview')
     expect(document.querySelector('[data-refer="semantic-model-last-modifier"]').textContent).toBe('editor')
     expect(document.querySelector('[data-refer="semantic-model-last-modified-time"]').textContent).not.toBe('-')
   })
 
   it('omits absent modification audit values', async () => {
     await renderDetails({ datasets: [] })
+    await selectTab('Overview')
     expect(document.querySelector('[data-refer="semantic-model-last-modifier"]')).toBeNull()
     expect(document.querySelector('[data-refer="semantic-model-last-modified-time"]')).toBeNull()
   })
@@ -373,6 +386,7 @@ describe('editing from Semantic Model details', () => {
       } else {
         expect(navigation.replace).not.toHaveBeenCalled()
         expect(store.getState().metalakes.activatedDetails.comment).toBe('saved comment')
+        await selectTab('Overview')
         expect(document.querySelector('[data-refer="semantic-model-last-modifier"]').textContent).toBe('editor')
       }
       expect(document.querySelector('[data-refer="handle-submit-semantic-model"]')).toBeNull()
@@ -396,7 +410,9 @@ describe('Semantic Model accessible details', () => {
 
 describe('focused semantic metadata editing', () => {
   const selectOption = async (id, label) => {
-    await act(async () => Simulate.mouseDown(document.querySelector(id).closest('.ant-select-selector')))
+    await act(async () =>
+      Simulate.mouseDown(document.querySelector(id).closest('.ant-select').querySelector('.ant-select-selector'))
+    )
     await click(findText('.ant-select-item-option-content', label))
   }
 
@@ -442,6 +458,7 @@ describe('focused semantic metadata editing', () => {
   it('preserves text and structured drafts through repeated format switches before saving', async () => {
     const definition = definitionWith(() => 'Original guidance')
     await renderDetails(definition)
+    await selectTab('Overview')
     await click(findText('button', 'Edit Model AI Context'))
     await act(async () =>
       Simulate.change(document.querySelector('#semanticMetadata_contextText'), {
@@ -501,7 +518,10 @@ describe('focused semantic metadata editing', () => {
         return Promise.resolve({ semanticModel: model })
       })
       await renderDetails(definition, model)
-      if (kind === 'model') await click(findText('button', 'Edit Model AI Context'))
+      if (kind === 'model') {
+        await selectTab('Overview')
+        await click(findText('button', 'Edit Model AI Context'))
+      }
       if (kind === 'dataset') await click(document.querySelector('[aria-label="Edit dataset orders"]'))
       if (kind === 'field') {
         await click(
@@ -565,13 +585,14 @@ describe('focused semantic metadata editing', () => {
     await click(document.querySelector('[aria-label="Edit field amount"]'))
     await click(document.querySelector('[aria-label="Remove dialect 1"]'))
     await click(findText('.ant-modal button', 'Save'))
-    expect(document.body.textContent).toContain('expression must have non-empty dialects')
+    expect(document.body.textContent).toContain('Add at least one dialect expression.')
     expect(defHttp.put).not.toHaveBeenCalled()
     expect(document.querySelector('.ant-modal')).not.toBeNull()
   })
 
   it('closes an unchanged focused edit without sending a definition replacement', async () => {
     await renderDetails(definitionWith(() => null))
+    await selectTab('Overview')
     await click(findText('button', 'Edit Model AI Context'))
     await click(findText('.ant-modal button', 'Save'))
     expect(defHttp.put).not.toHaveBeenCalled()
@@ -587,12 +608,193 @@ describe('focused semantic metadata editing', () => {
     const code = document.querySelector('[data-refer="semantic-model-metrics-grid"] pre')
     expect(code.textContent).toBe(sql)
     expect(code.className).toContain('whitespace-pre-wrap')
-    expect(code.className).toContain('overflow-auto')
+    expect(code.className).toContain('overflow-hidden')
+    await click(document.querySelector('[aria-label="View expression for revenue"]'))
+    const fullSql = document.querySelector('.ant-modal pre')
+    expect(fullSql.textContent).toBe(sql)
+    expect(fullSql.className).toContain('leading-6')
+    expect(fullSql.className).toContain('overflow-auto')
   })
 
   it('does not show an AI Context action for a field without guidance', async () => {
     await renderDetails(definitionWith(() => null))
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
     expect(document.querySelector('[aria-label="amount AI Context"]')).toBeNull()
+  })
+
+  it('keeps model metadata in Overview while browsing compact expression rows', async () => {
+    const definition = definitionWith(() => 'guidance')
+    definition.metrics[0].expression.dialects = ['ANSI_SQL', 'TRINO', 'SPARK_SQL', 'POSTGRESQL'].map(dialect => ({
+      dialect,
+      expression: `-- ${dialect}\nSUM(amount)`
+    }))
+    await renderDetails(definition)
+    expect(document.body.textContent).not.toContain('Model AI Context')
+    await selectTab('Metrics')
+    const grid = document.querySelector('[data-refer="semantic-model-metrics-grid"]')
+    expect(grid.querySelectorAll('pre')).toHaveLength(1)
+    expect(grid.textContent).toContain('4 dialects')
+    await click(document.querySelector('[aria-label="View expression for revenue"]'))
+    expect(document.querySelector('.ant-modal pre').textContent).toBe('-- ANSI_SQL\nSUM(amount)')
+    await selectOption('[aria-label="SQL dialect"]', 'TRINO')
+    expect(document.querySelector('.ant-modal pre').textContent).toBe('-- TRINO\nSUM(amount)')
+    await selectOption('[aria-label="SQL dialect"]', 'All dialects')
+    expect(document.querySelectorAll('.ant-modal pre')).toHaveLength(4)
+    await click(document.querySelector('.ant-modal-close'))
+    await selectTab('Overview')
+    expect(document.body.textContent).toContain('Model AI Context')
+  })
+
+  it('filters fields by label, expands matching datasets, and clears both detail filters', async () => {
+    const definition = definitionWith(() => null)
+    definition.datasets[0].fields[0].label = 'Revenue amount'
+    definition.datasets.push({ name: 'other', fields: [{ name: 'cost' }] })
+    definition.metrics.push({ name: 'profit' })
+    await renderDetails(definition)
+    await act(async () =>
+      Simulate.change(document.querySelector('[aria-label="Search fields"]'), { target: { value: 'REVENUE' } })
+    )
+    const grid = document.querySelector('[data-refer="semantic-model-datasets-grid"]')
+    expect(grid.textContent).toContain('Revenue amount')
+    expect(grid.textContent).not.toContain('other')
+    expect(grid.querySelectorAll('[data-refer="semantic-model-fields-grid"]')).toHaveLength(1)
+    await click(findText('button', 'Clear field search'))
+    expect(grid.textContent).toContain('other')
+    await selectTab('Metrics')
+    await act(async () =>
+      Simulate.change(document.querySelector('[aria-label="Search metrics"]'), { target: { value: 'PROF' } })
+    )
+    const metrics = document.querySelector('[data-refer="semantic-model-metrics-grid"]')
+    expect(metrics.textContent).toContain('profit')
+    expect(metrics.textContent).not.toContain('revenue')
+    await click(findText('button', 'Clear metric search'))
+    expect(metrics.textContent).toContain('revenue')
+  })
+
+  it('uses the existing type palette in fields and metrics with a neutral fallback', async () => {
+    const definition = definitionWith(() => null)
+    definition.datasets[0].fields[0].datatype = 'String'
+    definition.metrics[0].datatype = 'Decimal'
+    definition.metrics.push({ name: 'unknown', datatype: 'FutureType' })
+    await renderDetails(definition)
+    await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    expect(findText('.ant-tag', 'String').className).toContain('ant-tag-orange')
+    await selectTab('Metrics')
+    expect(findText('.ant-tag', 'Decimal').className).toContain('ant-tag-blue')
+    expect(findText('.ant-tag', 'FutureType').className).not.toMatch(/ant-tag-(blue|orange)/)
+  })
+
+  it('formats structured extension data and still exposes the exact raw value', async () => {
+    const definition = definitionWith(() => null)
+    const raw = '{ "nested": {"flag":true}, "values":[1,2] }'
+    definition.customExtensions = [
+      { vendorName: 'json', data: raw },
+      { vendorName: 'text', data: 'arbitrary text' }
+    ]
+    await renderDetails(definition)
+    await selectTab('Overview')
+    await expandContext('Model Vendor Extensions')
+    const json = document.querySelector('section[aria-label="json"]')
+    expect(json.querySelector('pre').textContent).toBe(JSON.stringify(JSON.parse(raw), null, 2))
+    await click(findText('button', 'Show raw value'))
+    expect(json.querySelector('pre').textContent).toBe(raw)
+    expect(document.querySelector('section[aria-label="text"] pre').textContent).toBe('arbitrary text')
+    expect(definition.customExtensions[0].data).toBe(raw)
+  })
+
+  it('opens field guidance editing directly and retains drafts across all editor tabs', async () => {
+    const definition = definitionWith(() => ({ instructions: 'Original' }))
+    await renderDetails(definition)
+    await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    await click(document.querySelector('[aria-label="amount AI Context"]'))
+    await click(findText('.ant-modal button', 'Edit AI Context'))
+    expect(findText('.ant-modal [role="tab"]', 'AI Context').getAttribute('aria-selected')).toBe('true')
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_instructions'), {
+        target: { value: 'Keep guidance draft' }
+      })
+    )
+    await click(findText('.ant-modal [role="tab"]', 'Expressions'))
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_dialects_0_expression'), {
+        target: { value: '-- draft\namount * 2' }
+      })
+    )
+    await click(findText('.ant-modal [role="tab"]', 'Basic information'))
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_description'), {
+        target: { value: 'Keep description draft' }
+      })
+    )
+    await click(findText('.ant-modal button', 'Cancel'))
+    expect(document.body.textContent).toContain('Discard unsaved changes?')
+    await click(findText('.ant-modal button', 'Keep editing'))
+    expect(document.querySelector('#semanticMetadata_description').value).toBe('Keep description draft')
+    await click(findText('.ant-modal [role="tab"]', 'Expressions'))
+    expect(document.querySelector('#semanticMetadata_dialects_0_expression').value).toBe('-- draft\namount * 2')
+    await click(findText('.ant-modal [role="tab"]', 'AI Context'))
+    expect(document.querySelector('#semanticMetadata_instructions').value).toBe('Keep guidance draft')
+    await click(findText('.ant-modal button', 'Cancel'))
+    await click(findText('.ant-modal button', 'Discard changes'))
+    expect(document.querySelector('.ant-modal')).toBeNull()
+    expect(defHttp.put).not.toHaveBeenCalled()
+  })
+
+  it('closes an unchanged editor immediately on Cancel', async () => {
+    await renderDetails(definitionWith(() => null))
+    await click(document.querySelector('[aria-label="Edit dataset orders"]'))
+    await click(findText('.ant-modal button', 'Cancel'))
+    expect(document.querySelector('.ant-modal')).toBeNull()
+    expect(document.body.textContent).not.toContain('Discard unsaved changes?')
+  })
+
+  it('reveals and focuses invalid SQL even when saving from another section', async () => {
+    await renderDetails(definitionWith(() => null))
+    await selectTab('Metrics')
+    await click(document.querySelector('[aria-label="Edit metric revenue"]'))
+    await click(findText('.ant-modal [role="tab"]', 'Expressions'))
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_dialects_0_expression'), { target: { value: '' } })
+    )
+    await click(findText('.ant-modal [role="tab"]', 'Basic information'))
+    await click(findText('.ant-modal button', 'Save'))
+    expect(findText('.ant-modal [role="tab"]', 'Expressions').getAttribute('aria-selected')).toBe('true')
+    await act(async () => new Promise(resolve => requestAnimationFrame(resolve)))
+    expect(document.activeElement.id).toBe('semanticMetadata_dialects_0_expression')
+    expect(document.querySelector('.ant-form-item-explain-error').textContent).toContain('required')
+    expect(defHttp.put).not.toHaveBeenCalled()
+  })
+
+  it('keeps the server permission reason beside the unsaved draft', async () => {
+    await renderDetails(definitionWith(() => null))
+    await click(document.querySelector('[aria-label="Edit dataset orders"]'))
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_description'), { target: { value: 'My draft' } })
+    )
+    defHttp.put.mockRejectedValue({
+      response: { data: { message: 'Permission denied: MODIFY_SEMANTIC_MODEL is required' } }
+    })
+    await click(findText('.ant-modal button', 'Save'))
+    expect(document.querySelector('.ant-modal .ant-alert').textContent).toContain(
+      'Permission denied: MODIFY_SEMANTIC_MODEL is required'
+    )
+    expect(document.querySelector('#semanticMetadata_description').value).toBe('My draft')
+    expect(document.querySelector('.ant-modal')).not.toBeNull()
+  })
+  it('protects an edited structured draft even after switching back to unchanged text', async () => {
+    await renderDetails(definitionWith(() => 'Original text'))
+    await selectTab('Overview')
+    await click(findText('button', 'Edit Model AI Context'))
+    await selectOption('#semanticMetadata_contextFormat', 'Structured')
+    await act(async () =>
+      Simulate.change(document.querySelector('#semanticMetadata_instructions'), { target: { value: 'Hidden draft' } })
+    )
+    await selectOption('#semanticMetadata_contextFormat', 'Text')
+    expect(document.querySelector('#semanticMetadata_contextText').value).toBe('Original text')
+    await click(findText('.ant-modal button', 'Cancel'))
+    expect(document.body.textContent).toContain('Discard unsaved changes?')
+    await click(findText('.ant-modal button', 'Keep editing'))
+    await selectOption('#semanticMetadata_contextFormat', 'Structured')
+    expect(document.querySelector('#semanticMetadata_instructions').value).toBe('Hidden draft')
   })
 })

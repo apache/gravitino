@@ -17,12 +17,13 @@
  * under the License.
  */
 
-import { useState } from 'react'
-import { Alert, Button, Modal, Space, Typography, Upload, message } from 'antd'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Button, Descriptions, Modal, Space, Typography, Upload, message } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { importSemanticModelApi } from '@/lib/api/semanticModels'
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchSemanticModels } from '@/lib/store/metalakes'
+import { parseOssiePreview } from '@/lib/utils/ossiePreview'
 import { semanticModelErrorMessage } from '@/lib/utils/semanticModel'
 
 export default function ImportSemanticModelDialog({ open, setOpen, metalake, catalog, schema }) {
@@ -30,21 +31,47 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selection, setSelection] = useState(null)
+  const [reading, setReading] = useState(false)
+  const selectionId = useRef(0)
+  useEffect(
+    () => () => {
+      selectionId.current++
+    },
+    []
+  )
+
+  const selectFile = async selected => {
+    const id = ++selectionId.current
+    setError('')
+    setSelection(null)
+    setFile(selected)
+    setReading(true)
+    try {
+      const document = await selected.text()
+      const format = selected.name.toLowerCase().endsWith('.json') ? 'json' : 'yaml'
+      const preview = parseOssiePreview(document, format)
+      if (id === selectionId.current) setSelection({ document, format, preview })
+    } catch (err) {
+      if (id === selectionId.current) setError(semanticModelErrorMessage(err, 'Unable to read the OSSIE document.'))
+    } finally {
+      if (id === selectionId.current) setReading(false)
+    }
+  }
 
   const importDocument = async () => {
-    if (!file || loading) return
+    if (!selection || reading || loading) return
     setLoading(true)
     setError('')
     try {
-      const document = await file.text()
-      if (!document.trim()) throw new Error('The selected file is empty.')
+      const { document, format } = selection
 
       const response = await importSemanticModelApi({
         metalake,
         catalog,
         schema,
         document,
-        format: file.name.toLowerCase().endsWith('.json') ? 'json' : 'yaml'
+        format
       })
       if (!response?.semanticModel) throw new Error('Import returned an empty response.')
       await dispatch(fetchSemanticModels({ metalake, catalog, schema, init: true }))
@@ -60,12 +87,18 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
   return (
     <Modal
       title='Import OSSIE document'
+      style={{ top: 24 }}
+      styles={{ body: { maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' } }}
       open={open}
       onCancel={() => setOpen(false)}
       onOk={importDocument}
       okText='Import'
       confirmLoading={loading}
-      okButtonProps={{ disabled: !file, 'data-refer': 'import-semantic-model-submit' }}
+      okButtonProps={{
+        disabled: !selection || reading,
+        'data-refer': 'import-semantic-model-submit',
+        'aria-label': 'Import'
+      }}
       cancelButtonProps={{ disabled: loading }}
       closable={!loading}
       maskClosable={!loading}
@@ -83,16 +116,22 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
           beforeUpload={selected => {
             setError('')
             if (!/\.(ya?ml|json)$/i.test(selected.name)) {
+              selectionId.current++
+              setSelection(null)
+              setReading(false)
               setFile(null)
               setError('Select a .yaml, .yml, or .json file.')
 
               return Upload.LIST_IGNORE
             }
-            setFile(selected)
+            selectFile(selected)
 
             return false
           }}
           onRemove={() => {
+            selectionId.current++
+            setSelection(null)
+            setReading(false)
             setFile(null)
             setError('')
           }}
@@ -101,6 +140,27 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
             Select file
           </Button>
         </Upload>
+        {reading && <Typography.Text>Reading document...</Typography.Text>}
+        {selection && (
+          <>
+            <Descriptions bordered size='small' column={2} title='Import preview'>
+              <Descriptions.Item label='Model' span={2}>
+                {selection.preview.name}
+              </Descriptions.Item>
+              <Descriptions.Item label='Destination' span={2}>
+                {metalake} / {catalog} / {schema}
+              </Descriptions.Item>
+              {['datasets', 'fields', 'relationships', 'metrics'].map(key => (
+                <Descriptions.Item key={key} label={key[0].toUpperCase() + key.slice(1)}>
+                  {selection.preview[key]}
+                </Descriptions.Item>
+              ))}
+            </Descriptions>
+            <Typography.Text type='secondary'>
+              The server will validate the complete document and its sources on import.
+            </Typography.Text>
+          </>
+        )}
         {error && (
           <Alert
             type='error'

@@ -17,9 +17,11 @@
  * under the License.
  */
 
-import { Collapse, Tag } from 'antd'
+import { Button, Tag, theme } from 'antd'
+import SemanticMetadataSection from './SemanticMetadataSection'
 
-export default function SemanticModelAIContext({ context, label = 'AI Context', inline = false }) {
+export default function SemanticModelAIContext({ context, label = 'AI Context', inline = false, onEdit }) {
+  const { token } = theme.useToken()
   if (!context || (typeof context === 'object' && !Object.keys(context).length)) return null
 
   const additional =
@@ -37,13 +39,17 @@ export default function SemanticModelAIContext({ context, label = 'AI Context', 
         <dl className='m-0 space-y-3'>
           {context.instructions && (
             <div>
-              <dt className='font-semibold'>Instructions</dt>
+              <dt className='text-xs font-medium' style={{ color: token.colorTextSecondary }}>
+                Instructions
+              </dt>
               <dd className='m-0'>{context.instructions}</dd>
             </div>
           )}
           {context.synonyms?.length > 0 && (
             <div>
-              <dt className='font-semibold'>Synonyms</dt>
+              <dt className='text-xs font-medium' style={{ color: token.colorTextSecondary }}>
+                Synonyms
+              </dt>
               <dd className='m-0'>
                 {context.synonyms.map((value, index) => (
                   <Tag key={index} className='mb-1 whitespace-pre-wrap'>
@@ -55,7 +61,9 @@ export default function SemanticModelAIContext({ context, label = 'AI Context', 
           )}
           {context.examples?.length > 0 && (
             <div>
-              <dt className='font-semibold'>Examples</dt>
+              <dt className='text-xs font-medium' style={{ color: token.colorTextSecondary }}>
+                Examples
+              </dt>
               <dd className='m-0'>
                 <ul className='list-disc pl-5'>
                   {context.examples.map((value, index) => (
@@ -67,7 +75,9 @@ export default function SemanticModelAIContext({ context, label = 'AI Context', 
           )}
           {Object.keys(additional).length > 0 && (
             <div>
-              <dt className='font-semibold'>Additional context</dt>
+              <dt className='text-xs font-medium' style={{ color: token.colorTextSecondary }}>
+                Additional context
+              </dt>
               <dd className='m-0'>
                 <pre className='m-0 whitespace-pre-wrap break-all font-mono text-xs'>
                   {JSON.stringify(additional, null, 2)}
@@ -81,8 +91,17 @@ export default function SemanticModelAIContext({ context, label = 'AI Context', 
   )
 
   return inline ? (
-    content
+    <>
+      {onEdit && (
+        <Button className='mb-3' onClick={onEdit}>
+          Edit AI Context
+        </Button>
+      )}
+      {content}
+    </>
   ) : (
-    <Collapse size='small' className='mb-3' items={[{ key: 'context', label, children: content }]} />
+    <SemanticMetadataSection label={label} onEdit={onEdit}>
+      {content}
+    </SemanticMetadataSection>
   )
 }

@@ -24,6 +24,7 @@ import {
   Button,
   Divider,
   Flex,
+  Input,
   Modal,
   Popover,
   Space,
@@ -36,7 +37,6 @@ import {
   message
 } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
-import useResizeObserver from 'use-resize-observer'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Tags from '@/components/CustomTags'
 import GetOwner from '@/components/GetOwner'
@@ -47,6 +47,8 @@ import { getSemanticModelDetails } from '@/lib/store/metalakes'
 import { copyToClipboard } from '@/lib/utils'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 import { formatSemanticModelDefinition } from '@/lib/utils/semanticModel'
+import { ColumnTypeColorEnum } from '@/config'
+import SemanticModelExpression from './SemanticModelExpression'
 import SemanticModelAIContext from './SemanticModelAIContext'
 import SemanticModelExport from './SemanticModelExport'
 import SemanticModelExtensions from './SemanticModelExtensions'
@@ -63,25 +65,11 @@ const sourceFullName = source => {
   return [...(source.namespace || []), source.name].filter(Boolean).join('.')
 }
 
-const renderExpression = expression => {
-  const dialects = expression?.dialects || []
+const renderDataType = datatype => {
+  if (!datatype) return <span>-</span>
+  const type = { DateTime: 'timestamp', DateTimeTz: 'timestamp_tz' }[datatype] || datatype.toLowerCase()
 
-  if (!dialects.length) {
-    return <span>-</span>
-  }
-
-  return (
-    <div className='min-w-0 space-y-2'>
-      {dialects.map((dialect, index) => (
-        <div key={`${dialect?.dialect}-${index}`}>
-          <Tag>{dialect?.dialect}</Tag>
-          <pre className='m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs [overflow-wrap:anywhere]'>
-            {dialect?.expression}
-          </pre>
-        </div>
-      ))}
-    </div>
-  )
+  return <Tag color={ColumnTypeColorEnum[type] || undefined}>{datatype}</Tag>
 }
 
 const topAlignedColumns = columns =>
@@ -90,13 +78,6 @@ const topAlignedColumns = columns =>
 const renderColumns = columns => <span className='font-mono text-xs'>{(columns || []).join(', ') || '-'}</span>
 
 const hasMetadata = entity => !!entity.aiContext || entity.customExtensions?.length > 0
-
-const renderMetadata = (entity, label) => (
-  <>
-    <SemanticModelAIContext context={entity?.aiContext} label={`${label} AI Context`} />
-    <SemanticModelExtensions extensions={entity?.customExtensions} label={`${label} Vendor Extensions`} />
-  </>
-)
 
 export default function SemanticModelDetailsPage() {
   const searchParams = useSearchParams()
@@ -114,7 +95,9 @@ export default function SemanticModelDetailsPage() {
   const [openEdit, setOpenEdit] = useState(false)
   const [metadataEdit, setMetadataEdit] = useState(null)
   const [fieldContext, setFieldContext] = useState(null)
-  const { ref, width } = useResizeObserver()
+  const [fieldSearch, setFieldSearch] = useState('')
+  const [metricSearch, setMetricSearch] = useState('')
+  const [expandedDatasets, setExpandedDatasets] = useState([])
 
   const definition = semanticModel?.definition
   const properties = semanticModel?.properties
@@ -137,6 +120,39 @@ export default function SemanticModelDetailsPage() {
   const metrics = useMemo(
     () => (definition?.metrics || []).map(metric => ({ ...metric, key: metric.name })),
     [definition]
+  )
+
+  const fieldQuery = fieldSearch.trim().toLowerCase()
+
+  const filteredDatasets = useMemo(
+    () =>
+      fieldQuery
+        ? datasets
+            .map(dataset => ({
+              ...dataset,
+              fields: (dataset.fields || []).filter(field =>
+                [field.name, field.label].some(value => value?.toLowerCase().includes(fieldQuery))
+              )
+            }))
+            .filter(dataset => dataset.fields.length)
+        : datasets,
+    [datasets, fieldQuery]
+  )
+
+  const filteredMetrics = useMemo(
+    () => metrics.filter(metric => metric.name.toLowerCase().includes(metricSearch.trim().toLowerCase())),
+    [metrics, metricSearch]
+  )
+
+  const renderMetadata = (entity, label, target) => (
+    <>
+      <SemanticModelAIContext
+        context={entity?.aiContext}
+        label={`${label} AI Context`}
+        onEdit={target ? () => setMetadataEdit({ ...target, section: 'context' }) : undefined}
+      />
+      <SemanticModelExtensions extensions={entity?.customExtensions} label={`${label} Vendor Extensions`} />
+    </>
   )
 
   const definitionText = useMemo(() => formatSemanticModelDefinition(definition), [definition])
@@ -275,7 +291,7 @@ export default function SemanticModelDetailsPage() {
         dataIndex: 'datatype',
         key: 'datatype',
         width: 140,
-        render: datatype => (datatype ? <Tag>{datatype}</Tag> : <span>-</span>)
+        render: renderDataType
       },
       {
         title: 'Time Dimension',
@@ -288,7 +304,7 @@ export default function SemanticModelDetailsPage() {
         title: 'Expression',
         dataIndex: 'expression',
         key: 'expression',
-        render: renderExpression
+        render: (expression, record) => <SemanticModelExpression expression={expression} name={record.name} />
       },
       {
         title: 'Description',
@@ -361,13 +377,13 @@ export default function SemanticModelDetailsPage() {
         dataIndex: 'datatype',
         key: 'datatype',
         width: 140,
-        render: datatype => (datatype ? <Tag>{datatype}</Tag> : <span>-</span>)
+        render: renderDataType
       },
       {
         title: 'Expression',
         dataIndex: 'expression',
         key: 'expression',
-        render: renderExpression
+        render: (expression, record) => <SemanticModelExpression expression={expression} name={record.name} />
       },
       {
         title: 'Description',
@@ -395,6 +411,7 @@ export default function SemanticModelDetailsPage() {
   )
 
   const tabOptions = [
+    { label: 'Overview', key: 'Overview' },
     { label: 'Datasets', key: 'Datasets' },
     { label: 'Relationships', key: 'Relationships' },
     { label: 'Metrics', key: 'Metrics' },
@@ -427,12 +444,12 @@ export default function SemanticModelDetailsPage() {
 
   const expandedFieldsRow = dataset => (
     <div>
-      {renderMetadata(dataset, dataset.name)}
+      {renderMetadata(dataset, dataset.name, { kind: 'dataset', name: dataset.name })}
       <Table
         data-refer='semantic-model-fields-grid'
         size='small'
         rowKey={field => field.name}
-        dataSource={dataset.fields || []}
+        dataSource={(dataset.fields || []).map(field => ({ ...field, datasetName: dataset.name }))}
         tableLayout='fixed'
         scroll={{ x: 1000 }}
         columns={topAlignedColumns([
@@ -468,18 +485,14 @@ export default function SemanticModelDetailsPage() {
   return (
     <>
       <Spin spinning={store.activatedDetailsLoading}>
-        <Flex className='mb-2' gap='small' align='flex-start' ref={ref}>
+        <Flex className='mb-2' gap='small' align='flex-start'>
           <div className='size-8'>
             <Icons.iconify icon='mdi:graph-outline' className='my-icon-large' />
           </div>
-          <div className='grow-1 relative bottom-1'>
+          <div className='relative bottom-1 min-w-0 flex-1'>
             <Title level={3} style={{ marginBottom: '0.125rem' }}>
-              <Space>
-                <span
-                  title={semanticModelName}
-                  className='min-w-10 truncate'
-                  style={{ maxWidth: `calc(${width}px - 90px)`, display: 'inherit' }}
-                >
+              <div className='flex min-w-0 items-center gap-2'>
+                <span title={semanticModelName} className='min-w-0 truncate'>
                   {semanticModelName || ''}
                 </span>
                 <Tooltip title='Edit'>
@@ -492,152 +505,182 @@ export default function SemanticModelDetailsPage() {
                     onClick={() => setOpenEdit(true)}
                   />
                 </Tooltip>
-              </Space>
+              </div>
             </Title>
-            <Paragraph
-              type='secondary'
-              className='truncate'
-              title={semanticModel?.comment}
-              style={{ marginBottom: 0, maxWidth: `calc(${width}px - 56px)` }}
-            >
+            <Paragraph type='secondary' className='truncate' title={semanticModel?.comment} style={{ marginBottom: 0 }}>
               {semanticModel?.comment}
             </Paragraph>
           </div>
+          <div className='ml-auto shrink-0'>
+            <SemanticModelExport
+              key={metadataObjectFullName}
+              metalake={metalake}
+              catalog={catalog}
+              schema={schema}
+              semanticModel={semanticModelName}
+              disabled={store.activatedDetailsLoading || !definition}
+            />
+          </div>
         </Flex>
-        <Space split={<Divider type='vertical' />} wrap={true} className='mb-2'>
-          {anthEnable && (
-            <Space size={4}>
-              <Tooltip title='Owned' placement='top'>
-                <Icons.User className='size-4' color='grey' />
-              </Tooltip>
-              <GetOwner
-                metalake={metalake}
-                metadataObjectType={'semantic_model'}
-                metadataObjectFullName={metadataObjectFullName}
-              />
-            </Space>
-          )}
-          {semanticModel?.audit?.creator && (
-            <Space size={4}>
-              <Tooltip title='Creator' placement='top'>
-                <Icons.UserPen className='size-4' color='grey' />
-              </Tooltip>
-              <span>{semanticModel.audit.creator}</span>
-            </Space>
-          )}
-          <Space size={4}>
-            <Tooltip title='Created' placement='top'>
-              <span className='inline-flex'>
-                <Icons.iconify icon='mdi:clock-outline' className='size-4' props={{ color: 'grey' }} />
-              </span>
-            </Tooltip>
-            <span>{createdAtText}</span>
-          </Space>
-          <Space size={4}>
-            <Tooltip title='Tags' placement='top'>
-              <Icons.Tags className='size-4' color='grey' />
-            </Tooltip>
-            {store.currentEntityTags && store.currentEntityTags?.length > 0 ? (
-              <Popover placement='bottom' title={<span>Tags</span>} content={tagContent}>
-                <a className='text-defaultPrimary'>{store.currentEntityTags?.length}</a>
-              </Popover>
-            ) : (
-              <a className='text-defaultPrimary'>0</a>
-            )}
-          </Space>
-          <Space size={4}>
-            <Tooltip title='Properties' placement='top'>
-              <Icons.TableProperties className='size-4' color='grey' />
-            </Tooltip>
-            {properties && Object.keys(properties).length > 0 ? (
-              <Popover placement='bottom' title={<span>Properties</span>} content={propertyContent}>
-                <a className='text-defaultPrimary'>{Object.keys(properties).length}</a>
-              </Popover>
-            ) : (
-              <a className='text-defaultPrimary'>0</a>
-            )}
-          </Space>
-          {semanticModel?.audit?.lastModifier && (
-            <Space size={4} data-refer='semantic-model-last-modifier'>
-              <Tooltip title='Last modified by'>
-                <Icons.UserPen className='size-4' color='grey' />
-              </Tooltip>
-              <span>{semanticModel.audit.lastModifier}</span>
-            </Space>
-          )}
-          {lastModifiedAt && (
-            <Space size={4} data-refer='semantic-model-last-modified-time'>
-              <Tooltip title='Last modified'>
-                <Icons.History className='size-4' color='grey' />
-              </Tooltip>
-              <span>{lastModifiedText}</span>
-            </Space>
-          )}
-        </Space>
       </Spin>
-      <Flex justify='space-between' align='start' gap='small' wrap>
-        <Button className='mb-3' disabled={!definition} onClick={() => setMetadataEdit({ kind: 'model' })}>
-          Edit Model AI Context
-        </Button>
-        <SemanticModelExport
-          key={metadataObjectFullName}
-          metalake={metalake}
-          catalog={catalog}
-          schema={schema}
-          semanticModel={semanticModelName}
-          disabled={store.activatedDetailsLoading || !definition}
-        />
-      </Flex>
-      {renderMetadata(definition, 'Model')}
       <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={setTabKey} items={tabOptions} />
       <Spin spinning={store.activatedDetailsLoading}>
+        {tabKey === 'Overview' && (
+          <div>
+            <Space split={<Divider type='vertical' />} wrap={true} className='mb-2'>
+              {anthEnable && (
+                <Space size={4}>
+                  <Tooltip title='Owned' placement='top'>
+                    <Icons.User className='size-4' color='grey' />
+                  </Tooltip>
+                  <GetOwner
+                    metalake={metalake}
+                    metadataObjectType={'semantic_model'}
+                    metadataObjectFullName={metadataObjectFullName}
+                  />
+                </Space>
+              )}
+              {semanticModel?.audit?.creator && (
+                <Space size={4}>
+                  <Tooltip title='Creator' placement='top'>
+                    <Icons.UserPen className='size-4' color='grey' />
+                  </Tooltip>
+                  <span>{semanticModel.audit.creator}</span>
+                </Space>
+              )}
+              <Space size={4}>
+                <Tooltip title='Created' placement='top'>
+                  <span className='inline-flex'>
+                    <Icons.iconify icon='mdi:clock-outline' className='size-4' props={{ color: 'grey' }} />
+                  </span>
+                </Tooltip>
+                <span>{createdAtText}</span>
+              </Space>
+              <Space size={4}>
+                <Tooltip title='Tags' placement='top'>
+                  <Icons.Tags className='size-4' color='grey' />
+                </Tooltip>
+                {store.currentEntityTags && store.currentEntityTags?.length > 0 ? (
+                  <Popover placement='bottom' title={<span>Tags</span>} content={tagContent}>
+                    <a className='text-defaultPrimary'>{store.currentEntityTags?.length}</a>
+                  </Popover>
+                ) : (
+                  <a className='text-defaultPrimary'>0</a>
+                )}
+              </Space>
+              <Space size={4}>
+                <Tooltip title='Properties' placement='top'>
+                  <Icons.TableProperties className='size-4' color='grey' />
+                </Tooltip>
+                {properties && Object.keys(properties).length > 0 ? (
+                  <Popover placement='bottom' title={<span>Properties</span>} content={propertyContent}>
+                    <a className='text-defaultPrimary'>{Object.keys(properties).length}</a>
+                  </Popover>
+                ) : (
+                  <a className='text-defaultPrimary'>0</a>
+                )}
+              </Space>
+              {semanticModel?.audit?.lastModifier && (
+                <Space size={4} data-refer='semantic-model-last-modifier'>
+                  <Tooltip title='Last modified by'>
+                    <Icons.UserPen className='size-4' color='grey' />
+                  </Tooltip>
+                  <span>{semanticModel.audit.lastModifier}</span>
+                </Space>
+              )}
+              {lastModifiedAt && (
+                <Space size={4} data-refer='semantic-model-last-modified-time'>
+                  <Tooltip title='Last modified'>
+                    <Icons.History className='size-4' color='grey' />
+                  </Tooltip>
+                  <span>{lastModifiedText}</span>
+                </Space>
+              )}
+            </Space>
+            <Button
+              className='mb-3 block'
+              disabled={!definition}
+              onClick={() => setMetadataEdit({ kind: 'model', section: 'context' })}
+            >
+              Edit Model AI Context
+            </Button>
+            {renderMetadata(definition, 'Model')}
+          </div>
+        )}
         {tabKey === 'Datasets' && (
-          <Table
-            data-refer='semantic-model-datasets-grid'
-            size='small'
-            tableLayout='fixed'
-            scroll={{ x: datasetTableWidth, y: 'max(20rem, calc(100vh - 37rem))' }}
-            dataSource={datasets}
-            columns={datasetResizableColumns}
-            components={datasetComponents}
-            expandable={{
-              expandedRowRender: expandedFieldsRow,
-              rowExpandable: dataset => (dataset.fields || []).length > 0 || hasMetadata(dataset)
-            }}
-            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
-          />
+          <>
+            <Space className='mb-3'>
+              <Input
+                aria-label='Search fields'
+                placeholder='Search field name or label'
+                value={fieldSearch}
+                onChange={event => setFieldSearch(event.target.value)}
+              />
+              {fieldSearch && <Button onClick={() => setFieldSearch('')}>Clear field search</Button>}
+            </Space>
+            <Table
+              data-refer='semantic-model-datasets-grid'
+              size='small'
+              tableLayout='fixed'
+              scroll={{ x: datasetTableWidth, y: 'max(20rem, calc(100vh - 28rem))' }}
+              dataSource={filteredDatasets}
+              columns={datasetResizableColumns}
+              components={datasetComponents}
+              expandable={{
+                expandedRowRender: expandedFieldsRow,
+                expandedRowKeys: fieldQuery ? filteredDatasets.map(dataset => dataset.key) : expandedDatasets,
+                onExpandedRowsChange: keys => {
+                  if (!fieldQuery) setExpandedDatasets(keys)
+                },
+                rowExpandable: dataset => (dataset.fields || []).length > 0 || hasMetadata(dataset)
+              }}
+              pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            />
+          </>
         )}
         {tabKey === 'Relationships' && (
           <Table
             data-refer='semantic-model-relationships-grid'
             size='small'
             tableLayout='fixed'
-            scroll={{ x: relationshipTableWidth, y: 'max(20rem, calc(100vh - 37rem))' }}
+            scroll={{ x: relationshipTableWidth, y: 'max(20rem, calc(100vh - 28rem))' }}
             dataSource={relationships}
             columns={relationshipResizableColumns}
             components={relationshipComponents}
             expandable={{
-              expandedRowRender: relationship => renderMetadata(relationship, relationship.name),
+              expandedRowRender: relationship =>
+                renderMetadata(relationship, relationship.name, { kind: 'relationship', name: relationship.name }),
               rowExpandable: hasMetadata
             }}
             pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
           />
         )}
         {tabKey === 'Metrics' && (
-          <Table
-            data-refer='semantic-model-metrics-grid'
-            size='small'
-            tableLayout='fixed'
-            scroll={{ x: metricTableWidth, y: 'max(20rem, calc(100vh - 37rem))' }}
-            dataSource={metrics}
-            columns={metricResizableColumns}
-            components={metricComponents}
-            expandable={{
-              expandedRowRender: metric => renderMetadata(metric, metric.name),
-              rowExpandable: hasMetadata
-            }}
-            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
-          />
+          <>
+            <Space className='mb-3'>
+              <Input
+                aria-label='Search metrics'
+                placeholder='Search metric name'
+                value={metricSearch}
+                onChange={event => setMetricSearch(event.target.value)}
+              />
+              {metricSearch && <Button onClick={() => setMetricSearch('')}>Clear metric search</Button>}
+            </Space>
+            <Table
+              data-refer='semantic-model-metrics-grid'
+              size='small'
+              tableLayout='fixed'
+              scroll={{ x: metricTableWidth, y: 'max(20rem, calc(100vh - 28rem))' }}
+              dataSource={filteredMetrics}
+              columns={metricResizableColumns}
+              components={metricComponents}
+              expandable={{
+                expandedRowRender: metric => renderMetadata(metric, metric.name, { kind: 'metric', name: metric.name }),
+                rowExpandable: hasMetadata
+              }}
+              pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            />
+          </>
         )}
         {tabKey === 'Definition' &&
           (definitionText ? (
@@ -669,7 +712,19 @@ export default function SemanticModelDetailsPage() {
       </Spin>
       {fieldContext && (
         <Modal open title={`${fieldContext.name} AI Context`} footer={null} onCancel={() => setFieldContext(null)}>
-          <SemanticModelAIContext context={fieldContext.aiContext} inline />
+          <SemanticModelAIContext
+            context={fieldContext.aiContext}
+            inline
+            onEdit={() => {
+              setMetadataEdit({
+                kind: 'field',
+                name: fieldContext.name,
+                datasetName: fieldContext.datasetName,
+                section: 'context'
+              })
+              setFieldContext(null)
+            }}
+          />
         </Modal>
       )}
       {metadataEdit && (

@@ -28,12 +28,13 @@ import reducer, {
   fetchTables,
   fetchViews,
   getSemanticModelDetails,
+  updateSemanticModel,
   setIntoTreeNodeWithFetch,
   setLoadedNodes,
   setMetalakeTree
 } from './index'
 
-vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), delete: vi.fn() } }))
+vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), delete: vi.fn(), put: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
 
 const namespace = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
@@ -189,5 +190,31 @@ describe('superseded Semantic Model lists', () => {
     expect(store.getState().metalakes.semanticModels).toEqual([])
     expect(store.getState().metalakes.semanticModelRequests).toEqual({})
     expect(store.getState().metalakes.semanticModelListRequestId).toBeNull()
+  })
+})
+
+describe('semantic metadata update errors', () => {
+  it.each([
+    [{ response: { data: { message: 'Permission denied for this model' } } }, 'Permission denied for this model'],
+    [{ response: { data: { error: { message: 'Unknown source column amount' } } } }, 'Unknown source column amount'],
+    [new Error('Network unavailable'), 'Network unavailable']
+  ])('retains the actionable server reason', async (error, message) => {
+    defHttp.put.mockRejectedValueOnce(error)
+
+    const result = await store.dispatch(
+      updateSemanticModel({ ...namespace, semanticModel: 'orders', data: { updates: [] } })
+    )
+    expect(result.payload).toEqual({ err: true, message })
+    expect(store.getState().metalakes.tableLoading).toBe(false)
+    expect(defHttp.get).not.toHaveBeenCalled()
+  })
+  it('reports an empty update response instead of closing the editor', async () => {
+    defHttp.put.mockResolvedValue({})
+
+    const result = await store.dispatch(
+      updateSemanticModel({ ...namespace, semanticModel: 'orders', data: { updates: [] } })
+    )
+    expect(result.payload).toEqual({ err: true, message: 'Failed to update the Semantic Model.' })
+    expect(defHttp.get).not.toHaveBeenCalled()
   })
 })
