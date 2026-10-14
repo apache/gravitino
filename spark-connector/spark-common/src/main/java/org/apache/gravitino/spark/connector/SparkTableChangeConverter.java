@@ -91,9 +91,13 @@ public class SparkTableChangeConverter {
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
       TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
           (TableChange.UpdateColumnDefaultValue) change;
+      // Spark 4.1 deprecates newDefaultValue in favour of newCurrentDefault, which Spark 3.5 and
+      // 4.0's UpdateColumnDefaultValue does not declare. Scoped to this declaration so the rest of
+      // the method keeps the -Werror deprecation gate.
+      @SuppressWarnings("deprecation")
+      String newDefaultValue = updateColumnDefaultValue.newDefaultValue();
       return org.apache.gravitino.rel.TableChange.updateColumnDefaultValue(
-          updateColumnDefaultValue.fieldNames(),
-          Literals.stringLiteral(updateColumnDefaultValue.newDefaultValue()));
+          updateColumnDefaultValue.fieldNames(), Literals.stringLiteral(newDefaultValue));
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

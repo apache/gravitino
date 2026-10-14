@@ -903,7 +903,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     // drop branch
     sql(String.format("ALTER TABLE %s DROP BRANCH `%s`", tableName, branch1));
     Assertions.assertThrows(
-        ValidationException.class,
+        unknownVersionException(),
         () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1)));
   }
 
@@ -950,7 +950,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     // drop tag
     sql(String.format("ALTER TABLE %s DROP TAG `%s`", tableName, tag1));
     Assertions.assertThrows(
-        ValidationException.class,
+        unknownVersionException(),
         () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1)));
   }
 
@@ -1114,6 +1114,18 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     queryResult = getTableData(tableName);
     Assertions.assertEquals(4, queryResult.size());
     Assertions.assertEquals("1,1,1;1,1,1;1,1,1;1,1,1", String.join(";", queryResult));
+  }
+
+  /**
+   * The exception a query against a branch or tag that no longer exists raises. Iceberg makes this
+   * check with {@code ValidationException.check} in {@code SparkCatalog} up to its Spark 4.0
+   * module, and with {@code Preconditions.checkArgument} in {@code SparkTable} from its Spark 4.1
+   * one.
+   *
+   * @return the exception class this Spark line raises
+   */
+  protected Class<? extends Throwable> unknownVersionException() {
+    return ValidationException.class;
   }
 
   protected SparkMetadataColumnInfo[] getIcebergMetadataColumns() {

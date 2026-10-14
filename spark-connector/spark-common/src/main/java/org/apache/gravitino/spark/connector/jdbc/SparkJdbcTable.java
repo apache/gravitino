@@ -30,7 +30,7 @@ import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.types.StructType;
 
-public class SparkJdbcTable extends JDBCTable {
+public class SparkJdbcTable extends SparkJdbcTableBase {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
 
@@ -42,7 +42,7 @@ public class SparkJdbcTable extends JDBCTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    super(identifier, jdbcTable.schema(), jdbcTable.jdbcOptions());
+    super(identifier, jdbcTable);
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             false,
