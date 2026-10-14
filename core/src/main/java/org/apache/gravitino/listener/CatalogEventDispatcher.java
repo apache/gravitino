@@ -21,6 +21,7 @@ package org.apache.gravitino.listener;
 
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -221,43 +222,23 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws Exception {
-    // Do not put properties on the event payload - they may contain credentials (#12566).
-    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
-    try {
-      dispatcher.testConnection(ident, type, provider, comment, properties);
-      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
-      throw e;
-    }
+    CatalogInfo catalogInfo =
+        new CatalogInfo(ident.name(), type, provider, comment, properties, null);
+    dispatchTestConnection(
+        ident,
+        catalogInfo,
+        null,
+        () -> dispatcher.testConnection(ident, type, provider, comment, properties));
   }
 
   @Override
   public void testConnection(NameIdentifier ident) throws Exception {
-    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
-    try {
-      dispatcher.testConnection(ident);
-      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
-      throw e;
-    }
+    dispatchTestConnection(ident, null, null, () -> dispatcher.testConnection(ident));
   }
 
   @Override
   public void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception {
-    // Do not put changes on the event payload - they may contain credentials (#12566).
-    eventBus.dispatchEvent(new TestConnectionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
-    try {
-      dispatcher.testConnection(ident, changes);
-      eventBus.dispatchEvent(new TestConnectionEvent(PrincipalUtils.getCurrentUserName(), ident));
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new TestConnectionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
-      throw e;
-    }
+    dispatchTestConnection(ident, null, changes, () -> dispatcher.testConnection(ident, changes));
   }
 
   @Override
@@ -285,5 +266,27 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
           new DisableCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
       throw e;
     }
+  }
+
+  private void dispatchTestConnection(
+      NameIdentifier ident,
+      @Nullable CatalogInfo catalogInfo,
+      @Nullable CatalogChange[] changes,
+      ConnectionTestAction action)
+      throws Exception {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new TestConnectionPreEvent(user, ident, catalogInfo, changes));
+    try {
+      action.run();
+      eventBus.dispatchEvent(new TestConnectionEvent(user, ident, catalogInfo, changes));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new TestConnectionFailureEvent(user, ident, e, catalogInfo, changes));
+      throw e;
+    }
+  }
+
+  @FunctionalInterface
+  private interface ConnectionTestAction {
+    void run() throws Exception;
   }
 }
