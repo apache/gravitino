@@ -231,8 +231,6 @@ fun registerCoreTestTask(
       "gravitino.core.database.shard.telemetry.directory",
       shardTelemetryDirectory.get().asFile.absolutePath
     )
-    inputs.property("coreDatabaseForks", concurrencyResolution.forks())
-    inputs.property("coreDatabaseActiveLanes", coreDatabaseActiveLaneCount)
     outputs.dir(shardTelemetryDirectory)
 
     doFirst {
