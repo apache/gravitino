@@ -94,7 +94,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             f"/{encode_string(identifier.name())}",
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def create_semantic_model(
         self,
@@ -121,7 +121,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             json=req,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def import_ossie_document(
         self, namespace: Namespace, document: str, document_format: str = "yaml"
@@ -137,7 +137,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             headers={"Content-Type": media_type},
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def export_ossie_document(
         self, identifier: NameIdentifier, document_format: str = "yaml"
@@ -172,7 +172,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             json=updates_request,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def drop_semantic_model(self, identifier: NameIdentifier) -> bool:
         self._check_semantic_model_name_identifier(identifier)
@@ -194,13 +194,14 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             )
         return f"application/{document_format}"
 
-    @staticmethod
-    def _to_semantic_model(resp) -> SemanticModel:
+    def _to_semantic_model(self, resp, namespace: Namespace) -> SemanticModel:
         semantic_model_resp = SemanticModelResponse.from_json(
             resp.body, infer_missing=True
         )
         semantic_model_resp.validate()
-        return GenericSemanticModel(semantic_model_resp.semantic_model())
+        return GenericSemanticModel(
+            semantic_model_resp.semantic_model(), self._rest_client, namespace
+        )
 
     @staticmethod
     def _to_semantic_model_update_request(

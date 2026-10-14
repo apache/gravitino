@@ -21,37 +21,112 @@ package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper.TABLE_NAME;
 
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
-/** Portable SQL for {@code table_maintenance_action}. */
+/** Portable SQL for {@code table_maintenance_action} (MySQL / H2 {@code MODE=MYSQL}). */
 public class TableMaintenanceActionBaseSQLProvider {
 
   /**
-   * Inserts an in-flight occupancy row before {@code runJob}. {@code job_id} stays null until bound
-   * after submission (§5.2).
+   * @return SQL expression for the database clock in epoch millis
+   */
+  protected String currentTimeMillisExpr() {
+    return DatabaseTimeSQL.MYSQL;
+  }
+
+  /**
+   * Inserts an unbound occupancy claim before {@code runJob}. {@code finished_at = 0} holds the
+   * exclusive soft slot (same pattern as {@code deleted_at}); {@code created_at} is the claim lease
+   * start from the database clock.
    *
-   * @param actionMeta row to insert
+   * @param actionMeta row to insert ({@code createdAt} is ignored; DB time is used)
    * @return INSERT statement
    */
   public String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, policy_id, created_at)"
-        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, #{actionMeta.createdAt})";
+        + " (table_id, policy_id, created_at, finished_at)"
+        + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, "
+        + currentTimeMillisExpr()
+        + ", 0)";
   }
 
   /**
-   * Binds the Gravitino job run id after {@code runJob} succeeds.
+   * Extends an expired unbound claim lease by CAS on {@code created_at} (ShedLock-style). Lease age
+   * is evaluated against the database clock so every node shares one TTL timeline.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
+   * @return UPDATE statement
+   */
+  public String reclaimExpiredUnbound(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    String now = currentTimeMillisExpr();
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET created_at = "
+        + now
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at <= ("
+        + now
+        + ") - #{claimTimeoutMs}";
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement for the unbound claim row
+   */
+  public String selectUnboundByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return selectColumns()
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND job_id IS NULL AND finished_at = 0";
+  }
+
+  /**
+   * Live unbound claim still within TTL on the database clock.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
+   * @return SELECT statement
+   */
+  public String selectLiveUnboundByTableAndPolicy(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    return selectColumns()
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at > ("
+        + currentTimeMillisExpr()
+        + ") - #{claimTimeoutMs}";
+  }
+
+  /**
+   * Binds the Gravitino job run id after {@code runJob}. Keeps {@code finished_at = 0} so the soft
+   * slot covers the whole run. {@code expectedCreatedAt} fences against a concurrent reclaim that
+   * CAS-updated {@code created_at}.
    *
    * @param id action row id
    * @param jobId {@code job_run_meta.job_run_id}
+   * @param expectedCreatedAt claim lease start observed at acquire time
    * @return UPDATE statement
    */
-  public String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
+  public String bindJobId(
+      @Param("id") long id,
+      @Param("jobId") long jobId,
+      @Param("expectedCreatedAt") long expectedCreatedAt) {
     return "UPDATE "
         + TABLE_NAME
         + " SET job_id = #{jobId}"
-        + " WHERE id = #{id} AND job_id IS NULL AND finished_at IS NULL";
+        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at = #{expectedCreatedAt}";
   }
 
   /**
@@ -82,15 +157,18 @@ public class TableMaintenanceActionBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET before_snapshot_id = #{beforeSnapshotId}"
-        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at IS NULL";
+        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at = 0";
   }
 
   /**
-   * Sets terminal snapshot pointers when the Spark Job finishes.
+   * Sets terminal snapshot pointers when the Spark Job finishes and releases the soft slot.
+   *
+   * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
+   * so finish timestamps do not contend across concurrent submitters.
    *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
-   * @param finishedAt finish time millis
+   * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
   public String markFinished(
@@ -100,7 +178,7 @@ public class TableMaintenanceActionBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
-        + " WHERE job_id = #{jobId} AND finished_at IS NULL";
+        + " WHERE job_id = #{jobId} AND finished_at = 0";
   }
 
   /**
@@ -117,6 +195,33 @@ public class TableMaintenanceActionBaseSQLProvider {
    */
   public String deleteByJobId(@Param("jobId") long jobId) {
     return "DELETE FROM " + TABLE_NAME + " WHERE job_id = #{jobId}";
+  }
+
+  /**
+   * Returns the open row ({@code finished_at = 0}) for {@code (table_id, policy_id)}, if any.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public String selectInFlightByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return selectColumns()
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at = 0";
+  }
+
+  /**
+   * Returns {@code MAX(finished_at)} among completed rows for {@code (table_id, policy_id)}.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public String selectMaxFinishedAt(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return "SELECT MAX(finished_at) FROM "
+        + TABLE_NAME
+        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND finished_at > 0";
   }
 
   private static String selectColumns() {

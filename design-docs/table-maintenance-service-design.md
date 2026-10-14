@@ -91,10 +91,10 @@ submit). Industry options compared below:
 | Cluster CAS + heartbeat                   | Yes                       | Yes     | Lock only  | Yes (heavy) |
 | Fits long-lived expand + one-shot submits | Yes                       | Yes     | No         | Yes         |
 
-**Chosen:** db-scheduler — Apache 2.0, one `scheduled_tasks` table with built-in heartbeat, and it
-fits both long-lived expand leases and one-shot cron/commit submits (three pools: expand / cron /
-commit). JobRunr is LGPL. ShedLock only provides a lock, not the scheduler TMS needs. Quartz JDBC
-can do the job but is heavier than needed here.
+**Chosen:** db-scheduler — Apache 2.0, built-in heartbeat, and three isolated pools each with its
+own task table (`scheduled_expand_tasks` / `scheduled_cron_tasks` / `scheduled_commit_tasks`).
+JobRunr is LGPL. ShedLock only provides a lock, not the scheduler TMS needs. Quartz JDBC can do
+the job but is heavier than needed here.
 
 ### 4.3 Snapshot drift
 
@@ -162,7 +162,7 @@ policy first, then scheduling.
 | Store                                                          | Role                                                         |
 | -------------------------------------------------------------- | ------------------------------------------------------------ |
 | `policy_meta` / `policy_relation_meta` / `policy_version_info` | Triggers + `minIntervalMs` + `jobOptions` / `rewriteOptions` |
-| `scheduled_tasks`                                              | Scheduler rows: expand / cron-job / commit-job               |
+| `scheduled_expand_tasks` / `scheduled_cron_tasks` / `scheduled_commit_tasks` | Scheduler rows (one db-scheduler table per pool) |
 | `table_maintenance_job`                                        | Per-run occupancy; before/after `snapshot_id`                |
 | `table_snapshot_metrics`                                       | Metrics keyed by Iceberg `snapshot_id`                       |
 | `gravitino.conf`                                               | Cluster-static Gravitino / IRC client auth                   |
@@ -179,8 +179,8 @@ policy may enable both commit and time triggers (`commitTrigger` and `timeTrigge
 Triggers are **flat** peers on policy content (same JSON object as `jobOptions` /
 `rewriteOptions` / `minIntervalMs`): `commitTrigger` (boolean) and `timeTrigger` (cron
 string). Operators edit that versioned content through Policy APIs. `policy_meta` only holds
-identity and attachment. `scheduled_tasks` is runtime state for db-scheduler — not where
-operators set triggers.
+identity and attachment. The `scheduled_*_tasks` tables are runtime state for db-scheduler —
+not where operators set triggers.
 
 TMS has two trigger modes. They never feed each other's queues:
 
@@ -254,16 +254,17 @@ each — it does not write secrets back into policy content:
 
 ### 5.2 Scheduling and commit
 
-db-scheduler runs **three** task kinds in `scheduled_tasks`:
+db-scheduler runs **three** isolated pools. Each pool needs its own physical task table (upstream
+db-scheduler does not support sharing one table across Scheduler instances):
 
-| Kind | `task_name`     | Role                                            |
-| ---- | --------------- | ----------------------------------------------- |
-| 1    | `policy-expand` | Long-lived lease per policy; fans out cron-jobs |
-| 2    | `cron-job`      | One-shot crontab Spark submit                   |
-| 3    | `commit-job`    | One-shot commit-triggered chained Spark submit  |
+| Pool   | Table                     | `task_name`     | Role                                            |
+| ------ | ------------------------- | --------------- | ----------------------------------------------- |
+| Expand | `scheduled_expand_tasks`  | `policy-expand` | Long-lived lease per policy; fans out cron-jobs |
+| Cron   | `scheduled_cron_tasks`    | `cron-job`      | One-shot crontab Spark submit                   |
+| Commit | `scheduled_commit_tasks`  | `commit-job`    | One-shot commit-triggered chained Spark submit  |
 
 **policy-expand** stays after each pick. **cron-job** and **commit-job** are deleted after a
-short `runJob`. Spark lifetime and in-flight checks use `table_maintenance_job`, not those
+short `runJob`. Spark lifetime and in-flight checks use `table_maintenance_action`, not those
 one-shot rows.
 
 Every node may poll; **exactly one claim wins** per due instance (CAS + heartbeat). Missed
@@ -271,11 +272,12 @@ heartbeats free only a hung **short** callback — not a long-running Spark Job.
 
 | Pool   | Registers     | Default threads | conf key (`gravitino.maintenance.`) |
 | ------ | ------------- | --------------- | ----------------------------------- |
-| Expand | policy-expand | 4               | `scheduler.expand.threads`          |
-| Cron   | cron-job      | 8               | `scheduler.cron.threads`            |
-| Commit | commit-job    | 4               | `scheduler.commit.threads`          |
+| Expand | policy-expand | 4               | `scheduler.expandThreads`           |
+| Cron   | cron-job      | 8               | `scheduler.cronThreads`             |
+| Commit | commit-job    | 4               | `scheduler.commitThreads`           |
 
-PK is `(task_name, task_instance)`. `scheduled_tasks` uses upstream db-scheduler DDL.
+PK is `(task_name, task_instance)`. Each table uses upstream db-scheduler DDL (MySQL
+`DATETIME(6)` / PostgreSQL `TIMESTAMP WITH TIME ZONE` time columns).
 
 **TMS tables used by cron-job and commit-job**
 
@@ -478,9 +480,9 @@ gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.r
 gravitino.auxService.names = iceberg-rest
 gravitino.eventListener.names = tms-commit-job
 gravitino.eventListener.tms-commit-job.class = org.apache.gravitino.maintenance.listener.IcebergUpdateTableEventListener
-gravitino.maintenance.scheduler.expand.threads = 4
-gravitino.maintenance.scheduler.cron.threads = 8
-gravitino.maintenance.scheduler.commit.threads = 4
+gravitino.maintenance.scheduler.expandThreads = 4
+gravitino.maintenance.scheduler.cronThreads = 8
+gravitino.maintenance.scheduler.commitThreads = 4
 ```
 
 `extensionPackages` plus colocated IRC start the TMS Feature and db-scheduler pools. The
@@ -492,9 +494,9 @@ onCommit does not. HTTP / Kafka commit ingress is out of scope.
 
 | Key                                                     | Default | Description                   |
 | ------------------------------------------------------- | ------- | ----------------------------- |
-| `gravitino.maintenance.scheduler.expand.threads`        | `4`     | Expand pool                   |
-| `gravitino.maintenance.scheduler.cron.threads`          | `8`     | Cron pool                     |
-| `gravitino.maintenance.scheduler.commit.threads`        | `4`     | Commit pool                   |
+| `gravitino.maintenance.scheduler.expandThreads`         | `4`     | Expand pool                   |
+| `gravitino.maintenance.scheduler.cronThreads`           | `8`     | Cron pool                     |
+| `gravitino.maintenance.scheduler.commitThreads`         | `4`     | Commit pool                   |
 | `gravitino.maintenance.scheduler.pollingIntervalMs`     | `10000` | Poll interval                 |
 | `gravitino.maintenance.scheduler.heartbeatIntervalMs`   | `60000` | Heartbeat while callback runs |
 | `gravitino.maintenance.scheduler.missedHeartbeatsLimit` | `6`     | Misses before dead            |
@@ -564,7 +566,7 @@ gravitino.maintenance.ircAuth.oauthCredential = client_id:client_secret
 | ----- | --------------------------------------------------------------------------------- |
 | 1     | `TableMaintenanceRESTFeature`; start/stop three db-scheduler pools                |
 | 2     | `PolicyExpandPipeline` + `MaintenanceSparkSubmitPipeline` + gates                 |
-| 3     | Migrations: `scheduled_tasks`, `table_maintenance_job`, `table_snapshot_metrics`  |
+| 3     | Migrations: `scheduled_*_tasks`, `table_maintenance_action`, `table_snapshot_metrics` |
 | 4     | IRC EventListener upserts commit-job; policy create → INSERT expand; Job listener |
 | 5     | Metrics, shutdown, docs; `gravitino.conf` client auth; privilege docs             |
 

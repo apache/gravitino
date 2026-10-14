@@ -215,6 +215,10 @@ public enum OperationType {
   DROP_SEMANTIC_MODEL,
   LOAD_SEMANTIC_MODEL,
   LIST_SEMANTIC_MODEL,
+  /** Import a Semantic Model from an Ossie document. */
+  IMPORT_SEMANTIC_MODEL,
+  /** Export a Semantic Model as an Ossie document. */
+  EXPORT_SEMANTIC_MODEL,
 
   // Function operations
   REGISTER_FUNCTION,
