@@ -23,6 +23,7 @@ import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
@@ -46,6 +47,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.time.Duration;
@@ -3071,12 +3073,18 @@ public class TestJcasbinAuthorizer {
     }
   }
 
-  /** Parallel list workers prefetch request membership only once, including an empty result. */
-  @Test
-  public void testParallelRequestPrefetchIsSingleFlight() throws Exception {
+  /**
+   * Parallel list workers share one prefetch outcome, including missing users and query failures.
+   *
+   * @param failQuery whether the initial query fails
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testParallelRequestPrefetchIsSingleFlight(boolean failQuery) throws Exception {
     UserMetaMapper requestMapper = mock(UserMetaMapper.class);
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     AtomicInteger queries = new AtomicInteger();
+    RuntimeException queryFailure = new RuntimeException("auth subject database unavailable");
     CountDownLatch queried = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     CountDownLatch started = new CountDownLatch(8);
@@ -3086,6 +3094,9 @@ public class TestJcasbinAuthorizer {
               queries.incrementAndGet();
               queried.countDown();
               assertTrue(release.await(10, TimeUnit.SECONDS));
+              if (failQuery) {
+                throw queryFailure;
+              }
               return Collections.emptyList();
             });
     Method prefetch =
@@ -3113,14 +3124,28 @@ public class TestJcasbinAuthorizer {
                               return query.apply(requestMapper);
                             });
                     started.countDown();
-                    assertEquals(
-                        Optional.empty(),
-                        prefetch.invoke(
-                            jcasbinAuthorizer,
-                            METALAKE,
-                            USERNAME,
-                            Collections.emptyList(),
-                            context));
+                    if (failQuery) {
+                      InvocationTargetException failure =
+                          assertThrows(
+                              InvocationTargetException.class,
+                              () ->
+                                  prefetch.invoke(
+                                      jcasbinAuthorizer,
+                                      METALAKE,
+                                      USERNAME,
+                                      Collections.emptyList(),
+                                      context));
+                      assertSame(queryFailure, failure.getCause());
+                    } else {
+                      assertEquals(
+                          Optional.empty(),
+                          prefetch.invoke(
+                              jcasbinAuthorizer,
+                              METALAKE,
+                              USERNAME,
+                              Collections.emptyList(),
+                              context));
+                    }
                   }
                   return null;
                 }));
@@ -3132,11 +3157,105 @@ public class TestJcasbinAuthorizer {
         result.get(10, TimeUnit.SECONDS);
       }
       assertEquals(1, queries.get());
-      assertEquals(Collections.emptyMap(), context.getPrefetchedRoleVersions());
+      if (failQuery) {
+        assertNull(context.getPrefetchedRoleVersions());
+        // Recover the backend: the failed request must retain its error, while a new one retries.
+        when(requestMapper.batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList()))
+            .thenAnswer(
+                invocation -> {
+                  queries.incrementAndGet();
+                  return Collections.emptyList();
+                });
+        try {
+          sessionUtilsMockedStatic
+              .when(() -> SessionUtils.getWithoutCommit(eq(UserMetaMapper.class), any()))
+              .thenAnswer(
+                  invocation -> {
+                    Function<UserMetaMapper, ?> query = invocation.getArgument(1);
+                    return query.apply(requestMapper);
+                  });
+          InvocationTargetException failure =
+              assertThrows(
+                  InvocationTargetException.class,
+                  () ->
+                      prefetch.invoke(
+                          jcasbinAuthorizer, METALAKE, USERNAME, Collections.emptyList(), context));
+          assertSame(queryFailure, failure.getCause());
+          assertEquals(1, queries.get());
+          assertEquals(
+              Optional.empty(),
+              prefetch.invoke(
+                  jcasbinAuthorizer,
+                  METALAKE,
+                  USERNAME,
+                  Collections.emptyList(),
+                  new AuthorizationRequestContext()));
+          assertEquals(2, queries.get());
+        } finally {
+          sessionUtilsMockedStatic
+              .when(() -> SessionUtils.getWithoutCommit(eq(UserMetaMapper.class), any()))
+              .thenAnswer(
+                  invocation -> {
+                    Function<UserMetaMapper, ?> query = invocation.getArgument(1);
+                    return query.apply(userMetaMapper);
+                  });
+        }
+      } else {
+        assertEquals(Collections.emptyMap(), context.getPrefetchedRoleVersions());
+      }
     } finally {
       release.countDown();
       workers.shutdownNow();
       assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  /** Failed prefetch rejects subsequent role checks, while a fresh request can recover. */
+  @Test
+  public void testFailedPrefetchDeniesUntilNextRequest() throws Exception {
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+    List<AuthPrefetchRow> rows =
+        userMetaMapper.batchGetAuthSubjectsForUser(METALAKE, USERNAME, Collections.emptyList());
+    UserMetaMapper requestMapper = mock(UserMetaMapper.class);
+    RuntimeException failure = new RuntimeException("auth subject database unavailable");
+    when(requestMapper.batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList()))
+        .thenThrow(failure)
+        .thenReturn(rows);
+    sessionUtilsMockedStatic
+        .when(() -> SessionUtils.getWithoutCommit(eq(UserMetaMapper.class), any()))
+        .thenAnswer(
+            invocation -> {
+              Function<UserMetaMapper, ?> query = invocation.getArgument(1);
+              return query.apply(requestMapper);
+            });
+    try {
+      Principal principal = PrincipalUtils.getCurrentPrincipal();
+      AuthorizationRequestContext context = new AuthorizationRequestContext();
+      assertFalse(
+          jcasbinAuthorizer.authorize(principal, METALAKE, metalakeObject(), USE_CATALOG, context));
+      // Use another object to avoid reusing the first object's cached denial.
+      assertFalse(
+          jcasbinAuthorizer.authorize(principal, METALAKE, catalogObject(), USE_CATALOG, context));
+      verify(requestMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+      assertTrue(
+          jcasbinAuthorizer.authorize(
+              principal,
+              METALAKE,
+              catalogObject(),
+              USE_CATALOG,
+              new AuthorizationRequestContext()));
+      verify(requestMapper, Mockito.times(2))
+          .batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    } finally {
+      sessionUtilsMockedStatic
+          .when(() -> SessionUtils.getWithoutCommit(eq(UserMetaMapper.class), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<UserMetaMapper, ?> query = invocation.getArgument(1);
+                return query.apply(userMetaMapper);
+              });
     }
   }
 

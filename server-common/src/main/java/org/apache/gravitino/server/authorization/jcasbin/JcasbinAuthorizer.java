@@ -1095,7 +1095,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *       consumed by {@link #versionCheckAndLoadRoles} to skip its dedicated probe.
    * </ul>
    *
-   * <p>The fat prefetch runs at most once per request, gated by {@code prefetchedRoleVersions}.
+   * <p>The fat prefetch runs at most once per request. Its success or runtime failure is shared by
+   * parallel workers; a failed prefetch can be retried by a fresh request.
    */
   private Optional<UserUpdatedAt> prefetchUserAndGroupInfo(
       String metalake,
@@ -1106,11 +1107,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (requestContext.getPrefetchedRoleVersions() != null) {
       return loadUserInfo(metalake, username, requestContext);
     }
-    // List workers share a request. Serialize initial prefetch with role loading so only one
-    // worker publishes the role-name/version map and primes the shared membership caches.
-    synchronized (requestContext) {
-      return prefetchUserAndGroupInfoOnce(metalake, username, groupNames, requestContext);
-    }
+    // Use the request's terminal result, including failures, so waiting list workers do not
+    // serialize repeated failed queries. This shares the monitor used by role loading.
+    return requestContext.computeAuthSubjectPrefetchIfAbsent(
+        () -> prefetchUserAndGroupInfoOnce(metalake, username, groupNames, requestContext));
   }
 
   private Optional<UserUpdatedAt> prefetchUserAndGroupInfoOnce(
