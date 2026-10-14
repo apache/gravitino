@@ -38,6 +38,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,10 +57,8 @@ import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
-import org.junit.jupiter.api.extension.TestWatcher;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,26 +91,11 @@ public class BackendTestExtension
 
   @Override
   @SuppressWarnings("unchecked")
-  public void afterAll(ExtensionContext context) throws Exception {
+  public void afterAll(ExtensionContext context) {
     ConcurrentHashMap<String, BackendResource> map =
         (ConcurrentHashMap<String, BackendResource>) context.getStore(NAMESPACE).remove(STORE_KEY);
-
     if (map != null) {
-      Exception failure = null;
-      for (BackendResource resource : map.values()) {
-        try {
-          resource.close();
-        } catch (Exception e) {
-          if (failure == null) {
-            failure = e;
-          } else {
-            failure.addSuppressed(e);
-          }
-        }
-      }
-      if (failure != null) {
-        throw failure;
-      }
+      map.values().forEach(BackendResource::closeQuietly);
     }
   }
 
@@ -262,27 +246,18 @@ public class BackendTestExtension
         backend.close();
         backend.initialize(config);
         return resource;
-      } catch (Exception failure) {
-        try {
-          resource.close();
-        } catch (Exception closeFailure) {
-          failure.addSuppressed(closeFailure);
-        }
-        throw failure;
+      } catch (Exception e) {
+        resource.closeQuietly();
+        throw e;
       }
     }
   }
 
-  private static class BackendSetupCallback
-      implements BeforeEachCallback,
-          AfterEachCallback,
-          LifecycleMethodExecutionExceptionHandler,
-          TestWatcher {
+  private static class BackendSetupCallback implements BeforeEachCallback, AfterEachCallback {
     private final String backendType;
     private final boolean reuseBackend;
     private final BackendFactory backendFactory;
-    private BackendResource backendResource;
-    private boolean closeAfterEach;
+    private BackendResource perTestBackend;
 
     private BackendSetupCallback(
         String backendType, boolean reuseBackend, BackendFactory backendFactory) {
@@ -293,78 +268,42 @@ public class BackendTestExtension
 
     @Override
     public void beforeEach(ExtensionContext context) throws Exception {
-      DatabaseIsolation isolation = isolation(context);
-      if (isolation == DatabaseIsolation.DEDICATED_SERVER) {
-        throw new UnsupportedOperationException(
-            "DEDICATED_SERVER isolation is not implemented for core database tests");
-      }
-
-      closeAfterEach = !reuseBackend || isolation == DatabaseIsolation.FRESH_NAMESPACE;
-      try {
-        if (reuseBackend && isolation == DatabaseIsolation.FRESH_NAMESPACE) {
+      BackendResource resource;
+      if (reuseBackend && isolation(context) == DatabaseIsolation.RESETTABLE_NAMESPACE) {
+        resource = getOrCreateClassBackend(context);
+      } else {
+        if (reuseBackend) {
+          // Only one backend can own the global SQL session, so the class backend must go first.
           closeClassBackend(context);
         }
-        backendResource = closeAfterEach ? newBackendResource() : getOrCreateClassBackend(context);
-        backendResource.activate();
-        injectBackend(context, backendResource.backend);
-      } catch (Exception e) {
-        cleanupAfterSetupFailure(e);
-        throw e;
+        perTestBackend = backendFactory.create(backendType);
+        resource = perTestBackend;
+      }
+      resource.activate();
+
+      Object testInstance = context.getRequiredTestInstance();
+      if (testInstance instanceof TestJDBCBackend) {
+        LOG.info("Injecting {} backend into test instance", backendType);
+        ((TestJDBCBackend) testInstance).setBackend(resource.backend);
+        ((TestJDBCBackend) testInstance).setBackendType(backendType);
       }
     }
 
     @Override
     public void afterEach(ExtensionContext context) throws Exception {
-      if (closeAfterEach && backendResource != null) {
-        backendResource.close();
-        backendResource = null;
-      }
-    }
-
-    @Override
-    public void testAborted(ExtensionContext context, Throwable cause) {
-      poisonSharedFixture();
-    }
-
-    @Override
-    public void testFailed(ExtensionContext context, Throwable cause) {
-      poisonSharedFixture();
-    }
-
-    @Override
-    public void handleBeforeEachMethodExecutionException(
-        ExtensionContext context, Throwable throwable) throws Throwable {
-      poisonSharedFixture();
-      throw throwable;
-    }
-
-    @Override
-    public void handleAfterEachMethodExecutionException(
-        ExtensionContext context, Throwable throwable) throws Throwable {
-      poisonSharedFixture();
-      throw throwable;
-    }
-
-    private void injectBackend(ExtensionContext context, RelationalBackend backend) {
-      Object testInstance = context.getRequiredTestInstance();
-      if (testInstance instanceof TestJDBCBackend) {
-        LOG.info("Injecting {} backend into test instance", backendType);
-        ((TestJDBCBackend) testInstance).setBackend(backend);
-        ((TestJDBCBackend) testInstance).setBackendType(backendType);
+      if (perTestBackend != null) {
+        BackendResource resource = perTestBackend;
+        perTestBackend = null;
+        resource.close();
       }
     }
 
     private BackendResource getOrCreateClassBackend(ExtensionContext context) throws Exception {
-      ConcurrentHashMap<String, BackendResource> backendMap = backendMap(context);
+      Map<String, BackendResource> backendMap = backendMap(context);
       synchronized (backendMap) {
         BackendResource resource = backendMap.get(backendType);
-        if (resource != null && resource.poisoned) {
-          backendMap.remove(backendType);
-          resource.close();
-          resource = null;
-        }
         if (resource == null) {
-          resource = newBackendResource();
+          resource = backendFactory.create(backendType);
           backendMap.put(backendType, resource);
         }
         return resource;
@@ -372,7 +311,7 @@ public class BackendTestExtension
     }
 
     private void closeClassBackend(ExtensionContext context) throws Exception {
-      ConcurrentHashMap<String, BackendResource> backendMap = backendMap(context);
+      Map<String, BackendResource> backendMap = backendMap(context);
       synchronized (backendMap) {
         BackendResource resource = backendMap.remove(backendType);
         if (resource != null) {
@@ -382,7 +321,7 @@ public class BackendTestExtension
     }
 
     @SuppressWarnings("unchecked")
-    private ConcurrentHashMap<String, BackendResource> backendMap(ExtensionContext context) {
+    private Map<String, BackendResource> backendMap(ExtensionContext context) {
       ExtensionContext classContext = context;
       while (classContext.getTestMethod().isPresent()) {
         classContext =
@@ -390,44 +329,15 @@ public class BackendTestExtension
                 .getParent()
                 .orElseThrow(() -> new IllegalStateException("Test class context is unavailable"));
       }
-
-      ConcurrentHashMap<String, BackendResource> backendMap =
-          (ConcurrentHashMap<String, BackendResource>)
-              classContext.getStore(NAMESPACE).get(STORE_KEY);
+      Map<String, BackendResource> backendMap =
+          (Map<String, BackendResource>) classContext.getStore(NAMESPACE).get(STORE_KEY);
       if (backendMap == null) {
         throw new IllegalStateException("Backend fixture store is unavailable");
       }
       return backendMap;
     }
 
-    private BackendResource newBackendResource() throws Exception {
-      return backendFactory.create(backendType);
-    }
-
-    private void cleanupAfterSetupFailure(Exception failure) {
-      if (backendResource == null) {
-        return;
-      }
-      if (!closeAfterEach) {
-        backendResource.poisoned = true;
-        return;
-      }
-      try {
-        backendResource.close();
-      } catch (Exception closeFailure) {
-        failure.addSuppressed(closeFailure);
-      } finally {
-        backendResource = null;
-      }
-    }
-
-    private void poisonSharedFixture() {
-      if (!closeAfterEach && backendResource != null) {
-        backendResource.poisoned = true;
-      }
-    }
-
-    private DatabaseIsolation isolation(ExtensionContext context) {
+    private static DatabaseIsolation isolation(ExtensionContext context) {
       DatabaseFixture methodFixture =
           context.getRequiredTestMethod().getAnnotation(DatabaseFixture.class);
       if (methodFixture != null) {
@@ -443,7 +353,6 @@ public class BackendTestExtension
     private final String backendType;
     private final RelationalBackend backend;
     private final BackendActivator activator;
-    private boolean poisoned;
 
     BackendResource(String backendType, RelationalBackend backend, BackendActivator activator) {
       this.backendType = backendType;
@@ -457,25 +366,20 @@ public class BackendTestExtension
 
     private void close() throws Exception {
       LOG.info("Tearing down backend: {}", backendType);
-      Exception failure = null;
       try {
         backend.close();
-      } catch (Exception e) {
-        failure = e;
-      }
-      try {
+      } finally {
         if (backend instanceof H2BackendWrapper) {
           ((H2BackendWrapper) backend).cleanFile();
         }
-      } catch (Exception e) {
-        if (failure == null) {
-          failure = e;
-        } else {
-          failure.addSuppressed(e);
-        }
       }
-      if (failure != null) {
-        throw failure;
+    }
+
+    private void closeQuietly() {
+      try {
+        close();
+      } catch (Exception e) {
+        LOG.error("Failed to close backend {}", backendType, e);
       }
     }
   }

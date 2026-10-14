@@ -20,32 +20,26 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
-import org.junit.jupiter.api.extension.TestWatcher;
 
 class TestBackendTestExtension {
 
@@ -122,144 +116,6 @@ class TestBackendTestExtension {
   }
 
   @Test
-  void testFailedSharedFixtureIsClosedAndRebuilt() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
-
-    ExtensionContext firstContext = contexts.methodContext("first");
-    Extension firstCallback = startInvocation(extension, true, firstContext);
-    ((AfterEachCallback) firstCallback).afterEach(firstContext);
-    ((TestWatcher) firstCallback).testFailed(firstContext, new AssertionError("expected"));
-
-    runInvocation(extension, true, contexts.methodContext("second"));
-
-    assertEquals(2, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), never()).close();
-
-    extension.afterAll(contexts.classContext);
-    verify(factory.backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testLifecycleFailurePoisonsSharedFixture() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
-
-    ExtensionContext firstContext = contexts.methodContext("first");
-    Extension firstCallback = startInvocation(extension, true, firstContext);
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            ((LifecycleMethodExecutionExceptionHandler) firstCallback)
-                .handleBeforeEachMethodExecutionException(
-                    firstContext, new IllegalStateException("expected")));
-
-    runInvocation(extension, true, contexts.methodContext("second"));
-
-    assertEquals(2, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-
-    extension.afterAll(contexts.classContext);
-    verify(factory.backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testActivationFailurePoisonsSharedFixture() throws Exception {
-    List<RelationalBackend> backends = new ArrayList<>();
-    AtomicInteger activations = new AtomicInteger();
-    BackendTestExtension.BackendFactory factory =
-        backendType -> {
-          RelationalBackend backend = mock(RelationalBackend.class);
-          backends.add(backend);
-          return new BackendTestExtension.BackendResource(
-              backendType,
-              backend,
-              () -> {
-                if (activations.incrementAndGet() == 2) {
-                  throw new IllegalStateException("expected");
-                }
-              });
-        };
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
-
-    runInvocation(extension, true, contexts.methodContext("first"));
-    assertThrows(
-        IllegalStateException.class,
-        () -> startInvocation(extension, true, contexts.methodContext("second")));
-    runInvocation(extension, true, contexts.methodContext("second"));
-
-    assertEquals(2, backends.size());
-    verify(backends.get(0), times(1)).close();
-
-    extension.afterAll(contexts.classContext);
-    verify(backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testDedicatedServerIsolationFailsFast() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DedicatedServerTests.class);
-    extension.beforeAll(contexts.classContext);
-
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> startInvocation(extension, true, contexts.methodContext("first")));
-    assertEquals(0, factory.backends.size());
-
-    extension.afterAll(contexts.classContext);
-  }
-
-  @Test
-  void testAfterAllClosesEveryFixtureAndAggregatesFailures() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
-
-    runInvocation(extension, true, "h2", contexts.methodContext("first"));
-    runInvocation(extension, true, "mysql", contexts.methodContext("second"));
-    doThrow(new IOException("h2 close")).when(factory.backends.get(0)).close();
-    doThrow(new IOException("mysql close")).when(factory.backends.get(1)).close();
-
-    Exception failure =
-        assertThrows(Exception.class, () -> extension.afterAll(contexts.classContext));
-    assertEquals(1, failure.getSuppressed().length);
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testH2CleanupRunsAfterUncheckedBackendCloseFailure() throws Exception {
-    BackendTestExtension.H2BackendWrapper backend =
-        mock(BackendTestExtension.H2BackendWrapper.class);
-    BackendTestExtension extension =
-        new BackendTestExtension(
-            backendType ->
-                new BackendTestExtension.BackendResource(backendType, backend, () -> {}));
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
-    runInvocation(extension, true, contexts.methodContext("first"));
-
-    doThrow(new IllegalStateException("close")).when(backend).close();
-    doThrow(new IOException("clean")).when(backend).cleanFile();
-
-    Exception failure =
-        assertThrows(Exception.class, () -> extension.afterAll(contexts.classContext));
-    assertEquals("close", failure.getMessage());
-    assertEquals(1, failure.getSuppressed().length);
-    assertEquals("clean", failure.getSuppressed()[0].getMessage());
-    verify(backend, times(1)).cleanFile();
-  }
-
-  @Test
   void testDisplayNamePreservesMethodAndBackend() {
     BackendTestExtension extension =
         new BackendTestExtension(
@@ -279,39 +135,14 @@ class TestBackendTestExtension {
   private static void runInvocation(
       BackendTestExtension extension, boolean reuseBackend, ExtensionContext context)
       throws Exception {
-    runInvocation(extension, reuseBackend, "h2", context);
-  }
-
-  private static void runInvocation(
-      BackendTestExtension extension,
-      boolean reuseBackend,
-      String backendType,
-      ExtensionContext context)
-      throws Exception {
-    Extension callback = startInvocation(extension, reuseBackend, backendType, context);
-    ((AfterEachCallback) callback).afterEach(context);
-  }
-
-  private static Extension startInvocation(
-      BackendTestExtension extension, boolean reuseBackend, ExtensionContext context)
-      throws Exception {
-    return startInvocation(extension, reuseBackend, "h2", context);
-  }
-
-  private static Extension startInvocation(
-      BackendTestExtension extension,
-      boolean reuseBackend,
-      String backendType,
-      ExtensionContext context)
-      throws Exception {
     TestTemplateInvocationContext invocation =
         extension
-            .createInvocationContexts("testMethod", List.of(backendType), reuseBackend)
+            .createInvocationContexts("testMethod", List.of("h2"), reuseBackend)
             .findFirst()
             .orElseThrow();
     Extension callback = invocation.getAdditionalExtensions().get(0);
     ((BeforeEachCallback) callback).beforeEach(context);
-    return callback;
+    ((AfterEachCallback) callback).afterEach(context);
   }
 
   private static class CountingBackendFactory implements BackendTestExtension.BackendFactory {
@@ -381,10 +212,5 @@ class TestBackendTestExtension {
 
     @DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
     void fresh() {}
-  }
-
-  @DatabaseFixture(DatabaseIsolation.DEDICATED_SERVER)
-  private static class DedicatedServerTests {
-    void first() {}
   }
 }

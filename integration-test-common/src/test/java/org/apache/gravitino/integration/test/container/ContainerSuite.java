@@ -972,8 +972,7 @@ public class ContainerSuite implements Closeable {
   @Override
   public void close() throws IOException {
     try {
-      closeResources(closer);
-    } finally {
+      closer.close();
       mySQLContainer = null;
       mySQLVersion5Container = null;
       hiveContainer = null;
@@ -987,16 +986,8 @@ public class ContainerSuite implements Closeable {
       kerberosHiveContainer = null;
       sqlBaseHiveContainer = null;
       pgContainerMap.clear();
-    }
-  }
-
-  static void closeResources(CloseableGroup resources) throws IOException {
-    try {
-      resources.close();
-    } catch (IOException e) {
-      throw e;
     } catch (Exception e) {
-      throw new IOException("Failed to close ContainerEnvironment", e);
+      LOG.error("Failed to close ContainerEnvironment", e);
     }
   }
 

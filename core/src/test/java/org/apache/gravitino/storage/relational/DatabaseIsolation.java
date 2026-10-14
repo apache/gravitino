@@ -25,8 +25,5 @@ public enum DatabaseIsolation {
   RESETTABLE_NAMESPACE,
 
   /** Create and close a fresh database backend for each test. */
-  FRESH_NAMESPACE,
-
-  /** Create a dedicated database server for each test. */
-  DEDICATED_SERVER
+  FRESH_NAMESPACE
 }
