@@ -39,6 +39,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
+import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -185,13 +186,11 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(1, nullPartitionInfo.size());
     Assertions.assertTrue(String.valueOf(nullPartitionInfo.get(0)[0]).startsWith("dt="));
 
-    Exception exception =
-        Assertions.assertThrows(
-            Exception.class,
-            () -> {
-              sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
-            });
-    Assertions.assertTrue(exception.getMessage().contains("Partition already exists"));
+    // Spark checks partitionExists before adding a partition and raises its own exception, so
+    // assert the type rather than the message.
+    Assertions.assertThrows(
+        PartitionsAlreadyExistException.class,
+        () -> sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')"));
   }
 
   @ParameterizedTest
