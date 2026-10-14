@@ -361,7 +361,7 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
             .append('\'')
             .append(", rewriteOptions=")
             .append(rewriteOptions);
-    appendPeerFields(sb, true);
+    appendExecutionFields(sb, true);
     sb.append('}');
     return sb.toString();
   }

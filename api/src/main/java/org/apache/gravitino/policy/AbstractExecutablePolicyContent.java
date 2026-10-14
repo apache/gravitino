@@ -100,10 +100,10 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
   }
 
   /**
-   * Whether execution peer fields match.
+   * Whether execution fields match.
    *
    * @param that other content
-   * @return true when peers are equal
+   * @return true when execution fields are equal
    */
   protected boolean executionFieldsEqual(AbstractExecutablePolicyContent that) {
     return Objects.equals(timeTrigger, that.timeTrigger)
@@ -114,19 +114,19 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
   }
 
   /**
-   * @return hash of execution peer fields
+   * @return hash of execution fields
    */
   protected int executionFieldsHashCode() {
     return Objects.hash(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
-   * Appends peer fields to a subclass {@code toString} body.
+   * Appends execution fields to a subclass {@code toString} body.
    *
    * @param sb builder already containing an opening brace and any subclass fields
-   * @param leadingComma whether to prefix a comma (true when subclass fields precede peers)
+   * @param leadingComma whether to prefix a comma (true when subclass fields precede these)
    */
-  protected void appendPeerFields(StringBuilder sb, boolean leadingComma) {
+  protected void appendExecutionFields(StringBuilder sb, boolean leadingComma) {
     if (leadingComma) {
       sb.append(", ");
     }

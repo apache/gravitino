@@ -87,7 +87,7 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("IcebergRewriteManifestsContent{");
-    appendPeerFields(sb, false);
+    appendExecutionFields(sb, false);
     sb.append('}');
     return sb.toString();
   }
