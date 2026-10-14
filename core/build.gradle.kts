@@ -308,6 +308,10 @@ fun registerCoreTestTask(
           "Docker running, or set GRAVITINO_TEST_${backend.uppercase()}_URL."
       )
     }
+    // Which server this task uses; CI's injected-database job asserts it.
+    val source =
+      if (injected != null) "injected" else if (rootProject.extra["dockerTest"] == true) "docker" else "none"
+    logger.lifecycle("[CORE-DB-SOURCE] task={} backend={} source={}", path, backend, source)
   }
 
   // Contract with SharedCoreDatabaseProvisioner (core/src/test/java/.../storage/relational)
