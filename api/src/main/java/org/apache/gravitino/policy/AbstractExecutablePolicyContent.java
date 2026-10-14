@@ -123,13 +123,12 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
   /**
    * Appends execution fields to a subclass {@code toString} body.
    *
+   * <p>Callers that already wrote subclass fields should append {@code ", "} before invoking this
+   * method.
+   *
    * @param sb builder already containing an opening brace and any subclass fields
-   * @param leadingComma whether to prefix a comma (true when subclass fields precede these)
    */
-  protected void appendExecutionFields(StringBuilder sb, boolean leadingComma) {
-    if (leadingComma) {
-      sb.append(", ");
-    }
+  protected void appendExecutionFields(StringBuilder sb) {
     sb.append("timeTrigger='")
         .append(timeTrigger)
         .append('\'')

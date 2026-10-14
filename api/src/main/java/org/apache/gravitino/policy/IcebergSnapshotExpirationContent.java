@@ -87,7 +87,7 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("IcebergSnapshotExpirationContent{");
-    appendExecutionFields(sb, false);
+    appendExecutionFields(sb);
     sb.append('}');
     return sb.toString();
   }
