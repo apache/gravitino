@@ -42,22 +42,22 @@ public final class MaintenanceMinIntervalConfigs {
 
   /** Config key for compaction cooldown. */
   public static final String COMPACTION_MIN_INTERVAL_MS_KEY =
-      "gravitino.maintenance.task.compaction.minIntervalMs";
+      "gravitino.maintenance.compaction.minIntervalMs";
 
   /** Config key for manifest-rewrite cooldown. */
   public static final String MANIFEST_REWRITE_MIN_INTERVAL_MS_KEY =
-      "gravitino.maintenance.task.manifest-rewrite.minIntervalMs";
+      "gravitino.maintenance.manifest-rewrite.minIntervalMs";
 
   /** Config key for snapshot-expiry cooldown. */
   public static final String SNAPSHOT_EXPIRY_MIN_INTERVAL_MS_KEY =
-      "gravitino.maintenance.task.snapshot-expiry.minIntervalMs";
+      "gravitino.maintenance.snapshot-expiry.minIntervalMs";
 
   /** Config key for orphan-cleanup cooldown. */
   public static final String ORPHAN_CLEANUP_MIN_INTERVAL_MS_KEY =
-      "gravitino.maintenance.task.orphan-cleanup.minIntervalMs";
+      "gravitino.maintenance.orphan-cleanup.minIntervalMs";
 
   /** Cooldown between finished compaction runs when the policy omits {@code minIntervalMs}. */
-  public static final ConfigEntry<Long> MAINTENANCE_TASK_COMPACTION_MIN_INTERVAL_MS =
+  public static final ConfigEntry<Long> COMPACTION_MIN_INTERVAL_MS =
       new ConfigBuilder(COMPACTION_MIN_INTERVAL_MS_KEY)
           .doc(
               "Minimum interval in milliseconds between finished compaction runs when the "
@@ -70,7 +70,7 @@ public final class MaintenanceMinIntervalConfigs {
   /**
    * Cooldown between finished manifest-rewrite runs when the policy omits {@code minIntervalMs}.
    */
-  public static final ConfigEntry<Long> MAINTENANCE_TASK_MANIFEST_REWRITE_MIN_INTERVAL_MS =
+  public static final ConfigEntry<Long> MANIFEST_REWRITE_MIN_INTERVAL_MS =
       new ConfigBuilder(MANIFEST_REWRITE_MIN_INTERVAL_MS_KEY)
           .doc(
               "Minimum interval in milliseconds between finished manifest-rewrite runs when the "
@@ -81,7 +81,7 @@ public final class MaintenanceMinIntervalConfigs {
           .createWithDefault(DEFAULT_HOURLY_MIN_INTERVAL_MS);
 
   /** Cooldown between finished snapshot-expiry runs when the policy omits {@code minIntervalMs}. */
-  public static final ConfigEntry<Long> MAINTENANCE_TASK_SNAPSHOT_EXPIRY_MIN_INTERVAL_MS =
+  public static final ConfigEntry<Long> SNAPSHOT_EXPIRY_MIN_INTERVAL_MS =
       new ConfigBuilder(SNAPSHOT_EXPIRY_MIN_INTERVAL_MS_KEY)
           .doc(
               "Minimum interval in milliseconds between finished snapshot-expiry runs when the "
@@ -92,7 +92,7 @@ public final class MaintenanceMinIntervalConfigs {
           .createWithDefault(DEFAULT_HOURLY_MIN_INTERVAL_MS);
 
   /** Cooldown between finished orphan-cleanup runs when the policy omits {@code minIntervalMs}. */
-  public static final ConfigEntry<Long> MAINTENANCE_TASK_ORPHAN_CLEANUP_MIN_INTERVAL_MS =
+  public static final ConfigEntry<Long> ORPHAN_CLEANUP_MIN_INTERVAL_MS =
       new ConfigBuilder(ORPHAN_CLEANUP_MIN_INTERVAL_MS_KEY)
           .doc(
               "Minimum interval in milliseconds between finished orphan-cleanup runs when the "
@@ -114,13 +114,13 @@ public final class MaintenanceMinIntervalConfigs {
     Preconditions.checkNotNull(builtInType, "builtInType cannot be null");
     switch (builtInType) {
       case ICEBERG_COMPACTION:
-        return MAINTENANCE_TASK_COMPACTION_MIN_INTERVAL_MS;
+        return COMPACTION_MIN_INTERVAL_MS;
       case ICEBERG_REWRITE_MANIFESTS:
-        return MAINTENANCE_TASK_MANIFEST_REWRITE_MIN_INTERVAL_MS;
+        return MANIFEST_REWRITE_MIN_INTERVAL_MS;
       case ICEBERG_SNAPSHOT_EXPIRATION:
-        return MAINTENANCE_TASK_SNAPSHOT_EXPIRY_MIN_INTERVAL_MS;
+        return SNAPSHOT_EXPIRY_MIN_INTERVAL_MS;
       case ICEBERG_ORPHAN_FILE_REMOVAL:
-        return MAINTENANCE_TASK_ORPHAN_CLEANUP_MIN_INTERVAL_MS;
+        return ORPHAN_CLEANUP_MIN_INTERVAL_MS;
       default:
         throw new IllegalArgumentException(
             "No minIntervalMs config for built-in policy type: " + builtInType);

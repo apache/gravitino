@@ -30,17 +30,16 @@ public class TestMaintenanceMinIntervalConfigs {
     Config config = new Config(false) {};
     Assertions.assertEquals(
         MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS,
-        config.get(MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_COMPACTION_MIN_INTERVAL_MS));
+        config.get(MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS));
     Assertions.assertEquals(
         MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS,
-        config.get(
-            MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_MANIFEST_REWRITE_MIN_INTERVAL_MS));
+        config.get(MaintenanceMinIntervalConfigs.MANIFEST_REWRITE_MIN_INTERVAL_MS));
     Assertions.assertEquals(
         MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS,
-        config.get(MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_SNAPSHOT_EXPIRY_MIN_INTERVAL_MS));
+        config.get(MaintenanceMinIntervalConfigs.SNAPSHOT_EXPIRY_MIN_INTERVAL_MS));
     Assertions.assertEquals(
         MaintenanceMinIntervalConfigs.DEFAULT_ORPHAN_CLEANUP_MIN_INTERVAL_MS,
-        config.get(MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_ORPHAN_CLEANUP_MIN_INTERVAL_MS));
+        config.get(MaintenanceMinIntervalConfigs.ORPHAN_CLEANUP_MIN_INTERVAL_MS));
   }
 
   @Test
@@ -66,7 +65,7 @@ public class TestMaintenanceMinIntervalConfigs {
   @Test
   void testResolvePrefersPolicyThenConfigThenDefault() {
     Config config = new Config(false) {};
-    config.set(MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_COMPACTION_MIN_INTERVAL_MS, 900_000L);
+    config.set(MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS, 900_000L);
 
     Assertions.assertEquals(
         120_000L,
@@ -86,11 +85,10 @@ public class TestMaintenanceMinIntervalConfigs {
   @Test
   void testRejectsNegativeMinInterval() {
     Config config = new Config(false) {};
-    config.set(MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_COMPACTION_MIN_INTERVAL_MS, -1L);
+    config.set(MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS, -1L);
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            config.get(MaintenanceMinIntervalConfigs.MAINTENANCE_TASK_COMPACTION_MIN_INTERVAL_MS));
+        () -> config.get(MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS));
   }
 
   @Test
