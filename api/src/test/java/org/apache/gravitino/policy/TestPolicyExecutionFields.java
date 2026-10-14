@@ -53,9 +53,9 @@ public class TestPolicyExecutionFields {
   }
 
   @Test
-  void testTimeTriggerRequiresValidCron() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
+  void testDoesNotParseTimeTriggerCron() {
+    // Cron syntax is owned by the scheduler registration path, not this API helper.
+    Assertions.assertDoesNotThrow(
         () ->
             PolicyExecutionFields.validate(
                 "0 2 * *", null, null, Collections.emptyMap(), Collections.emptyMap()));
@@ -70,5 +70,14 @@ public class TestPolicyExecutionFields {
         () ->
             PolicyExecutionFields.validate(
                 "   ", null, null, Collections.emptyMap(), Collections.emptyMap()));
+  }
+
+  @Test
+  void testRejectsNegativeMinIntervalMs() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PolicyExecutionFields.validate(
+                null, null, -1L, Collections.emptyMap(), Collections.emptyMap()));
   }
 }

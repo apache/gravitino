@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
@@ -32,10 +31,15 @@ import org.apache.commons.lang3.StringUtils;
  *
  * <p>JSON property names are stable API keys. Trigger peers are scalars: {@code timeTrigger} is a
  * cron string and {@code commitTrigger} is a boolean.
+ *
+ * <p>{@code timeTrigger} cron syntax is <strong>not</strong> validated here. The scheduler
+ * registration path (db-scheduler / runtime cron parser) is the source of truth; validating with a
+ * regex or a second library in {@code api} would drift from that runtime and pull scheduler
+ * dependencies into the public API module.
  */
 public final class PolicyExecutionFields {
 
-  /** JSON property for the Quartz cron string. */
+  /** JSON property for the cron string passed to the scheduler. */
   public static final String TIME_TRIGGER_JSON_KEY = "timeTrigger";
 
   /** JSON property for the commit-trigger boolean. */
@@ -49,13 +53,6 @@ public final class PolicyExecutionFields {
 
   /** JSON property for updater / control-plane options. */
   public static final String UPDATE_OPTIONS_JSON_KEY = "updateOptions";
-
-  /** Allowed charset / named tokens per Quartz cron field (shape only, not full Quartz parse). */
-  private static final Pattern CRON_FIELD =
-      Pattern.compile(
-          "(?i)^(?:\\*|/|-|,|\\?|#|[0-9]|L|W|"
-              + "JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC|"
-              + "SUN|MON|TUE|WED|THU|FRI|SAT)+$");
 
   private PolicyExecutionFields() {}
 
@@ -83,9 +80,12 @@ public final class PolicyExecutionFields {
   }
 
   /**
-   * Validates common execution peer fields (cron shape, cooldown, option maps).
+   * Validates common execution peer fields (cooldown and option maps).
    *
-   * @param timeTrigger optional cron expression
+   * <p>Does not parse {@code timeTrigger}; cron validity is checked when the expression is
+   * registered with the scheduler.
+   *
+   * @param timeTrigger optional cron expression (stored as-is when non-blank)
    * @param commitTrigger optional commit flag
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions job options (may be empty)
@@ -100,40 +100,11 @@ public final class PolicyExecutionFields {
     if (!hasAny(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions)) {
       return;
     }
-    if (StringUtils.isNotBlank(timeTrigger)) {
-      validateCronExpression(timeTrigger.trim());
-    }
     if (minIntervalMs != null) {
       Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");
     }
     validateOptionMap(jobOptions, "jobOptions");
     validateOptionMap(updateOptions, "updateOptions");
-  }
-
-  /**
-   * Validates Quartz cron field count and allowed tokens (shape check, not full Quartz parse).
-   *
-   * @param expression trimmed cron expression
-   */
-  public static void validateCronExpression(String expression) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(expression), "timeTrigger must not be blank");
-    String[] fields = expression.trim().split("\\s+");
-    Preconditions.checkArgument(
-        fields.length == 6 || fields.length == 7,
-        "timeTrigger must be a Quartz cron with 6 fields "
-            + "(seconds minutes hours day-of-month month day-of-week) or 7 fields "
-            + "(optional year), but got %s field(s): '%s'",
-        fields.length,
-        expression);
-    for (int i = 0; i < fields.length; i++) {
-      Preconditions.checkArgument(
-          CRON_FIELD.matcher(fields[i]).matches(),
-          "timeTrigger field %s ('%s') is not a valid Quartz cron token "
-              + "(digits, *, ,, -, /, ?, L, W, #, or month/day-of-week names)",
-          i + 1,
-          fields[i]);
-    }
   }
 
   /**

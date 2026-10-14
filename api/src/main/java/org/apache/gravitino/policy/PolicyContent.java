@@ -50,9 +50,10 @@ public interface PolicyContent {
   }
 
   /**
-   * Optional Quartz cron expression that schedules automated policy evaluation.
+   * Optional cron expression that schedules automated policy evaluation.
    *
-   * <p>Wire form is a plain string, e.g. {@code "timeTrigger": "0 0 2 * * ?"}.
+   * <p>Wire form is a plain string, e.g. {@code "timeTrigger": "0 0 2 * * ?"}. Cron syntax is not
+   * validated on the policy API; the scheduler registration path parses it.
    *
    * @return cron expression, or {@code null} when unset
    */
