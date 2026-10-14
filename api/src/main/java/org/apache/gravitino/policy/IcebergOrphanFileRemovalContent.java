@@ -154,7 +154,7 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
       return false;
     }
     IcebergOrphanFileRemovalContent that = (IcebergOrphanFileRemovalContent) other;
-    return peersEqual(that)
+    return executionFieldsEqual(that)
         && olderThanDays == that.olderThanDays
         && dryRun == that.dryRun
         && Objects.equals(location, that.location);
@@ -162,6 +162,6 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
 
   @Override
   public int hashCode() {
-    return Objects.hash(peersHashCode(), olderThanDays, location, dryRun);
+    return Objects.hash(executionFieldsHashCode(), olderThanDays, location, dryRun);
   }
 }

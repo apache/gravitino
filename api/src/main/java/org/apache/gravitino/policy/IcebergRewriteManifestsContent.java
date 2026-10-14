@@ -76,12 +76,12 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   @Override
   public boolean equals(Object other) {
     return other instanceof IcebergRewriteManifestsContent
-        && peersEqual((IcebergRewriteManifestsContent) other);
+        && executionFieldsEqual((IcebergRewriteManifestsContent) other);
   }
 
   @Override
   public int hashCode() {
-    return peersHashCode();
+    return executionFieldsHashCode();
   }
 
   @Override

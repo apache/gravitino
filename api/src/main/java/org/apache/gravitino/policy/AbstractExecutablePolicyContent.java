@@ -105,7 +105,7 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
    * @param that other content
    * @return true when peers are equal
    */
-  protected boolean peersEqual(AbstractExecutablePolicyContent that) {
+  protected boolean executionFieldsEqual(AbstractExecutablePolicyContent that) {
     return Objects.equals(timeTrigger, that.timeTrigger)
         && Objects.equals(commitTrigger, that.commitTrigger)
         && Objects.equals(minIntervalMs, that.minIntervalMs)
@@ -116,7 +116,7 @@ public abstract class AbstractExecutablePolicyContent implements PolicyContent {
   /**
    * @return hash of execution peer fields
    */
-  protected int peersHashCode() {
+  protected int executionFieldsHashCode() {
     return Objects.hash(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 

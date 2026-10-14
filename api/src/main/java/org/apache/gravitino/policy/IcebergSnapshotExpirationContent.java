@@ -76,12 +76,12 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
   @Override
   public boolean equals(Object other) {
     return other instanceof IcebergSnapshotExpirationContent
-        && peersEqual((IcebergSnapshotExpirationContent) other);
+        && executionFieldsEqual((IcebergSnapshotExpirationContent) other);
   }
 
   @Override
   public int hashCode() {
-    return peersHashCode();
+    return executionFieldsHashCode();
   }
 
   @Override

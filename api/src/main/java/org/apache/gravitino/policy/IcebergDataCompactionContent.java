@@ -314,7 +314,7 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
       return false;
     }
     IcebergDataCompactionContent that = (IcebergDataCompactionContent) o;
-    return peersEqual(that)
+    return executionFieldsEqual(that)
         && Objects.equals(minDataFileMse, that.minDataFileMse)
         && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
@@ -328,7 +328,7 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
   @Override
   public int hashCode() {
     return Objects.hash(
-        peersHashCode(),
+        executionFieldsHashCode(),
         minDataFileMse,
         minDeleteFileNumber,
         dataFileMseWeight,
