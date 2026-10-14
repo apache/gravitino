@@ -26,31 +26,49 @@ import org.junit.jupiter.api.Test;
 public class TestPolicyExecutionFields {
 
   @Test
-  void testValidateAcceptsTimeAndCommitTriggers() {
+  void testValidateAcceptsScalarTriggers() {
     Assertions.assertDoesNotThrow(
         () ->
             PolicyExecutionFields.validate(
-                new TimeTrigger("0 0 2 * * ?"),
-                CommitTrigger.INSTANCE,
+                "0 0 2 * * ?",
+                true,
                 100L,
                 ImmutableMap.of("uri", "http://irc"),
                 ImmutableMap.of("metalake", "ml")));
   }
 
   @Test
-  void testCommitTriggerPresenceIsValid() {
+  void testCommitTriggerTrueIsValid() {
     Assertions.assertDoesNotThrow(
         () ->
             PolicyExecutionFields.validate(
-                null, new CommitTrigger(), null, Collections.emptyMap(), Collections.emptyMap()));
+                null, true, null, Collections.emptyMap(), Collections.emptyMap()));
   }
 
   @Test
-  void testTimeTriggerRequiresCron() {
+  void testCommitTriggerFalseDoesNotCountAsSet() {
+    Assertions.assertFalse(
+        PolicyExecutionFields.hasAny(
+            null, false, null, Collections.emptyMap(), Collections.emptyMap()));
+  }
+
+  @Test
+  void testTimeTriggerRequiresValidCron() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             PolicyExecutionFields.validate(
-                new TimeTrigger(null), null, null, Collections.emptyMap(), Collections.emptyMap()));
+                "0 2 * *", null, null, Collections.emptyMap(), Collections.emptyMap()));
+  }
+
+  @Test
+  void testBlankTimeTriggerTreatedAsUnset() {
+    Assertions.assertFalse(
+        PolicyExecutionFields.hasAny(
+            "   ", null, null, Collections.emptyMap(), Collections.emptyMap()));
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyExecutionFields.validate(
+                "   ", null, null, Collections.emptyMap(), Collections.emptyMap()));
   }
 }

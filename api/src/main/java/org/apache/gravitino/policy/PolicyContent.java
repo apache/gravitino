@@ -50,22 +50,28 @@ public interface PolicyContent {
   }
 
   /**
-   * Optional time-based trigger for automated policy evaluation.
+   * Optional Quartz cron expression that schedules automated policy evaluation.
    *
-   * @return time trigger, or {@code null} when unset
+   * <p>Wire form is a plain string, e.g. {@code "timeTrigger": "0 0 2 * * ?"}.
+   *
+   * @return cron expression, or {@code null} when unset
    */
   @Nullable
-  default TimeTrigger timeTrigger() {
+  default String timeTrigger() {
     return null;
   }
 
   /**
-   * Optional commit trigger for automated policy evaluation after an Iceberg commit.
+   * Optional flag that evaluates the policy after an Iceberg commit.
    *
-   * @return commit trigger, or {@code null} when unset
+   * <p>Wire form is a plain boolean, e.g. {@code "commitTrigger": true}. {@code null} or {@code
+   * false} means unset / disabled.
+   *
+   * @return {@code true} when commit-triggered evaluation is enabled, otherwise {@code null} or
+   *     {@code false}
    */
   @Nullable
-  default CommitTrigger commitTrigger() {
+  default Boolean commitTrigger() {
     return null;
   }
 
