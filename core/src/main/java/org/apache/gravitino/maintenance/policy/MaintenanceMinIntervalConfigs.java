@@ -31,6 +31,9 @@ import org.apache.gravitino.policy.Policy;
  *
  * <p>Used when a maintenance policy omits {@code minIntervalMs}. Resolution order is policy content
  * → these server keys → the code defaults below.
+ *
+ * <p>Lookup by {@link Policy.BuiltInType} goes through {@link MaintenancePolicyDefinitions}; do not
+ * add a parallel switch or task-type enum for the same 1:1 mapping.
  */
 public final class MaintenanceMinIntervalConfigs {
 
@@ -111,20 +114,7 @@ public final class MaintenanceMinIntervalConfigs {
    * @return config entry
    */
   public static ConfigEntry<Long> forBuiltInType(Policy.BuiltInType builtInType) {
-    Preconditions.checkNotNull(builtInType, "builtInType cannot be null");
-    switch (builtInType) {
-      case ICEBERG_COMPACTION:
-        return COMPACTION_MIN_INTERVAL_MS;
-      case ICEBERG_REWRITE_MANIFESTS:
-        return MANIFEST_REWRITE_MIN_INTERVAL_MS;
-      case ICEBERG_SNAPSHOT_EXPIRATION:
-        return SNAPSHOT_EXPIRY_MIN_INTERVAL_MS;
-      case ICEBERG_ORPHAN_FILE_REMOVAL:
-        return ORPHAN_CLEANUP_MIN_INTERVAL_MS;
-      default:
-        throw new IllegalArgumentException(
-            "No minIntervalMs config for built-in policy type: " + builtInType);
-    }
+    return MaintenancePolicyDefinitions.require(builtInType).minIntervalMs();
   }
 
   /**

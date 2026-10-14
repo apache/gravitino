@@ -21,10 +21,8 @@ package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -176,28 +174,26 @@ public class TestPolicyContents {
   }
 
   @Test
-  void testValidateRejectsNegativeMinIntervalMsOnPolicyContentPath() {
+  void testValidateRejectsNegativeMinIntervalMsOnExecutableContent() {
     PolicyContent content =
-        new PolicyContent() {
-          @Override
-          public Set<MetadataObject.Type> supportedObjectTypes() {
-            return ImmutableSet.of(MetadataObject.Type.TABLE);
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return Collections.emptyMap();
-          }
-
-          @Override
-          public Long minIntervalMs() {
-            return -1L;
-          }
-        };
+        ((AbstractExecutablePolicyContent) PolicyContents.icebergDataCompaction())
+            .withExecutionFields(null, null, -1L, null, null);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     Assertions.assertTrue(exception.getMessage().contains("minIntervalMs"));
+  }
+
+  @Test
+  void testExecutionPeersOnlyOnAbstractExecutablePolicyContent() {
+    Assertions.assertInstanceOf(
+        AbstractExecutablePolicyContent.class, PolicyContents.icebergDataCompaction());
+    Assertions.assertInstanceOf(
+        AbstractExecutablePolicyContent.class, PolicyContents.icebergOrphanFileRemoval());
+    Assertions.assertFalse(
+        PolicyContents.custom(
+                ImmutableMap.of("rule", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null)
+            instanceof AbstractExecutablePolicyContent);
   }
 
   @Test
@@ -209,6 +205,17 @@ public class TestPolicyContents {
             PolicyContents.custom(
                     ImmutableMap.of("rule", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null)
                 .validate());
+  }
+
+  @Test
+  void testOrphanFileRemovalRejectsCommitTrigger() {
+    PolicyContent content =
+        ((AbstractExecutablePolicyContent) PolicyContents.icebergOrphanFileRemoval())
+            .withExecutionFields(null, true, null, null, null);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("commitTrigger"));
   }
 
   private static Map<String, String> mapOf(String key, String value) {

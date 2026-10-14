@@ -19,14 +19,18 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.MetadataObject;
 
-/** The interface of the content of the policy. */
+/**
+ * The interface of the content of the policy.
+ *
+ * <p>Execution peers ({@code timeTrigger}, {@code commitTrigger}, {@code minIntervalMs}, {@code
+ * jobOptions}, {@code updateOptions}) are not part of this universal interface. Built-in Iceberg
+ * maintenance contents carry them via {@link AbstractExecutablePolicyContent}.
+ */
 public interface PolicyContent {
 
   /**
@@ -50,75 +54,15 @@ public interface PolicyContent {
   }
 
   /**
-   * Optional cron expression that schedules automated policy evaluation.
-   *
-   * <p>Wire form is a plain string, e.g. {@code "timeTrigger": "0 0 2 * * ?"}. Cron syntax is not
-   * validated on the policy API; the scheduler registration path parses it.
-   *
-   * @return cron expression, or {@code null} when unset
-   */
-  @Nullable
-  default String timeTrigger() {
-    return null;
-  }
-
-  /**
-   * Optional flag that evaluates the policy after an Iceberg commit.
-   *
-   * <p>Wire form is a plain boolean, e.g. {@code "commitTrigger": true}. {@code null} or {@code
-   * false} means unset / disabled.
-   *
-   * @return {@code true} when commit-triggered evaluation is enabled, otherwise {@code null} or
-   *     {@code false}
-   */
-  @Nullable
-  default Boolean commitTrigger() {
-    return null;
-  }
-
-  /**
-   * Optional cooldown between finished automated runs for this policy.
-   *
-   * @return minimum interval in milliseconds, or {@code null} when unset
-   */
-  @Nullable
-  default Long minIntervalMs() {
-    return null;
-  }
-
-  /**
-   * Optional job / client options carried in policy content (non-secret).
-   *
-   * @return job options; never {@code null}
-   */
-  default Map<String, String> jobOptions() {
-    return Collections.emptyMap();
-  }
-
-  /**
-   * Optional updater / control-plane options carried in policy content (non-secret).
-   *
-   * @return update options; never {@code null}
-   */
-  default Map<String, String> updateOptions() {
-    return Collections.emptyMap();
-  }
-
-  /**
    * Validates the policy content.
    *
-   * <p>Checks {@link #supportedObjectTypes()} and the shared execution peer fields ({@link
-   * #timeTrigger()}, {@link #commitTrigger()}, {@link #minIntervalMs()}, {@link #jobOptions()},
-   * {@link #updateOptions()}). Implementations that override this method must call {@code
-   * PolicyContent.super.validate()} (or equivalent) so peer validation stays on the persistence
-   * path.
+   * <p>Checks universal fields such as {@link #supportedObjectTypes()}. Maintenance execution-field
+   * validation lives on {@link AbstractExecutablePolicyContent}.
    *
    * @throws IllegalArgumentException if the content is invalid.
    */
   default void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         CollectionUtils.isNotEmpty(supportedObjectTypes()), "supportedObjectTypes cannot be empty");
-    PolicyExecutionFields.validate(
-        timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updateOptions());
   }
 }

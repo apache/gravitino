@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -104,6 +105,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.AbstractExecutablePolicyContent;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -671,6 +673,21 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
+    // Execution peers live on AbstractExecutablePolicyContent, not universal PolicyContent.
+    String timeTrigger = null;
+    Boolean commitTrigger = null;
+    Long minIntervalMs = null;
+    Map<String, String> jobOptions = null;
+    Map<String, String> updateOptions = null;
+    if (policyContent instanceof AbstractExecutablePolicyContent) {
+      AbstractExecutablePolicyContent executable = (AbstractExecutablePolicyContent) policyContent;
+      timeTrigger = executable.timeTrigger();
+      commitTrigger = executable.commitTrigger();
+      minIntervalMs = executable.minIntervalMs();
+      jobOptions = emptyToNull(executable.jobOptions());
+      updateOptions = emptyToNull(executable.updateOptions());
+    }
+
     if (policyContent instanceof PolicyContents.CustomContent) {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
@@ -686,13 +703,30 @@ public class DTOConverters {
           .withOlderThanDays(content.olderThanDays())
           .withLocation(content.location())
           .withDryRun(content.dryRun())
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
+          .withMinIntervalMs(minIntervalMs)
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
-      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.instance();
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
+          .withMinIntervalMs(minIntervalMs)
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
+          .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
-      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.instance();
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
+          .withMinIntervalMs(minIntervalMs)
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
+          .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
@@ -706,6 +740,11 @@ public class DTOConverters {
           .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
           .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .withTimeTrigger(timeTrigger)
+          .withCommitTrigger(commitTrigger)
+          .withMinIntervalMs(minIntervalMs)
+          .withJobOptions(jobOptions)
+          .withUpdateOptions(updateOptions)
           .build();
     }
 
@@ -1568,29 +1607,19 @@ public class DTOConverters {
     }
 
     if (policyContentDTO instanceof PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) {
-      PolicyContentDTO.IcebergOrphanFileRemovalContentDTO content =
-          (PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO;
-      return PolicyContents.icebergOrphanFileRemoval(
-          content.olderThanDays(), content.location(), content.dryRun());
+      return ((PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
-      return PolicyContents.icebergRewriteManifests();
+      return ((PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
-      return PolicyContents.icebergSnapshotExpiration();
+      return ((PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
-      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
-          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
-      return PolicyContents.icebergDataCompaction(
-          icebergCompactionContentDTO.minDataFileMse(),
-          icebergCompactionContentDTO.minDeleteFileNumber(),
-          icebergCompactionContentDTO.dataFileMseWeight(),
-          icebergCompactionContentDTO.deleteFileNumberWeight(),
-          icebergCompactionContentDTO.maxPartitionNum(),
-          icebergCompactionContentDTO.rewriteStrategy(),
-          icebergCompactionContentDTO.sortOrder(),
-          icebergCompactionContentDTO.rewriteOptions());
+      return ((PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO).toDomainContent();
     }
 
     if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {
@@ -1607,5 +1636,10 @@ public class DTOConverters {
 
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
+  }
+
+  @Nullable
+  private static Map<String, String> emptyToNull(Map<String, String> options) {
+    return options == null || options.isEmpty() ? null : options;
   }
 }

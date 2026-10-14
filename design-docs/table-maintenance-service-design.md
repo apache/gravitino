@@ -125,6 +125,31 @@ parts:
 1. **Policy** — what to maintain, when to trigger, and non-sensitive job settings.
 2. **Scheduling and commit** — how work is enqueued, claimed, and recorded.
 
+### 5.0 Terminology: policy identity vs scheduler task kind
+
+Do **not** overload “task type”. TMS uses two different identities:
+
+| Concept | Meaning | Identity today |
+| ------- | ------- | -------------- |
+| **Policy / activity type** | Which maintenance the policy describes (compaction, manifest-rewrite, snapshot-expiry, orphan-cleanup) | `Policy.BuiltInType` (e.g. `ICEBERG_COMPACTION`) |
+| **Scheduler task kind** | Which db-scheduler row / pool owns the work | `policy-expand`, `cron-job`, `commit-job` |
+
+Rules:
+
+- Prefer **`Policy.BuiltInType`** as the single policy/activity identity. Server defaults
+  (for example per-type `minIntervalMs`) and content registries key off it. Do **not**
+  introduce a parallel enum that maps 1:1 to `BuiltInType` (the former
+  `TableMaintenanceTaskType` pattern).
+- Keep **scheduler task kinds** separate. They are control-plane scheduling units, not
+  policy types. One policy may produce expand / cron / commit work without changing its
+  `BuiltInType`.
+- If a future runtime “activity” ever diverges from policy identity (non-1:1), introduce
+  that concept then with an explicit contract. Until then, do not invent a second
+  activity layer.
+
+In prose, prefer “maintenance type” / `BuiltInType` for policy activity, and “scheduler
+task kind” for expand / cron-job / commit-job.
+
 TMS has two trigger paths that stay separate:
 
 - **crontab** — expand a policy into one-shot Spark submits (one type per submit).

@@ -27,7 +27,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Optional execution peer fields shared by policy contents: triggers, cooldown, and option bags.
+ * Helpers for maintenance execution peer fields: triggers, cooldown, and option bags.
+ *
+ * <p>Invoked from {@link AbstractExecutablePolicyContent}, not from universal {@link
+ * PolicyContent#validate()}. Type-specific rules (for example rejecting {@code commitTrigger} for
+ * orphan cleanup) belong on the concrete content or the server create/alter path.
  *
  * <p>JSON property names are stable API keys. Trigger peers are scalars: {@code timeTrigger} is a
  * cron string and {@code commitTrigger} is a boolean.

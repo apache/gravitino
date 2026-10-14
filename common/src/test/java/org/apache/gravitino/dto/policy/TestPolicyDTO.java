@@ -177,4 +177,58 @@ public class TestPolicyDTO {
         IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
+
+  @Test
+  public void testIcebergCompactionMaintenancePeerFieldsSerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withTimeTrigger("0 0 2 * * ?")
+            .withCommitTrigger(true)
+            .withMinIntervalMs(3_600_000L)
+            .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
+            .withUpdateOptions(ImmutableMap.of("metalake", "ml"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction-tms")
+            .withComment("tms peers")
+            .withPolicyType("system_iceberg_compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
+    Assertions.assertEquals("0 0 2 * * ?", content.timeTrigger());
+    Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
+    Assertions.assertEquals(3_600_000L, content.minIntervalMs());
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updateOptions().get("metalake"));
+    Assertions.assertDoesNotThrow(content::validate);
+  }
+
+  @Test
+  public void testMaintenancePeerValidateOnDto() {
+    PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
+        PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+            .withCommitTrigger(true)
+            .build();
+    IllegalArgumentException orphanEx =
+        Assertions.assertThrows(IllegalArgumentException.class, orphanOnCommit::validate);
+    Assertions.assertTrue(orphanEx.getMessage().contains("commitTrigger"));
+
+    // Cron syntax is not validated on the policy API; scheduler registration parses it.
+    PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withTimeTrigger("a a a a a a")
+            .build();
+    Assertions.assertDoesNotThrow(opaqueCron::validate);
+  }
 }

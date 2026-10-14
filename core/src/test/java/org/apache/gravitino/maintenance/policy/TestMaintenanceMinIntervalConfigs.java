@@ -106,5 +106,29 @@ public class TestMaintenanceMinIntervalConfigs {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> MaintenanceMinIntervalConfigs.forBuiltInType(Policy.BuiltInType.ROW_FILTER));
+    Assertions.assertFalse(
+        MaintenancePolicyDefinitions.isMaintenance(Policy.BuiltInType.ROW_FILTER));
+  }
+
+  @Test
+  void testRegistryCoversFourMaintenanceTypes() {
+    Assertions.assertEquals(4, MaintenancePolicyDefinitions.all().size());
+    Assertions.assertTrue(
+        MaintenancePolicyDefinitions.isMaintenance(Policy.BuiltInType.ICEBERG_COMPACTION));
+    Assertions.assertTrue(
+        MaintenancePolicyDefinitions.isMaintenance(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS));
+    Assertions.assertTrue(
+        MaintenancePolicyDefinitions.isMaintenance(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION));
+    Assertions.assertTrue(
+        MaintenancePolicyDefinitions.isMaintenance(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL));
+
+    MaintenancePolicyDefinition compaction =
+        MaintenancePolicyDefinitions.require(Policy.BuiltInType.ICEBERG_COMPACTION);
+    Assertions.assertEquals(Policy.BuiltInType.ICEBERG_COMPACTION, compaction.builtInType());
+    Assertions.assertEquals(
+        MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS, compaction.minIntervalMs());
+    Assertions.assertEquals(
+        MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS_KEY,
+        compaction.minIntervalMsKey());
   }
 }

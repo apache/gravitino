@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Built-in policy content for Iceberg compaction strategy. */
-public class IcebergDataCompactionContent implements PolicyContent {
+public class IcebergDataCompactionContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Strategy type value for iceberg data compaction. */
@@ -267,7 +267,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    PolicyContent.super.validate();
+    super.validate();
     // All fields are defaulted in the constructor, so only range checks are needed here.
     Preconditions.checkArgument(minDataFileMse >= 0, "minDataFileMse must be >= 0");
     Preconditions.checkArgument(minDeleteFileNumber >= 0, "minDeleteFileNumber must be >= 0");
@@ -314,7 +314,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
       return false;
     }
     IcebergDataCompactionContent that = (IcebergDataCompactionContent) o;
-    return Objects.equals(minDataFileMse, that.minDataFileMse)
+    return executionFieldsEqual(that)
+        && Objects.equals(minDataFileMse, that.minDataFileMse)
         && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
         && Objects.equals(deleteFileNumberWeight, that.deleteFileNumberWeight)
@@ -327,6 +328,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
   @Override
   public int hashCode() {
     return Objects.hash(
+        executionFieldsHashCode(),
         minDataFileMse,
         minDeleteFileNumber,
         dataFileMseWeight,
@@ -339,25 +341,29 @@ public class IcebergDataCompactionContent implements PolicyContent {
 
   @Override
   public String toString() {
-    return "IcebergDataCompactionContent{"
-        + "minDataFileMse="
-        + minDataFileMse
-        + ", minDeleteFileNumber="
-        + minDeleteFileNumber
-        + ", dataFileMseWeight="
-        + dataFileMseWeight
-        + ", deleteFileNumberWeight="
-        + deleteFileNumberWeight
-        + ", maxPartitionNum="
-        + maxPartitionNum
-        + ", rewriteStrategy='"
-        + rewriteStrategy
-        + '\''
-        + ", sortOrder='"
-        + sortOrder
-        + '\''
-        + ", rewriteOptions="
-        + rewriteOptions
-        + '}';
+    StringBuilder sb =
+        new StringBuilder("IcebergDataCompactionContent{")
+            .append("minDataFileMse=")
+            .append(minDataFileMse)
+            .append(", minDeleteFileNumber=")
+            .append(minDeleteFileNumber)
+            .append(", dataFileMseWeight=")
+            .append(dataFileMseWeight)
+            .append(", deleteFileNumberWeight=")
+            .append(deleteFileNumberWeight)
+            .append(", maxPartitionNum=")
+            .append(maxPartitionNum)
+            .append(", rewriteStrategy='")
+            .append(rewriteStrategy)
+            .append('\'')
+            .append(", sortOrder='")
+            .append(sortOrder)
+            .append('\'')
+            .append(", rewriteOptions=")
+            .append(rewriteOptions)
+            .append(", ");
+    appendExecutionFields(sb);
+    sb.append('}');
+    return sb.toString();
   }
 }
