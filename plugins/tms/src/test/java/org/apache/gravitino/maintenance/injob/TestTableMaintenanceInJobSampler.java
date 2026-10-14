@@ -73,6 +73,22 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCronJobSampleRetryWithSameS0IsIdempotent() {
+    long jobId = 1003L;
+    insertBoundAction(jobId, 5L, 6L);
+    InJobGateOutcome first =
+        sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, METRICS_JSON, () -> 300L);
+    InJobGateOutcome retry =
+        sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, "{\"mse\":9}", () -> 300L);
+
+    Assertions.assertTrue(first.continueMaintenance());
+    Assertions.assertTrue(retry.continueMaintenance());
+    Assertions.assertEquals(
+        METRICS_JSON, metricsMetaService.getMetrics(5L, 6L, 300L).metricsValue());
+    Assertions.assertEquals(300L, actionMetaService.getByJobId(jobId).beforeSnapshotId());
+  }
+
+  @TestTemplate
   void testCommitChainTypeGateWithoutReSample() {
     InJobGateOutcome ok = sampler.gateCommitChainType(300L, () -> 300L);
     Assertions.assertTrue(ok.continueMaintenance());

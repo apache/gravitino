@@ -34,6 +34,7 @@ class TestTableMaintenanceRESTFeature {
     TableMaintenanceRESTFeature.SchedulerShutdownListener listener =
         new TableMaintenanceRESTFeature.SchedulerShutdownListener();
     Assertions.assertDoesNotThrow(() -> listener.onEvent(event));
+    // stop is idempotent so configure-after-stop can start pools again and re-register a listener
     Assertions.assertDoesNotThrow(TableMaintenanceRESTFeature::stopSchedulers);
   }
 }

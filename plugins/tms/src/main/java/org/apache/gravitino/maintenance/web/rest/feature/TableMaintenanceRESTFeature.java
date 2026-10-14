@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.maintenance.web.rest.feature;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import javax.ws.rs.core.Feature;
@@ -44,6 +43,9 @@ import org.slf4j.LoggerFactory;
  * <p>TMS does not register public REST resources in this change; the feature only owns server
  * lifecycle for in-process scheduling. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs
  * during Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
+ *
+ * <p>After {@link #stopSchedulers()}, a later {@link #configure} may start pools again and
+ * re-register the destroy listener (needed for tests / embedded restarts in the same JVM).
  */
 @Provider
 public class TableMaintenanceRESTFeature implements Feature {
@@ -55,7 +57,6 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
       new AtomicReference<>();
-  private static final AtomicBoolean SHUTDOWN_REGISTERED = new AtomicBoolean(false);
 
   @Override
   public boolean configure(FeatureContext context) {
@@ -79,9 +80,9 @@ public class TableMaintenanceRESTFeature implements Feature {
       return true;
     }
 
-    if (SHUTDOWN_REGISTERED.compareAndSet(false, true)) {
-      context.register(new SchedulerShutdownListener());
-    }
+    // Register only after a successful CAS so a later configure-after-stop can attach a listener
+    // again on the new FeatureContext (listener is scoped to the Jersey Application).
+    context.register(new SchedulerShutdownListener());
     LOG.info("Table maintenance scheduler pools are running");
     return true;
   }

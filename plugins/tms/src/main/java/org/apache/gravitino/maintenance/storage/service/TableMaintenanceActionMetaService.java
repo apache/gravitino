@@ -216,7 +216,10 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Records the sampled Iceberg snapshot id ({@code S0}) once for a running action.
+   * Records the sampled Iceberg snapshot id ({@code S0}) for a running action.
+   *
+   * <p>Safe to retry with the same {@code beforeSnapshotId} (cron / in-job re-entry after a partial
+   * sample). A different snapshot id on an already-set row fails.
    *
    * @param jobId Gravitino job run id
    * @param beforeSnapshotId sampled snapshot id
@@ -229,10 +232,19 @@ public class TableMaintenanceActionMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
             mapper -> mapper.updateBeforeSnapshot(jobId, beforeSnapshotId));
+    if (updated == 1) {
+      return;
+    }
+    TableMaintenanceActionPO current = getByJobId(jobId);
     Preconditions.checkState(
-        updated == 1,
-        "expected to set before_snapshot_id once on an unfinished action, updated=%s",
-        updated);
+        current != null && current.finishedAt() != null && current.finishedAt() == 0L,
+        "expected an unfinished action for job_id=%s",
+        jobId);
+    Preconditions.checkState(
+        current.beforeSnapshotId() != null && current.beforeSnapshotId() == beforeSnapshotId,
+        "before_snapshot_id already set to %s, refusing %s",
+        current.beforeSnapshotId(),
+        beforeSnapshotId);
   }
 
   /**
