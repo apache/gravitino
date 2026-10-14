@@ -34,8 +34,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -84,6 +82,15 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
+import org.apache.gravitino.listener.api.event.BaseEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.rel.Column;
@@ -98,6 +105,7 @@ import org.apache.gravitino.semantic.Dialects;
 import org.apache.gravitino.semantic.Expression;
 import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
+import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
@@ -125,7 +133,18 @@ import org.mockito.MockedStatic;
 public class TestSemanticModelOperations extends BaseOperationsTest {
 
   private static final String VND_V1_JSON = "application/vnd.gravitino.v1+json";
-  private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
+  private static final OssieDocument EXPORTED_YAML =
+      OssieDocument.yaml(
+          """
+          version: 0.2.0.dev0
+          name: sales
+          datasets: []
+          """);
+  private static final OssieDocument EXPORTED_JSON =
+      OssieDocument.json(
+          """
+          {"version":"0.2.0.dev0","name":"sales","datasets":[]}
+          """);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -135,6 +154,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   private final SemanticModelDispatcher dispatcher = mock(SemanticModelDispatcher.class);
+  private final EventBus eventBus = mock(EventBus.class);
   private final TableDispatcher tables = mock(TableDispatcher.class);
   private final ViewDispatcher views = mock(ViewDispatcher.class);
   private boolean tablesSupported = true;
@@ -161,7 +181,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(SemanticModelDispatcher.class).ranked(2);
+            bind(new SemanticModelEventDispatcher(eventBus, dispatcher))
+                .to(SemanticModelDispatcher.class)
+                .ranked(2);
             bind(new SemanticModelSourceValidator(
                     tables,
                     views,
@@ -181,7 +203,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   @BeforeEach
   void resetDispatcher() {
-    reset(dispatcher, tables, views);
+    reset(dispatcher, tables, views, eventBus);
     tablesSupported = true;
     viewsSupported = true;
     sourceAuthorizer = new PassThroughAuthorizer();
@@ -191,7 +213,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     when(table.columns()).thenReturn(new Column[] {column});
     when(tables.loadTable(any())).thenReturn(table);
     when(dispatcher.loadSemanticModel(any())).thenReturn(semanticModel("sales", null));
-    doCallRealMethod().when(dispatcher).exportOssieDocument(any(), any());
+    doCallRealMethod().when(dispatcher).importOssieDocument(any(), any(), any());
   }
 
   @Test
@@ -976,6 +998,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   private void verifyNoModelWrites() {
     verify(dispatcher, never()).createSemanticModel(any(), any(), any(), any());
+    verify(dispatcher, never()).importSemanticModel(any(), any(), any(), any());
     verify(dispatcher, never()).alterSemanticModel(any(), any(SemanticModelChange[].class));
   }
 
@@ -995,13 +1018,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   void testImportOssieYamlAndJsonDocuments(String jsonMediaType) {
     NameIdentifier salesIdent = semanticModelIdentifier("sales");
     NameIdentifier inventoryIdent = semanticModelIdentifier("inventory");
-    when(dispatcher.createSemanticModel(
+    when(dispatcher.importSemanticModel(
             eq(salesIdent),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
             eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
         .thenReturn(semanticModel("sales", "Sales definitions"));
-    when(dispatcher.createSemanticModel(
+    when(dispatcher.importSemanticModel(
             eq(inventoryIdent),
             eq(null),
             any(SemanticModelDefinition.class),
@@ -1059,7 +1082,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     ArgumentCaptor<SemanticModelDefinition> definitionCaptor =
         ArgumentCaptor.forClass(SemanticModelDefinition.class);
     verify(dispatcher)
-        .createSemanticModel(
+        .importSemanticModel(
             eq(salesIdent),
             eq("Sales definitions"),
             definitionCaptor.capture(),
@@ -1071,11 +1094,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         Dialects.ANSI_SQL,
         definitionCaptor.getValue().datasets()[0].fields()[0].expression().dialects()[0].dialect());
     verify(dispatcher)
-        .createSemanticModel(
+        .importSemanticModel(
             eq(inventoryIdent),
             eq(null),
             any(SemanticModelDefinition.class),
             eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version")));
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.json(json)), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1083,7 +1108,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @ValueSource(strings = {"text/yaml", "application/x-yaml"})
   void testImportOssieYamlMediaTypeAliases(String mediaType) {
     NameIdentifier ident = semanticModelIdentifier("marketing");
-    when(dispatcher.createSemanticModel(
+    when(dispatcher.importSemanticModel(
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
@@ -1106,11 +1131,12 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     body.validate();
     Assertions.assertEquals("marketing", body.getSemanticModel().name());
     verify(dispatcher)
-        .createSemanticModel(
+        .importSemanticModel(
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
             eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1118,7 +1144,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   void testImportOssieDocumentWithoutContentTypeDefaultsToYaml()
       throws IOException, InterruptedException {
     NameIdentifier ident = semanticModelIdentifier("marketing");
-    when(dispatcher.createSemanticModel(
+    when(dispatcher.importSemanticModel(
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
@@ -1152,19 +1178,20 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     body.validate();
     Assertions.assertEquals("marketing", body.getSemanticModel().name());
     verify(dispatcher)
-        .createSemanticModel(
+        .importSemanticModel(
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
             eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
   @Test
-  void testExportOssieYamlAndJsonDocuments() throws Exception {
+  void testExportOssieYamlAndJsonDocuments() {
     NameIdentifier ident = semanticModelIdentifier("sales");
-    when(dispatcher.loadSemanticModel(ident))
-        .thenReturn(semanticModel("sales", "Sales definitions"));
+    when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML)).thenReturn(EXPORTED_YAML);
+    when(dispatcher.exportOssieDocument(ident, OssieFormat.JSON)).thenReturn(EXPORTED_JSON);
 
     Response yamlResponse = getOssie(semanticModelPath() + "/sales/ossie");
 
@@ -1173,11 +1200,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         "attachment; filename=\"sales.ossie.yaml\"",
         yamlResponse.getHeaderString("Content-Disposition"));
-    String yaml = yamlResponse.readEntity(String.class);
-    Assertions.assertTrue(yaml.contains("version:"));
-    Assertions.assertTrue(yaml.contains("name:"));
-    Assertions.assertFalse(yaml.contains("semantic_model:"));
-    Assertions.assertFalse(yaml.contains("definition:"));
+    Assertions.assertEquals(EXPORTED_YAML.content(), yamlResponse.readEntity(String.class));
 
     Response jsonResponse =
         target(semanticModelPath() + "/sales/ossie")
@@ -1190,17 +1213,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         "attachment; filename=\"sales.ossie.json\"",
         jsonResponse.getHeaderString("Content-Disposition"));
-    JsonNode json = JSON_MAPPER.readTree(jsonResponse.readEntity(String.class));
-    Assertions.assertEquals("0.2.0.dev0", json.path("version").textValue());
-    Assertions.assertEquals("sales", json.path("name").textValue());
-    Assertions.assertEquals(
-        "semantic_model_catalog.semantic_model_schema.orders",
-        json.at("/datasets/0/source").textValue());
-    Assertions.assertFalse(json.has("semantic_model"));
-    Assertions.assertFalse(json.has("definition"));
+    Assertions.assertEquals(EXPORTED_JSON.content(), jsonResponse.readEntity(String.class));
     verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
     verify(dispatcher).exportOssieDocument(ident, OssieFormat.JSON);
-    verify(dispatcher, times(2)).loadSemanticModel(ident);
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1227,6 +1242,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalArgumentException.class.getSimpleName(),
         "expected yaml or json");
+    verify(dispatcher)
+        .importOssieDocument(eq(namespace), eq(OssieDocument.yaml(querySource)), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1256,6 +1273,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalSemanticModelException.class.getSimpleName(),
         "Cannot parse Apache Ossie JSON");
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.json(yaml)), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1270,32 +1288,119 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testOssieImportPropagatesCreateErrors() {
+  void testOssieImportPropagatesDispatcherErrors() {
     String yaml =
         "version: 0.2.0.dev0\nname: sales\ndatasets:\n"
             + "  - name: orders\n    source: sales.mart.orders\n";
     doThrow(new SemanticModelAlreadyExistsException("sales already exists"))
         .when(dispatcher)
-        .createSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any());
+        .importSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any());
     assertError(
         postDocument(semanticModelPath() + "/ossie", yaml, "application/yaml"),
         Response.Status.CONFLICT,
         ErrorConstants.ALREADY_EXISTS_CODE,
         SemanticModelAlreadyExistsException.class.getSimpleName(),
         "sales already exists");
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
+    verify(dispatcher)
+        .importSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any());
+    verifyNoMoreInteractions(dispatcher);
   }
 
   @Test
-  void testOssieExportPropagatesLoadErrors() {
+  void testOssieExportPropagatesDispatcherErrors() {
     doThrow(new NoSuchSemanticModelException("sales does not exist"))
         .when(dispatcher)
-        .loadSemanticModel(semanticModelIdentifier("sales"));
+        .exportOssieDocument(semanticModelIdentifier("sales"), OssieFormat.YAML);
     assertError(
         getOssie(semanticModelPath() + "/sales/ossie"),
         Response.Status.NOT_FOUND,
         ErrorConstants.NOT_FOUND_CODE,
         NoSuchSemanticModelException.class.getSimpleName(),
         "sales does not exist");
+    verify(dispatcher).exportOssieDocument(semanticModelIdentifier("sales"), OssieFormat.YAML);
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "success,200",
+    "missing,400",
+    "denied,403",
+    "connection,502",
+    "unsupported,400",
+    "invalid,400"
+  })
+  void testImportEmitsDedicatedEventsAcrossSourceValidation(String scenario, int status) {
+    NameIdentifier source = NameIdentifier.of(metalake, catalog, schema, "orders");
+    if (scenario.equals("missing")) {
+      when(tables.loadTable(source)).thenThrow(new NoSuchTableException("missing table"));
+      when(views.loadView(source)).thenThrow(new NoSuchViewException("missing view"));
+    } else if (scenario.equals("denied")) {
+      sourceAuthorizer = mock(GravitinoAuthorizer.class);
+    } else if (scenario.equals("connection")) {
+      when(tables.loadTable(source)).thenThrow(new ConnectionFailedException("connection failed"));
+    } else if (scenario.equals("unsupported")) {
+      tablesSupported = false;
+      viewsSupported = false;
+    }
+    when(dispatcher.importSemanticModel(any(), any(), any(), any()))
+        .thenReturn(semanticModel("sales", null));
+    String document =
+        scenario.equals("invalid")
+            ? "invalid: ["
+            : "version: 0.2.0.dev0\nname: sales\ndatasets:\n  - name: orders\n    source: "
+                + catalog
+                + "."
+                + schema
+                + ".orders\n";
+    try (Response response =
+        postDocument(semanticModelPath() + "/ossie", document, "application/yaml")) {
+      Assertions.assertEquals(status, response.getStatus());
+    }
+    ArgumentCaptor<BaseEvent> events = ArgumentCaptor.forClass(BaseEvent.class);
+    verify(eventBus, times(2)).dispatchEvent(events.capture());
+    Assertions.assertInstanceOf(ImportSemanticModelPreEvent.class, events.getAllValues().get(0));
+    if (status == 200) {
+      Assertions.assertInstanceOf(ImportSemanticModelEvent.class, events.getAllValues().get(1));
+      verify(dispatcher).importSemanticModel(any(), any(), any(), any());
+    } else {
+      Assertions.assertInstanceOf(
+          ImportSemanticModelFailureEvent.class, events.getAllValues().get(1));
+      verifyNoModelWrites();
+    }
+    if (List.of("denied", "unsupported", "invalid").contains(scenario)) {
+      verifyNoInteractions(tables, views);
+    } else {
+      verify(tables).loadTable(source);
+    }
+    verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(document)), any());
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testExportEmitsDedicatedEventsWithoutSourceLookup(boolean missing) {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    if (missing) {
+      when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML))
+          .thenThrow(new NoSuchSemanticModelException("missing model"));
+    } else {
+      when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML)).thenReturn(EXPORTED_YAML);
+    }
+    try (Response response = getOssie(semanticModelPath() + "/sales/ossie")) {
+      Assertions.assertEquals(missing ? 404 : 200, response.getStatus());
+    }
+    ArgumentCaptor<BaseEvent> events = ArgumentCaptor.forClass(BaseEvent.class);
+    verify(eventBus, times(2)).dispatchEvent(events.capture());
+    Assertions.assertInstanceOf(ExportSemanticModelPreEvent.class, events.getAllValues().get(0));
+    Assertions.assertEquals(
+        missing ? ExportSemanticModelFailureEvent.class : ExportSemanticModelEvent.class,
+        events.getAllValues().get(1).getClass());
+    verifyNoInteractions(tables, views);
+    verifyNoModelWrites();
+    verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
+    verifyNoMoreInteractions(dispatcher);
   }
 
   private SemanticModelCreateRequest createRequest(
