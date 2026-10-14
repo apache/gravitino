@@ -243,7 +243,8 @@ public class Configs {
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.replayWindowSecs")
           .doc(
-              "Recent change log replay window in seconds; 0 disables replay. This bounds recorded created_at age, not commit age")
+              "Recent change log replay window in seconds; 0 disables replay. This bounds recorded created_at age, not commit age. "
+                  + "Replay sweeps start at most once per max(pollIntervalSecs, replayWindowSecs / 4)")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(value -> value >= 0 && value <= 86400, "Must be between 0 and 86400 seconds")

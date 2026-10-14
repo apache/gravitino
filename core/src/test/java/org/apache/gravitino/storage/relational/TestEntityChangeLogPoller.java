@@ -73,6 +73,8 @@ import org.mockito.MockedStatic;
 public class TestEntityChangeLogPoller {
 
   private static final int MAX_ROWS = 2000;
+  // max(pollIntervalSecs = 1, default replayWindowSecs = 60 / 4): the gap between sweep starts.
+  private static final long SWEEP_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(15);
 
   @Test
   void testDefaultPollingKeepsIncrementalEventWithinSixSecondsWithReplayWork()
@@ -113,8 +115,16 @@ public class TestEntityChangeLogPoller {
             })
         .when(scheduler)
         .schedule(any(Runnable.class), anyLong(), any(TimeUnit.class));
+    // A 12s window makes the sweep interval equal the 3s poll interval, so every cycle replays:
+    // the worst case for incremental delivery under the default poll interval and batch size.
     EntityChangeLogPoller poller =
-        spy(new EntityChangeLogPoller(Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS));
+        spy(
+            new EntityChangeLogPoller(
+                Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS,
+                Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE,
+                12,
+                Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES,
+                new EntityChangeLogMetricsSource()));
     doReturn(scheduler).when(poller).createScheduler();
     doAnswer(invocation -> TimeUnit.MILLISECONDS.toNanos(clockMillis.get()))
         .when(poller)
@@ -160,17 +170,23 @@ public class TestEntityChangeLogPoller {
     when(mapper.selectRecentEntityChanges(200, 2, 2, 60000, 2)).thenReturn(List.of());
     List<EntityChangeRecord> received = new ArrayList<>();
     EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    AtomicLong clock = new AtomicLong();
     try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessions, mapper);
-      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, 2, metrics);
+      EntityChangeLogPoller poller = spy(new EntityChangeLogPoller(1, 2, metrics));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
       poller.registerListener(replayListener(received));
       Assertions.assertFalse(poller.pollChanges());
+      clock.addAndGet(SWEEP_INTERVAL_NANOS);
       Assertions.assertTrue(poller.pollChanges());
       Assertions.assertFalse(poller.pollChanges());
+      clock.addAndGet(SWEEP_INTERVAL_NANOS);
       Assertions.assertTrue(poller.pollChanges());
       Assertions.assertEquals(List.of(2L, 1L), ids(received));
       Assertions.assertEquals(
           2L, metrics.getMetricRegistry().getGauges().get("cursor-id").getValue());
+      Assertions.assertEquals(
+          1L, metrics.getMetricRegistry().getCounters().get("replay-records-total").getCount());
     }
   }
 
@@ -183,13 +199,17 @@ public class TestEntityChangeLogPoller {
         .thenReturn(changes(2, 3), changes(1, 2));
     when(mapper.selectRecentEntityChanges(0, 3, 4, 60000, 2)).thenReturn(changes(4, 4));
     List<EntityChangeRecord> received = new ArrayList<>();
+    AtomicLong clock = new AtomicLong();
     try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessions, mapper);
       EntityChangeLogPoller poller =
-          new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource());
+          spy(new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
       poller.registerListener(replayListener(received));
       Assertions.assertTrue(poller.pollChanges());
+      // The second page continues the sweep at once even though no sweep interval has passed.
       Assertions.assertFalse(poller.pollChanges());
+      clock.addAndGet(SWEEP_INTERVAL_NANOS);
       Assertions.assertTrue(poller.pollChanges());
       Assertions.assertEquals(List.of(4L, 2L, 3L, 1L), ids(received));
       verify(mapper).selectRecentEntityChanges(0, 3, 4, 60000, 2);
@@ -334,17 +354,24 @@ public class TestEntityChangeLogPoller {
     when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2))
         .thenReturn(changes(1, 1))
         .thenThrow(new IllegalStateException("replay database unavailable"));
+    AtomicLong clock = new AtomicLong();
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
     List<LogEvent> logs =
         captureReplayLogs(
             () -> {
               try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
                 mockSessionUtils(sessions, mapper);
-                EntityChangeLogPoller poller =
-                    new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource());
+                EntityChangeLogPoller poller = spy(new EntityChangeLogPoller(1, 2, metrics));
+                doAnswer(ignored -> clock.get()).when(poller).nanoTime();
                 poller.pollChanges();
+                clock.addAndGet(SWEEP_INTERVAL_NANOS);
                 poller.pollChanges();
               }
             });
+    Assertions.assertEquals(
+        1L, metrics.getMetricRegistry().getCounters().get("replay-failures-total").getCount());
+    Assertions.assertEquals(
+        0L, metrics.getMetricRegistry().getCounters().get("poll-failures-total").getCount());
     String diagnostics =
         logs.stream()
             .map(e -> e.getMessage().getFormattedMessage())
@@ -421,6 +448,71 @@ public class TestEntityChangeLogPoller {
       Assertions.assertEquals(List.of(2L), ids(legacyReceived));
       Assertions.assertEquals(List.of(2L, 1L), ids(replayReceived));
       verify(broken).onEntityChange(incremental);
+    }
+  }
+
+  @Test
+  void testReplaySweepsStartAtMostOncePerSweepInterval() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 1));
+    when(mapper.selectEntityChanges(1, 2)).thenReturn(List.of());
+    when(mapper.selectRecentEntityChanges(-1, 0, 1, 60000, 2)).thenReturn(changes(1, 1));
+    AtomicLong clock = new AtomicLong();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+      poller.pollChanges();
+      verify(mapper, times(1)).selectRecentEntityChanges(-1, 0, 1, 60000, 2);
+      // Polls inside the sweep interval read only the incremental stream.
+      clock.addAndGet(SWEEP_INTERVAL_NANOS - 1);
+      poller.pollChanges();
+      verify(mapper, times(1)).selectRecentEntityChanges(-1, 0, 1, 60000, 2);
+      clock.addAndGet(1);
+      poller.pollChanges();
+      verify(mapper, times(2)).selectRecentEntityChanges(-1, 0, 1, 60000, 2);
+      verify(mapper, times(3)).selectEntityChanges(anyLong(), anyInt());
+    }
+  }
+
+  @Test
+  void testReplaySweepIntervalIsAtLeastThePollInterval() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 1));
+    when(mapper.selectEntityChanges(1, 2)).thenReturn(List.of());
+    when(mapper.selectRecentEntityChanges(-1, 0, 1, 8000, 2)).thenReturn(List.of());
+    AtomicLong clock = new AtomicLong();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      // window / 4 = 2s is shorter than the 3s poll interval, so sweeps follow the poll interval.
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(3, 2, 8, 10, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+      poller.pollChanges();
+      clock.addAndGet(TimeUnit.SECONDS.toNanos(2));
+      poller.pollChanges();
+      verify(mapper, times(1)).selectRecentEntityChanges(-1, 0, 1, 8000, 2);
+      clock.addAndGet(TimeUnit.SECONDS.toNanos(1));
+      poller.pollChanges();
+      verify(mapper, times(2)).selectRecentEntityChanges(-1, 0, 1, 8000, 2);
+    }
+  }
+
+  @Test
+  void testDedupEvictionsAreCounted() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(1, 2));
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2)).thenReturn(List.of());
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1, 2, 60, 1, metrics);
+      poller.pollChanges();
+      Assertions.assertEquals(
+          1L, metrics.getMetricRegistry().getCounters().get("dedup-evictions-total").getCount());
+      Assertions.assertEquals(
+          0L, metrics.getMetricRegistry().getCounters().get("replay-records-total").getCount());
     }
   }
 

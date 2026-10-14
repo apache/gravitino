@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.storage.relational;
 
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.Namespace;
@@ -50,7 +54,11 @@ public class TestCacheCommitOrdering extends TestJDBCBackend {
     CaffeineEntityCache peer = new CaffeineEntityCache(new Config() {});
     peer.put(slow);
     peer.put(fast);
-    EntityChangeLogPoller poller = new EntityChangeLogPoller(3600);
+    // The hour-long poll interval also spaces replay sweeps an hour apart; skip ahead before the
+    // polls that must start a new sweep after the late commit.
+    AtomicLong clockOffset = new AtomicLong();
+    EntityChangeLogPoller poller = spy(new EntityChangeLogPoller(3600));
+    doAnswer(ignored -> System.nanoTime() + clockOffset.get()).when(poller).nanoTime();
     poller.registerListener(new EntityCacheChangeLogListener(peer));
     poller.start();
     CountDownLatch insertedLowId = new CountDownLatch(1);
@@ -90,6 +98,7 @@ public class TestCacheCommitOrdering extends TestJDBCBackend {
       commitSlow.countDown();
       transaction.get(15, TimeUnit.SECONDS);
       Assertions.assertFalse(backend.exists(slow.nameIdentifier(), EntityType.TABLE));
+      clockOffset.set(TimeUnit.HOURS.toNanos(2));
       for (int i = 0; i < 3; i++) {
         poller.pollChanges();
       }

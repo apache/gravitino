@@ -79,6 +79,11 @@ import org.slf4j.LoggerFactory;
  * EntityChangeLogListener#supportsReplay()}. Their callbacks must be idempotent because bounded
  * deduplication may evict IDs and startup replay can include historical rows.
  *
+ * <p>Each replay sweep rereads every row in the window, so a new sweep starts at most once per
+ * {@code max(pollIntervalSecs, replayWindowSecs / 4)}. This bounds rereads to about four per row
+ * and delays recovery of a late row by up to one sweep interval; a row is caught only if it becomes
+ * visible before its recorded age exceeds the window minus one sweep interval.
+ *
  * <p>A full incremental batch or replay page means more rows may be waiting, so the next cycle
  * starts right away instead of after the poll interval. When both reads are empty or partial, or
  * the cycle fails, the poller waits the full interval. A backlog is therefore drained as fast as
@@ -98,6 +103,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private final EntityChangeLogMetricsSource metrics;
   private final long replayWindowMs;
   private final int replayMaxEntries;
+  // Minimum gap between the starts of two replay sweeps. Each sweep rereads the whole window, so
+  // starting one every poll would reread every recent row about window/interval times.
+  private final long replaySweepIntervalNanos;
   // Guarded by doPollChanges' monitor. Insertion order makes expiry and capacity eviction bounded.
   private final Map<Long, Long> rememberedIds = new LinkedHashMap<>();
   private long replayAfterCreatedAt = -1;
@@ -109,6 +117,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private boolean capacityWarningReported;
   private long capacityWarningNanos;
   private long pendingDedupEvictions;
+  private boolean replaySweepStarted;
+  private long lastReplaySweepStartNanos;
 
   private ScheduledExecutorService scheduler;
   private volatile boolean closed = false;
@@ -176,6 +186,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
     this.replayWindowMs = TimeUnit.SECONDS.toMillis(replayWindowSecs);
     this.replayMaxEntries = replayMaxEntries;
     Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
+    this.replaySweepIntervalNanos =
+        TimeUnit.SECONDS.toNanos(Math.max(pollIntervalSecs, replayWindowSecs / 4));
     Preconditions.checkArgument(batchSize > 0, "batchSize must be positive");
     this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
     this.pollIntervalSecs = pollIntervalSecs;
@@ -368,6 +380,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
     boolean replayBacklog = false;
     if (replayWindowMs > 0
         && entityPollHighWaterId > 0
+        && (replayUpperId != 0 || replaySweepDue())
         && (!replayFailed
             || nanoTime() - replayFailureNanos >= TimeUnit.SECONDS.toNanos(pollIntervalSecs))) {
       try {
@@ -378,6 +391,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
           return false;
         }
         replayFailed = true;
+        metrics.replayFailed();
         replayFailureNanos = nanoTime();
         LOG.warn(
             "Entity change log replay failed cursor={} replayAfterCreatedAt={} replayAfterId={} "
@@ -395,6 +409,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   private boolean replayRecentChanges() {
     if (replayUpperId == 0) {
+      replaySweepStarted = true;
+      lastReplaySweepStartNanos = nanoTime();
       replayUpperId = entityPollHighWaterId;
     }
     List<EntityChangeRecord> page =
@@ -426,6 +442,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
       }
     }
     if (!unseen.isEmpty()) {
+      metrics.replayRecordsFound(unseen.size());
       unseen.sort(Comparator.comparingLong(EntityChangeRecord::getId));
       LOG.warn(
           "Entity change log replay found {} previously unseen record(s) behind cursor={} "
@@ -476,6 +493,17 @@ public class EntityChangeLogPoller implements AutoCloseable {
     return true;
   }
 
+  /**
+   * A new sweep starts at most once per sweep interval; pages of a sweep in progress are not
+   * throttled. The first sweep after startup runs at once to cover history below the start cursor.
+   * A row is caught when it becomes visible before its recorded age exceeds the window minus one
+   * sweep interval.
+   */
+  private boolean replaySweepDue() {
+    return !replaySweepStarted
+        || nanoTime() - lastReplaySweepStartNanos >= replaySweepIntervalNanos;
+  }
+
   private List<EntityChangeLogListener> replayListeners() {
     List<EntityChangeLogListener> eligible = new ArrayList<>();
     for (EntityChangeLogListener listener : listeners) {
@@ -520,6 +548,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
         ids.remove();
         evicted++;
       }
+    }
+    if (evicted > 0) {
+      metrics.dedupEvicted(evicted);
     }
     pendingDedupEvictions += evicted;
     if (pendingDedupEvictions > 0

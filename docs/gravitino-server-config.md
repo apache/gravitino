@@ -329,8 +329,8 @@ Caches are local to each server, so a metalake modified on one server would othe
 its neighbors. Every server writes its changes to an entity change log table and polls that table
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
-Each poll reads at most `pollBatchSize` incremental records and, when replay is enabled,
-one additional recent-history page of at most `pollBatchSize` records. If either query returns a
+Each poll reads at most `pollBatchSize` incremental records and, when a replay sweep is in
+progress or due, one additional recent-history page of at most `pollBatchSize` records. If either query returns a
 full page, the next poll starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
 server can read and apply batches rather than at a fixed `pollBatchSize / pollIntervalSecs`
 records per second. Once both queries return fewer records than the batch size, or the cycle
@@ -343,14 +343,14 @@ full incremental-batch drain; partial and empty incremental queries still sample
 including each cycle of a replay-only drain. Each poll holds its whole batch
 in memory, so raise `pollBatchSize` in moderate steps.
 
-| Configuration Item                              | Description                                                                                                                                         | Default Value       |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls once a server has caught up. Must be positive.                                                                    | `3`                 |
-| `gravitino.entityChangeLog.pollBatchSize`       | Maximum number of change log records read per poll. A full batch is followed by another poll right away. Must be positive.                          | `2000`              |
-| `gravitino.entityChangeLog.replayWindowSecs` | Recent-history recorded-age window in seconds, using database time. `0` disables replay; maximum `86400`. | `60` |
-| `gravitino.entityChangeLog.replayMaxEntries` | Maximum event IDs remembered locally for deduplication. Must be positive. Capacity eviction permits duplicate invalidations. | `100000` |
-| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`. | `2592000` (30 days) |
-| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                         | `86400` (1 day)     |
+| Configuration Item                              | Description                                                                                                                                                                                   | Default Value       |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls once a server has caught up. Must be positive.                                                                                                              | `3`                 |
+| `gravitino.entityChangeLog.pollBatchSize`       | Maximum number of change log records read per poll. A full batch is followed by another poll right away. Must be positive.                                                                    | `2000`              |
+| `gravitino.entityChangeLog.replayWindowSecs`    | Recent-history recorded-age window in seconds, using database time. Replay sweeps start at most once per `max(pollIntervalSecs, replayWindowSecs / 4)`. `0` disables replay; maximum `86400`. | `60`                |
+| `gravitino.entityChangeLog.replayMaxEntries`    | Maximum event IDs remembered locally for deduplication. Must be positive. Capacity eviction permits duplicate invalidations.                                                                  | `100000`            |
+| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`.                                           | `2592000` (30 days) |
+| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                                                                   | `86400` (1 day)     |
 
 The built-in entity, catalog, and authorization listeners opt into replay. Third-party
 `EntityChangeLogListener` implementations keep incremental-only delivery by default. Override
@@ -370,7 +370,12 @@ cursor, ordered by `(created_at, id)` with a fixed ID ceiling per sweep. Each qu
 clock, and the existing `created_at` index supports the time filter; repeated IDs are suppressed
 by a process-local bounded set.
 Full replay pages continue immediately, but every cycle delivers its incremental batch first.
-A row that becomes visible behind an already scanned replay page is considered on the next sweep.
+A new sweep starts at most once per `max(pollIntervalSecs, replayWindowSecs / 4)`, 15 seconds by
+default; the first sweep after startup runs at once. A row that becomes visible behind an already
+scanned replay page, or between sweeps, is considered on the next sweep. Late-commit recovery can
+therefore take up to one extra sweep interval, and a row is guaranteed to be replayed only if it
+becomes visible before its recorded age exceeds the window minus one sweep interval (45 seconds by
+default).
 
 The window measures age of the stored **`created_at`**, not time since commit. PostgreSQL's
 existing writer uses `CURRENT_TIMESTAMP`, which is the transaction start timestamp; a long
@@ -378,8 +383,10 @@ transaction can therefore consume replay headroom even before inserting its log 
 that commit outside it, records deleted by retention cleanup, and an overloaded replay sweep can still lose
 invalidations. Keep retention longer than the replay window and allow enough headroom for polling
 and backlog. This is bounded compensation, not a lossless delivery protocol. Replay does not change
-cache TTLs. Replay rereads eligible rows on each sweep; deduplication avoids repeated listener work,
-not the SQL reads. Database work grows with window traffic and server count. More recent rows than
+cache TTLs. Each sweep rereads every row in the window; deduplication avoids repeated listener work,
+not the SQL reads. With the sweep interval at a quarter of the window, each row is read by about
+four sweeps per server, so replay reads grow with write rate and server count but not with the
+poll interval. More recent rows than
 `replayMaxEntries` can cause repeated invalidations, including catalog reloads; increase capacity or reduce the window based on measured traffic and memory.
 
 At startup, INFO logs report the window and dedup capacity. A WARN containing
@@ -391,7 +398,8 @@ also produce unseen IDs. Ages compare JVM and database clocks and are not commit
 `replay failed` logs include page cursors and the exception; incremental delivery is preserved,
 and replay retries are limited to one attempt per polling interval during a failure.
 `replay dedup capacity reached` reports accumulated eviction and possible repeated invalidations,
-at most once per polling interval. An event never observed because it committed outside the window
+at most once per polling interval. The `entity-change-log` metrics `replay-records-total`,
+`replay-failures-total`, and `dedup-evictions-total` count the same events for monitoring. An event never observed because it committed outside the window
 cannot be diagnosed from replay logs alone.
 The `record-lag` gauge compares maximum ID and cursor, so a value of zero does not rule out a
 late lower-ID commit; inspect the replay diagnostics as well.
