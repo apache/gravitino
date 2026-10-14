@@ -818,10 +818,11 @@ public class JobManager implements JobOperationDispatcher {
                   NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
               deleteJobStagingDir(job);
             } catch (OptimisticLockException e) {
-              // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
-              // job and checks retention eligibility again; this batch can process other jobs.
+              // Keep files when deletion conflicts or times out on a lock. The next cleanup run
+              // re-reads the job and checks retention eligibility again; other jobs in this batch
+              // can still be processed.
               LOG.info(
-                  "Job {} under metalake {} changed concurrently; deferring cleanup",
+                  "Job {} under metalake {} could not be deleted because of a concurrent operation; deferring cleanup",
                   job.name(),
                   metalake);
             } catch (IOException e) {
@@ -1342,9 +1343,9 @@ public class JobManager implements JobOperationDispatcher {
               }));
     } catch (OptimisticLockException e) {
       // A later poll re-reads both executor state and metadata. Never stop the scheduled
-      // task or replay external submission/cancellation because a metadata CAS lost.
+      // task or replay external submission/cancellation because a metadata write conflicted.
       LOG.info(
-          "Job {} under metalake {} changed concurrently; deferring status update",
+          "Job {} under metalake {} could not be updated because of a concurrent operation; deferring status update",
           job.name(),
           metalake);
       return Optional.empty();

@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -148,6 +149,39 @@ public class TestExceptionUtils {
                 ExceptionUtils.checkSQLException(failure, Entity.EntityType.TABLE, "m1.c1.s1.t1"));
     assertSame(failure, conflict.getCause());
     assertTrue(conflict.getMessage().contains("m1.c1.s1.t1"));
+  }
+
+  @Test
+  void testDuplicateKeyTakesPrecedenceOverChainedLockWaitTimeout() {
+    for (int backend = 0; backend < 3; backend++) {
+      for (boolean duplicateFirst : List.of(true, false)) {
+        SQLException duplicate =
+            new SQLException(
+                "duplicate key", backend == 0 ? "23000" : "23505", backend == 0 ? 1062 : 23505);
+        SQLException timeout =
+            new SQLException(
+                "lock wait timeout",
+                backend == 0 ? "40001" : backend == 1 ? "HYT00" : "55P03",
+                backend == 0 ? 1205 : backend == 1 ? 50200 : 0);
+        BatchUpdateException batch = new BatchUpdateException("batch failed", new int[0]);
+        batch.setNextException(duplicateFirst ? duplicate : timeout);
+        batch.setNextException(duplicateFirst ? timeout : duplicate);
+        PersistenceException failure = new PersistenceException(batch);
+
+        assertTrue(ExceptionUtils.isLockWaitTimeout(failure));
+        // Custom association messages must not classify the mixed chain before checkSQLException.
+        assertSame(failure, ExceptionUtils.lockWaitTimeoutAsConflict(failure, "The association"));
+        ExceptionUtils.throwIfLockWaitTimeout(failure, "The association");
+        EntityAlreadyExistsException exists =
+            assertThrows(
+                EntityAlreadyExistsException.class,
+                () ->
+                    ExceptionUtils.checkSQLException(
+                        failure, Entity.EntityType.TABLE, "m1.c1.s1.t1"));
+        assertSame(failure, exists.getCause());
+        assertEquals("The TABLE entity: m1.c1.s1.t1 already exists.", exists.getMessage());
+      }
+    }
   }
 
   @Test

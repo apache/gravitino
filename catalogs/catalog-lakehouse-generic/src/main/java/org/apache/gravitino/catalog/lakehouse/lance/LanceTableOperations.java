@@ -68,6 +68,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
@@ -643,8 +644,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    *
    * <p>Two concurrent loads can both read the old metadata. The first update wins; the second gets
    * {@link OptimisticLockException}. Repair is safe to run more than once, so the loser waits
-   * briefly, reads the winner's latest row, and tries again. Ordinary IO failures are not safe to
-   * retry here and are returned immediately.
+   * briefly, reads the winner's latest row, and tries again. Lock wait timeouts are returned
+   * immediately: each attempt has already consumed the backend's lock wait budget. Ordinary IO
+   * failures are not safe to retry here and are returned immediately.
    */
   private TableEntity updateTableWithCasRetry(
       NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
@@ -653,6 +655,9 @@ public class LanceTableOperations extends ManagedTableOperations {
       try {
         return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
       } catch (OptimisticLockException e) {
+        if (ExceptionUtils.isLockWaitTimeout(e)) {
+          throw e;
+        }
         lastConflict = e;
         LOG.debug(
             "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",

@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
@@ -49,6 +50,9 @@ public class ExceptionUtils {
   private static final Set<Integer> LOCK_WAIT_TIMEOUT_VENDOR_CODES =
       Set.of(MYSQL_LOCK_WAIT_TIMEOUT, H2_LOCK_TIMEOUT);
 
+  private static final Set<String> DUPLICATE_KEY_SQL_STATES = Set.of("23505");
+  private static final Set<Integer> DUPLICATE_KEY_VENDOR_CODES = Set.of(1062);
+
   private ExceptionUtils() {}
 
   /**
@@ -56,16 +60,23 @@ public class ExceptionUtils {
    * exception. A lock wait timeout becomes an {@link OptimisticLockException}, see {@link
    * #lockWaitTimeoutAsConflict(RuntimeException, String)}. It is classified here, before the
    * backend converter, because the converter reports an unrecognised SQL error as an {@link
-   * IOException}, which callers turn into an internal error.
+   * IOException}, which callers turn into an internal error. A duplicate-key failure takes
+   * precedence over a timeout in the same exception chain: retrying cannot resolve that violation.
    *
    * @param re The failure of the write.
    * @param type The type of the entity being written.
    * @param entityName The name of the entity being written.
    * @throws IOException If the SQL error has no more specific mapping.
-   * @throws OptimisticLockException If the failure contains a lock wait timeout.
+   * @throws EntityAlreadyExistsException If the failure contains a duplicate-key violation.
+   * @throws OptimisticLockException If the failure contains a lock wait timeout without a
+   *     duplicate-key violation.
    */
   public static void checkSQLException(
       RuntimeException re, Entity.EntityType type, String entityName) throws IOException {
+    if (isDuplicateKey(re)) {
+      throw new EntityAlreadyExistsException(
+          re, "The %s entity: %s already exists.", type.name(), entityName);
+    }
     throwIfLockWaitTimeout(
         re, String.format("The %s %s", type.name().toLowerCase(Locale.ROOT), entityName));
     if (re.getCause() instanceof SQLException) {
@@ -115,7 +126,8 @@ public class ExceptionUtils {
    *
    * @param re The failure of the write.
    * @param target What was being written, as the subject of the message.
-   * @throws OptimisticLockException If the failure is a lock wait timeout.
+   * @throws OptimisticLockException If the failure is a lock wait timeout without a duplicate-key
+   *     violation.
    * @see #lockWaitTimeoutAsConflict(RuntimeException, String)
    */
   public static void throwIfLockWaitTimeout(RuntimeException re, String target) {
@@ -205,7 +217,8 @@ public class ExceptionUtils {
    * transaction back, so the store write can be retried. Callers must account for any external side
    * effects that occurred before the store write before retrying the whole operation. Any other
    * failure, including one that is already an {@link OptimisticLockException}, is returned
-   * unchanged.
+   * unchanged. A failure containing a duplicate-key violation is also returned unchanged so that
+   * the service can report the non-retryable error instead of a timeout elsewhere in the chain.
    *
    * @param failure The failure of the write.
    * @param target What was being written, as the subject of the message, for example "The table
@@ -214,7 +227,9 @@ public class ExceptionUtils {
    */
   public static RuntimeException lockWaitTimeoutAsConflict(
       RuntimeException failure, String target) {
-    if (failure instanceof OptimisticLockException || !isLockWaitTimeout(failure)) {
+    if (failure instanceof OptimisticLockException
+        || !isLockWaitTimeout(failure)
+        || isDuplicateKey(failure)) {
       return failure;
     }
     return new OptimisticLockException(
@@ -222,5 +237,9 @@ public class ExceptionUtils {
         "%s could not be changed because a concurrent operation held its lock longer than the"
             + " backend's lock wait timeout; retry the operation",
         target);
+  }
+
+  private static boolean isDuplicateKey(Throwable failure) {
+    return hasSqlException(failure, DUPLICATE_KEY_SQL_STATES, DUPLICATE_KEY_VENDOR_CODES);
   }
 }

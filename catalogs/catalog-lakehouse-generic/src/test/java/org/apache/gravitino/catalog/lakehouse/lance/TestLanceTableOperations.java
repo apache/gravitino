@@ -40,6 +40,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -470,6 +472,51 @@ public class TestLanceTableOperations {
     Assertions.assertInstanceOf(OptimisticLockException.class, failure.getCause());
     verify(store, Mockito.times(5))
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  /** Lock timeouts must not consume the CAS retry budget on either metadata-repair path. */
+  @ParameterizedTest
+  @CsvSource({
+    "true, 1205, 40001",
+    "true, 50200, HYT00",
+    "true, 0, 55P03",
+    "false, 1205, 40001",
+    "false, 50200, HYT00",
+    "false, 0, 55P03"
+  })
+  public void testLoadDoesNotRetryLockWaitTimeout(
+      boolean nonEmptyDataset, int vendorCode, String sqlState) throws Exception {
+    NameIdentifier ident;
+    if (nonEmptyDataset) {
+      ident = prepareDeclaredTableForRepair("repair-lock-timeout");
+    } else {
+      ident = NameIdentifier.of("schema", "table");
+      String location = tempDir.resolve("empty-lock-timeout").toString();
+      TableEntity entity = tableEntity(ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location));
+      when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+          .thenReturn(entity);
+      Dataset dataset = mock(Dataset.class);
+      when(dataset.getSchema()).thenReturn(new Schema(List.of()));
+      when(dataset.version()).thenReturn(3L);
+      Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+    }
+    RuntimeException driverFailure =
+        new RuntimeException(new SQLException("lock wait timeout", sqlState, vendorCode));
+    RuntimeException conflict =
+        ExceptionUtils.lockWaitTimeoutAsConflict(driverFailure, Entity.EntityType.TABLE, ident);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(conflict);
+
+    OptimisticLockException failure =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertSame(conflict, failure);
+    Assertions.assertSame(driverFailure, failure.getCause());
+    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+    verify(lanceTableOps, never()).backoffBeforeRetry(any());
   }
 
   @Test
