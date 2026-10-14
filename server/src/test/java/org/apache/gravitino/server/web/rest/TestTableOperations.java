@@ -509,6 +509,32 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testLoadTableWithSpaceInName() {
+    when(dispatcher.loadTable(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier ident = invocation.getArgument(0);
+              return mockTable(
+                  ident.name(),
+                  new Column[] {mockColumn("col1", Types.StringType.get())},
+                  "mock comment",
+                  ImmutableMap.of(),
+                  new Transform[0]);
+            });
+
+    // The client builds request paths with RESTUtils.encodeString, so the server must decode the
+    // encoded name back to the original one.
+    try (Response resp =
+        target(tablePath(metalake, catalog, schema) + RESTUtils.encodeString("table 1"))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+      Assertions.assertEquals("table 1", resp.readEntity(TableResponse.class).getTable().name());
+    }
+  }
+
+  @Test
   public void testLoadTable() {
     Column[] columns =
         new Column[] {
