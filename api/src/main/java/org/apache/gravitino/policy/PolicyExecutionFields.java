@@ -36,8 +36,8 @@ public final class PolicyExecutionFields {
   /** JSON property for {@link TimeTrigger}. */
   public static final String TIME_TRIGGER_JSON_KEY = "timeTrigger";
 
-  /** JSON property for {@link EventTrigger}. */
-  public static final String EVENT_TRIGGER_JSON_KEY = "eventTrigger";
+  /** JSON property for {@link CommitTrigger}. */
+  public static final String COMMIT_TRIGGER_JSON_KEY = "commitTrigger";
 
   /** JSON property for minimum interval between finished runs. */
   public static final String MIN_INTERVAL_MS_JSON_KEY = "minIntervalMs";
@@ -54,7 +54,7 @@ public final class PolicyExecutionFields {
    * Whether any execution peer field is set.
    *
    * @param timeTrigger optional time trigger
-   * @param eventTrigger optional event trigger
+   * @param commitTrigger optional commit trigger
    * @param minIntervalMs cooldown ms
    * @param jobOptions job options map
    * @param updateOptions update options map
@@ -62,12 +62,12 @@ public final class PolicyExecutionFields {
    */
   public static boolean hasAny(
       @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
+      @Nullable CommitTrigger commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return timeTrigger != null
-        || eventTrigger != null
+        || commitTrigger != null
         || minIntervalMs != null
         || (jobOptions != null && !jobOptions.isEmpty())
         || (updateOptions != null && !updateOptions.isEmpty());
@@ -77,25 +77,25 @@ public final class PolicyExecutionFields {
    * Validates common execution peer fields (trigger shape, cooldown, option maps).
    *
    * @param timeTrigger optional time trigger
-   * @param eventTrigger optional event trigger
+   * @param commitTrigger optional commit trigger
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions job options (may be empty)
    * @param updateOptions update options (may be empty)
    */
   public static void validate(
       @Nullable TimeTrigger timeTrigger,
-      @Nullable EventTrigger eventTrigger,
+      @Nullable CommitTrigger commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
-    if (!hasAny(timeTrigger, eventTrigger, minIntervalMs, jobOptions, updateOptions)) {
+    if (!hasAny(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions)) {
       return;
     }
     if (timeTrigger != null) {
       timeTrigger.validate();
     }
-    if (eventTrigger != null) {
-      eventTrigger.validate();
+    if (commitTrigger != null) {
+      commitTrigger.validate();
     }
     if (minIntervalMs != null) {
       Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");

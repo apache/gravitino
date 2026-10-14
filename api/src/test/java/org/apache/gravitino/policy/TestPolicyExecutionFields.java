@@ -26,28 +26,23 @@ import org.junit.jupiter.api.Test;
 public class TestPolicyExecutionFields {
 
   @Test
-  void testValidateAcceptsSplitTriggers() {
+  void testValidateAcceptsTimeAndCommitTriggers() {
     Assertions.assertDoesNotThrow(
         () ->
             PolicyExecutionFields.validate(
                 new TimeTrigger("0 0 2 * * ?"),
-                new EventTrigger(true),
+                CommitTrigger.INSTANCE,
                 100L,
                 ImmutableMap.of("uri", "http://irc"),
                 ImmutableMap.of("metalake", "ml")));
   }
 
   @Test
-  void testEventTriggerRequiresEnabledEvent() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
+  void testCommitTriggerPresenceIsValid() {
+    Assertions.assertDoesNotThrow(
         () ->
             PolicyExecutionFields.validate(
-                null,
-                new EventTrigger(false),
-                null,
-                Collections.emptyMap(),
-                Collections.emptyMap()));
+                null, new CommitTrigger(), null, Collections.emptyMap(), Collections.emptyMap()));
   }
 
   @Test

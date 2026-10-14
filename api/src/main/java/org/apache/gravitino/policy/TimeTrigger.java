@@ -34,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
  * <p>{@link #validateCronExpression(String)} is a <strong>shape check</strong> only: field count
  * plus allowed Quartz tokens. It does not enforce Quartz value ranges or cross-field rules.
  */
-public final class TimeTrigger {
+public final class TimeTrigger implements Trigger {
 
   /** Allowed charset / named tokens per Quartz cron field (shape only, not full Quartz parse). */
   private static final Pattern CRON_FIELD =
@@ -72,6 +72,7 @@ public final class TimeTrigger {
    *
    * @throws IllegalArgumentException if the expression is missing or malformed
    */
+  @Override
   public void validate() {
     Preconditions.checkArgument(
         cronExpression != null, "timeTrigger.cronExpression must be set when timeTrigger is set");

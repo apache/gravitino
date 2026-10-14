@@ -60,12 +60,12 @@ public interface PolicyContent {
   }
 
   /**
-   * Optional event-based trigger for automated policy evaluation.
+   * Optional commit trigger for automated policy evaluation after an Iceberg commit.
    *
-   * @return event trigger, or {@code null} when unset
+   * @return commit trigger, or {@code null} when unset
    */
   @Nullable
-  default EventTrigger eventTrigger() {
+  default CommitTrigger commitTrigger() {
     return null;
   }
 
