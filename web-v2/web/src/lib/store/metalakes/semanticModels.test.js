@@ -22,6 +22,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import toast from 'react-hot-toast'
 import { defHttp } from '@/lib/utils/axios'
 import reducer, {
+  resetMetalakeStore,
   deleteSemanticModel,
   fetchSemanticModels,
   fetchTables,
@@ -136,5 +137,57 @@ describe('semantic model deletion errors', () => {
     expect(result.meta.requestStatus).toBe('rejected')
     expect(result.error.message).toMatch(/empty response/i)
     expect(defHttp.get).not.toHaveBeenCalled()
+  })
+})
+
+describe('superseded Semantic Model lists', () => {
+  it('ignores an old failure after a successful refresh', async () => {
+    let rejectInitial
+    defHttp.get.mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          rejectInitial = reject
+        })
+    )
+    const initial = store.dispatch(fetchSemanticModels(namespace))
+    defHttp.get.mockResolvedValueOnce({ identifiers: [{ name: 'new' }] })
+    await store.dispatch(fetchSemanticModels(namespace))
+    rejectInitial(new Error('Old request failed'))
+    await initial
+    expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['new'])
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('does not replace a newly selected schema with an older schema response', async () => {
+    let resolveInitial
+    defHttp.get.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveInitial = resolve
+        })
+    )
+    const initial = store.dispatch(fetchSemanticModels(namespace))
+    defHttp.get.mockResolvedValueOnce({ identifiers: [{ name: 'other_model' }] })
+    await store.dispatch(fetchSemanticModels({ ...namespace, schema: 'other' }))
+    resolveInitial({ identifiers: [{ name: 'old_model' }] })
+    await initial
+    expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['other_model'])
+  })
+
+  it('clears request tracking and ignores in-flight results when resetting the store', async () => {
+    let resolveInitial
+    defHttp.get.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveInitial = resolve
+        })
+    )
+    const initial = store.dispatch(fetchSemanticModels(namespace))
+    store.dispatch(resetMetalakeStore())
+    resolveInitial({ identifiers: [{ name: 'old_model' }] })
+    await initial
+    expect(store.getState().metalakes.semanticModels).toEqual([])
+    expect(store.getState().metalakes.semanticModelRequests).toEqual({})
+    expect(store.getState().metalakes.semanticModelListRequestId).toBeNull()
   })
 })

@@ -20,7 +20,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
-import reducer, { fetchSemanticModels, setIntoTreeNodeWithFetch, setMetalakeTree } from './index'
+import reducer, { fetchSemanticModels, setIntoTreeNodeWithFetch, setMetalakeTree, setLoadedNodes } from './index'
 
 const adapter = defHttp.getAxios().defaults.adapter
 
@@ -68,4 +68,42 @@ it.each([0, 1])('loads both the schema tab and tree when concurrent response %s 
   expect(treeResult.meta.requestStatus).toBe('fulfilled')
   expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['orders'])
   expect(treeResult.payload.data.some(node => node.node === 'semanticModel' && node.name === 'orders')).toBe(true)
+})
+
+it.each(['list', 'tree'])('ignores an older %s response after a successful list refresh', async consumer => {
+  const namespace = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
+  const key = '{{demo}}{{sales}}{{relational}}{{mart}}'
+  const store = configureStore({ reducer: { metalakes: reducer } })
+  store.dispatch(setMetalakeTree([{ key, node: 'schema', children: [] }]))
+  store.dispatch(setLoadedNodes([key]))
+  const responses = []
+  defHttp.getAxios().defaults.adapter = config =>
+    new Promise(resolve => {
+      const respond = names =>
+        resolve({
+          config,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          data: {
+            code: 0,
+            identifiers: names.map(name => ({ namespace: ['demo', 'sales', 'mart'], name }))
+          }
+        })
+      if (config.url.split('?')[0].endsWith('/semantic-models')) responses.push(respond)
+      else respond([])
+    })
+
+  const initial = store.dispatch(
+    consumer === 'tree' ? setIntoTreeNodeWithFetch({ key }) : fetchSemanticModels({ ...namespace, init: true })
+  )
+  await vi.waitFor(() => expect(responses).toHaveLength(1))
+  const refresh = store.dispatch(fetchSemanticModels({ ...namespace, init: true }))
+  await vi.waitFor(() => expect(responses).toHaveLength(2))
+  responses[1](['orders', 'imported'])
+  await refresh
+  responses[0](['orders'])
+  await initial
+  expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['orders', 'imported'])
+  expect(store.getState().metalakes.metalakeTree[0].children.map(model => model.name)).toEqual(['orders', 'imported'])
 })

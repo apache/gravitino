@@ -254,7 +254,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
                 </Form.Item>
                 <Form.Item
                   name='definition'
-                  label='Definition'
+                  label='Definition (advanced JSON)'
                   extra='The datasets, relationships and metrics of the semantic model, as JSON. The server validates the sources.'
                   rules={[{ required: true }, { validator: validateDefinition }]}
                   messageVariables={{ label: 'definition' }}

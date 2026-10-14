@@ -129,6 +129,9 @@ const mergeWithSemanticModelNodes = ({ tree, key, entities }) => {
   return _.uniqBy([...subSchemas, ...tables, ...functions, ...views, ...entities], 'key')
 }
 
+const semanticModelSchemaKey = ({ metalake, catalog, schema }) =>
+  `{{${metalake}}}{{${catalog}}}{{relational}}{{${schema}}}`
+
 const isAuthReady = state => {
   const { authType, authToken } = state.auth
 
@@ -236,6 +239,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
   async ({ key, reload }, { getState, dispatch }) => {
     let result = {
       key,
+      semanticModelRequestId: getState().metalakes.semanticModelRequests[key]?.requestId,
       data: [],
       tree: getState().metalakes.metalakeTree
     }
@@ -2378,15 +2382,20 @@ export const deleteView = createAsyncThunk(
 
 export const fetchSemanticModels = createAsyncThunk(
   'appMetalakes/fetchSemanticModels',
-  async ({ init, metalake, catalog, schema }, { getState, dispatch }) => {
+  async ({ init, metalake, catalog, schema }, { getState, dispatch, requestId }) => {
+    const schemaKey = semanticModelSchemaKey({ metalake, catalog, schema })
     const [err, res] = await to(getSemanticModelsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
+
+    if (getState().metalakes.semanticModelRequests[schemaKey]?.requestId !== requestId) {
+      return { stale: true }
+    }
 
     if (err) {
       // The catalog doesn't support semantic models (405), or the server predates the endpoint and
       // has no route for it (404). Both mean "this schema has none" - return empty silently rather
       // than failing every schema page against an older server.
       if ([404, 405].includes(err?.response?.status)) {
-        return { semanticModels: [], init }
+        return { semanticModels: [], init, schemaKey }
       }
       throw err instanceof Error ? err : new Error(err?.message ?? String(err))
     }
@@ -2421,7 +2430,6 @@ export const fetchSemanticModels = createAsyncThunk(
       init &&
       getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`)
     ) {
-      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
       dispatch(
         setIntoTreeNodes({
           key: schemaKey,
@@ -2434,7 +2442,7 @@ export const fetchSemanticModels = createAsyncThunk(
       )
     }
 
-    return { semanticModels, init }
+    return { semanticModels, init, schemaKey }
   }
 )
 
@@ -2530,6 +2538,8 @@ export const appMetalakesSlice = createSlice({
     functions: [],
     views: [],
     semanticModels: [],
+    semanticModelRequests: {},
+    semanticModelListRequestId: null,
     columns: [],
     filesets: [],
     topics: [],
@@ -2597,6 +2607,8 @@ export const appMetalakesSlice = createSlice({
       state.functions = []
       state.views = []
       state.semanticModels = []
+      state.semanticModelRequests = {}
+      state.semanticModelListRequestId = null
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2884,6 +2896,8 @@ export const appMetalakesSlice = createSlice({
       state.tables = []
       state.views = []
       state.semanticModels = []
+      state.semanticModelRequests = {}
+      state.semanticModelListRequestId = null
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2912,9 +2926,21 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(setIntoTreeNodeWithFetch.fulfilled, (state, action) => {
-      const { key, data, entities } = action.payload
+      const { key, data, entities, semanticModelRequestId } = action.payload
+      const latest = state.semanticModelRequests[key]
 
-      state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
+      // A pre-refresh tree load must not restore an older Semantic Model list either.
+      const currentModels =
+        latest?.semanticModels ??
+        findInTree(state.metalakeTree, 'key', key)?.children?.filter(node => node.node === 'semanticModel') ??
+        []
+
+      const children =
+        latest && latest.requestId !== semanticModelRequestId
+          ? [...data.filter(node => node.node !== 'semanticModel'), ...currentModels]
+          : data
+
+      state.metalakeTree = updateTreeData(state.metalakeTree, key, children)
 
       if (entities && state.selectedNodes.includes(key)) {
         state.tableData = entities
@@ -3272,8 +3298,19 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
+    builder.addCase(fetchSemanticModels.pending, (state, action) => {
+      const key = semanticModelSchemaKey(action.meta.arg)
+      state.semanticModelRequests[key] = { requestId: action.meta.requestId }
+      state.semanticModelListRequestId = action.meta.requestId
+    })
     builder.addCase(fetchSemanticModels.fulfilled, (state, action) => {
-      state.semanticModels = action.payload.semanticModels
+      if (action.payload.stale) return
+      const request = state.semanticModelRequests[action.payload.schemaKey]
+      if (request && request.requestId !== action.meta.requestId) return
+      if (request) request.semanticModels = action.payload.semanticModels
+      if (!state.semanticModelListRequestId || state.semanticModelListRequestId === action.meta.requestId) {
+        state.semanticModels = action.payload.semanticModels
+      }
     })
     builder.addCase(fetchSemanticModels.rejected, (state, action) => {
       if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError')) {

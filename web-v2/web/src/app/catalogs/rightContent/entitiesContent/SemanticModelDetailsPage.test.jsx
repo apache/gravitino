@@ -101,11 +101,32 @@ const definitionWith = context => ({
       name: 'orders',
       source: { namespace: ['sales', 'mart'], name: 'orders' },
       aiContext: context('dataset'),
-      fields: [{ name: 'amount', aiContext: context('field') }]
+      fields: [
+        {
+          name: 'amount',
+          expression: { dialects: [{ dialect: 'ANSI_SQL', expression: 'amount' }] },
+          aiContext: context('field')
+        }
+      ]
     }
   ],
-  relationships: [{ name: 'customers', from: 'orders', to: 'customers', aiContext: context('relationship') }],
-  metrics: [{ name: 'revenue', aiContext: context('metric') }]
+  relationships: [
+    {
+      name: 'customers',
+      from: 'orders',
+      to: 'orders',
+      fromColumns: ['amount'],
+      toColumns: ['amount'],
+      aiContext: context('relationship')
+    }
+  ],
+  metrics: [
+    {
+      name: 'revenue',
+      expression: { dialects: [{ dialect: 'ANSI_SQL', expression: 'SUM(amount)' }] },
+      aiContext: context('metric')
+    }
+  ]
 })
 
 const renderDetails = async (definition, details = {}) => {
@@ -175,9 +196,10 @@ describe('Semantic Model AI guidance', () => {
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
     await expandContext('orders AI Context')
     verify('dataset')
-    await click(document.querySelector('[data-refer="semantic-model-fields-grid"] button.ant-table-row-expand-icon'))
-    await expandContext('amount AI Context')
+    await click(document.querySelector('[aria-label="amount AI Context"]'))
     verify('field')
+    expect(document.querySelector('.ant-modal .ant-collapse')).toBeNull()
+    await click(document.querySelector('.ant-modal-close'))
     await selectTab('Relationships')
     await click(
       document.querySelector('[data-refer="semantic-model-relationships-grid"] button.ant-table-row-expand-icon')
@@ -369,5 +391,120 @@ describe('Semantic Model accessible details', () => {
     await renderDetails({ datasets: [] })
     await selectTab('Definition')
     expect(container.querySelector('button[aria-label="Copy definition"]')).not.toBeNull()
+  })
+})
+
+describe('focused semantic metadata editing', () => {
+  it.each(['model', 'dataset', 'field', 'relationship', 'metric'])(
+    'edits only the selected %s metadata and preserves unknown keys',
+    async kind => {
+      navigation.name = 'orders'
+      const definition = definitionWith(scope => ({ instructions: `${scope} guidance`, extra: { preserve: scope } }))
+      const extension = [{ vendorName: 'vendor', data: '{"keep":true}' }]
+      definition.customExtensions = extension
+      definition.datasets[0].fields[0].customExtensions = extension
+      let model = { name: 'orders', definition, properties: {} }
+      defHttp.get.mockImplementation(({ url }) =>
+        Promise.resolve(url.endsWith('/semantic-models') ? { identifiers: [] } : { semanticModel: model })
+      )
+      defHttp.put.mockImplementation(({ data }) => {
+        model = { ...model, definition: data.updates[0].definition }
+
+        return Promise.resolve({ semanticModel: model })
+      })
+      await renderDetails(definition, model)
+      if (kind === 'model') await click(findText('button', 'Edit Model AI Context'))
+      if (kind === 'dataset') await click(document.querySelector('[aria-label="Edit dataset orders"]'))
+      if (kind === 'field') {
+        await click(
+          document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon')
+        )
+        await click(document.querySelector('[aria-label="Edit field amount"]'))
+      }
+      if (kind === 'relationship') {
+        await selectTab('Relationships')
+        await click(document.querySelector('[aria-label="Edit relationship customers"]'))
+      }
+      if (kind === 'metric') {
+        await selectTab('Metrics')
+        await click(document.querySelector('[aria-label="Edit metric revenue"]'))
+      }
+      const expected = structuredClone(definition)
+
+      const entity = {
+        model: expected,
+        dataset: expected.datasets[0],
+        field: expected.datasets[0].fields[0],
+        relationship: expected.relationships[0],
+        metric: expected.metrics[0]
+      }[kind]
+      entity.aiContext.instructions = 'Edited guidance'
+      await act(async () =>
+        Simulate.change(document.querySelector('#semanticMetadata_instructions'), {
+          target: { value: 'Edited guidance' }
+        })
+      )
+      if (kind === 'field') {
+        entity.label = 'Order Amount'
+        entity.description = 'Field description'
+        entity.expression.dialects[0].expression = '-- comment\namount * 2'
+        await act(async () => {
+          Simulate.change(document.querySelector('#semanticMetadata_label'), { target: { value: entity.label } })
+          Simulate.change(document.querySelector('#semanticMetadata_description'), {
+            target: { value: entity.description }
+          })
+          Simulate.change(document.querySelector('#semanticMetadata_dialects_0_expression'), {
+            target: { value: entity.expression.dialects[0].expression }
+          })
+        })
+        defHttp.put.mockRejectedValueOnce(new Error('Save rejected'))
+        await click(findText('.ant-modal button', 'Save'))
+        expect(document.querySelector('#semanticMetadata_label').value).toBe('Order Amount')
+        expect(document.body.textContent).toContain('Your edits are retained')
+      }
+      await click(findText('.ant-modal button', 'Save'))
+      expect(defHttp.put.mock.lastCall[0].data).toEqual({
+        updates: [{ '@type': 'replaceDefinition', definition: expected }]
+      })
+      expect(store.getState().metalakes.activatedDetails.definition).toEqual(expected)
+      expect(document.querySelector('.ant-modal')).toBeNull()
+    }
+  )
+
+  it('blocks an empty dialect list and retains the editor for correction', async () => {
+    await renderDetails(definitionWith(() => null))
+    await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    await click(document.querySelector('[aria-label="Edit field amount"]'))
+    await click(document.querySelector('[aria-label="Remove dialect 1"]'))
+    await click(findText('.ant-modal button', 'Save'))
+    expect(document.body.textContent).toContain('expression must have non-empty dialects')
+    expect(defHttp.put).not.toHaveBeenCalled()
+    expect(document.querySelector('.ant-modal')).not.toBeNull()
+  })
+
+  it('closes an unchanged focused edit without sending a definition replacement', async () => {
+    await renderDetails(definitionWith(() => null))
+    await click(findText('button', 'Edit Model AI Context'))
+    await click(findText('.ant-modal button', 'Save'))
+    expect(defHttp.put).not.toHaveBeenCalled()
+    expect(document.querySelector('.ant-modal')).toBeNull()
+  })
+
+  it('keeps SQL line breaks in bounded code blocks', async () => {
+    const definition = definitionWith(() => null)
+    const sql = '-- comment\nSELECT ' + 'x'.repeat(200)
+    definition.metrics[0].expression.dialects[0].expression = sql
+    await renderDetails(definition)
+    await selectTab('Metrics')
+    const code = document.querySelector('[data-refer="semantic-model-metrics-grid"] pre')
+    expect(code.textContent).toBe(sql)
+    expect(code.className).toContain('whitespace-pre-wrap')
+    expect(code.className).toContain('overflow-auto')
+  })
+
+  it('does not show an AI Context action for a field without guidance', async () => {
+    await renderDetails(definitionWith(() => null))
+    await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    expect(document.querySelector('[aria-label="amount AI Context"]')).toBeNull()
   })
 })
