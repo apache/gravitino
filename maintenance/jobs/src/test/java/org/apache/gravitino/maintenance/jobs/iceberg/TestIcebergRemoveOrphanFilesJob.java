@@ -42,7 +42,8 @@ public class TestIcebergRemoveOrphanFilesJob {
         new BuiltInJobTemplateProvider()
             .jobTemplates().stream()
                 .anyMatch(t -> t.name().equals("builtin-iceberg-remove-orphan-files")));
-    assertTrue(new IcebergRemoveOrphanFilesJob().jobTemplate().arguments().contains("{{dry_run}}"));
+    assertTrue(
+        new IcebergRemoveOrphanFilesJob().jobTemplate().arguments().contains("{{dry_run:-false}}"));
   }
 
   /** Verifies server-side template discovery without Spark, Iceberg, or Hadoop libraries. */

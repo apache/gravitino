@@ -113,7 +113,7 @@ class TestHiveCatalogOperations {
             org.apache.gravitino.credential.CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS));
     Assertions.assertTrue(propertyEntryMap.containsKey(S3Properties.GRAVITINO_S3_ROLE_ARN));
     Assertions.assertTrue(propertyEntryMap.containsKey(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         propertyEntryMap.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID).isHidden());
     Assertions.assertTrue(
         propertyEntryMap.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET).isHidden());

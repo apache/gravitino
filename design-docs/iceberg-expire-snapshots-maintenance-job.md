@@ -627,4 +627,4 @@ combined into a single PR if preferred.
 | Data requirements | `TABLE_METADATA` + `TABLE_STATISTICS` + `PARTITION_STATISTICS` | `TABLE_METADATA`                        |
 | Trigger input     | `custom-data-file-mse`, `custom-delete-file-number` (statistics) | `snapshot-count` (table metadata property) |
 | Iceberg procedure | `rewrite_data_files`                                           | `expire_snapshots`                      |
-| Key parameters    | strategy, sort-order, where, options (all required)             | older_than, retain_last (independently optional, fall back to Iceberg table properties), stream_results (defaults to `true`) |
+| Key parameters    | strategy, sort-order, where, options (all required)             | older_than, retain_last (independently optional, fall back to Iceberg table properties), stream_results (defaults to `false`) |

@@ -149,10 +149,7 @@ public class PolicyMetaService {
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyVersionMapper.class,
-                  mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())));
+          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -380,9 +377,26 @@ public class PolicyMetaService {
     NameIdentifier observedIdentifier =
         NameIdentifier.of(policyEntity.namespace(), existingPolicyPO.getPolicyName());
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
+    insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
+  }
+
+  /**
+   * Inserts the new content snapshot, unless the write allocated none.
+   *
+   * <p>A write that leaves comment, enabled and content untouched keeps {@code current_version}
+   * where it is, and the row still points at the snapshot it already had. Inserting that snapshot
+   * again would collide with the unique key over (policy_id, version, deleted_at).
+   *
+   * @param oldPolicyPO the row being replaced
+   * @param newPolicyPO the replacement, carrying the snapshot it points at
+   */
+  private void insertPolicyVersionIfAllocated(PolicyPO oldPolicyPO, PolicyPO newPolicyPO) {
+    if (newPolicyPO.getCurrentVersion().equals(oldPolicyPO.getCurrentVersion())) {
+      return;
+    }
     SessionUtils.doWithoutCommit(
         PolicyVersionMapper.class,
-        mapper -> mapper.insertPolicyVersion(replacementPolicyPO.getPolicyVersionPO()));
+        mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO()));
   }
 
   private void insertNewPolicyWithoutCommit(PolicyPO policyPO) {
@@ -457,7 +471,7 @@ public class PolicyMetaService {
                 PolicyMetaMapper.class,
                 mapper ->
                     mapper.softDeletePolicyByIdAndVersion(
-                        observedPolicyPO.getPolicyId(), observedPolicyPO.getCurrentVersion())),
+                        observedPolicyPO.getPolicyId(), observedPolicyPO.getOccVersion())),
         () -> policyWriteFailure(identifier, observedPolicyPO));
   }
 

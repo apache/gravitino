@@ -47,6 +47,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -320,6 +321,29 @@ class TestGravitinoConnectorForwardUser {
             TrinoException.class,
             () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
     assertEquals(GENERIC_INTERNAL_ERROR.toErrorCode(), ex.getErrorCode());
+    assertEquals(
+        "Failed to create per-user Gravitino client for user 'alice': connection refused",
+        ex.getMessage());
+  }
+
+  @Test
+  void testResolveSessionMetadataMapsLoadMetalakeDenialToPermissionDenied() {
+    CatalogConnectorContext ctx =
+        mockContextWithConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2"));
+    String message = "User alice is not authorized to perform operation loadMetalake";
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    when(client.loadMetalake(any())).thenThrow(new ForbiddenException(message));
+    GravitinoConnector connector = newConnectorWithAuthClient(ctx, session -> client);
+
+    TrinoException ex =
+        assertThrows(
+            TrinoException.class,
+            () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), ex.getErrorCode());
+    assertEquals(message, ex.getMessage());
   }
 
   /**

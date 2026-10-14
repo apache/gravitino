@@ -35,9 +35,11 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -161,7 +163,15 @@ public class JobTemplateMetaService {
                           JobTemplateMetaMapper.class,
                           mapper ->
                               mapper.updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO)),
-                  () -> writeFailure(jobTemplateIdent, oldJobTemplatePO)));
+                  () -> writeFailure(jobTemplateIdent, oldJobTemplatePO)),
+          () -> {
+            // Job templates are not entity-cacheable, so JDBCBackend does not log their changes.
+            // Peers still cache the old name's id for authorization, so log a rename here.
+            if (!Objects.equals(oldJobTemplateEntity.name(), newJobTemplateEntity.name())) {
+              EntityChangeLogWriter.append(
+                  jobTemplateIdent, Entity.EntityType.JOB_TEMPLATE, OperateType.ALTER);
+            }
+          });
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB_TEMPLATE, jobTemplateIdent.name());
       throw e;
@@ -248,7 +258,9 @@ public class JobTemplateMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 JobMetaMapper.class,
-                mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())));
+                mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())),
+        () ->
+            EntityChangeLogWriter.append(ident, Entity.EntityType.JOB_TEMPLATE, OperateType.DROP));
   }
 
   /** Locks the observed template while a job is inserted in the same transaction. */

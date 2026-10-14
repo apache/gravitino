@@ -10,7 +10,7 @@ CALL
 
 <BLANK_LINE>
 
-<QUERY_FAILED> Drop catalog failed. Catalog test.gt_mysql_xxx1 not exists
+<QUERY_FAILED> Catalog test.gt_mysql_xxx1 not exists
 
 CALL
 

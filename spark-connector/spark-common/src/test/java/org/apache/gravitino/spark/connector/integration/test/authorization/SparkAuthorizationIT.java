@@ -157,8 +157,8 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
                 Privileges.CreateTable.allow(),
-                // Spark JDBC catalog needs vended jdbc-password via getCredentials / getSecrets.
-                Privileges.UseSecret.allow()));
+                // Spark JDBC catalog needs USE_SECRETS to receive vended jdbc credentials.
+                Privileges.UseSecrets.allow()));
     gravitinoMetalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(securableObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
   }
@@ -286,7 +286,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             JDBC_CATALOG,
-            ImmutableList.of(Privileges.UseCatalog.allow(), Privileges.UseSecret.allow()));
+            ImmutableList.of(Privileges.UseCatalog.allow(), Privileges.UseSecrets.allow()));
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject,
@@ -336,7 +336,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
                 Privileges.CreateTable.allow(),
-                Privileges.UseSecret.allow()));
+                Privileges.UseSecrets.allow()));
     gravitinoMetalake.createRole(testRole, new HashMap<>(), ImmutableList.of(catalogObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
 

@@ -120,7 +120,9 @@ public class RelationalEntityStore
     }
     this.entityChangeLogPoller =
         new EntityChangeLogPoller(
-            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS), changeLogMetrics);
+            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
+            config.get(Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE),
+            changeLogMetrics);
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),

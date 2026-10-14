@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -72,6 +73,7 @@ import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.NotFoundExceptionMapper;
 import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
 import org.apache.gravitino.server.web.mapper.WebApplicationExceptionMapper;
+import org.apache.gravitino.server.web.rest.SemanticModelSourceValidator;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -167,6 +169,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
+            bindAsContract(SemanticModelSourceValidator.class);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
             bind(gravitinoEnv.viewDispatcher()).to(ViewDispatcher.class).ranked(1);
             bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
@@ -183,6 +186,9 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.secretProviderRegistry()).to(SecretProviderRegistry.class).ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(gravitinoEnv.functionDispatcher()).to(FunctionDispatcher.class).ranked(1);
+            bind(gravitinoEnv.semanticModelDispatcher())
+                .to(SemanticModelDispatcher.class)
+                .ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
             bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
             bind(gravitinoEnv.statisticDispatcher()).to(StatisticDispatcher.class).ranked(1);

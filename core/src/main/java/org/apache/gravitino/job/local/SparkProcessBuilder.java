@@ -50,8 +50,9 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
 
   private final String sparkSubmit;
 
-  protected SparkProcessBuilder(SparkJobTemplate sparkJobTemplate, Map<String, String> configs) {
-    super(sparkJobTemplate, configs);
+  protected SparkProcessBuilder(
+      SparkJobTemplate sparkJobTemplate, File workingDirectory, Map<String, String> configs) {
+    super(sparkJobTemplate, workingDirectory, configs);
     this.sparkSubmit = resolveSparkSubmit(configs);
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,6 +44,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
@@ -582,5 +584,46 @@ public class TestCatalogConnectorMetadataView {
     when(catalog.asViewCatalog()).thenThrow(new UnsupportedOperationException("Not supported"));
     return new CatalogConnectorMetadata(
         metalake, NameIdentifier.of("metalake", "test_catalog"), mock(GravitinoConfig.class));
+  }
+
+  @Test
+  public void testViewExists() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenReturn(true);
+
+    assertTrue(createMetadataWithViewCatalog(viewCatalog).viewExists("s", "v"));
+    verify(viewCatalog).viewExists(NameIdentifier.of("s", "v"));
+  }
+
+  @Test
+  public void testCatalogWithoutViewCatalogHasNoViews() {
+    assertFalse(createMetadataWithoutViewCatalog().viewExists("s", "v"));
+  }
+
+  @Test
+  public void testServerWithoutViewSupportHasNoViews() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any()))
+        .thenThrow(new UnsupportedOperationException("Views are not supported"));
+
+    assertFalse(createMetadataWithViewCatalog(viewCatalog).viewExists("s", "v"));
+  }
+
+  @Test
+  public void testMissingSchemaHasNoViews() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenThrow(new NoSuchSchemaException("missing"));
+
+    assertFalse(createMetadataWithViewCatalog(viewCatalog).viewExists("s", "v"));
+  }
+
+  @Test
+  public void testViewExistsDeniedIsPermissionDenied() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenThrow(new ForbiddenException("denied"));
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.viewExists("s", "v"));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
   }
 }

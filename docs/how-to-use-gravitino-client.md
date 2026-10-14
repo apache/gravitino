@@ -55,14 +55,20 @@ gravitino_admin_client = GravitinoAdminClient(
    uri="http://localhost:8090",
    client_config={"gravitino_client_request_timeout": 60},
 )
-# ...
+try:
+    # ...
+finally:
+    gravitino_admin_client.close()
 
 gravitino_client = GravitinoClient(
    uri="http://localhost:8090",
    metalake_name="test",
    client_config={"gravitino_client_request_timeout": 60},
 )
-# ...
+try:
+    # ...
+finally:
+    gravitino_client.close()
 ```
 
 ### Python Client Configuration
@@ -75,8 +81,11 @@ gravitino_client = GravitinoClient(
 
 ## Retrying concurrent metadata changes
 
-If another writer changes metadata during an alter or drop, the server returns HTTP 409
-with error code `1012`. The Java and Python clients raise `OptimisticLockException`.
+If another writer changes metadata during a write, such as an alter, a drop, a statistic update
+or a model-version link, the server may return HTTP 409 with error code `1012`. An idempotent delete may instead return `false` if another delete or
+rename wins. A model-version read may also return this conflict if concurrent changes prevent
+obtaining consistent metadata within the server's bounded read attempts. The Java and Python
+clients raise `OptimisticLockException` for error code `1012`.
 Import the exception in Java:
 
 ```java
@@ -92,3 +101,4 @@ from gravitino.exceptions.base import OptimisticLockException
 Catch this exception, reload the latest metadata, reconsider your intended change, and
 retry with a bounded number of attempts. Do not replay a stale update unchanged or
 retry every HTTP 409 response, since other conflicts may require a different action.
+For a model-version read conflict, retry the read with a bounded number of attempts.

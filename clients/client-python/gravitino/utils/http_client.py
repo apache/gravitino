@@ -97,6 +97,7 @@ class HTTPClient:
         self.timeout = gravitino_client_config.get_client_request_timeout()
         self.is_debug = is_debug
         self.auth_data_provider = auth_data_provider
+        self._closed = False
 
     def _build_url(self, endpoint=None, params=None):
         url = self.host
@@ -167,7 +168,10 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
-        if data:
+        if isinstance(data, (str, bytes)):
+            request_data = data.encode("utf-8") if isinstance(data, str) else data
+            self._update_headers(self.JSON_HEADER)
+        elif data:
             request_data = urlencode(data.to_dict()).encode()
             self._update_headers(self.FORMDATA_HEADER)
         else:
@@ -244,9 +248,13 @@ class HTTPClient:
         )
 
     def close(self):
-        self._request("close", "/")
+        if self._closed:
+            return
+
         if self.auth_data_provider is not None:
             self.auth_data_provider.close()
+
+        self._closed = True
 
 
 def unpack(path: str):

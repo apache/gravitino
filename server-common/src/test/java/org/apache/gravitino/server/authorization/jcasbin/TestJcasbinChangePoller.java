@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
@@ -119,28 +120,38 @@ public class TestJcasbinChangePoller {
   }
 
   @Test
-  void testVirtualNamespaceTypesAreSkippedWithoutFailingTheBatch() {
+  void testVirtualNamespaceTypesInvalidateLookupKeys() {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // TAG/POLICY/JOB live in a virtual namespace, so their change-log full name has more levels
-    // than MetadataObjects.of() accepts. They must be skipped, not blow up the whole batch.
-    Assertions.assertDoesNotThrow(
-        () ->
-            poller.onEntityChange(
-                List.of(
-                    change(1L, MetadataObject.Type.TAG, "ml1.system.tag.pii"),
-                    change(2L, MetadataObject.Type.POLICY, "ml1.system.policy.retention"),
-                    change(3L, MetadataObject.Type.JOB, "ml1.system.job.job1"),
-                    change(4L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"))));
+    // TAG/POLICY/JOB/JOB_TEMPLATE live in a virtual namespace (<metalake>.system.<kind>.<name>).
+    // Authorization caches their ids by leaf name, so a peer must drop exactly that key.
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.TAG, "ml1.system.tag.pii"),
+            change(2L, MetadataObject.Type.POLICY, "ml1.system.policy.retention"),
+            change(3L, MetadataObject.Type.JOB, "ml1.system.job.job1"),
+            change(4L, MetadataObject.Type.JOB_TEMPLATE, "ml1.system.job_template.tpl1"),
+            change(5L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1")));
 
-    // The one mappable record in the batch is still applied.
     Assertions.assertEquals(
         List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
         metadataIdCache.invalidatedPrefixes);
-    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+    Assertions.assertEquals(
+        List.of(
+            lookupKey("pii", MetadataObject.Type.TAG),
+            lookupKey("retention", MetadataObject.Type.POLICY),
+            lookupKey("job1", MetadataObject.Type.JOB),
+            lookupKey("tpl1", MetadataObject.Type.JOB_TEMPLATE)),
+        metadataIdCache.invalidatedKeys);
+  }
+
+  // The key JcasbinAuthorizationLookups builds when authorizing a metalake-level object by name.
+  private static String lookupKey(String name, MetadataObject.Type type) {
+    return JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+        "ml1", MetadataObjects.of(null, name, type));
   }
 
   @Test

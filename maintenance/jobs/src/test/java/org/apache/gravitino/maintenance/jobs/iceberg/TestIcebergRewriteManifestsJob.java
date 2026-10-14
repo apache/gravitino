@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -146,20 +147,21 @@ public class TestIcebergRewriteManifestsJob {
     IcebergRewriteManifestsJob job = new IcebergRewriteManifestsJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(10, template.arguments().size()); // 5 flags * 2 (flag + value)
-
-    // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--use-caching"));
-    assertTrue(template.arguments().contains("{{use_caching}}"));
-    assertTrue(template.arguments().contains("--spec-id"));
-    assertTrue(template.arguments().contains("{{spec_id}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    // Only the catalog and the table are required; the other options default to empty values,
+    // which the job treats as unset.
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--use-caching",
+            "{{use_caching:-}}",
+            "--spec-id",
+            "{{spec_id:-}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
@@ -195,7 +197,7 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v1", version);
+    assertEquals("v2", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 

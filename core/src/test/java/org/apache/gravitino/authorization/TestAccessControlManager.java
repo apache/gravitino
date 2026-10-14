@@ -19,12 +19,15 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -62,6 +65,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
@@ -73,6 +77,7 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -126,6 +131,16 @@ public class TestAccessControlManager {
           .withVersion(SchemaVersion.V_0_1)
           .build();
 
+  private static BaseMetalake disabledMetalakeEntity =
+      BaseMetalake.builder()
+          .withId(3L)
+          .withName("metalake_disabled")
+          .withProperties(ImmutableMap.of(Metalake.PROPERTY_IN_USE, "false"))
+          .withAuditInfo(
+              AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+          .withVersion(SchemaVersion.V_0_1)
+          .build();
+
   @BeforeAll
   public static void setUp() throws Exception {
     File dbDir = new File(DB_DIR);
@@ -138,10 +153,13 @@ public class TestAccessControlManager {
         .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -165,6 +183,7 @@ public class TestAccessControlManager {
 
     entityStore.put(metalakeEntity, true);
     entityStore.put(listMetalakeEntity, true);
+    entityStore.put(disabledMetalakeEntity, true);
 
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
@@ -346,6 +365,38 @@ public class TestAccessControlManager {
     Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchGroupException);
     Assertions.assertFalse(results.get(2).succeeded());
     Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
+  }
+
+  @Test
+  public void testAddRemoveUserGroupChecksMetalakeExists() {
+    // add/remove user/group against a nonexistent metalake must surface the
+    // documented NoSuchMetalakeException, not a raw storage error.
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addGroup("nope", "g1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeUser("nope", "u1"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.removeGroup("nope", "g1"));
+  }
+
+  @Test
+  public void testAddRemoveUserGroupRejectsDisabledMetalake() {
+    // add/remove user/group against a disabled (not-in-use) metalake must surface
+    // MetalakeNotInUseException, consistent with the count/list siblings.
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.addUser("metalake_disabled", "u1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.addGroup("metalake_disabled", "g1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.removeUser("metalake_disabled", "u1"));
+    Assertions.assertThrows(
+        MetalakeNotInUseException.class,
+        () -> accessControlManager.removeGroup("metalake_disabled", "g1"));
   }
 
   @Test

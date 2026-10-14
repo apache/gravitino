@@ -35,14 +35,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -69,6 +64,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -94,7 +90,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
@@ -209,7 +204,7 @@ public class TestJobManager {
         List.of(Entity.EntityType.METALAKE, Entity.EntityType.JOB_TEMPLATE)) {
       Mockito.reset(entityStore, jobExecutor);
       String executionId = "submitted_" + parent.name();
-      when(jobExecutor.submitJob(any())).thenReturn(executionId);
+      when(jobExecutor.submitJob(any(), any())).thenReturn(executionId);
       NoSuchEntityException missing = new NoSuchEntityException("Parent was deleted: %s", parent);
       doThrow(missing).when(entityStore).put(any(JobEntity.class), eq(false));
 
@@ -218,7 +213,7 @@ public class TestJobManager {
               NoSuchJobTemplateException.class,
               () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
       Assertions.assertSame(missing, failure.getCause());
-      verify(jobExecutor, times(1)).submitJob(any());
+      verify(jobExecutor, times(1)).submitJob(any(), any());
       verify(jobExecutor, never()).cancelJob(any());
       verify(entityStore, times(1)).put(any(JobEntity.class), eq(false));
     }
@@ -758,7 +753,7 @@ public class TestJobManager {
     when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
 
     String jobExecutionId = "job_execution_id_for_test";
-    when(jobExecutor.submitJob(any())).thenReturn(jobExecutionId);
+    when(jobExecutor.submitJob(any(), any())).thenReturn(jobExecutionId);
 
     doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
 
@@ -779,7 +774,7 @@ public class TestJobManager {
     Assertions.assertEquals("Job template does not exist", e.getMessage());
 
     // Test when job executor fails
-    doThrow(new RuntimeException("Job executor error")).when(jobExecutor).submitJob(any());
+    doThrow(new RuntimeException("Job executor error")).when(jobExecutor).submitJob(any(), any());
 
     Assertions.assertThrows(
         RuntimeException.class,
@@ -808,7 +803,7 @@ public class TestJobManager {
     // The job executor may start the job right after it is submitted, so the queued time must be
     // taken before the submission to never be later than the reported started time.
     AtomicReference<Instant> submittedAt = new AtomicReference<>();
-    when(jobExecutor.submitJob(any()))
+    when(jobExecutor.submitJob(any(), any()))
         .thenAnswer(
             invocation -> {
               Thread.sleep(5);
@@ -837,7 +832,7 @@ public class TestJobManager {
         new IllegalArgumentException(
             "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
                 + " be set for Spark jobs");
-    doThrow(rejection).when(jobExecutor).submitJob(any());
+    doThrow(rejection).when(jobExecutor).submitJob(any(), any());
 
     // The rejection must reach the caller as is, so the REST layer reports the original reason
     // with a 400 instead of wrapping it into a generic 500 error.
@@ -881,7 +876,7 @@ public class TestJobManager {
     when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
         .thenReturn(jobTemplateEntity);
 
-    when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
+    when(jobExecutor.submitJob(any(), any())).thenReturn("job_execution_id_for_test");
     doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
 
     JobEntity jobEntity =
@@ -899,12 +894,163 @@ public class TestJobManager {
     Assertions.assertEquals(Lists.newArrayList("Hello!"), runtimeJobTemplateDTO.arguments());
     Assertions.assertEquals(jobTemplateEntity.name(), runtimeJobTemplateDTO.name());
     Assertions.assertEquals(jobTemplateEntity.comment(), runtimeJobTemplateDTO.comment());
-    // createRuntimeJobTemplate() also resolves the executable by fetching it into the job's
-    // staging directory, so it ends up as a local staging-dir path rather than the original
-    // "/bin/echo" - just confirm it was actually resolved to something under that directory.
-    Assertions.assertTrue(
-        runtimeJobTemplateDTO.executable().endsWith("echo"),
-        () -> "Unexpected resolved executable: " + runtimeJobTemplateDTO.executable());
+    // JobManager doesn't fetch the resources, the runtime template keeps the resolved URI.
+    Assertions.assertEquals("/bin/echo", runtimeJobTemplateDTO.executable());
+
+    // The job executor gets the context of the job run and the template with the URIs.
+    ArgumentCaptor<JobContext> contextCaptor = ArgumentCaptor.forClass(JobContext.class);
+    ArgumentCaptor<JobTemplate> templateCaptor = ArgumentCaptor.forClass(JobTemplate.class);
+    verify(jobExecutor).submitJob(contextCaptor.capture(), templateCaptor.capture());
+    JobContext context = contextCaptor.getValue();
+    Assertions.assertEquals(jobEntity.id(), context.jobId());
+    Assertions.assertEquals(metalake, context.metalake());
+    Assertions.assertTrue(context.stagingDir().isDirectory(), context::toString);
+    Assertions.assertEquals("/bin/echo", templateCaptor.getValue().executable());
+    Assertions.assertEquals(Lists.newArrayList("Hello!"), templateCaptor.getValue().arguments());
+    // Nothing is fetched into the staging directory on behalf of the job executor.
+    String[] staged = context.stagingDir().list();
+    Assertions.assertTrue(staged == null || staged.length == 0);
+  }
+
+  @Test
+  public void testRunJobResolvesDefaultValues() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity jobTemplateEntity =
+        newShellJobTemplateEntity(
+            "shell_job_with_defaults",
+            Lists.newArrayList(
+                "--greeting", "{{greeting:-Hi}}", "--note", "{{note:-}}", "{{name}}"));
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("job_execution_id_for_test");
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    JobEntity jobEntity =
+        jobManager.runJob(
+            metalake, jobTemplateEntity.name(), ImmutableMap.of("name", "Bob", "unused", "x"));
+
+    ShellJobTemplateDTO runtimeJobTemplateDTO =
+        (ShellJobTemplateDTO)
+            JsonUtils.anyFieldMapper()
+                .readValue(jobEntity.runtimeJobTemplate(), JobTemplateDTO.class);
+    Assertions.assertEquals(
+        Lists.newArrayList("--greeting", "Hi", "--note", "", "Bob"),
+        runtimeJobTemplateDTO.arguments());
+  }
+
+  @Test
+  public void testRunJobRejectsMissingParametersBeforeStaging() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity jobTemplateEntity =
+        newShellJobTemplateEntity(
+            "shell_job_with_required", Lists.newArrayList("{{b}}", "{{a}}", "{{c:-x}}"));
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.runJob(metalake, jobTemplateEntity.name(), Collections.emptyMap()));
+    Assertions.assertTrue(e.getMessage().contains("[a, b]"), e.getMessage());
+
+    verify(jobExecutor, never()).submitJob(any(), any());
+    verify(entityStore, never()).put(any(JobEntity.class), anyBoolean());
+    // Nothing was created for the job, not even the directory its staging directory would live in.
+    Assertions.assertFalse(jobManager.jobStagingDir(0L).getParentFile().exists());
+  }
+
+  @Test
+  public void testRunJobRemovesStagingDirWhenTemplateResolutionFails() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    // Both environment keys resolve to the same key, which fails the resolution after the
+    // staging directory is created.
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName("shell_job_with_duplicate_keys")
+            .withExecutable("/bin/echo")
+            .withEnvironments(ImmutableMap.of("{{a}}", "1", "{{b}}", "2"))
+            .build();
+    JobTemplateEntity jobTemplateEntity = toJobTemplateEntity(shellJobTemplate);
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            jobManager.runJob(
+                metalake, jobTemplateEntity.name(), ImmutableMap.of("a", "SAME", "b", "SAME")));
+
+    verify(jobExecutor, never()).submitJob(any(), any());
+    // The staging directory was created, and removed again when the template failed to resolve.
+    File jobRunsDir = jobManager.jobStagingDir(0L).getParentFile();
+    Assertions.assertTrue(jobRunsDir.isDirectory(), "The job staging directory was never created");
+    Assertions.assertArrayEquals(new String[0], jobRunsDir.list());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testRunJobRemovesStagingDirWhenResourceFetchFails() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName("shell_job_with_missing_executable")
+            .withExecutable("/non_existent_dir_" + UUID.randomUUID() + "/run.sh")
+            .build();
+    JobTemplateEntity jobTemplateEntity = toJobTemplateEntity(shellJobTemplate);
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+    // The default implementation localizes the job template into the staging directory, which
+    // fails for the missing executable, before the job reaches submitJob(JobTemplate).
+    when(jobExecutor.submitJob(any(), any())).thenCallRealMethod();
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, jobTemplateEntity.name(), Collections.emptyMap()));
+
+    verify(jobExecutor, never()).submitJob(any(JobTemplate.class));
+    // The staging directory was created, and removed again when the job failed to be submitted.
+    File jobRunsDir = jobManager.jobStagingDir(0L).getParentFile();
+    Assertions.assertTrue(jobRunsDir.isDirectory(), "The job staging directory was never created");
+    Assertions.assertArrayEquals(new String[0], jobRunsDir.list());
+  }
+
+  @Test
+  public void testRegisterAndAlterJobTemplateRejectConflictingDefaults() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity conflicting =
+        newShellJobTemplateEntity(
+            "shell_job_conflicting", Lists.newArrayList("{{mode:-all}}", "{{mode:-stats}}"));
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> jobManager.registerJobTemplate(metalake, conflicting));
+    Assertions.assertTrue(e.getMessage().contains("mode"), e.getMessage());
+    verify(entityStore, never()).put(any(JobTemplateEntity.class), anyBoolean());
+
+    JobTemplateEntity valid = newShellJobTemplateEntity("shell_job", "A shell job template");
+    JobTemplateChange invalidUpdate =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.ShellTemplateUpdate.builder()
+                .withNewArguments(ImmutableList.of("--options", "{{options:-{}}"))
+                .build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> jobManager.updateJobTemplateEntity(valid.nameIdentifier(), valid, invalidUpdate));
   }
 
   @Test
@@ -915,7 +1061,7 @@ public class TestJobManager {
 
     JobTemplateEntity shellJobTemplate =
         newShellJobTemplateEntity("shell_job", "A shell job template");
-    when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
+    when(jobExecutor.submitJob(any(), any())).thenReturn("job_execution_id_for_test");
     doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
 
     // Use a fixed job ID so that both runs resolve to the same staging directory.
@@ -1626,11 +1772,10 @@ public class TestJobManager {
 
     try {
       JobTemplate jobTemplate =
-          JobManager.createRuntimeJobTemplate(
-              newShellJobTemplateEntity("shell_job", "echo"),
-              Collections.emptyMap(),
-              jobStagingDir);
-      String executionId = ownerExecutor.submitJob(jobTemplate);
+          new JobTemplateResolver(newShellJobTemplateEntity("shell_job", "echo"))
+              .resolve(Collections.emptyMap());
+      String executionId =
+          ownerExecutor.submitJob(new JobContext(1L, metalake, jobStagingDir), jobTemplate);
       Awaitility.await()
           .atMost(1, TimeUnit.MINUTES)
           .until(() -> ownerExecutor.getJobStatus(executionId) == JobHandle.Status.SUCCEEDED);
@@ -2326,6 +2471,26 @@ public class TestJobManager {
         .build();
   }
 
+  private JobTemplateEntity newShellJobTemplateEntity(String name, List<String> arguments) {
+    return toJobTemplateEntity(
+        ShellJobTemplate.builder()
+            .withName(name)
+            .withExecutable("/bin/echo")
+            .withArguments(arguments)
+            .build());
+  }
+
+  private JobTemplateEntity toJobTemplateEntity(JobTemplate jobTemplate) {
+    return JobTemplateEntity.builder()
+        .withId(new Random().nextLong())
+        .withName(jobTemplate.name())
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(jobTemplate))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
   private JobTemplateEntity newSparkJobTemplateEntity(String name, String comment) {
     SparkJobTemplate sparkJobTemplate =
         SparkJobTemplate.builder()
@@ -2773,98 +2938,6 @@ public class TestJobManager {
             eq(Entity.EntityType.JOB),
             captor.capture());
     return captor.getValue().apply(latestJobEntity);
-  }
-
-  private HttpServer createLoopbackHttpServer(String response) throws IOException {
-    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    server.createContext(
-        "/artifact.jar",
-        exchange -> {
-          byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(200, bytes.length);
-          try (OutputStream outputStream = exchange.getResponseBody()) {
-            outputStream.write(bytes);
-          }
-        });
-    return server;
-  }
-
-  @Test
-  public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
-    File stagingDir = new File(testStagingDir);
-    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
-
-    Path missingFilePath =
-        Path.of(System.getProperty("java.io.tmpdir"), "missing-job-file-" + UUID.randomUUID());
-    String uri = missingFilePath.toUri().toString();
-
-    Assertions.assertThrows(
-        RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
-  }
-
-  @Test
-  public void testFetchFileFromUriSsrfBlocked() {
-    File stagingDir = new File(testStagingDir);
-    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
-    FileFetcher.get().initialize(true);
-
-    // Loopback address
-    RuntimeException e1 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e1);
-
-    // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
-    RuntimeException e2 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () ->
-                JobManager.fetchFileFromUri(
-                    "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e2);
-
-    // RFC-1918 private range
-    RuntimeException e3 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e3);
-
-    // Alibaba Cloud / Oracle Cloud metadata endpoint
-    RuntimeException e4 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
-    assertRemoteUriBlockedMessage(e4);
-  }
-
-  @Test
-  public void testFetchFileFromUriShouldAllowLocalhostWhenBlockingDisabled() throws Exception {
-    File stagingDir = new File(testStagingDir);
-    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
-    HttpServer server = createLoopbackHttpServer("job artifact");
-
-    try {
-      server.start();
-      int port = server.getAddress().getPort();
-      FileFetcher.get().initialize(false);
-
-      String fetchedFile =
-          JobManager.fetchFileFromUri(
-              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000);
-
-      Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
-    } finally {
-      FileFetcher.get().initialize(true);
-      server.stop(0);
-    }
-  }
-
-  private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
-    Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
-    Assertions.assertTrue(
-        exception.getCause().getMessage().contains(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
   }
 
   @Test

@@ -198,11 +198,15 @@ public class TestRelationalEntityStoreHierarchicalCache {
         .thenReturn("org.h2.Driver");
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS))
         .thenReturn(Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS))
+        .thenReturn(10);
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
         .thenReturn(Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
     Mockito.when(config.get(Configs.STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(Configs.VERSION_RETENTION_COUNT)).thenReturn(1L);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);

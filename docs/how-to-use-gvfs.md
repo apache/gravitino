@@ -53,7 +53,9 @@ the path mapping and convert automatically.
 | `fs.gvfs.impl.disable.cache`                          | Disable the Gravitino Virtual File System cache in the Hadoop environment. If you need to proxy multi-user operations, set this value to `true` and create a separate File System for each user.                                                                                                                                                                       | `false`                                                        | No                                  |
 | `fs.gravitino.server.uri`                             | The Gravitino server URI which GVFS needs to load the fileset metadata.                                                                                                                                                                                                                                                                                                | (none)                                                         | Yes                                 |
 | `fs.gravitino.client.metalake`                        | The metalake to which the fileset belongs.                                                                                                                                                                                                                                                                                                                             | (none)                                                         | Yes                                 |
-| `fs.gravitino.client.authType`                        | The auth type the Gravitino client uses with the Gravitino Virtual File System. Supports `simple`, `oauth2`, and `kerberos`.                                                                                                                                                                                                                                           | `simple`                                                       | No                                  |
+| `fs.gravitino.client.authType`                        | The auth type the Gravitino client uses with the Gravitino Virtual File System. Supports `simple`, `basic`, `oauth2`, and `kerberos`.                                                                                                                                                                                                                                  | `simple`                                                       | No                                  |
+| `fs.gravitino.client.basic.username`                  | The username for the Gravitino client when using `basic` auth type with the local user store.                                                                                                                                                                                                                                                                          | (none)                                                         | Yes if you use `basic` auth type    |
+| `fs.gravitino.client.basic.password`                  | The password for the Gravitino client when using `basic` auth type with the local user store.                                                                                                                                                                                                                                                                          | (none)                                                         | Yes if you use `basic` auth type    |
 | `fs.gravitino.client.oauth2.serverUri`                | The auth server URI for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                                                                                                                                                                                     | (none)                                                         | Yes if you use `oauth2` auth type   |
 | `fs.gravitino.client.oauth2.credential`               | The auth credential for the Gravitino client when using `oauth2` auth type in the Gravitino Virtual File System.                                                                                                                                                                                                                                                       | (none)                                                         | Yes if you use `oauth2` auth type   |
 | `fs.gravitino.client.oauth2.path`                     | The auth server path for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System. Please remove the first slash `/` from the path, for example `oauth/token`.                                                                                                                                                                        | (none)                                                         | Yes if you use `oauth2` auth type   |
@@ -321,7 +323,7 @@ For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https:
 
 ### Authentication
 
-Gravitino Virtual File System supports two kinds of authentication types to access Gravitino server: `simple` and `oauth2`.
+Gravitino Virtual File System supports `simple`, `basic`, `oauth2`, and `kerberos` authentication to access the Gravitino server.
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
@@ -345,6 +347,25 @@ conf.set("fs.gravitino.client.metalake","test_metalake");
 // Configure the auth type to simple,
 // or do not configure this configuration, gvfs will use simple type as default.
 conf.set("fs.gravitino.client.authType", "simple");
+Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
+FileSystem fs = filesetPath.getFileSystem(conf);
+```
+
+#### `Basic` Authentication
+
+To use `basic` authentication, configure the Gravitino server with the built-in local user store as described in [Local users and groups](security/local-users-and-groups.md).
+
+Then, configure the Hadoop client with the local user's credentials:
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+conf.set("fs.gravitino.client.authType", "basic");
+conf.set("fs.gravitino.client.basic.username", "${your_username}");
+conf.set("fs.gravitino.client.basic.password", "${your_password}");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```

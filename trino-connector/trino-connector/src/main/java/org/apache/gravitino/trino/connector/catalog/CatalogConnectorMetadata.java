@@ -38,10 +38,12 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.function.Function;
@@ -105,7 +107,7 @@ public class CatalogConnectorMetadata {
       try {
         vc = catalog.asViewCatalog();
       } catch (UnsupportedOperationException e) {
-        LOG.debug("Catalog {} does not support view operations", catalogName);
+        LOG.debug("Catalog %s does not support view operations", catalogName);
       }
       this.viewCatalog = vc;
     } catch (NoSuchCatalogException e) {
@@ -116,6 +118,8 @@ public class CatalogConnectorMetadata {
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
           "Catalog does not support schema or table operations." + e.getMessage(),
           e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -148,6 +152,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -156,7 +162,7 @@ public class CatalogConnectorMetadata {
    *
    * @param schemaName the name of the schema
    * @return the Gravitino schema
-   * @throws TrinoException if the schema is not found
+   * @throws TrinoException if the schema is not found or the request fails
    */
   public GravitinoSchema getSchema(String schemaName) {
     try {
@@ -165,6 +171,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -174,7 +182,7 @@ public class CatalogConnectorMetadata {
    * @param schemaName the name of the schema
    * @param tableName the name of the table
    * @return the Gravitino table
-   * @throws TrinoException if the table is not found
+   * @throws TrinoException if the table is not found or the request fails
    */
   public GravitinoTable getTable(String schemaName, String tableName) {
     try {
@@ -183,6 +191,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchTableException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist", e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -199,6 +209,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -210,7 +222,33 @@ public class CatalogConnectorMetadata {
    * @return true if the table exists, false otherwise
    */
   public boolean tableExists(String schemaName, String tableName) {
-    return tableCatalog.tableExists(NameIdentifier.of(schemaName, tableName));
+    try {
+      return tableCatalog.tableExists(NameIdentifier.of(schemaName, tableName));
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Checks if a view exists in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @param viewName the name of the view
+   * @return true if the view exists, false otherwise or if the catalog does not support views
+   */
+  public boolean viewExists(String schemaName, String viewName) {
+    if (viewCatalog == null) {
+      return false;
+    }
+    try {
+      return viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName));
+    } catch (UnsupportedOperationException | NoSuchSchemaException e) {
+      // The client exposes a view catalog for every relational catalog, so a catalog without view
+      // support (for example JDBC) only reports it when called. A missing schema has no views.
+      return false;
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
   }
 
   /**
@@ -239,6 +277,8 @@ public class CatalogConnectorMetadata {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
       }
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -250,12 +290,14 @@ public class CatalogConnectorMetadata {
   public void createSchema(GravitinoSchema schema) {
     try {
       schemaCatalog.createSchema(schema.getName(), schema.getComment(), schema.getProperties());
-    } catch (NoSuchSchemaException e) {
+    } catch (NoSuchCatalogException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
-    } catch (TableAlreadyExistsException e) {
+    } catch (SchemaAlreadyExistsException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS, "Schema already exists", e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -266,17 +308,18 @@ public class CatalogConnectorMetadata {
    * @param cascade whether to cascade drop the schema
    */
   public void dropSchema(String schemaName, boolean cascade) {
+    boolean success;
     try {
-      boolean success = schemaCatalog.dropSchema(schemaName, cascade);
-
-      if (!success) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
-      }
-
+      success = schemaCatalog.dropSchema(schemaName, cascade);
     } catch (NonEmptySchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+    if (!success) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
     }
   }
 
@@ -286,9 +329,14 @@ public class CatalogConnectorMetadata {
    * @param tableName the name of the table
    */
   public void dropTable(SchemaTableName tableName) {
-    boolean dropped =
-        tableCatalog.dropTable(
-            NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()));
+    boolean dropped;
+    try {
+      dropped =
+          tableCatalog.dropTable(
+              NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()));
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
     if (!dropped) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED, "Failed to drop table " + tableName);
@@ -312,12 +360,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchTableException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
-    } catch (IllegalArgumentException e) {
-      // TODO yuhui need improve get the error message. From IllegalArgumentException.
-      // At present, the IllegalArgumentException cannot get the error information clearly from the
-      // Gravitino server.
-      String message = GravitinoErrorCode.toSimpleErrorMessage(e);
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, message, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -480,6 +524,8 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
     }
   }
 
@@ -490,12 +536,20 @@ public class CatalogConnectorMetadata {
    * @param functionName the name of the function
    * @return the function
    * @throws UnsupportedOperationException if the catalog does not support functions
+   * @throws NoSuchFunctionException if the function does not exist
    */
   public Function getFunction(String schemaName, String functionName) {
     if (!supportsFunctions()) {
       throw new UnsupportedOperationException("Catalog does not support functions");
     }
-    return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
+    try {
+      return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
+    } catch (NoSuchFunctionException e) {
+      // Callers treat a missing function as an empty result.
+      throw e;
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
   }
 
   /**

@@ -43,6 +43,8 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.dataformat.yaml)
   implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
@@ -104,6 +106,10 @@ artifacts {
 }
 
 tasks.test {
+  val policiesDocument = rootProject.file("docs/policies.md")
+  inputs.file(policiesDocument)
+  systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
     environment("GRAVITINO_HOME", project.rootDir.path)

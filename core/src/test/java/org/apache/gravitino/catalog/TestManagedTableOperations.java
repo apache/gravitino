@@ -337,6 +337,54 @@ public class TestManagedTableOperations {
   }
 
   @Test
+  public void testAlterTableDeleteAndRenameInOneRequest() {
+    // Deleting a lower-position column shifts the columns after it, so renaming the last one in
+    // the same request must not re-insert it past the end of the list.
+    NameIdentifier lastIdent = createThreeColumnTable("rename_last");
+    Table renamedLast =
+        tableOperations.alterTable(
+            lastIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.renameColumn(new String[] {"col3"}, "col3_renamed"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2", "col3_renamed"},
+        Arrays.stream(renamedLast.columns()).map(Column::name).toArray(String[]::new));
+
+    // After deleting col1 in the same request, renaming col2 must not move it behind col3.
+    NameIdentifier middleIdent = createThreeColumnTable("rename_middle");
+    Table renamedMiddle =
+        tableOperations.alterTable(
+            middleIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.renameColumn(new String[] {"col2"}, "col2_renamed"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2_renamed", "col3"},
+        Arrays.stream(renamedMiddle.columns()).map(Column::name).toArray(String[]::new));
+  }
+
+  private NameIdentifier createThreeColumnTable(String tableName) {
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, tableName);
+    Column[] columns =
+        new Column[] {
+          createColumn("col1", Types.StringType.get(), null),
+          createColumn("col2", Types.IntegerType.get(), Literals.integerLiteral(1)),
+          createColumn("col3", Types.StringType.get(), null)
+        };
+    tableOperations.createTable(
+        tableIdent,
+        columns,
+        "Test bundled alters",
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    return tableIdent;
+  }
+
+  @Test
   public void testAlterTable() {
     NameIdentifier table1Ident =
         NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table1");

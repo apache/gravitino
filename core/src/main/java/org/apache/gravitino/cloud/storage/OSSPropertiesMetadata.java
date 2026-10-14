@@ -37,7 +37,7 @@ public class OSSPropertiesMetadata {
                   "OSS access key ID",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(

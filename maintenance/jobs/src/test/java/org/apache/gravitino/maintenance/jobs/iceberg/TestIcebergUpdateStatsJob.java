@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,7 +42,7 @@ public class TestIcebergUpdateStatsJob {
     assertNotNull(template);
     assertEquals("builtin-iceberg-update-stats", template.name());
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
-    assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+    assertEquals("v2", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test
@@ -49,18 +50,19 @@ public class TestIcebergUpdateStatsJob {
     IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(10, template.arguments().size());
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--update-mode"));
-    assertTrue(template.arguments().contains("{{update_mode}}"));
-    assertTrue(template.arguments().contains("--updater-options"));
-    assertTrue(template.arguments().contains("{{updater_options}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--update-mode",
+            "{{update_mode:-all}}",
+            "--updater-options",
+            "{{updater_options:-}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
