@@ -30,12 +30,16 @@ import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /**
- * Selects the nearest attached maintenance policy of a given built-in type for a metadata object.
+ * Selects attached maintenance policies of a given built-in type for a metadata object.
  *
  * <p>Resolution walks the metadata object and its ancestors from nearest to outermost (for a table:
  * table → schema → catalog). At each level, only policies attached on that object are considered
  * ({@code inherited == false} from {@link PolicyDispatcher#listPolicyInfosForMetadataObject}).
  * Among matches at the same level, the policy with the lexicographically smallest name wins.
+ *
+ * <p>{@link #resolveNearest} returns the first match in that walk. {@link #resolveDirectChain}
+ * returns every level that has a direct match so callers can merge {@code jobOptions} / {@code
+ * updateOptions} across the hierarchy.
  */
 public class NearestMaintenancePolicyResolver {
 
@@ -60,19 +64,34 @@ public class NearestMaintenancePolicyResolver {
    */
   public Optional<PolicyEntity> resolveNearest(
       String metalake, MetadataObject metadataObject, Policy.BuiltInType builtInType) {
+    List<PolicyEntity> chain = resolveDirectChain(metalake, metadataObject, builtInType);
+    return chain.isEmpty() ? Optional.empty() : Optional.of(chain.get(0));
+  }
+
+  /**
+   * Returns direct matching policies from nearest to outermost (at most one per level).
+   *
+   * <p>Used when merging {@code jobOptions} / {@code updateOptions} across the hierarchy while
+   * triggers and {@code minIntervalMs} still come from the nearest policy only.
+   *
+   * @param metalake metalake name
+   * @param metadataObject metadata object (typically a table)
+   * @param builtInType built-in maintenance policy type
+   * @return nearest-first chain of direct matches
+   */
+  public List<PolicyEntity> resolveDirectChain(
+      String metalake, MetadataObject metadataObject, Policy.BuiltInType builtInType) {
     Preconditions.checkNotNull(metalake, "metalake cannot be null");
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     Preconditions.checkNotNull(builtInType, "builtInType cannot be null");
     Preconditions.checkArgument(
         builtInType != Policy.BuiltInType.CUSTOM, "builtInType must be a built-in type");
 
+    List<PolicyEntity> chain = new ArrayList<>();
     for (MetadataObject level : resolutionOrder(metadataObject)) {
-      Optional<PolicyEntity> match = firstDirectMatch(metalake, level, builtInType);
-      if (match.isPresent()) {
-        return match;
-      }
+      firstDirectMatch(metalake, level, builtInType).ifPresent(chain::add);
     }
-    return Optional.empty();
+    return chain;
   }
 
   private Optional<PolicyEntity> firstDirectMatch(
