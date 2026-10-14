@@ -112,7 +112,7 @@ finally:
 
 A model needs a name and a definition with at least one dataset. This example defines a field and
 a revenue metric over the existing orders table. The native REST API nests the definition under
-`definition` and uses camelCase field names.
+`definition`. Its field names include `primaryKey` and `datatype`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

@@ -77,7 +77,7 @@ different forms:
 | Aspect | Native REST API | Ossie document |
 |--------|-----------------|----------------|
 | Definition location | Nested under `definition` in the model object | Datasets and metrics at the document root |
-| Field names | camelCase, such as `primaryKey` | snake_case, such as `primary_key` |
+| Field names | `primaryKey`, `datatype` | `primary_key`, `datatype` |
 | Dataset source | `{"namespace":["sales","mart"],"name":"orders"}` | `sales.mart.orders` |
 | Model description | `comment` | `description` |
 | Gravitino properties | `properties` on the model | A root `GRAVITINO_PROPERTIES` custom extension |
