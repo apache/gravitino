@@ -285,8 +285,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
             + "catalog=>'memory1', provider=>'memory', properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
         // The message must carry the reason the registration failed, not just the fact that it
         // did. (?s) lets .* span the newlines of the underlying configuration error.
-        "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\."
-            + ".*unknown-direct-key.*");
+        "(?s)Create catalog failed due to the loading process fails\\." + ".*unknown-direct-key.*");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory1");
     // Failed registration still leaves a Gravitino catalog entry visible to catalog_status /
     // system.catalog; drop it so later tests that assume only the seed "memory" catalog stay
@@ -375,7 +374,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
           "call gravitino.system.create_catalog("
               + "catalog=>'memory_failed', provider=>'memory',"
               + " properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
-          "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\..*");
+          "(?s)Create catalog failed due to the loading process fails\\..*");
       assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
           .doesNotContain("memory_failed");
 
