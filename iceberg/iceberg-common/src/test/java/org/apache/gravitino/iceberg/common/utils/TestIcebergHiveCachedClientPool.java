@@ -101,16 +101,15 @@ public class TestIcebergHiveCachedClientPool {
   }
 
   @Test
-  void testCloseMultipleInstances() throws IOException {
+  void testInstanceReplacementDoesNotSabotageTheSharedCache() throws IOException {
     Configuration configuration = new Configuration();
     Map<String, String> properties = Maps.newHashMap();
     IcebergHiveCachedClientPool pool1 = new IcebergHiveCachedClientPool(configuration, properties);
-    IcebergHiveCachedClientPool pool2 = new IcebergHiveCachedClientPool(configuration, properties);
+    HiveClientPool cached = pool1.clientPool();
 
-    Assertions.assertDoesNotThrow(
-        () -> {
-          pool1.close();
-          pool2.close();
-        });
+    // Instances are replaceable views over the shared static cache: a fresh instance for
+    // the same key must reuse the cached pool rather than create a parallel entry.
+    IcebergHiveCachedClientPool pool2 = new IcebergHiveCachedClientPool(configuration, properties);
+    Assertions.assertSame(cached, pool2.clientPool());
   }
 }
