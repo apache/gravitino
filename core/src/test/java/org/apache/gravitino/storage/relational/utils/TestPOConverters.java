@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.utils;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -67,6 +68,7 @@ import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -1030,6 +1032,141 @@ public class TestPOConverters {
     assertEquals(expectedPolicy.comment(), convertedPolicy.comment());
     assertEquals(expectedPolicy.enabled(), convertedPolicy.enabled());
     assertEquals(expectedPolicy.content(), convertedPolicy.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergCompactionWithExecutionPeers() throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergDataCompaction(
+            IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+            IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+            IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+            IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+            IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+            ImmutableMap.of("target-file-size-bytes", "134217728"),
+            "0 0 2 * * ?",
+            true,
+            3_600_000L,
+            ImmutableMap.of("spark.executor.memory", "4g"),
+            ImmutableMap.of("metalake", "ml"));
+
+    // Persistence must keep peer keys flat (not nested under executionSpec).
+    String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(storedJson.contains("\"timeTrigger\""));
+    assertTrue(storedJson.contains("\"commitTrigger\""));
+    assertTrue(storedJson.contains("\"minIntervalMs\""));
+    assertTrue(storedJson.contains("\"jobOptions\""));
+    assertTrue(storedJson.contains("\"updaterOptions\""));
+    assertFalse(storedJson.contains("\"executionSpec\""));
+
+    PolicyVersionPO policyVersionPO =
+        createPolicyVersionPO(1L, 1L, 1L, "compaction with peers", true, content);
+    PolicyPO policyPO =
+        createPolicyPO(1L, "iceberg-compaction", "system_iceberg_compaction", 1L, policyVersionPO);
+
+    PolicyEntity convertedPolicy =
+        POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy("test_metalake"));
+
+    assertEquals(Policy.BuiltInType.ICEBERG_COMPACTION, convertedPolicy.policyType());
+    assertEquals(content, convertedPolicy.content());
+
+    IcebergDataCompactionContent loaded = (IcebergDataCompactionContent) convertedPolicy.content();
+    assertEquals("0 0 2 * * ?", loaded.timeTrigger());
+    assertEquals(Boolean.TRUE, loaded.commitTrigger());
+    assertEquals(3_600_000L, loaded.minIntervalMs());
+    assertEquals("4g", loaded.jobOptions().get("spark.executor.memory"));
+    assertEquals("ml", loaded.updaterOptions().get("metalake"));
+    assertEquals("134217728", loaded.rewriteOptions().get("target-file-size-bytes"));
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergOrphanFileRemovalWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergOrphanFileRemoval(
+            7L,
+            "s3://bucket/table/data",
+            true,
+            "0 0 3 * * ?",
+            null,
+            1_800_000L,
+            ImmutableMap.of("spark.executor.cores", "2"),
+            ImmutableMap.of("metalake", "ml"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                2L,
+                "orphan-cleanup",
+                "system_iceberg_orphan_file_removal",
+                1L,
+                createPolicyVersionPO(2L, 1L, 1L, "orphan peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergRewriteManifestsWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergRewriteManifests(
+            "0 30 1 * * ?",
+            true,
+            900_000L,
+            ImmutableMap.of("spark.executor.memory", "2g"),
+            ImmutableMap.of("queue", "tms"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                3L,
+                "rewrite-manifests",
+                "system_iceberg_rewrite_manifests",
+                1L,
+                createPolicyVersionPO(3L, 1L, 1L, "rewrite peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergSnapshotExpirationWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergSnapshotExpiration(
+            "0 0 4 * * ?",
+            false,
+            2_700_000L,
+            ImmutableMap.of("spark.driver.memory", "1g"),
+            ImmutableMap.of("metalake", "ml"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                4L,
+                "snapshot-expiration",
+                "system_iceberg_snapshot_expiration",
+                1L,
+                createPolicyVersionPO(4L, 1L, 1L, "snapshot peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  private static void assertFlatExecutionPeersPersisted(PolicyContent content)
+      throws JsonProcessingException {
+    String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(storedJson.contains("\"timeTrigger\""));
+    assertTrue(storedJson.contains("\"minIntervalMs\""));
+    assertTrue(storedJson.contains("\"jobOptions\""));
+    assertTrue(storedJson.contains("\"updaterOptions\""));
+    assertFalse(storedJson.contains("\"executionSpec\""));
   }
 
   @Test
