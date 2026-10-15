@@ -258,9 +258,10 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
         .associateTags(new String[] {"tag3"}, null);
   }
 
+  /** Verify metadata access does not bypass tag permissions when listing or reading tags. */
   @Test
   @Order(7)
-  public void testListTagByMetadata() {
+  public void testListAndGetTagByMetadata() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     SupportsTags tableSupportTag =
         gravitinoMetalake
@@ -281,6 +282,10 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     String[] tagsLoadByNormalUser = tableSupportTagByNormalUser.listTags();
     Arrays.sort(tagsLoadByNormalUser);
     assertArrayEquals(new String[] {"tag2", "tag3"}, tagsLoadByNormalUser);
+    assertEquals("tag1", tableSupportTag.getTag("tag1").name());
+    assertEquals("tag2", tableSupportTagByNormalUser.getTag("tag2").name());
+    assertEquals("tag3", tableSupportTagByNormalUser.getTag("tag3").name());
+    assertThrows(ForbiddenException.class, () -> tableSupportTagByNormalUser.getTag("tag1"));
   }
 
   @Test
