@@ -60,7 +60,8 @@ public interface PolicyContentDTO extends PolicyContent {
     /**
      * Optional flag to evaluate the policy after an Iceberg commit.
      *
-     * @return {@code true} when enabled; {@code null} or {@code false} when unset or disabled
+     * @return {@code true} when enabled, {@code false} when explicitly disabled, or {@code null}
+     *     when unset
      */
     @Nullable
     Boolean commitTrigger();
