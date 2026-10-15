@@ -220,6 +220,41 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobCancelsExecutionWhenRegistrationConflicts() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    Mockito.reset(entityStore, jobExecutor);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_conflict");
+    OptimisticLockException conflict = new OptimisticLockException("lock wait timeout");
+    doThrow(conflict).when(entityStore).put(any(JobEntity.class), eq(false));
+
+    // Cancellation cannot guarantee that the execution has not already performed work.
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertFalse(failure instanceof OptimisticLockException);
+    Assertions.assertSame(conflict, failure.getCause());
+    Assertions.assertTrue(failure.getMessage().contains("submitted_conflict"));
+    Assertions.assertTrue(failure.getMessage().contains("Check the execution before retrying"));
+    verify(jobExecutor, times(1)).cancelJob("submitted_conflict");
+
+    // A failed cancellation is kept on the cause for diagnosis and is not a retryable conflict.
+    Mockito.reset(jobExecutor);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_conflict_2");
+    RuntimeException cancelFailure = new RuntimeException("executor unavailable");
+    doThrow(cancelFailure).when(jobExecutor).cancelJob("submitted_conflict_2");
+    RuntimeException second =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertFalse(second instanceof OptimisticLockException);
+    Assertions.assertSame(conflict, second.getCause());
+    Assertions.assertTrue(second.getMessage().contains("submitted_conflict_2"));
+    Assertions.assertTrue(List.of(second.getCause().getSuppressed()).contains(cancelFailure));
+  }
+
+  @Test
   public void testAlterJobTemplateDistinguishesMissingFromConflict() throws IOException {
     NoSuchEntityException missing = new NoSuchEntityException("Template was deleted");
     doThrow(missing).when(entityStore).update(any(), any(), any(), any());
