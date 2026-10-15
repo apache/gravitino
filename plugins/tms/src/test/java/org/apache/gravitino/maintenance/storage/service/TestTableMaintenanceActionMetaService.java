@@ -52,6 +52,9 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     actionService.recordBeforeSnapshot(jobId, 100L);
     Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
+    // Same S0 is idempotent (in-job / cron retry after a partial sample).
+    actionService.recordBeforeSnapshot(jobId, 100L);
+    Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
     Assertions.assertThrows(
         IllegalStateException.class, () -> actionService.recordBeforeSnapshot(jobId, 101L));
 

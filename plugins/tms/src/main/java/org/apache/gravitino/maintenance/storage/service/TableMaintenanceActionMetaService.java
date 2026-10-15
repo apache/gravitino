@@ -216,7 +216,10 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Records the sampled Iceberg snapshot id ({@code S0}) once for a running action.
+   * Records the sampled Iceberg snapshot id ({@code S0}) for a running action.
+   *
+   * <p>Safe to retry with the same {@code beforeSnapshotId} (cron / in-job re-entry after a partial
+   * sample). A different snapshot id on an already-set row fails.
    *
    * @param jobId Gravitino job run id
    * @param beforeSnapshotId sampled snapshot id
@@ -229,10 +232,19 @@ public class TableMaintenanceActionMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
             mapper -> mapper.updateBeforeSnapshot(jobId, beforeSnapshotId));
+    if (updated == 1) {
+      return;
+    }
+    TableMaintenanceActionPO current = getByJobId(jobId);
     Preconditions.checkState(
-        updated == 1,
-        "expected to set before_snapshot_id once on an unfinished action, updated=%s",
-        updated);
+        current != null && current.finishedAt() != null && current.finishedAt() == 0L,
+        "expected an unfinished action for job_id=%s",
+        jobId);
+    Preconditions.checkState(
+        current.beforeSnapshotId() != null && current.beforeSnapshotId() == beforeSnapshotId,
+        "before_snapshot_id already set to %s, refusing %s",
+        current.beforeSnapshotId(),
+        beforeSnapshotId);
   }
 
   /**
@@ -300,6 +312,29 @@ public class TableMaintenanceActionMetaService {
             TableMaintenanceActionMapper.class,
             mapper -> mapper.selectInFlightByTableAndPolicy(tableId, policyId));
     return open == null ? Collections.emptyList() : open;
+  }
+
+  /**
+   * Whether an unbound claim is still within TTL on the <strong>database</strong> clock.
+   *
+   * <p>Must not be evaluated with {@code System.currentTimeMillis()} against {@code created_at}:
+   * acquire/reclaim already use DB time, and JVM skew would disagree with that lease.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL
+   * @return true when a live unbound claim holds the soft slot
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "hasLiveUnboundTableMaintenanceAction")
+  public boolean hasLiveUnboundClaim(long tableId, long policyId, long claimTimeoutMs) {
+    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
+    TableMaintenanceActionPO live =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs));
+    return live != null;
   }
 
   /**
