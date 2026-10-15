@@ -45,6 +45,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.filter.authorization.LoadViewAuthorizationExecutor.MissingViewProbeException;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -52,7 +53,7 @@ import org.mockito.MockedStatic;
 public class TestLoadViewAuthorizationExecutor {
   @Test
   public void testAuthorizedMissingViewProbe() throws Exception {
-    check(false, true, false, true, true);
+    assertThrows(MissingViewProbeException.class, () -> check(false, true, false, true, true));
   }
 
   @Test
@@ -148,16 +149,16 @@ public class TestLoadViewAuthorizationExecutor {
     var dispatcher = mock(ViewDispatcher.class);
     when(env.internalViewDispatcher()).thenReturn(dispatcher);
     if (probeFailure != null) {
-      when(dispatcher.viewExists(ident)).thenThrow(probeFailure);
+      when(dispatcher.viewExistsWithoutImport(ident)).thenThrow(probeFailure);
     } else {
-      when(dispatcher.viewExists(ident)).thenReturn(exists);
+      when(dispatcher.viewExistsWithoutImport(ident)).thenReturn(exists);
     }
     try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
       mocked.when(GravitinoEnv::getInstance).thenReturn(env);
       assertEquals(expected, executor.execute(new AuthorizationRequestContext()));
     }
     if (shouldProbe) {
-      verify(dispatcher).viewExists(ident);
+      verify(dispatcher).viewExistsWithoutImport(ident);
     } else {
       verifyNoInteractions(dispatcher);
     }

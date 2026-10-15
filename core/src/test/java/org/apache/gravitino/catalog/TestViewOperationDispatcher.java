@@ -26,11 +26,15 @@ import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -145,6 +149,64 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         return auditInfo;
       }
     };
+  }
+
+  @Test
+  void testExistenceProbeDoesNotImportExternalViewOrSchema() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "external_probe_schema");
+    NameIdentifier viewIdent =
+        NameIdentifier.of(metalake, catalog, "external_probe_schema", "external_view");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    // Create only in the connector: neither the parent schema nor the view is registered.
+    operations.createSchema(schemaIdent, "external schema", ImmutableMap.of());
+    operations.views.put(
+        viewIdent,
+        createMockView(
+            "external_view",
+            ImmutableMap.of(),
+            AuditInfo.builder().withCreator("owner").withCreateTime(Instant.now()).build()));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(viewIdent, VIEW));
+    ViewDispatcher dispatcher =
+        new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
+    Assertions.assertTrue(dispatcher.viewExistsWithoutImport(viewIdent));
+    Assertions.assertFalse(
+        dispatcher.viewExistsWithoutImport(NameIdentifier.of(viewIdent.namespace(), "missing")));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(viewIdent, VIEW));
+    verify(entityStore, never()).put(any(), anyBoolean());
+    // Ordinary existence checks retain their existing import behavior for metadata operations.
+    Assertions.assertTrue(dispatcher.viewExists(viewIdent));
+    Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertTrue(entityStore.exists(viewIdent, VIEW));
+  }
+
+  @Test
+  void testExistenceProbePreservesConnectorPredicate() throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "probe_predicate_schema", "view");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations original = (TestCatalogOperations) testCatalog.ops();
+    TestCatalogOperations operations = spy(original);
+    // The connector predicate can differ from what an ordinary load would return.
+    doReturn(true).when(operations).viewExists(ident);
+    FieldUtils.writeField(testCatalog, "ops", operations, true);
+    try {
+      ViewDispatcher dispatcher =
+          new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
+      Assertions.assertTrue(dispatcher.viewExistsWithoutImport(ident));
+      verify(operations).viewExists(ident);
+      verify(operations, never()).loadView(any());
+      Assertions.assertFalse(
+          entityStore.exists(NameIdentifier.of(ident.namespace().levels()), SCHEMA));
+      Assertions.assertFalse(entityStore.exists(ident, VIEW));
+    } finally {
+      FieldUtils.writeField(testCatalog, "ops", original, true);
+    }
   }
 
   @Test
