@@ -206,6 +206,8 @@ jobs:
             -x :catalogs-contrib:catalog-jdbc-clickhouse:test
             -x :catalogs-contrib:catalog-jdbc-hologres:test
             -x :catalogs-contrib:catalog-jdbc-oceanbase:test
+            # Core's tests run in the core-test job, one lane per job; :core:test is deprecated.
+            -x :core:test
           )
 
           if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
@@ -223,40 +225,18 @@ jobs:
 
           ./gradlew "${gradle_args[@]}"
 
-      - name: Fetch base branch for coverage diff
+      - name: Upload coverage data
         if: github.event_name == 'pull_request'
-        run: git fetch origin ${{ github.base_ref }} --depth=1
-
-      - name: Generate Coverage Report
-        id: coverage
-        if: github.event_name == 'pull_request'
-        run: |
-          python3 dev/ci/jacoco_report.py \
-            --base-ref "${{ github.base_ref }}" \
-            --head-sha "${{ github.event.pull_request.head.sha }}" \
-            --repo-url "${{ github.event.pull_request.head.repo.html_url }}" \
-            --min-overall 40 \
-            --min-changed 60 \
-            --output coverage-report.md
-
-      - name: Save PR number
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
-
-      - name: Upload Coverage Report
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report
+          name: jacoco-build
+          # build.gradle.kts anchors the artifact at the repository root, so the report paths keep
+          # their module prefix, which jacoco_report.py uses to name modules.
           path: |
-            coverage-report.md
-            pr-number.txt
-
-      - name: Output Coverage Info
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        run: |
-          echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
-          echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
+            build.gradle.kts
+            **/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v7
@@ -269,3 +249,156 @@ jobs:
             catalogs-contrib/**/*.tar
             catalogs/**/*.log
             catalogs/**/*.tar
+
+  core-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: [ 17 ]
+        # One job per core test lane, so each lane's results and coverage inputs are inspectable on
+        # their own. Lanes are defined in core/build.gradle.kts.
+        lane: [ unit, h2, mysql, postgresql ]
+        include:
+          - lane: unit
+            task: coreUnitTest
+            skip-docker-tests: true
+          - lane: h2
+            task: coreH2Test
+            skip-docker-tests: true
+          - lane: mysql
+            task: coreMySQLTest
+            skip-docker-tests: false
+          - lane: postgresql
+            task: corePostgreSQLTest
+            skip-docker-tests: false
+    timeout-minutes: 120
+    needs: changes
+    if: >-
+      needs.changes.outputs.source_changes == 'true' &&
+      needs.changes.outputs.maintenance_module_only_changes != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: ${{ matrix.java-version }}
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Run core ${{ matrix.lane }} lane
+        run: |
+          ./gradlew :core:${{ matrix.task }} \
+            -PskipWeb=true \
+            -PskipITs \
+            -PskipDockerTests=${{ matrix.skip-docker-tests }}
+
+      - name: Validate core test evidence
+        run: |
+          junit_xml="$(find "core/build/test-results/${{ matrix.task }}" \
+            -type f -name 'TEST-*.xml' -print -quit)"
+          test -n "${junit_xml}"
+          test -s "${junit_xml}"
+          test -s "build/reports/tests/core/${{ matrix.task }}/index.html"
+          test -s "core/build/jacoco/${{ matrix.task }}.exec"
+
+      - name: Upload core test evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-${{ matrix.lane }}-test-evidence
+          path: |
+            core/build/test-results/${{ matrix.task }}
+            build/reports/tests/core/${{ matrix.task }}
+            core/build/jacoco/${{ matrix.task }}.exec
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload core test report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: core test report ${{ matrix.lane }}
+          path: |
+            build/reports/tests/core
+            core/build/test-results
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [ changes, build, core-test ]
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success' &&
+      (needs.changes.outputs.maintenance_module_only_changes == 'true' ||
+      needs['core-test'].result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        with:
+          java-version: 17
+
+      - name: Fetch base branch for coverage diff
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Download coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jacoco-*
+          merge-multiple: true
+
+      - name: Download core test evidence
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: core-*-test-evidence
+          path: core-test-evidence
+
+      - name: Generate combined core coverage
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        run: |
+          mkdir -p core/build/jacoco
+          for task in coreUnitTest coreH2Test coreMySQLTest corePostgreSQLTest; do
+            exec_file="$(find core-test-evidence -path "*/core/build/jacoco/${task}.exec" -print -quit)"
+            test -n "${exec_file}"
+            install -m 0644 "${exec_file}" "core/build/jacoco/${task}.exec"
+          done
+          ./gradlew \
+            :core:jacocoTestReport \
+            -PcoreSuiteCoverage=true \
+            -PskipWeb=true
+          test -s core/build/reports/jacoco/test/jacocoTestReport.xml
+
+      - name: Generate Coverage Report
+        id: coverage
+        run: |
+          python3 dev/ci/jacoco_report.py \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --repo-url "${{ github.event.pull_request.head.repo.html_url }}" \
+            --min-overall 40 \
+            --min-changed 60 \
+            --output coverage-report.md
+
+      - name: Save PR number
+        if: steps.coverage.outputs.has_reports == 'true'
+        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
+
+      - name: Upload Coverage Report
+        if: steps.coverage.outputs.has_reports == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: |
+            coverage-report.md
+            pr-number.txt
+
+      - name: Output Coverage Info
+        if: steps.coverage.outputs.has_reports == 'true'
+        run: |
+          echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
+          echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
