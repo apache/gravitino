@@ -34,25 +34,30 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  * Masks sensitive-named values on resolved runtime job templates before they are exposed on API or
  * event paths. Stored runtime JSON is unchanged.
  *
- * <p>Covered:
+ * <p>Argument masking is grouped by payload shape:
  *
  * <ul>
- *   <li>Map fields {@code environments} / {@code customFields} / {@code configs} and runJob {@code
- *       jobConf}: sensitive-named keys, plus nested JSON under {@link #NESTED_JSON_MAP_KEYS}
- *   <li>{@code arguments}: Iceberg nest flags in {@link #NESTED_JSON_ARGUMENT_FLAGS}; long options
- *       {@code --name} / {@code --name=value} whose name matches {@link
- *       SecretPropertyUtils#isSensitivePropertyKey} (the following token after {@code --name} is
- *       always replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}, including non-secret
- *       values such as identifiers after {@code --use-credential-file}); conf-style payloads after
- *       {@link #CONF_ARGUMENT_FLAGS} in either {@code --conf key=value} or {@code --conf=key=value}
- *       form when {@code key} is sensitive; {@code -Dkey=value} when {@code key} is sensitive
+ *   <li>Nest JSON — {@link #NESTED_JSON_ARGUMENT_FLAGS} ({@code --updater-options} / {@code
+ *       --spark-conf} / {@code --options})
+ *   <li>Spark conf property — {@link #CONF_ARGUMENT_FLAGS} ({@code --conf} / {@code -c}): a single
+ *       {@code key=value} in either two-token or {@code --conf=key=value} form
+ *   <li>JVM options string — {@link #JVM_OPTIONS_ARGUMENT_FLAGS} ({@code --driver-java-options} /
+ *       {@code --executor-java-options}): a space-separated JVM string that may start with {@code
+ *       -}; sensitive {@code -Dkey=value} tokens inside are masked
+ *   <li>Sensitive-named long options — {@code --name} / {@code --name=value} when the name matches
+ *       {@link SecretPropertyUtils#isSensitivePropertyKey} (the following token after {@code
+ *       --name} is always replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}, including
+ *       non-secret values such as identifiers after {@code --use-credential-file})
+ *   <li>Standalone {@code -Dkey=value} when {@code key} is sensitive
  * </ul>
  *
+ * <p>Map fields {@code environments} / {@code customFields} / {@code configs} and runJob {@code
+ * jobConf} mask sensitive-named keys, plus nested JSON under {@link #NESTED_JSON_MAP_KEYS}.
+ *
  * <p>Not masked (out of scope): resource URI fields ({@code executable}, {@code className}, {@code
- * jars}, {@code files}, {@code archives}, Shell {@code scripts}), including credential-bearing
- * query parameters or userinfo in those URIs. Free-form argument tokens that are not nest flags,
- * sensitive long options, conf payloads, or {@code -Dkey=value} forms are left unchanged (for
- * example a {@code --where} SQL predicate).
+ * jars}, {@code files}, {@code archives}, Shell {@code scripts}); {@code --hiveconf}; conf property
+ * values that embed {@code -D} secrets under a non-sensitive conf key (for example {@code
+ * spark.driver.extraJavaOptions}); free-form tokens such as a {@code --where} SQL predicate.
  *
  * <p>Null map entries are preserved in the masked DTO / {@code jobConf} maps used on the REST and
  * event {@code jobConf} paths. When {@code JobInfo} rebuilds a {@code JobTemplate} via {@code
@@ -83,12 +88,18 @@ public final class JobRuntimeTemplateMaskUtils {
       ImmutableSet.of("--updater-options", "--spark-conf", "--options");
 
   /**
-   * Spark / JVM style flags whose payload is a {@code key=value} config entry. Both the two-token
-   * form ({@code --conf key=value}) and the equals form ({@code --conf=key=value}) use {@link
+   * Spark flags whose payload is a single {@code key=value} config entry. Both the two-token form
+   * ({@code --conf key=value}) and the equals form ({@code --conf=key=value}) use {@link
    * #maskConfKeyValuePayload}.
    */
-  static final Set<String> CONF_ARGUMENT_FLAGS =
-      ImmutableSet.of("--conf", "-c", "--driver-java-options");
+  static final Set<String> CONF_ARGUMENT_FLAGS = ImmutableSet.of("--conf", "-c");
+
+  /**
+   * Spark flags whose payload is a space-separated JVM options string (often starting with {@code
+   * -X} / {@code -D}). Both two-token and equals forms use {@link #maskJvmOptionsPayload}.
+   */
+  static final Set<String> JVM_OPTIONS_ARGUMENT_FLAGS =
+      ImmutableSet.of("--driver-java-options", "--executor-java-options");
 
   private JobRuntimeTemplateMaskUtils() {}
 
@@ -166,8 +177,8 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks nest-flag JSON values, sensitive-named long options, conf {@code key=value} payloads, and
-   * {@code -Dkey=value} tokens. Other tokens are left unchanged.
+   * Masks nest-flag JSON values, sensitive-named long options, conf {@code key=value} payloads, JVM
+   * options strings, and standalone {@code -Dkey=value} tokens. Other tokens are left unchanged.
    */
   @Nullable
   private static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
@@ -181,6 +192,7 @@ public final class JobRuntimeTemplateMaskUtils {
     boolean maskNextAsNestedJson = false;
     boolean maskNextAsSecret = false;
     boolean maskNextAsConfPayload = false;
+    boolean maskNextAsJvmOptions = false;
     for (String arg : arguments) {
       if (maskNextAsNestedJson) {
         maskNextAsNestedJson = false;
@@ -206,6 +218,15 @@ public final class JobRuntimeTemplateMaskUtils {
         }
         // Missing conf value or next token is another flag; fall through.
       }
+      if (maskNextAsJvmOptions) {
+        maskNextAsJvmOptions = false;
+        if (arg != null && !isKnownStandaloneFlag(arg)) {
+          // JVM strings often start with '-' (e.g. -Xmx / -D); only skip known flags.
+          result.add(maskJvmOptionsPayload(arg));
+          continue;
+        }
+        // Missing JVM options value; this token may itself be a flag.
+      }
 
       String nestEquals = maskEqualsNestFlagArgument(arg);
       if (nestEquals != null) {
@@ -215,6 +236,11 @@ public final class JobRuntimeTemplateMaskUtils {
       String confEquals = maskEqualsConfFlagArgument(arg);
       if (confEquals != null) {
         result.add(confEquals);
+        continue;
+      }
+      String jvmEquals = maskEqualsJvmOptionsFlagArgument(arg);
+      if (jvmEquals != null) {
+        result.add(jvmEquals);
         continue;
       }
       String sensitiveEquals = maskEqualsSensitiveFlagArgument(arg);
@@ -233,11 +259,30 @@ public final class JobRuntimeTemplateMaskUtils {
         maskNextAsNestedJson = true;
       } else if (arg != null && CONF_ARGUMENT_FLAGS.contains(arg)) {
         maskNextAsConfPayload = true;
+      } else if (arg != null && JVM_OPTIONS_ARGUMENT_FLAGS.contains(arg)) {
+        maskNextAsJvmOptions = true;
       } else if (isSensitiveLongOptionFlag(arg)) {
         maskNextAsSecret = true;
       }
     }
     return result;
+  }
+
+  /**
+   * Whether {@code arg} is a known flag that must not be consumed as a JVM-options payload when it
+   * immediately follows {@code --driver-java-options} / {@code --executor-java-options}.
+   */
+  private static boolean isKnownStandaloneFlag(@Nullable String arg) {
+    if (arg == null) {
+      return false;
+    }
+    if (NESTED_JSON_ARGUMENT_FLAGS.contains(arg)
+        || CONF_ARGUMENT_FLAGS.contains(arg)
+        || JVM_OPTIONS_ARGUMENT_FLAGS.contains(arg)) {
+      return true;
+    }
+    // Other long options (including non-sensitive ones such as --catalog).
+    return arg.startsWith("--") && arg.length() > 2 && arg.indexOf('=') < 0;
   }
 
   /**
@@ -259,8 +304,8 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * @return masked {@code --conf=key=value} (or {@code -c=} / {@code --driver-java-options=})
-   *     token, or {@code null} when {@code arg} is not that form
+   * @return masked {@code --conf=key=value} (or {@code -c=}) token, or {@code null} when {@code
+   *     arg} is not that form
    */
   @Nullable
   private static String maskEqualsConfFlagArgument(@Nullable String arg) {
@@ -272,6 +317,25 @@ public final class JobRuntimeTemplateMaskUtils {
       if (arg.startsWith(prefix)) {
         String payload = arg.substring(prefix.length());
         return prefix + maskConfKeyValuePayload(payload);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * @return masked {@code --driver-java-options=...} / {@code --executor-java-options=...} token,
+   *     or {@code null} when {@code arg} is not that form
+   */
+  @Nullable
+  private static String maskEqualsJvmOptionsFlagArgument(@Nullable String arg) {
+    if (arg == null) {
+      return null;
+    }
+    for (String flag : JVM_OPTIONS_ARGUMENT_FLAGS) {
+      String prefix = flag + "=";
+      if (arg.startsWith(prefix)) {
+        String payload = arg.substring(prefix.length());
+        return prefix + maskJvmOptionsPayload(payload);
       }
     }
     return null;
@@ -294,6 +358,35 @@ public final class JobRuntimeTemplateMaskUtils {
       return payload;
     }
     return key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
+  }
+
+  /**
+   * Masks sensitive {@code -Dkey=value} tokens inside a space-separated JVM options string.
+   *
+   * @param payload JVM options after {@code --driver-java-options} / {@code
+   *     --executor-java-options}
+   * @return masked payload, or {@code payload} unchanged when nothing was sensitive
+   */
+  private static String maskJvmOptionsPayload(String payload) {
+    if (payload.isEmpty()) {
+      return payload;
+    }
+    String[] parts = payload.trim().split("\\s+");
+    boolean changed = false;
+    List<String> out = new ArrayList<>(parts.length);
+    for (String part : parts) {
+      if (part.isEmpty()) {
+        continue;
+      }
+      String maskedDashD = maskSensitiveDashDArgument(part);
+      if (maskedDashD != null) {
+        out.add(maskedDashD);
+        changed = true;
+      } else {
+        out.add(part);
+      }
+    }
+    return changed ? String.join(" ", out) : payload;
   }
 
   /**

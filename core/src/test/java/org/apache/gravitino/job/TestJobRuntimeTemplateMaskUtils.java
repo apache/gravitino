@@ -258,6 +258,46 @@ public class TestJobRuntimeTemplateMaskUtils {
   }
 
   @Test
+  void testMaskSensitiveArgumentsMasksJvmOptionsStrings() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of(
+                    "--driver-java-options",
+                    "-Xmx1g -Dpassword=secret -XX:+UseG1GC",
+                    "--executor-java-options=-Dapi.token=tok -Xms512m",
+                    "--driver-java-options",
+                    "--catalog",
+                    "ice",
+                    "--conf",
+                    "--catalog",
+                    "ice2"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    List<String> args = spark.arguments();
+    Assertions.assertEquals("--driver-java-options", args.get(0));
+    Assertions.assertEquals(
+        "-Xmx1g -Dpassword=" + HiddenPropertyMaskUtils.MASKED_VALUE + " -XX:+UseG1GC", args.get(1));
+    Assertions.assertEquals(
+        "--executor-java-options=-Dapi.token=" + HiddenPropertyMaskUtils.MASKED_VALUE + " -Xms512m",
+        args.get(2));
+    // Missing JVM payload then a long option — do not swallow --catalog.
+    Assertions.assertEquals("--driver-java-options", args.get(3));
+    Assertions.assertEquals("--catalog", args.get(4));
+    Assertions.assertEquals("ice", args.get(5));
+    // --conf followed by another flag still skips (conf values do not start with '-').
+    Assertions.assertEquals("--conf", args.get(6));
+    Assertions.assertEquals("--catalog", args.get(7));
+    Assertions.assertEquals("ice2", args.get(8));
+  }
+
+  @Test
   void testMaskSensitiveArgumentsNestFlagFollowedByEqualsForm() {
     SparkJobTemplateDTO input =
         SparkJobTemplateDTO.builder()
