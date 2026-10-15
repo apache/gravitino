@@ -48,9 +48,9 @@ public interface DomainMember {
   MetadataObject object();
 
   /**
-   * Returns the sub-domain the member is reached through. A member of the listed domain itself is
-   * reported as such even if it is also reached through a sub-domain. A member reached through
-   * several sub-domains, and not a member of the listed domain itself, reports one of them.
+   * Returns the sub-domain the member comes from. Among the domains selected by the {@link
+   * DomainMemberFilter}, a member of the listed domain itself is reported as such even if it also
+   * comes from a sub-domain; otherwise one of the sub-domains it comes from is reported.
    *
    * @return The name of the sub-domain, or empty if the object is a member of the listed domain
    *     itself.

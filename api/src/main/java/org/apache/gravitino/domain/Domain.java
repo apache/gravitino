@@ -221,13 +221,12 @@ public interface Domain extends Auditable {
    * access are returned.
    *
    * <p>Only the objects that carry a backing tag themselves are listed. A catalog or schema that
-   * carries one stands for the objects under it, which are not listed one by one. An object reached
-   * more than once is listed once, see {@link DomainMember#subdomain()}. Sub-domain names in the
-   * filter that are not sub-domains of this domain visible to the caller are ignored.
+   * carries one stands for the objects under it, which are not listed one by one. An object is
+   * listed when it comes from any of the domains the filter selects, and it is listed once, see
+   * {@link DomainMember#subdomain()}.
    *
    * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists all
-   *     members of this domain itself; set {@code withIncludeAllSubdomains(true)} to include those
-   *     of its sub-domains.
+   *     members of this domain and its sub-domains.
    * @return The members of this domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */

@@ -29,38 +29,32 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * The filter of {@link Domain#listMembers(DomainMemberFilter)}.
+ * The filter of {@link Domain#listMembers(DomainMemberFilter)}. Each option narrows the listed
+ * members, and an option that is not set does not narrow them, so a filter built without setting
+ * any option lists all members of the domain and its sub-domains.
  *
- * <p>The members of the domain itself are always listed. The sub-domain options choose which
- * sub-domains' members are listed as well, independent of the order they are set in:
+ * <p>The domains option selects members by the domain they come from, which is the listed domain
+ * itself or one of its sub-domains (see {@link DomainMember#subdomain()}). For example, on domain
+ * "Finance" with sub-domains "Tax" and "Trading":
  *
  * <ul>
- *   <li>{@link Builder#withIncludeAllSubdomains(boolean) withIncludeAllSubdomains(true)}: all
- *       sub-domains; the sub-domains given by {@link Builder#withSubdomains(String...)} are
- *       ignored.
- *   <li>Otherwise, the default: only the given sub-domains, or none if no sub-domain is given.
+ *   <li>not set: the members of Finance, Tax and Trading;
+ *   <li>{@code withDomains("Finance")}: only the members of Finance itself;
+ *   <li>{@code withDomains("Finance", "Tax")}: the members of Finance and Tax;
+ *   <li>{@code withDomains("Tax")}: only the members of Tax.
  * </ul>
- *
- * <p>To list only the members of a sub-domain, call {@link Domain#listMembers(DomainMemberFilter)}
- * on the sub-domain.
  */
 @Evolving
 public final class DomainMemberFilter {
 
-  private final boolean includeAllSubdomains;
   private final Set<MetadataObject.Type> types;
   @Nullable private final String nameContains;
-  private final Set<String> subdomains;
+  private final Set<String> domains;
 
-  private DomainMemberFilter(
-      boolean includeAllSubdomains,
-      Set<MetadataObject.Type> types,
-      @Nullable String nameContains,
-      Set<String> subdomains) {
-    this.includeAllSubdomains = includeAllSubdomains;
-    this.types = types;
-    this.nameContains = nameContains;
-    this.subdomains = subdomains;
+  private DomainMemberFilter(Builder builder) {
+    this.types = builder.types;
+    this.nameContains = builder.nameContains;
+    this.domains = builder.domains;
   }
 
   /**
@@ -70,16 +64,6 @@ public final class DomainMemberFilter {
    */
   public static Builder builder() {
     return new Builder();
-  }
-
-  /**
-   * Returns whether the members of all sub-domains are listed. When it is true, {@link
-   * #subdomains()} is empty.
-   *
-   * @return True if the members of all sub-domains are listed, false by default.
-   */
-  public boolean includeAllSubdomains() {
-    return includeAllSubdomains;
   }
 
   /**
@@ -102,14 +86,14 @@ public final class DomainMemberFilter {
   }
 
   /**
-   * Returns the sub-domains whose members are listed in addition to those of the domain itself. It
-   * is used only when {@link #includeAllSubdomains()} is false.
+   * Returns the domains the members to list come from: the listed domain itself, its sub-domains,
+   * or both.
    *
-   * @return The names of the sub-domains, or an empty set when all sub-domains or no sub-domain is
-   *     listed.
+   * @return The names of the domains, or an empty set to list the members of the listed domain and
+   *     all its sub-domains.
    */
-  public Set<String> subdomains() {
-    return subdomains;
+  public Set<String> domains() {
+    return domains;
   }
 
   /**
@@ -127,10 +111,9 @@ public final class DomainMemberFilter {
       return false;
     }
     DomainMemberFilter that = (DomainMemberFilter) other;
-    return includeAllSubdomains == that.includeAllSubdomains
-        && types.equals(that.types)
+    return types.equals(that.types)
         && Objects.equals(nameContains, that.nameContains)
-        && subdomains.equals(that.subdomains);
+        && domains.equals(that.domains);
   }
 
   /**
@@ -140,7 +123,7 @@ public final class DomainMemberFilter {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(includeAllSubdomains, types, nameContains, subdomains);
+    return Objects.hash(types, nameContains, domains);
   }
 
   /**
@@ -151,45 +134,29 @@ public final class DomainMemberFilter {
   @Override
   public String toString() {
     return "DomainMemberFilter{"
-        + "includeAllSubdomains="
-        + includeAllSubdomains
-        + ", types="
+        + "types="
         + types
         + ", nameContains="
         + nameContains
-        + ", subdomains="
-        + subdomains
+        + ", domains="
+        + domains
         + "}";
   }
 
   /** A builder for {@link DomainMemberFilter}. */
   public static final class Builder {
 
-    private boolean includeAllSubdomains = false;
     private Set<MetadataObject.Type> types = ImmutableSet.of();
     @Nullable private String nameContains;
-    private Set<String> subdomains = ImmutableSet.of();
+    private Set<String> domains = ImmutableSet.of();
 
     private Builder() {}
-
-    /**
-     * Sets whether the members of all sub-domains are listed. Defaults to false. If it is true, the
-     * sub-domains given by {@link #withSubdomains(String...)} are ignored. If it is false, only the
-     * given sub-domains are listed, or none if no sub-domain is given.
-     *
-     * @param includeAllSubdomains Whether the members of all sub-domains are listed.
-     * @return This builder.
-     */
-    public Builder withIncludeAllSubdomains(boolean includeAllSubdomains) {
-      this.includeAllSubdomains = includeAllSubdomains;
-      return this;
-    }
 
     /**
      * Sets the metadata object types of the members to list. Defaults to all {@link
      * DomainMember#SUPPORTED_TYPES supported types}.
      *
-     * @param types The metadata object types.
+     * @param types The metadata object types, or none to list members of all supported types.
      * @return This builder.
      * @throws IllegalArgumentException If the types are null, contain null, or contain a type that
      *     is not in {@link DomainMember#SUPPORTED_TYPES}.
@@ -224,22 +191,22 @@ public final class DomainMemberFilter {
     }
 
     /**
-     * Sets the sub-domains whose members are listed in addition to those of the domain itself. They
-     * are ignored if {@link #withIncludeAllSubdomains(boolean) withIncludeAllSubdomains(true)} is
-     * set. Names that are not sub-domains of the listed domain visible to the caller are ignored
-     * when the members are listed.
+     * Sets the domains the members to list come from. Each name is the listed domain itself or one
+     * of its sub-domains. Names that are neither, or that are not visible to the caller, are
+     * ignored when the members are listed. Defaults to the listed domain and all its sub-domains.
      *
-     * @param subdomains The names of the sub-domains.
+     * @param domains The names of the domains, or none to list the members of the listed domain and
+     *     all its sub-domains.
      * @return This builder.
      * @throws IllegalArgumentException If the names are null, or contain a null or blank name.
      */
-    public Builder withSubdomains(String... subdomains) {
-      Preconditions.checkArgument(subdomains != null, "subdomains must not be null");
-      for (String subdomain : subdomains) {
+    public Builder withDomains(String... domains) {
+      Preconditions.checkArgument(domains != null, "domains must not be null");
+      for (String domain : domains) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(subdomain), "subdomains must not contain a blank name");
+            StringUtils.isNotBlank(domain), "domains must not contain a blank name");
       }
-      this.subdomains = ImmutableSet.copyOf(subdomains);
+      this.domains = ImmutableSet.copyOf(domains);
       return this;
     }
 
@@ -249,11 +216,7 @@ public final class DomainMemberFilter {
      * @return The immutable domain member filter.
      */
     public DomainMemberFilter build() {
-      return new DomainMemberFilter(
-          includeAllSubdomains,
-          types,
-          nameContains,
-          includeAllSubdomains ? ImmutableSet.of() : subdomains);
+      return new DomainMemberFilter(this);
     }
   }
 }

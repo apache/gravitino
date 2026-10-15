@@ -28,10 +28,9 @@ public class TestDomainMemberFilter {
   @Test
   public void testDefaultFilter() {
     DomainMemberFilter filter = DomainMemberFilter.builder().build();
-    Assertions.assertFalse(filter.includeAllSubdomains());
-    Assertions.assertTrue(filter.subdomains().isEmpty());
     Assertions.assertTrue(filter.types().isEmpty());
     Assertions.assertFalse(filter.nameContains().isPresent());
+    Assertions.assertTrue(filter.domains().isEmpty());
 
     Assertions.assertEquals(DomainMemberFilter.builder().build(), filter);
     Assertions.assertEquals(DomainMemberFilter.builder().build().hashCode(), filter.hashCode());
@@ -43,64 +42,38 @@ public class TestDomainMemberFilter {
         DomainMemberFilter.builder()
             .withTypes(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW)
             .withNameContains("trade")
-            .withSubdomains("trading", "tax")
+            .withDomains("finance", "tax")
             .build();
-    Assertions.assertFalse(filter.includeAllSubdomains());
-    Assertions.assertEquals(ImmutableSet.of("trading", "tax"), filter.subdomains());
     Assertions.assertEquals(
         ImmutableSet.of(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW), filter.types());
     Assertions.assertEquals("trade", filter.nameContains().get());
+    Assertions.assertEquals(ImmutableSet.of("finance", "tax"), filter.domains());
 
+    // Order and duplicates do not matter, and the setters are independent of each other.
     DomainMemberFilter sameFilter =
         DomainMemberFilter.builder()
-            .withTypes(MetadataObject.Type.VIEW, MetadataObject.Type.TABLE)
+            .withDomains("tax", "finance", "tax")
             .withNameContains("trade")
-            .withSubdomains("tax", "trading", "tax")
+            .withTypes(MetadataObject.Type.VIEW, MetadataObject.Type.TABLE)
             .build();
     Assertions.assertEquals(sameFilter, filter);
     Assertions.assertEquals(sameFilter.hashCode(), filter.hashCode());
     Assertions.assertNotEquals(DomainMemberFilter.builder().build(), filter);
-    Assertions.assertTrue(filter.toString().contains("subdomains=[trading, tax]"));
+    Assertions.assertTrue(filter.toString().contains("domains=[finance, tax]"));
   }
 
   @Test
-  public void testSubdomainOptions() {
-    // By default, only the domain itself.
-    DomainMemberFilter ownOnly = DomainMemberFilter.builder().build();
-    Assertions.assertFalse(ownOnly.includeAllSubdomains());
-    Assertions.assertTrue(ownOnly.subdomains().isEmpty());
-    Assertions.assertEquals(
-        ownOnly, DomainMemberFilter.builder().withIncludeAllSubdomains(false).build());
-    Assertions.assertEquals(ownOnly, DomainMemberFilter.builder().withSubdomains().build());
+  public void testDomains() {
+    // Only the listed domain itself, only a sub-domain, or both.
+    DomainMemberFilter ownOnly = DomainMemberFilter.builder().withDomains("finance").build();
+    Assertions.assertEquals(ImmutableSet.of("finance"), ownOnly.domains());
+    DomainMemberFilter taxOnly = DomainMemberFilter.builder().withDomains("tax").build();
+    Assertions.assertEquals(ImmutableSet.of("tax"), taxOnly.domains());
+    Assertions.assertNotEquals(ownOnly, taxOnly);
 
-    // The domain itself plus the given sub-domains.
-    DomainMemberFilter withTax = DomainMemberFilter.builder().withSubdomains("tax").build();
-    Assertions.assertFalse(withTax.includeAllSubdomains());
-    Assertions.assertEquals(ImmutableSet.of("tax"), withTax.subdomains());
+    // No domain given: the listed domain and all its sub-domains, the same as the default.
     Assertions.assertEquals(
-        withTax,
-        DomainMemberFilter.builder().withIncludeAllSubdomains(false).withSubdomains("tax").build());
-    Assertions.assertEquals(
-        withTax,
-        DomainMemberFilter.builder().withSubdomains("tax").withIncludeAllSubdomains(false).build());
-
-    // All sub-domains; the given sub-domains are ignored, whatever the order.
-    DomainMemberFilter all = DomainMemberFilter.builder().withIncludeAllSubdomains(true).build();
-    Assertions.assertTrue(all.includeAllSubdomains());
-    Assertions.assertTrue(all.subdomains().isEmpty());
-    Assertions.assertNotEquals(ownOnly, all);
-    Assertions.assertEquals(
-        all,
-        DomainMemberFilter.builder().withSubdomains("tax").withIncludeAllSubdomains(true).build());
-    Assertions.assertEquals(
-        all,
-        DomainMemberFilter.builder().withIncludeAllSubdomains(true).withSubdomains("tax").build());
-
-    // Each setter keeps its own value: a later call replaces only the same option.
-    DomainMemberFilter.Builder builder =
-        DomainMemberFilter.builder().withIncludeAllSubdomains(true).withSubdomains("tax");
-    Assertions.assertEquals(all, builder.build());
-    Assertions.assertEquals(withTax, builder.withIncludeAllSubdomains(false).build());
+        DomainMemberFilter.builder().build(), DomainMemberFilter.builder().withDomains().build());
   }
 
   @Test
@@ -111,23 +84,23 @@ public class TestDomainMemberFilter {
             .withTypes(MetadataObject.Type.VIEW)
             .withNameContains("trade")
             .withNameContains("tax")
-            .withSubdomains("trading")
-            .withSubdomains("tax")
+            .withDomains("trading")
+            .withDomains("tax")
             .build();
     Assertions.assertEquals(ImmutableSet.of(MetadataObject.Type.VIEW), filter.types());
     Assertions.assertEquals("tax", filter.nameContains().get());
-    Assertions.assertEquals(ImmutableSet.of("tax"), filter.subdomains());
+    Assertions.assertEquals(ImmutableSet.of("tax"), filter.domains());
 
-    // Setting no types, or a null name, resets the option to its default.
+    // Setting no types or domains, or a null name, resets the option to its default.
     DomainMemberFilter reset =
         DomainMemberFilter.builder()
             .withTypes(MetadataObject.Type.TABLE)
             .withTypes()
             .withNameContains("trade")
             .withNameContains(null)
+            .withDomains("tax")
+            .withDomains()
             .build();
-    Assertions.assertTrue(reset.types().isEmpty());
-    Assertions.assertFalse(reset.nameContains().isPresent());
     Assertions.assertEquals(DomainMemberFilter.builder().build(), reset);
   }
 
@@ -136,12 +109,11 @@ public class TestDomainMemberFilter {
     DomainMemberFilter filter =
         DomainMemberFilter.builder()
             .withTypes(MetadataObject.Type.TABLE)
-            .withSubdomains("trading")
+            .withDomains("trading")
             .build();
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> filter.types().add(MetadataObject.Type.VIEW));
-    Assertions.assertThrows(
-        UnsupportedOperationException.class, () -> filter.subdomains().add("tax"));
+    Assertions.assertThrows(UnsupportedOperationException.class, () -> filter.domains().add("tax"));
   }
 
   @Test
@@ -178,16 +150,11 @@ public class TestDomainMemberFilter {
         IllegalArgumentException.class, () -> DomainMemberFilter.builder().withNameContains(" "));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> DomainMemberFilter.builder().withSubdomains((String[]) null));
+        () -> DomainMemberFilter.builder().withDomains((String[]) null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> DomainMemberFilter.builder().withDomains("tax", ""));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> DomainMemberFilter.builder().withSubdomains("trading", ""));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DomainMemberFilter.builder().withSubdomains("trading", null));
-
-    // Null clears the name filter.
-    DomainMemberFilter filter = DomainMemberFilter.builder().withNameContains(null).build();
-    Assertions.assertEquals(DomainMemberFilter.builder().build(), filter);
+        () -> DomainMemberFilter.builder().withDomains("tax", null));
   }
 }
