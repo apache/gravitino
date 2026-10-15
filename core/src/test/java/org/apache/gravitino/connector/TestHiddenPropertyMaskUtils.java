@@ -221,12 +221,14 @@ public class TestHiddenPropertyMaskUtils {
         "spark_conf",
         "{\"spark.master\":\"local[*]\",\"spark.executor.instances\":1,\"api_token\":\"nested-tok\"}");
     properties.put("options", "{\"min-input-files\":\"2\",\"jdbc.password\":\"rewrite-secret\"}");
-    // Looks like nested JSON with a sensitive key, but is not a known JSON-map field — leave as-is.
+    // Looks like nested JSON with a sensitive key, but is not a declared JSON-map field — leave.
     String unknownJsonBlob = "{\"password\":\"should-stay-visible\"}";
     properties.put("custom_blob", unknownJsonBlob);
     properties.put("not_json", "password=looks-like-but-not-a-key");
 
-    Map<String, String> masked = HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
+    Map<String, String> masked =
+        HiddenPropertyMaskUtils.maskSensitiveNamedProperties(
+            properties, ImmutableSet.of("updater_options", "spark_conf", "options"));
 
     Assertions.assertEquals("http://localhost:8090", masked.get("gravitino_uri"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("password"));
@@ -256,6 +258,59 @@ public class TestHiddenPropertyMaskUtils {
             .readValue(masked.get("options"), new TypeReference<Map<String, String>>() {});
     Assertions.assertEquals("2", options.get("min-input-files"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, options.get("jdbc.password"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesWithoutNestedKeysLeavesJsonBlobs() {
+    String updater = "{\"gravitino_uri\":\"http://localhost:8090\",\"password\":\"nested-pw\"}";
+    Map<String, String> properties =
+        ImmutableMap.of("updater_options", updater, "password", "top-secret");
+
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
+
+    Assertions.assertEquals(updater, masked.get("updater_options"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("password"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesRecursesIntoNestedObjectsAndArrays() throws Exception {
+    String nested =
+        "{\"outer\":{\"password\":\"deep-pw\",\"ok\":\"keep\"},"
+            + "\"list\":[{\"api_token\":\"tok\"},{\"plain\":\"x\"}]}";
+    Map<String, String> properties = ImmutableMap.of("options", nested);
+
+    Map<String, String> masked =
+        HiddenPropertyMaskUtils.maskSensitiveNamedProperties(
+            properties, ImmutableSet.of("options"));
+
+    Assertions.assertFalse(masked.get("options").contains("deep-pw"));
+    Assertions.assertTrue(masked.get("options").contains("keep"));
+    Assertions.assertTrue(masked.get("options").contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+
+    Map<String, Object> parsed =
+        JsonUtils.anyFieldMapper()
+            .readValue(masked.get("options"), new TypeReference<Map<String, Object>>() {});
+    @SuppressWarnings("unchecked")
+    Map<String, Object> outer = (Map<String, Object>) parsed.get("outer");
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, outer.get("password"));
+    Assertions.assertEquals("keep", outer.get("ok"));
+
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> list = (List<Map<String, Object>>) parsed.get("list");
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, list.get(0).get("api_token"));
+    Assertions.assertEquals("x", list.get(1).get("plain"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesMasksEntireValueOnMalformedNestedJson() {
+    Map<String, String> properties =
+        ImmutableMap.of("spark_conf", "{not-valid-json,\"password\":\"maybe\"}");
+
+    Map<String, String> masked =
+        HiddenPropertyMaskUtils.maskSensitiveNamedProperties(
+            properties, ImmutableSet.of("spark_conf"));
+
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("spark_conf"));
   }
 
   @Test

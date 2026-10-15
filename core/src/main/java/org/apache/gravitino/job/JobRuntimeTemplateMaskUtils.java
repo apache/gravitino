@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.job;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -29,10 +31,29 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
  * Masks sensitive-named values on resolved runtime job templates before they are exposed on API or
  * event paths. Stored runtime JSON is unchanged.
  *
- * <p>{@code arguments} are not masked (no property keys). Nested JSON string maps are masked only
- * for the known keys handled by {@link HiddenPropertyMaskUtils#maskSensitiveNamedProperties}.
+ * <p>{@code arguments} are not masked: they are positional strings without property keys, so {@link
+ * org.apache.gravitino.secret.SecretPropertyUtils} keyword matching cannot apply. Do not put
+ * secrets in job arguments; use {@code environments}, {@code configs}, or {@code customFields}
+ * instead.
+ *
+ * <p>Nested JSON string maps are masked only for the Iceberg built-in / optimizer keys listed in
+ * {@link #NESTED_JSON_MAP_KEYS} (never by guessing on a leading curly brace).
  */
 public final class JobRuntimeTemplateMaskUtils {
+
+  /**
+   * JobConf / template keys whose values are known to be JSON maps (Iceberg built-in jobs and the
+   * optimizer). Nested sensitive keys inside these values are masked.
+   *
+   * <ul>
+   *   <li>{@code updater_options} — update-stats job credentials / client options
+   *   <li>{@code spark_conf} — Spark configs for built-in Iceberg jobs
+   *   <li>{@code options} — rewrite-data-files / compaction options (from policy {@code jobOptions}
+   *       / {@code rewriteOptions})
+   * </ul>
+   */
+  static final Set<String> NESTED_JSON_MAP_KEYS =
+      ImmutableSet.of("updater_options", "spark_conf", "options");
 
   private JobRuntimeTemplateMaskUtils() {}
 
@@ -90,6 +111,6 @@ public final class JobRuntimeTemplateMaskUtils {
   private static Map<String, String> maskSensitiveMap(Map<String, String> properties) {
     return properties == null
         ? null
-        : HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
+        : HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties, NESTED_JSON_MAP_KEYS);
   }
 }

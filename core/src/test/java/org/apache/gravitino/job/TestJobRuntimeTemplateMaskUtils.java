@@ -1,0 +1,103 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.job;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
+import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.job.JobTemplate.JobType;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+public class TestJobRuntimeTemplateMaskUtils {
+
+  @Test
+  void testMaskSensitiveFieldsOnSparkTemplate() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withComment("c")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(ImmutableList.of("--password=cli-secret", "plain-arg"))
+            .withEnvironments(ImmutableMap.of("AUTH_PASSWORD", "env-secret", "CATALOG", "ice"))
+            .withCustomFields(
+                ImmutableMap.of(
+                    "updater_options",
+                    "{\"gravitino_uri\":\"http://localhost\",\"password\":\"nested-pw\"}",
+                    "update_mode",
+                    "stats"))
+            .withClassName("org.example.App")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.master",
+                    "local[*]",
+                    "spark_conf",
+                    "{\"jdbc.password\":\"jdbc-pw\",\"spark.executor.memory\":\"1g\"}"))
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    Assertions.assertInstanceOf(SparkJobTemplateDTO.class, masked);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+
+    // arguments stay unmasked (no property keys)
+    Assertions.assertEquals(
+        ImmutableList.of("--password=cli-secret", "plain-arg"), spark.arguments());
+
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, spark.environments().get("AUTH_PASSWORD"));
+    Assertions.assertEquals("ice", spark.environments().get("CATALOG"));
+    Assertions.assertFalse(spark.customFields().get("updater_options").contains("nested-pw"));
+    Assertions.assertTrue(
+        spark.customFields().get("updater_options").contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("stats", spark.customFields().get("update_mode"));
+    Assertions.assertFalse(spark.configs().get("spark_conf").contains("jdbc-pw"));
+    Assertions.assertTrue(spark.configs().get("spark_conf").contains("1g"));
+  }
+
+  @Test
+  void testMaskSensitiveFieldsOnShellTemplate() {
+    ShellJobTemplateDTO input =
+        ShellJobTemplateDTO.builder()
+            .withName("shell_job")
+            .withJobType(JobType.SHELL)
+            .withExecutable("/bin/echo")
+            .withArguments(ImmutableList.of("hello"))
+            .withEnvironments(ImmutableMap.of("API_TOKEN", "tok"))
+            .withCustomFields(ImmutableMap.of("plain", "v"))
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    Assertions.assertInstanceOf(ShellJobTemplateDTO.class, masked);
+    ShellJobTemplateDTO shell = (ShellJobTemplateDTO) masked;
+
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, shell.environments().get("API_TOKEN"));
+    Assertions.assertEquals("v", shell.customFields().get("plain"));
+    Assertions.assertEquals(ImmutableList.of("hello"), shell.arguments());
+  }
+
+  @Test
+  void testMaskSensitiveFieldsNull() {
+    Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveFields(null));
+  }
+}

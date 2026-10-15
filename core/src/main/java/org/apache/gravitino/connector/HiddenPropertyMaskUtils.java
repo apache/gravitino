@@ -18,9 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,24 +63,6 @@ public final class HiddenPropertyMaskUtils {
 
   /** Placeholder returned instead of editable hidden / credential / secret property values. */
   public static final String MASKED_VALUE = "******";
-
-  /**
-   * JobConf / template keys whose values are known to be flat JSON string maps (Iceberg built-in
-   * jobs and the optimizer). Nested sensitive keys inside these values are masked; other keys are
-   * never treated as JSON by guessing on a leading curly brace.
-   *
-   * <ul>
-   *   <li>{@code updater_options} — update-stats job credentials / client options
-   *   <li>{@code spark_conf} — Spark configs for built-in Iceberg jobs
-   *   <li>{@code options} — rewrite-data-files / compaction options (from policy {@code jobOptions}
-   *       / {@code rewriteOptions})
-   * </ul>
-   */
-  private static final Set<String> NESTED_JSON_MAP_KEYS =
-      ImmutableSet.of("updater_options", "spark_conf", "options");
-
-  private static final TypeReference<Map<String, Object>> OBJECT_MAP_TYPE =
-      new TypeReference<Map<String, Object>>() {};
 
   private HiddenPropertyMaskUtils() {}
 
@@ -203,26 +184,42 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Returns a mutable copy of {@code properties} with sensitive-looking values replaced by {@link
-   * #MASKED_VALUE}, without requiring {@link PropertiesMetadata}.
-   *
-   * <p>A top-level entry is masked when its key matches {@link
-   * SecretPropertyUtils#isSensitivePropertyKey} or its value is a secret-manager URN ({@link
-   * SecretPropertyUtils#isSecretProperty}). For the known JSON-map keys {@code updater_options},
-   * {@code spark_conf}, and {@code options} (Iceberg built-in job / optimizer convention),
-   * sensitive-named keys inside the JSON object are also masked and the value is rewritten. Other
-   * values are never parsed as JSON.
-   *
-   * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
-   * have no properties metadata declaration.
+   * #MASKED_VALUE}, without requiring {@link PropertiesMetadata}. Equivalent to {@link
+   * #maskSensitiveNamedProperties(Map, Set)} with no nested JSON keys.
    *
    * @param properties source map, may be null
    * @return a mutable masked copy; never null
    */
   public static Map<String, String> maskSensitiveNamedProperties(
       @Nullable Map<String, String> properties) {
+    return maskSensitiveNamedProperties(properties, null);
+  }
+
+  /**
+   * Returns a mutable copy of {@code properties} with sensitive-looking values replaced by {@link
+   * #MASKED_VALUE}, without requiring {@link PropertiesMetadata}.
+   *
+   * <p>A top-level entry is masked when its key matches {@link
+   * SecretPropertyUtils#isSensitivePropertyKey} or its value is a secret-manager URN ({@link
+   * SecretPropertyUtils#isSecretProperty}). When {@code nestedJsonMapKeys} is non-null, values for
+   * those keys are parsed as JSON and sensitive-named keys are masked at any nesting depth (objects
+   * and arrays). Other values are never parsed as JSON. On parse failure for a nested JSON key, the
+   * entire value is replaced with {@link #MASKED_VALUE} so secrets are not left in a broken blob.
+   *
+   * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
+   * have no properties metadata declaration. Callers that know job-specific JSON-map keys (for
+   * example Iceberg built-in jobs) should pass them via {@code nestedJsonMapKeys}.
+   *
+   * @param properties source map, may be null
+   * @param nestedJsonMapKeys keys whose string values are JSON maps/objects to walk; may be null
+   * @return a mutable masked copy; never null
+   */
+  public static Map<String, String> maskSensitiveNamedProperties(
+      @Nullable Map<String, String> properties, @Nullable Set<String> nestedJsonMapKeys) {
     if (properties == null || properties.isEmpty()) {
       return new HashMap<>();
     }
+    Set<String> nestedKeys = nestedJsonMapKeys == null ? Collections.emptySet() : nestedJsonMapKeys;
     Map<String, String> result = new LinkedHashMap<>(properties.size());
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
@@ -233,8 +230,8 @@ public final class HiddenPropertyMaskUtils {
       if (SecretPropertyUtils.isSensitivePropertyKey(key)
           || SecretPropertyUtils.isSecretProperty(key, value)) {
         result.put(key, MASKED_VALUE);
-      } else if (NESTED_JSON_MAP_KEYS.contains(key)) {
-        result.put(key, maskNestedJsonMapValue(value));
+      } else if (nestedKeys.contains(key)) {
+        result.put(key, maskNestedJsonValue(value));
       } else {
         result.put(key, value);
       }
@@ -243,43 +240,88 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
-   * Parses {@code value} as a flat JSON map and masks sensitive-named keys. Scalar values (string,
-   * number, boolean, null) are stringified like {@code IcebergSparkConfigUtils.parseFlatJsonMap};
-   * nested objects/arrays cause the original value to be returned unchanged. On parse failure
-   * returns {@code value} unchanged.
+   * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
+   * nested objects and arrays). Non-object roots and malformed JSON are replaced with {@link
+   * #MASKED_VALUE} so secrets are not returned unchanged.
    */
-  private static String maskNestedJsonMapValue(String value) {
+  private static String maskNestedJsonValue(String value) {
     ObjectMapper mapper = JsonUtils.anyFieldMapper();
     try {
-      Map<String, Object> nested = mapper.readValue(value, OBJECT_MAP_TYPE);
-      if (nested == null || nested.isEmpty()) {
+      Object root = mapper.readValue(value, Object.class);
+      if (!(root instanceof Map) && !(root instanceof List)) {
+        // Scalar JSON (string/number/boolean/null) — nothing to walk by key name.
         return value;
       }
+      MaskedJson masked = maskJsonNode(root);
+      return masked.changed ? mapper.writeValueAsString(masked.value) : value;
+    } catch (Exception e) {
+      // Malformed JSON on a caller-declared nest key — do not leave a possible secret blob as-is.
+      return MASKED_VALUE;
+    }
+  }
+
+  private static MaskedJson maskJsonNode(Object node) {
+    if (node instanceof Map) {
+      Map<?, ?> map = (Map<?, ?>) node;
+      if (map.isEmpty()) {
+        return new MaskedJson(node, false);
+      }
+      Map<String, Object> out = new LinkedHashMap<>(map.size());
       boolean changed = false;
-      Map<String, String> masked = new LinkedHashMap<>(nested.size());
-      for (Map.Entry<String, Object> entry : nested.entrySet()) {
-        String nestedKey = entry.getKey();
-        Object nestedRaw = entry.getValue();
-        if (nestedKey == null) {
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+        if (entry.getKey() == null) {
           continue;
         }
+        String nestedKey = String.valueOf(entry.getKey());
+        Object nestedRaw = entry.getValue();
         if (nestedRaw instanceof Map || nestedRaw instanceof List) {
-          // Not a flat map — leave the original blob alone rather than partially rewriting it.
-          return value;
-        }
-        String nestedValue = nestedRaw == null ? "" : nestedRaw.toString();
-        if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)
-            || SecretPropertyUtils.isSecretProperty(nestedKey, nestedValue)) {
-          masked.put(nestedKey, MASKED_VALUE);
-          changed = true;
+          if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)) {
+            out.put(nestedKey, MASKED_VALUE);
+            changed = true;
+          } else {
+            MaskedJson child = maskJsonNode(nestedRaw);
+            out.put(nestedKey, child.value);
+            changed |= child.changed;
+          }
         } else {
-          masked.put(nestedKey, nestedValue);
+          String nestedValue = nestedRaw == null ? "" : nestedRaw.toString();
+          if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)
+              || SecretPropertyUtils.isSecretProperty(nestedKey, nestedValue)) {
+            out.put(nestedKey, MASKED_VALUE);
+            changed = true;
+          } else {
+            out.put(nestedKey, nestedRaw);
+          }
         }
       }
-      return changed ? mapper.writeValueAsString(masked) : value;
-    } catch (Exception e) {
-      // Malformed JSON — leave the original value alone.
-      return value;
+      return new MaskedJson(out, changed);
+    }
+    if (node instanceof List) {
+      List<?> list = (List<?>) node;
+      List<Object> out = new ArrayList<>(list.size());
+      boolean changed = false;
+      for (Object item : list) {
+        if (item instanceof Map || item instanceof List) {
+          MaskedJson child = maskJsonNode(item);
+          out.add(child.value);
+          changed |= child.changed;
+        } else {
+          out.add(item);
+        }
+      }
+      return new MaskedJson(out, changed);
+    }
+    return new MaskedJson(node, false);
+  }
+
+  /** Result of walking a JSON tree for sensitive-key masking. */
+  private static final class MaskedJson {
+    private final Object value;
+    private final boolean changed;
+
+    private MaskedJson(Object value, boolean changed) {
+      this.value = value;
+      this.changed = changed;
     }
   }
 }
