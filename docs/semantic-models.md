@@ -47,9 +47,11 @@ definition, and audit information. The definition uses these components:
 | `aiContext` | Context for consumers, represented as text or a structured object. |
 | `customExtensions` | Vendor-specific information preserved with the definition. |
 
-Expressions contain one or more dialect-specific representations. For example, a metric can carry
-an `ANSI_SQL` expression. Gravitino validates the definition's structure but does not parse or
-execute the expression text.
+Expressions contain one or more dialect-specific representations. The Java and Python SDKs provide
+`Dialects` constants for `ANSI_SQL`, `SNOWFLAKE`, `MDX`, `TABLEAU`, `DATABRICKS`, `MAQL`, and `BIGQUERY`.
+Other non-empty dialect identifiers are also accepted and preserved. Choose identifiers supported
+by the application consuming the model. Gravitino validates the definition's structure but does
+not parse or execute the expression text.
 
 ### Sources and Validation
 
@@ -57,6 +59,7 @@ Dataset sources use `catalog.schema.object` within the model's metalake. They ma
 catalog or schema in that metalake. Each source must resolve to an existing table or a logical view
 supported by its catalog. Cross-metalake references are not supported.
 
+The `from` and `to` endpoints of a relationship name datasets within the model.
 Primary-key, unique-key, and relationship columns refer to columns of the source table or view,
 rather than field aliases in the model. Gravitino checks that these columns exist; it does not
 check whether the data satisfies the declared keys or relationships.

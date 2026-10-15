@@ -96,6 +96,10 @@ paths:
       summary: Import an Apache Ossie Semantic Model
       description: >-
         Imports one standalone Apache Ossie document and creates the represented Semantic Model.
+        The imported definition is validated before the model is stored, including source identifier
+        shape, source existence, and primary-key, unique-key, and relationship columns. When
+        authorization is enabled, source lookups also require the caller's permission to access the
+        source metadata.
         The request body is the raw JSON or YAML document, not a JSON-encoded string. Content-Type
         selects the parser; when the header is absent, the body is parsed as YAML. Parsing does not
         fall back to another format.

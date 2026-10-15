@@ -21,10 +21,11 @@ The examples use the `2.0.0-SNAPSHOT` server and clients. They assume:
 
 * A server at `http://localhost:8090` and an existing metalake named `example`.
 * A relational catalog named `sales`, with a schema named `mart`.
-* An existing source table `sales.mart.orders` with `order_id` and `order_amount` columns.
+* An existing source table `sales.mart.orders` with `order_id`, `customer_id`, and `order_amount` columns.
+* An existing source table `sales.mart.customers` with `customer_id` and `customer_code` columns.
 
 See [Manage Relational Metadata](./manage-relational-metadata-using-gravitino.md) to create the
-source table. Add the credentials required by your deployment as described in
+source tables. Add the credentials required by your deployment as described in
 [Authentication](./security/how-to-authenticate.md). With authorization enabled, the caller also
 needs the [model and source privileges](#ownership-and-privileges).
 
@@ -55,11 +56,13 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.semantic.DataType;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.DialectExpression;
+import org.apache.gravitino.semantic.Dialects;
 import org.apache.gravitino.semantic.Expression;
 import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
@@ -84,9 +87,11 @@ from gravitino import GravitinoClient, NameIdentifier
 from gravitino.api.semantic.data_type import DataType
 from gravitino.api.semantic.dataset import Dataset
 from gravitino.api.semantic.dialect_expression import DialectExpression
+from gravitino.api.semantic.dialects import Dialects
 from gravitino.api.semantic.expression import Expression
 from gravitino.api.semantic.field import Field
 from gravitino.api.semantic.metric import Metric
+from gravitino.api.semantic.relationship import Relationship
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
 from gravitino.namespace import Namespace
@@ -110,9 +115,13 @@ finally:
 
 ### Create a Semantic Model
 
-A model needs a name and a definition with at least one dataset. This example defines a field and
-a revenue metric over the existing orders table. The native REST API nests the definition under
-`definition`. Its field names include `primaryKey` and `datatype`.
+A model needs a name and a definition with at least one dataset. This example defines a revenue
+metric over orders and links orders to customers by `customer_id`. The native REST API nests the
+definition under `definition`. Its field names include `primaryKey` and `datatype`.
+
+The relationship's `from` and `to` name datasets in the model. Its column lists and the datasets'
+keys use source table column names, even when those columns are not listed in `fields`. Each array
+inside `uniqueKeys` defines one unique key.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -138,6 +147,22 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
             "datatype": "Decimal"
           }
         ]
+      },
+      {
+        "name": "customers",
+        "source": {"namespace": ["sales", "mart"], "name": "customers"},
+        "primaryKey": ["customer_id"],
+        "uniqueKeys": [["customer_code"]],
+        "fields": []
+      }
+    ],
+    "relationships": [
+      {
+        "name": "orders_to_customers",
+        "from": "orders",
+        "to": "customers",
+        "fromColumns": ["customer_id"],
+        "toColumns": ["customer_id"]
       }
     ],
     "metrics": [
@@ -159,7 +184,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 Expression amountExpression = Expression.builder()
     .withDialects(new DialectExpression[] {
-        DialectExpression.builder().withDialect("ANSI_SQL")
+        DialectExpression.builder().withDialect(Dialects.ANSI_SQL)
             .withExpression("order_amount").build()
     }).build();
 Field amount = Field.builder().withName("order_amount")
@@ -168,16 +193,26 @@ Dataset orders = Dataset.builder().withName("orders")
     .withSource(NameIdentifier.of("sales", "mart", "orders"))
     .withPrimaryKey(new String[] {"order_id"})
     .withFields(new Field[] {amount}).build();
+Dataset customers = Dataset.builder().withName("customers")
+    .withSource(NameIdentifier.of("sales", "mart", "customers"))
+    .withPrimaryKey(new String[] {"customer_id"})
+    .withUniqueKeys(new String[][] {{"customer_code"}})
+    .withFields(new Field[0]).build();
+Relationship ordersToCustomers = Relationship.builder().withName("orders_to_customers")
+    .withFrom("orders").withTo("customers")
+    .withFromColumns(new String[] {"customer_id"})
+    .withToColumns(new String[] {"customer_id"}).build();
 
 Expression revenueExpression = Expression.builder()
     .withDialects(new DialectExpression[] {
-        DialectExpression.builder().withDialect("ANSI_SQL")
+        DialectExpression.builder().withDialect(Dialects.ANSI_SQL)
             .withExpression("SUM(orders.order_amount)").build()
     }).build();
 Metric revenue = Metric.builder().withName("total_revenue")
     .withExpression(revenueExpression).withDatatype(DataType.DECIMAL).build();
 SemanticModelDefinition definition = SemanticModelDefinition.builder()
-    .withDatasets(new Dataset[] {orders})
+    .withDatasets(new Dataset[] {orders, customers})
+    .withRelationships(new Relationship[] {ordersToCustomers})
     .withMetrics(new Metric[] {revenue}).build();
 
 SemanticModel created = models.createSemanticModel(
@@ -190,18 +225,33 @@ SemanticModel created = models.createSemanticModel(
 ```python
 amount = Field(
     "order_amount",
-    Expression([DialectExpression("ANSI_SQL", "order_amount")]),
+    Expression([DialectExpression(Dialects.ANSI_SQL, "order_amount")]),
     datatype=DataType.DECIMAL)
 orders = Dataset(
     "orders",
     NameIdentifier.of("sales", "mart", "orders"),
     primary_key=["order_id"],
     fields=[amount])
+customers = Dataset(
+    "customers",
+    NameIdentifier.of("sales", "mart", "customers"),
+    primary_key=["customer_id"],
+    unique_keys=[["customer_code"]],
+    fields=[])
+orders_to_customers = Relationship(
+    "orders_to_customers",
+    from_dataset="orders",
+    to_dataset="customers",
+    from_columns=["customer_id"],
+    to_columns=["customer_id"])
 revenue = Metric(
     "total_revenue",
-    Expression([DialectExpression("ANSI_SQL", "SUM(orders.order_amount)")]),
+    Expression([DialectExpression(Dialects.ANSI_SQL, "SUM(orders.order_amount)")]),
     datatype=DataType.DECIMAL)
-definition = SemanticModelDefinition(datasets=[orders], metrics=[revenue])
+definition = SemanticModelDefinition(
+    datasets=[orders, customers],
+    relationships=[orders_to_customers],
+    metrics=[revenue])
 
 created = models.create_semantic_model(
     ident, "Governed sales definitions", definition, {"domain": "sales"})
@@ -356,6 +406,17 @@ datasets:
             - dialect: ANSI_SQL
               expression: order_amount
         datatype: Decimal
+  - name: customers
+    source: sales.mart.customers
+    primary_key: [customer_id]
+    unique_keys: [[customer_code]]
+    fields: []
+relationships:
+  - name: orders_to_customers
+    from: orders
+    to: customers
+    from_columns: [customer_id]
+    to_columns: [customer_id]
 metrics:
   - name: total_revenue
     expression:
