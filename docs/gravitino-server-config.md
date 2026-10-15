@@ -577,6 +577,18 @@ server, are documented with those services. See
 | `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
 | `gravitino.job.outputMaxBytes`         | Maximum number of bytes read from the tail of a job's stdout/stderr when fetching its output.                                                                  | `262144` (256KB)              |
 
+#### Table maintenance cooldowns
+
+When a table-maintenance policy omits `minIntervalMs`, the server uses these per-type keys, then
+the code defaults below. Policy content always wins when set.
+
+| Configuration Item                                     | Description                                     | Default Value   |
+|--------------------------------------------------------|-------------------------------------------------|-----------------|
+| `gravitino.maintenance.compaction.minIntervalMs`       | Cooldown between finished compaction runs       | `3600000` (1h)  |
+| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | Cooldown between finished manifest-rewrite runs | `3600000` (1h)  |
+| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | Cooldown between finished snapshot-expiry runs  | `3600000` (1h)  |
+| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | Cooldown between finished orphan-cleanup runs   | `86400000` (1d) |
+
 ### Key Management
 
 The server talks to KMS instances you name in `gravitino.conf`. Each name is one configured
