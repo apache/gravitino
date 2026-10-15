@@ -32,10 +32,11 @@ import org.apache.gravitino.tag.TagValue;
 
 /**
  * A domain groups metadata objects from any catalog under a business name, such as "Finance". A
- * metadata object is a member of a domain when it carries the domain's backing tag, directly or
- * inherited from its catalog or schema. For the same tag, the assignment nearest to the object
- * wins: a table that carries {@code dept=hr} under a schema that carries {@code dept=finance} is a
- * member of the domain backed by {@code dept=hr} only.
+ * leaf metadata object, of a type in {@link DomainMember#SUPPORTED_TYPES}, is a member of a domain
+ * when it carries the domain's backing tag, directly or inherited from its catalog or schema;
+ * catalogs and schemas are never members themselves. For the same tag, the assignment nearest to
+ * the object wins: a table that carries {@code dept=hr} under a schema that carries {@code
+ * dept=finance} is a member of the domain backed by {@code dept=hr} only.
  *
  * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. A new domain is
  * in {@link Status#DRAFT} status and is visible only to its owner and the users who can manage it
@@ -232,11 +233,12 @@ public interface Domain extends Auditable {
    * of a sub-domain is its own members. Only objects of the {@link DomainMember#SUPPORTED_TYPES
    * supported types} are members, and only the members the caller can access are returned.
    *
-   * <p>Only the objects that carry a backing tag themselves are listed. A catalog or schema that
-   * carries one stands for the objects under it, which are not listed one by one. An object is
-   * listed once, even if it is a member of several domains in the scope, see {@link
-   * DomainMember#subdomain()}. To keep only the members of this domain itself, select the listed
-   * members whose {@link DomainMember#subdomain()} is empty.
+   * <p>A catalog or schema that carries a backing tag is expanded to the leaf objects under it that
+   * Gravitino has recorded, and the catalog or schema itself is not listed. Objects of an external
+   * catalog that Gravitino has not recorded yet are not listed. An object is listed once, even if
+   * it is a member of several domains in the scope, see {@link DomainMember#subdomain()}. With the
+   * whole scope selected, the default, the members of this domain itself are the listed members
+   * whose {@link DomainMember#subdomain()} is empty.
    *
    * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists the
    *     whole scope of this domain.

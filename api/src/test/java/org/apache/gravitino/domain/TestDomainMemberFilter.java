@@ -133,9 +133,22 @@ public class TestDomainMemberFilter {
       }
     }
 
-    Assertions.assertFalse(DomainMember.SUPPORTED_TYPES.contains(MetadataObject.Type.DOMAIN));
-    Assertions.assertFalse(DomainMember.SUPPORTED_TYPES.contains(MetadataObject.Type.COLUMN));
-    Assertions.assertFalse(DomainMember.SUPPORTED_TYPES.contains(MetadataObject.Type.FUNCTION));
+    // Only leaf objects are members: never catalogs, schemas, columns, functions or domains.
+    Assertions.assertEquals(
+        ImmutableSet.of(
+            MetadataObject.Type.TABLE,
+            MetadataObject.Type.VIEW,
+            MetadataObject.Type.FILESET,
+            MetadataObject.Type.TOPIC,
+            MetadataObject.Type.MODEL,
+            MetadataObject.Type.SEMANTIC_MODEL),
+        DomainMember.SUPPORTED_TYPES);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> DomainMemberFilter.builder().withTypes(MetadataObject.Type.CATALOG));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> DomainMemberFilter.builder().withTypes(MetadataObject.Type.SCHEMA));
   }
 
   @Test

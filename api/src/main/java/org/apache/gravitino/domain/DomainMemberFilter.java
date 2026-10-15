@@ -45,8 +45,8 @@ import org.apache.gravitino.annotation.Evolving;
  *   <li>{@code withDomains("Tax", "Trading")}: the members of Tax and Trading.
  * </ul>
  *
- * <p>To keep only the members of the listed domain itself, select the listed members whose {@link
- * DomainMember#subdomain()} is empty.
+ * <p>With the whole scope selected, the default, the members of the listed domain itself are the
+ * listed members whose {@link DomainMember#subdomain()} is empty; select them to keep only those.
  */
 @Evolving
 public final class DomainMemberFilter {
