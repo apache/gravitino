@@ -136,9 +136,10 @@ public interface RoleMetaMapper {
   @Results(
       id = "rolePrivilegeSnapshot",
       value = {
-        @Result(property = "roleId", column = "roleId", id = true),
-        @Result(property = "metadataObjectId", column = "metadataObjectId", id = true),
-        @Result(property = "type", column = "type", id = true),
+        @Result(property = "id", column = "relationId", id = true),
+        @Result(property = "roleId", column = "roleId"),
+        @Result(property = "metadataObjectId", column = "metadataObjectId"),
+        @Result(property = "type", column = "type"),
         @Result(property = "privilegeNames", column = "privilegeNames"),
         @Result(property = "privilegeConditions", column = "privilegeConditions"),
         @Result(property = "currentVersion", column = "currentVersion"),

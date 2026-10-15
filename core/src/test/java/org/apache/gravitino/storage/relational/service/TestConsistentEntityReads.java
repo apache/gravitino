@@ -37,6 +37,9 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -331,6 +334,43 @@ public class TestConsistentEntityReads extends TestJDBCBackend {
             NoSuchEntityException.class, () -> backend.get(missing, Entity.EntityType.TABLE));
       }
     }
+  }
+
+  @TestTemplate
+  void testRolePreservesDistinctRowsForSameTarget() throws Exception {
+    parents();
+    List<SecurableObject> objects =
+        List.of(
+            SecurableObjects.ofCatalog(CATALOG, List.of(Privileges.UseCatalog.allow())),
+            SecurableObjects.ofCatalog(CATALOG, List.of(Privileges.CreateSchema.allow())));
+    RoleEntity role =
+        createRoleEntity(
+            12345L,
+            AuthorizationUtils.ofRoleNamespace(METALAKE),
+            "duplicate_targets",
+            AUDIT_INFO,
+            objects,
+            Map.of());
+    backend.insert(role, false);
+    RoleEntity read = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(2, read.securableObjects().size());
+    assertTrue(read.securableObjects().containsAll(objects));
+    List<RoleEntity> roles =
+        RoleMetaService.getInstance()
+            .listRolesByMetadataObject(
+                NameIdentifier.of(METALAKE, CATALOG), Entity.EntityType.CATALOG, true);
+    assertEquals(1, roles.size());
+    assertEquals(2, roles.get(0).securableObjects().size());
+    assertTrue(roles.get(0).securableObjects().containsAll(objects));
+    backend.update(
+        role.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        current -> {
+          RoleEntity snapshot = (RoleEntity) current;
+          assertEquals(2, snapshot.securableObjects().size());
+          assertTrue(snapshot.securableObjects().containsAll(objects));
+          return snapshot;
+        });
   }
 
   private void checkTableOverwrite(boolean replaceId, boolean cached) throws Exception {
