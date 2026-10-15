@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.tag.TagValue;
@@ -35,8 +36,8 @@ import org.apache.gravitino.tag.TagValue;
  * inherited from its catalog or schema.
  *
  * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. A new domain is
- * in {@link Status#DRAFT} status and is visible only to its owner and managers until it is
- * published.
+ * in {@link Status#DRAFT} status and is visible only to its owner and the users who can manage it
+ * until it is published.
  *
  * <p>A {@code Domain} is a snapshot. The operations on it that change the domain itself, such as
  * {@link #publish()} and {@link #attachToParent(String)}, return a new snapshot and leave this one
@@ -47,7 +48,7 @@ public interface Domain extends Auditable {
 
   /** The status of a domain. */
   enum Status {
-    /** The domain is visible only to its owner and managers. */
+    /** The domain is visible only to its owner and the users who can manage it. */
     DRAFT,
     /** The domain is visible to all users who can use it. */
     PUBLISHED
@@ -113,18 +114,18 @@ public interface Domain extends Auditable {
    * published only when its parent is published. Publishing a published domain has no effect.
    *
    * @return The published domain.
-   * @throws NoSuchDomainException If the domain does not exist.
+   * @throws NoSuchDomainException If the domain does not exist or is not visible to the caller.
    * @throws IllegalArgumentException If the domain is a sub-domain and its parent is not published.
    */
   Domain publish() throws NoSuchDomainException, IllegalArgumentException;
 
   /**
-   * Unpublishes the domain, making it visible only to its owner and managers. A domain can be
-   * unpublished only when it has no published sub-domains. Unpublishing a draft domain has no
-   * effect.
+   * Unpublishes the domain, making it visible only to its owner and the users who can manage it. A
+   * domain can be unpublished only when it has no published sub-domains. Unpublishing a draft
+   * domain has no effect.
    *
    * @return The unpublished domain.
-   * @throws NoSuchDomainException If the domain does not exist.
+   * @throws NoSuchDomainException If the domain does not exist or is not visible to the caller.
    * @throws IllegalArgumentException If the domain has published sub-domains.
    */
   Domain unpublish() throws NoSuchDomainException, IllegalArgumentException;
@@ -132,11 +133,12 @@ public interface Domain extends Auditable {
   /**
    * Attaches this domain as a sub-domain of the given parent. If this domain is a sub-domain of
    * another domain, it is moved under the given parent. Attaching to the current parent has no
-   * effect.
+   * effect. The backing tag is not renamed.
    *
    * @param parent The name of the parent domain.
    * @return The attached domain.
-   * @throws NoSuchDomainException If this domain or the parent does not exist.
+   * @throws NoSuchDomainException If this domain or the parent does not exist or is not visible to
+   *     the caller.
    * @throws IllegalArgumentException If this domain cannot be attached to the parent, for example
    *     because the parent is this domain or a sub-domain, this domain has sub-domains, or this
    *     domain is published and the parent is not.
@@ -145,10 +147,10 @@ public interface Domain extends Auditable {
 
   /**
    * Detaches this domain from its parent, making it a top-level domain. Detaching a top-level
-   * domain has no effect.
+   * domain has no effect. The backing tag is not renamed.
    *
    * @return The detached domain.
-   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */
   Domain detachFromParent() throws NoSuchDomainException;
 
@@ -160,7 +162,7 @@ public interface Domain extends Auditable {
    * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
    *     remove the backing tag.
    * @return The updated domain.
-   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws NoSuchTagException If the tag does not exist.
    * @throws IllegalArgumentException If the value is not allowed by the tag.
    */
@@ -169,32 +171,39 @@ public interface Domain extends Auditable {
 
   /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
-   * If no backing tag is given, a tag named after the domain path, such as "Finance/Trading", is
-   * created and used as the backing tag.
    *
-   * @param name The name of the sub-domain.
+   * <p>If no backing tag is given, a tag named after the domain path, such as "Finance/Trading", is
+   * created and used as the backing tag. If a tag with that name already exists, it is used only
+   * when the caller owns it or the metalake; otherwise the creation fails.
+   *
+   * @param name The name of the sub-domain, which must not contain "/".
    * @param comment The comment of the sub-domain, or null.
    * @param properties The properties of the sub-domain, or null.
    * @param backingTag The existing tag, with an optional value, that backs the sub-domain, or null
    *     to create the default backing tag.
    * @return The created sub-domain.
-   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
-   * @throws IllegalArgumentException If this domain is itself a sub-domain, or the sub-domain
-   *     cannot be created under this domain.
+   * @throws NoSuchTagException If the given backing tag does not exist.
+   * @throws ForbiddenException If a tag with the default name exists and the caller does not own it
+   *     or the metalake.
+   * @throws IllegalArgumentException If the name contains "/", the value of the given backing tag
+   *     is not allowed by the tag, this domain is itself a sub-domain, or the sub-domain cannot be
+   *     created under this domain.
    */
   Domain createSubdomain(
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
       @Nullable TagValue backingTag)
-      throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException;
+      throws NoSuchDomainException, DomainAlreadyExistsException, NoSuchTagException,
+          ForbiddenException, IllegalArgumentException;
 
   /**
    * Lists the names of the sub-domains of this domain.
    *
    * @return The names of the sub-domains.
-   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */
   String[] listSubdomains() throws NoSuchDomainException;
 
@@ -202,7 +211,7 @@ public interface Domain extends Auditable {
    * Lists the sub-domains of this domain with details.
    *
    * @return The sub-domains.
-   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */
   Domain[] listSubdomainsInfo() throws NoSuchDomainException;
 
@@ -211,11 +220,16 @@ public interface Domain extends Auditable {
    * DomainMember#SUPPORTED_TYPES supported types} are members, and only the members the caller can
    * access are returned.
    *
+   * <p>Only the objects that carry a backing tag themselves are listed. A catalog or schema that
+   * carries one stands for the objects under it, which are not listed one by one. An object reached
+   * more than once is listed once, see {@link DomainMember#subdomain()}. Sub-domain names in the
+   * filter that are not sub-domains of this domain visible to the caller are ignored.
+   *
    * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists all
    *     members of this domain itself; set {@code withIncludeAllSubdomains(true)} to include those
    *     of its sub-domains.
    * @return The members of this domain.
-   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */
   DomainMember[] listMembers(DomainMemberFilter filter) throws NoSuchDomainException;
 }

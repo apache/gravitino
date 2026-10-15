@@ -23,7 +23,6 @@ import com.google.errorprone.annotations.FormatString;
 
 /** Exception thrown when a domain is not empty, for example when it has sub-domains. */
 public class NonEmptyDomainException extends GravitinoRuntimeException {
-
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -33,5 +32,17 @@ public class NonEmptyDomainException extends GravitinoRuntimeException {
   @FormatMethod
   public NonEmptyDomainException(@FormatString String message, Object... args) {
     super(message, args);
+  }
+
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public NonEmptyDomainException(Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

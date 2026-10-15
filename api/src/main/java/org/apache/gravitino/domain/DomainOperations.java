@@ -22,8 +22,10 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.tag.TagValue;
 
@@ -31,8 +33,9 @@ import org.apache.gravitino.tag.TagValue;
  * Interface for the domain operations of a metalake. Operations on a single domain, such as
  * publishing it or managing its sub-domains, are on {@link Domain}.
  *
- * <p>A domain in {@link Domain.Status#DRAFT} status is visible only to its owner and managers. For
- * other users it is omitted from lists, and getting it throws {@link NoSuchDomainException}.
+ * <p>A domain in {@link Domain.Status#DRAFT} status is visible only to its owner and the users who
+ * can manage it. For other users it is omitted from lists, and getting it throws {@link
+ * NoSuchDomainException}.
  */
 @Evolving
 public interface DomainOperations {
@@ -67,7 +70,8 @@ public interface DomainOperations {
    * Domain#createSubdomain(String, String, Map, TagValue)} to create a sub-domain.
    *
    * <p>If no backing tag is given, a tag named after the domain is created and used as the backing
-   * tag. If a tag with that name already exists, it is used only when the caller owns it.
+   * tag. If a tag with that name already exists, it is used only when the caller owns it or the
+   * metalake; otherwise the creation fails.
    *
    * @param name The name of the domain, which must not contain "/".
    * @param comment The comment of the domain, or null.
@@ -76,14 +80,19 @@ public interface DomainOperations {
    *     create the default backing tag.
    * @return The created domain.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
-   * @throws IllegalArgumentException If the name or the backing tag is invalid.
+   * @throws NoSuchTagException If the given backing tag does not exist.
+   * @throws ForbiddenException If a tag with the default name exists and the caller does not own it
+   *     or the metalake.
+   * @throws IllegalArgumentException If the name contains "/", or the value of the given backing
+   *     tag is not allowed by the tag.
    */
   Domain createDomain(
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
       @Nullable TagValue backingTag)
-      throws DomainAlreadyExistsException, IllegalArgumentException;
+      throws DomainAlreadyExistsException, NoSuchTagException, ForbiddenException,
+          IllegalArgumentException;
 
   /**
    * Alters a domain. Renaming a domain does not rename its backing tag.
@@ -91,11 +100,14 @@ public interface DomainOperations {
    * @param name The name of the domain.
    * @param changes The changes to apply to the domain.
    * @return The altered domain.
-   * @throws NoSuchDomainException If the domain does not exist.
-   * @throws IllegalArgumentException If the changes cannot be applied to the domain.
+   * @throws NoSuchDomainException If the domain does not exist or is not visible to the caller.
+   * @throws DomainAlreadyExistsException If the domain is renamed and a domain with the new name
+   *     already exists.
+   * @throws IllegalArgumentException If the changes cannot be applied to the domain, for example
+   *     because the new name contains "/".
    */
   Domain alterDomain(String name, DomainChange... changes)
-      throws NoSuchDomainException, IllegalArgumentException;
+      throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Deletes a domain. The backing tag and the tags on the member objects are kept.

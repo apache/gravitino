@@ -104,6 +104,34 @@ public class TestDomainMemberFilter {
   }
 
   @Test
+  public void testLaterCallReplacesValue() {
+    DomainMemberFilter filter =
+        DomainMemberFilter.builder()
+            .withTypes(MetadataObject.Type.TABLE)
+            .withTypes(MetadataObject.Type.VIEW)
+            .withNameContains("trade")
+            .withNameContains("tax")
+            .withSubdomains("trading")
+            .withSubdomains("tax")
+            .build();
+    Assertions.assertEquals(ImmutableSet.of(MetadataObject.Type.VIEW), filter.types());
+    Assertions.assertEquals("tax", filter.nameContains().get());
+    Assertions.assertEquals(ImmutableSet.of("tax"), filter.subdomains());
+
+    // Setting no types, or a null name, resets the option to its default.
+    DomainMemberFilter reset =
+        DomainMemberFilter.builder()
+            .withTypes(MetadataObject.Type.TABLE)
+            .withTypes()
+            .withNameContains("trade")
+            .withNameContains(null)
+            .build();
+    Assertions.assertTrue(reset.types().isEmpty());
+    Assertions.assertFalse(reset.nameContains().isPresent());
+    Assertions.assertEquals(DomainMemberFilter.builder().build(), reset);
+  }
+
+  @Test
   public void testCollectionsAreImmutable() {
     DomainMemberFilter filter =
         DomainMemberFilter.builder()

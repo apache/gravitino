@@ -32,7 +32,7 @@ public interface DomainChange {
   /**
    * Creates a new domain change to rename the domain. The backing tag of the domain is not renamed.
    *
-   * @param newName The new name of the domain.
+   * @param newName The new name of the domain, which must not contain "/".
    * @return The domain change.
    */
   static DomainChange rename(String newName) {
@@ -42,10 +42,10 @@ public interface DomainChange {
   /**
    * Creates a new domain change to update the domain comment.
    *
-   * @param newComment The new comment for the domain.
+   * @param newComment The new comment for the domain, or null to remove the comment.
    * @return The domain change.
    */
-  static DomainChange updateComment(String newComment) {
+  static DomainChange updateComment(@Nullable String newComment) {
     return new UpdateDomainComment(newComment);
   }
 
@@ -129,17 +129,18 @@ public interface DomainChange {
 
   /** A domain change to update the domain comment. */
   final class UpdateDomainComment implements DomainChange {
-    private final String newComment;
+    @Nullable private final String newComment;
 
-    private UpdateDomainComment(String newComment) {
+    private UpdateDomainComment(@Nullable String newComment) {
       this.newComment = newComment;
     }
 
     /**
      * Get the new comment of the domain.
      *
-     * @return The new comment of the domain.
+     * @return The new comment of the domain, or null to remove the comment.
      */
+    @Nullable
     public String getNewComment() {
       return newComment;
     }

@@ -226,7 +226,8 @@ public final class DomainMemberFilter {
     /**
      * Sets the sub-domains whose members are listed in addition to those of the domain itself. They
      * are ignored if {@link #withIncludeAllSubdomains(boolean) withIncludeAllSubdomains(true)} is
-     * set.
+     * set. Names that are not sub-domains of the listed domain visible to the caller are ignored
+     * when the members are listed.
      *
      * @param subdomains The names of the sub-domains.
      * @return This builder.

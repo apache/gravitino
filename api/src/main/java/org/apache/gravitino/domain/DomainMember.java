@@ -48,7 +48,9 @@ public interface DomainMember {
   MetadataObject object();
 
   /**
-   * Returns the sub-domain the member is reached through.
+   * Returns the sub-domain the member is reached through. A member of the listed domain itself is
+   * reported as such even if it is also reached through a sub-domain. A member reached through
+   * several sub-domains, and not a member of the listed domain itself, reports one of them.
    *
    * @return The name of the sub-domain, or empty if the object is a member of the listed domain
    *     itself.
