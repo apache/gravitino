@@ -19,9 +19,12 @@
 
 package org.apache.gravitino.policy;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -170,6 +173,42 @@ public class TestPolicyContents {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     Assertions.assertTrue(exception.getMessage().contains("maxPartitionNum"));
+  }
+
+  @Test
+  void testValidateRejectsNegativeMinIntervalMsOnPolicyContentPath() {
+    PolicyContent content =
+        new PolicyContent() {
+          @Override
+          public Set<MetadataObject.Type> supportedObjectTypes() {
+            return ImmutableSet.of(MetadataObject.Type.TABLE);
+          }
+
+          @Override
+          public Map<String, String> properties() {
+            return Collections.emptyMap();
+          }
+
+          @Override
+          public Long minIntervalMs() {
+            return -1L;
+          }
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("minIntervalMs"));
+  }
+
+  @Test
+  void testValidateAcceptsBuiltInContentsWithoutExecutionPeers() {
+    Assertions.assertDoesNotThrow(() -> PolicyContents.icebergDataCompaction().validate());
+    Assertions.assertDoesNotThrow(() -> PolicyContents.icebergOrphanFileRemoval().validate());
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyContents.custom(
+                    ImmutableMap.of("rule", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null)
+                .validate());
   }
 
   private static Map<String, String> mapOf(String key, String value) {

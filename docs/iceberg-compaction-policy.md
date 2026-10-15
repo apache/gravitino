@@ -29,9 +29,17 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `rewriteStrategy`        | No       | `binpack`           | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                       |
 | `sortOrder`              | No       | `""`                | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`.        |
 | `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                        |
+| `timeTrigger`            | No       | unset               | Cron string for scheduled evaluation (e.g. `0 0 2 * * ?`). Not shape-checked at create/update.                |
+| `commitTrigger`          | No       | unset               | When `true`, evaluate after an Iceberg commit. `null` / `false` means unset / disabled.                       |
+| `minIntervalMs`          | No       | unset               | Cooldown in milliseconds after the last finished job for this policy type. Must be `>= 0` when set.           |
+| `jobOptions`             | No       | unset               | Spark / IRC client options merged into `runJob` conf. Separate from `rewriteOptions`.                         |
+| `updateOptions`          | No       | unset               | Gravitino updater options merged into `runJob` `updateOptions`.                                               |
 
 `rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
 parameters separate from the `options` map.
+
+`rewriteOptions` configures the Iceberg rewrite procedure. `jobOptions` and `updateOptions` are runtime
+bags for job submission (and auth overlay on the executor). They are not interchangeable.
 
 ## Generated Rules and Properties
 

@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -114,6 +115,26 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
+    @JsonProperty("timeTrigger")
+    @Nullable
+    private String timeTrigger;
+
+    @JsonProperty("commitTrigger")
+    @Nullable
+    private Boolean commitTrigger;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
+
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
 
@@ -204,6 +225,34 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
+    @Nullable
+    public String timeTrigger() {
+      return timeTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Boolean commitTrigger() {
+      return commitTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    @Override
+    public Map<String, String> jobOptions() {
+      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+    }
+
+    @Override
+    public Map<String, String> updateOptions() {
+      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+    }
+
+    @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
     }
@@ -224,7 +273,10 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
-    private PolicyContent toDomainContent() {
+    /**
+     * @return domain policy content including execution peers
+     */
+    public PolicyContent toDomainContent() {
       return PolicyContents.icebergDataCompaction(
           minDataFileMse(),
           minDeleteFileNumber(),
@@ -233,7 +285,12 @@ public interface PolicyContentDTO extends PolicyContent {
           maxPartitionNum(),
           rewriteStrategy(),
           sortOrder(),
-          rewriteOptions());
+          rewriteOptions(),
+          timeTrigger(),
+          commitTrigger(),
+          minIntervalMs(),
+          jobOptions(),
+          updateOptions());
     }
   }
 
@@ -251,6 +308,26 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("dryRun")
     private Boolean dryRun;
+
+    @JsonProperty("timeTrigger")
+    @Nullable
+    private String timeTrigger;
+
+    @JsonProperty("commitTrigger")
+    @Nullable
+    private Boolean commitTrigger;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
 
     private IcebergOrphanFileRemovalContentDTO() {}
 
@@ -279,6 +356,34 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
+    @Nullable
+    public String timeTrigger() {
+      return timeTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Boolean commitTrigger() {
+      return commitTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    @Override
+    public Map<String, String> jobOptions() {
+      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+    }
+
+    @Override
+    public Map<String, String> updateOptions() {
+      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+    }
+
+    @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
     }
@@ -295,19 +400,55 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @Override
     public void validate() {
+      Preconditions.checkArgument(
+          !Boolean.TRUE.equals(commitTrigger),
+          "commitTrigger is not allowed for orphan file removal");
       PolicyContentDTO.super.validate();
       toDomainContent().validate();
     }
 
-    private PolicyContent toDomainContent() {
-      return PolicyContents.icebergOrphanFileRemoval(olderThanDays(), location(), dryRun());
+    /**
+     * @return domain policy content including execution peers
+     */
+    public PolicyContent toDomainContent() {
+      return PolicyContents.icebergOrphanFileRemoval(
+          olderThanDays(),
+          location(),
+          dryRun(),
+          timeTrigger(),
+          commitTrigger(),
+          minIntervalMs(),
+          jobOptions(),
+          updateOptions());
     }
   }
 
   /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+    @JsonProperty("timeTrigger")
+    @Nullable
+    private String timeTrigger;
+
+    @JsonProperty("commitTrigger")
+    @Nullable
+    private Boolean commitTrigger;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
+
     private IcebergRewriteManifestsContentDTO() {}
 
     /**
@@ -318,6 +459,34 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
+    @Nullable
+    public String timeTrigger() {
+      return timeTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Boolean commitTrigger() {
+      return commitTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    @Override
+    public Map<String, String> jobOptions() {
+      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+    }
+
+    @Override
+    public Map<String, String> updateOptions() {
+      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+    }
+
+    @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
     }
@@ -338,15 +507,41 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
-    private PolicyContent toDomainContent() {
-      return PolicyContents.icebergRewriteManifests();
+    /**
+     * @return domain policy content including execution peers
+     */
+    public PolicyContent toDomainContent() {
+      return PolicyContents.icebergRewriteManifests(
+          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updateOptions());
     }
   }
 
   /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    @JsonProperty("timeTrigger")
+    @Nullable
+    private String timeTrigger;
+
+    @JsonProperty("commitTrigger")
+    @Nullable
+    private Boolean commitTrigger;
+
+    @JsonProperty("minIntervalMs")
+    @Nullable
+    private Long minIntervalMs;
+
+    @JsonProperty("jobOptions")
+    @Nullable
+    private Map<String, String> jobOptions;
+
+    @JsonProperty("updateOptions")
+    @Nullable
+    private Map<String, String> updateOptions;
+
     private IcebergSnapshotExpirationContentDTO() {}
 
     /**
@@ -357,6 +552,34 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
+    @Nullable
+    public String timeTrigger() {
+      return timeTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Boolean commitTrigger() {
+      return commitTrigger;
+    }
+
+    @Override
+    @Nullable
+    public Long minIntervalMs() {
+      return minIntervalMs;
+    }
+
+    @Override
+    public Map<String, String> jobOptions() {
+      return jobOptions == null ? Collections.emptyMap() : jobOptions;
+    }
+
+    @Override
+    public Map<String, String> updateOptions() {
+      return updateOptions == null ? Collections.emptyMap() : updateOptions;
+    }
+
+    @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
     }
@@ -377,8 +600,12 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
-    private PolicyContent toDomainContent() {
-      return PolicyContents.icebergSnapshotExpiration();
+    /**
+     * @return domain policy content including execution peers
+     */
+    public PolicyContent toDomainContent() {
+      return PolicyContents.icebergSnapshotExpiration(
+          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updateOptions());
     }
   }
 
