@@ -232,6 +232,22 @@ public class IcebergCatalogWrapperHelper {
 
   public IcebergTableChange buildIcebergTableChanges(
       NameIdentifier gravitinoNameIdentifier, TableChange... tableChanges) {
+    return buildIcebergTableChanges(icebergCatalog, gravitinoNameIdentifier, tableChanges);
+  }
+
+  /**
+   * Builds an {@link IcebergTableChange} using the given catalog to load the table. This overload
+   * allows callers to pass a catalog obtained within an impersonation context (e.g. inside {@code
+   * IcebergCatalogWrapper.buildAndUpdateTable}), ensuring that the metadata.json read is performed
+   * under the correct user's credentials.
+   *
+   * @param catalog the Iceberg catalog to use for loading the table
+   * @param gravitinoNameIdentifier the Gravitino name identifier of the table
+   * @param tableChanges the changes to apply
+   * @return the built table change containing the transaction
+   */
+  public IcebergTableChange buildIcebergTableChanges(
+      Catalog catalog, NameIdentifier gravitinoNameIdentifier, TableChange... tableChanges) {
 
     TableIdentifier icebergTableIdentifier = buildIcebergTableIdentifier(gravitinoNameIdentifier);
 
@@ -263,7 +279,7 @@ public class IcebergCatalogWrapperHelper {
       }
     }
 
-    Table icebergBaseTable = icebergCatalog.loadTable(icebergTableIdentifier);
+    Table icebergBaseTable = catalog.loadTable(icebergTableIdentifier);
     Transaction transaction = icebergBaseTable.newTransaction();
     IcebergTableChange icebergTableChange =
         new IcebergTableChange(icebergTableIdentifier, transaction);
