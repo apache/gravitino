@@ -21,6 +21,8 @@ package org.apache.gravitino.server.web.filter.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -93,8 +96,39 @@ public class TestLoadViewAuthorizationExecutor {
             annotation.allowCheckExistence()));
   }
 
+  @Test
+  void testUnsupportedViewOperationsRemainForbidden() throws Exception {
+    check(
+        false,
+        true,
+        false,
+        false,
+        true,
+        new UnsupportedOperationException("Catalog does not support view operations"));
+  }
+
+  @Test
+  void testProbeBackendFailureIsNotTreatedAsMissingView() {
+    IllegalStateException failure = new IllegalStateException("View backend unavailable");
+    assertSame(
+        failure,
+        assertThrows(
+            IllegalStateException.class, () -> check(false, true, false, false, true, failure)));
+  }
+
   private void check(
       boolean primary, boolean probe, boolean exists, boolean expected, boolean shouldProbe)
+      throws Exception {
+    check(primary, probe, exists, expected, shouldProbe, null);
+  }
+
+  private void check(
+      boolean primary,
+      boolean probe,
+      boolean exists,
+      boolean expected,
+      boolean shouldProbe,
+      @Nullable RuntimeException probeFailure)
       throws Exception {
     NameIdentifier ident = NameIdentifier.of("m", "c", "s", "v");
     var executor =
@@ -113,7 +147,11 @@ public class TestLoadViewAuthorizationExecutor {
     var env = mock(GravitinoEnv.class);
     var dispatcher = mock(ViewDispatcher.class);
     when(env.internalViewDispatcher()).thenReturn(dispatcher);
-    when(dispatcher.viewExists(ident)).thenReturn(exists);
+    if (probeFailure != null) {
+      when(dispatcher.viewExists(ident)).thenThrow(probeFailure);
+    } else {
+      when(dispatcher.viewExists(ident)).thenReturn(exists);
+    }
     try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
       mocked.when(GravitinoEnv::getInstance).thenReturn(env);
       assertEquals(expected, executor.execute(new AuthorizationRequestContext()));

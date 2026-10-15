@@ -65,7 +65,14 @@ public class LoadViewAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
 
     NameIdentifier viewIdentifier = metadataContext.get(Entity.EntityType.VIEW);
-    return viewIdentifier != null
-        && !GravitinoEnv.getInstance().internalViewDispatcher().viewExists(viewIdentifier);
+    if (viewIdentifier == null) {
+      return false;
+    }
+    try {
+      return !GravitinoEnv.getInstance().internalViewDispatcher().viewExists(viewIdentifier);
+    } catch (UnsupportedOperationException e) {
+      // Preserve the primary denial when the connector cannot perform the existence probe.
+      return false;
+    }
   }
 }

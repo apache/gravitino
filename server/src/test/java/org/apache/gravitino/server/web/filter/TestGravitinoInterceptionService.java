@@ -1055,6 +1055,64 @@ public class TestGravitinoInterceptionService {
   }
 
   /**
+   * Unsupported view probes preserve the primary denial and its authorization event.
+   *
+   * @throws Throwable If authorization interception fails.
+   */
+  @Test
+  public void testLoadViewAuthorizationReturnsForbiddenWhenViewsAreUnsupported() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+      EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.internalViewDispatcher()).thenReturn(viewDispatcher);
+      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+      when(viewDispatcher.viewExists(ArgumentMatchers.any()))
+          .thenThrow(new UnsupportedOperationException("Catalog does not support view operations"));
+
+      Method method =
+          ViewOperations.class.getMethod(
+              "loadView", String.class, String.class, String.class, String.class);
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(new Object[] {"testMetalake", "testCatalog", "testSchema", "missingView"});
+
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(viewDispatcher).viewExists(ArgumentMatchers.any());
+      verify(mockEventBus)
+          .dispatchEvent(ArgumentMatchers.any(AuthorizationDenialFailureEvent.class));
+    }
+  }
+
+  /**
    * When {@code checkCurrentUser} throws {@link NoSuchMetalakeException}, the 403 is a
    * resource-not-found masquerading as forbidden — no {@link AuthorizationDenialFailureEvent} is
    * dispatched, leaving {@code operationFailureFired} false so that {@code HttpAuditFilter} can
