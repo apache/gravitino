@@ -33,6 +33,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 
 /** Represents a generic view. */
 class GenericView implements View, SupportsTags {
@@ -101,8 +102,18 @@ class GenericView implements View, SupportsTags {
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override

@@ -246,7 +246,11 @@ raw_events.supports_tags().associate_tags(["pii"], None)
 ### List Tags on an Object
 
 The response includes tags inherited from ancestors. With `details=true` each tag carries an
-`inherited` field, which a plain name listing does not.
+`inherited` field, which a plain name listing does not. Both response modes include
+`hasInaccessibleTags`. Gravitino resolves direct and inherited tag associations before
+authorization filtering, so the flag also covers inaccessible inherited tags. The flag reveals
+only that at least one tag was omitted; it does not reveal the tag's name, count, details, or
+inheritance source.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -256,26 +260,59 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags?details=true"
 ```
 
+If every effective tag is inaccessible, the response contains an empty list and sets the flag:
+
+```json
+{
+  "code": 0,
+  "tags": [],
+  "hasInaccessibleTags": true
+}
+```
+
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
 Table customers = ...
-String[] tagNames = customers.supportsTags().listTags();
-Tag[] tags = customers.supportsTags().listTagsInfo();
+TagList<String> nameList = customers.supportsTags().listTagsWithVisibility();
+String[] tagNames = nameList.tags();
+boolean omittedTags = nameList.hasInaccessibleTags();
+
+TagList<Tag> detailList = customers.supportsTags().listTagsInfoWithVisibility();
+Tag[] tags = detailList.tags();
+boolean omittedTagDetails = detailList.hasInaccessibleTags();
 ```
+
+The existing `listTags()` and `listTagsInfo()` methods continue to return only the visible arrays.
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
 customers = ...
-tag_names = customers.supports_tags().list_tags()
-tags = customers.supports_tags().list_tags_info()
+name_list = customers.supports_tags().list_tags_with_visibility()
+tag_names = name_list.tags()
+omitted_tags = name_list.has_inaccessible_tags()
+
+detail_list = customers.supports_tags().list_tags_info_with_visibility()
+tags = detail_list.tags()
+omitted_tag_details = detail_list.has_inaccessible_tags()
 ```
+
+The existing `list_tags()` and `list_tags_info()` methods continue to return only the visible lists.
 
 </TabItem>
 </Tabs>
+
+Interpret the visible list and `hasInaccessibleTags` together:
+
+| Visible list | `hasInaccessibleTags` | Meaning |
+|---|---:|---|
+| Empty | `false` | The object has no effective tag associations. |
+| Empty | `true` | All effective tag associations are inaccessible. |
+| Non-empty | `true` | The response includes visible tags and omits at least one inaccessible tag. |
+| Non-empty | `false` | All effective tag associations are visible. |
 
 ### Get One Tag on an Object
 

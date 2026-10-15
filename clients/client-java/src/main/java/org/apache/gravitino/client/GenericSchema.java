@@ -30,9 +30,11 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 
 /** Represents a generic schema. */
 class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPolicies {
@@ -95,8 +97,18 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -115,8 +127,18 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   }
 
   @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
+  }
+
+  @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override

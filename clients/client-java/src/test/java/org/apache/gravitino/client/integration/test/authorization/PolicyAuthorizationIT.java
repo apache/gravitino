@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -40,14 +39,12 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.client.RESTClient;
-import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
-import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
@@ -326,8 +323,13 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
             .listPolicies();
     Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
 
-    RESTClient restClient = getNormalUserRestClient();
-    assertPolicyListResponse(restClient, "table1", new String[0], true);
+    SupportsPolicies table1Policies =
+        gravitinoMetalakeLoadByNormalUser
+            .loadCatalog(CATALOG)
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA, "table1"))
+            .supportsPolicies();
+    assertPolicyList(table1Policies, new String[0], true);
 
     SupportsPolicies table2Policies =
         gravitinoMetalake
@@ -337,7 +339,13 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
             .supportsPolicies();
     table2Policies.associatePolicies(new String[] {"policy1"}, new String[0]);
     try {
-      assertPolicyListResponse(restClient, "table2", new String[] {"policy2"}, true);
+      SupportsPolicies normalUserTable2Policies =
+          gravitinoMetalakeLoadByNormalUser
+              .loadCatalog(CATALOG)
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(SCHEMA, "table2"))
+              .supportsPolicies();
+      assertPolicyList(normalUserTable2Policies, new String[] {"policy2"}, true);
     } finally {
       table2Policies.associatePolicies(new String[0], new String[] {"policy1"});
     }
@@ -454,61 +462,22 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     metalakeLoadByNormalUser.deletePolicy("policy2");
   }
 
-  private RESTClient getNormalUserRestClient() {
-    try {
-      Method restClientMethod =
-          normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
-      restClientMethod.setAccessible(true);
-      return (RESTClient) restClientMethod.invoke(normalUserClient);
-    } catch (ReflectiveOperationException e) {
-      throw new RuntimeException("Failed to access the normal user's REST client", e);
-    }
-  }
-
-  private void assertPolicyListResponse(
-      RESTClient restClient,
-      String tableName,
+  private void assertPolicyList(
+      SupportsPolicies supportsPolicies,
       String[] expectedPolicyNames,
       boolean hasInaccessiblePolicies) {
-    String path =
-        "api/metalakes/"
-            + METALAKE
-            + "/objects/table/"
-            + CATALOG
-            + "."
-            + SCHEMA
-            + "."
-            + tableName
-            + "/policies";
-    PolicyNameListResponse nameListResponse =
-        restClient.get(
-            path,
-            PolicyNameListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
-    String[] actualPolicyNames = nameListResponse.getNames();
+    PolicyList<String> nameResult = supportsPolicies.listPoliciesWithVisibility();
+    String[] actualPolicyNames = nameResult.policies();
     Arrays.sort(actualPolicyNames);
     Arrays.sort(expectedPolicyNames);
     Assertions.assertArrayEquals(expectedPolicyNames, actualPolicyNames);
-    Assertions.assertEquals(hasInaccessiblePolicies, nameListResponse.hasInaccessiblePolicies());
+    Assertions.assertEquals(hasInaccessiblePolicies, nameResult.hasInaccessiblePolicies());
 
-    MetadataObjectPolicyListResponse listResponse =
-        restClient.get(
-            path,
-            Map.of("details", "true"),
-            MetadataObjectPolicyListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
+    var detailsResult = supportsPolicies.listPolicyInfosWithVisibility();
     String[] actualDetailNames =
-        Arrays.stream(listResponse.getPolicies())
-            .map(policy -> policy.name())
-            .toArray(String[]::new);
+        Arrays.stream(detailsResult.policies()).map(policy -> policy.name()).toArray(String[]::new);
     Arrays.sort(actualDetailNames);
     Assertions.assertArrayEquals(expectedPolicyNames, actualDetailNames);
-    Assertions.assertEquals(hasInaccessiblePolicies, listResponse.hasInaccessiblePolicies());
+    Assertions.assertEquals(hasInaccessiblePolicies, detailsResult.hasInaccessiblePolicies());
   }
 }

@@ -26,13 +26,15 @@ import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 
 /**
  * The implementation of {@link SupportsTags}. This interface will be composited into catalog,
@@ -60,31 +62,43 @@ class MetadataObjectTagOperations implements SupportsTags {
 
   @Override
   public String[] listTags() {
-    NameListResponse resp =
+    return listTagsWithVisibility().tags();
+  }
+
+  @Override
+  public TagList<String> listTagsWithVisibility() {
+    TagNameListResponse resp =
         restClient.get(
             tagRequestPath,
-            NameListResponse.class,
+            TagNameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
 
     resp.validate();
-    return resp.getNames();
+    return new TagList<>(resp.getNames(), resp.hasInaccessibleTags());
   }
 
   @Override
   public Tag[] listTagsInfo() {
-    TagListResponse resp =
+    return listTagsInfoWithVisibility().tags();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    MetadataObjectTagListResponse resp =
         restClient.get(
             tagRequestPath,
             ImmutableMap.of("details", "true"),
-            TagListResponse.class,
+            MetadataObjectTagListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
 
     resp.validate();
-    return Arrays.stream(resp.getTags())
-        .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
-        .toArray(Tag[]::new);
+    Tag[] tags =
+        Arrays.stream(resp.getTags())
+            .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
+            .toArray(Tag[]::new);
+    return new TagList<>(tags, resp.hasInaccessibleTags());
   }
 
   @Override

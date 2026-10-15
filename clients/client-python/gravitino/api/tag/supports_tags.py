@@ -20,6 +20,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 
 
 class SupportsTags(ABC):
@@ -37,6 +38,14 @@ class SupportsTags(ABC):
         """
         pass
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        """List visible tag names and report whether inaccessible tags were omitted.
+
+        The compatibility default cannot detect omitted tags. Implementations backed by
+        authorization-aware APIs should override this method.
+        """
+        return TagList(self.list_tags(), False)
+
     @abstractmethod
     def list_tags_info(self) -> list[Tag]:
         """List all the tags with details for the specific object.
@@ -45,6 +54,14 @@ class SupportsTags(ABC):
             list[Tag]: The list of tags.
         """
         pass
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        """List visible tag details and report whether inaccessible tags were omitted.
+
+        The compatibility default cannot detect omitted tags. Implementations backed by
+        authorization-aware APIs should override this method.
+        """
+        return TagList(self.list_tags_info(), False)
 
     @abstractmethod
     def get_tag(self, name: str) -> Tag:

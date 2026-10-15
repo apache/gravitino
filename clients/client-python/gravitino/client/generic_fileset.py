@@ -23,6 +23,7 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
@@ -89,8 +90,14 @@ class GenericFileset(
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> List[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)

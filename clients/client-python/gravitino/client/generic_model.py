@@ -22,7 +22,7 @@ from typing import Optional
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.model.model import Model
-from gravitino.api.tag import Tag
+from gravitino.api.tag import Tag, TagList
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
@@ -74,8 +74,14 @@ class GenericModel(Model, SupportsTags):
     def list_tags(self) -> list[str]:
         return self._model_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._model_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         return self._model_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._model_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._model_tag_operations.get_tag(name)
