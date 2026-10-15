@@ -70,10 +70,10 @@ public interface DomainOperations {
    * Domain#createSubdomain(String, String, Map, TagValue)} to create a sub-domain.
    *
    * <p>If no backing tag is given, a tag named after the domain is created and used as the backing
-   * tag. If a tag with that name already exists, it is used only when the caller owns it or the
-   * metalake; otherwise the creation fails.
+   * tag. If a tag with that name already exists, it is used only when it backs no other domain and
+   * the caller owns it or the metalake; otherwise the creation fails.
    *
-   * @param name The name of the domain, which must not contain "/".
+   * @param name The name of the domain.
    * @param comment The comment of the domain, or null.
    * @param properties The properties of the domain, or null.
    * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
@@ -83,8 +83,8 @@ public interface DomainOperations {
    * @throws NoSuchTagException If the given backing tag does not exist.
    * @throws ForbiddenException If a tag with the default name exists and the caller does not own it
    *     or the metalake.
-   * @throws IllegalArgumentException If the name contains "/", or the value of the given backing
-   *     tag is not allowed by the tag.
+   * @throws IllegalArgumentException If a tag with the default name already backs another domain,
+   *     or the value of the given backing tag is not allowed by the tag.
    */
   Domain createDomain(
       String name,
@@ -103,8 +103,7 @@ public interface DomainOperations {
    * @throws NoSuchDomainException If the domain does not exist or is not visible to the caller.
    * @throws DomainAlreadyExistsException If the domain is renamed and a domain with the new name
    *     already exists.
-   * @throws IllegalArgumentException If the changes cannot be applied to the domain, for example
-   *     because the new name contains "/".
+   * @throws IllegalArgumentException If the changes cannot be applied to the domain.
    */
   Domain alterDomain(String name, DomainChange... changes)
       throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException;

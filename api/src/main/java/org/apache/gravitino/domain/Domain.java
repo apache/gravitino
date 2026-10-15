@@ -174,9 +174,10 @@ public interface Domain extends Auditable {
    *
    * <p>If no backing tag is given, a tag named after the domain path, such as "Finance/Trading", is
    * created and used as the backing tag. If a tag with that name already exists, it is used only
-   * when the caller owns it or the metalake; otherwise the creation fails.
+   * when it backs no other domain and the caller owns it or the metalake; otherwise the creation
+   * fails.
    *
-   * @param name The name of the sub-domain, which must not contain "/".
+   * @param name The name of the sub-domain.
    * @param comment The comment of the sub-domain, or null.
    * @param properties The properties of the sub-domain, or null.
    * @param backingTag The existing tag, with an optional value, that backs the sub-domain, or null
@@ -187,9 +188,9 @@ public interface Domain extends Auditable {
    * @throws NoSuchTagException If the given backing tag does not exist.
    * @throws ForbiddenException If a tag with the default name exists and the caller does not own it
    *     or the metalake.
-   * @throws IllegalArgumentException If the name contains "/", the value of the given backing tag
-   *     is not allowed by the tag, this domain is itself a sub-domain, or the sub-domain cannot be
-   *     created under this domain.
+   * @throws IllegalArgumentException If a tag with the default name already backs another domain,
+   *     the value of the given backing tag is not allowed by the tag, this domain is itself a
+   *     sub-domain, or the sub-domain cannot be created under this domain.
    */
   Domain createSubdomain(
       String name,

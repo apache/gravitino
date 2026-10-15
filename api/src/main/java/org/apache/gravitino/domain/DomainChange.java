@@ -32,7 +32,7 @@ public interface DomainChange {
   /**
    * Creates a new domain change to rename the domain. The backing tag of the domain is not renamed.
    *
-   * @param newName The new name of the domain, which must not contain "/".
+   * @param newName The new name of the domain.
    * @return The domain change.
    */
   static DomainChange rename(String newName) {
