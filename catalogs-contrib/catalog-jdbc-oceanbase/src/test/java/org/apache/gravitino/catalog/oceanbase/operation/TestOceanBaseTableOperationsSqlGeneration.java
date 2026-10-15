@@ -27,6 +27,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -88,5 +89,54 @@ public class TestOceanBaseTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampsBeforeSqlGeneration() {
+    String expectedMessage =
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6";
+    assertCreateTableRejected(Types.TimestampType.withoutTimeZone(9), expectedMessage);
+    assertCreateTableRejected(Types.TimestampType.withTimeZone(9), expectedMessage);
+  }
+
+  @Test
+  public void testRejectVariantBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.VariantType.get(),
+        "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
+  }
+
+  @Test
+  public void testRejectUnknownBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.NullType.get(),
+        "OceanBase has no column type that preserves the Gravitino unknown type");
+  }
+
+  @Test
+  public void testRejectGeometryBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.GeometryType.crs84(),
+        "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata");
+  }
+
+  @Test
+  public void testRejectGeographyBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.GeographyType.crs84(),
+        "OceanBase has no geography column type that preserves CRS and edge algorithm metadata");
+  }
+
+  private void assertCreateTableRejected(Type type, String expectedMessage) {
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(type).withNullable(true).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
   }
 }
