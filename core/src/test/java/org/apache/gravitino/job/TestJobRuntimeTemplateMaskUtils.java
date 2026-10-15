@@ -20,6 +20,7 @@ package org.apache.gravitino.job;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
@@ -38,7 +39,18 @@ public class TestJobRuntimeTemplateMaskUtils {
             .withComment("c")
             .withJobType(JobType.SPARK)
             .withExecutable("local:///app.jar")
-            .withArguments(ImmutableList.of("--password=cli-secret", "plain-arg"))
+            .withArguments(
+                ImmutableList.of(
+                    "--password=cli-secret",
+                    "plain-arg",
+                    "--updater-options",
+                    "{\"gravitino_uri\":\"http://localhost\",\"password\":\"arg-pw\"}",
+                    "--spark-conf",
+                    "{\"jdbc.password\":\"arg-jdbc\",\"spark.executor.memory\":\"1g\"}",
+                    "--options",
+                    "{\"min-input-files\":\"2\",\"api_token\":\"arg-tok\"}",
+                    "--catalog",
+                    "ice"))
             .withEnvironments(ImmutableMap.of("AUTH_PASSWORD", "env-secret", "CATALOG", "ice"))
             .withCustomFields(
                 ImmutableMap.of(
@@ -59,9 +71,22 @@ public class TestJobRuntimeTemplateMaskUtils {
     Assertions.assertInstanceOf(SparkJobTemplateDTO.class, masked);
     SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
 
-    // arguments stay unmasked (no property keys)
-    Assertions.assertEquals(
-        ImmutableList.of("--password=cli-secret", "plain-arg"), spark.arguments());
+    List<String> args = spark.arguments();
+    // Free-form tokens stay unmasked.
+    Assertions.assertEquals("--password=cli-secret", args.get(0));
+    Assertions.assertEquals("plain-arg", args.get(1));
+    Assertions.assertEquals("--updater-options", args.get(2));
+    Assertions.assertFalse(args.get(3).contains("arg-pw"));
+    Assertions.assertTrue(args.get(3).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertTrue(args.get(3).contains("http://localhost"));
+    Assertions.assertEquals("--spark-conf", args.get(4));
+    Assertions.assertFalse(args.get(5).contains("arg-jdbc"));
+    Assertions.assertTrue(args.get(5).contains("1g"));
+    Assertions.assertEquals("--options", args.get(6));
+    Assertions.assertFalse(args.get(7).contains("arg-tok"));
+    Assertions.assertTrue(args.get(7).contains("2"));
+    Assertions.assertEquals("--catalog", args.get(8));
+    Assertions.assertEquals("ice", args.get(9));
 
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, spark.environments().get("AUTH_PASSWORD"));
@@ -72,6 +97,23 @@ public class TestJobRuntimeTemplateMaskUtils {
     Assertions.assertEquals("stats", spark.customFields().get("update_mode"));
     Assertions.assertFalse(spark.configs().get("spark_conf").contains("jdbc-pw"));
     Assertions.assertTrue(spark.configs().get("spark_conf").contains("1g"));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsSkipsMissingValue() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(ImmutableList.of("--spark-conf", "--catalog", "ice"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    Assertions.assertEquals(
+        ImmutableList.of("--spark-conf", "--catalog", "ice"), spark.arguments());
   }
 
   @Test

@@ -19,6 +19,8 @@
 package org.apache.gravitino.job;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -31,13 +33,11 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
  * Masks sensitive-named values on resolved runtime job templates before they are exposed on API or
  * event paths. Stored runtime JSON is unchanged.
  *
- * <p>{@code arguments} are not masked: they are positional strings without property keys, so {@link
- * org.apache.gravitino.secret.SecretPropertyUtils} keyword matching cannot apply. Do not put
- * secrets in job arguments; use {@code environments}, {@code configs}, or {@code customFields}
- * instead.
- *
- * <p>Nested JSON string maps are masked only for the Iceberg built-in / optimizer keys listed in
- * {@link #NESTED_JSON_MAP_KEYS} (never by guessing on a leading curly brace).
+ * <p>Nested JSON string maps are masked for the Iceberg built-in / optimizer keys listed in {@link
+ * #NESTED_JSON_MAP_KEYS} on {@code environments} / {@code customFields} / {@code configs}, and for
+ * the matching CLI flags in {@link #NESTED_JSON_ARGUMENT_FLAGS} on {@code arguments} (the value
+ * token immediately after the flag). Other argument tokens are left unchanged; do not put secrets
+ * in free-form arguments.
  */
 public final class JobRuntimeTemplateMaskUtils {
 
@@ -54,6 +54,13 @@ public final class JobRuntimeTemplateMaskUtils {
    */
   static final Set<String> NESTED_JSON_MAP_KEYS =
       ImmutableSet.of("updater_options", "spark_conf", "options");
+
+  /**
+   * Iceberg built-in job CLI flags whose following argument is a JSON map with the same masking
+   * rules as {@link #NESTED_JSON_MAP_KEYS}.
+   */
+  static final Set<String> NESTED_JSON_ARGUMENT_FLAGS =
+      ImmutableSet.of("--updater-options", "--spark-conf", "--options");
 
   private JobRuntimeTemplateMaskUtils() {}
 
@@ -79,7 +86,7 @@ public final class JobRuntimeTemplateMaskUtils {
           .withComment(shell.comment())
           .withJobType(shell.jobType())
           .withExecutable(shell.executable())
-          .withArguments(shell.arguments())
+          .withArguments(maskSensitiveArguments(shell.arguments()))
           .withEnvironments(maskedEnvironments)
           .withCustomFields(maskedCustomFields)
           .withScripts(shell.scripts())
@@ -93,7 +100,7 @@ public final class JobRuntimeTemplateMaskUtils {
           .withComment(spark.comment())
           .withJobType(spark.jobType())
           .withExecutable(spark.executable())
-          .withArguments(spark.arguments())
+          .withArguments(maskSensitiveArguments(spark.arguments()))
           .withEnvironments(maskedEnvironments)
           .withCustomFields(maskedCustomFields)
           .withClassName(spark.className())
@@ -112,5 +119,36 @@ public final class JobRuntimeTemplateMaskUtils {
     return properties == null
         ? null
         : HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties, NESTED_JSON_MAP_KEYS);
+  }
+
+  /**
+   * Masks the value token after known Iceberg JSON-map CLI flags. Other tokens (including free-form
+   * strings that happen to look like JSON) are left unchanged.
+   */
+  @Nullable
+  private static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
+    if (arguments == null) {
+      return null;
+    }
+    if (arguments.isEmpty()) {
+      return arguments;
+    }
+    List<String> result = new ArrayList<>(arguments.size());
+    boolean maskNext = false;
+    for (String arg : arguments) {
+      if (maskNext) {
+        maskNext = false;
+        if (arg != null && !arg.startsWith("--")) {
+          result.add(HiddenPropertyMaskUtils.maskSensitiveJsonValue(arg));
+          continue;
+        }
+        // Missing value for the previous flag; this token may itself be a nest flag.
+      }
+      result.add(arg);
+      if (arg != null && NESTED_JSON_ARGUMENT_FLAGS.contains(arg)) {
+        maskNext = true;
+      }
+    }
+    return result;
   }
 }

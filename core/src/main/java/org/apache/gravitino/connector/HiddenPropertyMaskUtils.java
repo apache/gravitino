@@ -241,8 +241,26 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Non-object roots and malformed JSON are replaced with {@link
-   * #MASKED_VALUE} so secrets are not returned unchanged.
+   * nested objects and arrays). Malformed JSON is replaced with {@link #MASKED_VALUE}. Scalar JSON
+   * roots are returned unchanged.
+   *
+   * <p>Useful when a caller already knows a string is a nested JSON map (for example a CLI argument
+   * following {@code --spark-conf}).
+   *
+   * @param value JSON string to mask; may be null
+   * @return masked JSON, {@link #MASKED_VALUE} on parse failure, or null when {@code value} is null
+   */
+  @Nullable
+  public static String maskSensitiveJsonValue(@Nullable String value) {
+    if (value == null) {
+      return null;
+    }
+    return maskNestedJsonValue(value);
+  }
+
+  /**
+   * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
+   * nested objects and arrays). Malformed JSON is replaced with {@link #MASKED_VALUE}.
    */
   private static String maskNestedJsonValue(String value) {
     ObjectMapper mapper = JsonUtils.anyFieldMapper();
