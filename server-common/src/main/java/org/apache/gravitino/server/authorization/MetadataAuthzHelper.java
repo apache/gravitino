@@ -355,19 +355,20 @@ public class MetadataAuthzHelper {
     NameIdentifier[] nameIdentifiers =
         Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
     boolean isMetadataObject = METADATA_OBJECT_ENTITY_TYPES.contains(entityType);
-    if (enableAuthorization() && nameIdentifiers.length > 0) {
-      if (isMetadataObject) {
-        Arrays.stream(nameIdentifiers)
-            .forEach(
-                identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
-      }
+    if (!enableAuthorization() || nameIdentifiers.length == 0) {
+      return entities;
+    }
+    if (isMetadataObject) {
+      Arrays.stream(nameIdentifiers)
+          .forEach(
+              identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));
+    }
 
-      if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
-        // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
-        // the list visible, and no object-level deny exists, so the per-object authorization loop
-        // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
-        return entities;
-      }
+    if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
+      // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
+      // the list visible, and no object-level deny exists, so the per-object authorization loop
+      // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
+      return entities;
     }
     preloadToCache(entityType, nameIdentifiers);
     // Ownership is defined on metadata objects, independently of the filter expression.
