@@ -1058,7 +1058,7 @@ public class TestPOConverters {
     assertTrue(storedJson.contains("\"commitTrigger\""));
     assertTrue(storedJson.contains("\"minIntervalMs\""));
     assertTrue(storedJson.contains("\"jobOptions\""));
-    assertTrue(storedJson.contains("\"updateOptions\""));
+    assertTrue(storedJson.contains("\"updaterOptions\""));
     assertFalse(storedJson.contains("\"executionSpec\""));
 
     PolicyVersionPO policyVersionPO =
@@ -1077,7 +1077,7 @@ public class TestPOConverters {
     assertEquals(Boolean.TRUE, loaded.commitTrigger());
     assertEquals(3_600_000L, loaded.minIntervalMs());
     assertEquals("4g", loaded.jobOptions().get("spark.executor.memory"));
-    assertEquals("ml", loaded.updateOptions().get("metalake"));
+    assertEquals("ml", loaded.updaterOptions().get("metalake"));
     assertEquals("134217728", loaded.rewriteOptions().get("target-file-size-bytes"));
   }
 

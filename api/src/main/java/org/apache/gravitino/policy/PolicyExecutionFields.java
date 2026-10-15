@@ -56,7 +56,7 @@ public final class PolicyExecutionFields {
   public static final String JOB_OPTIONS_JSON_KEY = "jobOptions";
 
   /** JSON property for updater / control-plane options. */
-  public static final String UPDATE_OPTIONS_JSON_KEY = "updateOptions";
+  public static final String UPDATER_OPTIONS_JSON_KEY = "updaterOptions";
 
   private PolicyExecutionFields() {}
 
@@ -70,7 +70,7 @@ public final class PolicyExecutionFields {
    * @param commitTrigger optional commit flag; any non-null value counts as set
    * @param minIntervalMs cooldown ms
    * @param jobOptions job options map
-   * @param updateOptions update options map
+   * @param updaterOptions updater options map
    * @return {@code true} when any field is present
    */
   public static boolean hasAny(
@@ -78,12 +78,12 @@ public final class PolicyExecutionFields {
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     return StringUtils.isNotBlank(timeTrigger)
         || commitTrigger != null
         || minIntervalMs != null
         || (jobOptions != null && !jobOptions.isEmpty())
-        || (updateOptions != null && !updateOptions.isEmpty());
+        || (updaterOptions != null && !updaterOptions.isEmpty());
   }
 
   /**
@@ -96,22 +96,22 @@ public final class PolicyExecutionFields {
    * @param commitTrigger optional commit flag
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions job options (may be empty)
-   * @param updateOptions update options (may be empty)
+   * @param updaterOptions updater options (may be empty)
    */
   public static void validate(
       @Nullable String timeTrigger,
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
-    if (!hasAny(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions)) {
+      @Nullable Map<String, String> updaterOptions) {
+    if (!hasAny(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions)) {
       return;
     }
     if (minIntervalMs != null) {
       Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");
     }
     validateOptionMap(jobOptions, "jobOptions");
-    validateOptionMap(updateOptions, "updateOptions");
+    validateOptionMap(updaterOptions, "updaterOptions");
   }
 
   /**

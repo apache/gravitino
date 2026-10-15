@@ -68,9 +68,9 @@ public interface ExecutablePolicyContent extends PolicyContent {
   }
 
   /**
-   * @return update options; never {@code null}
+   * @return updater options; never {@code null}
    */
-  default Map<String, String> updateOptions() {
-    return executionSpec().updateOptions();
+  default Map<String, String> updaterOptions() {
+    return executionSpec().updaterOptions();
   }
 }

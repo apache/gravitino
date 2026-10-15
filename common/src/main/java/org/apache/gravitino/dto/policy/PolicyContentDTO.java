@@ -86,7 +86,7 @@ public interface PolicyContentDTO extends PolicyContent {
      *
      * @return unmodifiable defensive copy; never {@code null} (empty when unset)
      */
-    Map<String, String> updateOptions();
+    Map<String, String> updaterOptions();
   }
 
   /** Represents a custom policy content DTO. */
@@ -135,7 +135,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Represents a typed iceberg compaction policy content DTO. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updateOptions", "rewriteOptions"})
+  @ToString(exclude = {"jobOptions", "updaterOptions", "rewriteOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergCompactionContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
@@ -180,9 +180,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @Nullable
     private Map<String, String> jobOptions;
 
-    @JsonProperty("updateOptions")
+    @JsonProperty("updaterOptions")
     @Nullable
-    private Map<String, String> updateOptions;
+    private Map<String, String> updaterOptions;
 
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
@@ -297,8 +297,8 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    public Map<String, String> updateOptions() {
-      return PolicyExecutionFields.copyOptions(updateOptions);
+    public Map<String, String> updaterOptions() {
+      return PolicyExecutionFields.copyOptions(updaterOptions);
     }
 
     @Override
@@ -339,13 +339,13 @@ public interface PolicyContentDTO extends PolicyContent {
           commitTrigger(),
           minIntervalMs(),
           jobOptions(),
-          updateOptions());
+          updaterOptions());
     }
   }
 
   /** Typed orphan cleanup policy content for REST requests and responses. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updateOptions"})
+  @ToString(exclude = {"jobOptions", "updaterOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
@@ -374,9 +374,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @Nullable
     private Map<String, String> jobOptions;
 
-    @JsonProperty("updateOptions")
+    @JsonProperty("updaterOptions")
     @Nullable
-    private Map<String, String> updateOptions;
+    private Map<String, String> updaterOptions;
 
     private IcebergOrphanFileRemovalContentDTO() {}
 
@@ -428,8 +428,8 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    public Map<String, String> updateOptions() {
-      return PolicyExecutionFields.copyOptions(updateOptions);
+    public Map<String, String> updaterOptions() {
+      return PolicyExecutionFields.copyOptions(updaterOptions);
     }
 
     @Override
@@ -468,13 +468,13 @@ public interface PolicyContentDTO extends PolicyContent {
           commitTrigger(),
           minIntervalMs(),
           jobOptions(),
-          updateOptions());
+          updaterOptions());
     }
   }
 
   /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updateOptions"})
+  @ToString(exclude = {"jobOptions", "updaterOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
@@ -494,9 +494,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @Nullable
     private Map<String, String> jobOptions;
 
-    @JsonProperty("updateOptions")
+    @JsonProperty("updaterOptions")
     @Nullable
-    private Map<String, String> updateOptions;
+    private Map<String, String> updaterOptions;
 
     private IcebergRewriteManifestsContentDTO() {}
 
@@ -531,8 +531,8 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    public Map<String, String> updateOptions() {
-      return PolicyExecutionFields.copyOptions(updateOptions);
+    public Map<String, String> updaterOptions() {
+      return PolicyExecutionFields.copyOptions(updaterOptions);
     }
 
     @Override
@@ -561,13 +561,13 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public PolicyContent toDomainContent() {
       return PolicyContents.icebergRewriteManifests(
-          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updateOptions());
+          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updaterOptions());
     }
   }
 
   /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updateOptions"})
+  @ToString(exclude = {"jobOptions", "updaterOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
@@ -587,9 +587,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @Nullable
     private Map<String, String> jobOptions;
 
-    @JsonProperty("updateOptions")
+    @JsonProperty("updaterOptions")
     @Nullable
-    private Map<String, String> updateOptions;
+    private Map<String, String> updaterOptions;
 
     private IcebergSnapshotExpirationContentDTO() {}
 
@@ -624,8 +624,8 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    public Map<String, String> updateOptions() {
-      return PolicyExecutionFields.copyOptions(updateOptions);
+    public Map<String, String> updaterOptions() {
+      return PolicyExecutionFields.copyOptions(updaterOptions);
     }
 
     @Override
@@ -654,7 +654,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public PolicyContent toDomainContent() {
       return PolicyContents.icebergSnapshotExpiration(
-          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updateOptions());
+          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updaterOptions());
     }
   }
 

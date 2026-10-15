@@ -51,7 +51,7 @@ public class TestPolicyExecutionSpec {
 
     String text = spec.toString();
     Assertions.assertTrue(text.contains("jobOptionsKeys=[password]"));
-    Assertions.assertTrue(text.contains("updateOptionsKeys=[oauth_credential]"));
+    Assertions.assertTrue(text.contains("updaterOptionsKeys=[oauth_credential]"));
     Assertions.assertFalse(text.contains("secret"));
     Assertions.assertFalse(text.contains("id:secret"));
   }

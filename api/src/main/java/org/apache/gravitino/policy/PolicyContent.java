@@ -28,7 +28,7 @@ import org.apache.gravitino.MetadataObject;
  * The interface of the content of the policy.
  *
  * <p>Execution peers ({@code timeTrigger}, {@code commitTrigger}, {@code minIntervalMs}, {@code
- * jobOptions}, {@code updateOptions}) are not part of this universal interface. Built-in Iceberg
+ * jobOptions}, {@code updaterOptions}) are not part of this universal interface. Built-in Iceberg
  * maintenance contents carry them via {@link ExecutablePolicyContent}/{@link PolicyExecutionSpec}.
  */
 public interface PolicyContent {

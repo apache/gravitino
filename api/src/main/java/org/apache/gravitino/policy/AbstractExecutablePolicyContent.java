@@ -40,7 +40,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
   @Nullable private final Boolean commitTrigger;
   @Nullable private final Long minIntervalMs;
   private final Map<String, String> jobOptions;
-  private final Map<String, String> updateOptions;
+  private final Map<String, String> updaterOptions;
 
   /**
    * Creates content with the given execution peers.
@@ -54,7 +54,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
     this.commitTrigger = spec.commitTrigger();
     this.minIntervalMs = spec.minIntervalMs();
     this.jobOptions = spec.jobOptions();
-    this.updateOptions = spec.updateOptions();
+    this.updaterOptions = spec.updaterOptions();
   }
 
   /** Creates content with unset execution peers. */
@@ -65,7 +65,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
   @Override
   public PolicyExecutionSpec executionSpec() {
     return PolicyExecutionSpec.of(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   /**
@@ -120,7 +120,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
         .append(spec.minIntervalMs())
         .append(", jobOptionsKeys=")
         .append(spec.jobOptions().keySet())
-        .append(", updateOptionsKeys=")
-        .append(spec.updateOptions().keySet());
+        .append(", updaterOptionsKeys=")
+        .append(spec.updaterOptions().keySet());
   }
 }

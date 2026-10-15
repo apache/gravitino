@@ -187,7 +187,7 @@ public class TestPolicyDTO {
             .withCommitTrigger(true)
             .withMinIntervalMs(3_600_000L)
             .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
-            .withUpdateOptions(ImmutableMap.of("metalake", "ml"))
+            .withUpdaterOptions(ImmutableMap.of("metalake", "ml"))
             .build();
 
     PolicyDTO policyDTO =
@@ -210,7 +210,7 @@ public class TestPolicyDTO {
     Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
     Assertions.assertEquals(3_600_000L, content.minIntervalMs());
     Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
-    Assertions.assertEquals("ml", content.updateOptions().get("metalake"));
+    Assertions.assertEquals("ml", content.updaterOptions().get("metalake"));
     Assertions.assertDoesNotThrow(content::validate);
   }
 
@@ -219,7 +219,7 @@ public class TestPolicyDTO {
     PolicyContentDTO.IcebergCompactionContentDTO content =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
             .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
-            .withUpdateOptions(ImmutableMap.of("metalake", "ml"))
+            .withUpdaterOptions(ImmutableMap.of("metalake", "ml"))
             .build();
 
     Assertions.assertThrows(
@@ -227,9 +227,9 @@ public class TestPolicyDTO {
         () -> content.jobOptions().put("spark.executor.memory", "8g"));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> content.updateOptions().put("metalake", "other"));
+        () -> content.updaterOptions().put("metalake", "other"));
     Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
-    Assertions.assertEquals("ml", content.updateOptions().get("metalake"));
+    Assertions.assertEquals("ml", content.updaterOptions().get("metalake"));
   }
 
   @Test

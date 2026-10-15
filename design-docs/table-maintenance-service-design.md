@@ -177,10 +177,10 @@ policy may enable both commit and time triggers (`commitTrigger` and `timeTrigge
 #### 5.1.1 Evaluate triggers (`commitTrigger` + `timeTrigger`)
 
 Triggers are **flat** peers on policy content (same JSON object as `jobOptions` /
-`rewriteOptions` / `minIntervalMs`): `commitTrigger` (boolean) and `timeTrigger` (cron
-string). Operators edit that versioned content through Policy APIs. `policy_meta` only holds
-identity and attachment. The `scheduled_*_tasks` tables are runtime state for db-scheduler —
-not where operators set triggers.
+`updaterOptions` / `rewriteOptions` / `minIntervalMs`): `commitTrigger` (boolean) and
+`timeTrigger` (cron string). Operators edit that versioned content through Policy APIs.
+`policy_meta` only holds identity and attachment. The `scheduled_*_tasks` tables are runtime
+state for db-scheduler — not where operators set triggers.
 
 TMS has two trigger modes. They never feed each other's queues:
 
@@ -226,12 +226,13 @@ Example content:
 | `timeTrigger`    | Sets / refreshes next `policy-expand` due time                    |
 | `minIntervalMs`  | Cooldown for this policy's type; highest when set                 |
 | `jobOptions`     | Non-sensitive Spark / IRC client props (`uri`, `type`, memory, …) |
+| `updaterOptions` | Non-sensitive Gravitino updater props (`gravitino_uri`, `metalake`, …) |
 
 #### 5.1.2 Sensitive credentials
 
 Policy content is versioned, edited through Policy APIs, and readable with `VIEW_POLICY`.
 **Secrets must not live there.** Put credential-shaped keys in `jobOptions` /
-`rewriteOptions` / `updateOptions` and create/alter **rejects** them. Non-sensitive Spark /
+`rewriteOptions` / `updaterOptions` and create/alter **rejects** them. Non-sensitive Spark /
 IRC client props (`uri`, `type`, memory, …) stay on the nearest policy; auth is
 cluster-static in `gravitino.conf` (values may be SecretManager references). Conf keys: §7.4.
 
@@ -249,7 +250,7 @@ each — it does not write secrets back into policy content:
 
 | Runtime bag         | Non-sensitive (examples)                                      | Auth overlay                            |
 | ------------------- | ------------------------------------------------------------- | --------------------------------------- |
-| **`updateOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*` |
+| **`updaterOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*` |
 | **`jobOptions`**    | nearest policy `jobOptions` (`uri`, `type`, Spark resources…) | `gravitino.maintenance.ircAuth.*`       |
 
 ### 5.2 Scheduling and commit
@@ -529,7 +530,7 @@ Cluster-static — **not** in policy content and **not** a DB table.
 
 | Prefix                                 | Role                                                         | Merged into `runJob` bag                        |
 | -------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| `gravitino.maintenance.gravitinoAuth.` | Expand / submit / RBAC client; also jobs that call Gravitino | `updateOptions` (+ non-sensitive updater props) |
+| `gravitino.maintenance.gravitinoAuth.` | Expand / submit / RBAC client; also jobs that call Gravitino | `updaterOptions` (+ non-sensitive updater props) |
 | `gravitino.maintenance.ircAuth.`       | Iceberg REST client auth for Spark Jobs → IRC                | `jobOptions` (+ policy non-sensitive props)     |
 
 Illustrative auth keys (same shape under each prefix; values may be SecretManager references where

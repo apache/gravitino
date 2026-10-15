@@ -29,7 +29,7 @@ import org.apache.commons.lang3.StringUtils;
  *
  * <p>This type is Jackson-independent in-memory composition for {@link ExecutablePolicyContent}.
  * Wire and persistence JSON keep the flat peer keys ({@code timeTrigger}, {@code commitTrigger},
- * {@code minIntervalMs}, {@code jobOptions}, {@code updateOptions}) on content DTOs / content
+ * {@code minIntervalMs}, {@code jobOptions}, {@code updaterOptions}) on content DTOs / content
  * classes; converters reconstruct a {@code PolicyExecutionSpec} from those fields.
  */
 public final class PolicyExecutionSpec {
@@ -42,19 +42,19 @@ public final class PolicyExecutionSpec {
   @Nullable private final Boolean commitTrigger;
   @Nullable private final Long minIntervalMs;
   private final Map<String, String> jobOptions;
-  private final Map<String, String> updateOptions;
+  private final Map<String, String> updaterOptions;
 
   private PolicyExecutionSpec(
       @Nullable String timeTrigger,
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     this.timeTrigger = StringUtils.isBlank(timeTrigger) ? null : timeTrigger;
     this.commitTrigger = commitTrigger;
     this.minIntervalMs = minIntervalMs;
     this.jobOptions = PolicyExecutionFields.copyOptions(jobOptions);
-    this.updateOptions = PolicyExecutionFields.copyOptions(updateOptions);
+    this.updaterOptions = PolicyExecutionFields.copyOptions(updaterOptions);
   }
 
   /**
@@ -65,7 +65,7 @@ public final class PolicyExecutionSpec {
    *     is retained
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
-   * @param updateOptions optional update options
+   * @param updaterOptions optional updater options
    * @return immutable spec, or {@link #EMPTY} when every peer is unset
    */
   public static PolicyExecutionSpec of(
@@ -73,13 +73,13 @@ public final class PolicyExecutionSpec {
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     if (!PolicyExecutionFields.hasAny(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions)) {
+        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions)) {
       return EMPTY;
     }
     return new PolicyExecutionSpec(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   /**
@@ -122,10 +122,10 @@ public final class PolicyExecutionSpec {
   }
 
   /**
-   * @return update options; never {@code null}
+   * @return updater options; never {@code null}
    */
-  public Map<String, String> updateOptions() {
-    return updateOptions;
+  public Map<String, String> updaterOptions() {
+    return updaterOptions;
   }
 
   /**
@@ -133,13 +133,13 @@ public final class PolicyExecutionSpec {
    */
   public boolean hasAny() {
     return PolicyExecutionFields.hasAny(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   /** Validates shared peer constraints (cooldown and option maps). */
   public void validate() {
     PolicyExecutionFields.validate(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   @Override
@@ -155,12 +155,12 @@ public final class PolicyExecutionSpec {
         && Objects.equals(commitTrigger, that.commitTrigger)
         && Objects.equals(minIntervalMs, that.minIntervalMs)
         && Objects.equals(jobOptions, that.jobOptions)
-        && Objects.equals(updateOptions, that.updateOptions);
+        && Objects.equals(updaterOptions, that.updaterOptions);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
+    return Objects.hash(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   @Override
@@ -176,8 +176,8 @@ public final class PolicyExecutionSpec {
         + minIntervalMs
         + ", jobOptionsKeys="
         + jobOptions.keySet()
-        + ", updateOptionsKeys="
-        + updateOptions.keySet()
+        + ", updaterOptionsKeys="
+        + updaterOptions.keySet()
         + '}';
   }
 }

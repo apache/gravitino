@@ -678,14 +678,14 @@ public class DTOConverters {
     Boolean commitTrigger = null;
     Long minIntervalMs = null;
     Map<String, String> jobOptions = null;
-    Map<String, String> updateOptions = null;
+    Map<String, String> updaterOptions = null;
     if (policyContent instanceof ExecutablePolicyContent) {
       ExecutablePolicyContent executable = (ExecutablePolicyContent) policyContent;
       timeTrigger = executable.timeTrigger();
       commitTrigger = executable.commitTrigger();
       minIntervalMs = executable.minIntervalMs();
       jobOptions = emptyToNull(executable.jobOptions());
-      updateOptions = emptyToNull(executable.updateOptions());
+      updaterOptions = emptyToNull(executable.updaterOptions());
     }
 
     if (policyContent instanceof PolicyContents.CustomContent) {
@@ -707,7 +707,7 @@ public class DTOConverters {
           .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
           .withJobOptions(jobOptions)
-          .withUpdateOptions(updateOptions)
+          .withUpdaterOptions(updaterOptions)
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
@@ -716,7 +716,7 @@ public class DTOConverters {
           .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
           .withJobOptions(jobOptions)
-          .withUpdateOptions(updateOptions)
+          .withUpdaterOptions(updaterOptions)
           .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
@@ -725,7 +725,7 @@ public class DTOConverters {
           .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
           .withJobOptions(jobOptions)
-          .withUpdateOptions(updateOptions)
+          .withUpdaterOptions(updaterOptions)
           .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
@@ -744,7 +744,7 @@ public class DTOConverters {
           .withCommitTrigger(commitTrigger)
           .withMinIntervalMs(minIntervalMs)
           .withJobOptions(jobOptions)
-          .withUpdateOptions(updateOptions)
+          .withUpdaterOptions(updaterOptions)
           .build();
     }
 

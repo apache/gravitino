@@ -382,7 +382,7 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
             .append(", sortOrder='")
             .append(sortOrder)
             .append('\'')
-            // Never render rewriteOptions values; same redaction as jobOptions / updateOptions.
+            // Never render rewriteOptions values; same redaction as jobOptions / updaterOptions.
             .append(", rewriteOptionsKeys=")
             .append(rewriteOptions.keySet())
             .append(", ");

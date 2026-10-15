@@ -166,7 +166,7 @@ public class PolicyContents {
    * @param commitTrigger optional commit-trigger flag
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
-   * @param updateOptions optional update options
+   * @param updaterOptions optional updater options
    * @return iceberg compaction policy content
    */
   public static PolicyContent icebergDataCompaction(
@@ -182,7 +182,7 @@ public class PolicyContents {
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
@@ -193,7 +193,7 @@ public class PolicyContents {
         sortOrder,
         rewriteOptions,
         PolicyExecutionSpec.of(
-            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -229,7 +229,7 @@ public class PolicyContents {
    * @param commitTrigger optional commit-trigger flag (must not be {@code true})
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
-   * @param updateOptions optional update options
+   * @param updaterOptions optional updater options
    * @return orphan cleanup policy content
    */
   public static PolicyContent icebergOrphanFileRemoval(
@@ -240,13 +240,13 @@ public class PolicyContents {
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     return new IcebergOrphanFileRemovalContent(
         olderThanDays,
         location,
         dryRun,
         PolicyExecutionSpec.of(
-            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -265,7 +265,7 @@ public class PolicyContents {
    * @param commitTrigger optional commit-trigger flag
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
-   * @param updateOptions optional update options
+   * @param updaterOptions optional updater options
    * @return rewrite-manifests policy content
    */
   public static PolicyContent icebergRewriteManifests(
@@ -273,10 +273,10 @@ public class PolicyContents {
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     return new IcebergRewriteManifestsContent(
         PolicyExecutionSpec.of(
-            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -295,7 +295,7 @@ public class PolicyContents {
    * @param commitTrigger optional commit-trigger flag
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
-   * @param updateOptions optional update options
+   * @param updaterOptions optional updater options
    * @return snapshot-expiration policy content
    */
   public static PolicyContent icebergSnapshotExpiration(
@@ -303,10 +303,10 @@ public class PolicyContents {
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @Nullable Map<String, String> updaterOptions) {
     return new IcebergSnapshotExpirationContent(
         PolicyExecutionSpec.of(
-            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions));
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
