@@ -327,36 +327,20 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
 
     RESTClient restClient = getNormalUserRestClient();
-    String path =
-        "api/metalakes/"
-            + METALAKE
-            + "/objects/table/"
-            + CATALOG
-            + "."
-            + SCHEMA
-            + ".table1/policies";
-    PolicyNameListResponse nameListResponse =
-        restClient.get(
-            path,
-            PolicyNameListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
-    Assertions.assertEquals(0, nameListResponse.getNames().length);
-    Assertions.assertTrue(nameListResponse.hasInaccessiblePolicies());
+    assertPolicyListResponse(restClient, "table1", new String[0], true);
 
-    MetadataObjectPolicyListResponse listResponse =
-        restClient.get(
-            path,
-            Map.of("details", "true"),
-            MetadataObjectPolicyListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
-    Assertions.assertEquals(0, listResponse.getPolicies().length);
-    Assertions.assertTrue(listResponse.hasInaccessiblePolicies());
+    SupportsPolicies table2Policies =
+        gravitinoMetalake
+            .loadCatalog(CATALOG)
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA, "table2"))
+            .supportsPolicies();
+    table2Policies.associatePolicies(new String[] {"policy1"}, new String[0]);
+    try {
+      assertPolicyListResponse(restClient, "table2", new String[] {"policy2"}, true);
+    } finally {
+      table2Policies.associatePolicies(new String[0], new String[] {"policy1"});
+    }
   }
 
   @Test
@@ -479,5 +463,52 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException("Failed to access the normal user's REST client", e);
     }
+  }
+
+  private void assertPolicyListResponse(
+      RESTClient restClient,
+      String tableName,
+      String[] expectedPolicyNames,
+      boolean hasInaccessiblePolicies) {
+    String path =
+        "api/metalakes/"
+            + METALAKE
+            + "/objects/table/"
+            + CATALOG
+            + "."
+            + SCHEMA
+            + "."
+            + tableName
+            + "/policies";
+    PolicyNameListResponse nameListResponse =
+        restClient.get(
+            path,
+            PolicyNameListResponse.class,
+            Map.of(),
+            error -> {
+              throw new AssertionError(error);
+            });
+    String[] actualPolicyNames = nameListResponse.getNames();
+    Arrays.sort(actualPolicyNames);
+    Arrays.sort(expectedPolicyNames);
+    Assertions.assertArrayEquals(expectedPolicyNames, actualPolicyNames);
+    Assertions.assertEquals(hasInaccessiblePolicies, nameListResponse.hasInaccessiblePolicies());
+
+    MetadataObjectPolicyListResponse listResponse =
+        restClient.get(
+            path,
+            Map.of("details", "true"),
+            MetadataObjectPolicyListResponse.class,
+            Map.of(),
+            error -> {
+              throw new AssertionError(error);
+            });
+    String[] actualDetailNames =
+        Arrays.stream(listResponse.getPolicies())
+            .map(policy -> policy.name())
+            .toArray(String[]::new);
+    Arrays.sort(actualDetailNames);
+    Assertions.assertArrayEquals(expectedPolicyNames, actualDetailNames);
+    Assertions.assertEquals(hasInaccessiblePolicies, listResponse.hasInaccessiblePolicies());
   }
 }
