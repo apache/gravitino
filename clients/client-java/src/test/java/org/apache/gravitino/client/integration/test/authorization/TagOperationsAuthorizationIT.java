@@ -39,7 +39,10 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.RESTClient;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -286,6 +289,32 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals("tag2", tableSupportTagByNormalUser.getTag("tag2").name());
     assertEquals("tag3", tableSupportTagByNormalUser.getTag("tag3").name());
     assertThrows(ForbiddenException.class, () -> tableSupportTagByNormalUser.getTag("tag1"));
+
+    RESTClient restClient = getNormalUserRestClient();
+    String path =
+        "api/metalakes/" + METALAKE + "/objects/table/" + CATALOG + "." + SCHEMA + ".table1/tags";
+    TagNameListResponse nameListResponse =
+        restClient.get(
+            path,
+            TagNameListResponse.class,
+            Map.of(),
+            error -> {
+              throw new AssertionError(error);
+            });
+    Assertions.assertEquals(2, nameListResponse.getNames().length);
+    Assertions.assertTrue(nameListResponse.hasInaccessibleTags());
+
+    MetadataObjectTagListResponse listResponse =
+        restClient.get(
+            path,
+            Map.of("details", "true"),
+            MetadataObjectTagListResponse.class,
+            Map.of(),
+            error -> {
+              throw new AssertionError(error);
+            });
+    Assertions.assertEquals(2, listResponse.getTags().length);
+    Assertions.assertTrue(listResponse.hasInaccessibleTags());
   }
 
   @Test
@@ -471,5 +500,16 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private Column[] createColumns() {
     return new Column[] {Column.of("col1", Types.StringType.get())};
+  }
+
+  private RESTClient getNormalUserRestClient() {
+    try {
+      Method restClientMethod =
+          normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
+      restClientMethod.setAccessible(true);
+      return (RESTClient) restClientMethod.invoke(normalUserClient);
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException("Failed to access the normal user's REST client", e);
+    }
   }
 }

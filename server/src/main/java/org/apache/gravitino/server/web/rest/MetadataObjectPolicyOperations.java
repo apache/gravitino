@@ -45,8 +45,9 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -182,13 +183,6 @@ public class MetadataObjectPolicyOperations {
             Set<PolicyDTO> policies = Sets.newHashSet();
             PolicyEntity[] nonInheritedPolicies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
-            nonInheritedPolicies =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.POLICY,
-                    nonInheritedPolicies,
-                    (policyEntity -> NameIdentifierUtil.ofPolicy(metalake, policyEntity.name())));
             if (ArrayUtils.isNotEmpty(nonInheritedPolicies)) {
               Collections.addAll(
                   policies,
@@ -210,17 +204,30 @@ public class MetadataObjectPolicyOperations {
               }
             }
 
+            PolicyDTO[] policyDTOs = policies.toArray(new PolicyDTO[0]);
+            int policyCount = policyDTOs.length;
+            policyDTOs =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.POLICY,
+                    policyDTOs,
+                    policyDTO -> NameIdentifierUtil.ofPolicy(metalake, policyDTO.name()));
+            boolean hasInaccessiblePolicies = policyDTOs.length < policyCount;
+
             if (verbose) {
               LOG.info(
                   "List {} policies info for object type: {}, full name: {} under metalake: {}",
-                  policies.size(),
+                  policyDTOs.length,
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new PolicyListResponse(policies.toArray(new PolicyDTO[0])));
+              return Utils.ok(
+                  new MetadataObjectPolicyListResponse(policyDTOs, hasInaccessiblePolicies));
 
             } else {
-              String[] policyNames = policies.stream().map(PolicyDTO::name).toArray(String[]::new);
+              String[] policyNames =
+                  Arrays.stream(policyDTOs).map(PolicyDTO::name).toArray(String[]::new);
 
               LOG.info(
                   "List {} policies for object type: {}, full name: {} under metalake: {}",
@@ -228,7 +235,7 @@ public class MetadataObjectPolicyOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new NameListResponse(policyNames));
+              return Utils.ok(new PolicyNameListResponse(policyNames, hasInaccessiblePolicies));
             }
           });
 

@@ -42,8 +42,10 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
@@ -137,9 +139,11 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
-    PolicyListResponse policyListResponse = response.readEntity(PolicyListResponse.class);
+    MetadataObjectPolicyListResponse policyListResponse =
+        response.readEntity(MetadataObjectPolicyListResponse.class);
     Assertions.assertEquals(0, policyListResponse.getCode());
     Assertions.assertEquals(catalogPolicyInfos.length, policyListResponse.getPolicies().length);
+    Assertions.assertFalse(policyListResponse.hasInaccessiblePolicies());
 
     Map<String, Policy> resultPolicies =
         Arrays.stream(policyListResponse.getPolicies())
@@ -159,9 +163,10 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
 
-    NameListResponse nameListResponse = response1.readEntity(NameListResponse.class);
+    PolicyNameListResponse nameListResponse = response1.readEntity(PolicyNameListResponse.class);
     Assertions.assertEquals(0, nameListResponse.getCode());
     Assertions.assertEquals(catalogPolicyInfos.length, nameListResponse.getNames().length);
+    Assertions.assertFalse(nameListResponse.hasInaccessiblePolicies());
     Assertions.assertArrayEquals(
         Arrays.stream(catalogPolicyInfos).map(PolicyEntity::name).toArray(String[]::new),
         nameListResponse.getNames());
