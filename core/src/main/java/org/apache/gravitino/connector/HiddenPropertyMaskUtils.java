@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -79,8 +80,8 @@ public final class HiddenPropertyMaskUtils {
   private static final Set<String> NESTED_JSON_MAP_KEYS =
       ImmutableSet.of("updater_options", "spark_conf", "options");
 
-  private static final TypeReference<Map<String, String>> STRING_MAP_TYPE =
-      new TypeReference<Map<String, String>>() {};
+  private static final TypeReference<Map<String, Object>> OBJECT_MAP_TYPE =
+      new TypeReference<Map<String, Object>>() {};
 
   private HiddenPropertyMaskUtils() {}
 
@@ -242,24 +243,31 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
-   * Parses {@code value} as a flat JSON string map and masks sensitive-named keys. On parse failure
+   * Parses {@code value} as a flat JSON map and masks sensitive-named keys. Scalar values (string,
+   * number, boolean, null) are stringified like {@code IcebergSparkConfigUtils.parseFlatJsonMap};
+   * nested objects/arrays cause the original value to be returned unchanged. On parse failure
    * returns {@code value} unchanged.
    */
   private static String maskNestedJsonMapValue(String value) {
     ObjectMapper mapper = JsonUtils.anyFieldMapper();
     try {
-      Map<String, String> nested = mapper.readValue(value, STRING_MAP_TYPE);
+      Map<String, Object> nested = mapper.readValue(value, OBJECT_MAP_TYPE);
       if (nested == null || nested.isEmpty()) {
         return value;
       }
       boolean changed = false;
       Map<String, String> masked = new LinkedHashMap<>(nested.size());
-      for (Map.Entry<String, String> entry : nested.entrySet()) {
+      for (Map.Entry<String, Object> entry : nested.entrySet()) {
         String nestedKey = entry.getKey();
-        String nestedValue = entry.getValue();
-        if (nestedKey == null || nestedValue == null) {
+        Object nestedRaw = entry.getValue();
+        if (nestedKey == null) {
           continue;
         }
+        if (nestedRaw instanceof Map || nestedRaw instanceof List) {
+          // Not a flat map — leave the original blob alone rather than partially rewriting it.
+          return value;
+        }
+        String nestedValue = nestedRaw == null ? "" : nestedRaw.toString();
         if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)
             || SecretPropertyUtils.isSecretProperty(nestedKey, nestedValue)) {
           masked.put(nestedKey, MASKED_VALUE);
@@ -270,7 +278,7 @@ public final class HiddenPropertyMaskUtils {
       }
       return changed ? mapper.writeValueAsString(masked) : value;
     } catch (Exception e) {
-      // Malformed or non-string-map JSON — leave the original value alone.
+      // Malformed JSON — leave the original value alone.
       return value;
     }
   }
