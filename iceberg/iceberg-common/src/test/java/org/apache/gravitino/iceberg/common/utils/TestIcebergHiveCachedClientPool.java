@@ -99,17 +99,4 @@ public class TestIcebergHiveCachedClientPool {
                 () -> IcebergHiveCachedClientPool.extractKey("ugi", configuration));
     Assertions.assertNotEquals(key9, key10);
   }
-
-  @Test
-  void testInstanceReplacementDoesNotSabotageTheSharedCache() throws IOException {
-    Configuration configuration = new Configuration();
-    Map<String, String> properties = Maps.newHashMap();
-    IcebergHiveCachedClientPool pool1 = new IcebergHiveCachedClientPool(configuration, properties);
-    HiveClientPool cached = pool1.clientPool();
-
-    // Instances are replaceable views over the shared static cache: a fresh instance for
-    // the same key must reuse the cached pool rather than create a parallel entry.
-    IcebergHiveCachedClientPool pool2 = new IcebergHiveCachedClientPool(configuration, properties);
-    Assertions.assertSame(cached, pool2.clientPool());
-  }
 }

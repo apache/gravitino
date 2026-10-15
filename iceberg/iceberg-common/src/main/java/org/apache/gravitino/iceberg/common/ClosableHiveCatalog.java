@@ -88,10 +88,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
     // Do clean up work here. We need a mechanism to close the HiveCatalog; however, HiveCatalog
     // doesn't implement the Closeable interface.
 
-    // Close the internal HiveCatalog client pool to release catalog-local resources. The
-    // IcebergHiveCachedClientPool installed by initialize() shares a JVM-wide client cache
-    // whose entries are reclaimed by their own expire-after-access eviction, so it is
-    // deliberately not closed here.
+    // First, close the internal HiveCatalog client pool to prevent resource leaks
     closeInternalClientPool();
   }
 
@@ -147,10 +144,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
         new IcebergHiveCachedClientPool(this.getConf(), this.properties());
     FieldUtils.writeField(this, "clients", newClientPool, true);
 
-    // Then try to release the old pool's scheduler thread. IcebergHiveCachedClientPool's
-    // shared client cache is deliberately NOT closed here: entries (and their connections)
-    // belong to every catalog in the process and are reclaimed by the cache's own
-    // expire-after-access eviction.
+    // Then try to close the old pool to release resources
     if (oldPool != null) {
       // Additionally, try to shutdown the internal scheduler thread pool in Iceberg's
       // CachedClientPool to prevent memory leak. This is necessary because Iceberg's
@@ -199,9 +193,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   /**
    * Close the internal HiveCatalog client pool using reflection. This is necessary because
-   * HiveCatalog doesn't provide a public API to close its client pool. IcebergHiveCachedClientPool
-   * is not {@link AutoCloseable}: its shared client cache is reclaimed by its own
-   * expire-after-access eviction, so there is nothing to close here for it.
+   * HiveCatalog doesn't provide a public API to close its client pool.
    */
   private void closeInternalClientPool() {
     try {
