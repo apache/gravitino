@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -29,10 +27,10 @@ import org.apache.commons.lang3.StringUtils;
  * Immutable execution peer fields for executable policy contents: triggers, cooldown, and option
  * bags.
  *
- * <p>JSON property names remain the flat peer keys on policy content ({@code timeTrigger}, {@code
- * commitTrigger}, {@code minIntervalMs}, {@code jobOptions}, {@code updateOptions}). This type is
- * the in-memory composition for {@link ExecutablePolicyContent}; persistence uses
- * {@code @JsonUnwrapped} so those keys stay flat in stored policy content JSON.
+ * <p>This type is Jackson-independent in-memory composition for {@link ExecutablePolicyContent}.
+ * Wire and persistence JSON keep the flat peer keys ({@code timeTrigger}, {@code commitTrigger},
+ * {@code minIntervalMs}, {@code jobOptions}, {@code updateOptions}) on content DTOs / content
+ * classes; converters reconstruct a {@code PolicyExecutionSpec} from those fields.
  */
 public final class PolicyExecutionSpec {
 
@@ -62,24 +60,20 @@ public final class PolicyExecutionSpec {
   /**
    * Creates an immutable execution spec.
    *
-   * <p>Annotated for Jackson so {@code POConverters} can rebuild executable policy content from
-   * stored JSON (including {@code @JsonUnwrapped} peers on {@link
-   * AbstractExecutablePolicyContent}).
-   *
    * @param timeTrigger optional cron expression
-   * @param commitTrigger optional commit-trigger flag
+   * @param commitTrigger optional commit-trigger flag; any non-null value (including {@code false})
+   *     is retained
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
    * @param updateOptions optional update options
-   * @return immutable spec
+   * @return immutable spec, or {@link #EMPTY} when every peer is unset
    */
-  @JsonCreator
   public static PolicyExecutionSpec of(
-      @JsonProperty("timeTrigger") @Nullable String timeTrigger,
-      @JsonProperty("commitTrigger") @Nullable Boolean commitTrigger,
-      @JsonProperty("minIntervalMs") @Nullable Long minIntervalMs,
-      @JsonProperty("jobOptions") @Nullable Map<String, String> jobOptions,
-      @JsonProperty("updateOptions") @Nullable Map<String, String> updateOptions) {
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updateOptions) {
     if (!PolicyExecutionFields.hasAny(
         timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions)) {
       return EMPTY;
@@ -104,8 +98,8 @@ public final class PolicyExecutionSpec {
   }
 
   /**
-   * @return {@code true} when commit-triggered evaluation is enabled, otherwise {@code null} or
-   *     {@code false}
+   * @return commit-trigger flag when explicitly supplied (including {@code false}), or {@code null}
+   *     when unset
    */
   @Nullable
   public Boolean commitTrigger() {

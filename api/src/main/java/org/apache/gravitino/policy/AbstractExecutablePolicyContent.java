@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.policy;
 
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -27,12 +27,20 @@ import javax.annotation.Nullable;
  *
  * <p>Peers are supplied at construction as an immutable {@link PolicyExecutionSpec}. Subclasses
  * keep strategy fields separate and pass the spec through {@link
- * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}. Persisted JSON keeps peer keys flat via
- * {@link JsonUnwrapped}.
+ * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}. Persisted JSON keeps peer keys flat by
+ * storing the scalar/map fields directly on this type (same layout as {@code PolicyContentDTO});
+ * {@link #executionSpec()} reconstructs the in-memory composition. DTOs use the same flat keys via
+ * {@code DTOConverters}.
  */
 public abstract class AbstractExecutablePolicyContent implements ExecutablePolicyContent {
 
-  @JsonUnwrapped private final PolicyExecutionSpec executionSpec;
+  // Flat peer fields for persistence JSON (POConverters / anyFieldMapper). Kept in sync with
+  // PolicyExecutionSpec; do not nest under an "executionSpec" object.
+  @Nullable private final String timeTrigger;
+  @Nullable private final Boolean commitTrigger;
+  @Nullable private final Long minIntervalMs;
+  private final Map<String, String> jobOptions;
+  private final Map<String, String> updateOptions;
 
   /**
    * Creates content with the given execution peers.
@@ -41,7 +49,12 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
    *     PolicyExecutionSpec#empty()}
    */
   protected AbstractExecutablePolicyContent(@Nullable PolicyExecutionSpec executionSpec) {
-    this.executionSpec = executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
+    PolicyExecutionSpec spec = executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
+    this.timeTrigger = spec.timeTrigger();
+    this.commitTrigger = spec.commitTrigger();
+    this.minIntervalMs = spec.minIntervalMs();
+    this.jobOptions = spec.jobOptions();
+    this.updateOptions = spec.updateOptions();
   }
 
   /** Creates content with unset execution peers. */
@@ -51,7 +64,8 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
 
   @Override
   public PolicyExecutionSpec executionSpec() {
-    return executionSpec;
+    return PolicyExecutionSpec.of(
+        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions);
   }
 
   /**
@@ -64,7 +78,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
   @Override
   public void validate() throws IllegalArgumentException {
     ExecutablePolicyContent.super.validate();
-    executionSpec.validate();
+    executionSpec().validate();
   }
 
   /**
@@ -74,14 +88,14 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
    * @return true when execution fields are equal
    */
   protected boolean executionFieldsEqual(AbstractExecutablePolicyContent that) {
-    return Objects.equals(executionSpec, that.executionSpec);
+    return Objects.equals(executionSpec(), that.executionSpec());
   }
 
   /**
    * @return hash of execution fields
    */
   protected int executionFieldsHashCode() {
-    return Objects.hashCode(executionSpec);
+    return Objects.hashCode(executionSpec());
   }
 
   /**
@@ -96,16 +110,17 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
    * @param sb builder already containing an opening brace and any subclass fields
    */
   protected void appendExecutionFields(StringBuilder sb) {
+    PolicyExecutionSpec spec = executionSpec();
     sb.append("timeTrigger='")
-        .append(executionSpec.timeTrigger())
+        .append(spec.timeTrigger())
         .append('\'')
         .append(", commitTrigger=")
-        .append(executionSpec.commitTrigger())
+        .append(spec.commitTrigger())
         .append(", minIntervalMs=")
-        .append(executionSpec.minIntervalMs())
+        .append(spec.minIntervalMs())
         .append(", jobOptionsKeys=")
-        .append(executionSpec.jobOptions().keySet())
+        .append(spec.jobOptions().keySet())
         .append(", updateOptionsKeys=")
-        .append(executionSpec.updateOptions().keySet());
+        .append(spec.updateOptions().keySet());
   }
 }

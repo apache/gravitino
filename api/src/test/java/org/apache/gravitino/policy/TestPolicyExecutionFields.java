@@ -46,8 +46,9 @@ public class TestPolicyExecutionFields {
   }
 
   @Test
-  void testCommitTriggerFalseDoesNotCountAsSet() {
-    Assertions.assertFalse(
+  void testCommitTriggerFalseCountsAsSet() {
+    // Explicit false must round-trip; do not treat it as unset when other peers are absent.
+    Assertions.assertTrue(
         PolicyExecutionFields.hasAny(
             null, false, null, Collections.emptyMap(), Collections.emptyMap()));
   }

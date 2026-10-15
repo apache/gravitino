@@ -134,7 +134,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Represents a typed iceberg compaction policy content DTO. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updateOptions"})
+  @ToString(exclude = {"jobOptions", "updateOptions", "rewriteOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergCompactionContentDTO implements PolicyContentDTO, ExecutionPeersDTO {

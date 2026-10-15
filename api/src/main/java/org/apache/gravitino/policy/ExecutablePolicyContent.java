@@ -44,8 +44,8 @@ public interface ExecutablePolicyContent extends PolicyContent {
   }
 
   /**
-   * @return {@code true} when commit-triggered evaluation is enabled, otherwise {@code null} or
-   *     {@code false}
+   * @return commit-trigger flag when explicitly supplied (including {@code false}), or {@code null}
+   *     when unset
    */
   @Nullable
   default Boolean commitTrigger() {

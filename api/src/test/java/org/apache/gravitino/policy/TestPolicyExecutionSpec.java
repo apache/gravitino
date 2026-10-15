@@ -32,6 +32,14 @@ public class TestPolicyExecutionSpec {
   }
 
   @Test
+  void commitTriggerFalseIsRetainedWhenAlone() {
+    PolicyExecutionSpec spec = PolicyExecutionSpec.of(null, false, null, null, null);
+    Assertions.assertNotSame(PolicyExecutionSpec.EMPTY, spec);
+    Assertions.assertEquals(Boolean.FALSE, spec.commitTrigger());
+    Assertions.assertTrue(spec.hasAny());
+  }
+
+  @Test
   void toStringOmitsOptionValues() {
     PolicyExecutionSpec spec =
         PolicyExecutionSpec.of(

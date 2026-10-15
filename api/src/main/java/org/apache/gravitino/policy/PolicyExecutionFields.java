@@ -63,8 +63,11 @@ public final class PolicyExecutionFields {
   /**
    * Whether any execution peer field is set.
    *
+   * <p>Every non-null {@code commitTrigger} (including {@code false}) counts as explicitly
+   * supplied, so JSON round-trips and {@code equals}/{@code hashCode} do not depend on other peers.
+   *
    * @param timeTrigger optional cron expression
-   * @param commitTrigger optional commit flag ({@code true} counts as set)
+   * @param commitTrigger optional commit flag; any non-null value counts as set
    * @param minIntervalMs cooldown ms
    * @param jobOptions job options map
    * @param updateOptions update options map
@@ -77,7 +80,7 @@ public final class PolicyExecutionFields {
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updateOptions) {
     return StringUtils.isNotBlank(timeTrigger)
-        || Boolean.TRUE.equals(commitTrigger)
+        || commitTrigger != null
         || minIntervalMs != null
         || (jobOptions != null && !jobOptions.isEmpty())
         || (updateOptions != null && !updateOptions.isEmpty());
