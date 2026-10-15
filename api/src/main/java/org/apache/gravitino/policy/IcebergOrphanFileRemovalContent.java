@@ -31,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Configuration for table-level Iceberg orphan cleanup on an optimizer invocation. */
-public class IcebergOrphanFileRemovalContent implements PolicyContent {
+public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -64,10 +64,19 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
   private final boolean dryRun;
 
   private IcebergOrphanFileRemovalContent() {
-    this(DEFAULT_OLDER_THAN_DAYS, null, DEFAULT_DRY_RUN);
+    this(DEFAULT_OLDER_THAN_DAYS, null, DEFAULT_DRY_RUN, PolicyExecutionSpec.empty());
   }
 
   IcebergOrphanFileRemovalContent(long olderThanDays, @Nullable String location, boolean dryRun) {
+    this(olderThanDays, location, dryRun, PolicyExecutionSpec.empty());
+  }
+
+  IcebergOrphanFileRemovalContent(
+      long olderThanDays,
+      @Nullable String location,
+      boolean dryRun,
+      @Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
     this.olderThanDays = olderThanDays;
     this.location = location;
     this.dryRun = dryRun;
@@ -136,7 +145,10 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
 
   @Override
   public void validate() {
-    PolicyContent.super.validate();
+    super.validate();
+    Preconditions.checkArgument(
+        !Boolean.TRUE.equals(commitTrigger()),
+        "commitTrigger is not allowed for orphan file removal");
     validateOlderThanDays(olderThanDays);
     Preconditions.checkArgument(
         location == null || StringUtils.isNotBlank(location), "location must not be blank");
@@ -151,13 +163,14 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
       return false;
     }
     IcebergOrphanFileRemovalContent that = (IcebergOrphanFileRemovalContent) other;
-    return olderThanDays == that.olderThanDays
+    return executionFieldsEqual(that)
+        && olderThanDays == that.olderThanDays
         && dryRun == that.dryRun
         && Objects.equals(location, that.location);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(olderThanDays, location, dryRun);
+    return Objects.hash(executionFieldsHashCode(), olderThanDays, location, dryRun);
   }
 }

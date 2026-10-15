@@ -134,6 +134,55 @@ public class PolicyContents {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
+    return icebergDataCompaction(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
+        rewriteOptions,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content with rewrite strategy, sort order, and execution
+   * peers.
+   *
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
+   * @param maxPartitionNum maximum partition number selected for compaction
+   * @param rewriteStrategy Iceberg rewrite_data_files top-level strategy
+   * @param sortOrder Iceberg rewrite_data_files top-level sort_order
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergDataCompaction(
+      long minDataFileMse,
+      long minDeleteFileNumber,
+      long dataFileMseWeight,
+      long deleteFileNumberWeight,
+      long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
     return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
@@ -142,7 +191,9 @@ public class PolicyContents {
         maxPartitionNum,
         rewriteStrategy,
         sortOrder,
-        rewriteOptions);
+        rewriteOptions,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -165,7 +216,37 @@ public class PolicyContents {
    */
   public static PolicyContent icebergOrphanFileRemoval(
       long olderThanDays, @Nullable String location, boolean dryRun) {
-    return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
+    return icebergOrphanFileRemoval(olderThanDays, location, dryRun, null, null, null, null, null);
+  }
+
+  /**
+   * Creates orphan cleanup policy content with execution peers.
+   *
+   * @param olderThanDays minimum file age in days, from 1 to 36500 inclusive
+   * @param location optional scan location within the table
+   * @param dryRun whether to list candidates without deleting them
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag (must not be {@code true})
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return orphan cleanup policy content
+   */
+  public static PolicyContent icebergOrphanFileRemoval(
+      long olderThanDays,
+      @Nullable String location,
+      boolean dryRun,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergOrphanFileRemovalContent(
+        olderThanDays,
+        location,
+        dryRun,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -174,7 +255,28 @@ public class PolicyContents {
    * @return rewrite-manifests policy content
    */
   public static PolicyContent icebergRewriteManifests() {
-    return new IcebergRewriteManifestsContent();
+    return icebergRewriteManifests(null, null, null, null, null);
+  }
+
+  /**
+   * Creates placeholder Iceberg rewrite-manifests policy content with execution peers.
+   *
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return rewrite-manifests policy content
+   */
+  public static PolicyContent icebergRewriteManifests(
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergRewriteManifestsContent(
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -183,7 +285,28 @@ public class PolicyContents {
    * @return snapshot-expiration policy content
    */
   public static PolicyContent icebergSnapshotExpiration() {
-    return new IcebergSnapshotExpirationContent();
+    return icebergSnapshotExpiration(null, null, null, null, null);
+  }
+
+  /**
+   * Creates placeholder Iceberg snapshot-expiration policy content with execution peers.
+   *
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return snapshot-expiration policy content
+   */
+  public static PolicyContent icebergSnapshotExpiration(
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergSnapshotExpirationContent(
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
