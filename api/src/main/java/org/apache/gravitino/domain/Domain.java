@@ -38,7 +38,8 @@ import org.apache.gravitino.tag.TagValue;
  * published.
  *
  * <p>A {@code Domain} is a snapshot. The operations on it that change the domain itself, such as
- * {@link #publish()}, return a new snapshot and leave this one unchanged.
+ * {@link #publish()} and {@link #attachToParent(String)}, return a new snapshot and leave this one
+ * unchanged.
  */
 @Evolving
 public interface Domain extends Auditable {
@@ -128,6 +129,29 @@ public interface Domain extends Auditable {
   Domain unpublish() throws NoSuchDomainException, IllegalArgumentException;
 
   /**
+   * Attaches this domain as a sub-domain of the given parent. If this domain is a sub-domain of
+   * another domain, it is moved under the given parent. Attaching to the current parent has no
+   * effect.
+   *
+   * @param parent The name of the parent domain.
+   * @return The attached domain.
+   * @throws NoSuchDomainException If this domain or the parent does not exist.
+   * @throws IllegalArgumentException If this domain cannot be attached to the parent, for example
+   *     because the parent is this domain or a sub-domain, this domain has sub-domains, or this
+   *     domain is published and the parent is not.
+   */
+  Domain attachToParent(String parent) throws NoSuchDomainException, IllegalArgumentException;
+
+  /**
+   * Detaches this domain from its parent, making it a top-level domain. Detaching a top-level
+   * domain has no effect.
+   *
+   * @return The detached domain.
+   * @throws NoSuchDomainException If this domain does not exist.
+   */
+  Domain detachFromParent() throws NoSuchDomainException;
+
+  /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
    * If no backing tag is given, a tag named after the domain path, such as "Finance/Trading", is
    * created and used as the backing tag.
@@ -149,28 +173,6 @@ public interface Domain extends Auditable {
       @Nullable Map<String, String> properties,
       @Nullable TagValue backingTag)
       throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException;
-
-  /**
-   * Attaches an existing domain as a sub-domain of this domain. If the domain is a sub-domain of
-   * another domain, it is moved under this domain. Attaching a sub-domain of this domain has no
-   * effect.
-   *
-   * @param name The name of the domain to attach.
-   * @throws NoSuchDomainException If this domain or the domain to attach does not exist.
-   * @throws IllegalArgumentException If the domain cannot be attached, for example because this
-   *     domain is a sub-domain, the domain to attach has sub-domains, or the domain to attach is
-   *     published and this domain is not.
-   */
-  void attachSubdomain(String name) throws NoSuchDomainException, IllegalArgumentException;
-
-  /**
-   * Detaches a sub-domain from this domain. The detached domain becomes top-level.
-   *
-   * @param name The name of the sub-domain to detach.
-   * @return True if the sub-domain is detached, false if it is not a sub-domain of this domain.
-   * @throws NoSuchDomainException If this domain does not exist.
-   */
-  boolean detachSubdomain(String name) throws NoSuchDomainException;
 
   /**
    * Lists the names of the sub-domains of this domain.
