@@ -82,6 +82,7 @@ public final class ExecutablePolicyContentSerde {
    *
    * @param spec execution peers; {@code null} or empty writes nothing
    * @param gen JSON generator already inside a content object
+   * @throws IOException if writing JSON fails
    */
   public static void writeExecutionPeerFields(@Nullable PolicyExecutionSpec spec, JsonGenerator gen)
       throws IOException {
