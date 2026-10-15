@@ -232,6 +232,29 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
+   * Initializes the configured driver class so that it registers itself with {@link DriverManager}
+   * before {@link #getDriver()} looks it up.
+   *
+   * <p>{@code DriverManager} only discovers drivers on the server classpath by itself. A driver in
+   * the catalog's own libs directory registers only when its class is initialized, which the lazy
+   * connection pool does on its first connection. The create-time probe runs before that, so
+   * without this the lookup fails with "No suitable driver". The class is loaded by this catalog's
+   * class loader, which is also the loader {@code DriverManager} checks the caller against.
+   */
+  private void ensureDriverRegistered() {
+    String driverClassName = jdbcConfig.getJdbcDriver();
+    if (StringUtils.isBlank(driverClassName)) {
+      return;
+    }
+    try {
+      Class.forName(driverClassName, true, getClass().getClassLoader());
+    } catch (ClassNotFoundException e) {
+      // The data source already rejects a missing driver class when the catalog is initialized;
+      // leave the lookup to getDriver(), which reports its own error.
+    }
+  }
+
+  /**
    * Lists the schemas under the given namespace.
    *
    * @param namespace The namespace to list the schemas for.
@@ -280,6 +303,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public void probeConnection(NameIdentifier catalogIdent) {
     Driver driver;
     try {
+      ensureDriverRegistered();
       driver = getDriver();
     } catch (SQLException e) {
       throw new ConnectionFailedException(
