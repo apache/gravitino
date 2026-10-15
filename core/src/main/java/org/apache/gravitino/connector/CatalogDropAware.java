@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
+import java.util.List;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
 
 /** Supports cleanup that must run only when a catalog is permanently dropped. */
@@ -26,4 +28,24 @@ public interface CatalogDropAware {
 
   /** Performs cleanup after the catalog metadata has been permanently dropped. */
   void onCatalogDropped();
+
+  /**
+   * Performs cleanup after the catalog metadata has been permanently dropped, when the catalog
+   * registration is unmanaged and its external objects (schemas and the tables inside them) are
+   * left in place. Implementations should remove the Gravitino identifier that was written into
+   * those external objects, for example the {@code gravitino.identifier} property or the "From
+   * Gravitino, DO NOT EDIT" snippet in comments, so that a later catalog that manages the same
+   * external objects does not inherit stale identifiers.
+   *
+   * <p>Cleanup is best-effort: a failure to clear an identifier must not fail the drop. The default
+   * implementation only forwards to {@link #onCatalogDropped()}; unmanaged catalogs that never
+   * write identifiers to external objects do not need to override this method.
+   *
+   * @param remainingExternalSchemas the identifiers of the schemas that still exist in the external
+   *     system after the catalog registration was dropped. The list is empty for managed catalogs,
+   *     whose external objects are dropped together with the registration.
+   */
+  default void onCatalogDropped(List<NameIdentifier> remainingExternalSchemas) {
+    onCatalogDropped();
+  }
 }
