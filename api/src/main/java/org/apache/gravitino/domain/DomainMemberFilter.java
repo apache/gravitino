@@ -29,19 +29,31 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * The filter of {@link Domain#listMembers(DomainMemberFilter)}. A filter built without setting any
- * field matches all members of the domain and its sub-domains.
+ * The filter of {@link Domain#listMembers(DomainMemberFilter)}.
+ *
+ * <p>The members of the domain itself are always listed. The sub-domain options choose which
+ * sub-domains' members are listed as well:
+ *
+ * <ul>
+ *   <li>All sub-domains, the default: {@link Builder#withIncludeAllSubdomains(boolean)
+ *       withIncludeAllSubdomains(true)}.
+ *   <li>Only the given sub-domains: {@link Builder#withSubdomains(String...)}.
+ *   <li>No sub-domain: {@code withIncludeAllSubdomains(false)} without sub-domains.
+ * </ul>
+ *
+ * <p>To list only the members of a sub-domain, call {@link Domain#listMembers(DomainMemberFilter)}
+ * on the sub-domain.
  */
 @Evolving
 public final class DomainMemberFilter {
 
-  private final boolean includeSubdomains;
+  private final boolean includeAllSubdomains;
   private final Set<MetadataObject.Type> types;
   @Nullable private final String nameContains;
   private final Set<String> subdomains;
 
   private DomainMemberFilter(Builder builder) {
-    this.includeSubdomains = builder.includeSubdomains;
+    this.includeAllSubdomains = builder.includeAllSubdomains;
     this.types = builder.types;
     this.nameContains = builder.nameContains;
     this.subdomains = builder.subdomains;
@@ -57,12 +69,13 @@ public final class DomainMemberFilter {
   }
 
   /**
-   * Returns whether the members of the sub-domains are included.
+   * Returns whether the members of all sub-domains are listed. When it is true, {@link
+   * #subdomains()} is empty.
    *
-   * @return True if the members of the sub-domains are included, the default.
+   * @return True if the members of all sub-domains are listed, the default.
    */
-  public boolean includeSubdomains() {
-    return includeSubdomains;
+  public boolean includeAllSubdomains() {
+    return includeAllSubdomains;
   }
 
   /**
@@ -85,11 +98,11 @@ public final class DomainMemberFilter {
   }
 
   /**
-   * Returns the sub-domains whose members are listed. When it is not empty, only the members
-   * reached through these sub-domains are listed, not those of the domain itself.
+   * Returns the sub-domains whose members are listed in addition to those of the domain itself. It
+   * is used only when {@link #includeAllSubdomains()} is false.
    *
-   * @return The names of the sub-domains, or an empty set to list the members of the domain and all
-   *     its sub-domains.
+   * @return The names of the sub-domains, or an empty set when all sub-domains or no sub-domain are
+   *     listed.
    */
   public Set<String> subdomains() {
     return subdomains;
@@ -110,7 +123,7 @@ public final class DomainMemberFilter {
       return false;
     }
     DomainMemberFilter that = (DomainMemberFilter) other;
-    return includeSubdomains == that.includeSubdomains
+    return includeAllSubdomains == that.includeAllSubdomains
         && types.equals(that.types)
         && Objects.equals(nameContains, that.nameContains)
         && subdomains.equals(that.subdomains);
@@ -123,7 +136,7 @@ public final class DomainMemberFilter {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(includeSubdomains, types, nameContains, subdomains);
+    return Objects.hash(includeAllSubdomains, types, nameContains, subdomains);
   }
 
   /**
@@ -134,8 +147,8 @@ public final class DomainMemberFilter {
   @Override
   public String toString() {
     return "DomainMemberFilter{"
-        + "includeSubdomains="
-        + includeSubdomains
+        + "includeAllSubdomains="
+        + includeAllSubdomains
         + ", types="
         + types
         + ", nameContains="
@@ -148,7 +161,7 @@ public final class DomainMemberFilter {
   /** A builder for {@link DomainMemberFilter}. */
   public static final class Builder {
 
-    private boolean includeSubdomains = true;
+    private boolean includeAllSubdomains = true;
     private Set<MetadataObject.Type> types = ImmutableSet.of();
     @Nullable private String nameContains;
     private Set<String> subdomains = ImmutableSet.of();
@@ -156,13 +169,18 @@ public final class DomainMemberFilter {
     private Builder() {}
 
     /**
-     * Sets whether the members of the sub-domains are included. Defaults to true.
+     * Sets whether the members of all sub-domains are listed. Defaults to true. Setting it to true
+     * clears the sub-domains set by {@link #withSubdomains(String...)}; setting it to false without
+     * sub-domains lists only the members of the domain itself.
      *
-     * @param includeSubdomains Whether the members of the sub-domains are included.
+     * @param includeAllSubdomains Whether the members of all sub-domains are listed.
      * @return This builder.
      */
-    public Builder withIncludeSubdomains(boolean includeSubdomains) {
-      this.includeSubdomains = includeSubdomains;
+    public Builder withIncludeAllSubdomains(boolean includeAllSubdomains) {
+      this.includeAllSubdomains = includeAllSubdomains;
+      if (includeAllSubdomains) {
+        this.subdomains = ImmutableSet.of();
+      }
       return this;
     }
 
@@ -205,9 +223,9 @@ public final class DomainMemberFilter {
     }
 
     /**
-     * Sets the sub-domains whose members are listed. Only the members reached through these
-     * sub-domains are listed, not those of the domain itself. Defaults to the domain and all its
-     * sub-domains.
+     * Sets the sub-domains whose members are listed in addition to those of the domain itself. It
+     * replaces {@link #withIncludeAllSubdomains(boolean) withIncludeAllSubdomains(true)}; without
+     * names, only the members of the domain itself are listed.
      *
      * @param subdomains The names of the sub-domains.
      * @return This builder.
@@ -220,6 +238,7 @@ public final class DomainMemberFilter {
             StringUtils.isNotBlank(subdomain), "subdomains must not contain a blank name");
       }
       this.subdomains = ImmutableSet.copyOf(subdomains);
+      this.includeAllSubdomains = false;
       return this;
     }
 
@@ -227,13 +246,8 @@ public final class DomainMemberFilter {
      * Builds a domain member filter.
      *
      * @return The immutable domain member filter.
-     * @throws IllegalArgumentException If sub-domains are set while the members of the sub-domains
-     *     are excluded.
      */
     public DomainMemberFilter build() {
-      Preconditions.checkArgument(
-          subdomains.isEmpty() || includeSubdomains,
-          "subdomains cannot be set when includeSubdomains is false");
       return new DomainMemberFilter(this);
     }
   }
