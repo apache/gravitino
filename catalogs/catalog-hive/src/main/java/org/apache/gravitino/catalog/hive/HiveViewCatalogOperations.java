@@ -219,9 +219,12 @@ class HiveViewCatalogOperations implements ViewCatalog {
           Dialects.TRINO.equalsIgnoreCase(HiveView.detectDialect(currentHiveTable.properties()));
       // Owner/runAsInvoker round-trip through the TRINO_VIEW_OWNER_PROPERTY reserved property (see
       // toHmsViewOriginalText()/loadHiveView()), but Gravitino's view model still has no path
-      // concept, so replacing a native Trino view with a non-empty SQL path would silently discard
-      // it. Reject the replace instead of doing that.
-      boolean currentTrinoViewHasUnrepresentableFields = false;
+      // concept, so altering a native Trino view with a non-empty SQL path would silently discard
+      // it on the next load. Reject the whole alterView() call upfront - before any change is
+      // applied to HMS - rather than only guarding ReplaceView: toHiveView() (used to build the
+      // return value for every change type, including a plain rename) now also rejects a
+      // non-empty path, and discovering that only after c.alterTable() already ran would report
+      // a successful HMS mutation as a thrown exception.
       String currentOwner = null;
       if (isTrinoView) {
         TrinoNativeViewCodec.ViewDefinition currentDefinition;
@@ -235,7 +238,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   + "decoded",
               e);
         }
-        currentTrinoViewHasUnrepresentableFields = !currentDefinition.path.isEmpty();
+        if (!currentDefinition.path.isEmpty()) {
+          throw new UnsupportedOperationException(
+              "View "
+                  + ident
+                  + " is a native Trino view with a non-empty SQL path; Gravitino cannot "
+                  + "represent this field, so altering it would silently discard it");
+        }
         currentOwner = currentDefinition.owner;
       }
 
@@ -300,13 +309,6 @@ class HiveViewCatalogOperations implements ViewCatalog {
             updatedProperties.remove(property);
           }
         } else if (change instanceof ViewChange.ReplaceView) {
-          if (currentTrinoViewHasUnrepresentableFields) {
-            throw new UnsupportedOperationException(
-                "View "
-                    + ident
-                    + " is a native Trino view with a non-empty SQL path; Gravitino cannot "
-                    + "represent this field, so replacing it would silently discard it");
-          }
           ViewChange.ReplaceView replace = (ViewChange.ReplaceView) change;
           SQLRepresentation sqlRepresentation =
               validateSQLRepresentation(
@@ -550,6 +552,16 @@ class HiveViewCatalogOperations implements ViewCatalog {
         throw new UnsupportedOperationException(
             "View " + ident + " carries the presto_view marker but its payload cannot be decoded",
             e);
+      }
+      if (!decoded.path.isEmpty()) {
+        // Gravitino's view model has no SQL path (SET PATH) concept, so silently dropping it on
+        // load would let an unqualified function resolve differently than the view's creator
+        // intended. Reject the view instead of exposing it with incorrect semantics.
+        throw new UnsupportedOperationException(
+            "View "
+                + ident
+                + " is a native Trino view with a non-empty SQL path; Gravitino cannot "
+                + "represent this field");
       }
       representationSql = decoded.originalSql;
       resolvedComment = decoded.comment;

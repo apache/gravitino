@@ -1330,17 +1330,92 @@ class TestHiveCatalogOperations {
     // non-empty path would silently discard it. TrinoNativeViewCodec.encode() always writes an
     // empty path (Gravitino itself never produces one), so this payload is built by hand to
     // simulate a view created directly by a native Trino connector with a non-empty path.
-    String encoded =
-        "/* Presto View: "
-            + Base64.getEncoder()
-                .encodeToString(
-                    ("{\"originalSql\":\"SELECT 1\",\"catalog\":null,\"schema\":null,"
-                            + "\"columns\":[{\"name\":\"c1\",\"type\":\"integer\",\"comment\":null}],"
-                            + "\"comment\":null,\"owner\":null,\"runAsInvoker\":true,"
-                            + "\"path\":[{\"catalog\":\"c\",\"schema\":\"s\"}]}")
-                        .getBytes(StandardCharsets.UTF_8))
-            + " */";
-    assertReplaceRejectsUnrepresentableNativeView(encoded);
+    assertReplaceRejectsUnrepresentableNativeView(nativeViewPayloadWithNonEmptyPath());
+  }
+
+  @Test
+  void testAlterViewRenameRejectsExistingNonEmptyPathBeforeMutatingHms() throws Exception {
+    // A rename (or any non-ReplaceView change) doesn't touch the view's encoded payload, so it
+    // was previously allowed to proceed even on a native view with an unrepresentable non-empty
+    // path - only to have the HMS rename already succeed and then throw while toHiveView() built
+    // the return value, reporting a successful mutation as a failure. The rejection must happen
+    // upfront, before alterTable() is ever called.
+    String encoded = nativeViewPayloadWithNonEmptyPath();
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_trino")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> op.alterView(NameIdentifier.of("db", "v_trino"), ViewChange.rename("v_trino2")));
+
+    verify(hiveClient, never()).alterTable(anyString(), anyString(), anyString(), any());
+  }
+
+  @Test
+  void testLoadViewRejectsNonEmptyPath() throws Exception {
+    // Gravitino's view model has no SQL path (SET PATH) concept; silently dropping a non-empty
+    // path on load would let an unqualified function resolve differently than the native Trino
+    // view's creator intended. TrinoNativeViewCodec.encode() always writes an empty path
+    // (Gravitino itself never produces one), so this payload is built by hand to simulate a view
+    // created directly by a native Trino connector with a non-empty path.
+    String encoded = nativeViewPayloadWithNonEmptyPath();
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_trino")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> op.loadView(NameIdentifier.of("db", "v_trino")));
+  }
+
+  /**
+   * Builds a native "Presto View" payload with a non-empty SQL path by hand.
+   * TrinoNativeViewCodec.encode() always writes an empty path (Gravitino itself never produces
+   * one), so this simulates a view created directly by a native Trino connector with a non-empty
+   * path (e.g. one set via {@code SET PATH} before {@code CREATE VIEW}).
+   */
+  private static String nativeViewPayloadWithNonEmptyPath() {
+    return "/* Presto View: "
+        + Base64.getEncoder()
+            .encodeToString(
+                ("{\"originalSql\":\"SELECT 1\",\"catalog\":null,\"schema\":null,"
+                        + "\"columns\":[{\"name\":\"c1\",\"type\":\"integer\",\"comment\":null}],"
+                        + "\"comment\":null,\"owner\":null,\"runAsInvoker\":true,"
+                        + "\"path\":[{\"catalog\":\"c\",\"schema\":\"s\"}]}")
+                    .getBytes(StandardCharsets.UTF_8))
+        + " */";
   }
 
   private void assertReplaceRejectsUnrepresentableNativeView(String encoded) throws Exception {
