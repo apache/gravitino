@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.service.metrics;
 
 import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getCounterResult;
-import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getTimerResult;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -284,15 +283,11 @@ public class TestJdbcMetricsStore {
           Assertions.assertEquals(
               getCounterResult(commitReport.commitMetrics().totalPositionalDeletes()),
               rs.getLong("total_positional_deletes"));
-          Assertions.assertEquals(
-              getCounterResult(commitReport.commitMetrics().addedEqualityDeleteFiles()),
-              rs.getLong("added_equality_deletes"));
-          Assertions.assertEquals(
-              getCounterResult(commitReport.commitMetrics().removedEqualityDeleteFiles()),
-              rs.getLong("removed_equality_deletes"));
-          Assertions.assertEquals(
-              getCounterResult(commitReport.commitMetrics().totalEqualityDeletes()),
-              rs.getLong("total_equality_deletes"));
+          // The *_equality_deletes columns hold delete RECORD counts (fixture: 18/20),
+          // not the delete FILE counts (5/8) already stored in *_equality_delete_files.
+          Assertions.assertEquals(18, rs.getLong("added_equality_deletes"));
+          Assertions.assertEquals(20, rs.getLong("removed_equality_deletes"));
+          Assertions.assertEquals(22, rs.getLong("total_equality_deletes"));
           Assertions.assertEquals(
               getCounterResult(commitReport.commitMetrics().manifestsCreated()),
               rs.getLong("manifests_created"));
@@ -310,9 +305,9 @@ public class TestJdbcMetricsStore {
           Assertions.assertEquals(
               getCounterResult(commitReport.commitMetrics().removedDVs()),
               rs.getLong("removed_dvs"));
-          Assertions.assertEquals(
-              getTimerResult(commitReport.commitMetrics().totalDuration()),
-              rs.getLong("total_duration_ms"));
+          // The column is a duration in milliseconds (fixture records 100s), not the
+          // number of timing events.
+          Assertions.assertEquals(100_000L, rs.getLong("total_duration_ms"));
           Assertions.assertEquals(
               getCounterResult(commitReport.commitMetrics().attempts()), rs.getLong("attempts"));
           Assertions.assertEquals(
@@ -396,9 +391,8 @@ public class TestJdbcMetricsStore {
           Assertions.assertEquals(
               getCounterResult(scanReport.scanMetrics().totalFileSizeInBytes()),
               rs.getLong("total_file_size_in_bytes"));
-          Assertions.assertEquals(
-              getTimerResult(scanReport.scanMetrics().totalPlanningDuration()),
-              rs.getLong("total_planning_duration"));
+          // A duration in milliseconds (fixture records 10 minutes), not an event count.
+          Assertions.assertEquals(600_000L, rs.getLong("total_planning_duration"));
 
         } else {
           Assertions.fail("No data found in scan_metrics_report");
