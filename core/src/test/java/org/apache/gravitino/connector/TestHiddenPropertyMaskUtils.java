@@ -316,6 +316,29 @@ public class TestHiddenPropertyMaskUtils {
   }
 
   @Test
+  void testMaskSensitiveNamedPropertiesLeavesPlainNonJsonNestValuesUnchanged() {
+    Map<String, String> properties =
+        ImmutableMap.of("options", "verbose", "spark_conf", "local[*]", "password", "secret");
+
+    Map<String, String> masked =
+        HiddenPropertyMaskUtils.maskSensitiveNamedProperties(
+            properties, ImmutableSet.of("options", "spark_conf"));
+
+    Assertions.assertEquals("verbose", masked.get("options"));
+    Assertions.assertEquals("local[*]", masked.get("spark_conf"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("password"));
+  }
+
+  @Test
+  void testMaskSensitiveJsonValueLeavesPlainNonJsonUnchanged() {
+    Assertions.assertEquals("verbose", HiddenPropertyMaskUtils.maskSensitiveJsonValue("verbose"));
+    Assertions.assertEquals("5", HiddenPropertyMaskUtils.maskSensitiveJsonValue("5"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue("{not-json,\"password\":\"x\"}"));
+  }
+
+  @Test
   void testMaskSensitiveNamedPropertiesLeavesBlankNestedJsonUnchanged() {
     Map<String, String> properties = new LinkedHashMap<>();
     properties.put("spark_conf", "");

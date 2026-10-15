@@ -186,7 +186,9 @@ public final class JobInfo {
 
   /**
    * Returns the resolved job template that was actually submitted for execution, with placeholders
-   * replaced. Its executable, scripts, jars, files and archives are the URIs from the template.
+   * replaced. Sensitive-named map / argument values are masked for the event path; resource URI
+   * fields ({@code executable}, {@code jars}, {@code files}, {@code archives}, {@code scripts},
+   * {@code className}) are not masked.
    *
    * @return the runtime job template, or null for jobs run before this field was introduced
    */

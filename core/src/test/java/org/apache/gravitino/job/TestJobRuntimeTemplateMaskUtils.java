@@ -73,8 +73,8 @@ public class TestJobRuntimeTemplateMaskUtils {
     SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
 
     List<String> args = spark.arguments();
-    // Free-form tokens stay unmasked.
-    Assertions.assertEquals("--password=cli-secret", args.get(0));
+    // Sensitive-named long options are masked; nest-flag JSON values are walked.
+    Assertions.assertEquals("--password=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(0));
     Assertions.assertEquals("plain-arg", args.get(1));
     Assertions.assertEquals("--updater-options", args.get(2));
     Assertions.assertFalse(args.get(3).contains("arg-pw"));
@@ -181,6 +181,65 @@ public class TestJobRuntimeTemplateMaskUtils {
     Assertions.assertFalse(masked.get("spark_conf").contains("jdbc-pw"));
     Assertions.assertTrue(masked.get("spark_conf").contains("1g"));
     Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(null));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsMasksSensitiveNamedFlags() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of(
+                    "--password",
+                    "plain-pw",
+                    "--access-key=ak-secret",
+                    "--catalog",
+                    "ice",
+                    "--conf",
+                    "jdbc.password=jdbc-pw",
+                    "-Dapi.token=tok-secret",
+                    "-Dspark.executor.memory=1g"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    List<String> args = spark.arguments();
+    Assertions.assertEquals("--password", args.get(0));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, args.get(1));
+    Assertions.assertEquals("--access-key=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(2));
+    Assertions.assertEquals("--catalog", args.get(3));
+    Assertions.assertEquals("ice", args.get(4));
+    Assertions.assertEquals("--conf", args.get(5));
+    Assertions.assertEquals("jdbc.password=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(6));
+    Assertions.assertEquals("-Dapi.token=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(7));
+    Assertions.assertEquals("-Dspark.executor.memory=1g", args.get(8));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsNestFlagFollowedByEqualsForm() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of(
+                    "--spark-conf",
+                    "--options={\"password\":\"opt-pw\",\"min-input-files\":\"2\"}"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    List<String> args = spark.arguments();
+    Assertions.assertEquals("--spark-conf", args.get(0));
+    Assertions.assertTrue(args.get(1).startsWith("--options="));
+    Assertions.assertFalse(args.get(1).contains("opt-pw"));
+    Assertions.assertTrue(args.get(1).contains("2"));
+    Assertions.assertTrue(args.get(1).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
   }
 
   @Test

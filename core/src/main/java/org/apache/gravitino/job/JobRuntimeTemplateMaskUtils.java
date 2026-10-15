@@ -28,16 +28,33 @@ import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 
 /**
  * Masks sensitive-named values on resolved runtime job templates before they are exposed on API or
  * event paths. Stored runtime JSON is unchanged.
  *
- * <p>Nested JSON string maps are masked for the Iceberg built-in / optimizer keys listed in {@link
- * #NESTED_JSON_MAP_KEYS} on {@code environments} / {@code customFields} / {@code configs} / runJob
- * {@code jobConf}, and for the matching CLI flags in {@link #NESTED_JSON_ARGUMENT_FLAGS} on {@code
- * arguments} (the value token after the flag, or the {@code --flag=json} form). Other argument
- * tokens are left unchanged; do not put secrets in free-form arguments.
+ * <p>Covered:
+ *
+ * <ul>
+ *   <li>Map fields {@code environments} / {@code customFields} / {@code configs} and runJob {@code
+ *       jobConf}: sensitive-named keys, plus nested JSON under {@link #NESTED_JSON_MAP_KEYS}
+ *   <li>{@code arguments}: Iceberg nest flags in {@link #NESTED_JSON_ARGUMENT_FLAGS}; long options
+ *       {@code --name} / {@code --name=value} whose name matches {@link
+ *       SecretPropertyUtils#isSensitivePropertyKey}; bare {@code key=value} tokens and {@code
+ *       -Dkey=value} when {@code key} is sensitive (for example a value after {@code --conf})
+ * </ul>
+ *
+ * <p>Not masked (out of scope): resource URI fields ({@code executable}, {@code className}, {@code
+ * jars}, {@code files}, {@code archives}, Shell {@code scripts}), including credential-bearing
+ * query parameters or userinfo in those URIs. Free-form argument tokens that are not nest flags,
+ * sensitive long options, or sensitive {@code key=value} / {@code -Dkey=value} forms are left
+ * unchanged.
+ *
+ * <p>Null map entries are preserved in the masked DTO / {@code jobConf} maps used on the REST and
+ * event {@code jobConf} paths. When {@code JobInfo} rebuilds a {@code JobTemplate} via {@code
+ * ImmutableMap.copyOf}, null values cannot be carried; a hand-edited runtime JSON with nulls may
+ * cause that rebuild to be skipped (logged) rather than expose a partial template.
  */
 public final class JobRuntimeTemplateMaskUtils {
 
@@ -138,9 +155,8 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks the value token after known Iceberg JSON-map CLI flags, including the single-token {@code
-   * --flag=json} form. Other tokens (including free-form strings that happen to look like JSON) are
-   * left unchanged.
+   * Masks nest-flag JSON values, sensitive-named long options, and sensitive {@code key=value} /
+   * {@code -Dkey=value} tokens. Other tokens are left unchanged.
    */
   @Nullable
   private static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
@@ -151,24 +167,52 @@ public final class JobRuntimeTemplateMaskUtils {
       return arguments;
     }
     List<String> result = new ArrayList<>(arguments.size());
-    boolean maskNext = false;
+    boolean maskNextAsNestedJson = false;
+    boolean maskNextAsSecret = false;
     for (String arg : arguments) {
-      if (maskNext) {
-        maskNext = false;
+      if (maskNextAsNestedJson) {
+        maskNextAsNestedJson = false;
         if (arg != null && !arg.startsWith("--")) {
           result.add(HiddenPropertyMaskUtils.maskSensitiveJsonValue(arg));
           continue;
         }
-        // Missing value for the previous flag; this token may itself be a nest flag.
+        // Missing value for the previous nest flag; this token may itself be a flag.
       }
-      String equalsForm = maskEqualsNestFlagArgument(arg);
-      if (equalsForm != null) {
-        result.add(equalsForm);
+      if (maskNextAsSecret) {
+        maskNextAsSecret = false;
+        if (arg != null && !arg.startsWith("--")) {
+          result.add(HiddenPropertyMaskUtils.MASKED_VALUE);
+          continue;
+        }
+        // Missing value for the previous sensitive flag; this token may itself be a flag.
+      }
+
+      String nestEquals = maskEqualsNestFlagArgument(arg);
+      if (nestEquals != null) {
+        result.add(nestEquals);
         continue;
       }
+      String sensitiveEquals = maskEqualsSensitiveFlagArgument(arg);
+      if (sensitiveEquals != null) {
+        result.add(sensitiveEquals);
+        continue;
+      }
+      String dashD = maskSensitiveDashDArgument(arg);
+      if (dashD != null) {
+        result.add(dashD);
+        continue;
+      }
+      String bareKv = maskSensitiveBareKeyValueArgument(arg);
+      if (bareKv != null) {
+        result.add(bareKv);
+        continue;
+      }
+
       result.add(arg);
       if (arg != null && NESTED_JSON_ARGUMENT_FLAGS.contains(arg)) {
-        maskNext = true;
+        maskNextAsNestedJson = true;
+      } else if (isSensitiveLongOptionFlag(arg)) {
+        maskNextAsSecret = true;
       }
     }
     return result;
@@ -190,5 +234,75 @@ public final class JobRuntimeTemplateMaskUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * @return masked {@code --sensitiveName=value}, or {@code null} when not that form
+   */
+  @Nullable
+  private static String maskEqualsSensitiveFlagArgument(@Nullable String arg) {
+    if (arg == null || !arg.startsWith("--")) {
+      return null;
+    }
+    int eq = arg.indexOf('=');
+    if (eq <= 2) {
+      return null;
+    }
+    String name = arg.substring(2, eq);
+    if (!SecretPropertyUtils.isSensitivePropertyKey(name)) {
+      return null;
+    }
+    return arg.substring(0, eq + 1) + HiddenPropertyMaskUtils.MASKED_VALUE;
+  }
+
+  /** {@code --password} / {@code --access-key} style flags (no {@code =}). */
+  private static boolean isSensitiveLongOptionFlag(@Nullable String arg) {
+    if (arg == null || !arg.startsWith("--") || arg.length() <= 2 || arg.indexOf('=') >= 0) {
+      return false;
+    }
+    return SecretPropertyUtils.isSensitivePropertyKey(arg.substring(2));
+  }
+
+  /**
+   * Masks {@code -DsensitiveKey=value} (common JVM / Spark style).
+   *
+   * @return masked token, or {@code null} when not that form
+   */
+  @Nullable
+  private static String maskSensitiveDashDArgument(@Nullable String arg) {
+    if (arg == null || !arg.startsWith("-D") || arg.length() <= 2) {
+      return null;
+    }
+    String rest = arg.substring(2);
+    int eq = rest.indexOf('=');
+    if (eq <= 0) {
+      return null;
+    }
+    String key = rest.substring(0, eq);
+    if (!SecretPropertyUtils.isSensitivePropertyKey(key)) {
+      return null;
+    }
+    return "-D" + key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
+  }
+
+  /**
+   * Masks a bare {@code sensitiveKey=value} token (for example the value after {@code --conf}).
+   *
+   * @return masked token, or {@code null} when not that form
+   */
+  @Nullable
+  private static String maskSensitiveBareKeyValueArgument(@Nullable String arg) {
+    if (arg == null || arg.startsWith("-")) {
+      return null;
+    }
+    int eq = arg.indexOf('=');
+    if (eq <= 0) {
+      return null;
+    }
+    String key = arg.substring(0, eq);
+    if (!SecretPropertyUtils.isSensitivePropertyKey(key)) {
+      return null;
+    }
+    return key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
   }
 }

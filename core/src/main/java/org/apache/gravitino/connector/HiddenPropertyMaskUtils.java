@@ -208,8 +208,10 @@ public final class HiddenPropertyMaskUtils {
    * (they carry no secret). On parse failure for a non-blank nested JSON key, the entire value is
    * replaced with {@link #MASKED_VALUE} so secrets are not left in a broken blob.
    *
-   * <p>Null values are preserved (key kept, value {@code null}) so response maps do not drop keys
-   * that were present in the source. Null keys are skipped.
+   * <p>Null values are preserved (key kept, value {@code null}) so REST response maps do not drop
+   * keys that were present in the source. Null keys are skipped. Note: when a masked DTO is later
+   * converted into a {@code JobTemplate} for the event path, {@code ImmutableMap.copyOf} cannot
+   * carry null values, so a null entry is only fully meaningful on the REST / raw-map paths.
    *
    * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
    * have no properties metadata declaration. Callers that know job-specific JSON-map keys (for
@@ -250,15 +252,16 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Blank strings are returned unchanged. Malformed non-blank JSON is
-   * replaced with {@link #MASKED_VALUE}. Scalar JSON roots are returned unchanged.
+   * nested objects and arrays). Blank strings and non-JSON plain text (trimmed value does not start
+   * with '{' or '[') are returned unchanged. Values that look like a JSON object/array but fail to
+   * parse are replaced with {@link #MASKED_VALUE}. Scalar JSON roots are returned unchanged.
    *
    * <p>Useful when a caller already knows a string is a nested JSON map (for example a CLI argument
    * following {@code --spark-conf}).
    *
    * @param value JSON string to mask; may be null
-   * @return masked JSON, {@link #MASKED_VALUE} on parse failure, blank/null when {@code value} is
-   *     blank/null
+   * @return masked JSON, {@link #MASKED_VALUE} on object/array parse failure, or the original value
+   *     when blank, plain non-JSON, scalar JSON, or null
    */
   @Nullable
   public static String maskSensitiveJsonValue(@Nullable String value) {
@@ -270,12 +273,17 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Blank strings are returned unchanged. Malformed non-blank JSON is
-   * replaced with {@link #MASKED_VALUE}.
+   * nested objects and arrays). Blank / plain non-JSON strings are returned unchanged. Malformed
+   * object/array-looking JSON is replaced with {@link #MASKED_VALUE}.
    */
   private static String maskNestedJsonValue(String value) {
     // Empty / whitespace-only values carry no secret (common for unresolved {{spark_conf:-}}).
     if (StringUtils.isBlank(value)) {
+      return value;
+    }
+    // Bare words (e.g. --options=verbose) are not JSON maps; do not treat parse failure as secret.
+    String trimmed = value.trim();
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
       return value;
     }
     ObjectMapper mapper = JsonUtils.anyFieldMapper();
@@ -288,7 +296,7 @@ public final class HiddenPropertyMaskUtils {
       MaskedJson masked = maskJsonNode(root);
       return masked.changed ? mapper.writeValueAsString(masked.value) : value;
     } catch (Exception e) {
-      // Malformed JSON on a caller-declared nest key — do not leave a possible secret blob as-is.
+      // Malformed object/array JSON on a caller-declared nest key — do not leave a secret blob.
       return MASKED_VALUE;
     }
   }
