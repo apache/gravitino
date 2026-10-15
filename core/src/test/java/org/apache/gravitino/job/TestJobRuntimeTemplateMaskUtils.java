@@ -21,6 +21,7 @@ package org.apache.gravitino.job;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
@@ -114,6 +115,72 @@ public class TestJobRuntimeTemplateMaskUtils {
     SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
     Assertions.assertEquals(
         ImmutableList.of("--spark-conf", "--catalog", "ice"), spark.arguments());
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsLeavesEmptyTokenUnchanged() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of("--spark-conf", "", "--options", "   ", "--catalog", "ice"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    Assertions.assertEquals(
+        ImmutableList.of("--spark-conf", "", "--options", "   ", "--catalog", "ice"),
+        spark.arguments());
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsMasksEqualsForm() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of(
+                    "--spark-conf={\"jdbc.password\":\"arg-jdbc\",\"spark.executor.memory\":\"1g\"}",
+                    "--options=",
+                    "--catalog",
+                    "ice"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    List<String> args = spark.arguments();
+    Assertions.assertTrue(args.get(0).startsWith("--spark-conf="));
+    Assertions.assertFalse(args.get(0).contains("arg-jdbc"));
+    Assertions.assertTrue(args.get(0).contains("1g"));
+    Assertions.assertTrue(args.get(0).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("--options=", args.get(1));
+    Assertions.assertEquals("--catalog", args.get(2));
+    Assertions.assertEquals("ice", args.get(3));
+  }
+
+  @Test
+  void testMaskSensitiveJobConf() {
+    Map<String, String> jobConf =
+        ImmutableMap.of(
+            "password",
+            "plain-pw",
+            "spark_conf",
+            "{\"jdbc.password\":\"jdbc-pw\",\"spark.executor.memory\":\"1g\"}",
+            "plain",
+            "ok");
+
+    Map<String, String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(jobConf);
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("password"));
+    Assertions.assertEquals("ok", masked.get("plain"));
+    Assertions.assertFalse(masked.get("spark_conf").contains("jdbc-pw"));
+    Assertions.assertTrue(masked.get("spark_conf").contains("1g"));
+    Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(null));
   }
 
   @Test

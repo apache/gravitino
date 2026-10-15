@@ -34,10 +34,10 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
  * event paths. Stored runtime JSON is unchanged.
  *
  * <p>Nested JSON string maps are masked for the Iceberg built-in / optimizer keys listed in {@link
- * #NESTED_JSON_MAP_KEYS} on {@code environments} / {@code customFields} / {@code configs}, and for
- * the matching CLI flags in {@link #NESTED_JSON_ARGUMENT_FLAGS} on {@code arguments} (the value
- * token immediately after the flag). Other argument tokens are left unchanged; do not put secrets
- * in free-form arguments.
+ * #NESTED_JSON_MAP_KEYS} on {@code environments} / {@code customFields} / {@code configs} / runJob
+ * {@code jobConf}, and for the matching CLI flags in {@link #NESTED_JSON_ARGUMENT_FLAGS} on {@code
+ * arguments} (the value token after the flag, or the {@code --flag=json} form). Other argument
+ * tokens are left unchanged; do not put secrets in free-form arguments.
  */
 public final class JobRuntimeTemplateMaskUtils {
 
@@ -63,6 +63,22 @@ public final class JobRuntimeTemplateMaskUtils {
       ImmutableSet.of("--updater-options", "--spark-conf", "--options");
 
   private JobRuntimeTemplateMaskUtils() {}
+
+  /**
+   * Returns a copy of {@code jobConf} with sensitive-named values masked for event / audit paths.
+   * Nested JSON under {@link #NESTED_JSON_MAP_KEYS} is walked the same way as template maps. Does
+   * not mutate the input; callers must keep the original for job execution.
+   *
+   * @param jobConf runtime configuration from the runJob caller; may be null
+   * @return a masked mutable copy, or null when {@code jobConf} is null
+   */
+  @Nullable
+  public static Map<String, String> maskSensitiveJobConf(@Nullable Map<String, String> jobConf) {
+    if (jobConf == null) {
+      return null;
+    }
+    return HiddenPropertyMaskUtils.maskSensitiveNamedProperties(jobConf, NESTED_JSON_MAP_KEYS);
+  }
 
   /**
    * Returns a copy of {@code jobTemplateDTO} with sensitive map values masked, or {@code null} when
@@ -122,8 +138,9 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks the value token after known Iceberg JSON-map CLI flags. Other tokens (including free-form
-   * strings that happen to look like JSON) are left unchanged.
+   * Masks the value token after known Iceberg JSON-map CLI flags, including the single-token {@code
+   * --flag=json} form. Other tokens (including free-form strings that happen to look like JSON) are
+   * left unchanged.
    */
   @Nullable
   private static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
@@ -144,11 +161,34 @@ public final class JobRuntimeTemplateMaskUtils {
         }
         // Missing value for the previous flag; this token may itself be a nest flag.
       }
+      String equalsForm = maskEqualsNestFlagArgument(arg);
+      if (equalsForm != null) {
+        result.add(equalsForm);
+        continue;
+      }
       result.add(arg);
       if (arg != null && NESTED_JSON_ARGUMENT_FLAGS.contains(arg)) {
         maskNext = true;
       }
     }
     return result;
+  }
+
+  /**
+   * @return masked {@code --flag=json} token, or {@code null} when {@code arg} is not that form
+   */
+  @Nullable
+  private static String maskEqualsNestFlagArgument(@Nullable String arg) {
+    if (arg == null) {
+      return null;
+    }
+    for (String flag : NESTED_JSON_ARGUMENT_FLAGS) {
+      String prefix = flag + "=";
+      if (arg.startsWith(prefix)) {
+        String json = arg.substring(prefix.length());
+        return prefix + HiddenPropertyMaskUtils.maskSensitiveJsonValue(json);
+      }
+    }
+    return null;
   }
 }

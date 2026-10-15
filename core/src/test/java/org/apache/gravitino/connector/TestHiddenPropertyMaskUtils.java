@@ -21,6 +21,8 @@ package org.apache.gravitino.connector;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
@@ -208,7 +210,7 @@ public class TestHiddenPropertyMaskUtils {
 
   @Test
   void testMaskSensitiveNamedPropertiesMasksKeywordKeysAndKnownNestedJson() throws Exception {
-    Map<String, String> properties = new java.util.LinkedHashMap<>();
+    Map<String, String> properties = new LinkedHashMap<>();
     properties.put("gravitino_uri", "http://localhost:8090");
     properties.put("password", "plain-password");
     properties.put("oauth_token", "tok-123");
@@ -311,6 +313,47 @@ public class TestHiddenPropertyMaskUtils {
             properties, ImmutableSet.of("spark_conf"));
 
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("spark_conf"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesLeavesBlankNestedJsonUnchanged() {
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("spark_conf", "");
+    properties.put("options", "   ");
+    properties.put("updater_options", "{\"password\":\"secret\"}");
+
+    Map<String, String> masked =
+        HiddenPropertyMaskUtils.maskSensitiveNamedProperties(
+            properties, ImmutableSet.of("spark_conf", "options", "updater_options"));
+
+    Assertions.assertEquals("", masked.get("spark_conf"));
+    Assertions.assertEquals("   ", masked.get("options"));
+    Assertions.assertTrue(
+        masked.get("updater_options").contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertFalse(masked.get("updater_options").contains("secret"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesPreservesNullValues() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("visible", "v");
+    properties.put("password", "secret");
+    properties.put("nullValue", null);
+
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
+
+    Assertions.assertEquals(3, masked.size());
+    Assertions.assertEquals("v", masked.get("visible"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("password"));
+    Assertions.assertTrue(masked.containsKey("nullValue"));
+    Assertions.assertNull(masked.get("nullValue"));
+  }
+
+  @Test
+  void testMaskSensitiveJsonValueLeavesBlankUnchanged() {
+    Assertions.assertEquals("", HiddenPropertyMaskUtils.maskSensitiveJsonValue(""));
+    Assertions.assertEquals("   ", HiddenPropertyMaskUtils.maskSensitiveJsonValue("   "));
+    Assertions.assertNull(HiddenPropertyMaskUtils.maskSensitiveJsonValue(null));
   }
 
   @Test

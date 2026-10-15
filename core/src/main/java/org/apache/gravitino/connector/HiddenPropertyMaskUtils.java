@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 
@@ -203,8 +204,12 @@ public final class HiddenPropertyMaskUtils {
    * SecretPropertyUtils#isSensitivePropertyKey} or its value is a secret-manager URN ({@link
    * SecretPropertyUtils#isSecretProperty}). When {@code nestedJsonMapKeys} is non-null, values for
    * those keys are parsed as JSON and sensitive-named keys are masked at any nesting depth (objects
-   * and arrays). Other values are never parsed as JSON. On parse failure for a nested JSON key, the
-   * entire value is replaced with {@link #MASKED_VALUE} so secrets are not left in a broken blob.
+   * and arrays). Other values are never parsed as JSON. Blank nested values are left unchanged
+   * (they carry no secret). On parse failure for a non-blank nested JSON key, the entire value is
+   * replaced with {@link #MASKED_VALUE} so secrets are not left in a broken blob.
+   *
+   * <p>Null values are preserved (key kept, value {@code null}) so response maps do not drop keys
+   * that were present in the source. Null keys are skipped.
    *
    * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
    * have no properties metadata declaration. Callers that know job-specific JSON-map keys (for
@@ -224,7 +229,11 @@ public final class HiddenPropertyMaskUtils {
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
-      if (key == null || value == null) {
+      if (key == null) {
+        continue;
+      }
+      if (value == null) {
+        result.put(key, null);
         continue;
       }
       if (SecretPropertyUtils.isSensitivePropertyKey(key)
@@ -241,14 +250,15 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Malformed JSON is replaced with {@link #MASKED_VALUE}. Scalar JSON
-   * roots are returned unchanged.
+   * nested objects and arrays). Blank strings are returned unchanged. Malformed non-blank JSON is
+   * replaced with {@link #MASKED_VALUE}. Scalar JSON roots are returned unchanged.
    *
    * <p>Useful when a caller already knows a string is a nested JSON map (for example a CLI argument
    * following {@code --spark-conf}).
    *
    * @param value JSON string to mask; may be null
-   * @return masked JSON, {@link #MASKED_VALUE} on parse failure, or null when {@code value} is null
+   * @return masked JSON, {@link #MASKED_VALUE} on parse failure, blank/null when {@code value} is
+   *     blank/null
    */
   @Nullable
   public static String maskSensitiveJsonValue(@Nullable String value) {
@@ -260,9 +270,14 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Malformed JSON is replaced with {@link #MASKED_VALUE}.
+   * nested objects and arrays). Blank strings are returned unchanged. Malformed non-blank JSON is
+   * replaced with {@link #MASKED_VALUE}.
    */
   private static String maskNestedJsonValue(String value) {
+    // Empty / whitespace-only values carry no secret (common for unresolved {{spark_conf:-}}).
+    if (StringUtils.isBlank(value)) {
+      return value;
+    }
     ObjectMapper mapper = JsonUtils.anyFieldMapper();
     try {
       Object root = mapper.readValue(value, Object.class);
