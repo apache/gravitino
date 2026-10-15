@@ -166,7 +166,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
               .withProperties(params)
               .withAuditInfo(
                   AuditInfo.builder()
-                      .withCreator(PrincipalUtils.getCurrentUserName())
+                      .withCreator(resolveHmsOwner(sqlRepresentation.dialect(), params))
                       .withCreateTime(Instant.now())
                       .build())
               .withCatalogName(catalogName())
@@ -335,9 +335,26 @@ class HiveViewCatalogOperations implements ViewCatalog {
         }
       }
 
+      // Native Trino prioritizes the live HMS table owner over the (possibly stale) owner encoded
+      // in the view payload, so a Gravitino-managed replace/property change must keep the HMS
+      // owner in sync with TRINO_VIEW_OWNER_PROPERTY or the two would immediately diverge again.
+      AuditInfo updatedAuditInfo = currentHiveTable.auditInfo();
+      if (isTrinoView) {
+        String targetOwner = resolveHmsOwner(Dialects.TRINO, updatedProperties);
+        String currentCreator = updatedAuditInfo == null ? null : updatedAuditInfo.creator();
+        if (!targetOwner.equals(currentCreator)) {
+          updatedAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(targetOwner)
+                  .withCreateTime(
+                      updatedAuditInfo == null ? Instant.now() : updatedAuditInfo.createTime())
+                  .build();
+        }
+      }
+
       HiveTable updatedHiveTable =
           buildAlteredHiveView(
-              currentHiveTable,
+              updatedAuditInfo,
               schemaIdent,
               newViewName,
               updatedComment,
@@ -381,7 +398,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
   }
 
   private HiveTable buildAlteredHiveView(
-      HiveTable currentHiveTable,
+      AuditInfo auditInfo,
       NameIdentifier schemaIdent,
       String viewName,
       String comment,
@@ -393,11 +410,35 @@ class HiveViewCatalogOperations implements ViewCatalog {
         .withComment(comment)
         .withColumns(copyColumns(columns))
         .withProperties(properties)
-        .withAuditInfo(currentHiveTable.auditInfo())
+        .withAuditInfo(auditInfo)
         .withCatalogName(catalogName())
         .withDatabaseName(schemaIdent.name())
         .withViewOriginalText(viewOriginalText)
         .build();
+  }
+
+  /**
+   * Resolves the HMS table owner that should back a Trino dialect view's {@code SECURITY DEFINER}
+   * owner: the connector-managed {@link #TRINO_VIEW_OWNER_PROPERTY}, if present, otherwise the
+   * current principal (matching native Trino, which always assigns an HMS owner regardless of
+   * security mode).
+   */
+  private String resolveHmsOwner(String dialect, Map<String, String> properties) {
+    if (Dialects.TRINO.equalsIgnoreCase(dialect)) {
+      return preferNonEmpty(
+          properties.get(TRINO_VIEW_OWNER_PROPERTY), PrincipalUtils.getCurrentUserName());
+    }
+    return PrincipalUtils.getCurrentUserName();
+  }
+
+  /**
+   * Returns {@code preferred} if non-empty, otherwise {@code fallback}. Names the single precedence
+   * rule shared by both directions of the HMS-owner / {@link #TRINO_VIEW_OWNER_PROPERTY}
+   * reconciliation: the live HMS owner wins on load (over the payload-decoded owner), and the
+   * connector-managed property wins on write (over the current principal).
+   */
+  private static String preferNonEmpty(String preferred, String fallback) {
+    return StringUtils.isNotEmpty(preferred) ? preferred : fallback;
   }
 
   @Override
@@ -515,7 +556,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
       restoredDefaultCatalog = decoded.catalog;
       restoredDefaultSchema = decoded.schema;
       if (decoded.owner != null) {
-        params.put(TRINO_VIEW_OWNER_PROPERTY, decoded.owner);
+        // Native Trino prioritizes the live HMS table owner over the owner encoded in the view
+        // payload (e.g. after ALTER VIEW ... SET AUTHORIZATION, which updates only the HMS owner),
+        // so mirror that precedence here instead of trusting the payload unconditionally.
+        String hmsOwner = auditInfo == null ? null : auditInfo.creator();
+        params.put(TRINO_VIEW_OWNER_PROPERTY, preferNonEmpty(hmsOwner, decoded.owner));
       }
       resolvedColumns =
           decoded.columns.stream()
