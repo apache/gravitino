@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.connector;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -202,5 +204,51 @@ public class TestHiddenPropertyMaskUtils {
 
     Assertions.assertEquals("root", masked.get("jdbc-user"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("jdbc-passwrod"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesMasksKeywordKeysAndNestedJson() throws Exception {
+    Map<String, String> properties = new java.util.LinkedHashMap<>();
+    properties.put("gravitino_uri", "http://localhost:8090");
+    properties.put("password", "plain-password");
+    properties.put("oauth_token", "tok-123");
+    properties.put("spark.hadoop.fs.s3a.secret.key", "s3-secret");
+    properties.put(
+        "updater_options",
+        "{\"gravitino_uri\":\"http://localhost:8090\",\"password\":\"nested-pw\","
+            + "\"oauth_credential\":\"cred\"}");
+    properties.put("spark_conf", "{\"spark.master\":\"local[*]\",\"api_token\":\"nested-tok\"}");
+    properties.put("not_json", "password=looks-like-but-not-a-key");
+
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
+
+    Assertions.assertEquals("http://localhost:8090", masked.get("gravitino_uri"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("password"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("oauth_token"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("spark.hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals("password=looks-like-but-not-a-key", masked.get("not_json"));
+
+    Map<String, String> updaterOptions =
+        JsonUtils.anyFieldMapper()
+            .readValue(masked.get("updater_options"), new TypeReference<Map<String, String>>() {});
+    Assertions.assertEquals("http://localhost:8090", updaterOptions.get("gravitino_uri"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, updaterOptions.get("password"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, updaterOptions.get("oauth_credential"));
+
+    Map<String, String> sparkConf =
+        JsonUtils.anyFieldMapper()
+            .readValue(masked.get("spark_conf"), new TypeReference<Map<String, String>>() {});
+    Assertions.assertEquals("local[*]", sparkConf.get("spark.master"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, sparkConf.get("api_token"));
+  }
+
+  @Test
+  void testMaskSensitiveNamedPropertiesReturnsEmptyForNull() {
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskSensitiveNamedProperties(null);
+    Assertions.assertTrue(masked.isEmpty());
+    masked.put("k", "v");
+    Assertions.assertEquals("v", masked.get("k"));
   }
 }

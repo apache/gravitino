@@ -18,13 +18,17 @@
  */
 package org.apache.gravitino.connector;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 
 /**
@@ -58,6 +62,9 @@ public final class HiddenPropertyMaskUtils {
 
   /** Placeholder returned instead of editable hidden / credential / secret property values. */
   public static final String MASKED_VALUE = "******";
+
+  private static final TypeReference<Map<String, String>> STRING_MAP_TYPE =
+      new TypeReference<Map<String, String>>() {};
 
   private HiddenPropertyMaskUtils() {}
 
@@ -175,5 +182,82 @@ public final class HiddenPropertyMaskUtils {
   public static Map<String, String> maskHiddenProperties(
       Map<String, String> properties, PropertiesMetadata metadata) {
     return maskHiddenProperties(properties, classifyHiddenProperties(properties, metadata));
+  }
+
+  /**
+   * Returns a mutable copy of {@code properties} with sensitive-looking values replaced by {@link
+   * #MASKED_VALUE}, without requiring {@link PropertiesMetadata}.
+   *
+   * <p>A top-level entry is masked when its key matches {@link
+   * SecretPropertyUtils#isSensitivePropertyKey} or its value is a secret-manager URN ({@link
+   * SecretPropertyUtils#isSecretProperty}). When a non-sensitive entry's value is a JSON object of
+   * string fields (for example job {@code updater_options} / {@code spark_conf}), sensitive-named
+   * keys inside that object are also masked and the value is rewritten. Non-JSON or non-object
+   * values are left unchanged.
+   *
+   * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
+   * have no properties metadata declaration.
+   *
+   * @param properties source map, may be null
+   * @return a mutable masked copy; never null
+   */
+  public static Map<String, String> maskSensitiveNamedProperties(
+      @Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return new HashMap<>();
+    }
+    Map<String, String> result = new LinkedHashMap<>(properties.size());
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null) {
+        continue;
+      }
+      if (SecretPropertyUtils.isSensitivePropertyKey(key)
+          || SecretPropertyUtils.isSecretProperty(key, value)) {
+        result.put(key, MASKED_VALUE);
+      } else {
+        result.put(key, maskNestedJsonMapValue(value));
+      }
+    }
+    return result;
+  }
+
+  /**
+   * When {@code value} is a JSON object of string fields, returns a rewritten JSON with
+   * sensitive-named keys masked; otherwise returns {@code value} unchanged.
+   */
+  private static String maskNestedJsonMapValue(String value) {
+    String trimmed = value.trim();
+    if (trimmed.isEmpty() || trimmed.charAt(0) != '{') {
+      return value;
+    }
+    ObjectMapper mapper = JsonUtils.anyFieldMapper();
+    try {
+      Map<String, String> nested = mapper.readValue(trimmed, STRING_MAP_TYPE);
+      if (nested == null || nested.isEmpty()) {
+        return value;
+      }
+      boolean changed = false;
+      Map<String, String> masked = new LinkedHashMap<>(nested.size());
+      for (Map.Entry<String, String> entry : nested.entrySet()) {
+        String nestedKey = entry.getKey();
+        String nestedValue = entry.getValue();
+        if (nestedKey == null || nestedValue == null) {
+          continue;
+        }
+        if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)
+            || SecretPropertyUtils.isSecretProperty(nestedKey, nestedValue)) {
+          masked.put(nestedKey, MASKED_VALUE);
+          changed = true;
+        } else {
+          masked.put(nestedKey, nestedValue);
+        }
+      }
+      return changed ? mapper.writeValueAsString(masked) : value;
+    } catch (Exception e) {
+      // Not a string-valued JSON object (or malformed) — leave the original value alone.
+      return value;
+    }
   }
 }

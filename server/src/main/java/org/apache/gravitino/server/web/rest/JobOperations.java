@@ -50,6 +50,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
@@ -560,11 +561,16 @@ public class JobOperations {
    * make the job unreadable or uncancellable through the API - failures here are logged and
    * swallowed rather than propagated, so callers of {@link #toDTO(JobEntity)} (get/run/cancel/list
    * job) always get a usable response with just the runtime job template omitted.
+   *
+   * <p>Sensitive-named values in environments, customFields, and Spark configs (including nested
+   * JSON maps such as {@code updater_options} / {@code spark_conf}) are masked before the DTO is
+   * returned on the API response path. Stored plaintext is unchanged.
    */
   private static JobTemplateDTO toRuntimeJobTemplateDTO(JobEntity jobEntity) {
     try {
-      return DTOConverters.fromRuntimeJobTemplateJson(
-          jobEntity.runtimeJobTemplate(), jobEntity.name());
+      return maskSensitiveJobTemplateFields(
+          DTOConverters.fromRuntimeJobTemplateJson(
+              jobEntity.runtimeJobTemplate(), jobEntity.name()));
     } catch (Exception e) {
       LOG.warn(
           "Failed to deserialize the runtime job template for job {}, omitting it from the "
@@ -573,6 +579,61 @@ public class JobOperations {
           e);
       return null;
     }
+  }
+
+  /**
+   * Returns a copy of {@code jobTemplateDTO} with sensitive map values masked for API responses.
+   * Registered job templates (placeholders) are not masked here — only resolved runtime templates
+   * on the job get/list/run/cancel path.
+   */
+  @VisibleForTesting
+  static JobTemplateDTO maskSensitiveJobTemplateFields(JobTemplateDTO jobTemplateDTO) {
+    if (jobTemplateDTO == null) {
+      return null;
+    }
+    Map<String, String> maskedEnvironments = maskSensitiveMap(jobTemplateDTO.environments());
+    Map<String, String> maskedCustomFields = maskSensitiveMap(jobTemplateDTO.customFields());
+
+    if (jobTemplateDTO instanceof ShellJobTemplateDTO) {
+      ShellJobTemplateDTO shell = (ShellJobTemplateDTO) jobTemplateDTO;
+      return ShellJobTemplateDTO.builder()
+          .withName(shell.name())
+          .withComment(shell.comment())
+          .withJobType(shell.jobType())
+          .withExecutable(shell.executable())
+          .withArguments(shell.arguments())
+          .withEnvironments(maskedEnvironments)
+          .withCustomFields(maskedCustomFields)
+          .withScripts(shell.scripts())
+          .withAudit(shell.audit())
+          .build();
+    }
+    if (jobTemplateDTO instanceof SparkJobTemplateDTO) {
+      SparkJobTemplateDTO spark = (SparkJobTemplateDTO) jobTemplateDTO;
+      return SparkJobTemplateDTO.builder()
+          .withName(spark.name())
+          .withComment(spark.comment())
+          .withJobType(spark.jobType())
+          .withExecutable(spark.executable())
+          .withArguments(spark.arguments())
+          .withEnvironments(maskedEnvironments)
+          .withCustomFields(maskedCustomFields)
+          .withClassName(spark.className())
+          .withJars(spark.jars())
+          .withFiles(spark.files())
+          .withArchives(spark.archives())
+          .withConfigs(maskSensitiveMap(spark.configs()))
+          .withAudit(spark.audit())
+          .build();
+    }
+    throw new IllegalArgumentException(
+        "Unsupported job template type: " + jobTemplateDTO.jobType());
+  }
+
+  private static Map<String, String> maskSensitiveMap(Map<String, String> properties) {
+    return properties == null
+        ? null
+        : HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {

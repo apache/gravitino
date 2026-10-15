@@ -51,10 +51,12 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
+import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
@@ -1463,6 +1465,67 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals("resolved", runtimeJobTemplateDTO.comment());
     Assertions.assertEquals("/bin/echo", runtimeJobTemplateDTO.executable());
     Assertions.assertEquals(Lists.newArrayList("resolved-arg"), runtimeJobTemplateDTO.arguments());
+  }
+
+  @Test
+  public void testToDTORuntimeJobTemplateMasksSensitiveFields() {
+    String runtimeJobTemplateJson =
+        "{"
+            + "\"jobType\":\"spark\","
+            + "\"name\":\"spark_template_1\","
+            + "\"comment\":\"resolved\","
+            + "\"executable\":\"local:///app.jar\","
+            + "\"arguments\":[\"--table\",\"db.t\"],"
+            + "\"environments\":{\"AUTH_PASSWORD\":\"env-secret\",\"CATALOG\":\"ice\"},"
+            + "\"customFields\":{"
+            + "\"updater_options\":\"{\\\"gravitino_uri\\\":\\\"http://localhost\\\","
+            + "\\\"password\\\":\\\"nested-pw\\\",\\\"oauth_token\\\":\\\"tok\\\"}\","
+            + "\"update_mode\":\"stats\""
+            + "},"
+            + "\"className\":\"org.example.App\","
+            + "\"configs\":{"
+            + "\"spark.master\":\"local[*]\","
+            + "\"spark.hadoop.fs.s3a.secret.key\":\"s3-secret\","
+            + "\"spark_conf\":\"{\\\"spark.executor.memory\\\":\\\"1g\\\","
+            + "\\\"jdbc.password\\\":\\\"jdbc-pw\\\"}\""
+            + "}"
+            + "}";
+    JobEntity jobWithSecrets =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-with-secrets")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("spark_template_1")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobDTO jobDTO = JobOperations.toDTO(jobWithSecrets);
+    Assertions.assertInstanceOf(SparkJobTemplateDTO.class, jobDTO.runtimeJobTemplate());
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) jobDTO.runtimeJobTemplate();
+
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, spark.environments().get("AUTH_PASSWORD"));
+    Assertions.assertEquals("ice", spark.environments().get("CATALOG"));
+    Assertions.assertEquals("stats", spark.customFields().get("update_mode"));
+    Assertions.assertFalse(spark.customFields().get("updater_options").contains("nested-pw"));
+    Assertions.assertFalse(spark.customFields().get("updater_options").contains("tok"));
+    Assertions.assertTrue(
+        spark.customFields().get("updater_options").contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("local[*]", spark.configs().get("spark.master"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        spark.configs().get("spark.hadoop.fs.s3a.secret.key"));
+    Assertions.assertFalse(spark.configs().get("spark_conf").contains("jdbc-pw"));
+    Assertions.assertTrue(spark.configs().get("spark_conf").contains("1g"));
+
+    // Stored entity JSON must remain unmasked (masking is response-only).
+    Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("env-secret"));
+    Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("nested-pw"));
   }
 
   @Test
