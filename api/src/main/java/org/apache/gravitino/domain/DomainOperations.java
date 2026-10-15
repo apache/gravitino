@@ -81,8 +81,8 @@ public interface DomainOperations {
    * @return The created domain.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
    * @throws NoSuchTagException If the given backing tag does not exist.
-   * @throws ForbiddenException If a tag with the default name exists and the caller does not own it
-   *     or the metalake.
+   * @throws ForbiddenException If the caller does not own the given backing tag or the metalake, or
+   *     a tag with the default name exists and the caller does not own it or the metalake.
    * @throws IllegalArgumentException If a tag with the default name already backs another domain,
    *     or the value of the given backing tag is not allowed by the tag.
    */

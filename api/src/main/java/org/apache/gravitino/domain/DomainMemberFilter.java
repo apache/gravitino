@@ -90,7 +90,7 @@ public final class DomainMemberFilter {
    * or both.
    *
    * @return The names of the domains, or an empty set to list the members of the listed domain and
-   *     all its sub-domains.
+   *     all its sub-domains visible to the caller.
    */
   public Set<String> domains() {
     return domains;
@@ -193,10 +193,11 @@ public final class DomainMemberFilter {
     /**
      * Sets the domains the members to list come from. Each name is the listed domain itself or one
      * of its sub-domains. Names that are neither, or that are not visible to the caller, are
-     * ignored when the members are listed. Defaults to the listed domain and all its sub-domains.
+     * ignored when the members are listed; if all names are ignored, no member is listed. Defaults
+     * to the listed domain and all its sub-domains visible to the caller.
      *
      * @param domains The names of the domains, or none to list the members of the listed domain and
-     *     all its sub-domains.
+     *     all its sub-domains visible to the caller.
      * @return This builder.
      * @throws IllegalArgumentException If the names are null, or contain a null or blank name.
      */

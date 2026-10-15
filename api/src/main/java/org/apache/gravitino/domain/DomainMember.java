@@ -49,11 +49,12 @@ public interface DomainMember {
 
   /**
    * Returns the sub-domain the member comes from. Among the domains selected by the {@link
-   * DomainMemberFilter}, a member of the listed domain itself is reported as such even if it also
-   * comes from a sub-domain; otherwise one of the sub-domains it comes from is reported.
+   * DomainMemberFilter}, an object that carries the listed domain's backing tag itself is reported
+   * as a member of the listed domain, even if it also carries the backing tag of a sub-domain;
+   * otherwise one of the sub-domains whose backing tag it carries is reported.
    *
-   * @return The name of the sub-domain, or empty if the object is a member of the listed domain
-   *     itself.
+   * @return The name of the sub-domain, or empty if the object carries the listed domain's backing
+   *     tag itself.
    */
   Optional<String> subdomain();
 }

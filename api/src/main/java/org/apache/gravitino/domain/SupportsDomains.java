@@ -23,9 +23,10 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * Interface for listing the domains of a metadata object, such as a catalog, schema or table.
  *
- * <p>An object belongs to a domain when its effective tags, its own tags plus those inherited from
- * its schema and catalog, include the domain's backing tag. Only the domains visible to the caller
- * are listed, and a parent domain is not listed for the members of its sub-domains.
+ * <p>An object belongs to a domain when its effective tags include the domain's backing tag. The
+ * effective tags are its own tags plus those inherited from its schema and catalog; for the same
+ * tag, the assignment nearest to the object wins. Only the domains visible to the caller are
+ * listed, and a parent domain is not listed for the members of its sub-domains.
  *
  * <p>To add an object to a domain or remove it, associate the domain's backing tag with the object
  * or remove it, through {@link org.apache.gravitino.tag.SupportsTags}.

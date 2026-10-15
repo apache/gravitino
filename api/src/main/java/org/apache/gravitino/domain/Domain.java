@@ -33,7 +33,9 @@ import org.apache.gravitino.tag.TagValue;
 /**
  * A domain groups metadata objects from any catalog under a business name, such as "Finance". A
  * metadata object is a member of a domain when it carries the domain's backing tag, directly or
- * inherited from its catalog or schema.
+ * inherited from its catalog or schema. For the same tag, the assignment nearest to the object
+ * wins: a table that carries {@code dept=hr} under a schema that carries {@code dept=finance} is a
+ * member of the domain backed by {@code dept=hr} only.
  *
  * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. A new domain is
  * in {@link Status#DRAFT} status and is visible only to its owner and the users who can manage it
@@ -164,10 +166,12 @@ public interface Domain extends Auditable {
    * @return The updated domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws NoSuchTagException If the tag does not exist.
+   * @throws ForbiddenException If the caller does not own the tag or the metalake.
    * @throws IllegalArgumentException If the value is not allowed by the tag.
    */
   Domain updateBackingTag(@Nullable TagValue backingTag)
-      throws NoSuchDomainException, NoSuchTagException, IllegalArgumentException;
+      throws NoSuchDomainException, NoSuchTagException, ForbiddenException,
+          IllegalArgumentException;
 
   /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
@@ -186,8 +190,8 @@ public interface Domain extends Auditable {
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
    * @throws NoSuchTagException If the given backing tag does not exist.
-   * @throws ForbiddenException If a tag with the default name exists and the caller does not own it
-   *     or the metalake.
+   * @throws ForbiddenException If the caller does not own the given backing tag or the metalake, or
+   *     a tag with the default name exists and the caller does not own it or the metalake.
    * @throws IllegalArgumentException If a tag with the default name already backs another domain,
    *     the value of the given backing tag is not allowed by the tag, this domain is itself a
    *     sub-domain, or the sub-domain cannot be created under this domain.
