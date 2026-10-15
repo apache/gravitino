@@ -22,10 +22,16 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Many;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -122,4 +128,87 @@ public interface RoleMetaMapper {
 
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "batchGetRoleUpdatedAt")
   List<RoleUpdatedAt> batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds);
+  /**
+   * Defines the nested result mapping for single-statement role reads.
+   *
+   * @return unused; this declaration is never executed
+   */
+  @Results(
+      id = "rolePrivilegeSnapshot",
+      value = {
+        @Result(property = "roleId", column = "roleId", id = true),
+        @Result(property = "metadataObjectId", column = "metadataObjectId", id = true),
+        @Result(property = "type", column = "type", id = true),
+        @Result(property = "privilegeNames", column = "privilegeNames"),
+        @Result(property = "privilegeConditions", column = "privilegeConditions"),
+        @Result(property = "currentVersion", column = "currentVersion"),
+        @Result(property = "lastVersion", column = "lastVersion"),
+        @Result(property = "deletedAt", column = "deletedAt")
+      })
+  @Select("SELECT 1")
+  SecurableObjectPO rolePrivilegeSnapshot();
+
+  /**
+   * Reads a role and its live privileges from one statement snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param roleName the role name
+   * @return the role snapshot, or null when it does not exist
+   */
+  @Results(
+      id = "roleWithPrivileges",
+      value = {
+        @Result(property = "roleId", column = "roleId", id = true),
+        @Result(property = "roleName", column = "roleName"),
+        @Result(property = "metalakeId", column = "metalakeId"),
+        @Result(property = "properties", column = "properties"),
+        @Result(property = "auditInfo", column = "auditInfo"),
+        @Result(property = "currentVersion", column = "currentVersion"),
+        @Result(property = "lastVersion", column = "lastVersion"),
+        @Result(property = "deletedAt", column = "deletedAt"),
+        @Result(
+            property = "securableObjectPOs",
+            javaType = List.class,
+            many = @Many(resultMap = "rolePrivilegeSnapshot", columnPrefix = "priv_"))
+      })
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "selectRoleWithPrivilegesByMetalakeIdAndName")
+  @Nullable
+  RolePO selectRoleWithPrivilegesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
+
+  /**
+   * Lists matching roles and all their privileges from one statement snapshot.
+   *
+   * @param metadataObjectId the metadata object ID
+   * @param metadataObjectType the metadata object type
+   * @return the role snapshots
+   */
+  @ResultMap("roleWithPrivileges")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "listRolesWithPrivilegesByMetadataObjectIdAndType")
+  List<RolePO> listRolesWithPrivilegesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+  /**
+   * Defines the role metadata mapping shared by principal snapshot reads.
+   *
+   * @return unused; this declaration is never executed
+   */
+  @Results(
+      id = "membershipRoleSnapshot",
+      value = {
+        @Result(property = "roleId", column = "roleId", id = true),
+        @Result(property = "roleName", column = "roleName"),
+        @Result(property = "metalakeId", column = "metalakeId"),
+        @Result(property = "properties", column = "properties"),
+        @Result(property = "auditInfo", column = "auditInfo"),
+        @Result(property = "currentVersion", column = "currentVersion"),
+        @Result(property = "lastVersion", column = "lastVersion"),
+        @Result(property = "deletedAt", column = "deletedAt")
+      })
+  @Select("SELECT 1")
+  RolePO membershipRoleSnapshot();
 }

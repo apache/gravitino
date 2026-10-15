@@ -133,8 +133,11 @@ public class RoleMetaService {
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
             mapper ->
-                mapper.listRolesByMetadataObjectIdAndType(
-                    metadataObjectId, metadataObject.type().name()));
+                allFields
+                    ? mapper.listRolesWithPrivilegesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name())
+                    : mapper.listRolesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()));
     return rolePOs.stream()
         .map(
             po -> {
@@ -234,7 +237,7 @@ public class RoleMetaService {
       String metalake = NameIdentifierUtil.getMetalake(identifier);
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
 
-      RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+      RolePO rolePO = getRoleWithPrivileges(metalakeId, identifier.name());
       RoleEntity oldRoleEntity =
           POConverters.fromRolePO(
               rolePO, listSecurableObjects(rolePO), AuthorizationUtils.ofRoleNamespace(metalake));
@@ -390,7 +393,7 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+    RolePO rolePO = getRoleWithPrivileges(metalakeId, identifier.name());
 
     List<SecurableObject> securableObjects = listSecurableObjects(rolePO);
 
@@ -514,7 +517,10 @@ public class RoleMetaService {
   }
 
   private static List<SecurableObject> listSecurableObjects(RolePO po) {
-    List<SecurableObjectPO> securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
+    List<SecurableObjectPO> securableObjectPOs = po.getSecurableObjectPOs();
+    if (securableObjectPOs == null) {
+      securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
+    }
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     securableObjectPOs.stream()
@@ -670,5 +676,19 @@ public class RoleMetaService {
       }
       return type.ordinal();
     }
+  }
+
+  private RolePO getRoleWithPrivileges(Long metalakeId, String roleName) {
+    RolePO rolePO =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class,
+            mapper -> mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName));
+    if (rolePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.ROLE.name().toLowerCase(),
+          roleName);
+    }
+    return rolePO;
   }
 }
