@@ -75,7 +75,8 @@ jobs:
           echo "applicable=true" >> "${GITHUB_OUTPUT}"
           matches="[]"
           match_count=0
-          for attempt in 1 2 3; do
+          # Give the contributor a few minutes to open the pull request after pushing.
+          for attempt in $(seq 1 12); do
             response="$(curl --fail-with-body --silent --show-error \
               --header "Accept: application/vnd.github+json" \
               --header "Authorization: Bearer ${GH_TOKEN}" \
@@ -94,10 +95,32 @@ jobs:
             if [[ "${match_count}" == "1" ]]; then
               break
             fi
-            if [[ "${attempt}" != "3" ]]; then
-              sleep 3
+            if [[ "${match_count}" != "0" || "${attempt}" == "12" ]]; then
+              break
             fi
+            sleep 15
           done
+
+          if [[ "${match_count}" == "0" && "${HEAD_REPOSITORY}" == "apache/gravitino" ]]; then
+            # Branches in the upstream repository only run for pull requests.
+            echo "No open pull request for ${HEAD_BRANCH}; Fork CI is dormant."
+            echo "applicable=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if [[ "${match_count}" == "0" ]]; then
+            # No pull request yet: test against the upstream default branch so the
+            # run is still useful and is mirrored once the pull request is opened.
+            default_branch="$(curl --fail-with-body --silent --show-error \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/apache/gravitino" | jq -r '.default_branch')"
+            echo "::notice::No open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}; testing against ${default_branch}."
+            echo "base_ref=${default_branch}" >> "${GITHUB_OUTPUT}"
+            echo "valid=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
 
           if [[ "${match_count}" != "1" ]]; then
             echo "::error::Expected one open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}, found ${match_count}."

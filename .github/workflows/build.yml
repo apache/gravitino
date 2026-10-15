@@ -148,7 +148,7 @@ jobs:
     strategy:
       matrix:
         java-version: [ 17 ]
-    timeout-minutes: 120
+    timeout-minutes: 180
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
