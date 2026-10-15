@@ -563,8 +563,8 @@ public class JobOperations {
    * job) always get a usable response with just the runtime job template omitted.
    *
    * <p>Sensitive-named values in environments, customFields, and Spark configs are masked before
-   * the DTO is returned. Nested JSON masking applies only to the known keys {@code updater_options}
-   * and {@code spark_conf}. Stored plaintext is unchanged.
+   * the DTO is returned. Nested JSON masking applies only to the known keys {@code
+   * updater_options}, {@code spark_conf}, and {@code options}. Stored plaintext is unchanged.
    */
   private static JobTemplateDTO toRuntimeJobTemplateDTO(JobEntity jobEntity) {
     try {

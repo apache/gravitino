@@ -66,11 +66,18 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * JobConf / template keys whose values are known to be flat JSON string maps (Iceberg built-in
-   * jobs and the optimizer CLI). Nested sensitive keys inside these values are masked; other keys
-   * are never treated as JSON by guessing on a leading curly brace.
+   * jobs and the optimizer). Nested sensitive keys inside these values are masked; other keys are
+   * never treated as JSON by guessing on a leading curly brace.
+   *
+   * <ul>
+   *   <li>{@code updater_options} — update-stats job credentials / client options
+   *   <li>{@code spark_conf} — Spark configs for built-in Iceberg jobs
+   *   <li>{@code options} — rewrite-data-files / compaction options (from policy {@code jobOptions}
+   *       / {@code rewriteOptions})
+   * </ul>
    */
   private static final Set<String> NESTED_JSON_MAP_KEYS =
-      ImmutableSet.of("updater_options", "spark_conf");
+      ImmutableSet.of("updater_options", "spark_conf", "options");
 
   private static final TypeReference<Map<String, String>> STRING_MAP_TYPE =
       new TypeReference<Map<String, String>>() {};
@@ -199,10 +206,10 @@ public final class HiddenPropertyMaskUtils {
    *
    * <p>A top-level entry is masked when its key matches {@link
    * SecretPropertyUtils#isSensitivePropertyKey} or its value is a secret-manager URN ({@link
-   * SecretPropertyUtils#isSecretProperty}). For the known JSON-map keys {@code updater_options} and
-   * {@code spark_conf} (Iceberg built-in job / optimizer convention), sensitive-named keys inside
-   * the JSON object are also masked and the value is rewritten. Other values are never parsed as
-   * JSON.
+   * SecretPropertyUtils#isSecretProperty}). For the known JSON-map keys {@code updater_options},
+   * {@code spark_conf}, and {@code options} (Iceberg built-in job / optimizer convention),
+   * sensitive-named keys inside the JSON object are also masked and the value is rewritten. Other
+   * values are never parsed as JSON.
    *
    * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
    * have no properties metadata declaration.

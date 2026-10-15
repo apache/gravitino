@@ -218,6 +218,7 @@ public class TestHiddenPropertyMaskUtils {
         "{\"gravitino_uri\":\"http://localhost:8090\",\"password\":\"nested-pw\","
             + "\"oauth_credential\":\"cred\"}");
     properties.put("spark_conf", "{\"spark.master\":\"local[*]\",\"api_token\":\"nested-tok\"}");
+    properties.put("options", "{\"min-input-files\":\"2\",\"jdbc.password\":\"rewrite-secret\"}");
     // Looks like nested JSON with a sensitive key, but is not a known JSON-map field — leave as-is.
     String unknownJsonBlob = "{\"password\":\"should-stay-visible\"}";
     properties.put("custom_blob", unknownJsonBlob);
@@ -246,6 +247,12 @@ public class TestHiddenPropertyMaskUtils {
             .readValue(masked.get("spark_conf"), new TypeReference<Map<String, String>>() {});
     Assertions.assertEquals("local[*]", sparkConf.get("spark.master"));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, sparkConf.get("api_token"));
+
+    Map<String, String> options =
+        JsonUtils.anyFieldMapper()
+            .readValue(masked.get("options"), new TypeReference<Map<String, String>>() {});
+    Assertions.assertEquals("2", options.get("min-input-files"));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, options.get("jdbc.password"));
   }
 
   @Test
