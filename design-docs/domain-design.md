@@ -21,7 +21,7 @@
 
 | Version | Author | Date | Status |
 | :---- | :---- | :---- | :---- |
-| 1.20 | Jerry Shao | 2026-10-15 | Draft |
+| 1.21 | Jerry Shao | 2026-10-15 | Draft |
 
 ## Goals
 
@@ -67,6 +67,7 @@ Each domain has **at most one** backing tag: a tag, optionally with a value (tag
 
 - **Default**: if none is given at creation, Gravitino creates a `NO_VALUE` tag named after the domain's path, as in Unity Catalog: `Finance`, and `Finance/Tax` for subdomain Tax. The creator owns it, so creating a domain this way also needs `CREATE_TAG`. If a tag with that name already exists, the domain adopts it, with the assets that carry it, only when the tag backs no other domain and the caller owns the tag or the metalake. If the tag already backs another domain, creation fails with 400; if the caller may not adopt it, with 403.
 - **Name clashes**: default tag names can clash even without `/` in domain names, because tags are never renamed on move or rename. For example, rename subdomain Tax under Finance to VAT (its tag stays `Finance/Tax`), then create a new Tax under Finance: both want `Finance/Tax`. Banning `/` would not prevent this, so domain names may contain `/`, and the adoption rule above resolves clashes.
+- **Matching** follows the tag lookup semantics (`GET /tags/{tag}/objects`). A backing tag without a value matches every assignment of the tag, with or without values, like a lookup without `value`. A backing tag with a value matches assignments whose values contain it, exact and case-sensitive, like `?value=`; a valueless assignment never matches it. The same rule applies to member listing, domains of an object and domain filters, always against the object's effective assignment, and to a default-name tag adopted at creation, which is bound without a value.
 - **Explicit**: any existing (tag, value), such as `dept=finance`, bound by that tag's owner (or the metalake owner). A (tag, value) may be bound explicitly to several domains, which then have the same members.
 - **Storage**: the backing tag is the `DOMAIN` object's own row in `tag_relation_meta`; there is no extra field to keep in sync. Reverse lookup uses `idx_tid_value` filtered to `DOMAIN` objects. Domains never inherit tags (`METALAKE` is not taggable).
 - **Changing it**: `PUT /domains/{domain}/backingTag` replaces or removes it on the server, under the domain's row lock. A missing tag fails with 404, a value the tag does not allow with 400, and a tag the caller does not own (nor the metalake) with 403; setting the current tag is a no-op. Assets carrying only the old tag drop out; nothing is migrated.
@@ -94,12 +95,13 @@ C1–C3 keep the hierarchy one level deep and acyclic, so no cycle detection is 
 - **Detach** removes the edge; the child becomes top-level.
 - **Locking**: each operation locks the domain rows involved (child, new parent, old parent) in id order, then checks the constraints. Otherwise two valid calls could together create two levels, a cycle, or a dangling edge.
 - **Delete** is refused while the domain has subdomains. Deleting removes the domain's own parent edge and its backing tag association. The tag and the tags on assets stay.
-- **Scope**: a parent's members include those of the subdomains the caller can see; a subdomain's members are its own only.
+- **Membership and scope**: membership comes from backing tags only (see Membership and inheritance), so an asset tagged only `Finance/Trading` is a member of Trading, not of Finance. A top-level domain's *scope* is its own members plus the members of the subdomains the caller can see; a subdomain's scope is its own members. Member listing and domain filters use scope, as in Unity Catalog, where a subdomain's assets also appear under its parent domain.
 
 ### Status
 
 - New domains are `DRAFT`. The owner or a `MANAGE_DOMAIN` holder publishes or unpublishes, at any time and without approval.
 - **Visibility is the same on every surface** (REST, MCP, UI). A `DRAFT` domain is visible only to its owner and `MANAGE_DOMAIN` holders, including those on its parent. For anyone else it does not exist: lists omit it, get returns 404, and it is not in `list_domains`, member listings, an object's domains, a tag's objects or a parent's roll-up. Responses carry `status`, so a caller that sees drafts can filter them out.
+- **Parent names** are the one exception: `parent` is always returned, even when the caller cannot see the parent. Only the name is exposed; getting the parent still returns 404, and nothing can be done on it. This happens only to the owner or child-level managers of a `DRAFT` subdomain under a parent they cannot see (C6 keeps published subdomains under published parents), or to a caller with privileges on a subdomain but no `USE_DOMAIN` on its published parent.
 - **Consistency**: publishing a subdomain needs a published parent; unpublishing needs no published subdomains (C6 covers attach and move).
 - Assets can be tagged into a `DRAFT` domain to prepare it; anyone with `APPLY_TAG` on its tag can do so, as in Unity Catalog.
 - Roll-ups depend on the caller: someone who can see a `DRAFT` subdomain sees its members under the parent; others do not.
@@ -110,8 +112,8 @@ C1–C3 keep the hierarchy one level deep and acyclic, so no cycle detection is 
 - **Dedicated tags (the default)** accumulate: with schema `Finance` and table `Sales`, the table is in both, and a child cannot leave a domain it inherits, as in Unity Catalog.
 - **Values of one tag** backing different domains override each other: with schema `dept=finance` and table `dept=hr`, the table is only in the `dept=hr` domain, unless it uses `dept=[finance, hr]`. This is the one case where a child can leave an inherited domain, and it follows from the tag owner's choice of binding.
 - **Member types**: catalogs, schemas, tables, views, filesets, topics, models and semantic models (`DomainMember.SUPPORTED_TYPES`). Columns and functions are not members: a column or function carrying a backing tag is not listed. A type that becomes taggable later joins only when it is added to this list. Metrics belong through their semantic model.
-- **Domains of an object**: the object's effective tags mapped to the domains the caller can see. For an inherited membership, `inheritedFrom` names the catalog or schema it comes from; it is absent for direct membership. The source is known while resolving inheritance, at no extra cost.
-- **Domain filters** check each candidate object with the rule above instead of listing all members first.
+- **Domains of an object**: the object's effective tags mapped to the domains the caller can see. Only the domains the object is a member of are returned; a parent reached only through a subdomain is not, and clients show it from `parent` (for example `Finance › Trading`). An object that is a member of both Finance and Trading gets both. For an inherited membership, `inheritedFrom` names the catalog or schema it comes from; it is absent for direct membership. The source is known while resolving inheritance, at no extra cost.
+- **Domain filters**, for APIs that filter objects by domain, match scope, consistent with member listing: a filter on Finance accepts members of Finance and of its visible subdomains; a filter on a subdomain accepts only its own members. Each candidate object is checked with the rule above instead of listing all members first.
 
 ### Member listing
 
@@ -187,9 +189,10 @@ DomainMemberDTO { object: MetadataObjectDTO, subdomain? }
 ```
 
 - **Membership requests** use `TagValuesAssociateRequest` with `Content-Type: application/vnd.gravitino.v2+json`, which carries (name, value) pairs. The v1 `TagsAssociateRequest` carries names only, so it works only for domains backed by a tag without a value. The Java and Python clients already send v2 requests (`SupportsTags#associateTags(TagValue[], TagValue[])`).
-- **Parent endpoints** address the child only, matching `Domain#attachToParent` and `Domain#detachFromParent`. Detaching needs no parent name, so a client acting on a stale snapshot cannot detach from the wrong parent.
+- **Parent endpoints** address the child only, matching `Domain#attachToParent` and `Domain#detachFromParent`; detaching needs no parent name.
 - **Create** happens in one transaction: domain, default tag, tag association and parent edge. On any failure nothing is created, and no default tag is left behind.
 - **State changes return the domain**: publish, unpublish, attach, move, detach and backing-tag changes return the updated domain, because the Java API returns a new `Domain` snapshot from them.
+- **Concurrency**: changes apply to the current state on the server and the last write wins, as for other Gravitino metadata operations; there is no version check. Detach removes the current parent edge and removing the backing tag removes the current one, whatever the caller's snapshot shows; detaching a top-level domain is a no-op, not an error. Domains are addressed by name, so if a domain is renamed and a new one takes its old name, later calls with that name act on the new domain.
 - **Member listing parameters**:
   - `domains` (repeatable, `?domains=Finance&domains=Tax`; not comma-separated, since domain names may contain `,`): the domains members come from, the listed domain itself and/or its subdomains. Not set means the domain and all its visible subdomains. On Finance with subdomains Tax and Trading, `domains=Finance` lists Finance's own members, `domains=Finance&domains=Tax` adds Tax's, and `domains=Tax` lists only Tax's. Names that are neither the domain nor a subdomain visible to the caller are ignored; if all given names are ignored, the result is empty rather than everything, so a typo cannot widen it.
   - `types` (comma-separated, each a supported member type) and `nameContains` (case-insensitive, on the full name).
