@@ -18,15 +18,24 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.sql.Connection;
 import java.sql.Driver;
+import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
@@ -89,6 +98,34 @@ public class TestJdbcCatalogOperationsProbe {
               Assertions.assertThrows(
                   ConnectionFailedException.class,
                   () -> ops.probeConnection(NameIdentifier.of("m", "c"))));
+    }
+  }
+
+  /**
+   * A driver that lives only in the catalog's libs directory is invisible to {@link DriverManager}
+   * until its class is initialized, and the lazy pool has not done that yet when the create-time
+   * probe runs. The probe must still find it instead of failing with "No suitable driver".
+   */
+  @Test
+  public void testProbeFindsDriverVisibleOnlyToCatalogClassLoader() throws Exception {
+    List<URL> urls = new ArrayList<>();
+    for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
+      urls.add(new File(entry).toURI().toURL());
+    }
+    ClassLoader original = Thread.currentThread().getContextClassLoader();
+    try (URLClassLoader catalogLoader =
+        new URLClassLoader(urls.toArray(new URL[0]), ClassLoader.getPlatformClassLoader())) {
+      Thread.currentThread().setContextClassLoader(catalogLoader);
+      Class<?> probeClass = Class.forName(IsolatedProbe.class.getName(), true, catalogLoader);
+      Assertions.assertNotSame(IsolatedProbe.class, probeClass);
+
+      @SuppressWarnings("unchecked")
+      Callable<String> probe = (Callable<String>) probeClass.getDeclaredConstructor().newInstance();
+      String message = probe.call();
+
+      Assertions.assertTrue(message.contains(SelfRegisteringDriver.REACHED), message);
+    } finally {
+      Thread.currentThread().setContextClassLoader(original);
     }
   }
 
@@ -198,6 +235,91 @@ public class TestJdbcCatalogOperationsProbe {
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
       // This fake driver does not use java.util.logging. FQN is used because java.sql.Driver
       // mandates java.util.logging.Logger, whose simple name would clash with org.slf4j.Logger.
+      throw new SQLFeatureNotSupportedException();
+    }
+  }
+
+  /**
+   * Runs the probe from inside the catalog class loader, the way a catalog does in the server, and
+   * returns the connection-failure message.
+   */
+  public static class IsolatedProbe implements Callable<String> {
+    @Override
+    public String call() {
+      JdbcCatalogOperations ops =
+          new JdbcCatalogOperations(
+              new SqliteExceptionConverter(),
+              new SqliteTypeConverter(),
+              new SqliteDatabaseOperations(":memory:"),
+              new SqliteTableOperations(),
+              new SqliteColumnDefaultValueConverter());
+      Map<String, String> config = new HashMap<>();
+      config.put(JdbcConfig.JDBC_DRIVER.getKey(), SelfRegisteringDriver.class.getName());
+      config.put(JdbcConfig.JDBC_URL.getKey(), SelfRegisteringDriver.URL_PREFIX + "//db:1/test");
+      config.put(JdbcConfig.USERNAME.getKey(), "u");
+      config.put(JdbcConfig.PASSWORD.getKey(), "p");
+      ops.setProbeConfigForTest(new JdbcConfig(config));
+      ConnectionFailedException e =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> ops.probeConnection(NameIdentifier.of("m", "c")));
+      return e.getMessage();
+    }
+  }
+
+  /**
+   * A driver that, like real JDBC drivers, registers itself with {@link DriverManager} when its
+   * class is initialized. It has no {@code META-INF/services/java.sql.Driver} entry, so nothing
+   * registers it automatically.
+   */
+  public static class SelfRegisteringDriver implements Driver {
+    static final String URL_PREFIX = "jdbc:selfregistering:";
+    static final String REACHED = "reached the catalog driver";
+
+    static {
+      try {
+        DriverManager.registerDriver(new SelfRegisteringDriver());
+      } catch (SQLException e) {
+        throw new ExceptionInInitializerError(e);
+      }
+    }
+
+    @Override
+    public Connection connect(String url, Properties info) throws SQLException {
+      if (!acceptsURL(url)) {
+        return null;
+      }
+      throw new SQLException(REACHED);
+    }
+
+    @Override
+    public boolean acceptsURL(String url) {
+      return url != null && url.startsWith(URL_PREFIX);
+    }
+
+    @Override
+    public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
+      return new DriverPropertyInfo[0];
+    }
+
+    @Override
+    public int getMajorVersion() {
+      return 1;
+    }
+
+    @Override
+    public int getMinorVersion() {
+      return 0;
+    }
+
+    @Override
+    public boolean jdbcCompliant() {
+      return false;
+    }
+
+    @Override
+    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
+      // FQN for the same reason as in SocketReadingDriver.
       throw new SQLFeatureNotSupportedException();
     }
   }
