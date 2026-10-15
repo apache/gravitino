@@ -26,7 +26,8 @@ import org.apache.gravitino.annotation.Evolving;
  * <p>An object belongs to a domain when its effective tags include the domain's backing tag. The
  * effective tags are its own tags plus those inherited from its schema and catalog; for the same
  * tag, the assignment nearest to the object wins. Only the domains visible to the caller are
- * listed, and a parent domain is not listed for the members of its sub-domains.
+ * listed, and a parent domain is not listed for the members of its sub-domains; its name is
+ * available from {@link Domain#parent()} of the listed sub-domain.
  *
  * <p>To add an object to a domain or remove it, associate the domain's backing tag with the object
  * or remove it, through {@link org.apache.gravitino.tag.SupportsTags}.

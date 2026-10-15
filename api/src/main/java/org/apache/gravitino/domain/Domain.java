@@ -43,7 +43,8 @@ import org.apache.gravitino.tag.TagValue;
  *
  * <p>A {@code Domain} is a snapshot. The operations on it that change the domain itself, such as
  * {@link #publish()} and {@link #attachToParent(String)}, return a new snapshot and leave this one
- * unchanged.
+ * unchanged. They apply to the current state of the domain, not to the state this snapshot shows,
+ * and the last write wins.
  */
 @Evolving
 public interface Domain extends Auditable {
@@ -86,15 +87,19 @@ public interface Domain extends Auditable {
   Status status();
 
   /**
-   * Returns the name of the parent domain.
+   * Returns the name of the parent domain. The name is returned even when the parent is not visible
+   * to the caller, for example a draft parent; getting that parent still fails with {@link
+   * NoSuchDomainException}.
    *
    * @return The name of the parent domain, or empty if the domain is top-level.
    */
   Optional<String> parent();
 
   /**
-   * Returns the backing tag of the domain. The metadata objects that carry this tag, with this
-   * value if one is set, are the members of the domain.
+   * Returns the backing tag of the domain. The metadata objects whose effective assignment of this
+   * tag matches it are the members of the domain. A backing tag without a value matches every
+   * assignment of the tag, with or without values. A backing tag with a value matches the
+   * assignments whose values contain it, compared exactly and case-sensitively.
    *
    * @return The backing tag of the domain, or empty if the backing tag has been removed or deleted
    *     and no new one has been set.
@@ -148,8 +153,9 @@ public interface Domain extends Auditable {
   Domain attachToParent(String parent) throws NoSuchDomainException, IllegalArgumentException;
 
   /**
-   * Detaches this domain from its parent, making it a top-level domain. Detaching a top-level
-   * domain has no effect. The backing tag is not renamed.
+   * Detaches this domain from its current parent, making it a top-level domain, whatever parent
+   * this snapshot shows. Detaching a top-level domain has no effect. The backing tag is not
+   * renamed.
    *
    * @return The detached domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
@@ -157,9 +163,9 @@ public interface Domain extends Auditable {
   Domain detachFromParent() throws NoSuchDomainException;
 
   /**
-   * Replaces the backing tag of this domain, or removes it. Members are not migrated: objects that
-   * carry only the old backing tag are no longer members of the domain. Setting the current backing
-   * tag has no effect.
+   * Replaces the current backing tag of this domain, or removes it, whatever backing tag this
+   * snapshot shows. Members are not migrated: objects that carry only the old backing tag are no
+   * longer members of the domain. Setting the current backing tag has no effect.
    *
    * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
    *     remove the backing tag.
