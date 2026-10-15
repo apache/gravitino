@@ -46,7 +46,7 @@ tests:
           path: data["hdfs-site.xml"]
       - matchRegex:
           path: data["init.sh"]
-          pattern: "start-iceberg-rest-server\\.sh"
+          pattern: "exec /bin/bash .*/start-iceberg-rest-server\\.sh"
       - matchRegex:
           path: data["gravitino-iceberg-rest-server.conf"]
           pattern: "gravitino\\.iceberg-rest\\.httpPort = 9001"

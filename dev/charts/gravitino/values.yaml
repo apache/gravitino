@@ -504,7 +504,7 @@ additionalLog4j2Properties:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
-  /bin/bash ${GRAVITINO_HOME}/docker/docker-entrypoint.sh
+  exec /bin/bash ${GRAVITINO_HOME}/docker/docker-entrypoint.sh
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
