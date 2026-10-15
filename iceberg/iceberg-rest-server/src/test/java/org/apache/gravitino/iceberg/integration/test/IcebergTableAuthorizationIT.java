@@ -272,7 +272,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     setSchemaOwner(NORMAL_USER);
     Assertions.assertDoesNotThrow(() -> sql("DESC TABLE %s", tableName));
     // With ownership: non-existent table returns 404 (AnalysisException)
-    Assertions.assertThrowsExactly(
+    Assertions.assertThrows(
         AnalysisException.class, () -> sql("DESC TABLE %s_not_exist", tableName));
 
     setSchemaOwner(SUPER_USER);

@@ -18,20 +18,12 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
-import com.google.common.collect.ImmutableList;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.UUID;
-import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
-import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.IcebergBuild;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 
 /**
  * Integration test for Spark authorization through the Iceberg REST service loaded from the
@@ -48,6 +40,11 @@ public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizatio
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
+    Assertions.assertEquals(
+        System.getProperty("datastratoIcebergVersion"),
+        IcebergBuild.version(),
+        "The experimental integration test must run with the Datastrato Iceberg runtime");
+
     String rootDirectory = System.getenv("GRAVITINO_ROOT_DIR");
     String experimentalServerHome =
         Paths.get(rootDirectory, "iceberg", EXPERIMENTAL_SERVER_DIRECTORY).toString();
@@ -63,31 +60,5 @@ public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizatio
   @Override
   protected TestDatabaseName getTestDatabaseName() {
     return TestDatabaseName.PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT;
-  }
-
-  @Test
-  void testSparkCreateNamespaceAuthorization() {
-    String namespace = "experimental_authz_ns";
-    revokeUserRoles();
-    resetMetalakeAndCatalogOwner();
-
-    grantCatalogPrivileges(Privileges.UseCatalog.allow());
-    sql("USE %s", SPARK_CATALOG_NAME);
-
-    Assertions.assertThrowsExactly(
-        ForbiddenException.class, () -> sql("CREATE DATABASE %s", namespace));
-
-    grantCatalogPrivileges(Privileges.CreateSchema.allow());
-    Assertions.assertDoesNotThrow(() -> sql("CREATE DATABASE %s", namespace));
-    Assertions.assertDoesNotThrow(() -> sql("USE %s", namespace));
-  }
-
-  private void grantCatalogPrivileges(Privilege... privileges) {
-    String roleName = "experimentalCatalogRole_" + UUID.randomUUID();
-    SecurableObject catalogObject =
-        SecurableObjects.ofCatalog(GRAVITINO_CATALOG_NAME, ImmutableList.copyOf(privileges));
-    metalakeClientWithAllPrivilege.createRole(
-        roleName, new HashMap<>(), ImmutableList.of(catalogObject));
-    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
   }
 }

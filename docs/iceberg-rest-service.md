@@ -118,10 +118,13 @@ gravitino.auxService.names = iceberg-rest
 gravitino.iceberg-rest.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
 ```
 
-The selected directory is loaded by the Iceberg REST auxiliary service's isolated classloader. The
-experimental directory uses the Datastrato Iceberg distribution published under the
-`com.datastrato` Maven group. Its version is pinned by `datastrato-iceberg` in
-`gradle/libs.versions.toml`, independently of the regular Iceberg version.
+The selected directory is prepended to the Iceberg REST auxiliary service classpath. Only one of
+the regular and experimental directories can be active at a time. The selection takes effect when
+Iceberg classes are absent from the Gravitino server's base classpath; the binary distribution is
+packaged this way. The service logs the loaded Iceberg version and code source during startup so
+the effective runtime can be verified. The experimental directory uses the Datastrato Iceberg
+distribution published under the `com.datastrato` Maven group. Its version is pinned by
+`datastrato-iceberg` in `gradle/libs.versions.toml`, independently of the regular Iceberg version.
 
 #### HTTP Server
 

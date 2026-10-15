@@ -27,8 +27,44 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val experimentalSparkVersion: String = libs.versions.spark35.get()
+val experimentalSparkMajorVersion: String = experimentalSparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg.get()
+val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
+val caffeineVersion: String = libs.versions.caffeine.get()
+val jacksonVersion: String = libs.versions.jackson.get()
+
+val experimentalTestRuntimeClasspath by configurations.creating {
+  extendsFrom(configurations.testRuntimeClasspath.get())
+  resolutionStrategy {
+    force(
+      "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
+      "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion",
+      "com.fasterxml.jackson.core:jackson-core:$jacksonVersion",
+      "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
+      "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
+      "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    )
+    eachDependency {
+      if (requested.group == "org.apache.spark") {
+        useVersion(experimentalSparkVersion)
+        because("The experimental Iceberg Spark runtime is published for Spark 3.5")
+      } else if (requested.name.startsWith("iceberg-spark-runtime-")) {
+        useTarget(
+          "com.datastrato:experimental-iceberg-spark-runtime-${experimentalSparkMajorVersion}_$scalaVersion:$datastratoIcebergVersion"
+        )
+        because("Run experimental Iceberg integration tests with the matching Spark runtime")
+      } else if (
+        requested.name.startsWith("iceberg-") &&
+        (requested.group == "org.apache.iceberg" || requested.group == "com.datastrato")
+      ) {
+        useTarget("com.datastrato:experimental-${requested.name}:$datastratoIcebergVersion")
+        because("Run experimental Iceberg integration tests with the Datastrato distribution")
+      }
+    }
+  }
+}
 
 dependencies {
   implementation(project(":api"))
@@ -199,17 +235,45 @@ tasks {
   }
 }
 
+val experimentalTest by tasks.registering(Test::class) {
+  description = "Runs Iceberg REST tests that require the experimental Iceberg runtime"
+  group = "verification"
+  testClassesDirs = sourceSets.test.get().output.classesDirs
+  classpath =
+    sourceSets.main.get().output +
+    sourceSets.test.get().output +
+    experimentalTestRuntimeClasspath
+  systemProperty("datastratoIcebergVersion", datastratoIcebergVersion)
+  setIncludes(
+    setOf(
+      "**/IcebergExperimentalAuthorizationIT.class"
+    )
+  )
+  filter {
+    includeTestsMatching(
+      "org.apache.gravitino.iceberg.integration.test.IcebergExperimentalAuthorizationIT"
+    )
+  }
+  mustRunAfter(tasks.test)
+  dependsOn(
+    tasks.testClasses,
+    tasks.jar,
+    ":catalogs:catalog-lakehouse-iceberg:jar",
+    ":iceberg:iceberg-rest-experimental-server:copyDepends",
+    ":iceberg:iceberg-rest-experimental-server:jar"
+  )
+}
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
+  exclude("**/IcebergExperimentalAuthorizationIT.class")
   if (skipITs) {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
     dependsOn(
       tasks.jar,
-      ":catalogs:catalog-lakehouse-iceberg:jar",
-      ":iceberg:iceberg-rest-experimental-server:copyDepends",
-      ":iceberg:iceberg-rest-experimental-server:jar"
+      ":catalogs:catalog-lakehouse-iceberg:jar"
     )
   }
 }

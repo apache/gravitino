@@ -25,38 +25,37 @@ plugins {
 }
 
 val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
+val caffeineVersion: String = libs.versions.caffeine.get()
+val jacksonVersion: String = libs.versions.jackson.get()
 
 configurations.configureEach {
-  resolutionStrategy.eachDependency {
-    if (
-      requested.name.startsWith("iceberg-") &&
-      (requested.group == "org.apache.iceberg" || requested.group == "com.datastrato")
-    ) {
-      useTarget("com.datastrato:experimental-${requested.name}:$datastratoIcebergVersion")
-      because("Use the Datastrato Iceberg distribution in the experimental auxiliary service")
+  resolutionStrategy {
+    force(
+      "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
+      "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion",
+      "com.fasterxml.jackson.core:jackson-core:$jacksonVersion",
+      "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
+      "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
+      "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    )
+    eachDependency {
+      if (
+        requested.name.startsWith("iceberg-") &&
+        (requested.group == "org.apache.iceberg" || requested.group == "com.datastrato")
+      ) {
+        useTarget("com.datastrato:experimental-${requested.name}:$datastratoIcebergVersion")
+        because("Use the Datastrato Iceberg distribution in the experimental auxiliary service")
+      }
     }
   }
 }
 
 dependencies {
-  implementation(project(":common")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
-  implementation(project(":iceberg:iceberg-common")) {
-    exclude("*")
-  }
   implementation(project(":iceberg:iceberg-rest-server"))
   implementation(libs.bundles.iceberg)
 }
 
 tasks {
-  compileJava {
-    dependsOn(":iceberg:iceberg-rest-server:copyDepends")
-  }
-
   val copyDepends by registering(Sync::class) {
     dependsOn(":iceberg:iceberg-rest-server:copyDepends")
     from(configurations.runtimeClasspath)

@@ -66,7 +66,7 @@ jobs:
             EXCLUDE_CONTRIB_TESTS="$EXCLUDE_CONTRIB_TESTS -x :catalogs-contrib:$module:test"
           done
 
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
+          ./gradlew test :iceberg:iceberg-rest-server:experimentalTest -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
             -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test \
             -x :flink-connector:flink-common:test \
             -x :flink-connector:flink-1.19:test -x :flink-connector:flink-runtime-1.19:test \
