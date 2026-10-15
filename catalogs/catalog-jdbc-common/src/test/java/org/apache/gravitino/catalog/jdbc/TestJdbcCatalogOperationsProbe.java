@@ -233,8 +233,8 @@ public class TestJdbcCatalogOperationsProbe {
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-      // This fake driver does not use java.util.logging. FQN is used because java.sql.Driver
-      // mandates java.util.logging.Logger, whose simple name would clash with org.slf4j.Logger.
+      // This fake driver does not use java.util.logging. The FQN is required because spotless
+      // rewrites every Logger import to org.slf4j.Logger.
       throw new SQLFeatureNotSupportedException();
     }
   }
@@ -319,7 +319,8 @@ public class TestJdbcCatalogOperationsProbe {
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-      // FQN for the same reason as in SocketReadingDriver.
+      // This fake driver does not use java.util.logging. The FQN is required because spotless
+      // rewrites every Logger import to org.slf4j.Logger.
       throw new SQLFeatureNotSupportedException();
     }
   }
