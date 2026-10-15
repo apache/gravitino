@@ -152,6 +152,25 @@ public class TestExceptionUtils {
   }
 
   @Test
+  void testSharedDuplicateKeyClassifier() {
+    for (SQLException duplicate :
+        List.of(
+            new SQLException("MySQL duplicate", null, 1062),
+            new SQLException("H2 duplicate", "23505", 23505),
+            new SQLException("PostgreSQL duplicate", "23505"))) {
+      assertTrue(ExceptionUtils.isDuplicateKey(duplicate));
+      BatchUpdateException batch = new BatchUpdateException("batch failed", new int[0]);
+      batch.setNextException(new SQLException("lock timeout", "55P03"));
+      batch.setNextException(duplicate);
+      assertTrue(ExceptionUtils.isDuplicateKey(new PersistenceException(batch)));
+    }
+    assertFalse(ExceptionUtils.isDuplicateKey(new SQLException("foreign key", "23503")));
+    assertFalse(ExceptionUtils.isDuplicateKey(new SQLException("lock timeout", "HY000", 1205)));
+    assertFalse(ExceptionUtils.isDuplicateKey(new IllegalStateException("not a SQL failure")));
+    assertFalse(ExceptionUtils.isDuplicateKey(null));
+  }
+
+  @Test
   void testDuplicateKeyTakesPrecedenceOverChainedLockWaitTimeout() {
     for (int backend = 0; backend < 3; backend++) {
       for (boolean duplicateFirst : List.of(true, false)) {

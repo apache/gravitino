@@ -286,7 +286,7 @@ public class StatisticMetaService {
     if (failure instanceof OptimisticLockException) {
       return failure;
     }
-    if (isDuplicateKey(failure)) {
+    if (ExceptionUtils.isDuplicateKey(failure)) {
       return statisticConflict(failure, names(pos), target);
     }
     if (isConcurrencyFailure(failure)) {
@@ -353,14 +353,6 @@ public class StatisticMetaService {
         .withStatisticValue(replacement.getStatisticValue())
         .withAuditInfo(replacement.getAuditInfo())
         .build();
-  }
-
-  /**
-   * Returns whether a failure is a unique-key violation. PostgreSQL and H2 report SQLState 23505,
-   * and MySQL reports error code 1062, the same codes the backend exception converters match.
-   */
-  private static boolean isDuplicateKey(Throwable failure) {
-    return ExceptionUtils.hasSqlException(failure, Set.of("23505"), Set.of(1062));
   }
 
   /**

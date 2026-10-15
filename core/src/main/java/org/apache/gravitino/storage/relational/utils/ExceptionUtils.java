@@ -217,8 +217,10 @@ public class ExceptionUtils {
    * transaction back, so the store write can be retried. Callers must account for any external side
    * effects that occurred before the store write before retrying the whole operation. Any other
    * failure, including one that is already an {@link OptimisticLockException}, is returned
-   * unchanged. A failure containing a duplicate-key violation is also returned unchanged so that
-   * the service can report the non-retryable error instead of a timeout elsewhere in the chain.
+   * unchanged. A failure containing a duplicate-key violation is also returned unchanged. Callers
+   * that subsequently use {@link #checkSQLException} report that violation as an already-exists
+   * error. Store write paths that do not use that classifier retain the original backend failure,
+   * including for a chain containing both a duplicate key and a lock wait timeout.
    *
    * @param failure The failure of the write.
    * @param target What was being written, as the subject of the message, for example "The table
@@ -239,7 +241,18 @@ public class ExceptionUtils {
         target);
   }
 
-  private static boolean isDuplicateKey(Throwable failure) {
+  /**
+   * Returns whether a failure contains a duplicate primary-key or unique-key violation.
+   *
+   * <p>Matches MySQL vendor code 1062 and PostgreSQL/H2 SQLState 23505 through causes and chained
+   * JDBC exceptions, using cycle protection. This only detects the violation; callers decide
+   * whether it represents an already-existing entity or a concurrent statistics write.
+   *
+   * @param failure the failure to inspect, including its causes and chained JDBC exceptions, or
+   *     null
+   * @return true if a duplicate-key violation is found
+   */
+  public static boolean isDuplicateKey(@Nullable Throwable failure) {
     return hasSqlException(failure, DUPLICATE_KEY_SQL_STATES, DUPLICATE_KEY_VENDOR_CODES);
   }
 }

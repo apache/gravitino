@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -256,6 +257,26 @@ public class TestRelationalEntityStoreLockWaitTimeout {
       for (Pair<String, Executable> write : writes()) {
         Throwable thrown = Assertions.assertThrows(Throwable.class, write.getRight());
         Assertions.assertSame(failure, thrown, write.getLeft());
+      }
+    }
+  }
+
+  /** Mixed duplicate-key/timeout chains remain unclassified on direct store write paths. */
+  @Test
+  void testMixedDuplicateKeyAndTimeoutPreservesBackendFailure() throws Exception {
+    for (boolean duplicateFirst : List.of(true, false)) {
+      BatchUpdateException batch = new BatchUpdateException("batch failed", new int[0]);
+      SQLException duplicate = new SQLException("duplicate key", "23505");
+      SQLException timeout = new SQLException("lock timeout", "55P03");
+      batch.setNextException(duplicateFirst ? duplicate : timeout);
+      batch.setNextException(duplicateFirst ? timeout : duplicate);
+      PersistenceException failure = new PersistenceException(batch);
+      initFailingStore(failure);
+      for (Pair<String, Executable> write : writes()) {
+        Assertions.assertSame(
+            failure,
+            Assertions.assertThrows(PersistenceException.class, write.getRight()),
+            write.getLeft());
       }
     }
   }
