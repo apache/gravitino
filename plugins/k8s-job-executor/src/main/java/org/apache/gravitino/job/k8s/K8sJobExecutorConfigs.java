@@ -35,7 +35,12 @@ public class K8sJobExecutorConfigs {
   /** The name of the job executor. */
   public static final String K8S_JOB_EXECUTOR_NAME = "k8s";
 
-  /** The name of the Kubernetes cluster the jobs run in, which is part of the job execution id. */
+  /**
+   * The name of the Kubernetes cluster the jobs run in, which is part of the job execution id. It
+   * must be the same on every Gravitino server, and must not be changed while jobs run: the jobs
+   * submitted under another name can't be queried nor cancelled, and stay unfinished until it is
+   * changed back.
+   */
   public static final String CLUSTER = "cluster";
 
   /** The default cluster name. */

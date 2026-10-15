@@ -75,6 +75,7 @@ public final class SparkApplicationUtils {
 
   private static final String SPARK_MASTER = "spark.master";
   private static final String SPARK_DEPLOY_MODE = "spark.submit.deployMode";
+  private static final String CLUSTER_DEPLOY_MODE = "cluster";
   private static final String SPARK_IMAGE = "spark.kubernetes.container.image";
   private static final String SPARK_DRIVER_SERVICE_ACCOUNT =
       "spark.kubernetes.authenticate.driver.serviceAccountName";
@@ -117,6 +118,16 @@ public final class SparkApplicationUtils {
 
     Map<String, String> sparkConf = new TreeMap<>(configs.sparkConf());
     sparkConf.putAll(template.configs());
+    // The operator only supports cluster mode, so a job that asks for client mode is rejected
+    // rather than silently run in cluster mode.
+    String deployMode = StringUtils.trimToNull(sparkConf.get(SPARK_DEPLOY_MODE));
+    if (deployMode != null && !CLUSTER_DEPLOY_MODE.equalsIgnoreCase(deployMode)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Job template %s sets %s to %s, but the k8s job executor only runs Spark jobs in %s"
+                  + " mode",
+              template.name(), SPARK_DEPLOY_MODE, deployMode, CLUSTER_DEPLOY_MODE));
+    }
     // The operator decides the master and the deploy mode.
     sparkConf.remove(SPARK_MASTER);
     sparkConf.remove(SPARK_DEPLOY_MODE);

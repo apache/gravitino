@@ -41,6 +41,10 @@ public final class PodLogUtils {
    * memory while reading. If the kept bytes start in the middle of a line, that partial line is
    * dropped, unless it is the only line.
    *
+   * <p>The whole stream is read: {@code maxBytes} bounds the memory and the lines returned, not the
+   * bytes read. The caller bounds those, for example by asking Kubernetes for the last lines of a
+   * log only.
+   *
    * @param log the log stream, which is read to its end
    * @param maxLines the maximum number of lines to return
    * @param maxBytes the maximum number of bytes to read from the tail of the log

@@ -91,6 +91,30 @@ public class TestSparkApplicationStatusUtils {
   }
 
   @Test
+  public void testUnreadableStatus() {
+    // A status without any state this version can read, for example of a newer operator, keeps
+    // the job unfinished after the no-status timeout.
+    GenericKubernetesResource app = app();
+    app.setAdditionalProperty("status", ImmutableMap.of("phase", "Running"));
+    Assertions.assertTrue(SparkApplicationStatusUtils.hasStatus(app));
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasState(app));
+    Assertions.assertEquals(
+        JobHandle.Status.QUEUED,
+        SparkApplicationStatusUtils.executionInfoOf(
+                app, null, CREATED_AT.plusMillis(NO_STATUS_TIMEOUT_MS + 1), NO_STATUS_TIMEOUT_MS)
+            .status());
+
+    // An empty status is no status.
+    app.setAdditionalProperty("status", ImmutableMap.of());
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasStatus(app));
+    Assertions.assertEquals(
+        JobHandle.Status.FAILED,
+        SparkApplicationStatusUtils.executionInfoOf(
+                app, null, CREATED_AT.plusMillis(NO_STATUS_TIMEOUT_MS + 1), NO_STATUS_TIMEOUT_MS)
+            .status());
+  }
+
+  @Test
   public void testTimes() {
     JobExecutionInfo queued = executionInfoOf(app("Submitted", "DriverRequested"));
     Assertions.assertNull(queued.startedAt());

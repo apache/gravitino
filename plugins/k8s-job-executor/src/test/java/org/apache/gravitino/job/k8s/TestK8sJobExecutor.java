@@ -52,6 +52,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
@@ -698,10 +699,152 @@ public class TestK8sJobExecutor {
     String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
     Assertions.assertThrows(
         NoSuchJobException.class,
-        () -> executor.getJobExecutionInfo(jobExecutionId.replaceFirst("^default/", "other/")));
-    Assertions.assertThrows(
-        NoSuchJobException.class,
         () -> executor.getJobExecutionInfo(jobExecutionId.replace("/sparkapp/", "/job/")));
+  }
+
+  @Test
+  public void testJobOfAnotherCluster() {
+    // For example, submitted before the cluster was renamed. The job isn't missing, which would
+    // end it while it may still run, so its queries fail and leave it as it is.
+    String jobExecutionId =
+        executor.submitJob(context(1L), sparkTemplate()).replaceFirst("^default/", "other/");
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+    Assertions.assertThrows(IllegalStateException.class, () -> executor.cancelJob(jobExecutionId));
+    Assertions.assertFalse(
+        K8sJobResourceUtils.isCancelRequested(sparkApplication("gravitino-job-1")));
+    Assertions.assertEquals(ImmutableList.of(), executor.getJobStdout(jobExecutionId, 10, 1024));
+  }
+
+  @Test
+  public void testIgnoreResourceOfAnotherJob() {
+    // The SparkApplication of the job is gone, and its name is used by another job's, for example
+    // of another Gravitino deployment with the same name prefix in the namespace.
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .withName("gravitino-job-1")
+        .delete();
+    GenericKubernetesResource other =
+        SparkApplicationUtils.buildSparkApplication(
+            context(2L), sparkTemplate(), TestSparkApplicationUtils.newConfigs(ImmutableMap.of()));
+    other.getMetadata().setName("gravitino-job-1");
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(other)
+        .create();
+    setStates("gravitino-job-1", "Submitted", "DriverReady");
+    createDriverPod("driver", "spark-kubernetes-driver");
+    server
+        .expect()
+        .get()
+        .withPath("/api/v1/namespaces/default/pods/driver/log?pretty=false&tailLines=10")
+        .andReturn(200, "other job\n")
+        .always();
+
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+    Assertions.assertThrows(NoSuchJobException.class, () -> executor.cancelJob(jobExecutionId));
+    Assertions.assertEquals(ImmutableList.of(), executor.getJobStdout(jobExecutionId, 10, 1024));
+    GenericKubernetesResource kept = sparkApplication("gravitino-job-1");
+    Assertions.assertNotNull(kept);
+    Assertions.assertFalse(K8sJobResourceUtils.isCancelRequested(kept));
+    Assertions.assertNotNull(client.pods().inNamespace("default").withName("driver").get());
+
+    // Nor one that isn't managed by Gravitino.
+    kept.getMetadata().setLabels(ImmutableMap.of());
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(kept)
+        .update();
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+    Assertions.assertEquals(ImmutableList.of(), executor.getJobStdout(jobExecutionId, 10, 1024));
+  }
+
+  @Test
+  public void testKeepJobWithUnreadableStatus() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    // A status this version can't read, for example of a newer operator.
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    app.setAdditionalProperty("status", ImmutableMap.of("phase", "Running"));
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(app)
+        .update();
+    now.set(now.get().plusSeconds(601));
+
+    Assertions.assertEquals(
+        JobHandle.Status.QUEUED, executor.getJobExecutionInfo(jobExecutionId).status());
+    Assertions.assertNotNull(sparkApplication("gravitino-job-1"));
+  }
+
+  @Test
+  public void testJobWithoutStatusGoneMeanwhile() {
+    executor.initialize(
+        TestSparkApplicationUtils.newConfigs(
+            ImmutableMap.of(K8sJobExecutorConfigs.STATUS_CACHE_TTL_MS, "3600000")),
+        client);
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    Assertions.assertEquals(
+        JobHandle.Status.QUEUED, executor.getJobExecutionInfo(jobExecutionId).status());
+
+    // Another server cancels it and it is gone, while this one still has it in its cache. It is
+    // reported missing rather than failed, which settles a cancelling job as cancelled.
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .withName("gravitino-job-1")
+        .delete();
+    now.set(now.get().plusSeconds(601));
+
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+  }
+
+  @Test
+  public void testCancelWhoseDeletionResponseIsLost() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    setStates("gravitino-job-1", "Submitted", "DriverReady");
+    GenericKubernetesResource running = sparkApplication("gravitino-job-1");
+    // The deletion takes effect, but its response is lost. From then on the SparkApplication is
+    // marked and being deleted.
+    GenericKubernetesResource deleting = sparkApplication("gravitino-job-1");
+    deleting
+        .getMetadata()
+        .setAnnotations(ImmutableMap.of(K8sJobResourceUtils.ANNOTATION_CANCEL_REQUESTED, "true"));
+    deleting.getMetadata().setDeletionTimestamp(Instant.now().toString());
+    AtomicBoolean deleted = new AtomicBoolean();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReply(200, request -> deleted.get() ? deleting : running)
+        .always();
+    server
+        .expect()
+        .delete()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReply(
+            403,
+            request -> {
+              deleted.set(true);
+              return new StatusBuilder().withCode(403).build();
+            })
+        .once();
+
+    // The job is being cancelled, so the cancellation succeeds and the job keeps its mark.
+    executor.cancelJob(jobExecutionId);
+
+    Assertions.assertTrue(deleted.get());
+    Assertions.assertTrue(
+        K8sJobResourceUtils.isCancelRequested(sparkApplication("gravitino-job-1")));
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLED, executor.getJobExecutionInfo(jobExecutionId).status());
   }
 
   @Test

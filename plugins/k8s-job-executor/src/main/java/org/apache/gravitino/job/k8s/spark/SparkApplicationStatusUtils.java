@@ -120,7 +120,8 @@ public final class SparkApplicationStatusUtils {
    *       outcome it reached, or fails if it has none.
    *   <li>The stopped states walk back through the state transition history to the last outcome.
    *   <li>A SparkApplication without any status after the timeout fails, for example if its
-   *       namespace isn't watched by the operator.
+   *       namespace isn't watched by the operator. One with a status that has no state this version
+   *       can read stays queued.
    *   <li>An unknown state, of a newer operator, after an outcome is a stopped state too. Before
    *       any outcome it keeps the job unfinished: started if the application has reached a started
    *       state, queued otherwise.
@@ -188,7 +189,15 @@ public final class SparkApplicationStatusUtils {
       status = outcome == null ? JobHandle.Status.FAILED : statusOf(outcome);
       finishedAt = stoppedAt;
     } else if (current == null) {
-      if (createdAt != null && createdAt.plusMillis(noStatusTimeoutMs).isBefore(now)) {
+      if (hasStatus(app)) {
+        // The operator wrote a status this version can't read, for example a newer operator. The
+        // application is known to the operator, so the job stays unfinished rather than failing.
+        status = JobHandle.Status.QUEUED;
+        LOG.warn(
+            "Can't read the status of SparkApplication {}, considering it as {}",
+            nameOf(app),
+            status);
+      } else if (createdAt != null && createdAt.plusMillis(noStatusTimeoutMs).isBefore(now)) {
         LOG.warn(
             "SparkApplication {} has no status after {} ms, is its namespace watched by the Spark"
                 + " operator? Considering it as failed",
@@ -240,6 +249,18 @@ public final class SparkApplicationStatusUtils {
     }
     String phase = driver.getStatus() == null ? null : driver.getStatus().getPhase();
     return !"Succeeded".equals(phase) && !"Failed".equals(phase);
+  }
+
+  /**
+   * Returns whether the operator has written a status of the SparkApplication, whether or not this
+   * version can read a state from it.
+   *
+   * @param app the SparkApplication
+   * @return true if the application has a non-empty status
+   */
+  public static boolean hasStatus(GenericKubernetesResource app) {
+    Object status = app.getAdditionalProperties().get("status");
+    return status instanceof Map && !((Map<?, ?>) status).isEmpty();
   }
 
   /**

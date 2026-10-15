@@ -30,7 +30,6 @@ import io.fabric8.kubernetes.api.model.OwnerReference;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
-import io.fabric8.kubernetes.client.ResourceNotFoundException;
 import io.fabric8.kubernetes.client.dsl.NonNamespaceOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
@@ -45,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
@@ -88,6 +88,9 @@ public class K8sJobExecutor implements JobExecutor {
   // Gravitino queries the jobs one after another, and each query would otherwise wait for the
   // connection to time out again.
   @VisibleForTesting static final long UNREACHABLE_BACKOFF_MS = 10_000L;
+
+  // How many times a change of a SparkApplication is tried again after it changed meanwhile.
+  private static final int UPDATE_CONFLICT_RETRIES = 3;
 
   private final Clock clock;
 
@@ -223,59 +226,56 @@ public class K8sJobExecutor implements JobExecutor {
   @Override
   public void cancelJob(String jobId) throws NoSuchJobException {
     K8sJobExecutionId id = parseJobExecutionId(jobId);
-    GenericKubernetesResource app =
-        getSparkApplicationClient(id.namespace()).withName(id.name()).get();
-    if (app == null) {
-      throw new NoSuchJobException("SparkApplication of job %s doesn't exist", jobId);
-    }
-    if (SparkApplicationStatusUtils.isStopped(app)) {
-      return;
-    }
-
     // Mark the cancellation before deleting, so that a status query on any server tells a
-    // cancelled job from one deleted by someone else. The job may have stopped since it was read
-    // above, then it isn't marked, so that a finished job isn't reported as cancelled.
-    AtomicBoolean stopped = new AtomicBoolean();
-    try {
-      getSparkApplicationClient(id.namespace())
-          .withName(id.name())
-          .edit(
-              current -> {
-                stopped.set(SparkApplicationStatusUtils.isStopped(current));
-                if (!stopped.get()) {
+    // cancelled job from one deleted by someone else. A job that has stopped isn't marked, so
+    // that a finished job isn't reported as cancelled. The mark is only written if the job hasn't
+    // changed since it was checked, so a job that stops meanwhile is checked again.
+    GenericKubernetesResource app =
+        updateSparkApplication(
+                id,
+                current -> {
+                  if (SparkApplicationStatusUtils.isStopped(current)) {
+                    return false;
+                  }
                   setCancelRequested(current, true);
-                }
-                return current;
-              });
-    } catch (ResourceNotFoundException e) {
-      throw new NoSuchJobException(e, "SparkApplication of job %s doesn't exist", jobId);
-    } catch (KubernetesClientException e) {
-      if (e.getCode() == HttpURLConnection.HTTP_NOT_FOUND) {
-        throw new NoSuchJobException(e, "SparkApplication of job %s doesn't exist", jobId);
-      }
-      throw e;
-    }
-    if (stopped.get()) {
+                  return true;
+                })
+            .orElseThrow(
+                () -> new NoSuchJobException("SparkApplication of job %s doesn't exist", jobId));
+    if (SparkApplicationStatusUtils.isStopped(app)) {
       return;
     }
 
     try {
       deleteSparkApplication(id);
     } catch (KubernetesClientException e) {
-      // The job keeps running and the caller is told the cancellation failed, so remove the mark,
-      // otherwise the job would be reported as cancelled once it finishes by itself.
+      // The deletion may have taken effect although its response was lost. Then the job is being
+      // cancelled, and keeps its mark.
+      AtomicBoolean deleting = new AtomicBoolean();
       try {
-        getSparkApplicationClient(id.namespace())
-            .withName(id.name())
-            .edit(
+        Optional<GenericKubernetesResource> latest =
+            updateSparkApplication(
+                id,
                 current -> {
+                  deleting.set(current.getMetadata().getDeletionTimestamp() != null);
+                  if (deleting.get()) {
+                    return false;
+                  }
+                  // The job keeps running and the caller is told the cancellation failed, so
+                  // remove the mark, otherwise the job would be reported as cancelled once it
+                  // finishes by itself.
                   setCancelRequested(current, false);
-                  return current;
+                  return true;
                 });
+        deleting.compareAndSet(false, !latest.isPresent());
       } catch (RuntimeException removal) {
         e.addSuppressed(removal);
+        throw e;
       }
-      throw e;
+      if (!deleting.get()) {
+        throw e;
+      }
+      LOG.warn("The deletion of the SparkApplication of job {} took effect anyway", jobId, e);
     }
     LOG.info("Requested to cancel job {}", jobId);
   }
@@ -286,14 +286,19 @@ public class K8sJobExecutor implements JobExecutor {
       K8sJobExecutionId id = parseJobExecutionId(jobId);
       // The SparkApplication tells the driver pod apart from other pods with the same labels, and
       // names the driver container. It may already be gone, the driver pod is retained longer.
-      GenericKubernetesResource app = getSparkApplication(id).orElse(null);
+      GenericKubernetesResource app =
+          getSparkApplicationClient(id.namespace()).withName(id.name()).get();
+      if (app != null && !K8sJobResourceUtils.isJobResource(app)) {
+        // The name is used by a resource that isn't the job's, whose driver log isn't the job's.
+        return ImmutableList.of();
+      }
       Optional<Pod> driver = getDriverPod(id, app);
       if (!driver.isPresent()) {
         return ImmutableList.of();
       }
 
       // Kubernetes can only limit the bytes from the head of the log, so read the last lines and
-      // keep their tail.
+      // keep their tail. So the lines bound the bytes read, and maxBytes only the bytes kept.
       PodResource pod =
           client.pods().inNamespace(id.namespace()).withName(driver.get().getMetadata().getName());
       // The container must be named if the driver pod has others, for example a sidecar.
@@ -387,13 +392,13 @@ public class K8sJobExecutor implements JobExecutor {
   }
 
   private JobExecutionInfo getSparkApplicationExecutionInfo(K8sJobExecutionId id, String jobId) {
+    Optional<GenericKubernetesResource> cached =
+        sparkApplicationCache.find(id.namespace(), id.name());
     GenericKubernetesResource app =
-        sparkApplicationCache
-            .find(id.namespace(), id.name())
-            .orElseGet(() -> getSparkApplicationClient(id.namespace()).withName(id.name()).get());
-    if (app == null) {
-      throw new NoSuchJobException("SparkApplication of job %s doesn't exist", jobId);
-    }
+        (cached.isPresent() ? cached : getSparkApplication(id))
+            .filter(K8sJobResourceUtils::isJobResource)
+            .orElseThrow(
+                () -> new NoSuchJobException("SparkApplication of job %s doesn't exist", jobId));
     return getExecutionInfo(id, jobId, app);
   }
 
@@ -417,7 +422,7 @@ public class K8sJobExecutor implements JobExecutor {
         SparkApplicationStatusUtils.executionInfoOf(
             app, driver, clock.instant(), configs.noStatusTimeoutMs());
     if (info.status() == JobHandle.Status.FAILED
-        && !SparkApplicationStatusUtils.hasState(app)
+        && !SparkApplicationStatusUtils.hasStatus(app)
         && app.getMetadata().getDeletionTimestamp() == null) {
       return getExecutionInfoWithoutStatus(id, jobId, info);
     }
@@ -445,12 +450,18 @@ public class K8sJobExecutor implements JobExecutor {
     return info;
   }
 
+  /**
+   * Parses the job execution id of a job of the connected cluster. A job of another cluster isn't
+   * reported as missing, which would end it while it may still run, for example after the cluster
+   * is renamed: the query fails, and the job is left as it is.
+   */
   private K8sJobExecutionId parseJobExecutionId(String jobId) throws NoSuchJobException {
     K8sJobExecutionId id = K8sJobExecutionId.parse(jobId);
     if (!configs.cluster().equals(id.cluster())) {
-      throw new NoSuchJobException(
-          "Job %s runs in cluster %s, but the k8s job executor is connected to cluster %s",
-          jobId, id.cluster(), configs.cluster());
+      throw new IllegalStateException(
+          String.format(
+              "Job %s runs in cluster %s, but the k8s job executor is connected to cluster %s",
+              jobId, id.cluster(), configs.cluster()));
     }
     return id;
   }
@@ -465,13 +476,14 @@ public class K8sJobExecutor implements JobExecutor {
   private JobExecutionInfo getExecutionInfoWithoutStatus(
       K8sJobExecutionId id, String jobId, JobExecutionInfo failed) {
     // The SparkApplication may come from the cache: it may have got a status since, or be being
-    // deleted, for example by a cancellation on another server. Then it is mapped as usual.
+    // deleted, for example by a cancellation on another server. Then it is mapped as usual. If it
+    // is gone meanwhile, the job is missing rather than failed, which settles a cancelling job as
+    // cancelled.
     GenericKubernetesResource latest =
-        getSparkApplicationClient(id.namespace()).withName(id.name()).get();
-    if (latest == null) {
-      return failed;
-    }
-    if (SparkApplicationStatusUtils.hasState(latest)
+        getSparkApplication(id)
+            .orElseThrow(
+                () -> new NoSuchJobException("SparkApplication of job %s doesn't exist", jobId));
+    if (SparkApplicationStatusUtils.hasStatus(latest)
         || latest.getMetadata().getDeletionTimestamp() != null) {
       sparkApplicationCache.invalidate(id.namespace());
       return getExecutionInfo(id, jobId, latest);
@@ -501,8 +513,45 @@ public class K8sJobExecutor implements JobExecutor {
     }
   }
 
+  /**
+   * Returns the SparkApplication of a job, if it exists. A resource with its name that isn't a job
+   * resource of Gravitino, for example one created by another system, isn't.
+   */
   private Optional<GenericKubernetesResource> getSparkApplication(K8sJobExecutionId id) {
-    return Optional.ofNullable(getSparkApplicationClient(id.namespace()).withName(id.name()).get());
+    return Optional.ofNullable(getSparkApplicationClient(id.namespace()).withName(id.name()).get())
+        .filter(K8sJobResourceUtils::isJobResource);
+  }
+
+  /**
+   * Changes the SparkApplication of a job, only if it hasn't changed since it was read, and reads
+   * it again to decide the change again otherwise.
+   *
+   * @param id the job execution id
+   * @param change changes the SparkApplication in place, and returns whether it changed it
+   * @return the SparkApplication the change was decided on, or empty if it doesn't exist
+   */
+  private Optional<GenericKubernetesResource> updateSparkApplication(
+      K8sJobExecutionId id, Predicate<GenericKubernetesResource> change) {
+    for (int attempt = 0; ; attempt++) {
+      Optional<GenericKubernetesResource> app = getSparkApplication(id);
+      if (!app.isPresent() || !change.test(app.get())) {
+        return app;
+      }
+      try {
+        // An update carries the resource version that was read, so it fails if the
+        // SparkApplication has changed since.
+        getSparkApplicationClient(id.namespace()).resource(app.get()).update();
+        sparkApplicationCache.invalidate(id.namespace());
+        return app;
+      } catch (KubernetesClientException e) {
+        if (e.getCode() == HttpURLConnection.HTTP_NOT_FOUND) {
+          return Optional.empty();
+        }
+        if (e.getCode() != HttpURLConnection.HTTP_CONFLICT || attempt >= UPDATE_CONFLICT_RETRIES) {
+          throw e;
+        }
+      }
+    }
   }
 
   /**
