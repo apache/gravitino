@@ -44,6 +44,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -67,8 +68,10 @@ public class TestLoadTableAuthzHandler {
     IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
     CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
     when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
-    // The two-level namespace IS the hierarchical schema itself, so it exists.
+    // The two-level namespace is the hierarchical schema "a.b", and it holds a table "files".
     when(catalogWrapper.namespaceExists(Namespace.of("a", "b"))).thenReturn(true);
+    when(catalogWrapper.tableExists(TableIdentifier.of(Namespace.of("a", "b"), "files")))
+        .thenReturn(true);
     resetContext(wrapperManager);
 
     LoadTableAuthzHandler handler =
@@ -79,6 +82,24 @@ public class TestLoadTableAuthzHandler {
     // instead of being rejected as a metadata table.
     assertDoesNotThrow(() -> handler.process(nameIdentifierMap));
     verify(catalogWrapper).namespaceExists(Namespace.of("a", "b"));
+  }
+
+  @Test
+  public void testLoadTableRejectsMetadataTableWhenNamespaceHasNoSuchTable() throws Exception {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
+    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
+    // Both the namespace [db, t] and the table db.t exist, but [db, t] has no table "files",
+    // so db.t.files is a metadata-table request and must get 404 for the client fallback.
+    when(catalogWrapper.namespaceExists(Namespace.of("db", "t"))).thenReturn(true);
+    when(catalogWrapper.tableExists(TableIdentifier.of(Namespace.of("db", "t"), "files")))
+        .thenReturn(false);
+    resetContext(wrapperManager);
+
+    LoadTableAuthzHandler handler =
+        createHandler(new Object[] {TEST_CATALOG + "/", "db%1Ft", "files"});
+
+    assertThrows(NoSuchTableException.class, () -> handler.process(baseIdentifierMap()));
   }
 
   @Test
@@ -94,8 +115,7 @@ public class TestLoadTableAuthzHandler {
         createHandler(new Object[] {TEST_CATALOG + "/", "db%1Ft", "files"});
 
     assertThrows(NoSuchTableException.class, () -> handler.process(baseIdentifierMap()));
-    verify(catalogWrapper, never())
-        .tableExists(any(org.apache.iceberg.catalog.TableIdentifier.class));
+    verify(catalogWrapper, never()).tableExists(any(TableIdentifier.class));
   }
 
   @Test

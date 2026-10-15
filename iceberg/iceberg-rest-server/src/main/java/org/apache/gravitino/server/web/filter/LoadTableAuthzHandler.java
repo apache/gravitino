@@ -149,7 +149,7 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
    *
    * @param tableName The table name to check
    * @param namespace The Iceberg namespace of the table
-   * @param catalogWrapper the catalog wrapper used to test whether the namespace exists
+   * @param catalogWrapper the catalog wrapper used to test whether the table exists
    * @return true if this is a metadata table access, false otherwise
    */
   private boolean isMetadataTable(
@@ -165,17 +165,17 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       return false;
     }
 
-    // A metadata-table request targets the namespace [schema, table], which is not an
-    // existing namespace. A real table whose name collides with a metadata-table suffix
-    // lives in a hierarchical schema, whose namespace IS the schema itself and therefore
-    // exists - it must not be rejected. When the backend cannot answer, fall back to
-    // treating the request as a metadata-table access: the guaranteed 404 matches the
-    // behavior before this check existed, and loading a real table needs the backend up.
+    // A table in a hierarchical schema can have a metadata-table name, so only treat the
+    // request as a metadata-table access when no such table exists. This is the order the
+    // Iceberg client uses: load the full name first, then fall back to the metadata table.
+    // If the backend cannot answer, keep the 404; the client's fallback load reports the
+    // failure.
     try {
-      return !catalogWrapper.namespaceExists(namespace);
+      return !catalogWrapper.namespaceExists(namespace)
+          || !catalogWrapper.tableExists(TableIdentifier.of(namespace, tableName));
     } catch (Exception e) {
-      LOG.warn(
-          "Failed to check whether namespace {} exists; treating table {} as a metadata table",
+      LOG.debug(
+          "Failed to check whether table {}.{} exists, treating it as a metadata table",
           namespace,
           tableName,
           e);
