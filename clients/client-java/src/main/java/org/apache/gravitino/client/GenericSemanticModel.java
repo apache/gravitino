@@ -29,11 +29,13 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** An immutable client-side Semantic Model returned by the Gravitino REST API. */
@@ -122,8 +124,20 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
 
   /** {@inheritDoc} */
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   /** {@inheritDoc} */
@@ -152,8 +166,20 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
 
   /** {@inheritDoc} */
   @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   /** {@inheritDoc} */
