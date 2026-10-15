@@ -26,6 +26,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.tag.TagValue;
 
 /**
@@ -92,8 +93,8 @@ public interface Domain extends Auditable {
    * Returns the backing tag of the domain. The metadata objects that carry this tag, with this
    * value if one is set, are the members of the domain.
    *
-   * @return The backing tag of the domain, or empty if the backing tag has been deleted and no new
-   *     one has been set.
+   * @return The backing tag of the domain, or empty if the backing tag has been removed or deleted
+   *     and no new one has been set.
    */
   Optional<TagValue> backingTag();
 
@@ -150,6 +151,21 @@ public interface Domain extends Auditable {
    * @throws NoSuchDomainException If this domain does not exist.
    */
   Domain detachFromParent() throws NoSuchDomainException;
+
+  /**
+   * Replaces the backing tag of this domain, or removes it. Members are not migrated: objects that
+   * carry only the old backing tag are no longer members of the domain. Setting the current backing
+   * tag has no effect.
+   *
+   * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
+   *     remove the backing tag.
+   * @return The updated domain.
+   * @throws NoSuchDomainException If this domain does not exist.
+   * @throws NoSuchTagException If the tag does not exist.
+   * @throws IllegalArgumentException If the value is not allowed by the tag.
+   */
+  Domain updateBackingTag(@Nullable TagValue backingTag)
+      throws NoSuchDomainException, NoSuchTagException, IllegalArgumentException;
 
   /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
