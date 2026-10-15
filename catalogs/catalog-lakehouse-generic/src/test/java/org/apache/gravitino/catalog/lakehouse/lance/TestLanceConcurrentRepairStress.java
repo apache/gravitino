@@ -55,7 +55,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -270,11 +269,6 @@ public class TestLanceConcurrentRepairStress {
 
     @Override
     public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) {
       throw new UnsupportedOperationException();
     }
 

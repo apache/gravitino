@@ -38,6 +38,7 @@ import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,11 +69,13 @@ public class TestRelationalEntityStore {
           IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    CatalogEntity updated = Mockito.mock(CatalogEntity.class);
+    Mockito.when(updated.nameIdentifier()).thenReturn(ident);
 
     Mockito.doAnswer(
             invocation -> {
               Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
-              return null;
+              return updated;
             })
         .when(backend)
         .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));

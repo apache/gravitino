@@ -48,7 +48,6 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -231,11 +230,8 @@ public class TestMetalakeManager {
     MetalakeManager manager = new MetalakeManager(store, new RandomIdGenerator());
     NameIdentifier ident = NameIdentifier.of("concurrently_deleted_metalake");
     manager.createMetalake(ident, "comment", ImmutableMap.of());
-    Mockito.doThrow(
-            new NoSuchEntityException(
-                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", ident.toString()))
-        .when(store)
-        .delete(ident, EntityType.METALAKE, true);
+    // The store reports a delete that lost to a concurrent delete by returning false.
+    Mockito.doReturn(false).when(store).delete(ident, EntityType.METALAKE, true);
 
     Assertions.assertFalse(manager.dropMetalake(ident, true));
     store.close();

@@ -195,8 +195,6 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
       throw new RuntimeException("Failed to delete schema " + ident, ioe);
     } catch (NonEmptyEntityException neee) {
       throw new NonEmptySchemaException(neee, "Schema %s is not empty", ident);
-    } catch (NoSuchEntityException nsee) {
-      return false;
     }
   }
 
