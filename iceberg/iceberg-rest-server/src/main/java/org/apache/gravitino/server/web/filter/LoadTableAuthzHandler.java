@@ -31,7 +31,6 @@ import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInt
 import org.apache.gravitino.server.web.filter.IcebergLoadAuthzHandlerHelper.LoadContext;
 import org.apache.gravitino.server.web.filter.IcebergLoadAuthzHandlerHelper.LoadTarget;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -169,19 +168,25 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     // A table in a hierarchical schema can have a metadata-table name, so only treat the
     // request as a metadata-table access when the backend does not resolve it to a real table.
     // tableExists() cannot tell the two apart: backends resolve [db, t].files to the metadata
-    // table of db.t as well. If the backend cannot answer, keep the 404; the client's fallback
-    // load reports the failure.
+    // table of db.t as well.
     try {
-      return !catalogWrapper.namespaceExists(namespace)
-          || catalogWrapper.getCatalog().loadTable(TableIdentifier.of(namespace, tableName))
-              instanceof BaseMetadataTable;
+      if (!catalogWrapper.namespaceExists(namespace)) {
+        return true;
+      }
     } catch (Exception e) {
-      LOG.debug(
-          "Failed to check whether table {}.{} exists, treating it as a metadata table",
-          namespace,
-          tableName,
-          e);
+      // Some backends reject multi-level namespaces. Keep the 404 the client falls back on.
+      LOG.debug("Failed to check whether namespace {} exists", namespace, e);
       return true;
+    }
+
+    try {
+      return catalogWrapper.resolvesToMetadataTable(TableIdentifier.of(namespace, tableName));
+    } catch (NoSuchTableException e) {
+      return true;
+    } catch (RuntimeException e) {
+      // Let the real load report the failure. A 404 here would make the client fall back and
+      // read the metadata table of another table.
+      return false;
     }
   }
 }

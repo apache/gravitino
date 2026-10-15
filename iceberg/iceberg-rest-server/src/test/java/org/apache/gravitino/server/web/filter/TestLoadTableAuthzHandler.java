@@ -48,6 +48,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.BeforeAll;
@@ -116,7 +117,7 @@ public class TestLoadTableAuthzHandler {
         createHandler(new Object[] {TEST_CATALOG + "/", "db%1Ft", "files"});
 
     assertThrows(NoSuchTableException.class, () -> handler.process(baseIdentifierMap()));
-    verify(catalogWrapper, never()).getCatalog();
+    verify(catalogWrapper, never()).resolvesToMetadataTable(any(TableIdentifier.class));
   }
 
   @Test
@@ -134,6 +135,24 @@ public class TestLoadTableAuthzHandler {
     // A failing existence check must keep the guaranteed 404 for metadata-shaped requests,
     // not surface as a server error.
     assertThrows(NoSuchTableException.class, () -> handler.process(baseIdentifierMap()));
+  }
+
+  @Test
+  public void testLoadFailureOfExistingNamespaceGoesToAuthorization() throws Exception {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
+    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
+    when(catalogWrapper.namespaceExists(Namespace.of("a", "b"))).thenReturn(true);
+    when(catalogWrapper.resolvesToMetadataTable(any(TableIdentifier.class)))
+        .thenThrow(new ServiceUnavailableException("remote catalog unavailable"));
+    resetContext(wrapperManager);
+
+    LoadTableAuthzHandler handler =
+        createHandler(new Object[] {TEST_CATALOG + "/", "a%1Fb", "files"});
+
+    // A 404 would make the client fall back to the metadata table of a.b, so the request goes on
+    // to authorization and the real load reports the failure.
+    assertDoesNotThrow(() -> handler.process(baseIdentifierMap()));
   }
 
   private static LoadTableAuthzHandler createHandler(Object[] args) throws Exception {
@@ -168,8 +187,7 @@ public class TestLoadTableAuthzHandler {
     when(catalogWrapper.getCatalog()).thenReturn(catalog);
     when(catalogWrapper.namespaceExists(any(Namespace.class)))
         .thenAnswer(invocation -> catalog.namespaceExists(invocation.getArgument(0)));
-    when(catalogWrapper.tableExists(any(TableIdentifier.class)))
-        .thenAnswer(invocation -> catalog.tableExists(invocation.getArgument(0)));
+    when(catalogWrapper.resolvesToMetadataTable(any(TableIdentifier.class))).thenCallRealMethod();
     resetContext(wrapperManager);
   }
 
