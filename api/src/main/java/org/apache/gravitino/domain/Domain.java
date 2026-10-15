@@ -211,8 +211,9 @@ public interface Domain extends Auditable {
    * DomainMember#SUPPORTED_TYPES supported types} are members, and only the members the caller can
    * access are returned.
    *
-   * @param filter The filter of the members, use {@code DomainMemberFilter.builder().build()} to
-   *     list all members, including those of the sub-domains.
+   * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists all
+   *     members of this domain itself; set {@code withIncludeAllSubdomains(true)} to include those
+   *     of its sub-domains.
    * @return The members of this domain.
    * @throws NoSuchDomainException If this domain does not exist.
    */

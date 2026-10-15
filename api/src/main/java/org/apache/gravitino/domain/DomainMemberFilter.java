@@ -36,10 +36,9 @@ import org.apache.gravitino.annotation.Evolving;
  *
  * <ul>
  *   <li>{@link Builder#withIncludeAllSubdomains(boolean) withIncludeAllSubdomains(true)}: all
- *       sub-domains; the given sub-domains are ignored.
- *   <li>{@code withIncludeAllSubdomains(false)}: only the sub-domains given by {@link
- *       Builder#withSubdomains(String...)}, or none if no sub-domain is given.
- *   <li>Neither set: all sub-domains if no sub-domain is given, otherwise only the given ones.
+ *       sub-domains; the sub-domains given by {@link Builder#withSubdomains(String...)} are
+ *       ignored.
+ *   <li>Otherwise, the default: only the given sub-domains, or none if no sub-domain is given.
  * </ul>
  *
  * <p>To list only the members of a sub-domain, call {@link Domain#listMembers(DomainMemberFilter)}
@@ -77,7 +76,7 @@ public final class DomainMemberFilter {
    * Returns whether the members of all sub-domains are listed. When it is true, {@link
    * #subdomains()} is empty.
    *
-   * @return True if the members of all sub-domains are listed, the default.
+   * @return True if the members of all sub-domains are listed, false by default.
    */
   public boolean includeAllSubdomains() {
     return includeAllSubdomains;
@@ -106,7 +105,7 @@ public final class DomainMemberFilter {
    * Returns the sub-domains whose members are listed in addition to those of the domain itself. It
    * is used only when {@link #includeAllSubdomains()} is false.
    *
-   * @return The names of the sub-domains, or an empty set when all sub-domains or no sub-domain are
+   * @return The names of the sub-domains, or an empty set when all sub-domains or no sub-domain is
    *     listed.
    */
   public Set<String> subdomains() {
@@ -166,7 +165,7 @@ public final class DomainMemberFilter {
   /** A builder for {@link DomainMemberFilter}. */
   public static final class Builder {
 
-    @Nullable private Boolean includeAllSubdomains;
+    private boolean includeAllSubdomains = false;
     private Set<MetadataObject.Type> types = ImmutableSet.of();
     @Nullable private String nameContains;
     private Set<String> subdomains = ImmutableSet.of();
@@ -174,10 +173,9 @@ public final class DomainMemberFilter {
     private Builder() {}
 
     /**
-     * Sets whether the members of all sub-domains are listed. If it is true, the sub-domains given
-     * by {@link #withSubdomains(String...)} are ignored. If it is false, only the given sub-domains
-     * are listed, or none if no sub-domain is given. If it is not set, it is true when no
-     * sub-domain is given and false otherwise.
+     * Sets whether the members of all sub-domains are listed. Defaults to false. If it is true, the
+     * sub-domains given by {@link #withSubdomains(String...)} are ignored. If it is false, only the
+     * given sub-domains are listed, or none if no sub-domain is given.
      *
      * @param includeAllSubdomains Whether the members of all sub-domains are listed.
      * @return This builder.
@@ -250,10 +248,11 @@ public final class DomainMemberFilter {
      * @return The immutable domain member filter.
      */
     public DomainMemberFilter build() {
-      boolean includeAll =
-          includeAllSubdomains != null ? includeAllSubdomains : subdomains.isEmpty();
       return new DomainMemberFilter(
-          includeAll, types, nameContains, includeAll ? ImmutableSet.of() : subdomains);
+          includeAllSubdomains,
+          types,
+          nameContains,
+          includeAllSubdomains ? ImmutableSet.of() : subdomains);
     }
   }
 }

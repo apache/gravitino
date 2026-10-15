@@ -28,7 +28,7 @@ public class TestDomainMemberFilter {
   @Test
   public void testDefaultFilter() {
     DomainMemberFilter filter = DomainMemberFilter.builder().build();
-    Assertions.assertTrue(filter.includeAllSubdomains());
+    Assertions.assertFalse(filter.includeAllSubdomains());
     Assertions.assertTrue(filter.subdomains().isEmpty());
     Assertions.assertTrue(filter.types().isEmpty());
     Assertions.assertFalse(filter.nameContains().isPresent());
@@ -65,22 +65,13 @@ public class TestDomainMemberFilter {
 
   @Test
   public void testSubdomainOptions() {
-    DomainMemberFilter all = DomainMemberFilter.builder().build();
-
-    // Only the domain itself.
-    DomainMemberFilter ownOnly =
-        DomainMemberFilter.builder().withIncludeAllSubdomains(false).build();
+    // By default, only the domain itself.
+    DomainMemberFilter ownOnly = DomainMemberFilter.builder().build();
     Assertions.assertFalse(ownOnly.includeAllSubdomains());
     Assertions.assertTrue(ownOnly.subdomains().isEmpty());
-    Assertions.assertNotEquals(all, ownOnly);
     Assertions.assertEquals(
-        ownOnly,
-        DomainMemberFilter.builder().withIncludeAllSubdomains(false).withSubdomains().build());
-
-    // No sub-domain given and the flag not set: all sub-domains.
-    Assertions.assertEquals(all, DomainMemberFilter.builder().withSubdomains().build());
-    Assertions.assertEquals(
-        all, DomainMemberFilter.builder().withIncludeAllSubdomains(true).build());
+        ownOnly, DomainMemberFilter.builder().withIncludeAllSubdomains(false).build());
+    Assertions.assertEquals(ownOnly, DomainMemberFilter.builder().withSubdomains().build());
 
     // The domain itself plus the given sub-domains.
     DomainMemberFilter withTax = DomainMemberFilter.builder().withSubdomains("tax").build();
@@ -93,12 +84,14 @@ public class TestDomainMemberFilter {
         withTax,
         DomainMemberFilter.builder().withSubdomains("tax").withIncludeAllSubdomains(false).build());
 
-    // Including all sub-domains ignores the given ones, whatever the order.
-    DomainMemberFilter allIgnoringTax =
-        DomainMemberFilter.builder().withSubdomains("tax").withIncludeAllSubdomains(true).build();
-    Assertions.assertTrue(allIgnoringTax.includeAllSubdomains());
-    Assertions.assertTrue(allIgnoringTax.subdomains().isEmpty());
-    Assertions.assertEquals(all, allIgnoringTax);
+    // All sub-domains; the given sub-domains are ignored, whatever the order.
+    DomainMemberFilter all = DomainMemberFilter.builder().withIncludeAllSubdomains(true).build();
+    Assertions.assertTrue(all.includeAllSubdomains());
+    Assertions.assertTrue(all.subdomains().isEmpty());
+    Assertions.assertNotEquals(ownOnly, all);
+    Assertions.assertEquals(
+        all,
+        DomainMemberFilter.builder().withSubdomains("tax").withIncludeAllSubdomains(true).build());
     Assertions.assertEquals(
         all,
         DomainMemberFilter.builder().withIncludeAllSubdomains(true).withSubdomains("tax").build());
