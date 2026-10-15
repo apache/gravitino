@@ -24,10 +24,14 @@ export const githubApis = {
 }
 
 export const getGitHubApi = () => {
-  return defHttp.get({
-    url: `${githubApis.GET}`,
-    headers: {
-      Accept: 'application/vnd.github+json'
-    }
-  })
+  // Optional repository statistics should not display global errors when unavailable.
+  return defHttp.get(
+    {
+      url: `${githubApis.GET}`,
+      headers: {
+        Accept: 'application/vnd.github+json'
+      }
+    },
+    { errorMessageMode: 'none' }
+  )
 }
