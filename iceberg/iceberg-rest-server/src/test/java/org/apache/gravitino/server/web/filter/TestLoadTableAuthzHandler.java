@@ -26,6 +26,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,9 +44,12 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -56,6 +60,8 @@ public class TestLoadTableAuthzHandler {
   private static final String TEST_METALAKE = "test_metalake";
   private static final String TEST_CATALOG = "test_catalog";
   private static final String TEST_SCHEMA = "test_schema";
+  private static final Schema SCHEMA =
+      new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
 
   @BeforeAll
   public static void initAuthorizer() {
@@ -65,36 +71,31 @@ public class TestLoadTableAuthzHandler {
   @Test
   public void testLoadTableDoesNotRejectMetadataTableLikeNameInHierarchicalSchema()
       throws Exception {
-    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
-    CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
-    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
-    // The two-level namespace is the hierarchical schema "a.b", and it holds a table "files".
-    when(catalogWrapper.namespaceExists(Namespace.of("a", "b"))).thenReturn(true);
-    when(catalogWrapper.tableExists(TableIdentifier.of(Namespace.of("a", "b"), "files")))
-        .thenReturn(true);
-    resetContext(wrapperManager);
+    // The hierarchical schema "a.b" holds a real table "files". A table a.b exists too, so
+    // a.b.files could also name its metadata table; the real table must win.
+    InMemoryCatalog catalog = newCatalog();
+    catalog.createNamespace(Namespace.of("a"));
+    catalog.createNamespace(Namespace.of("a", "b"));
+    catalog.createTable(TableIdentifier.of(Namespace.of("a"), "b"), SCHEMA);
+    catalog.createTable(TableIdentifier.of(Namespace.of("a", "b"), "files"), SCHEMA);
+    resetContext(catalog);
 
     LoadTableAuthzHandler handler =
         createHandler(new Object[] {TEST_CATALOG + "/", "a%1Fb", "files"});
 
-    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = baseIdentifierMap();
-    // A real table named "files" in the hierarchical schema "a.b" must reach authorization
-    // instead of being rejected as a metadata table.
-    assertDoesNotThrow(() -> handler.process(nameIdentifierMap));
-    verify(catalogWrapper).namespaceExists(Namespace.of("a", "b"));
+    // The real table must reach authorization instead of being rejected as a metadata table.
+    assertDoesNotThrow(() -> handler.process(baseIdentifierMap()));
   }
 
   @Test
   public void testLoadTableRejectsMetadataTableWhenNamespaceHasNoSuchTable() throws Exception {
-    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
-    CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
-    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
     // Both the namespace [db, t] and the table db.t exist, but [db, t] has no table "files",
     // so db.t.files is a metadata-table request and must get 404 for the client fallback.
-    when(catalogWrapper.namespaceExists(Namespace.of("db", "t"))).thenReturn(true);
-    when(catalogWrapper.tableExists(TableIdentifier.of(Namespace.of("db", "t"), "files")))
-        .thenReturn(false);
-    resetContext(wrapperManager);
+    InMemoryCatalog catalog = newCatalog();
+    catalog.createNamespace(Namespace.of("db"));
+    catalog.createNamespace(Namespace.of("db", "t"));
+    catalog.createTable(TableIdentifier.of(Namespace.of("db"), "t"), SCHEMA);
+    resetContext(catalog);
 
     LoadTableAuthzHandler handler =
         createHandler(new Object[] {TEST_CATALOG + "/", "db%1Ft", "files"});
@@ -115,7 +116,7 @@ public class TestLoadTableAuthzHandler {
         createHandler(new Object[] {TEST_CATALOG + "/", "db%1Ft", "files"});
 
     assertThrows(NoSuchTableException.class, () -> handler.process(baseIdentifierMap()));
-    verify(catalogWrapper, never()).tableExists(any(TableIdentifier.class));
+    verify(catalogWrapper, never()).getCatalog();
   }
 
   @Test
@@ -151,6 +152,25 @@ public class TestLoadTableAuthzHandler {
         Entity.EntityType.SCHEMA,
         NameIdentifierUtil.ofSchema(TEST_METALAKE, TEST_CATALOG, TEST_SCHEMA));
     return nameIdentifierMap;
+  }
+
+  private static InMemoryCatalog newCatalog() {
+    InMemoryCatalog catalog = new InMemoryCatalog();
+    catalog.initialize("memory", ImmutableMap.of());
+    return catalog;
+  }
+
+  /** Points the handler at a catalog wrapper backed by {@code catalog}. */
+  private static void resetContext(InMemoryCatalog catalog) {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
+    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
+    when(catalogWrapper.getCatalog()).thenReturn(catalog);
+    when(catalogWrapper.namespaceExists(any(Namespace.class)))
+        .thenAnswer(invocation -> catalog.namespaceExists(invocation.getArgument(0)));
+    when(catalogWrapper.tableExists(any(TableIdentifier.class)))
+        .thenAnswer(invocation -> catalog.tableExists(invocation.getArgument(0)));
+    resetContext(wrapperManager);
   }
 
   private static void resetContext(IcebergCatalogWrapperManager wrapperManager) {

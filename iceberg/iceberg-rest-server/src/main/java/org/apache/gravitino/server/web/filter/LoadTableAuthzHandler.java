@@ -31,6 +31,7 @@ import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInt
 import org.apache.gravitino.server.web.filter.IcebergLoadAuthzHandlerHelper.LoadContext;
 import org.apache.gravitino.server.web.filter.IcebergLoadAuthzHandlerHelper.LoadTarget;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -149,7 +150,7 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
    *
    * @param tableName The table name to check
    * @param namespace The Iceberg namespace of the table
-   * @param catalogWrapper the catalog wrapper used to test whether the table exists
+   * @param catalogWrapper the catalog wrapper used to resolve the table
    * @return true if this is a metadata table access, false otherwise
    */
   private boolean isMetadataTable(
@@ -166,13 +167,14 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     }
 
     // A table in a hierarchical schema can have a metadata-table name, so only treat the
-    // request as a metadata-table access when no such table exists. This is the order the
-    // Iceberg client uses: load the full name first, then fall back to the metadata table.
-    // If the backend cannot answer, keep the 404; the client's fallback load reports the
-    // failure.
+    // request as a metadata-table access when the backend does not resolve it to a real table.
+    // tableExists() cannot tell the two apart: backends resolve [db, t].files to the metadata
+    // table of db.t as well. If the backend cannot answer, keep the 404; the client's fallback
+    // load reports the failure.
     try {
       return !catalogWrapper.namespaceExists(namespace)
-          || !catalogWrapper.tableExists(TableIdentifier.of(namespace, tableName));
+          || catalogWrapper.getCatalog().loadTable(TableIdentifier.of(namespace, tableName))
+              instanceof BaseMetadataTable;
     } catch (Exception e) {
       LOG.debug(
           "Failed to check whether table {}.{} exists, treating it as a metadata table",
