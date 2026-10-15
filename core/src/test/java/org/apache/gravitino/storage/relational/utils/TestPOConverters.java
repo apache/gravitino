@@ -1082,6 +1082,94 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testFromPolicyPOIcebergOrphanFileRemovalWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergOrphanFileRemoval(
+            7L,
+            "s3://bucket/table/data",
+            true,
+            "0 0 3 * * ?",
+            null,
+            1_800_000L,
+            ImmutableMap.of("spark.executor.cores", "2"),
+            ImmutableMap.of("metalake", "ml"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                2L,
+                "orphan-cleanup",
+                "system_iceberg_orphan_file_removal",
+                1L,
+                createPolicyVersionPO(2L, 1L, 1L, "orphan peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergRewriteManifestsWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergRewriteManifests(
+            "0 30 1 * * ?",
+            true,
+            900_000L,
+            ImmutableMap.of("spark.executor.memory", "2g"),
+            ImmutableMap.of("queue", "tms"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                3L,
+                "rewrite-manifests",
+                "system_iceberg_rewrite_manifests",
+                1L,
+                createPolicyVersionPO(3L, 1L, 1L, "rewrite peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergSnapshotExpirationWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergSnapshotExpiration(
+            "0 0 4 * * ?",
+            false,
+            2_700_000L,
+            ImmutableMap.of("spark.driver.memory", "1g"),
+            ImmutableMap.of("metalake", "ml"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                4L,
+                "snapshot-expiration",
+                "system_iceberg_snapshot_expiration",
+                1L,
+                createPolicyVersionPO(4L, 1L, 1L, "snapshot peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  private static void assertFlatExecutionPeersPersisted(PolicyContent content)
+      throws JsonProcessingException {
+    String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(storedJson.contains("\"timeTrigger\""));
+    assertTrue(storedJson.contains("\"minIntervalMs\""));
+    assertTrue(storedJson.contains("\"jobOptions\""));
+    assertTrue(storedJson.contains("\"updaterOptions\""));
+    assertFalse(storedJson.contains("\"executionSpec\""));
+  }
+
+  @Test
   public void testFromTagPO() throws JsonProcessingException {
     TagPO tagPO = createTagPO(1L, "test", 1L, "this is test");
     Namespace tagNS =

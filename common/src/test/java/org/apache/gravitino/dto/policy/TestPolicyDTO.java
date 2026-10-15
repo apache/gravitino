@@ -27,6 +27,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -183,11 +184,13 @@ public class TestPolicyDTO {
     AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
     PolicyContentDTO.IcebergCompactionContentDTO typedContent =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withTimeTrigger("0 0 2 * * ?")
-            .withCommitTrigger(true)
-            .withMinIntervalMs(3_600_000L)
-            .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
-            .withUpdaterOptions(ImmutableMap.of("metalake", "ml"))
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    "0 0 2 * * ?",
+                    true,
+                    3_600_000L,
+                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of("metalake", "ml")))
             .build();
 
     PolicyDTO policyDTO =
@@ -201,6 +204,8 @@ public class TestPolicyDTO {
             .build();
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    Assertions.assertTrue(serJson.contains("\"timeTrigger\""));
+    Assertions.assertFalse(serJson.contains("\"executionSpec\""));
     PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
     Assertions.assertEquals(policyDTO, deserPolicyDTO);
 
@@ -218,8 +223,13 @@ public class TestPolicyDTO {
   public void testExecutionPeerOptionMapsAreUnmodifiableCopies() {
     PolicyContentDTO.IcebergCompactionContentDTO content =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withJobOptions(ImmutableMap.of("spark.executor.memory", "4g"))
-            .withUpdaterOptions(ImmutableMap.of("metalake", "ml"))
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    null,
+                    null,
+                    null,
+                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of("metalake", "ml")))
             .build();
 
     Assertions.assertThrows(
@@ -236,7 +246,7 @@ public class TestPolicyDTO {
   public void testMaintenancePeerValidateOnDto() {
     PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
         PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
-            .withCommitTrigger(true)
+            .withExecutionSpec(PolicyExecutionSpec.of(null, true, null, null, null))
             .build();
     IllegalArgumentException orphanEx =
         Assertions.assertThrows(IllegalArgumentException.class, orphanOnCommit::validate);
@@ -245,7 +255,7 @@ public class TestPolicyDTO {
     // Cron syntax is not validated on the policy API; scheduler registration parses it.
     PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withTimeTrigger("a a a a a a")
+            .withExecutionSpec(PolicyExecutionSpec.of("a a a a a a", null, null, null, null))
             .build();
     Assertions.assertDoesNotThrow(opaqueCron::validate);
   }

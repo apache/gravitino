@@ -24,7 +24,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -113,6 +112,7 @@ import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.policy.RowFilterContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -673,19 +673,10 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
-    // Execution peers live on ExecutablePolicyContent, not universal PolicyContent.
-    String timeTrigger = null;
-    Boolean commitTrigger = null;
-    Long minIntervalMs = null;
-    Map<String, String> jobOptions = null;
-    Map<String, String> updaterOptions = null;
+    PolicyExecutionSpec executionSpec = null;
     if (policyContent instanceof ExecutablePolicyContent) {
-      ExecutablePolicyContent executable = (ExecutablePolicyContent) policyContent;
-      timeTrigger = executable.timeTrigger();
-      commitTrigger = executable.commitTrigger();
-      minIntervalMs = executable.minIntervalMs();
-      jobOptions = emptyToNull(executable.jobOptions());
-      updaterOptions = emptyToNull(executable.updaterOptions());
+      PolicyExecutionSpec spec = ((ExecutablePolicyContent) policyContent).executionSpec();
+      executionSpec = spec.hasAny() ? spec : null;
     }
 
     if (policyContent instanceof PolicyContents.CustomContent) {
@@ -703,29 +694,17 @@ public class DTOConverters {
           .withOlderThanDays(content.olderThanDays())
           .withLocation(content.location())
           .withDryRun(content.dryRun())
-          .withTimeTrigger(timeTrigger)
-          .withCommitTrigger(commitTrigger)
-          .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(jobOptions)
-          .withUpdaterOptions(updaterOptions)
+          .withExecutionSpec(executionSpec)
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
       return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
-          .withTimeTrigger(timeTrigger)
-          .withCommitTrigger(commitTrigger)
-          .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(jobOptions)
-          .withUpdaterOptions(updaterOptions)
+          .withExecutionSpec(executionSpec)
           .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
       return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
-          .withTimeTrigger(timeTrigger)
-          .withCommitTrigger(commitTrigger)
-          .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(jobOptions)
-          .withUpdaterOptions(updaterOptions)
+          .withExecutionSpec(executionSpec)
           .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
@@ -740,11 +719,7 @@ public class DTOConverters {
           .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
           .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
-          .withTimeTrigger(timeTrigger)
-          .withCommitTrigger(commitTrigger)
-          .withMinIntervalMs(minIntervalMs)
-          .withJobOptions(jobOptions)
-          .withUpdaterOptions(updaterOptions)
+          .withExecutionSpec(executionSpec)
           .build();
     }
 
@@ -1636,10 +1611,5 @@ public class DTOConverters {
 
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
-  }
-
-  @Nullable
-  private static Map<String, String> emptyToNull(Map<String, String> options) {
-    return options == null || options.isEmpty() ? null : options;
   }
 }

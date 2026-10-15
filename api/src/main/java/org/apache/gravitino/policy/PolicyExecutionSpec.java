@@ -29,8 +29,9 @@ import org.apache.commons.lang3.StringUtils;
  *
  * <p>This type is Jackson-independent in-memory composition for {@link ExecutablePolicyContent}.
  * Wire and persistence JSON keep the flat peer keys ({@code timeTrigger}, {@code commitTrigger},
- * {@code minIntervalMs}, {@code jobOptions}, {@code updaterOptions}) on content DTOs / content
- * classes; converters reconstruct a {@code PolicyExecutionSpec} from those fields.
+ * {@code minIntervalMs}, {@code jobOptions}, {@code updaterOptions}); {@code common} maps those
+ * keys to and from this value object via custom Jackson serdes (same idea as {@code
+ * DistributionSerializer}).
  */
 public final class PolicyExecutionSpec {
 
@@ -134,6 +135,46 @@ public final class PolicyExecutionSpec {
   public boolean hasAny() {
     return PolicyExecutionFields.hasAny(
         timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * @param timeTrigger replacement cron expression
+   * @return new spec with updated {@code timeTrigger}
+   */
+  public PolicyExecutionSpec withTimeTrigger(@Nullable String timeTrigger) {
+    return of(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * @param commitTrigger replacement commit-trigger flag
+   * @return new spec with updated {@code commitTrigger}
+   */
+  public PolicyExecutionSpec withCommitTrigger(@Nullable Boolean commitTrigger) {
+    return of(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * @param minIntervalMs replacement cooldown
+   * @return new spec with updated {@code minIntervalMs}
+   */
+  public PolicyExecutionSpec withMinIntervalMs(@Nullable Long minIntervalMs) {
+    return of(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * @param jobOptions replacement job options
+   * @return new spec with updated {@code jobOptions}
+   */
+  public PolicyExecutionSpec withJobOptions(@Nullable Map<String, String> jobOptions) {
+    return of(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * @param updaterOptions replacement updater options
+   * @return new spec with updated {@code updaterOptions}
+   */
+  public PolicyExecutionSpec withUpdaterOptions(@Nullable Map<String, String> updaterOptions) {
+    return of(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   /** Validates shared peer constraints (cooldown and option maps). */

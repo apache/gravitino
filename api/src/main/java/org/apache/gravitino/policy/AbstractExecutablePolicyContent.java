@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -27,20 +26,13 @@ import javax.annotation.Nullable;
  *
  * <p>Peers are supplied at construction as an immutable {@link PolicyExecutionSpec}. Subclasses
  * keep strategy fields separate and pass the spec through {@link
- * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}. Persisted JSON keeps peer keys flat by
- * storing the scalar/map fields directly on this type (same layout as {@code PolicyContentDTO});
- * {@link #executionSpec()} reconstructs the in-memory composition. DTOs use the same flat keys via
- * {@code DTOConverters}.
+ * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}. Wire and persistence JSON keep peer keys
+ * flat; mapping to and from those keys is handled in {@code common} (custom Jackson serdes), not by
+ * flattening the five fields onto this type.
  */
 public abstract class AbstractExecutablePolicyContent implements ExecutablePolicyContent {
 
-  // Flat peer fields for persistence JSON (POConverters / anyFieldMapper). Kept in sync with
-  // PolicyExecutionSpec; do not nest under an "executionSpec" object.
-  @Nullable private final String timeTrigger;
-  @Nullable private final Boolean commitTrigger;
-  @Nullable private final Long minIntervalMs;
-  private final Map<String, String> jobOptions;
-  private final Map<String, String> updaterOptions;
+  private final PolicyExecutionSpec executionSpec;
 
   /**
    * Creates content with the given execution peers.
@@ -49,12 +41,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
    *     PolicyExecutionSpec#empty()}
    */
   protected AbstractExecutablePolicyContent(@Nullable PolicyExecutionSpec executionSpec) {
-    PolicyExecutionSpec spec = executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
-    this.timeTrigger = spec.timeTrigger();
-    this.commitTrigger = spec.commitTrigger();
-    this.minIntervalMs = spec.minIntervalMs();
-    this.jobOptions = spec.jobOptions();
-    this.updaterOptions = spec.updaterOptions();
+    this.executionSpec = executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
   }
 
   /** Creates content with unset execution peers. */
@@ -64,8 +51,7 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
 
   @Override
   public PolicyExecutionSpec executionSpec() {
-    return PolicyExecutionSpec.of(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+    return executionSpec;
   }
 
   /**

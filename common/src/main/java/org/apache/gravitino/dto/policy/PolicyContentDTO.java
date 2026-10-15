@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -36,6 +38,7 @@ import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyExecutionFields;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
@@ -44,10 +47,30 @@ public interface PolicyContentDTO extends PolicyContent {
   /**
    * Optional maintenance execution peers on Iceberg TMS policy content DTOs.
    *
+   * <p>Peers are stored as a composed {@link PolicyExecutionSpec}. Flat JSON keys are exposed via
+   * {@code @JsonProperty} accessors so the wire contract stays flat without duplicating five fields
+   * on every DTO.
+   *
    * <p>Option maps always return unmodifiable defensive copies so callers cannot mutate DTO state
    * after validation or change Lombok equality/hash state through the returned map.
    */
   interface ExecutionPeersDTO {
+
+    /**
+     * Stores {@code null} when every peer is unset so Lombok equality matches Jackson round-trips.
+     *
+     * @param spec peers to store; empty specs are normalized to {@code null}
+     * @return {@code null} when unset, otherwise the spec
+     */
+    static PolicyExecutionSpec normalize(@Nullable PolicyExecutionSpec spec) {
+      return spec == null || !spec.hasAny() ? null : spec;
+    }
+
+    /**
+     * @return immutable execution peers; never {@code null}
+     */
+    @JsonIgnore
+    PolicyExecutionSpec executionSpec();
 
     /**
      * Optional cron expression for automated evaluation.
@@ -55,7 +78,11 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return cron string, or {@code null} when unset
      */
     @Nullable
-    String timeTrigger();
+    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    default String timeTrigger() {
+      return executionSpec().timeTrigger();
+    }
 
     /**
      * Optional flag to evaluate the policy after an Iceberg commit.
@@ -64,7 +91,11 @@ public interface PolicyContentDTO extends PolicyContent {
      *     when unset
      */
     @Nullable
-    Boolean commitTrigger();
+    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    default Boolean commitTrigger() {
+      return executionSpec().commitTrigger();
+    }
 
     /**
      * Optional cooldown between finished automated runs.
@@ -72,21 +103,33 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return milliseconds, or {@code null} when unset
      */
     @Nullable
-    Long minIntervalMs();
+    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    default Long minIntervalMs() {
+      return executionSpec().minIntervalMs();
+    }
 
     /**
      * Optional non-secret job / client options.
      *
      * @return unmodifiable defensive copy; never {@code null} (empty when unset)
      */
-    Map<String, String> jobOptions();
+    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    default Map<String, String> jobOptions() {
+      return executionSpec().jobOptions();
+    }
 
     /**
      * Optional non-secret updater / control-plane options.
      *
      * @return unmodifiable defensive copy; never {@code null} (empty when unset)
      */
-    Map<String, String> updaterOptions();
+    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    default Map<String, String> updaterOptions() {
+      return executionSpec().updaterOptions();
+    }
   }
 
   /** Represents a custom policy content DTO. */
@@ -135,7 +178,7 @@ public interface PolicyContentDTO extends PolicyContent {
 
   /** Represents a typed iceberg compaction policy content DTO. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updaterOptions", "rewriteOptions"})
+  @ToString(exclude = {"executionSpec", "rewriteOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergCompactionContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
@@ -164,25 +207,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
-    @JsonProperty("timeTrigger")
-    @Nullable
-    private String timeTrigger;
+    @EqualsAndHashCode.Exclude @JsonIgnore @Nullable private PolicyExecutionSpec executionSpec;
 
-    @JsonProperty("commitTrigger")
-    @Nullable
-    private Boolean commitTrigger;
-
-    @JsonProperty("minIntervalMs")
-    @Nullable
-    private Long minIntervalMs;
-
-    @JsonProperty("jobOptions")
-    @Nullable
-    private Map<String, String> jobOptions;
-
-    @JsonProperty("updaterOptions")
-    @Nullable
-    private Map<String, String> updaterOptions;
+    @EqualsAndHashCode.Include
+    private PolicyExecutionSpec executionSpecForEquals() {
+      return ExecutionPeersDTO.normalize(executionSpec);
+    }
 
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
@@ -274,31 +304,38 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    @Nullable
-    public String timeTrigger() {
-      return timeTrigger;
+    @JsonIgnore
+    public PolicyExecutionSpec executionSpec() {
+      return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @Override
-    @Nullable
-    public Boolean commitTrigger() {
-      return commitTrigger;
+    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    private void setTimeTrigger(String timeTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @Override
-    @Nullable
-    public Long minIntervalMs() {
-      return minIntervalMs;
+    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    private void setCommitTrigger(Boolean commitTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @Override
-    public Map<String, String> jobOptions() {
-      return PolicyExecutionFields.copyOptions(jobOptions);
+    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    private void setMinIntervalMs(Long minIntervalMs) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @Override
-    public Map<String, String> updaterOptions() {
-      return PolicyExecutionFields.copyOptions(updaterOptions);
+    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    private void setJobOptions(Map<String, String> jobOptions) {
+      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+    }
+
+    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    private void setUpdaterOptions(Map<String, String> updaterOptions) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
     }
 
     @Override
@@ -326,6 +363,7 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return domain policy content including execution peers
      */
     public PolicyContent toDomainContent() {
+      PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergDataCompaction(
           minDataFileMse(),
           minDeleteFileNumber(),
@@ -335,17 +373,17 @@ public interface PolicyContentDTO extends PolicyContent {
           rewriteStrategy(),
           sortOrder(),
           rewriteOptions(),
-          timeTrigger(),
-          commitTrigger(),
-          minIntervalMs(),
-          jobOptions(),
-          updaterOptions());
+          spec.timeTrigger(),
+          spec.commitTrigger(),
+          spec.minIntervalMs(),
+          spec.jobOptions(),
+          spec.updaterOptions());
     }
   }
 
   /** Typed orphan cleanup policy content for REST requests and responses. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updaterOptions"})
+  @ToString(exclude = {"executionSpec"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
@@ -358,25 +396,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("dryRun")
     private Boolean dryRun;
 
-    @JsonProperty("timeTrigger")
-    @Nullable
-    private String timeTrigger;
+    @EqualsAndHashCode.Exclude @JsonIgnore @Nullable private PolicyExecutionSpec executionSpec;
 
-    @JsonProperty("commitTrigger")
-    @Nullable
-    private Boolean commitTrigger;
-
-    @JsonProperty("minIntervalMs")
-    @Nullable
-    private Long minIntervalMs;
-
-    @JsonProperty("jobOptions")
-    @Nullable
-    private Map<String, String> jobOptions;
-
-    @JsonProperty("updaterOptions")
-    @Nullable
-    private Map<String, String> updaterOptions;
+    @EqualsAndHashCode.Include
+    private PolicyExecutionSpec executionSpecForEquals() {
+      return ExecutionPeersDTO.normalize(executionSpec);
+    }
 
     private IcebergOrphanFileRemovalContentDTO() {}
 
@@ -405,31 +430,38 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    @Nullable
-    public String timeTrigger() {
-      return timeTrigger;
+    @JsonIgnore
+    public PolicyExecutionSpec executionSpec() {
+      return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @Override
-    @Nullable
-    public Boolean commitTrigger() {
-      return commitTrigger;
+    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    private void setTimeTrigger(String timeTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @Override
-    @Nullable
-    public Long minIntervalMs() {
-      return minIntervalMs;
+    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    private void setCommitTrigger(Boolean commitTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @Override
-    public Map<String, String> jobOptions() {
-      return PolicyExecutionFields.copyOptions(jobOptions);
+    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    private void setMinIntervalMs(Long minIntervalMs) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @Override
-    public Map<String, String> updaterOptions() {
-      return PolicyExecutionFields.copyOptions(updaterOptions);
+    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    private void setJobOptions(Map<String, String> jobOptions) {
+      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+    }
+
+    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    private void setUpdaterOptions(Map<String, String> updaterOptions) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
     }
 
     @Override
@@ -450,7 +482,7 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public void validate() {
       Preconditions.checkArgument(
-          !Boolean.TRUE.equals(commitTrigger),
+          !Boolean.TRUE.equals(commitTrigger()),
           "commitTrigger is not allowed for orphan file removal");
       PolicyContentDTO.super.validate();
       toDomainContent().validate();
@@ -460,43 +492,31 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return domain policy content including execution peers
      */
     public PolicyContent toDomainContent() {
+      PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergOrphanFileRemoval(
           olderThanDays(),
           location(),
           dryRun(),
-          timeTrigger(),
-          commitTrigger(),
-          minIntervalMs(),
-          jobOptions(),
-          updaterOptions());
+          spec.timeTrigger(),
+          spec.commitTrigger(),
+          spec.minIntervalMs(),
+          spec.jobOptions(),
+          spec.updaterOptions());
     }
   }
 
   /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updaterOptions"})
+  @ToString(exclude = {"executionSpec"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
-    @JsonProperty("timeTrigger")
-    @Nullable
-    private String timeTrigger;
+    @EqualsAndHashCode.Exclude @JsonIgnore @Nullable private PolicyExecutionSpec executionSpec;
 
-    @JsonProperty("commitTrigger")
-    @Nullable
-    private Boolean commitTrigger;
-
-    @JsonProperty("minIntervalMs")
-    @Nullable
-    private Long minIntervalMs;
-
-    @JsonProperty("jobOptions")
-    @Nullable
-    private Map<String, String> jobOptions;
-
-    @JsonProperty("updaterOptions")
-    @Nullable
-    private Map<String, String> updaterOptions;
+    @EqualsAndHashCode.Include
+    private PolicyExecutionSpec executionSpecForEquals() {
+      return ExecutionPeersDTO.normalize(executionSpec);
+    }
 
     private IcebergRewriteManifestsContentDTO() {}
 
@@ -508,31 +528,38 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    @Nullable
-    public String timeTrigger() {
-      return timeTrigger;
+    @JsonIgnore
+    public PolicyExecutionSpec executionSpec() {
+      return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @Override
-    @Nullable
-    public Boolean commitTrigger() {
-      return commitTrigger;
+    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    private void setTimeTrigger(String timeTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @Override
-    @Nullable
-    public Long minIntervalMs() {
-      return minIntervalMs;
+    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    private void setCommitTrigger(Boolean commitTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @Override
-    public Map<String, String> jobOptions() {
-      return PolicyExecutionFields.copyOptions(jobOptions);
+    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    private void setMinIntervalMs(Long minIntervalMs) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @Override
-    public Map<String, String> updaterOptions() {
-      return PolicyExecutionFields.copyOptions(updaterOptions);
+    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    private void setJobOptions(Map<String, String> jobOptions) {
+      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+    }
+
+    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    private void setUpdaterOptions(Map<String, String> updaterOptions) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
     }
 
     @Override
@@ -560,36 +587,28 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return domain policy content including execution peers
      */
     public PolicyContent toDomainContent() {
+      PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergRewriteManifests(
-          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updaterOptions());
+          spec.timeTrigger(),
+          spec.commitTrigger(),
+          spec.minIntervalMs(),
+          spec.jobOptions(),
+          spec.updaterOptions());
     }
   }
 
   /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
   @EqualsAndHashCode
-  @ToString(exclude = {"jobOptions", "updaterOptions"})
+  @ToString(exclude = {"executionSpec"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
-    @JsonProperty("timeTrigger")
-    @Nullable
-    private String timeTrigger;
+    @EqualsAndHashCode.Exclude @JsonIgnore @Nullable private PolicyExecutionSpec executionSpec;
 
-    @JsonProperty("commitTrigger")
-    @Nullable
-    private Boolean commitTrigger;
-
-    @JsonProperty("minIntervalMs")
-    @Nullable
-    private Long minIntervalMs;
-
-    @JsonProperty("jobOptions")
-    @Nullable
-    private Map<String, String> jobOptions;
-
-    @JsonProperty("updaterOptions")
-    @Nullable
-    private Map<String, String> updaterOptions;
+    @EqualsAndHashCode.Include
+    private PolicyExecutionSpec executionSpecForEquals() {
+      return ExecutionPeersDTO.normalize(executionSpec);
+    }
 
     private IcebergSnapshotExpirationContentDTO() {}
 
@@ -601,31 +620,38 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    @Nullable
-    public String timeTrigger() {
-      return timeTrigger;
+    @JsonIgnore
+    public PolicyExecutionSpec executionSpec() {
+      return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @Override
-    @Nullable
-    public Boolean commitTrigger() {
-      return commitTrigger;
+    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    private void setTimeTrigger(String timeTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @Override
-    @Nullable
-    public Long minIntervalMs() {
-      return minIntervalMs;
+    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    private void setCommitTrigger(Boolean commitTrigger) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @Override
-    public Map<String, String> jobOptions() {
-      return PolicyExecutionFields.copyOptions(jobOptions);
+    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    private void setMinIntervalMs(Long minIntervalMs) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @Override
-    public Map<String, String> updaterOptions() {
-      return PolicyExecutionFields.copyOptions(updaterOptions);
+    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    private void setJobOptions(Map<String, String> jobOptions) {
+      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+    }
+
+    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    private void setUpdaterOptions(Map<String, String> updaterOptions) {
+      this.executionSpec =
+          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
     }
 
     @Override
@@ -653,8 +679,13 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return domain policy content including execution peers
      */
     public PolicyContent toDomainContent() {
+      PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergSnapshotExpiration(
-          timeTrigger(), commitTrigger(), minIntervalMs(), jobOptions(), updaterOptions());
+          spec.timeTrigger(),
+          spec.commitTrigger(),
+          spec.minIntervalMs(),
+          spec.jobOptions(),
+          spec.updaterOptions());
     }
   }
 
