@@ -130,6 +130,29 @@ public final class LanceAuthorizationExpressions {
           + ")";
 
   /**
+   * Authorizes reading an existing object when a create request uses {@code exist_ok} mode and the
+   * object already exists. The response returns the existing object's metadata, so the caller must
+   * hold the same read privilege that a describe would require. Without this check, a caller with
+   * only {@code CREATE_TABLE} or {@code CREATE_SCHEMA} could obtain metadata that describe would
+   * deny.
+   *
+   * <p>For tables, the expression requires the table read privilege. For namespaces, it requires
+   * catalog access (at catalog level) or schema read (at schema level); the entity type is already
+   * resolved by the interceptor, so only the matching branch is evaluated.
+   */
+  public static final String EXIST_OK_TABLE_AUTHORIZATION_EXPRESSION =
+      "entityType == 'TABLE' && (" + LOAD_TABLE_AUTHORIZATION_EXPRESSION + ")";
+
+  /** See {@link #EXIST_OK_TABLE_AUTHORIZATION_EXPRESSION}; same logic for namespace reads. */
+  public static final String EXIST_OK_NAMESPACE_AUTHORIZATION_EXPRESSION =
+      "(entityType == 'CATALOG' && ("
+          + CAN_ACCESS_METADATA
+          + ")) || "
+          + "(entityType == 'SCHEMA' && ("
+          + LOAD_SCHEMA_AUTHORIZATION_EXPRESSION
+          + "))";
+
+  /**
    * Authorizes removing a table, whether the storage is deleted with it or only the Gravitino
    * metadata is. Both require ownership of the table or of one of its ancestors, matching the
    * Gravitino and Iceberg REST surfaces: MODIFY_TABLE alters a table but never removes it.
