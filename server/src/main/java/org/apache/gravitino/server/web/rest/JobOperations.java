@@ -562,9 +562,9 @@ public class JobOperations {
    * swallowed rather than propagated, so callers of {@link #toDTO(JobEntity)} (get/run/cancel/list
    * job) always get a usable response with just the runtime job template omitted.
    *
-   * <p>Sensitive-named values in environments, customFields, and Spark configs (including nested
-   * JSON maps such as {@code updater_options} / {@code spark_conf}) are masked before the DTO is
-   * returned on the API response path. Stored plaintext is unchanged.
+   * <p>Sensitive-named values in environments, customFields, and Spark configs are masked before
+   * the DTO is returned. Nested JSON masking applies only to the known keys {@code updater_options}
+   * and {@code spark_conf}. Stored plaintext is unchanged.
    */
   private static JobTemplateDTO toRuntimeJobTemplateDTO(JobEntity jobEntity) {
     try {

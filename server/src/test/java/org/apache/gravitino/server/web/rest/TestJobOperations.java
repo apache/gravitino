@@ -1479,7 +1479,7 @@ public class TestJobOperations extends JerseyTest {
             + "\"environments\":{\"AUTH_PASSWORD\":\"env-secret\",\"CATALOG\":\"ice\"},"
             + "\"customFields\":{"
             + "\"updater_options\":\"{\\\"gravitino_uri\\\":\\\"http://localhost\\\","
-            + "\\\"password\\\":\\\"nested-pw\\\",\\\"oauth_token\\\":\\\"tok\\\"}\","
+            + "\\\"password\\\":\\\"nested-pw\\\",\\\"oauth_token\\\":\\\"oauth-secret\\\"}\","
             + "\"update_mode\":\"stats\""
             + "},"
             + "\"className\":\"org.example.App\","
@@ -1513,7 +1513,7 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals("ice", spark.environments().get("CATALOG"));
     Assertions.assertEquals("stats", spark.customFields().get("update_mode"));
     Assertions.assertFalse(spark.customFields().get("updater_options").contains("nested-pw"));
-    Assertions.assertFalse(spark.customFields().get("updater_options").contains("tok"));
+    Assertions.assertFalse(spark.customFields().get("updater_options").contains("oauth-secret"));
     Assertions.assertTrue(
         spark.customFields().get("updater_options").contains(HiddenPropertyMaskUtils.MASKED_VALUE));
     Assertions.assertEquals("local[*]", spark.configs().get("spark.master"));

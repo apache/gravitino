@@ -20,6 +20,7 @@ package org.apache.gravitino.connector;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -62,6 +63,14 @@ public final class HiddenPropertyMaskUtils {
 
   /** Placeholder returned instead of editable hidden / credential / secret property values. */
   public static final String MASKED_VALUE = "******";
+
+  /**
+   * JobConf / template keys whose values are known to be flat JSON string maps (Iceberg built-in
+   * jobs and the optimizer CLI). Nested sensitive keys inside these values are masked; other keys
+   * are never treated as JSON by guessing on a leading curly brace.
+   */
+  private static final Set<String> NESTED_JSON_MAP_KEYS =
+      ImmutableSet.of("updater_options", "spark_conf");
 
   private static final TypeReference<Map<String, String>> STRING_MAP_TYPE =
       new TypeReference<Map<String, String>>() {};
@@ -190,10 +199,10 @@ public final class HiddenPropertyMaskUtils {
    *
    * <p>A top-level entry is masked when its key matches {@link
    * SecretPropertyUtils#isSensitivePropertyKey} or its value is a secret-manager URN ({@link
-   * SecretPropertyUtils#isSecretProperty}). When a non-sensitive entry's value is a JSON object of
-   * string fields (for example job {@code updater_options} / {@code spark_conf}), sensitive-named
-   * keys inside that object are also masked and the value is rewritten. Non-JSON or non-object
-   * values are left unchanged.
+   * SecretPropertyUtils#isSecretProperty}). For the known JSON-map keys {@code updater_options} and
+   * {@code spark_conf} (Iceberg built-in job / optimizer convention), sensitive-named keys inside
+   * the JSON object are also masked and the value is rewritten. Other values are never parsed as
+   * JSON.
    *
    * <p>Useful for job template {@code environments} / {@code customFields} / {@code configs} that
    * have no properties metadata declaration.
@@ -216,25 +225,23 @@ public final class HiddenPropertyMaskUtils {
       if (SecretPropertyUtils.isSensitivePropertyKey(key)
           || SecretPropertyUtils.isSecretProperty(key, value)) {
         result.put(key, MASKED_VALUE);
-      } else {
+      } else if (NESTED_JSON_MAP_KEYS.contains(key)) {
         result.put(key, maskNestedJsonMapValue(value));
+      } else {
+        result.put(key, value);
       }
     }
     return result;
   }
 
   /**
-   * When {@code value} is a JSON object of string fields, returns a rewritten JSON with
-   * sensitive-named keys masked; otherwise returns {@code value} unchanged.
+   * Parses {@code value} as a flat JSON string map and masks sensitive-named keys. On parse failure
+   * returns {@code value} unchanged.
    */
   private static String maskNestedJsonMapValue(String value) {
-    String trimmed = value.trim();
-    if (trimmed.isEmpty() || trimmed.charAt(0) != '{') {
-      return value;
-    }
     ObjectMapper mapper = JsonUtils.anyFieldMapper();
     try {
-      Map<String, String> nested = mapper.readValue(trimmed, STRING_MAP_TYPE);
+      Map<String, String> nested = mapper.readValue(value, STRING_MAP_TYPE);
       if (nested == null || nested.isEmpty()) {
         return value;
       }
@@ -256,7 +263,7 @@ public final class HiddenPropertyMaskUtils {
       }
       return changed ? mapper.writeValueAsString(masked) : value;
     } catch (Exception e) {
-      // Not a string-valued JSON object (or malformed) — leave the original value alone.
+      // Malformed or non-string-map JSON — leave the original value alone.
       return value;
     }
   }

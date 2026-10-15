@@ -207,7 +207,7 @@ public class TestHiddenPropertyMaskUtils {
   }
 
   @Test
-  void testMaskSensitiveNamedPropertiesMasksKeywordKeysAndNestedJson() throws Exception {
+  void testMaskSensitiveNamedPropertiesMasksKeywordKeysAndKnownNestedJson() throws Exception {
     Map<String, String> properties = new java.util.LinkedHashMap<>();
     properties.put("gravitino_uri", "http://localhost:8090");
     properties.put("password", "plain-password");
@@ -218,6 +218,9 @@ public class TestHiddenPropertyMaskUtils {
         "{\"gravitino_uri\":\"http://localhost:8090\",\"password\":\"nested-pw\","
             + "\"oauth_credential\":\"cred\"}");
     properties.put("spark_conf", "{\"spark.master\":\"local[*]\",\"api_token\":\"nested-tok\"}");
+    // Looks like nested JSON with a sensitive key, but is not a known JSON-map field — leave as-is.
+    String unknownJsonBlob = "{\"password\":\"should-stay-visible\"}";
+    properties.put("custom_blob", unknownJsonBlob);
     properties.put("not_json", "password=looks-like-but-not-a-key");
 
     Map<String, String> masked = HiddenPropertyMaskUtils.maskSensitiveNamedProperties(properties);
@@ -228,6 +231,7 @@ public class TestHiddenPropertyMaskUtils {
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("spark.hadoop.fs.s3a.secret.key"));
     Assertions.assertEquals("password=looks-like-but-not-a-key", masked.get("not_json"));
+    Assertions.assertEquals(unknownJsonBlob, masked.get("custom_blob"));
 
     Map<String, String> updaterOptions =
         JsonUtils.anyFieldMapper()
