@@ -47,21 +47,6 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class PolicyExecutionSpec {
 
-  /** JSON property for the cron string passed to the scheduler. */
-  public static final String TIME_TRIGGER_JSON_KEY = "timeTrigger";
-
-  /** JSON property for the commit-trigger boolean. */
-  public static final String COMMIT_TRIGGER_JSON_KEY = "commitTrigger";
-
-  /** JSON property for minimum interval between finished runs. */
-  public static final String MIN_INTERVAL_MS_JSON_KEY = "minIntervalMs";
-
-  /** JSON property for job / client options. */
-  public static final String JOB_OPTIONS_JSON_KEY = "jobOptions";
-
-  /** JSON property for updater / control-plane options. */
-  public static final String UPDATER_OPTIONS_JSON_KEY = "updaterOptions";
-
   /** Spec with every peer unset. */
   public static final PolicyExecutionSpec EMPTY =
       new PolicyExecutionSpec(null, null, null, null, null);
