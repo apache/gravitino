@@ -310,6 +310,44 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             });
     Assertions.assertEquals(2, listResponse.getTags().length);
     Assertions.assertTrue(listResponse.hasInaccessibleTags());
+
+    String untaggedCatalog = "untagged_catalog";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
+    gravitinoMetalake.createCatalog(
+        untaggedCatalog, Catalog.Type.RELATIONAL, "hive", "untagged catalog", properties);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(untaggedCatalog), MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.UseCatalog.allow()));
+
+    String tableWithOnlyInheritedHiddenTag = "table_with_only_inherited_hidden_tag";
+    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(CATALOG).asTableCatalog();
+    tableCatalog.createTable(
+        NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag),
+        createColumns(),
+        "test visibility indicators",
+        new HashMap<>());
+    try {
+      String untaggedCatalogPath =
+          "api/metalakes/" + METALAKE + "/objects/catalog/" + untaggedCatalog + "/tags";
+      assertTagListResponse(untaggedCatalogPath, new String[0], false);
+
+      String inheritedHiddenTagPath =
+          "api/metalakes/"
+              + METALAKE
+              + "/objects/table/"
+              + CATALOG
+              + "."
+              + SCHEMA
+              + "."
+              + tableWithOnlyInheritedHiddenTag
+              + "/tags";
+      assertTagListResponse(inheritedHiddenTagPath, new String[0], true);
+    } finally {
+      tableCatalog.dropTable(NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag));
+      gravitinoMetalake.dropCatalog(untaggedCatalog, true);
+    }
   }
 
   @Test
@@ -506,5 +544,38 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException("Failed to access the normal user's REST client", e);
     }
+  }
+
+  private void assertTagListResponse(
+      String path, String[] expectedTagNames, boolean hasInaccessibleTags) {
+    RESTClient restClient = getNormalUserRestClient();
+    TagNameListResponse nameListResponse =
+        restClient.get(
+            path,
+            TagNameListResponse.class,
+            Map.of(),
+            error -> {
+              throw new AssertionError(error);
+            });
+    String[] actualTagNames = nameListResponse.getNames();
+    Arrays.sort(actualTagNames);
+    Arrays.sort(expectedTagNames);
+    Assertions.assertArrayEquals(expectedTagNames, actualTagNames);
+    Assertions.assertEquals(hasInaccessibleTags, nameListResponse.hasInaccessibleTags());
+
+    MetadataObjectTagListResponse listResponse =
+        restClient.get(
+            path,
+            Map.of("details", "true"),
+            MetadataObjectTagListResponse.class,
+            Map.of(),
+            error -> {
+              throw new AssertionError(error);
+            });
+    String[] actualDetailNames =
+        Arrays.stream(listResponse.getTags()).map(tag -> tag.name()).toArray(String[]::new);
+    Arrays.sort(actualDetailNames);
+    Assertions.assertArrayEquals(expectedTagNames, actualDetailNames);
+    Assertions.assertEquals(hasInaccessibleTags, listResponse.hasInaccessibleTags());
   }
 }
