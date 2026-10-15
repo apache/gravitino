@@ -115,13 +115,18 @@ public final class SparkApplicationStatusUtils {
    *
    * <ul>
    *   <li>A SparkApplication that Gravitino requested to cancel is cancelled once it is being
-   *       deleted or has stopped.
+   *       deleted, unless it had stopped before. The cancel mark alone doesn't cancel it: a
+   *       cancellation that failed after marking it, for example because the server stopped or a
+   *       response was lost, leaves the mark on a job that keeps running, which then keeps the
+   *       outcome it reaches.
    *   <li>A SparkApplication being deleted by someone else, for example by its TTL, keeps the
    *       outcome it reached, or fails if it has none.
    *   <li>The stopped states walk back through the state transition history to the last outcome.
    *   <li>A SparkApplication without any status after the timeout fails, for example if its
    *       namespace isn't watched by the operator. One with a status that has no state this version
-   *       can read stays queued.
+   *       can read stays queued, even if it was started before, and nothing ends it until the
+   *       operator deletes it after its TTL. It means the operator is newer than this version
+   *       supports, which must be fixed rather than waited out.
    *   <li>An unknown state, of a newer operator, after an outcome is a stopped state too. Before
    *       any outcome it keeps the job unfinished: started if the application has reached a started
    *       state, queued otherwise.
@@ -134,8 +139,8 @@ public final class SparkApplicationStatusUtils {
    * reached a started state, and finished when it reached its outcome. As the driver container
    * status is only known once the job finished, the started time of a running job is refined to the
    * driver's when it finishes. A job that stopped without an outcome finished when its driver
-   * container terminated if that is known, else when it was deleted, or else when it entered its
-   * last state.
+   * container terminated if that is known, else when it entered its stopped state, or else when it
+   * was deleted.
    *
    * @param app the SparkApplication
    * @param driver the driver pod, or null if unknown
@@ -164,15 +169,15 @@ public final class SparkApplicationStatusUtils {
     Instant startedAt = startedAt(history, driverStartedAt, createdAt);
     // When the application stopped: when the driver container terminated if that is known, even
     // before the operator records an outcome, else when the application reached its outcome, else
-    // when it was deleted, else when it entered its current state. A deletion time is in whole
-    // seconds, so it may read earlier than a started time of the same second, which Gravitino
-    // would then drop.
+    // when it was deleted if it hadn't stopped by then, else when it entered its current state. A
+    // deletion time is in whole seconds, so it may read earlier than a started time of the same
+    // second, which Gravitino would then drop.
     Instant stoppedAt;
     if (driverFinishedAt != null) {
       stoppedAt = driverFinishedAt;
     } else if (outcome != null) {
       stoppedAt = outcome.driverFinishedAt != null ? outcome.driverFinishedAt : outcome.time;
-    } else if (deletedAt != null) {
+    } else if (deletedAt != null && !isStopped(current, outcome)) {
       stoppedAt = startedAt != null && deletedAt.isBefore(startedAt) ? startedAt : deletedAt;
     } else {
       stoppedAt = current == null ? null : current.time;
@@ -181,7 +186,8 @@ public final class SparkApplicationStatusUtils {
     JobHandle.Status status;
     Instant finishedAt = null;
     if (K8sJobResourceUtils.isCancelRequested(app)
-        && (deletedAt != null || isStopped(current, outcome))) {
+        && deletedAt != null
+        && !stoppedBefore(history, deletedAt)) {
       status = JobHandle.Status.CANCELLED;
       finishedAt = stoppedAt;
     } else if (deletedAt != null || isStopped(current, outcome)) {
@@ -299,6 +305,19 @@ public final class SparkApplicationStatusUtils {
     return isOutcome(current)
         || STOPPED_STATES.contains(current.summary)
         || (!running && outcome != null);
+  }
+
+  /**
+   * Returns whether the application had reached an outcome or a stopped state before it was
+   * deleted. A deletion time is in whole seconds, so a state of the same second counts as after.
+   */
+  private static boolean stoppedBefore(List<State> history, Instant deletedAt) {
+    return history.stream()
+        .anyMatch(
+            s ->
+                (isOutcome(s) || STOPPED_STATES.contains(s.summary))
+                    && s.time != null
+                    && s.time.isBefore(deletedAt));
   }
 
   private static boolean isOutcome(State state) {

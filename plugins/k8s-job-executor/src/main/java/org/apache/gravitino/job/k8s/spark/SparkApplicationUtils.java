@@ -124,9 +124,9 @@ public final class SparkApplicationUtils {
     if (deployMode != null && !CLUSTER_DEPLOY_MODE.equalsIgnoreCase(deployMode)) {
       throw new IllegalArgumentException(
           String.format(
-              "Job template %s sets %s to %s, but the k8s job executor only runs Spark jobs in %s"
-                  + " mode",
-              template.name(), SPARK_DEPLOY_MODE, deployMode, CLUSTER_DEPLOY_MODE));
+              "%s is set to %s by job template %s or by the k8s job executor configurations, but"
+                  + " the k8s job executor only runs Spark jobs in %s mode",
+              SPARK_DEPLOY_MODE, deployMode, template.name(), CLUSTER_DEPLOY_MODE));
     }
     // The operator decides the master and the deploy mode.
     sparkConf.remove(SPARK_MASTER);

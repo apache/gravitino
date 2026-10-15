@@ -320,12 +320,40 @@ public class TestSparkApplicationStatusUtils {
     Assertions.assertEquals(timeOf(1), cancelled.startedAt());
     Assertions.assertEquals(deletedAt, cancelled.finishedAt());
 
-    // The application stopped before the deletion.
+    // The application stopped by itself after it was marked, but before the deletion.
     GenericKubernetesResource stopped = app("Submitted", "DriverReady", "Failed");
     cancel(stopped);
+    stopped.getMetadata().setDeletionTimestamp(timeOf(3).toString());
     JobExecutionInfo info = executionInfoOf(stopped);
-    Assertions.assertEquals(JobHandle.Status.CANCELLED, info.status());
+    Assertions.assertEquals(JobHandle.Status.FAILED, info.status());
     Assertions.assertEquals(timeOf(2), info.finishedAt());
+
+    // An outcome recorded in the second of the deletion counts as after it.
+    GenericKubernetesResource sameSecond = app("Submitted", "DriverReady", "Failed");
+    cancel(sameSecond);
+    sameSecond.getMetadata().setDeletionTimestamp(CREATED_AT.plusSeconds(2).toString());
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, executionInfoOf(sameSecond).status());
+  }
+
+  @Test
+  public void testCancelMarkWithoutDeletion() {
+    // A cancellation that failed after marking the job, for example because its response was
+    // lost, leaves the mark. The job keeps running and keeps the outcome it reaches.
+    GenericKubernetesResource succeeded = app("Submitted", "DriverReady", "Succeeded");
+    cancel(succeeded);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, executionInfoOf(succeeded).status());
+
+    GenericKubernetesResource failed = app("Submitted", "DriverReady", "Failed");
+    cancel(failed);
+    Assertions.assertEquals(JobHandle.Status.FAILED, executionInfoOf(failed).status());
+
+    GenericKubernetesResource running = app("Submitted", "DriverReady", "RunningHealthy");
+    cancel(running);
+    Assertions.assertEquals(JobHandle.Status.STARTED, executionInfoOf(running).status());
+
+    // Deleted by its TTL after it succeeded, it still succeeded.
+    succeeded.getMetadata().setDeletionTimestamp(NOW.toString());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, executionInfoOf(succeeded).status());
   }
 
   @Test
@@ -444,15 +472,17 @@ public class TestSparkApplicationStatusUtils {
     Assertions.assertEquals(JobHandle.Status.FAILED, failed.status());
     Assertions.assertEquals(timeOf(2), failed.finishedAt());
 
+    // Stopped before it was cancelled, it isn't cancelled.
     cancel(app);
-    JobExecutionInfo cancelled = executionInfoOf(app);
-    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelled.status());
-    Assertions.assertEquals(timeOf(2), cancelled.finishedAt());
+    app.getMetadata().setDeletionTimestamp(NOW.toString());
+    Assertions.assertEquals(JobHandle.Status.FAILED, executionInfoOf(app).status());
+    Assertions.assertEquals(timeOf(2), executionInfoOf(app).finishedAt());
 
     GenericKubernetesResource stopped =
         app("Submitted", "DriverReady", "Succeeded", "TerminatedWithoutReleaseResources");
     cancel(stopped);
-    Assertions.assertEquals(JobHandle.Status.CANCELLED, executionInfoOf(stopped).status());
+    stopped.getMetadata().setDeletionTimestamp(NOW.toString());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, executionInfoOf(stopped).status());
     Assertions.assertEquals(timeOf(2), executionInfoOf(stopped).finishedAt());
   }
 

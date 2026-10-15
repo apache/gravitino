@@ -954,6 +954,62 @@ public class TestK8sJobExecutor {
   }
 
   @Test
+  public void testCancelWhoseDeletionFailsAfterTheJobIsGone() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    setStates("gravitino-job-1", "Submitted", "DriverReady");
+    // The deletion takes effect and the SparkApplication is gone, but the response is lost: it is
+    // read once to be marked, and is gone when read after the failed deletion.
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(200, sparkApplication("gravitino-job-1"))
+        .once();
+    server
+        .expect()
+        .delete()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .once();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(404, new StatusBuilder().withCode(404).build())
+        .always();
+
+    // The job is gone, so the cancellation succeeds.
+    executor.cancelJob(jobExecutionId);
+  }
+
+  @Test
+  public void testCancelConflictRetriesRunOut() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    setStates("gravitino-job-1", "Submitted", "DriverReady");
+    server
+        .expect()
+        .put()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(409, new StatusBuilder().withCode(409).build())
+        .times(4);
+
+    KubernetesClientException e =
+        Assertions.assertThrows(
+            KubernetesClientException.class, () -> executor.cancelJob(jobExecutionId));
+    Assertions.assertEquals(409, e.getCode());
+    // Not marked nor deleted, the job keeps running.
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    Assertions.assertFalse(K8sJobResourceUtils.isCancelRequested(app));
+    Assertions.assertNull(app.getMetadata().getDeletionTimestamp());
+    Assertions.assertEquals(
+        JobHandle.Status.STARTED, executor.getJobExecutionInfo(jobExecutionId).status());
+
+    // Once the conflicts are over, it can be cancelled.
+    executor.cancelJob(jobExecutionId);
+    Assertions.assertNull(sparkApplication("gravitino-job-1"));
+  }
+
+  @Test
   public void testCancelJobThatJustStopped() {
     String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
     // The job succeeds between the read of the cancellation and its mark.

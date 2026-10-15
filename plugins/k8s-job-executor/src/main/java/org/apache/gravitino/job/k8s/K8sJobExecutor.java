@@ -262,8 +262,9 @@ public class K8sJobExecutor implements JobExecutor {
                     return false;
                   }
                   // The job keeps running and the caller is told the cancellation failed, so
-                  // remove the mark, otherwise the job would be reported as cancelled once it
-                  // finishes by itself.
+                  // remove the mark, otherwise the job would be reported as cancelled if someone
+                  // else deleted it while it runs. A mark that can't be removed is harmless
+                  // otherwise: without a deletion, the job keeps the outcome it reaches.
                   setCancelRequested(current, false);
                   return true;
                 });

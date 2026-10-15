@@ -110,7 +110,11 @@ public class K8sJobExecutorConfigs {
   /** The default status cache TTL, 5 seconds. */
   public static final long DEFAULT_STATUS_CACHE_TTL_MS = 5_000L;
 
-  /** A job whose resource still has no status after this time is considered failed. */
+  /**
+   * A job whose resource still has no status after this time is considered failed, and its resource
+   * is deleted. A job whose resource has a status without any state this version can read, for
+   * example of a newer operator, stays unfinished instead, until the operator deletes the resource.
+   */
   public static final String NO_STATUS_TIMEOUT_MS = "noStatusTimeoutInMs";
 
   /** The default no status timeout, 10 minutes. */
