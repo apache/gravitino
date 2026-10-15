@@ -224,13 +224,13 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
-                  - $ref: "#/components/schemas/PolicyListResponse"
+                  - $ref: "#/components/schemas/PolicyNameListResponse"
+                  - $ref: "#/components/schemas/MetadataObjectPolicyListResponse"
               examples:
-                NameListResponse:
-                  $ref: "#/components/examples/NameListResponse"
-                PolicyListResponse:
-                  $ref: "#/components/examples/PolicyListResponse"
+                PolicyNameListResponse:
+                  $ref: "#/components/examples/PolicyNameListResponse"
+                MetadataObjectPolicyListResponse:
+                  $ref: "#/components/examples/MetadataObjectPolicyListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
@@ -484,6 +484,30 @@ components:
           items:
             $ref: "#/components/schemas/Policy"
 
+    PolicyNameListResponse:
+      allOf:
+        - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+        - type: object
+          required:
+            - names
+            - hasInaccessiblePolicies
+          properties:
+            hasInaccessiblePolicies:
+              type: boolean
+              description: Whether one or more inaccessible policies were omitted from the response
+
+    MetadataObjectPolicyListResponse:
+      allOf:
+        - $ref: "#/components/schemas/PolicyListResponse"
+        - type: object
+          required:
+            - policies
+            - hasInaccessiblePolicies
+          properties:
+            hasInaccessiblePolicies:
+              type: boolean
+              description: Whether one or more inaccessible policies were omitted from the response
+
     MetadataObject:
       type: object
       description: A metadata object
@@ -703,6 +727,13 @@ components:
             $ref: "#/components/schemas/MetadataObject"
 
   examples:
+    PolicyNameListResponse:
+      value: {
+        "code": 0,
+        "names": ["my_policy1"],
+        "hasInaccessiblePolicies": true
+      }
+
     NameListResponse:
       value: {
         "code": 0,
@@ -741,6 +772,13 @@ components:
             }
           }
         ]
+      }
+
+    MetadataObjectPolicyListResponse:
+      value: {
+        "code": 0,
+        "policies": [],
+        "hasInaccessiblePolicies": true
       }
 
     PolicyCreate:

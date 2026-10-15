@@ -45,8 +45,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -206,40 +207,36 @@ public class MetadataObjectTagOperations {
               }
             }
 
+            TagDTO[] tagDTOs = tags.toArray(new TagDTO[0]);
+            int tagCount = tagDTOs.length;
+            tagDTOs =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.TAG,
+                    tagDTOs,
+                    tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
+            boolean hasInaccessibleTags = tagDTOs.length < tagCount;
+
             if (verbose) {
               LOG.info(
                   "List {} tags info for object type: {}, full name: {} under metalake: {}",
-                  tags.size(),
+                  tagDTOs.length,
                   type,
                   fullName,
                   metalake);
-              TagDTO[] tagDTOS = tags.toArray(new TagDTO[0]);
-              tagDTOS =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.TAG,
-                      tagDTOS,
-                      tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
-              return Utils.ok(new TagListResponse(tagDTOS));
+              return Utils.ok(new MetadataObjectTagListResponse(tagDTOs, hasInaccessibleTags));
 
             } else {
               // We have used Set to avoid duplicate tag names
-              String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
-              tagNames =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.TAG,
-                      tagNames,
-                      tagName -> NameIdentifierUtil.ofTag(metalake, tagName));
+              String[] tagNames = Arrays.stream(tagDTOs).map(TagDTO::name).toArray(String[]::new);
               LOG.info(
                   "List {} tags for object type: {}, full name: {} under metalake: {}",
                   tagNames.length,
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new NameListResponse(tagNames));
+              return Utils.ok(new TagNameListResponse(tagNames, hasInaccessibleTags));
             }
           });
 

@@ -197,13 +197,13 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
-                  - $ref: "#/components/responses/TagListResponse"
+                  - $ref: "#/components/responses/TagNameListResponse"
+                  - $ref: "#/components/responses/MetadataObjectTagListResponse"
               examples:
-                NameListResponse:
-                  $ref: "#/components/examples/NameListResponse"
-                TagListResponse:
-                  $ref: "#/components/examples/TagListResponse"
+                TagNameListResponse:
+                  $ref: "#/components/examples/TagNameListResponse"
+                MetadataObjectTagListResponse:
+                  $ref: "#/components/examples/MetadataObjectTagListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
@@ -540,6 +540,18 @@ components:
           nullable: true
 
   responses:
+    TagNameListResponse:
+      allOf:
+        - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+        - type: object
+          required:
+            - names
+            - hasInaccessibleTags
+          properties:
+            hasInaccessibleTags:
+              type: boolean
+              description: Whether one or more inaccessible tags were omitted from the response
+
     TagListResponse:
       type: object
       properties:
@@ -554,6 +566,18 @@ components:
           description: A list of tag objects
           items:
             $ref: "#/components/schemas/Tag"
+
+    MetadataObjectTagListResponse:
+      allOf:
+        - $ref: "#/components/responses/TagListResponse"
+        - type: object
+          required:
+            - tags
+            - hasInaccessibleTags
+          properties:
+            hasInaccessibleTags:
+              type: boolean
+              description: Whether one or more inaccessible tags were omitted from the response
 
     TagResponse:
       type: object
@@ -583,6 +607,13 @@ components:
             $ref: "#/components/schemas/MetadataObject"
 
   examples:
+    TagNameListResponse:
+      value: {
+        "code": 0,
+        "names": ["my_tag1"],
+        "hasInaccessibleTags": true
+      }
+
     NameListResponse:
       value: {
         "code": 0,
@@ -619,6 +650,13 @@ components:
             "inherited": null
           }
         ]
+      }
+
+    MetadataObjectTagListResponse:
+      value: {
+        "code": 0,
+        "tags": [],
+        "hasInaccessibleTags": true
       }
 
     TagCreate:
