@@ -23,6 +23,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
@@ -77,6 +78,16 @@ public interface Schema extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Schema does not support tag operations.");
+  }
+
+  /**
+   * Returns the domain operations for this schema.
+   *
+   * @return The {@link SupportsDomains} if the schema supports domain operations.
+   * @throws UnsupportedOperationException If the schema does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("Schema does not support domain operations.");
   }
 
   /**

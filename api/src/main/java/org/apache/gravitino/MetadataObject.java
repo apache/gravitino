@@ -77,7 +77,12 @@ public interface MetadataObject {
     /** A job template represents a reusable template for creating jobs in Gravitino. */
     JOB_TEMPLATE,
     /** A function represents a user-defined function registered in Gravitino. */
-    FUNCTION;
+    FUNCTION,
+    /**
+     * A domain groups metadata objects from any catalog under a business name. An object belongs to
+     * a domain when it carries the domain's backing tag.
+     */
+    DOMAIN;
   }
 
   /**
