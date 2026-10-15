@@ -9,11 +9,11 @@ license: "This software is licensed under the Apache License version 2."
 
 Three layers of configuration apply, and they are set in different places for different lifetimes. Server configuration governs how jobs run at all, CLI configuration governs how the commands reach Gravitino, and `jobConf` governs a single job submission.
 
-| Layer               | Where it lives                  | Lifetime            |
-|---------------------|----------------------------------|---------------------|
-| Server              | `gravitino.conf`                 | Until server restart |
-| CLI                 | `conf/gravitino-optimizer.conf`  | Per command          |
-| Job submission      | `jobConf` in the request body    | One job run          |
+| Layer          | Where it lives                  | Lifetime             |
+| -------------- | ------------------------------- | -------------------- |
+| Server         | `gravitino.conf`                | Until server restart |
+| CLI            | `conf/gravitino-optimizer.conf` | Per command          |
+| Job submission | `jobConf` in the request body   | One job run          |
 
 ## Server Configuration
 
@@ -26,6 +26,120 @@ gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
 `gravitino.job.statusPullIntervalInMs` defaults to five minutes. Job status is polled rather than pushed, so REST status can lag the real Spark process by a full interval, which makes a working job look hung. Lower it to `10000` for local work and restart the server.
+
+### TMS cluster-static client auth
+
+For in-process Table Maintenance Service (TMS), client credentials are **cluster-static**: set them under
+the prefixes below in `gravitino.conf`. Do not store passwords, OAuth secrets, or keytab paths in policy
+content. Values may be plaintext or secret-manager references when the deployment supports them.
+
+At `runJob`, `gravitino.maintenance.gravitinoAuth.*` overlays policy `updateOptions`, and
+`gravitino.maintenance.ircAuth.*` overlays policy `jobOptions`. Auth wins on duplicate keys. The
+live scheduler submit call site is wired in a follow-up; `MaintenanceAuthConfigs` exposes the load
+and overlay helpers for that path.
+
+#### Gravitino client auth (`gravitino.maintenance.gravitinoAuth.`) — fixed schema
+
+`gravitino.conf` uses **camelCase** suffixes. At load time they are remapped to built-in
+`--updater-options` / `GravitinoAuthSettings` short names (`auth_type`, `oauth_server_uri`, …)
+before overlay onto policy `updateOptions`. Supported `authType` values are exactly four:
+**`none`**, **`simple`**, **`basic`**, **`oauth`**.
+
+| Conf suffix       | `updateOptions` key | Used when `authType` is | Meaning                                     |
+| ----------------- | ------------------- | ----------------------- | ------------------------------------------- |
+| `authType`        | `auth_type`         | all modes               | `none`, `simple`, `basic`, or `oauth`       |
+| `username`        | `username`          | `simple` / `basic`      | User principal (`simple` optional)          |
+| `password`        | `password`          | `basic`                 | Password or secret reference                |
+| `oauthServerUri`  | `oauth_server_uri`  | `oauth`                 | OAuth2 token server base URI                |
+| `oauthPath`       | `oauth_path`        | `oauth`                 | Token path (for example `oauth2/token`)     |
+| `oauthCredential` | `oauth_credential`  | `oauth`                 | Client credential, often `client_id:secret` |
+| `oauthScope`      | `oauth_scope`       | `oauth`                 | Token scope (IdP-specific)                  |
+
+**1. `none`** — Gravitino authorization disabled; omit the prefix or set:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = none
+```
+
+**2. `simple`**:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = simple
+gravitino.maintenance.gravitinoAuth.username = {username}
+```
+
+**3. `basic`**:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = basic
+gravitino.maintenance.gravitinoAuth.username = {username}
+gravitino.maintenance.gravitinoAuth.password = {password}
+```
+
+**4. `oauth`**:
+
+```properties
+gravitino.maintenance.gravitinoAuth.authType = oauth
+gravitino.maintenance.gravitinoAuth.oauthServerUri = https://idp.example.com/realms/demo
+gravitino.maintenance.gravitinoAuth.oauthPath = protocol/openid-connect/token
+gravitino.maintenance.gravitinoAuth.oauthCredential = {client_id}:{client_secret}
+gravitino.maintenance.gravitinoAuth.oauthScope = openid profile email
+```
+
+#### Iceberg REST / Spark auth (`gravitino.maintenance.ircAuth.`) — arbitrary passthrough
+
+Open prefix for Spark jobs that talk to Iceberg REST: any non-empty suffix under the prefix is
+stripped and overlaid onto `jobOptions`. Prefer Iceberg catalog properties (`rest.auth.*`, and
+related OAuth keys such as `credential` / `oauth2-server-uri` / `scope`).
+
+Gravitino Iceberg REST (IRC) shares `gravitino.authenticators` with the Gravitino server
+(`simple`, `basic`, `oauth`, `kerberos`), but **IRC does not support Kerberos** (see
+[How to authenticate](../security/how-to-authenticate.md#kerberos-mode)). For Spark/Flink clients,
+map the IRC authenticator to Iceberg `rest.auth.type` as below. Iceberg also defines `sigv4` and
+`google`; those are **not** supported when the target is Gravitino IRC.
+
+| Iceberg `rest.auth.type` | Gravitino IRC     | Notes                                                       |
+| ------------------------ | ----------------- | ----------------------------------------------------------- |
+| `none`                   | Supported         | IRC `simple` / auth disabled; omit the prefix or set `none` |
+| `basic`                  | Supported         | IRC `basic` (local users)                                   |
+| `oauth2`                 | Supported         | IRC `oauth`                                                 |
+| `sigv4`                  | Not supported yet | Iceberg AWS signing; not a Gravitino IRC authenticator      |
+| `google`                 | Not supported yet | Iceberg Google REST auth; not a Gravitino IRC authenticator |
+| *(Kerberos)*             | Not supported yet | Documented: IRC does not support Kerberos                   |
+
+**1. `none`** — IRC `simple` / no REST auth (default if the prefix is omitted):
+
+```properties
+gravitino.maintenance.ircAuth.rest.auth.type = none
+```
+
+**2. `basic`** — IRC `basic`:
+
+```properties
+gravitino.maintenance.ircAuth.rest.auth.type = basic
+gravitino.maintenance.ircAuth.rest.auth.basic.username = {username}
+gravitino.maintenance.ircAuth.rest.auth.basic.password = {password}
+```
+
+**3. `oauth2`** — IRC `oauth`, bearer token:
+
+```properties
+gravitino.maintenance.ircAuth.rest.auth.type = oauth2
+gravitino.maintenance.ircAuth.rest.auth.oauth2.token = <your-token>
+```
+
+`oauth2` with client credentials (Iceberg catalog property names, not Gravitino updater short names):
+
+```properties
+gravitino.maintenance.ircAuth.rest.auth.type = oauth2
+gravitino.maintenance.ircAuth.credential = {client_id}:{client_secret}
+gravitino.maintenance.ircAuth.oauth2-server-uri = https://idp.example.com/realms/demo/protocol/openid-connect/token
+gravitino.maintenance.ircAuth.scope = catalog
+```
+
+**4. `sigv4`** — **not supported yet** for Gravitino IRC.
+
+**5. `google`** — **not supported yet** for Gravitino IRC.
 
 ## CLI Configuration
 
@@ -57,11 +171,11 @@ When the Gravitino server has authentication enabled, `builtin-iceberg-update-st
 credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
 updater and `submit-update-stats-job` `runJob` calls):
 
-| `auth_type`      | Fields                                                                                         |
-|------------------|------------------------------------------------------------------------------------------------|
-| `none` (default) | (none)                                                                                         |
-| `simple`         | `username` (optional)                                                                          |
-| `basic`          | `username`, `password`                                                                         |
+| `auth_type`      | Fields                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| `none` (default) | (none)                                                                                       |
+| `simple`         | `username` (optional)                                                                        |
+| `basic`          | `username`, `password`                                                                       |
 | `oauth`          | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
 
 Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
@@ -169,14 +283,14 @@ Four things are worth confirming before assuming a configuration problem is a co
 Submit `builtin-iceberg-remove-orphan-files` with the same Spark and catalog
 settings described above. Its job-specific `jobConf` keys are:
 
-| Key                | Meaning                                                                               | Default                          |
-| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
-| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
-| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
-| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old | Three days ago (Iceberg default) |
-| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
-| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
-| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
+| Key                | Meaning                                                                                 | Default                          |
+| ------------------ | --------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                     | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                                | Required                         |
+| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old   | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                            | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                           | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed   | None                             |
 
 For direct template submission, supply `older_than: ""` and `location: ""` to
 use the defaults, `dry_run: "false"` (or `"true"` to preview), and
@@ -214,10 +328,17 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
   "enabled": true,
   "content": {
     "olderThanDays": 3,
-    "dryRun": true
+    "dryRun": true,
+    "timeTrigger": "0 0 3 * * ?",
+    "minIntervalMs": 86400000
   }
 }
 ```
+
+Optional TMS peer fields on content (`timeTrigger`, `commitTrigger`, `minIntervalMs`, `jobOptions`,
+`updateOptions`) are shared with compaction and other maintenance policy types. `commitTrigger` is
+not allowed for orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md) for
+peer-field semantics.
 
 Associate the policy with a tag and attach that tag to the target table, schema,
 or catalog, following the [policy setup walkthrough](./optimizer.md).
