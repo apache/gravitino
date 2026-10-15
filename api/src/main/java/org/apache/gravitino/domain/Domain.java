@@ -227,17 +227,19 @@ public interface Domain extends Auditable {
   Domain[] listSubdomainsInfo() throws NoSuchDomainException;
 
   /**
-   * Lists the members of this domain that match the filter. Only objects of the {@link
-   * DomainMember#SUPPORTED_TYPES supported types} are members, and only the members the caller can
-   * access are returned.
+   * Lists the members in the scope of this domain that match the filter. The scope of a top-level
+   * domain is its own members plus the members of its sub-domains visible to the caller; the scope
+   * of a sub-domain is its own members. Only objects of the {@link DomainMember#SUPPORTED_TYPES
+   * supported types} are members, and only the members the caller can access are returned.
    *
    * <p>Only the objects that carry a backing tag themselves are listed. A catalog or schema that
    * carries one stands for the objects under it, which are not listed one by one. An object is
-   * listed when it comes from any of the domains the filter selects, and it is listed once, see
-   * {@link DomainMember#subdomain()}.
+   * listed once, even if it is a member of several domains in the scope, see {@link
+   * DomainMember#subdomain()}. To keep only the members of this domain itself, select the listed
+   * members whose {@link DomainMember#subdomain()} is empty.
    *
-   * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists all
-   *     members of this domain and its sub-domains.
+   * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists the
+   *     whole scope of this domain.
    * @return The members of this domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */

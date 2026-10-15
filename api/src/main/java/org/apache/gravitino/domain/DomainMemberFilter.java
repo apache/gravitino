@@ -31,18 +31,22 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * The filter of {@link Domain#listMembers(DomainMemberFilter)}. Each option narrows the listed
  * members, and an option that is not set does not narrow them, so a filter built without setting
- * any option lists all members of the domain and its sub-domains.
+ * any option lists the whole scope of the domain.
  *
- * <p>The domains option selects members by the domain they come from, which is the listed domain
- * itself or one of its sub-domains (see {@link DomainMember#subdomain()}). For example, on domain
- * "Finance" with sub-domains "Tax" and "Trading":
+ * <p>The scope of a top-level domain is its own members plus the members of its sub-domains visible
+ * to the caller; the scope of a sub-domain is its own members. The domains option selects the
+ * scopes to list: each name is the listed domain itself or one of its sub-domains, and the members
+ * in the union of their scopes are listed. For example, on domain "Finance" with sub-domains "Tax"
+ * and "Trading":
  *
  * <ul>
- *   <li>not set: the members of Finance, Tax and Trading;
- *   <li>{@code withDomains("Finance")}: only the members of Finance itself;
- *   <li>{@code withDomains("Finance", "Tax")}: the members of Finance and Tax;
- *   <li>{@code withDomains("Tax")}: only the members of Tax.
+ *   <li>not set, or {@code withDomains("Finance")}: the members of Finance, Tax and Trading;
+ *   <li>{@code withDomains("Tax")}: only the members of Tax;
+ *   <li>{@code withDomains("Tax", "Trading")}: the members of Tax and Trading.
  * </ul>
+ *
+ * <p>To keep only the members of the listed domain itself, select the listed members whose {@link
+ * DomainMember#subdomain()} is empty.
  */
 @Evolving
 public final class DomainMemberFilter {
@@ -86,11 +90,10 @@ public final class DomainMemberFilter {
   }
 
   /**
-   * Returns the domains the members to list come from: the listed domain itself, its sub-domains,
-   * or both.
+   * Returns the domains whose scopes are listed: the listed domain itself, its sub-domains, or
+   * both.
    *
-   * @return The names of the domains, or an empty set to list the members of the listed domain and
-   *     all its sub-domains visible to the caller.
+   * @return The names of the domains, or an empty set to list the whole scope of the listed domain.
    */
   public Set<String> domains() {
     return domains;
@@ -191,13 +194,13 @@ public final class DomainMemberFilter {
     }
 
     /**
-     * Sets the domains the members to list come from. Each name is the listed domain itself or one
-     * of its sub-domains. Names that are neither, or that are not visible to the caller, are
-     * ignored when the members are listed; if all names are ignored, no member is listed. Defaults
-     * to the listed domain and all its sub-domains visible to the caller.
+     * Sets the domains whose scopes are listed. Each name is the listed domain itself, whose scope
+     * includes its visible sub-domains, or one of its sub-domains. Names that are neither, or that
+     * are not visible to the caller, are ignored when the members are listed; if all names are
+     * ignored, no member is listed. Defaults to the whole scope of the listed domain.
      *
-     * @param domains The names of the domains, or none to list the members of the listed domain and
-     *     all its sub-domains visible to the caller.
+     * @param domains The names of the domains, or none to list the whole scope of the listed
+     *     domain.
      * @return This builder.
      * @throws IllegalArgumentException If the names are null, or contain a null or blank name.
      */

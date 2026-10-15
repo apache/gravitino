@@ -64,14 +64,14 @@ public class TestDomainMemberFilter {
 
   @Test
   public void testDomains() {
-    // Only the listed domain itself, only a sub-domain, or both.
-    DomainMemberFilter ownOnly = DomainMemberFilter.builder().withDomains("finance").build();
-    Assertions.assertEquals(ImmutableSet.of("finance"), ownOnly.domains());
-    DomainMemberFilter taxOnly = DomainMemberFilter.builder().withDomains("tax").build();
-    Assertions.assertEquals(ImmutableSet.of("tax"), taxOnly.domains());
-    Assertions.assertNotEquals(ownOnly, taxOnly);
+    // The scope of the listed domain itself, or of some of its sub-domains.
+    DomainMemberFilter financeScope = DomainMemberFilter.builder().withDomains("finance").build();
+    Assertions.assertEquals(ImmutableSet.of("finance"), financeScope.domains());
+    DomainMemberFilter taxScope = DomainMemberFilter.builder().withDomains("tax").build();
+    Assertions.assertEquals(ImmutableSet.of("tax"), taxScope.domains());
+    Assertions.assertNotEquals(financeScope, taxScope);
 
-    // No domain given: the listed domain and all its sub-domains, the same as the default.
+    // No domain given: the whole scope of the listed domain, the same as the default.
     Assertions.assertEquals(
         DomainMemberFilter.builder().build(), DomainMemberFilter.builder().withDomains().build());
   }
