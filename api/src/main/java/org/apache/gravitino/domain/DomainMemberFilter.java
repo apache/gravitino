@@ -38,13 +38,13 @@ public final class DomainMemberFilter {
   private final boolean includeSubdomains;
   private final Set<MetadataObject.Type> types;
   @Nullable private final String nameContains;
-  @Nullable private final String subdomain;
+  private final Set<String> subdomains;
 
   private DomainMemberFilter(Builder builder) {
     this.includeSubdomains = builder.includeSubdomains;
     this.types = builder.types;
     this.nameContains = builder.nameContains;
-    this.subdomain = builder.subdomain;
+    this.subdomains = builder.subdomains;
   }
 
   /**
@@ -68,7 +68,8 @@ public final class DomainMemberFilter {
   /**
    * Returns the metadata object types of the members to list.
    *
-   * @return The metadata object types, or an empty set to list members of all types.
+   * @return The metadata object types, or an empty set to list members of all {@link
+   *     DomainMember#SUPPORTED_TYPES supported types}.
    */
   public Set<MetadataObject.Type> types() {
     return types;
@@ -84,13 +85,14 @@ public final class DomainMemberFilter {
   }
 
   /**
-   * Returns the sub-domain whose members are listed.
+   * Returns the sub-domains whose members are listed. When it is not empty, only the members
+   * reached through these sub-domains are listed, not those of the domain itself.
    *
-   * @return The name of the sub-domain, or empty to list the members of the domain and all its
-   *     sub-domains.
+   * @return The names of the sub-domains, or an empty set to list the members of the domain and all
+   *     its sub-domains.
    */
-  public Optional<String> subdomain() {
-    return Optional.ofNullable(subdomain);
+  public Set<String> subdomains() {
+    return subdomains;
   }
 
   /**
@@ -111,7 +113,7 @@ public final class DomainMemberFilter {
     return includeSubdomains == that.includeSubdomains
         && types.equals(that.types)
         && Objects.equals(nameContains, that.nameContains)
-        && Objects.equals(subdomain, that.subdomain);
+        && subdomains.equals(that.subdomains);
   }
 
   /**
@@ -121,7 +123,7 @@ public final class DomainMemberFilter {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(includeSubdomains, types, nameContains, subdomain);
+    return Objects.hash(includeSubdomains, types, nameContains, subdomains);
   }
 
   /**
@@ -138,8 +140,8 @@ public final class DomainMemberFilter {
         + types
         + ", nameContains="
         + nameContains
-        + ", subdomain="
-        + subdomain
+        + ", subdomains="
+        + subdomains
         + "}";
   }
 
@@ -149,7 +151,7 @@ public final class DomainMemberFilter {
     private boolean includeSubdomains = true;
     private Set<MetadataObject.Type> types = ImmutableSet.of();
     @Nullable private String nameContains;
-    @Nullable private String subdomain;
+    private Set<String> subdomains = ImmutableSet.of();
 
     private Builder() {}
 
@@ -165,19 +167,23 @@ public final class DomainMemberFilter {
     }
 
     /**
-     * Sets the metadata object types of the members to list. Defaults to all types.
+     * Sets the metadata object types of the members to list. Defaults to all {@link
+     * DomainMember#SUPPORTED_TYPES supported types}.
      *
      * @param types The metadata object types.
      * @return This builder.
-     * @throws IllegalArgumentException If the types are null, contain null, or contain {@link
-     *     MetadataObject.Type#DOMAIN}, which is never a member.
+     * @throws IllegalArgumentException If the types are null, contain null, or contain a type that
+     *     is not in {@link DomainMember#SUPPORTED_TYPES}.
      */
     public Builder withTypes(MetadataObject.Type... types) {
       Preconditions.checkArgument(types != null, "types must not be null");
       for (MetadataObject.Type type : types) {
         Preconditions.checkArgument(type != null, "types must not contain null");
         Preconditions.checkArgument(
-            type != MetadataObject.Type.DOMAIN, "A domain cannot be a member of a domain");
+            DomainMember.SUPPORTED_TYPES.contains(type),
+            "Type %s cannot be a domain member, supported types are %s",
+            type,
+            DomainMember.SUPPORTED_TYPES);
       }
       this.types = ImmutableSet.copyOf(types);
       return this;
@@ -199,17 +205,21 @@ public final class DomainMemberFilter {
     }
 
     /**
-     * Sets the sub-domain whose members are listed.
+     * Sets the sub-domains whose members are listed. Only the members reached through these
+     * sub-domains are listed, not those of the domain itself. Defaults to the domain and all its
+     * sub-domains.
      *
-     * @param subdomain The name of the sub-domain, or null to list the members of the domain and
-     *     all its sub-domains.
+     * @param subdomains The names of the sub-domains.
      * @return This builder.
-     * @throws IllegalArgumentException If the name is blank.
+     * @throws IllegalArgumentException If the names are null, or contain a null or blank name.
      */
-    public Builder withSubdomain(@Nullable String subdomain) {
-      Preconditions.checkArgument(
-          subdomain == null || StringUtils.isNotBlank(subdomain), "subdomain must not be blank");
-      this.subdomain = subdomain;
+    public Builder withSubdomains(String... subdomains) {
+      Preconditions.checkArgument(subdomains != null, "subdomains must not be null");
+      for (String subdomain : subdomains) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(subdomain), "subdomains must not contain a blank name");
+      }
+      this.subdomains = ImmutableSet.copyOf(subdomains);
       return this;
     }
 
@@ -217,13 +227,13 @@ public final class DomainMemberFilter {
      * Builds a domain member filter.
      *
      * @return The immutable domain member filter.
-     * @throws IllegalArgumentException If a sub-domain is set while the members of the sub-domains
+     * @throws IllegalArgumentException If sub-domains are set while the members of the sub-domains
      *     are excluded.
      */
     public DomainMemberFilter build() {
       Preconditions.checkArgument(
-          subdomain == null || includeSubdomains,
-          "subdomain cannot be set when includeSubdomains is false");
+          subdomains.isEmpty() || includeSubdomains,
+          "subdomains cannot be set when includeSubdomains is false");
       return new DomainMemberFilter(this);
     }
   }

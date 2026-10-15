@@ -18,13 +18,27 @@
  */
 package org.apache.gravitino.domain;
 
+import com.google.common.collect.Sets;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 
 /** A metadata object that is a member of a domain. */
 @Evolving
 public interface DomainMember {
+
+  /** The metadata object types that can be members of a domain. */
+  Set<MetadataObject.Type> SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   /**
    * Returns the metadata object that is a member of the domain.

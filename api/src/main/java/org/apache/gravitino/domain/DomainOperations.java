@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.tag.TagValue;
 
 /**
@@ -102,7 +102,7 @@ public interface DomainOperations {
    *
    * @param name The name of the domain.
    * @return True if the domain is deleted, false if it does not exist.
-   * @throws NonEmptyEntityException If the domain has sub-domains.
+   * @throws NonEmptyDomainException If the domain has sub-domains.
    */
-  boolean deleteDomain(String name) throws NonEmptyEntityException;
+  boolean deleteDomain(String name) throws NonEmptyDomainException;
 }

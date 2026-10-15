@@ -207,8 +207,9 @@ public interface Domain extends Auditable {
   Domain[] listSubdomainsInfo() throws NoSuchDomainException;
 
   /**
-   * Lists the members of this domain that match the filter. Only the members the caller can access
-   * are returned.
+   * Lists the members of this domain that match the filter. Only objects of the {@link
+   * DomainMember#SUPPORTED_TYPES supported types} are members, and only the members the caller can
+   * access are returned.
    *
    * @param filter The filter of the members, use {@code DomainMemberFilter.builder().build()} to
    *     list all members, including those of the sub-domains.
