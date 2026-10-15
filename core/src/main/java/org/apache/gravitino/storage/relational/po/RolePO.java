@@ -20,8 +20,8 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 
 public class RolePO {
   private Long roleId;
@@ -33,14 +33,13 @@ public class RolePO {
   private Long lastVersion;
   private Long deletedAt;
 
-  @Nullable private List<SecurableObjectPO> securableObjectPOs;
+  private List<SecurableObjectPO> securableObjectPOs = new ArrayList<>();
 
   /**
    * Returns privileges read in the same statement as this role.
    *
-   * @return the privilege snapshot, or null for metadata-only reads
+   * @return the privilege snapshot, or an empty list for metadata-only reads
    */
-  @Nullable
   public List<SecurableObjectPO> getSecurableObjectPOs() {
     return securableObjectPOs;
   }

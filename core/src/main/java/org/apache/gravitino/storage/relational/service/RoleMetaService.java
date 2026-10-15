@@ -237,7 +237,7 @@ public class RoleMetaService {
       String metalake = NameIdentifierUtil.getMetalake(identifier);
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
 
-      RolePO rolePO = getRoleWithPrivileges(metalakeId, identifier.name());
+      RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name(), true);
       RoleEntity oldRoleEntity =
           POConverters.fromRolePO(
               rolePO, listSecurableObjects(rolePO), AuthorizationUtils.ofRoleNamespace(metalake));
@@ -393,7 +393,7 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    RolePO rolePO = getRoleWithPrivileges(metalakeId, identifier.name());
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name(), true);
 
     List<SecurableObject> securableObjects = listSecurableObjects(rolePO);
 
@@ -517,10 +517,8 @@ public class RoleMetaService {
   }
 
   private static List<SecurableObject> listSecurableObjects(RolePO po) {
+    // Full role conversions must use privileges from the same statement as the role metadata.
     List<SecurableObjectPO> securableObjectPOs = po.getSecurableObjectPOs();
-    if (securableObjectPOs == null) {
-      securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
-    }
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     securableObjectPOs.stream()
@@ -561,10 +559,18 @@ public class RoleMetaService {
   }
 
   private static RolePO getRolePOByMetalakeIdAndName(Long metalakeId, String roleName) {
+    return getRolePOByMetalakeIdAndName(metalakeId, roleName, false);
+  }
+
+  private static RolePO getRolePOByMetalakeIdAndName(
+      Long metalakeId, String roleName, boolean withPrivileges) {
     RolePO rolePO =
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
-            mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+            mapper ->
+                withPrivileges
+                    ? mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName)
+                    : mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
 
     if (rolePO == null) {
       throw new NoSuchEntityException(
@@ -676,19 +682,5 @@ public class RoleMetaService {
       }
       return type.ordinal();
     }
-  }
-
-  private RolePO getRoleWithPrivileges(Long metalakeId, String roleName) {
-    RolePO rolePO =
-        SessionUtils.getWithoutCommit(
-            RoleMetaMapper.class,
-            mapper -> mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName));
-    if (rolePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.ROLE.name().toLowerCase(),
-          roleName);
-    }
-    return rolePO;
   }
 }

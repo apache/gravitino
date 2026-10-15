@@ -30,10 +30,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -42,6 +44,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.GroupEntity;
@@ -373,6 +376,138 @@ public class TestConsistentEntityReads extends TestJDBCBackend {
         });
   }
 
+  @TestTemplate
+  void testEmptyRoleRetainsEmptyPrivilegeSnapshot() throws Exception {
+    parents();
+    RoleEntity replacement = role("after", CATALOG);
+    RoleEntity empty =
+        RoleEntity.builder()
+            .withId(replacement.id())
+            .withName(replacement.name())
+            .withNamespace(replacement.namespace())
+            .withProperties(Map.of("marker", "before"))
+            .withSecurableObjects(List.of())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(empty, false);
+    RoleEntity read =
+        afterRootRead(
+            RoleMetaMapper.class,
+            () -> backend.get(empty.nameIdentifier(), Entity.EntityType.ROLE),
+            () -> backend.insert(replacement, true));
+    assertEquals(empty.properties(), read.properties());
+    assertTrue(read.securableObjects().isEmpty());
+    RoleEntity current = backend.get(empty.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(replacement.securableObjects(), current.securableObjects());
+  }
+
+  @TestTemplate
+  void testTableUpdaterReceivesConsistentSnapshot() throws Exception {
+    parents();
+    TableEntity before = table(RandomIdGenerator.INSTANCE.nextId(), "before", "old_column");
+    TableEntity after = table(before.id(), "after", "new_column");
+    assertUpdaterSnapshot(TableMetaMapper.class, before, after, this::assertTableSnapshot);
+  }
+
+  @TestTemplate
+  void testRoleUpdaterReceivesConsistentSnapshot() throws Exception {
+    parents();
+    createAndInsertCatalog(METALAKE, "other_catalog");
+    assertUpdaterSnapshot(
+        RoleMetaMapper.class,
+        role("before", CATALOG),
+        role("after", "other_catalog"),
+        (expected, actual) -> {
+          assertEquals(expected.properties(), actual.properties());
+          assertEquals(expected.securableObjects(), actual.securableObjects());
+        });
+  }
+
+  @TestTemplate
+  void testUserUpdaterReceivesConsistentSnapshot() throws Exception {
+    parents();
+    RoleEntity first = role("before", CATALOG);
+    RoleEntity second =
+        createRoleEntity(12346L, first.namespace(), "second_role", AUDIT_INFO, CATALOG);
+    backend.insert(first, false);
+    backend.insert(second, false);
+    Namespace namespace = AuthorizationUtils.ofUserNamespace(METALAKE);
+    UserEntity before =
+        createUserEntity(
+            12347L, namespace, "principal", AUDIT_INFO, List.of(first.name()), List.of(first.id()));
+    UserEntity after =
+        createUserEntity(
+            before.id(),
+            namespace,
+            before.name(),
+            AUDIT_INFO,
+            List.of(second.name()),
+            List.of(second.id()));
+    assertUpdaterSnapshot(
+        UserMetaMapper.class,
+        before,
+        after,
+        (expected, actual) -> {
+          assertEquals(expected.auditInfo(), actual.auditInfo());
+          assertEquals(expected.roleNames(), actual.roleNames());
+          assertEquals(expected.roleIds(), actual.roleIds());
+        });
+  }
+
+  @TestTemplate
+  void testGroupUpdaterReceivesConsistentSnapshot() throws Exception {
+    parents();
+    RoleEntity first = role("before", CATALOG);
+    RoleEntity second =
+        createRoleEntity(12346L, first.namespace(), "second_role", AUDIT_INFO, CATALOG);
+    backend.insert(first, false);
+    backend.insert(second, false);
+    Namespace namespace = AuthorizationUtils.ofGroupNamespace(METALAKE);
+    GroupEntity before =
+        createGroupEntity(
+            12347L, namespace, "principal", AUDIT_INFO, List.of(first.name()), List.of(first.id()));
+    GroupEntity after =
+        createGroupEntity(
+            before.id(),
+            namespace,
+            before.name(),
+            AUDIT_INFO,
+            List.of(second.name()),
+            List.of(second.id()));
+    assertUpdaterSnapshot(
+        GroupMetaMapper.class,
+        before,
+        after,
+        (expected, actual) -> {
+          assertEquals(expected.auditInfo(), actual.auditInfo());
+          assertEquals(expected.roleNames(), actual.roleNames());
+          assertEquals(expected.roleIds(), actual.roleIds());
+        });
+  }
+
+  private <E extends Entity & HasIdentifier> void assertUpdaterSnapshot(
+      Class<?> mapper, E before, E after, BiConsumer<E, E> assertSnapshot) throws Exception {
+    backend.insert(before, false);
+    AtomicBoolean invoked = new AtomicBoolean();
+    afterRootRead(
+        mapper,
+        () ->
+            assertThrows(
+                OptimisticLockException.class,
+                () ->
+                    backend.<E>update(
+                        before.nameIdentifier(),
+                        before.type(),
+                        current -> {
+                          assertSnapshot.accept(before, current);
+                          invoked.set(true);
+                          return current;
+                        })),
+        () -> backend.insert(after, true));
+    assertTrue(invoked.get(), "the updater must receive the observed snapshot before CAS fails");
+    assertSnapshot.accept(after, backend.get(after.nameIdentifier(), after.type()));
+  }
+
   private void checkTableOverwrite(boolean replaceId, boolean cached) throws Exception {
     parents();
     TableEntity original = table(RandomIdGenerator.INSTANCE.nextId(), "before", "old_column");
@@ -480,9 +615,8 @@ public class TestConsistentEntityReads extends TestJDBCBackend {
                           && !((List<?>) result).isEmpty()
                           && ((List<?>) result).get(0) instanceof RolePO)
                   && committed.compareAndSet(false, true)) {
-                // The root SELECT has completed. Commit on a different connection before the reader
-                // can
-                // issue its next statement. The joined read already owns all its dependent rows.
+                // Commit on another connection after the root SELECT, before any subsequent read.
+                // The joined read already owns all its dependent rows.
                 writer
                     .submit(
                         () -> {
