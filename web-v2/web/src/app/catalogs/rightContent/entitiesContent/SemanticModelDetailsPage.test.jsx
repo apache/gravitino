@@ -130,6 +130,7 @@ const definitionWith = context => ({
 })
 
 const renderDetails = async (definition, details = {}) => {
+  store.dispatch(getSemanticModelDetails.pending('load', { init: true }))
   store.dispatch(
     getSemanticModelDetails.fulfilled(
       { semanticModel: { name: navigation.name, definition, properties: {}, ...details }, init: true },
@@ -196,8 +197,10 @@ describe('Semantic Model AI guidance', () => {
     verify('model')
     await selectTab('Datasets')
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    await click(findText('button', 'View dataset details'))
     await expandContext('orders AI Context')
     verify('dataset')
+    await click(document.querySelector('.ant-modal-close'))
     await click(document.querySelector('[aria-label="amount AI Context"]'))
     verify('field')
     expect(document.querySelector('.ant-modal .ant-collapse')).toBeNull()
@@ -218,6 +221,7 @@ describe('Semantic Model AI guidance', () => {
   it('supports a dataset with context and no fields', async () => {
     await renderDetails({ datasets: [{ name: 'orders', aiContext: 'Dataset only' }] })
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    await click(findText('button', 'View dataset details'))
     await expandContext('orders AI Context')
     expect(document.body.textContent).toContain('Dataset only')
   })
@@ -308,9 +312,12 @@ describe('Semantic Model metadata', () => {
     await verify('model')
     await selectTab('Datasets')
     await click(document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon'))
+    await click(findText('button', 'View dataset details'))
     await verify('dataset')
-    await click(document.querySelector('[data-refer="semantic-model-fields-grid"] button.ant-table-row-expand-icon'))
+    await click(document.querySelector('.ant-modal-close'))
+    await click(document.querySelector('[aria-label="amount Vendor Extensions"]'))
     await verify('field')
+    await click(document.querySelector('.ant-modal-close'))
     await selectTab('Relationships')
     await click(
       document.querySelector('[data-refer="semantic-model-relationships-grid"] button.ant-table-row-expand-icon')
@@ -798,3 +805,109 @@ describe('focused semantic metadata editing', () => {
     expect(document.querySelector('#semanticMetadata_instructions').value).toBe('Hidden draft')
   })
 })
+
+it('preserves precise vendor numbers in both formatted and raw views', async () => {
+  const raw = '{"external_id":9007199254740993,"threshold":0.10000000000000000001}'
+  await renderDetails({ datasets: [], customExtensions: [{ vendorName: 'precise', data: raw }] })
+  await selectTab('Overview')
+  await expandContext('Model Vendor Extensions')
+  const pre = document.querySelector('section[aria-label="precise"] pre')
+  expect(pre.textContent).toContain('9007199254740993')
+  expect(pre.textContent).toContain('0.10000000000000000001')
+  await click(findText('button', 'Show raw value'))
+  expect(pre.textContent).toBe(raw)
+})
+
+it.each(['field', 'metric'])(
+  'keeps the %s preview dialect local to the row and shares it with View SQL',
+  async kind => {
+    const definition = definitionWith(() => null)
+    const entities = kind === 'field' ? definition.datasets[0].fields : definition.metrics
+    entities[0].expression.dialects = [
+      { dialect: 'TRINO', expression: 'trino_sql' },
+      { dialect: 'ANSI_SQL', expression: 'ansi_sql' }
+    ]
+    entities.push({ name: 'second', expression: structuredClone(entities[0].expression) })
+    const original = structuredClone(definition)
+    await renderDetails(definition)
+    if (kind === 'field')
+      await click(
+        document.querySelector('[data-refer="semantic-model-datasets-grid"] button.ant-table-row-expand-icon')
+      )
+    else await selectTab('Metrics')
+    const name = entities[0].name
+
+    const select = async (selector, label) => {
+      await act(async () =>
+        Simulate.mouseDown(
+          document.querySelector(selector).closest('.ant-select').querySelector('.ant-select-selector')
+        )
+      )
+      await click(
+        [
+          ...document.querySelectorAll(
+            '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content'
+          )
+        ].find(element => element.textContent === label)
+      )
+    }
+    await select(`[aria-label="Preview dialect for ${name}"]`, 'ANSI_SQL')
+    const grid = document.querySelector(`[data-refer="semantic-model-${kind === 'field' ? 'fields' : 'metrics'}-grid"]`)
+    expect([...grid.querySelectorAll('pre')].map(pre => pre.textContent)).toEqual(['ansi_sql', 'trino_sql'])
+    await click(document.querySelector(`[aria-label="View expression for ${name}"]`))
+    expect(document.querySelector('.ant-modal pre').textContent).toBe('ansi_sql')
+    await select('[aria-label="SQL dialect"]', 'TRINO')
+    await click(document.querySelector('.ant-modal-close'))
+    expect(grid.querySelector('pre').textContent).toBe('trino_sql')
+    expect(definition).toEqual(original)
+  }
+)
+
+it('expands the complete definition and returns to the same tab', async () => {
+  await renderDetails(definitionWith(() => null))
+  await selectTab('Definition')
+  const definitionText = document.querySelector('[data-refer="semantic-model-definition"]').textContent
+  await click(findText('button', 'Expand definition'))
+  expect(document.querySelector('.ant-modal pre').textContent).toBe(definitionText)
+  expect(findText('.ant-modal button', 'Copy definition')).toBeTruthy()
+  await click(document.querySelector('.ant-modal-close'))
+  expect(findText('[role="tab"]', 'Definition').getAttribute('aria-selected')).toBe('true')
+})
+
+it.each([false, true])(
+  'does not refresh or navigate for a save completed after leaving the model (rename=%s)',
+  async rename => {
+    navigation.name = 'orders'
+    const definition = definitionWith(() => null)
+    let finish
+    defHttp.put.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finish = resolve
+        })
+    )
+    defHttp.get.mockImplementation(({ url }) =>
+      Promise.resolve(
+        url.endsWith('/semantic-models')
+          ? { identifiers: [] }
+          : { semanticModel: { name: navigation.name, definition, properties: {} } }
+      )
+    )
+    await renderDetails(definition)
+    await click(document.querySelector('[aria-label="Edit Semantic Model"]'))
+    await act(async () =>
+      Simulate.change(document.querySelector('[data-refer="semantic-model-comment-field"]'), {
+        target: { value: 'Updated' }
+      })
+    )
+    await click(document.querySelector('[data-refer="handle-submit-semantic-model"]'))
+    expect(finish).toBeTypeOf('function')
+    await act(async () => root.render(null))
+    defHttp.get.mockClear()
+    await act(async () =>
+      finish({ semanticModel: { name: rename ? 'renamed' : navigation.name, definition, properties: {} } })
+    )
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(defHttp.get.mock.calls.every(([request]) => request.url.endsWith('/semantic-models'))).toBe(true)
+  }
+)

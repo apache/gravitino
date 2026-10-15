@@ -32,7 +32,7 @@ export default function SemanticModelAIContext({ context, label = 'AI Context', 
       : {}
 
   const content = (
-    <div className='max-h-64 overflow-auto whitespace-pre-wrap break-words'>
+    <div className='whitespace-pre-wrap break-words'>
       {typeof context === 'string' ? (
         <p className='m-0'>{context}</p>
       ) : (

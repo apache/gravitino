@@ -110,15 +110,15 @@ const renderDialog = async edit => {
 }
 
 describe('semantic model editor', () => {
-  it.each([false, true])('rejects the reserved name ossie (edit=%s)', async edit => {
+  it.each([false, true])('allows the model name ossie (edit=%s)', async edit => {
+    defHttp.post.mockResolvedValue({ semanticModel: { ...model, name: 'ossie' } })
+    defHttp.put.mockResolvedValue({ semanticModel: { ...model, name: 'ossie' } })
     await renderDialog(edit)
     await fill('name', 'ossie')
     if (!edit) await fill('definition', JSON.stringify(definition))
     await submit()
-    expect(document.body.textContent).toContain('The name "ossie" is reserved for OSSIE import.')
-    expect(defHttp.post).not.toHaveBeenCalled()
-    expect(defHttp.put).not.toHaveBeenCalled()
-    expect(close).not.toHaveBeenCalled()
+    expect(edit ? defHttp.put : defHttp.post).toHaveBeenCalledOnce()
+    expect(close).toHaveBeenCalledWith(false)
   })
 
   it('blocks a nested expression error before submission', async () => {

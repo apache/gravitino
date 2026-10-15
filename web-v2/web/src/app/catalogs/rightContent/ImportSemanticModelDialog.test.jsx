@@ -19,6 +19,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
+import { message } from 'antd'
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
@@ -28,6 +29,7 @@ import ImportSemanticModelDialog from './ImportSemanticModelDialog'
 
 vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), post: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
+const originalScrollIntoView = Element.prototype.scrollIntoView
 const schemaKey = '{{demo}}{{sales}}{{relational}}{{mart}}'
 let root
 let container
@@ -36,6 +38,7 @@ let store
 
 beforeEach(() => {
   vi.clearAllMocks()
+  Element.prototype.scrollIntoView = vi.fn()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const getComputedStyle = window.getComputedStyle
 
@@ -66,8 +69,12 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  await act(async () => root.unmount())
+  await act(async () => {
+    root.unmount()
+    message.destroy()
+  })
   container.remove()
+  Element.prototype.scrollIntoView = originalScrollIntoView
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -106,7 +113,11 @@ describe('OSSIE import', () => {
     defHttp.post.mockResolvedValue({ semanticModel: { name: 'imported' } })
     await renderDialog()
     expect(document.querySelector('[data-refer="import-semantic-model-submit"]').disabled).toBe(true)
+    expect(document.body.textContent).toContain('demo / sales / mart')
     await selectFile(name, text)
+    expect(document.body.textContent).toContain('Replace file')
+    expect(document.body.textContent).toContain('Remove file')
+    expect(document.body.textContent).toContain('bytes')
     expect(document.body.textContent).toContain('Import preview')
     expect(document.body.textContent).toContain('demo / sales / mart')
     expect(document.body.textContent).toContain('imported')
@@ -123,6 +134,9 @@ describe('OSSIE import', () => {
     expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['imported'])
     expect(store.getState().metalakes.metalakeTree[0].children.map(node => node.name)).toEqual(['orders', 'imported'])
     expect(close).toHaveBeenCalledWith(false)
+    const link = document.querySelector('.ant-message a')
+    expect(link.textContent).toBe('View model')
+    expect(new URL(link.href).searchParams.get('semanticModel')).toBe('imported')
   })
 
   it('shows server validation errors, retains the file, and allows retry', async () => {
@@ -132,6 +146,8 @@ describe('OSSIE import', () => {
     await renderDialog()
     await selectFile('model.json', '{"name":"imported"}')
     await submit()
+    expect(document.querySelector('.ant-alert-message').textContent).toBe('Import failed')
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
     expect(document.querySelector('.ant-alert-description').textContent).toBe('datasets[0].source is invalid')
     expect(document.body.textContent).toContain('model.json')
     expect(close).not.toHaveBeenCalled()
@@ -144,7 +160,8 @@ describe('OSSIE import', () => {
   it('rejects malformed JSON at preview time without submitting it', async () => {
     await renderDialog()
     await selectFile('model.json', '{ invalid }')
-    expect(document.querySelector('.ant-alert')).not.toBeNull()
+    expect(document.querySelector('.ant-alert-message').textContent).toBe('File preview failed')
+    expect(document.body.textContent).toContain('No import was attempted')
     expect(document.querySelector('[data-refer="import-semantic-model-submit"]').disabled).toBe(true)
     expect(defHttp.post).not.toHaveBeenCalled()
   })
@@ -163,8 +180,8 @@ describe('OSSIE import', () => {
     await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
     await selectFile('new.json', '{"name":"new"}')
     await act(async () => finish('name: old'))
-    expect(document.querySelector('.ant-descriptions').textContent).toContain('new')
-    expect(document.querySelector('.ant-descriptions').textContent).not.toContain('old')
+    expect(document.querySelector('[data-refer="import-preview"]').textContent).toContain('new')
+    expect(document.querySelector('[data-refer="import-preview"]').textContent).not.toContain('old')
   })
 
   it.each([

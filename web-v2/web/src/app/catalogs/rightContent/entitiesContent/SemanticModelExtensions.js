@@ -19,17 +19,12 @@
 
 import { useState } from 'react'
 import { Button, Typography } from 'antd'
+import { formatVendorJson } from '@/lib/utils/formatVendorJson'
 import SemanticMetadataSection from './SemanticMetadataSection'
 
 function ExtensionData({ data }) {
   const [raw, setRaw] = useState(false)
-  let formatted
-  try {
-    const parsed = JSON.parse(data)
-    if (parsed && typeof parsed === 'object') formatted = JSON.stringify(parsed, null, 2)
-  } catch {
-    // Vendor data may be arbitrary text.
-  }
+  const formatted = formatVendorJson(data)
 
   return (
     <>

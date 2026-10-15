@@ -20,7 +20,16 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
-import reducer, { fetchSemanticModels, setIntoTreeNodeWithFetch, setMetalakeTree, setLoadedNodes } from './index'
+import reducer, {
+  fetchSemanticModels,
+  setIntoTreeNodeWithFetch,
+  setMetalakeTree,
+  setLoadedNodes,
+  setSelectedNodes,
+  getSemanticModelDetails,
+  getCurrentEntityTags,
+  getSchemaDetails
+} from './index'
 
 const adapter = defHttp.getAxios().defaults.adapter
 
@@ -106,4 +115,66 @@ it.each(['list', 'tree'])('ignores an older %s response after a successful list 
   await initial
   expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['orders', 'imported'])
   expect(store.getState().metalakes.metalakeTree[0].children.map(model => model.name)).toEqual(['orders', 'imported'])
+})
+
+it.each(['model', 'schema', 'pending model'])(
+  'ignores late model details after navigating to %s',
+  async destination => {
+    const namespace = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
+    const store = configureStore({ reducer: { metalakes: reducer } })
+    const responses = []
+    defHttp.getAxios().defaults.adapter = config =>
+      new Promise(resolve => {
+        responses.push(value =>
+          resolve({ config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, ...value } })
+        )
+      })
+    const first = store.dispatch(getSemanticModelDetails({ ...namespace, semanticModel: 'first', init: true }))
+    await vi.waitFor(() => expect(responses).toHaveLength(1))
+    store.dispatch(setSelectedNodes([destination]))
+
+    const next = store.dispatch(
+      destination === 'schema'
+        ? getSchemaDetails({ ...namespace, init: true })
+        : getSemanticModelDetails({ ...namespace, semanticModel: 'second', init: true })
+    )
+    await vi.waitFor(() => expect(responses).toHaveLength(2))
+    if (destination !== 'pending model') {
+      responses[1]({ semanticModel: { name: 'second' }, schema: { name: 'mart' } })
+      await next
+    }
+    const before = store.getState().metalakes.activatedDetails
+    responses[0]({ semanticModel: { name: 'first' } })
+    await first
+    expect(store.getState().metalakes.activatedDetails).toEqual(before)
+    if (destination === 'pending model') {
+      responses[1]({ semanticModel: { name: 'second' } })
+      await next
+      expect(store.getState().metalakes.activatedDetails.name).toBe('second')
+    }
+  }
+)
+
+it('ignores tags from the previous selected entity even before the next tags request', async () => {
+  const store = configureStore({ reducer: { metalakes: reducer } })
+  let respond
+  defHttp.getAxios().defaults.adapter = config =>
+    new Promise(resolve => {
+      respond = () =>
+        resolve({ config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, tags: [{ name: 'old' }] } })
+    })
+
+  const request = store.dispatch(
+    getCurrentEntityTags({
+      init: true,
+      metalake: 'demo',
+      metadataObjectType: 'semantic_model',
+      metadataObjectFullName: 'sales.mart.old'
+    })
+  )
+  await vi.waitFor(() => expect(respond).toBeTypeOf('function'))
+  store.dispatch(setSelectedNodes(['new']))
+  respond()
+  await request
+  expect(store.getState().metalakes.currentEntityTags).toEqual([])
 })

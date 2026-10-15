@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
   Divider,
@@ -36,6 +36,7 @@ import {
   Typography,
   message
 } from 'antd'
+import styles from './SemanticModelDetailsPage.module.css'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Tags from '@/components/CustomTags'
@@ -90,14 +91,25 @@ export default function SemanticModelDetailsPage() {
   const auth = useAppSelector(state => state.auth)
   const { anthEnable } = auth
   const store = useAppSelector(state => state.metalakes)
-  const semanticModel = store.activatedDetails
+  const semanticModel = store.activatedDetails?.name === semanticModelName ? store.activatedDetails : null
   const [tabKey, setTabKey] = useState('Datasets')
   const [openEdit, setOpenEdit] = useState(false)
   const [metadataEdit, setMetadataEdit] = useState(null)
   const [fieldContext, setFieldContext] = useState(null)
+  const [metadataDetails, setMetadataDetails] = useState(null)
+  const [expandedDefinition, setExpandedDefinition] = useState(false)
   const [fieldSearch, setFieldSearch] = useState('')
   const [metricSearch, setMetricSearch] = useState('')
   const [expandedDatasets, setExpandedDatasets] = useState([])
+
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   const definition = semanticModel?.definition
   const properties = semanticModel?.properties
@@ -149,7 +161,14 @@ export default function SemanticModelDetailsPage() {
       <SemanticModelAIContext
         context={entity?.aiContext}
         label={`${label} AI Context`}
-        onEdit={target ? () => setMetadataEdit({ ...target, section: 'context' }) : undefined}
+        onEdit={
+          target
+            ? () => {
+                setMetadataDetails(null)
+                setMetadataEdit({ ...target, section: 'context' })
+              }
+            : undefined
+        }
       />
       <SemanticModelExtensions extensions={entity?.customExtensions} label={`${label} Vendor Extensions`} />
     </>
@@ -166,6 +185,7 @@ export default function SemanticModelDetailsPage() {
   const propertyContent = <PropertiesContent properties={properties} />
 
   const onSaved = async updated => {
+    if (!mounted.current) return
     if (updated.name !== semanticModelName) {
       const params = new URLSearchParams(searchParams.toString())
       params.set('semanticModel', updated.name)
@@ -191,6 +211,7 @@ export default function SemanticModelDetailsPage() {
         title: 'Dataset Name',
         dataIndex: 'name',
         key: 'name',
+        fixed: 'left',
         width: 200,
         ellipsis: true,
         sorter: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())
@@ -244,6 +265,7 @@ export default function SemanticModelDetailsPage() {
       {
         title: 'Actions',
         key: 'actions',
+        fixed: 'right',
         width: 90,
         render: (_, record) => (
           <Button
@@ -259,70 +281,13 @@ export default function SemanticModelDetailsPage() {
     []
   )
 
-  const fieldColumns = useMemo(
-    () => [
-      {
-        title: 'Field Name',
-        dataIndex: 'name',
-        key: 'name',
-        width: 220,
-        render: (name, field) => (
-          <div className='break-words'>
-            <div>{name}</div>
-            {field.label && <Typography.Text type='secondary'>{field.label}</Typography.Text>}
-            <div>
-              {' '}
-              {field.aiContext && (typeof field.aiContext === 'string' || Object.keys(field.aiContext).length > 0) && (
-                <Button
-                  size='small'
-                  type='link'
-                  aria-label={`${field.name} AI Context`}
-                  onClick={() => setFieldContext(field)}
-                >
-                  AI Context
-                </Button>
-              )}
-            </div>
-          </div>
-        )
-      },
-      {
-        title: 'Data Type',
-        dataIndex: 'datatype',
-        key: 'datatype',
-        width: 140,
-        render: renderDataType
-      },
-      {
-        title: 'Time Dimension',
-        dataIndex: 'dimension',
-        key: 'dimension',
-        width: 140,
-        render: dimension => <span>{dimension?.isTime ? 'Yes' : 'No'}</span>
-      },
-      {
-        title: 'Expression',
-        dataIndex: 'expression',
-        key: 'expression',
-        render: (expression, record) => <SemanticModelExpression expression={expression} name={record.name} />
-      },
-      {
-        title: 'Description',
-        dataIndex: 'description',
-        key: 'description',
-        ellipsis: true,
-        render: description => <span>{description || '-'}</span>
-      }
-    ],
-    []
-  )
-
   const relationshipColumns = useMemo(
     () => [
       {
         title: 'Relationship Name',
         dataIndex: 'name',
         key: 'name',
+        fixed: 'left',
         width: 220,
         ellipsis: true,
         sorter: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())
@@ -347,6 +312,7 @@ export default function SemanticModelDetailsPage() {
       {
         title: 'Actions',
         key: 'actions',
+        fixed: 'right',
         width: 90,
         render: (_, record) => (
           <Button
@@ -368,6 +334,7 @@ export default function SemanticModelDetailsPage() {
         title: 'Metric Name',
         dataIndex: 'name',
         key: 'name',
+        fixed: 'left',
         width: 200,
         ellipsis: true,
         sorter: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())
@@ -395,6 +362,7 @@ export default function SemanticModelDetailsPage() {
       {
         title: 'Actions',
         key: 'actions',
+        fixed: 'right',
         width: 90,
         render: (_, record) => (
           <Button
@@ -443,47 +411,91 @@ export default function SemanticModelDetailsPage() {
   }, [metricColumns])
 
   const expandedFieldsRow = dataset => (
-    <div>
-      {renderMetadata(dataset, dataset.name, { kind: 'dataset', name: dataset.name })}
-      <Table
-        data-refer='semantic-model-fields-grid'
-        size='small'
-        rowKey={field => field.name}
-        dataSource={(dataset.fields || []).map(field => ({ ...field, datasetName: dataset.name }))}
-        tableLayout='fixed'
-        scroll={{ x: 1000 }}
-        columns={topAlignedColumns([
-          ...fieldColumns,
-          {
-            title: 'Actions',
-            key: 'actions',
-            width: 90,
-            render: (_, field) => (
-              <Space direction='vertical' size={4}>
-                <Button
-                  size='small'
-                  aria-label={`Edit field ${field.name}`}
-                  onClick={() => setMetadataEdit({ kind: 'field', name: field.name, datasetName: dataset.name })}
-                >
-                  Edit
-                </Button>
-              </Space>
-            )
-          }
-        ])}
-        pagination={false}
-        expandable={{
-          expandedRowRender: field => (
-            <SemanticModelExtensions extensions={field.customExtensions} label={`${field.name} Vendor Extensions`} />
-          ),
-          rowExpandable: field => field.customExtensions?.length > 0
-        }}
-      />
-    </div>
+    <section aria-label={`${dataset.name} fields`} className='py-2'>
+      <div className='mb-3 flex items-center justify-between gap-3'>
+        <Typography.Text strong>Fields ({(dataset.fields || []).length})</Typography.Text>
+        {hasMetadata(dataset) && (
+          <Button
+            size='small'
+            onClick={() =>
+              setMetadataDetails({
+                entity: dataset,
+                label: dataset.name,
+                target: { kind: 'dataset', name: dataset.name }
+              })
+            }
+          >
+            View dataset details
+          </Button>
+        )}
+      </div>
+      <div data-refer='semantic-model-fields-grid' className='divide-y divide-borderColor'>
+        {(dataset.fields || []).map(field => (
+          <section key={field.name} aria-label={`Field ${field.name}`} className='py-3'>
+            <div className='mb-2 flex items-start justify-between gap-3'>
+              <div className='min-w-0 break-words'>
+                <Typography.Text strong>{field.name}</Typography.Text>
+                {field.label && (
+                  <Typography.Text type='secondary' className='ml-2'>
+                    {field.label}
+                  </Typography.Text>
+                )}
+              </div>
+              <Button
+                size='small'
+                aria-label={`Edit field ${field.name}`}
+                onClick={() => setMetadataEdit({ kind: 'field', name: field.name, datasetName: dataset.name })}
+              >
+                Edit
+              </Button>
+            </div>
+            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='min-w-0'>
+                <div className='mb-2'>
+                  {renderDataType(field.datatype)}
+                  <Typography.Text type='secondary'>
+                    Time dimension: {field.dimension?.isTime ? 'Yes' : 'No'}
+                  </Typography.Text>
+                </div>
+                {field.description && <Paragraph className='break-words'>{field.description}</Paragraph>}
+                <Space wrap>
+                  {field.aiContext &&
+                    (typeof field.aiContext === 'string' || Object.keys(field.aiContext).length > 0) && (
+                      <Button
+                        size='small'
+                        aria-label={`${field.name} AI Context`}
+                        onClick={() => setFieldContext({ ...field, datasetName: dataset.name })}
+                      >
+                        AI Context
+                      </Button>
+                    )}
+                  {field.customExtensions?.length > 0 && (
+                    <Button
+                      size='small'
+                      aria-label={`${field.name} Vendor Extensions`}
+                      onClick={() =>
+                        setMetadataDetails({
+                          entity: field,
+                          label: field.name,
+                          target: { kind: 'field', name: field.name, datasetName: dataset.name }
+                        })
+                      }
+                    >
+                      Vendor Extensions
+                    </Button>
+                  )}
+                </Space>
+              </div>
+              <SemanticModelExpression expression={field.expression} name={field.name} />
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
   )
 
   return (
-    <>
+    <div className={styles.page} data-refer='semantic-model-details'>
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start'>
           <div className='size-8'>
@@ -524,9 +536,9 @@ export default function SemanticModelDetailsPage() {
         </Flex>
       </Spin>
       <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={setTabKey} items={tabOptions} />
-      <Spin spinning={store.activatedDetailsLoading}>
+      <Spin wrapperClassName={styles.body} spinning={store.activatedDetailsLoading}>
         {tabKey === 'Overview' && (
-          <div>
+          <div className='min-h-0 overflow-auto'>
             <Space split={<Divider type='vertical' />} wrap={true} className='mb-2'>
               {anthEnable && (
                 <Space size={4}>
@@ -609,8 +621,9 @@ export default function SemanticModelDetailsPage() {
         )}
         {tabKey === 'Datasets' && (
           <>
-            <Space className='mb-3'>
+            <Space className='mb-3 shrink-0'>
               <Input
+                className='w-64'
                 aria-label='Search fields'
                 placeholder='Search field name or label'
                 value={fieldSearch}
@@ -620,9 +633,10 @@ export default function SemanticModelDetailsPage() {
             </Space>
             <Table
               data-refer='semantic-model-datasets-grid'
+              className={styles.table}
               size='small'
               tableLayout='fixed'
-              scroll={{ x: datasetTableWidth, y: 'max(20rem, calc(100vh - 28rem))' }}
+              scroll={{ x: datasetTableWidth, y: '100%' }}
               dataSource={filteredDatasets}
               columns={datasetResizableColumns}
               components={datasetComponents}
@@ -641,9 +655,10 @@ export default function SemanticModelDetailsPage() {
         {tabKey === 'Relationships' && (
           <Table
             data-refer='semantic-model-relationships-grid'
+            className={styles.table}
             size='small'
             tableLayout='fixed'
-            scroll={{ x: relationshipTableWidth, y: 'max(20rem, calc(100vh - 28rem))' }}
+            scroll={{ x: relationshipTableWidth, y: '100%' }}
             dataSource={relationships}
             columns={relationshipResizableColumns}
             components={relationshipComponents}
@@ -657,7 +672,7 @@ export default function SemanticModelDetailsPage() {
         )}
         {tabKey === 'Metrics' && (
           <>
-            <Space className='mb-3'>
+            <Space className='mb-3 shrink-0'>
               <Input
                 aria-label='Search metrics'
                 placeholder='Search metric name'
@@ -668,9 +683,10 @@ export default function SemanticModelDetailsPage() {
             </Space>
             <Table
               data-refer='semantic-model-metrics-grid'
+              className={styles.table}
               size='small'
               tableLayout='fixed'
-              scroll={{ x: metricTableWidth, y: 'max(20rem, calc(100vh - 28rem))' }}
+              scroll={{ x: metricTableWidth, y: '100%' }}
               dataSource={filteredMetrics}
               columns={metricResizableColumns}
               components={metricComponents}
@@ -684,24 +700,24 @@ export default function SemanticModelDetailsPage() {
         )}
         {tabKey === 'Definition' &&
           (definitionText ? (
-            <div className='relative rounded border border-borderColor p-3'>
-              <Button className='mb-3' onClick={() => setOpenEdit(true)}>
-                Edit JSON definition
-              </Button>
-              <Tooltip title='Copy definition' placement='top'>
-                <button
-                  type='button'
-                  aria-label='Copy definition'
-                  className='absolute right-3 top-3 inline-flex cursor-pointer items-center rounded border border-borderColor bg-transparent p-1 text-textSecondary transition-colors hover:text-defaultPrimary'
-                  onClick={onCopyDefinition}
-                >
-                  <Icons.Copy className='size-4' />
-                </button>
-              </Tooltip>
+            <div className='flex min-h-0 flex-1 flex-col rounded border border-borderColor p-3'>
+              <Space className='mb-3 shrink-0'>
+                <Button onClick={() => setOpenEdit(true)}>Edit JSON definition</Button>
+                <Tooltip title='Copy definition' placement='top'>
+                  <button
+                    type='button'
+                    aria-label='Copy definition'
+                    className='inline-flex cursor-pointer items-center rounded border border-borderColor bg-transparent p-1 text-textSecondary transition-colors hover:text-defaultPrimary'
+                    onClick={onCopyDefinition}
+                  >
+                    <Icons.Copy className='size-4' />
+                  </button>
+                </Tooltip>
+                <Button onClick={() => setExpandedDefinition(true)}>Expand definition</Button>
+              </Space>
               <pre
                 data-refer='semantic-model-definition'
-                className='m-0 overflow-auto whitespace-pre-wrap break-all font-mono text-sm leading-6'
-                style={{ maxHeight: 'calc(100vh - 34rem)' }}
+                className='m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-all font-mono text-sm leading-6'
               >
                 {definitionText}
               </pre>
@@ -710,8 +726,49 @@ export default function SemanticModelDetailsPage() {
             <Paragraph type='secondary'>No definition available.</Paragraph>
           ))}
       </Spin>
+      {expandedDefinition && (
+        <Modal
+          open
+          title={`${semanticModelName} definition`}
+          width='100vw'
+          style={{ top: 0, maxWidth: '100vw', margin: 0, paddingBottom: 0 }}
+          styles={{
+            content: { height: '100vh', display: 'flex', flexDirection: 'column', borderRadius: 0 },
+            body: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+          }}
+          footer={null}
+          onCancel={() => setExpandedDefinition(false)}
+        >
+          <Button className='mb-3 self-start' onClick={onCopyDefinition}>
+            Copy definition
+          </Button>
+          <pre className='m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-all font-mono text-sm leading-6'>
+            {definitionText}
+          </pre>
+        </Modal>
+      )}
+      {metadataDetails && (
+        <Modal
+          open
+          title={`${metadataDetails.label} details`}
+          footer={null}
+          width={800}
+          style={{ top: 24 }}
+          styles={{ body: { maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' } }}
+          onCancel={() => setMetadataDetails(null)}
+        >
+          {renderMetadata(metadataDetails.entity, metadataDetails.label, metadataDetails.target)}
+        </Modal>
+      )}
       {fieldContext && (
-        <Modal open title={`${fieldContext.name} AI Context`} footer={null} onCancel={() => setFieldContext(null)}>
+        <Modal
+          open
+          title={`${fieldContext.name} AI Context`}
+          footer={null}
+          style={{ top: 24 }}
+          styles={{ body: { maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' } }}
+          onCancel={() => setFieldContext(null)}
+        >
           <SemanticModelAIContext
             context={fieldContext.aiContext}
             inline
@@ -750,6 +807,6 @@ export default function SemanticModelDetailsPage() {
           onSaved={onSaved}
         />
       )}
-    </>
+    </div>
   )
 }

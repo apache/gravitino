@@ -110,6 +110,10 @@ const CatalogsListPage = () => {
       semanticModel: searchParams.get('semanticModel'),
       version: searchParams.get('version')
     }
+    let canceled = false
+    let detailRequest
+    let tagRequest
+    dispatch(setSelectedNodes(routeParams.catalog ? [buildNodePath(routeParams)] : []))
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {
         const {
@@ -355,13 +359,17 @@ const CatalogsListPage = () => {
             await dispatch(setActivatedDetailsLoading(false))
           }
           if (semanticModel) {
+            if (canceled) return
             store.semanticModels.length === 0 &&
               (await dispatch(fetchSemanticModels({ init: true, metalake, catalog, schema })))
-            await dispatch(resetActivatedDetails())
-            await dispatch(setActivatedDetailsLoading(true))
-            await dispatch(getSemanticModelDetails({ init: true, metalake, catalog, schema, semanticModel }))
-            await dispatch(setActivatedDetailsLoading(false))
-            dispatch(
+            if (canceled) return
+            dispatch(resetActivatedDetails())
+            dispatch(setActivatedDetailsLoading(true))
+            detailRequest = dispatch(getSemanticModelDetails({ init: true, metalake, catalog, schema, semanticModel }))
+            await detailRequest
+            if (canceled) return
+            dispatch(setActivatedDetailsLoading(false))
+            tagRequest = dispatch(
               getCurrentEntityTags({
                 init: true,
                 metalake,
@@ -386,7 +394,11 @@ const CatalogsListPage = () => {
     }
     fetchDependsData()
 
-    dispatch(setSelectedNodes(routeParams.catalog ? [buildNodePath(routeParams)] : []))
+    return () => {
+      canceled = true
+      detailRequest?.abort()
+      tagRequest?.abort()
+    }
   }, [searchParams, dispatch])
 
   return (

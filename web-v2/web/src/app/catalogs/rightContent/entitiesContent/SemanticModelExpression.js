@@ -24,25 +24,49 @@ export default function SemanticModelExpression({ expression, name }) {
   const { token } = theme.useToken()
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState(0)
+  const [all, setAll] = useState(false)
   const dialects = expression?.dialects || []
   if (!dialects.length) return <span>-</span>
-  const visible = selected === 'all' ? dialects : [dialects[selected] || dialects[0]]
+  const current = dialects[selected] ? selected : 0
+  const visible = all ? dialects : [dialects[current]]
 
   return (
     <div className='min-w-0'>
-      <Tag>{dialects[0].dialect}</Tag>
+      {dialects.length > 1 ? (
+        <Select
+          aria-label={`Preview dialect for ${name}`}
+          size='small'
+          className='mb-1 min-w-28'
+          value={current}
+          onChange={setSelected}
+          options={dialects.map((dialect, index) => ({ value: index, label: dialect.dialect }))}
+        />
+      ) : (
+        <Tag>{dialects[0].dialect}</Tag>
+      )}
       <pre className='m-0 max-h-8 overflow-hidden whitespace-pre-wrap break-words font-mono text-xs [overflow-wrap:anywhere]'>
-        {dialects[0].expression}
+        {dialects[current].expression}
       </pre>
-      <Button size='small' type='link' aria-label={`View expression for ${name}`} onClick={() => setOpen(true)}>
+      <Button
+        size='small'
+        type='link'
+        aria-label={`View expression for ${name}`}
+        onClick={() => {
+          setAll(false)
+          setOpen(true)
+        }}
+      >
         View SQL ({dialects.length} {dialects.length === 1 ? 'dialect' : 'dialects'})
       </Button>
       <Modal open={open} title={`${name} SQL expressions`} width={900} footer={null} onCancel={() => setOpen(false)}>
         <Select
           aria-label='SQL dialect'
           className='mb-3 w-full'
-          value={selected}
-          onChange={setSelected}
+          value={all ? 'all' : current}
+          onChange={value => {
+            setAll(value === 'all')
+            if (value !== 'all') setSelected(value)
+          }}
           options={[
             ...dialects.map((dialect, index) => ({ value: index, label: dialect.dialect })),
             { value: 'all', label: 'All dialects' }

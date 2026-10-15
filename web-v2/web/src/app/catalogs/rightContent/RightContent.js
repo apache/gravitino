@@ -110,7 +110,7 @@ const RightContent = () => {
         return <ViewDetailsPage />
       }
       if (semanticModelName) {
-        return <SemanticModelDetailsPage />
+        return <SemanticModelDetailsPage key={searchParams.toString()} />
       }
       switch (catalogType) {
         case 'relational':
@@ -160,9 +160,9 @@ const RightContent = () => {
   }
 
   return (
-    <div className='p-6' ref={ref}>
+    <div className={semanticModelName ? 'flex h-full min-h-0 flex-col overflow-hidden px-6 py-4' : 'p-6'} ref={ref}>
       <Breadcrumb
-        className='mb-4'
+        className={semanticModelName ? 'mb-2 shrink-0' : 'mb-4 shrink-0'}
         separator='>'
         items={[
           {

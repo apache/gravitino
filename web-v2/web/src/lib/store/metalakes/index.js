@@ -2540,6 +2540,8 @@ export const appMetalakesSlice = createSlice({
     semanticModels: [],
     semanticModelRequests: {},
     semanticModelListRequestId: null,
+    semanticModelDetailRequestId: null,
+    entityTagsRequestId: null,
     columns: [],
     filesets: [],
     topics: [],
@@ -2571,6 +2573,11 @@ export const appMetalakesSlice = createSlice({
       state.loadedNodes = action.payload
     },
     setSelectedNodes(state, action) {
+      if (state.selectedNodes.join() !== action.payload.join()) {
+        state.semanticModelDetailRequestId = null
+        state.entityTagsRequestId = null
+        state.currentEntityTags = []
+      }
       state.selectedNodes = action.payload
     },
     setExpanded(state, action) {
@@ -2609,6 +2616,8 @@ export const appMetalakesSlice = createSlice({
       state.semanticModels = []
       state.semanticModelRequests = {}
       state.semanticModelListRequestId = null
+      state.semanticModelDetailRequestId = null
+      state.entityTagsRequestId = null
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2626,6 +2635,7 @@ export const appMetalakesSlice = createSlice({
     },
     resetActivatedDetails(state, action) {
       state.activatedDetails = null
+      state.semanticModelDetailRequestId = null
 
       // Also clear table-related data to avoid stale content when switching details
       state.tableData = []
@@ -2898,6 +2908,8 @@ export const appMetalakesSlice = createSlice({
       state.semanticModels = []
       state.semanticModelRequests = {}
       state.semanticModelListRequestId = null
+      state.semanticModelDetailRequestId = null
+      state.entityTagsRequestId = null
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2975,12 +2987,16 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
+    builder.addCase(getCurrentEntityTags.pending, (state, action) => {
+      if (action.meta.arg.init) state.entityTagsRequestId = action.meta.requestId
+    })
     builder.addCase(getCurrentEntityTags.fulfilled, (state, action) => {
-      if (action.payload.init) {
+      if (action.payload.init && state.entityTagsRequestId === action.meta.requestId) {
         state.currentEntityTags = action.payload.tags
       }
     })
     builder.addCase(getCurrentEntityTags.rejected, (state, action) => {
+      if (action.meta.aborted || (action.meta.arg.init && state.entityTagsRequestId !== action.meta.requestId)) return
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
@@ -3317,12 +3333,20 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
+    builder.addCase(getSemanticModelDetails.pending, (state, action) => {
+      if (action.meta.arg.init) {
+        state.semanticModelDetailRequestId = action.meta.requestId
+        state.activatedDetails = null
+      }
+    })
     builder.addCase(getSemanticModelDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
+      if (action.payload.init && state.semanticModelDetailRequestId === action.meta.requestId) {
         state.activatedDetails = action.payload.semanticModel
       }
     })
     builder.addCase(getSemanticModelDetails.rejected, (state, action) => {
+      if (action.meta.aborted || (action.meta.arg.init && state.semanticModelDetailRequestId !== action.meta.requestId))
+        return
       if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }

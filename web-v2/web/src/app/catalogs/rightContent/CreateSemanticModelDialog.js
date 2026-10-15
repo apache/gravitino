@@ -234,17 +234,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
                 <Form.Item
                   name='name'
                   label='Semantic Model Name'
-                  rules={[
-                    { required: true },
-                    { type: 'string', max: 64 },
-                    { pattern: new RegExp(nameRegex) },
-                    {
-                      validator: (_, value) =>
-                        value?.trim() === 'ossie'
-                          ? Promise.reject(new Error('The name "ossie" is reserved for OSSIE import.'))
-                          : Promise.resolve()
-                    }
-                  ]}
+                  rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
                   messageVariables={{ label: 'semantic model name' }}
                 >
                   <Input data-refer='semantic-model-name-field' placeholder={mismatchName} />
