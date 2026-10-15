@@ -21,12 +21,12 @@
 
 | Version | Author | Date | Status |
 | :---- | :---- | :---- | :---- |
-| 1.21 | Jerry Shao | 2026-10-15 | Draft |
+| 1.23 | Jerry Shao | 2026-10-15 | Draft |
 
 ## Goals
 
 1. **Business grouping**: group assets from any catalog under named domains (e.g. "Finance") for discovery, browsing and agent retrieval. An asset can belong to several domains.
-2. **Membership is tags**: an asset is a member when it carries the domain's backing tag. There is no separate membership store.
+2. **Membership is tags**: an asset is a member when it carries the domain's backing tag, directly or inherited from its catalog or schema. There is no separate membership store.
 3. **Separate privileges**: domain privileges govern the `Domain` object; tag privileges govern membership. Membership grants no access to data.
 4. **One level of subdomains**, each with one parent; a subdomain can be moved.
 5. **Draft and published status**: a `DRAFT` domain is visible only to its owner and managers, the same on REST, MCP and any UI.
@@ -108,18 +108,25 @@ C1–C3 keep the hierarchy one level deep and acyclic, so no cycle detection is 
 
 ### Membership and inheritance
 
-- **Rule**: membership resolves an object's effective tags without filtering them by tag privileges. `MetadataObjectTagOperations#listTagsForMetadataObject` cannot be reused as is: it drops the tags the caller cannot load (`LOAD_TAG_AUTHORIZATION_EXPRESSION`: owner, `VIEW_TAG` or `APPLY_TAG`), so a caller without tag privileges would lose the backing tag before matching. Its inheritance resolution moves into a shared helper that the tag endpoint keeps filtering and domain matching uses unfiltered; domain visibility and object access are applied afterwards. An object's effective tags are its own plus its schema's and catalog's; for the same tag the nearest level wins, and different tags accumulate. An object is a member of domain D when its effective tags include D's backing (tag, value).
+- **Rule**: membership resolves an object's effective tags without filtering them by tag privileges. `MetadataObjectTagOperations#listTagsForMetadataObject` cannot be reused as is: it drops the tags the caller cannot load (`LOAD_TAG_AUTHORIZATION_EXPRESSION`: owner, `VIEW_TAG` or `APPLY_TAG`), so a caller without tag privileges would lose the backing tag before matching. Its inheritance resolution moves into a shared helper that the tag endpoint keeps filtering and domain matching uses unfiltered; domain visibility and object access are applied afterwards. An object's effective tags are its own plus its schema's and catalog's; for the same tag the nearest level wins, and different tags accumulate. A leaf object (see Member types) is a member of domain D when its effective tags include D's backing (tag, value).
 - **Dedicated tags (the default)** accumulate: with schema `Finance` and table `Sales`, the table is in both, and a child cannot leave a domain it inherits, as in Unity Catalog.
 - **Values of one tag** backing different domains override each other: with schema `dept=finance` and table `dept=hr`, the table is only in the `dept=hr` domain, unless it uses `dept=[finance, hr]`. This is the one case where a child can leave an inherited domain, and it follows from the tag owner's choice of binding.
-- **Member types**: catalogs, schemas, tables, views, filesets, topics, models and semantic models (`DomainMember.SUPPORTED_TYPES`). Columns and functions are not members: a column or function carrying a backing tag is not listed. A type that becomes taggable later joins only when it is added to this list. Metrics belong through their semantic model.
-- **Domains of an object**: the object's effective tags mapped to the domains the caller can see. Only the domains the object is a member of are returned; a parent reached only through a subdomain is not, and clients show it from `parent` (for example `Finance › Trading`). An object that is a member of both Finance and Trading gets both. For an inherited membership, `inheritedFrom` names the catalog or schema it comes from; it is absent for direct membership. The source is known while resolving inheritance, at no extra cost.
+- **Member types**: leaf objects only: tables, views, filesets, topics, models and semantic models (`DomainMember.SUPPORTED_TYPES`). Catalogs and schemas are never members: one that carries a backing tag passes membership to the leaf objects under it through tag inheritance, as in Unity Catalog, where tagging a catalog or schema makes the assets inside it appear in the domain. Columns and functions are not members either: a column or function carrying a backing tag is not listed. A type that becomes taggable later joins only when it is added to this list. Metrics belong through their semantic model.
+- **Domains of an object**: the object's effective tags mapped to the domains the caller can see. Only the domains the object is a member of are returned; a parent reached only through a subdomain is not, and clients show it from `parent` (for example `Finance › Trading`). An object that is a member of both Finance and Trading gets both. On a catalog or schema, which is never a member, it returns the domains whose backing tag the catalog's or schema's own effective tags match: this marks it as carrying the domain for the objects under it, not as a member. For an inherited membership, `inheritedFrom` names the catalog or schema it comes from; it is absent for direct membership. The source is known while resolving inheritance, at no extra cost.
 - **Domain filters**, for APIs that filter objects by domain, match scope, consistent with member listing: a filter on Finance accepts members of Finance and of its visible subdomains; a filter on a subdomain accepts only its own members. Each candidate object is checked with the rule above instead of listing all members first.
 
 ### Member listing
 
-`GET /domains/{domain}/objects` resolves the backing tags of the selected domains (by default the domain and its visible subdomains), lists the objects carrying them (`listMetadataObjectsForTag`, by tag and value), and unions the results. It keeps only the member types above, drops objects the caller cannot access (`filterMetadataObject`), de-duplicates, and records the subdomain each member comes from (see `DomainMemberDTO`). It needs no tag privilege.
+`GET /domains/{domain}/objects` lists leaf objects, expanding catalogs and schemas:
 
-Only directly tagged objects are listed; a catalog or schema stands for the children that inherit its tag. Whether to expand them, and what member counts mean, is open (see Open questions).
+1. Resolve the backing tags of the domains in the selected scopes (by default the listed domain's whole scope: itself and its visible subdomains).
+2. List the objects carrying them (`listMetadataObjectsForTag`, by tag and value). Leaf objects are candidates as they are; a tagged catalog or schema is replaced by the leaf objects under it, from Gravitino's store.
+3. Keep the candidates whose effective tags match a selected backing tag (the matching rules above, nearest level wins), so a leaf object that overrides an inherited value drops out.
+4. Drop objects the caller cannot access (`filterMetadataObject`), de-duplicate, and record the subdomain each member comes from (see `DomainMemberDTO`). No tag privilege is needed.
+
+- **Store only**: expansion uses the objects recorded in Gravitino's store. Objects in an external catalog that Gravitino has not recorded yet are not listed.
+- **Cost**: a domain backed by a tag on a large catalog lists every recorded leaf object under it. Paging is a follow-up, not part of Phase 1 (see REST API).
+- **Counts**: a domain's asset count is the number of expanded leaf members, consistent with the listing.
 
 ### Access control
 
@@ -194,10 +201,10 @@ DomainMemberDTO { object: MetadataObjectDTO, subdomain? }
 - **State changes return the domain**: publish, unpublish, attach, move, detach and backing-tag changes return the updated domain, because the Java API returns a new `Domain` snapshot from them.
 - **Concurrency**: changes apply to the current state on the server and the last write wins, as for other Gravitino metadata operations; there is no version check. Detach removes the current parent edge and removing the backing tag removes the current one, whatever the caller's snapshot shows; detaching a top-level domain is a no-op, not an error. Domains are addressed by name, so if a domain is renamed and a new one takes its old name, later calls with that name act on the new domain.
 - **Member listing parameters**:
-  - `domains` (repeatable, `?domains=Finance&domains=Tax`; not comma-separated, since domain names may contain `,`): the domains members come from, the listed domain itself and/or its subdomains. Not set means the domain and all its visible subdomains. On Finance with subdomains Tax and Trading, `domains=Finance` lists Finance's own members, `domains=Finance&domains=Tax` adds Tax's, and `domains=Tax` lists only Tax's. Names that are neither the domain nor a subdomain visible to the caller are ignored; if all given names are ignored, the result is empty rather than everything, so a typo cannot widen it.
-  - `types` (comma-separated, each a supported member type) and `nameContains` (case-insensitive, on the full name).
-  - No paging, like the other core list APIs. Filters see only the listed members, so they reach a catalog's tables only if catalogs are expanded.
-- **`DomainMemberDTO.subdomain`**: an object that carries the listed domain's backing tag itself has no `subdomain`, even if it also carries a selected subdomain's backing tag; otherwise it carries one of the selected subdomains whose backing tag it carries. For example, with schema `cat.db` tagged `Finance` and table `cat.db.trades` tagged `Finance/Trading`, listing Finance returns the schema with no `subdomain` and the table with `subdomain` Trading.
+  - `domains` (repeatable, `?domains=Tax&domains=Trading`; not comma-separated, since domain names may contain `,`): each name, the listed domain itself or one of its visible subdomains, selects that domain's scope, and the result is the union. On Finance with subdomains Tax and Trading, not setting it or `domains=Finance` lists the whole scope (Finance, Tax and Trading), `domains=Tax` lists only Tax's members, and `domains=Tax&domains=Trading` lists Tax's and Trading's. This is the same scope that domain filters use. Names that are neither the domain nor a subdomain visible to the caller are ignored; if all given names are ignored, the result is empty rather than everything, so a typo cannot widen it.
+  - `types` (comma-separated, each a leaf member type) and `nameContains` (case-insensitive, on the full name). Filters apply to the expanded leaf list, so `types=TABLE` finds the tables under a tagged catalog.
+  - No paging, like the other core list APIs; paging for large domains is a follow-up.
+- **`DomainMemberDTO.subdomain`**: an object whose effective tags match the listed domain's backing tag has no `subdomain`, even if they also match a selected subdomain's backing tag; otherwise it carries one of the selected subdomains whose backing tag they match. For example, with schema `cat.db` tagged `Finance` and table `cat.db.trades` tagged `Finance/Trading`, listing Finance returns the table with no `subdomain` (it is a member of Finance through inheritance, and of Trading); the schema is not listed. With the whole scope selected (the default), a member without `subdomain` is a member of the listed domain itself; to list only the domain's own members, select those.
 - **Errors**: 404 `NoSuchDomainException` (missing, or a `DRAFT` domain the caller cannot see); 404 `NoSuchTagException` (an explicit backing tag that does not exist); 409 `DomainAlreadyExistsException` (create, or rename to an existing name); 409 `NonEmptyDomainException` (drop with subdomains); 400 `IllegalArgumentException` (C1–C6, status consistency, invalid tag value, a default tag name that already backs another domain, a `DOMAIN` target on the generic tag association API); 403 `ForbiddenException` (a default tag name the caller may not adopt, or binding a tag the caller does not own).
 - **Encoding**: tag and domain names may contain `/`, which must be URL-encoded (`%2F`) in every path segment: `{tag}`, and `{domain}` in `/domains/{domain}`, `/objects/domain/{domain}/...` and `/owners/domain/{domain}`. The Java, Python and MCP clients already encode path segments, and Gravitino's Jetty 9.4 / Jersey stack decodes them into the path parameters.
 - **Reused**: owners at `/owners/domain/{domain}`; privileges through the role and permission APIs, with `DOMAIN` as a securable type; policies through the policy-tag association APIs.
@@ -215,7 +222,7 @@ A new read-only `domain` tool category in `mcp-server/`, added to `SUPPORTED_TOO
 | :---- | :---- |
 | `list_domains` | `GET /domains?details=true`; returns name, comment, parent, status and backing tag, so an agent can pick a domain |
 | `get_domain_by_name` | `GET /domains/{domain}` |
-| `list_metadata_by_domain` | `GET /domains/{domain}/objects`, with `domains` (a list), `types`, `name_contains`; lets an agent look within a domain by type and name |
+| `list_metadata_by_domain` | `GET /domains/{domain}/objects`, with `domains` (a list of scopes to include, the domain itself or its subdomains; default the whole scope), `types`, `name_contains`; lets an agent look within a domain by type and name |
 | `list_domains_for_metadata` | `GET /objects/{type}/{fullName}/domains` |
 
 Adding members uses the existing `associate_tag_with_metadata` tool, which today sends the v1 name-only request; it is extended to accept (name, value) pairs and send the v2 request, so value-backed domains work. The MCP server forwards the caller's `Authorization` header, so the server's visibility rules apply; with OAuth client-credentials, the agent sees what that service identity sees.
@@ -227,9 +234,8 @@ Adding members uses the existing `associate_tag_with_metadata` tool, which today
 
 ## Open Questions
 
-1. **Catalog or schema members**: list them as one member (cheap; counts are direct members only), expand them from Gravitino's store (slow for large catalogs; misses tables not yet recorded), or keep the list and count asynchronously (approximate, delayed)? Clients that show asset counts need expanded counts.
-2. **Policy inheritance to subdomains**: should a parent's policies also apply to its subdomains' assets? Options: no (proposed), inheritance in policy evaluation, or copying policies to subdomain tags.
-3. **Data-access grants on domains**, if wanted later: deny-only grants (tagging can only tighten access), or allow grants that also require grant authority on the asset when tagging. Either works only where Gravitino enforces authorization itself and adds a membership lookup to every check.
+1. **Policy inheritance to subdomains**: should a parent's policies also apply to its subdomains' assets? Options: no (proposed), inheritance in policy evaluation, or copying policies to subdomain tags.
+2. **Data-access grants on domains**, if wanted later: deny-only grants (tagging can only tighten access), or allow grants that also require grant authority on the asset when tagging. Either works only where Gravitino enforces authorization itself and adds a membership lookup to every check.
 
 ## Task Breakdown
 
@@ -242,7 +248,7 @@ Adding members uses the existing `associate_tag_with_metadata` tool, which today
 - [ ] `Domain` API in `api/`; `MetadataObject.Type.DOMAIN`, registered as taggable in `TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS`
 - [ ] Storage and manager in `core/`: `Domain` and `DomainRel` tables (H2, MySQL, PostgreSQL, upgrade scripts), constraints C1–C6, row locking, status and its consistency checks, status-based visibility on every path
 - [ ] Default backing tag: create it with the domain (checking `CREATE_TAG`), bind an existing one only for its owner; `PUT /domains/{domain}/backingTag`; reject `DOMAIN` targets on the generic tag association API; include domains, filtered by visibility, in tag object listings
-- [ ] Membership: shared effective-tag resolution without tag-privilege filtering; member listing with filters and subdomain roll-up; domains of an object with `inheritedFrom`
+- [ ] Membership: shared effective-tag resolution without tag-privilege filtering; member listing that expands catalogs and schemas to leaf objects from the store, with filters and subdomain roll-up; domains of an object with `inheritedFrom`
 - [ ] Authorization: `MANAGE_DOMAIN` and `USE_DOMAIN` with parent-to-subdomain inheritance; the `DOMAIN` branch of `CAN_ACCESS_METADATA`; imperative checks for a parent or backing tag in a request body
 - [ ] REST endpoints in `server/` as in REST API, including `PUT` / `DELETE /domains/{domain}/parent`, `PUT /domains/{domain}/backingTag` and the repeatable `domains` parameter
 - [ ] Java and Python clients
