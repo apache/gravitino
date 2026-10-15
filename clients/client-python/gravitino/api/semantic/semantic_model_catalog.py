@@ -21,7 +21,10 @@ from typing import Optional
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
-from gravitino.exceptions.base import NoSuchSemanticModelException
+from gravitino.exceptions.base import (
+    NoSuchSemanticModelException,
+    UnsupportedOperationException,
+)
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 
@@ -112,6 +115,58 @@ class SemanticModelCatalog(ABC):
             IllegalSemanticModelException:
                 If the definition is invalid.
         """
+
+    def import_ossie_document(
+        self, namespace: Namespace, document: str, document_format: str = "yaml"
+    ) -> SemanticModel:
+        """Import standalone Apache Ossie document text as a new Semantic Model.
+
+        The name comes from the document. Import never replaces an existing model.
+        The server parses the declared format without falling back to another
+        parser, and applies the same validation as :meth:`create_semantic_model`.
+        A root ``GRAVITINO_PROPERTIES`` custom extension supplies model properties;
+        other custom extensions and additional AI-context properties are preserved.
+
+        Args:
+            namespace (Namespace): The destination schema namespace.
+            document (str): Raw document text, not a path or a JSON-encoded string.
+            document_format (str): ``"yaml"`` (default) or ``"json"``.
+
+        Returns:
+            SemanticModel: The created model, including its definition and audit info.
+
+        Raises:
+            IllegalArgumentException: If the text is blank or the format is unsupported.
+            IllegalSemanticModelException: If the document or definition is invalid.
+            NoSuchSchemaException: If the destination schema does not exist.
+            SemanticModelAlreadyExistsException: If the model already exists.
+            UnsupportedOperationException: If this catalog does not support import.
+        """
+        raise UnsupportedOperationException("Ossie import is not supported")
+
+    def export_ossie_document(
+        self, identifier: NameIdentifier, document_format: str = "yaml"
+    ) -> str:
+        """Export a Semantic Model as standalone Apache Ossie document text.
+
+        The ``ossie-version`` property supplies the document version. Other model
+        properties are encoded in a root ``GRAVITINO_PROPERTIES`` custom extension.
+        The SDK returns the server's text without parsing or reformatting it.
+
+        Args:
+            identifier (NameIdentifier): The Semantic Model identifier.
+            document_format (str): ``"yaml"`` (default) or ``"json"``.
+
+        Returns:
+            str: The serialized document in the requested format.
+
+        Raises:
+            IllegalArgumentException: If the format is unsupported.
+            NoSuchSemanticModelException: If the model does not exist.
+            IllegalSemanticModelException: If the model cannot be exported.
+            UnsupportedOperationException: If this catalog does not support export.
+        """
+        raise UnsupportedOperationException("Ossie export is not supported")
 
     @abstractmethod
     def alter_semantic_model(

@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.maintenance.storage.service;
 
+import java.util.Optional;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -32,16 +34,25 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableSnapshotMetricsMetaService metricsService = TableSnapshotMetricsMetaService.getInstance();
 
     long before = System.currentTimeMillis();
-    long actionId = actionService.insertInFlight(10L, 20L);
+    OccupancyClaim claim =
+        actionService.insertInFlight(
+            10L, 20L, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
     long after = System.currentTimeMillis();
-    Assertions.assertNull(actionService.getById(actionId).jobId());
-    Assertions.assertTrue(actionService.getById(actionId).createdAt() >= before);
-    Assertions.assertTrue(actionService.getById(actionId).createdAt() <= after);
+    Assertions.assertNull(actionService.getById(claim.id()).jobId());
+    Assertions.assertEquals(0L, actionService.getById(claim.id()).finishedAt());
+    // DB clock may skew slightly from the JVM; allow a small window.
+    Assertions.assertTrue(claim.createdAt() >= before - 5_000L);
+    Assertions.assertTrue(claim.createdAt() <= after + 5_000L);
+    Assertions.assertEquals(claim.createdAt(), actionService.getById(claim.id()).createdAt());
 
     long jobId = 999L;
-    actionService.bindJobId(actionId, jobId);
+    actionService.bindJobId(claim, jobId);
     Assertions.assertEquals(jobId, actionService.getByJobId(jobId).jobId());
+    Assertions.assertEquals(0L, actionService.getByJobId(jobId).finishedAt());
 
+    actionService.recordBeforeSnapshot(jobId, 100L);
+    Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
+    // Same S0 is idempotent (in-job / cron retry after a partial sample).
     actionService.recordBeforeSnapshot(jobId, 100L);
     Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
     Assertions.assertThrows(
@@ -61,5 +72,31 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
         "{\"mse\":1}", metricsService.getMetrics(10L, 20L, 100L).metricsValue());
     Assertions.assertEquals(
         "{\"mse\":2}", metricsService.getMetrics(10L, 20L, 200L).metricsValue());
+  }
+
+  @TestTemplate
+  void testTryAcquireRejectsLiveUnboundAndReclaimsExpired() throws Exception {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    long tableId = 11L;
+    long policyId = 21L;
+    long timeoutMs = 200L;
+
+    Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(first.isPresent());
+    Assertions.assertEquals(0L, actions.getById(first.get().id()).finishedAt());
+    Assertions.assertTrue(actions.tryAcquireInFlight(tableId, policyId, timeoutMs).isEmpty());
+
+    Thread.sleep(timeoutMs + 50L);
+
+    Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(reclaimed.isPresent());
+    Assertions.assertEquals(first.get().id(), reclaimed.get().id());
+    Assertions.assertTrue(reclaimed.get().createdAt() >= first.get().createdAt());
+    Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
+
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> actions.bindJobId(first.get(), 1001L));
+    actions.bindJobId(reclaimed.get(), 1002L);
+    Assertions.assertEquals(1002L, actions.getById(reclaimed.get().id()).jobId());
   }
 }

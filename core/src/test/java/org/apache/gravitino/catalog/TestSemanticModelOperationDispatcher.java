@@ -37,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -44,6 +45,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
@@ -347,16 +349,34 @@ public class TestSemanticModelOperationDispatcher {
     assertEquals(format, document.format());
     assertThrows(
         SemanticModelAlreadyExistsException.class,
-        () -> dispatcher.importOssieDocument(NAMESPACE, document));
+        () -> dispatcher.importOssieDocument(NAMESPACE, document, definitionToValidate -> {}));
     assertSame(original, dispatcher.loadSemanticModel(MODEL_IDENT));
 
     assertTrue(dispatcher.dropSemanticModel(MODEL_IDENT));
-    SemanticModel imported = dispatcher.importOssieDocument(NAMESPACE, document);
+    SemanticModel imported =
+        dispatcher.importOssieDocument(NAMESPACE, document, definitionToValidate -> {});
     assertEquals(original.name(), imported.name());
     assertEquals(original.comment(), imported.comment());
     assertEquals(original.definition(), imported.definition());
     assertEquals(original.properties(), imported.properties());
     assertSame(imported, dispatcher.loadSemanticModel(MODEL_IDENT));
+  }
+
+  @Test
+  public void testParsedImportCreatesModelFromNativeValues() {
+    SemanticModelDefinition definition = validDefinition();
+    SemanticModel imported =
+        dispatcher.importSemanticModel(MODEL_IDENT, "Sales", definition, Map.of("domain", "sales"));
+
+    assertEquals(MODEL_IDENT.name(), imported.name());
+    assertEquals("Sales", imported.comment());
+    assertEquals(definition, imported.definition());
+    assertEquals("sales", imported.properties().get("domain"));
+    assertEquals(DEFAULT_VERSION, imported.properties().get(PROPERTY_OSSIE_VERSION));
+    assertSame(imported, dispatcher.loadSemanticModel(MODEL_IDENT));
+    assertThrows(
+        SemanticModelAlreadyExistsException.class,
+        () -> dispatcher.importSemanticModel(MODEL_IDENT, null, definition, Map.of()));
   }
 
   @Test
@@ -379,8 +399,42 @@ public class TestSemanticModelOperationDispatcher {
 
     assertThrows(
         IllegalSemanticModelException.class,
-        () -> dispatcher.importOssieDocument(NAMESPACE, invalid));
+        () -> dispatcher.importOssieDocument(NAMESPACE, invalid, definition -> {}));
     assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+  }
+
+  @Test
+  public void testImportSourceValidationRunsBeforePersistence() {
+    AtomicInteger validations = new AtomicInteger();
+    SemanticModel imported =
+        dispatcher.importOssieDocument(
+            NAMESPACE,
+            ossieDocument(),
+            definition -> {
+              assertEquals("orders", definition.datasets()[0].name());
+              assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+              validations.incrementAndGet();
+            });
+    assertEquals(1, validations.get());
+    assertSame(imported, dispatcher.loadSemanticModel(MODEL_IDENT));
+  }
+
+  @Test
+  public void testImportSourceValidationFailureDoesNotPersist() {
+    ForbiddenException denied = new ForbiddenException("source denied");
+    assertSame(
+        denied,
+        assertThrows(
+            ForbiddenException.class,
+            () ->
+                dispatcher.importOssieDocument(
+                    NAMESPACE,
+                    ossieDocument(),
+                    definition -> {
+                      throw denied;
+                    })));
+    assertFalse(dispatcher.semanticModelExists(MODEL_IDENT));
+    verify(schemaDispatcher, never()).loadSchema(SCHEMA_IDENT);
   }
 
   @Test
@@ -389,7 +443,7 @@ public class TestSemanticModelOperationDispatcher {
         IllegalSemanticModelException.class,
         () ->
             dispatcher.importOssieDocument(
-                NAMESPACE, OssieDocument.json(ossieDocument().content())));
+                NAMESPACE, OssieDocument.json(ossieDocument().content()), definition -> {}));
     verify(catalogManager, never()).loadCatalog(METADATA_CATALOG_IDENT);
   }
 
@@ -402,7 +456,7 @@ public class TestSemanticModelOperationDispatcher {
         .thenThrow(new NoSuchSchemaException("Schema does not exist"));
     assertThrows(
         NoSuchSchemaException.class,
-        () -> dispatcher.importOssieDocument(NAMESPACE, ossieDocument()));
+        () -> dispatcher.importOssieDocument(NAMESPACE, ossieDocument(), definition -> {}));
   }
 
   private static OssieDocument ossieDocument() {
