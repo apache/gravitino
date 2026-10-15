@@ -100,10 +100,19 @@ const buildSignature = (name, definition) => {
   )
 }
 
+// Only SQL implementations with the TRINO runtime are exposed as Trino language functions
+const isTrinoVisible = impl => impl?.language === 'SQL' && impl?.runtime === 'TRINO'
+
 const buildImplDetails = impl => {
   const details = [
     { label: 'Language', value: impl?.language || '-' },
-    { label: 'Runtime', value: impl?.runtime || '-' }
+    { label: 'Runtime', value: impl?.runtime || '-' },
+    {
+      label: 'Trino Connector',
+      value: isTrinoVisible(impl)
+        ? 'Eligible (language SQL, runtime TRINO)'
+        : 'Not exposed (requires language SQL and runtime TRINO)'
+    }
   ]
 
   if (impl?.sql) {

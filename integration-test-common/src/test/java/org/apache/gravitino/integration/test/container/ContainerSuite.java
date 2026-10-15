@@ -27,13 +27,17 @@ import com.github.dockerjava.api.model.Network.Ipam.Config;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -65,6 +69,7 @@ public class ContainerSuite implements Closeable {
   private static final String NETWORK_NAME = "gravitino-ci-network";
   private static final int CLICKHOUSE_CLUSTER_SIZE = 3;
   private static final String CLICKHOUSE_CLUSTER_HOST_PREFIX = "gravitino-ci-clickhouse-cluster-";
+  private static final String CLICKHOUSE_TEST_IMAGE_ENV = "GRAVITINO_CLICKHOUSE_TEST_IMAGE";
 
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
@@ -93,7 +98,7 @@ public class ContainerSuite implements Closeable {
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
-  private static volatile MinIOContainer minIOContainer;
+  private static volatile RustFSContainer rustFSContainer;
 
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
@@ -290,6 +295,27 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  /**
+   * Files copied into the Gravitino plugin directory of the Trino container: the connector lib
+   * directory, plus every jar in the directory named by {@code
+   * GRAVITINO_TRINO_CONNECTOR_EXTRA_LIBS}, which lets a build add plugin jars that are not part of
+   * the connector itself.
+   */
+  private static Map<String, String> trinoPluginFilesToMount(String trinoConnectorLibDir) {
+    ImmutableMap.Builder<String, String> files = ImmutableMap.builder();
+    files.put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir);
+    String extraLibDir = System.getenv("GRAVITINO_TRINO_CONNECTOR_EXTRA_LIBS");
+    if (extraLibDir != null && !extraLibDir.isEmpty()) {
+      File[] jars = new File(extraLibDir).listFiles((dir, name) -> name.endsWith(".jar"));
+      for (File jar : jars == null ? new File[0] : jars) {
+        files.put(
+            TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR + "/" + jar.getName(),
+            jar.getAbsolutePath());
+      }
+    }
+    return files.build();
+  }
+
   public void startTrinoContainer(
       String trinoConfDir,
       String trinoConnectorLibDir,
@@ -317,12 +343,7 @@ public class ContainerSuite implements Closeable {
                           .put("host.docker.internal", "host-gateway")
                           .put(HiveContainer.HOST_NAME, hiveContainerIp)
                           .build())
-                  .withFilesToMount(
-                      ImmutableMap.<String, String>builder()
-                          .put(
-                              TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR,
-                              trinoConnectorLibDir)
-                          .build())
+                  .withFilesToMount(trinoPluginFilesToMount(trinoConnectorLibDir))
                   .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
                   .withTrinoConfDir(trinoConfDir)
                   .withMetalakeName(metalakeName)
@@ -568,6 +589,8 @@ public class ContainerSuite implements Closeable {
           // Start ClickHouse container
           ClickHouseContainer.Builder clickHouseBuilder =
               ClickHouseContainer.builder()
+                  .withImage(resolveClickHouseImage())
+                  .withFilesToMount(resolveClickHouseTestFiles())
                   .withHostName("gravitino-ci-clickhouse")
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
@@ -600,6 +623,8 @@ public class ContainerSuite implements Closeable {
           for (int node = 1; node <= CLICKHOUSE_CLUSTER_SIZE; node++) {
             ClickHouseContainer.Builder clickHouseBuilder =
                 ClickHouseContainer.builder()
+                    .withImage(resolveClickHouseImage())
+                    .withFilesToMount(resolveClickHouseTestFiles())
                     .withHostName(CLICKHOUSE_CLUSTER_HOST_PREFIX + node)
                     .withEnvVars(
                         ImmutableMap.<String, String>builder()
@@ -698,27 +723,33 @@ public class ContainerSuite implements Closeable {
     return gravitinoLocalStackContainer;
   }
 
-  public void startMinIOContainer() {
+  /** Starts the shared RustFS object store for S3 credential-vending tests. */
+  public void startRustFSContainer() {
     ITUtils.cleanDisk();
-    if (minIOContainer == null) {
+    if (rustFSContainer == null) {
       synchronized (ContainerSuite.class) {
-        if (minIOContainer == null) {
-          MinIOContainer.Builder builder = MinIOContainer.builder().withNetwork(network);
-          MinIOContainer container = closer.register(builder.build());
+        if (rustFSContainer == null) {
+          RustFSContainer.Builder builder = RustFSContainer.builder().withNetwork(network);
+          RustFSContainer container = closer.register(builder.build());
           try {
             container.start();
           } catch (Exception e) {
-            LOG.error("Failed to start MinIO container", e);
-            throw new RuntimeException("Failed to start MinIO container", e);
+            LOG.error("Failed to start RustFS container", e);
+            throw new RuntimeException("Failed to start RustFS container", e);
           }
-          minIOContainer = container;
+          rustFSContainer = container;
         }
       }
     }
   }
 
-  public MinIOContainer getMinIOContainer() {
-    return minIOContainer;
+  /**
+   * Returns the shared RustFS fixture after {@link #startRustFSContainer()}.
+   *
+   * @return the RustFS fixture
+   */
+  public RustFSContainer getRustFSContainer() {
+    return rustFSContainer;
   }
 
   public HiveContainer getHiveContainerWithS3() {
@@ -957,6 +988,33 @@ public class ContainerSuite implements Closeable {
       pgContainerMap.clear();
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);
+    }
+  }
+
+  private static String resolveClickHouseImage() {
+    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
+    return configuredImage == null || configuredImage.isBlank()
+        ? ClickHouseContainer.DEFAULT_IMAGE
+        : configuredImage.trim();
+  }
+
+  private static Map<String, String> resolveClickHouseTestFiles() {
+    // The feature-specific ClickHouse test image is 25.8+, where Time types require this setting.
+    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
+    if (configuredImage == null || configuredImage.isBlank()) {
+      return ImmutableMap.of();
+    }
+
+    try (InputStream settings =
+        Objects.requireNonNull(
+            ContainerSuite.class.getResourceAsStream("/clickhouse-test-users.xml"))) {
+      Path settingsPath = Files.createTempFile("gravitino-clickhouse-test-users-", ".xml");
+      Files.copy(settings, settingsPath, StandardCopyOption.REPLACE_EXISTING);
+      settingsPath.toFile().deleteOnExit();
+      return ImmutableMap.of(
+          "/etc/clickhouse-server/users.d/gravitino-test-settings.xml", settingsPath.toString());
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to resolve ClickHouse test user settings", e);
     }
   }
 }

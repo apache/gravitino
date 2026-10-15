@@ -1,0 +1,78 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational.service;
+
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+/** Tests job identifier validation that does not require a JDBC backend. */
+public class TestJobMetaServiceValidation {
+
+  private static final String METALAKE_NAME = "metalake_test_job_meta_service";
+
+  @Test
+  void testUpdateJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .updateJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid"), e -> e));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .updateJob(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX), e -> e));
+  }
+
+  @Test
+  void testGetJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  }
+
+  @Test
+  void testDeleteJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  }
+}

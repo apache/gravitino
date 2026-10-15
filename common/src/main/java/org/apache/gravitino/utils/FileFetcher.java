@@ -156,9 +156,10 @@ public final class FileFetcher {
     }
 
     Path destPath = destFile.toPath().toAbsolutePath().normalize();
-    // Skip if the symlink already points to the correct target.
-    if (Files.isSymbolicLink(destPath)
-        && Files.readSymbolicLink(destPath).normalize().equals(srcPath)) {
+    // Skip if the destination already is the source file: a symlink to it, or the file itself when
+    // a file already fetched into the directory is fetched again. Replacing the file itself would
+    // turn it into a symlink to itself.
+    if (Files.exists(destPath) && Files.isSameFile(srcPath, destPath)) {
       return;
     }
     // Replace via a temporary symlink + rename to minimize the window where the destination path
@@ -202,7 +203,9 @@ public final class FileFetcher {
       Class<?> pathClass = Class.forName("org.apache.hadoop.fs.Path");
 
       Object fileSystem =
-          fileSystemClass.getMethod("get", configurationClass).invoke(null, configuration);
+          fileSystemClass
+              .getMethod("get", URI.class, configurationClass)
+              .invoke(null, uri, configuration);
       Object srcPath = pathClass.getConstructor(URI.class).newInstance(uri);
       Object destPath = pathClass.getConstructor(URI.class).newInstance(destFile.toURI());
       fileSystemClass

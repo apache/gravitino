@@ -69,6 +69,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -451,6 +453,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    // Check the comment before the storage locations are created, the entity validation only
+    // happens after that.
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.FILESET);
+
     storageLocations.forEach(
         (name, path) -> {
           if (StringUtils.isBlank(name)) {
@@ -612,7 +619,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      store.put(filesetEntity, true /* overwrite */);
+      // The existence check is advisory; the strict insert decides concurrent creates.
+      store.put(filesetEntity, false /* overwrite */);
+    } catch (EntityAlreadyExistsException exception) {
+      throw new FilesetAlreadyExistsException(exception, "Fileset %s already exists", ident);
     } catch (NoSuchEntityException exception) {
       // The schema can disappear after the check near the start of this method. The relational
       // store detects that race while taking the parent-schema lock; translate its storage-level
@@ -811,6 +821,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // Check the comment before the schema directories are created, the entity validation only
+    // happens after that.
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.SCHEMA);
+
     if (disableFSOps) {
       return super.createSchema(ident, comment, properties);
     }
@@ -1781,11 +1796,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private String getFileLocation(Fileset fileset, String subPath, String locationName) {
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
-    String processedSubPath;
-    if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
-      processedSubPath = SLASH + subPath.trim();
-    } else {
-      processedSubPath = subPath.trim();
+    String processedSubPath = subPath.trim();
+    // Validate before constructing a Hadoop Path, which normalizes away parent directory segments.
+    Preconditions.checkArgument(
+        subPath.indexOf('\0') < 0, "subPath must not contain null characters");
+    for (String segment : processedSubPath.split(SLASH)) {
+      Preconditions.checkArgument(
+          !"..".equals(segment), "subPath must not contain parent directory segments");
+    }
+    if (!processedSubPath.isEmpty() && !processedSubPath.startsWith(SLASH)) {
+      processedSubPath = SLASH + processedSubPath;
     }
 
     String targetLocationName;
@@ -1804,6 +1824,20 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           "Location name %s does not exist in fileset %s", targetLocationName, fileset.name());
     }
 
+    String storageLocation = fileset.storageLocations().get(targetLocationName);
+    String fileLocation =
+        processedSubPath.isEmpty()
+            ? storageLocation
+            : removeTrailingSlash(storageLocation) + processedSubPath;
+
+    // Compare normalized Path ancestors, including scheme and authority, rather than string
+    // prefixes. Keep the original spelling in the response for existing clients.
+    Path storagePath = normalizeLocationPath(storageLocation);
+    Path filePath = normalizeLocationPath(fileLocation);
+    Preconditions.checkArgument(
+        isWithinStorageLocation(storagePath, filePath),
+        "subPath must stay within the fileset storage location");
+
     // do checks for some data operations.
     if (hasCallerContext()) {
       Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
@@ -1819,10 +1853,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
         switch (dataOperation) {
           case RENAME:
-            // if the sub path is blank, it cannot be renamed otherwise the metadata in the
-            // Gravitino server may be inconsistent.
-            if (StringUtils.isBlank(processedSubPath)
-                || (processedSubPath.startsWith(SLASH) && processedSubPath.length() == 1)) {
+            // Include aliases such as /./ so the fileset root cannot be renamed independently of
+            // its metadata.
+            if (filePath.equals(storagePath)) {
               throw new GravitinoRuntimeException(
                   "subPath cannot be blank when need to rename a file or a directory.");
             }
@@ -1833,18 +1866,24 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
     }
 
-    String fileLocation;
-    // If the processed sub path is blank, we pass the storage location directly
-    if (StringUtils.isBlank(processedSubPath)) {
-      fileLocation = fileset.storageLocations().get(targetLocationName);
-    } else {
-      // the processed sub path always starts with "/" if it is not blank,
-      // so we can safely remove the tailing slash if the storage location ends with "/".
-      String storageLocation =
-          removeTrailingSlash(fileset.storageLocations().get(targetLocationName));
-      fileLocation = String.format("%s%s", storageLocation, processedSubPath);
-    }
     return fileLocation;
+  }
+
+  private Path normalizeLocationPath(String location) {
+    // Represent authority-only locations (for example s3a://bucket) as filesystem roots. Hadoop
+    // removes trailing slashes before normalizing dot segments, so parse again to remove a trailing
+    // slash introduced by normalization of an alias such as /directory/./.
+    Path path = new Path(ensureTrailingSlash(location));
+    return new Path(path.toString());
+  }
+
+  private static boolean isWithinStorageLocation(Path storagePath, Path filePath) {
+    for (Path current = filePath; current != null; current = current.getParent()) {
+      if (storagePath.equals(current)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @VisibleForTesting

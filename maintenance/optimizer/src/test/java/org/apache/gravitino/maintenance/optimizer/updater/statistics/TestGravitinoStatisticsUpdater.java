@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
@@ -32,6 +33,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtil
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.gravitino.stats.SupportsStatistics;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -122,6 +124,30 @@ class TestGravitinoStatisticsUpdater {
         PartitionUtils.encodePartitionPath(partitionPath), updates.get(0).partitionName());
     Assertions.assertEquals(2L, updates.get(0).statistics().get("s1").value());
     Assertions.assertEquals(3L, updates.get(0).statistics().get("s2").value());
+  }
+
+  @Test
+  void testTableStatisticConflictPropagatesWithoutRetry() {
+    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
+    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
+    updater.setGravitinoClientForTest(client);
+    SupportsStatistics statistics =
+        client
+            .loadCatalog("catalog")
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of("db", "table"))
+            .supportsStatistics();
+    OptimisticLockException conflict = new OptimisticLockException("concurrent statistic update");
+    Mockito.doThrow(conflict).when(statistics).updateStatistics(Mockito.anyMap());
+
+    Assertions.assertSame(
+        conflict,
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                updater.updateTableStatistics(
+                    NameIdentifier.of("catalog", "db", "table"), List.of(stat("row_count", 10L)))));
+    Mockito.verify(statistics).updateStatistics(Mockito.anyMap());
   }
 
   private StatisticEntry<?> stat(String name, long value) {

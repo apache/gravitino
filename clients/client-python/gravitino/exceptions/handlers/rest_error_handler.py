@@ -34,4 +34,33 @@ class RestErrorHandler(ErrorHandler):
         )
 
 
+class CodeMappingErrorHandler(RestErrorHandler):
+    """Base error handler that maps error codes to exceptions.
+
+    Subclasses declare a class-level ``_code_exception_map`` that maps an error
+    code to either an exception class or a dict of exception-type names to
+    exception classes for codes that need to disambiguate by the response
+    ``type`` field. Codes not present in the map are delegated to
+    ``RestErrorHandler.handle``.
+    """
+
+    _code_exception_map = {}
+
+    def handle(self, error_response: ErrorResponse):
+        error_message = error_response.format_error_message()
+        code = error_response.code()
+        exception_type = error_response.type()
+
+        mapping = self._code_exception_map.get(code)
+        if mapping is not None:
+            if isinstance(mapping, dict):
+                exception_class = mapping.get(exception_type)
+                if exception_class is not None:
+                    raise exception_class(error_message)
+            else:
+                raise mapping(error_message)
+
+        super().handle(error_response)
+
+
 REST_ERROR_HANDLER = RestErrorHandler()

@@ -94,8 +94,11 @@ Individual partitions are not listed, and adding or dropping one goes through th
 
 The display comes from the table itself, so it works for every relational catalog including Iceberg.
 An Iceberg table partitioned by `day(event_time)` shows that transform like any other table, because
-the partition spec is read back and presented in the same form. A count of zero means the table
-declares no partitioning rather than that partitions could not be read.
+the partition spec is read back and presented in the same form. A count of zero usually means the
+table declares no partitioning rather than that partitions could not be read. One exception is
+ClickHouse: a table whose `PARTITION BY` uses a native expression that Gravitino cannot structure
+shows zero partition fields, with the canonical expression preserved in the read-only `partition-key`
+property instead.
 
 ## Permissions
 

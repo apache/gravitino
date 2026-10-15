@@ -66,8 +66,9 @@ public class TestObjectPolicyResolver {
 
   @Test
   public void testResolveByPresenceAndValueSelector() throws Exception {
-    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
-    TagEntity classified = tag(2L, "classified", TagAssignment.noValue());
+    TagEntity domain =
+        tag(1L, "domain", TagAssignment.ofValues("finance")).copyWithInherited(false);
+    TagEntity classified = tag(2L, "classified", TagAssignment.noValue()).copyWithInherited(true);
     PolicyEntity selected = policy(10L, "selected", true);
     PolicyEntity disabled = policy(11L, "disabled", false);
     when(effectiveTagResolver.resolve(METALAKE, OBJECT))
@@ -87,11 +88,12 @@ public class TestObjectPolicyResolver {
     PolicyEntity[] policies = resolver.resolve(METALAKE, OBJECT);
 
     Assertions.assertArrayEquals(new PolicyEntity[] {selected}, policies);
+    Assertions.assertFalse(policies[0].inherited().orElseThrow());
   }
 
   @Test
   public void testResolveMissingSelectorAsAllValues() throws Exception {
-    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance")).copyWithInherited(true);
     PolicyEntity policy = policy(10L, "policy", true);
     when(effectiveTagResolver.resolve(METALAKE, OBJECT)).thenReturn(new TagEntity[] {domain});
     when(relationOperations.batchListEntitiesByRelation(
@@ -107,7 +109,9 @@ public class TestObjectPolicyResolver {
                     policy,
                     null)));
 
-    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
+    PolicyEntity[] policies = resolver.resolve(METALAKE, OBJECT);
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, policies);
+    Assertions.assertTrue(policies[0].inherited().orElseThrow());
   }
 
   @Test
@@ -126,7 +130,7 @@ public class TestObjectPolicyResolver {
   }
 
   @Test
-  public void testRejectMixedSelectorResults() throws Exception {
+  public void testSelectPolicyWhenAnySelectorMatches() throws Exception {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
     TagEntity classified = tag(2L, "classified", TagAssignment.ofValues("public"));
     PolicyEntity policy = policy(10L, "policy", true);
@@ -143,10 +147,7 @@ public class TestObjectPolicyResolver {
                 relation(domain, policy, TagValueSelector.of("finance")),
                 relation(classified, policy, TagValueSelector.of("pii"))));
 
-    IllegalStateException exception =
-        Assertions.assertThrows(
-            IllegalStateException.class, () -> resolver.resolve(METALAKE, OBJECT));
-    Assertions.assertTrue(exception.getMessage().contains("conflicting selector results"));
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
   }
 
   private static RelationalEntity<PolicyEntity> relation(

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
@@ -73,5 +74,15 @@ public class TestRESTService {
     } finally {
       server.stop();
     }
+  }
+
+  /** The documented Iceberg REST key reaches the value the service passes to its error builder. */
+  @Test
+  public void testIncludeErrorStackTraceReadFromServiceConfig() {
+    assertTrue(JettyServerConfig.fromConfig(new IcebergConfig()).isIncludeErrorStackTrace());
+    assertFalse(
+        JettyServerConfig.fromConfig(
+                new IcebergConfig(Collections.singletonMap("includeErrorStackTrace", "false")))
+            .isIncludeErrorStackTrace());
   }
 }

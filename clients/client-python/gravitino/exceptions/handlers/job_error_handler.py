@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -16,48 +16,36 @@
 # under the License.
 
 from gravitino.constants.error import ErrorConstants
-from gravitino.dto.responses.error_response import ErrorResponse
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
-    NoSuchMetalakeException,
-    JobTemplateAlreadyExistsException,
     IllegalJobTemplateOperationException,
-    NoSuchJobTemplateException,
-    NoSuchJobException,
     InUseException,
+    JobTemplateAlreadyExistsException,
     MetalakeNotInUseException,
+    NoSuchJobException,
+    NoSuchJobTemplateException,
+    NoSuchMetalakeException,
 )
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class JobErrorHandler(RestErrorHandler):
-    def handle(self, error_response: ErrorResponse):
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-        exception_type = error_response.type()
-
-        if code == ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-            if exception_type == IllegalJobTemplateOperationException.__name__:
-                raise IllegalJobTemplateOperationException(error_message)
-
-        if code == ErrorConstants.NOT_FOUND_CODE:
-            if exception_type == NoSuchMetalakeException.__name__:
-                raise NoSuchMetalakeException(error_message)
-            if exception_type == NoSuchJobTemplateException.__name__:
-                raise NoSuchJobTemplateException(error_message)
-            if exception_type == NoSuchJobException.__name__:
-                raise NoSuchJobException(error_message)
-
-        if code == ErrorConstants.ALREADY_EXISTS_CODE:
-            raise JobTemplateAlreadyExistsException(error_message)
-
-        if code == ErrorConstants.IN_USE_CODE:
-            raise InUseException(error_message)
-
-        if code == ErrorConstants.NOT_IN_USE_CODE:
-            if exception_type == MetalakeNotInUseException.__name__:
-                raise MetalakeNotInUseException(error_message)
-
-        super().handle(error_response)
+class JobErrorHandler(CodeMappingErrorHandler):
+    _code_exception_map = {
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: {
+            IllegalJobTemplateOperationException.__name__: (
+                IllegalJobTemplateOperationException
+            )
+        },
+        ErrorConstants.NOT_FOUND_CODE: {
+            NoSuchMetalakeException.__name__: NoSuchMetalakeException,
+            NoSuchJobTemplateException.__name__: NoSuchJobTemplateException,
+            NoSuchJobException.__name__: NoSuchJobException,
+        },
+        ErrorConstants.ALREADY_EXISTS_CODE: JobTemplateAlreadyExistsException,
+        ErrorConstants.IN_USE_CODE: InUseException,
+        ErrorConstants.NOT_IN_USE_CODE: {
+            MetalakeNotInUseException.__name__: MetalakeNotInUseException
+        },
+    }
 
 
 JOB_ERROR_HANDLER = JobErrorHandler()

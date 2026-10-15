@@ -32,10 +32,9 @@ public class ConnectorUtil {
 
   public static String removeDuplicateSparkExtensions(
       String[] extensions, String[] addedExtensions) {
-    Set<String> uniqueElements = new LinkedHashSet<>(Arrays.asList(extensions));
-    if (addedExtensions != null && StringUtils.isNoneBlank(addedExtensions)) {
-      uniqueElements.addAll(Arrays.asList(addedExtensions));
-    }
+    Set<String> uniqueElements = new LinkedHashSet<>();
+    addSparkExtensions(uniqueElements, extensions);
+    addSparkExtensions(uniqueElements, addedExtensions);
     return uniqueElements.stream()
         .reduce((element1, element2) -> element1 + ConnectorConstants.COMMA + element2)
         .orElse("");
@@ -48,5 +47,16 @@ public class ConnectorUtil {
     }
     seq.foreach(javaList::add);
     return javaList;
+  }
+
+  private static void addSparkExtensions(Set<String> uniqueElements, String[] extensions) {
+    if (extensions == null) {
+      return;
+    }
+
+    Arrays.stream(extensions)
+        .filter(StringUtils::isNotBlank)
+        .map(String::trim)
+        .forEach(uniqueElements::add);
   }
 }

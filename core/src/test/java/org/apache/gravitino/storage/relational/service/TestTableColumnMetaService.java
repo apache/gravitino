@@ -24,6 +24,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +41,16 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestTableColumnMetaService extends TestJDBCBackend {
 
+  private static final int WIDE_TABLE_COLUMN_COUNT = 5000;
   private static final String METALAKE_NAME = "metalake_for_table_column_test";
 
   @TestTemplate
@@ -147,6 +152,428 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertEquals(createdTable3.auditInfo(), retrievedTable3.auditInfo());
     Assertions.assertEquals(createdTable3.columns().size(), retrievedTable3.columns().size());
     compareTwoColumns(createdTable3.columns(), retrievedTable3.columns());
+  }
+
+  @TestTemplate
+  public void testInsertWideTableColumnsInBatches() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    List<ColumnEntity> columns = new ArrayList<>(WIDE_TABLE_COLUMN_COUNT);
+    for (int i = 0; i < WIDE_TABLE_COLUMN_COUNT; i++) {
+      columns.add(
+          ColumnEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("column_" + i)
+              .withPosition(i)
+              .withDataType(Types.IntegerType.get())
+              .withNullable(true)
+              .withAutoIncrement(false)
+              .withAuditInfo(AUDIT_INFO)
+              .build());
+    }
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("wide_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(columns)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+    compareTwoColumns(createdTable.columns(), retrievedTable.columns());
+  }
+
+  @TestTemplate
+  public void testDropColumnsRemovesTheirRelationsInBatches() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    // More dropped columns than one cleanup batch holds.
+    int columnCount = 1502;
+    List<ColumnEntity> columns = new ArrayList<>(columnCount);
+    for (int i = 0; i < columnCount; i++) {
+      columns.add(
+          ColumnEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("column_" + i)
+              .withPosition(i)
+              .withDataType(Types.IntegerType.get())
+              .withNullable(true)
+              .withAutoIncrement(false)
+              .withAuditInfo(AUDIT_INFO)
+              .build());
+    }
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_drop_columns")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(columns)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    long firstDropped = columns.get(0).id();
+    long lastDropped = columns.get(columnCount - 2).id();
+    long kept = columns.get(columnCount - 1).id();
+    for (long columnId : new long[] {firstDropped, lastDropped, kept}) {
+      insertColumnRelations(columnId);
+    }
+
+    TableEntity updated =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(columns.get(columnCount - 1)))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance()
+        .updateTable(table.nameIdentifier(), (TableEntity old) -> updated);
+
+    Assertions.assertEquals(0, countActiveColumnRelations(firstDropped));
+    Assertions.assertEquals(0, countActiveColumnRelations(lastDropped));
+    Assertions.assertEquals(2, countActiveColumnRelations(kept));
+  }
+
+  @TestTemplate
+  public void testMoveTableWithColumnChangeMovesAllColumns() throws Exception {
+    String catalogName = "catalog1";
+    String oldSchemaName = "schema1";
+    String newSchemaName = "schema2";
+    createParentEntities(METALAKE_NAME, catalogName, oldSchemaName, AUDIT_INFO);
+    createAndInsertSchema(METALAKE_NAME, catalogName, newSchemaName);
+
+    ColumnEntity unchanged = newIntColumn("unchanged", 0, "comment");
+    ColumnEntity changed = newIntColumn("changed", 1, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_move")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, oldSchemaName))
+            .withColumns(Lists.newArrayList(unchanged, changed))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // Move the table to the other schema and change one column in the same update.
+    ColumnEntity changedColumn = newIntColumn("changed", 1, "new comment", changed.id());
+    TableEntity moved =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, newSchemaName))
+            .withColumns(Lists.newArrayList(unchanged, changedColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().updateTable(table.nameIdentifier(), (TableEntity old) -> moved);
+
+    // Dropping the old schema must not take any of the moved table's columns with it.
+    Assertions.assertTrue(
+        SchemaMetaService.getInstance()
+            .deleteSchema(NameIdentifier.of(METALAKE_NAME, catalogName, oldSchemaName), true));
+
+    TableEntity retrieved =
+        TableMetaService.getInstance().getTableByIdentifier(moved.nameIdentifier());
+    compareTwoColumns(moved.columns(), retrieved.columns());
+  }
+
+  @TestTemplate
+  public void testOverwriteSameTableKeepsColumnIds() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity kept = newIntColumn("kept", 0, "comment");
+    ColumnEntity dropped = newIntColumn("dropped", 1, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_before_rename")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(kept, dropped))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    insertColumnRelations(kept.id());
+    insertColumnRelations(dropped.id());
+
+    // Re-import the same table under a new name, e.g. after an out-of-band rename. The importer
+    // gives every column a fresh id and doesn't know the stored ones.
+    ColumnEntity reimportedKept = newIntColumn("kept", 0, "comment");
+    ColumnEntity added = newIntColumn("added", 1, "comment");
+    TableEntity reimported =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName("table_after_rename")
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(reimportedKept, added))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(reimported, true);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
+    Map<String, Long> columnIds =
+        TableMetaService.getInstance()
+            .getTableByIdentifier(reimported.nameIdentifier())
+            .columns()
+            .stream()
+            .collect(Collectors.toMap(ColumnEntity::name, ColumnEntity::id));
+    Assertions.assertEquals(2, columnIds.size());
+    Assertions.assertEquals(kept.id(), columnIds.get("kept"));
+    Assertions.assertEquals(added.id(), columnIds.get("added"));
+    Assertions.assertEquals(2, countActiveColumnRelations(kept.id()));
+    // The column that is gone from the table loses its relations with it.
+    Assertions.assertEquals(0, countActiveColumnRelations(dropped.id()));
+
+    // Overwriting again works too: the rows written by the first overwrite are retired first.
+    TableMetaService.getInstance().insertTable(reimported, true);
+    TableEntity retrieved =
+        TableMetaService.getInstance().getTableByIdentifier(reimported.nameIdentifier());
+    Assertions.assertEquals(
+        kept.id(),
+        retrieved.columns().stream().filter(c -> c.name().equals("kept")).findFirst().get().id());
+    Assertions.assertEquals(2, retrieved.columns().size());
+  }
+
+  @TestTemplate
+  public void testOverwriteNeverGivesOneStoredIdToTwoColumns() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity original = newIntColumn("b", 0, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_carried_id")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(original))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    insertColumnRelations(original.id());
+
+    // The stored column already travels under a new name, and a new column takes its old name. The
+    // stored id stays with the column that carries it.
+    ColumnEntity renamed = newIntColumn("c", 0, "comment", original.id());
+    ColumnEntity newColumn = newIntColumn("b", 1, "comment");
+    TableEntity overwritten =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(renamed, newColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(overwritten, true);
+
+    compareTwoColumns(
+        overwritten.columns(),
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()).columns());
+    Assertions.assertEquals(2, countActiveColumnRelations(original.id()));
+  }
+
+  @TestTemplate
+  public void testOverwriteReusesNewestIdOfDuplicateLegacyColumns() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity older = newIntColumn("a", 0, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_duplicate_names")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(older))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    ColumnEntity newer = newIntColumn("b", 1, "comment");
+    TableEntity withNewer =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(older, newer))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance()
+        .updateTable(table.nameIdentifier(), (TableEntity old) -> withNewer);
+    insertColumnRelations(older.id());
+    insertColumnRelations(newer.id());
+
+    // Legacy data: two live columns share one name. The newer one was written at a later version.
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "UPDATE "
+              + TableColumnMapper.COLUMN_TABLE_NAME
+              + " SET column_name = 'a' WHERE column_id = "
+              + newer.id());
+    }
+
+    ColumnEntity reimported = newIntColumn("a", 0, "comment");
+    TableEntity overwritten =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(reimported))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(overwritten, true);
+
+    List<ColumnEntity> columns =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()).columns();
+    Assertions.assertEquals(1, columns.size());
+    Assertions.assertEquals(newer.id(), columns.get(0).id());
+    Assertions.assertEquals(2, countActiveColumnRelations(newer.id()));
+    Assertions.assertEquals(0, countActiveColumnRelations(older.id()));
+  }
+
+  @TestTemplate
+  public void testOverwriteWithoutColumnsRemovesAllColumnRelations() throws Exception {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity column = newIntColumn("column", 0, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_without_columns")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    insertColumnRelations(column.id());
+
+    TableEntity overwritten =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(overwritten, true);
+
+    Assertions.assertTrue(
+        TableMetaService.getInstance()
+            .getTableByIdentifier(table.nameIdentifier())
+            .columns()
+            .isEmpty());
+    Assertions.assertEquals(0, countActiveColumnRelations(column.id()));
+  }
+
+  @TestTemplate
+  public void testOverwriteOfAnotherTableDoesNotInheritColumnIds() throws Exception {
+    // Only MySQL/H2 can resolve the upsert to another table's row through the natural key.
+    // PostgreSQL's upsert targets table_id and rejects the insert instead.
+    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity storedColumn = newIntColumn("column", 0, "comment");
+    TableEntity stale =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_same_name")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(storedColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(stale, false);
+
+    ColumnEntity newColumn = newIntColumn("column", 0, "comment");
+    TableEntity other =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(stale.name())
+            .withNamespace(stale.namespace())
+            .withColumns(Lists.newArrayList(newColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(other, true);
+
+    TableEntity stored =
+        TableMetaService.getInstance().getTableByIdentifier(other.nameIdentifier());
+    Assertions.assertEquals(1, stored.columns().size());
+    Assertions.assertEquals(newColumn.id(), stored.columns().get(0).id());
+  }
+
+  private ColumnEntity newIntColumn(String name, int position, String comment) {
+    return newIntColumn(name, position, comment, RandomIdGenerator.INSTANCE.nextId());
+  }
+
+  private ColumnEntity newIntColumn(String name, int position, String comment, long id) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withPosition(position)
+        .withComment(comment)
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private void insertColumnRelations(long columnId) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "INSERT INTO owner_meta (metalake_id, metadata_object_id, metadata_object_type,"
+              + " owner_id, owner_type, audit_info, current_version, last_version, deleted_at,"
+              + " updated_at) VALUES (1, "
+              + columnId
+              + ", 'COLUMN', 1, 'USER', '{}', 0, 0, 0, 0)");
+      statement.executeUpdate(
+          "INSERT INTO tag_relation_meta (tag_id, metadata_object_id, metadata_object_type,"
+              + " audit_info, current_version, last_version, deleted_at) VALUES (1, "
+              + columnId
+              + ", 'COLUMN', '{}', 0, 0, 0)");
+    }
+  }
+
+  private int countActiveColumnRelations(long columnId) throws SQLException {
+    int count = 0;
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String table : new String[] {"owner_meta", "tag_relation_meta"}) {
+        try (ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM "
+                    + table
+                    + " WHERE metadata_object_type = 'COLUMN' AND deleted_at = 0"
+                    + " AND metadata_object_id = "
+                    + columnId)) {
+          Assertions.assertTrue(resultSet.next());
+          count += resultSet.getInt(1);
+        }
+      }
+    }
+    return count;
   }
 
   @TestTemplate
@@ -499,6 +926,12 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         TableColumnMetaService.getInstance()
             .getColumnIdByTableIdAndName(retrievedTable.id(), updatedColumn.name());
     Assertions.assertEquals(updatedColumn.id(), updatedColumnId);
+    // The column keeps its id on rename, so its old name must no longer resolve to it.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableColumnMetaService.getInstance()
+                .getColumnIdByTableIdAndName(retrievedTable.id(), column.name()));
 
     ColumnPO updatedColumnPO =
         TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id());
@@ -527,6 +960,16 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id()));
+    // Neither name of the dropped column resolves, and it has no full name any more.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableColumnMetaService.getInstance()
+                .getColumnIdByTableIdAndName(retrievedTable.id(), column.name()));
+    Map<Long, String> fullNames =
+        MetadataObjectService.getColumnObjectsFullName(Lists.newArrayList(updatedColumn.id()));
+    Assertions.assertTrue(fullNames.containsKey(updatedColumn.id()));
+    Assertions.assertNull(fullNames.get(updatedColumn.id()));
   }
 
   @TestTemplate

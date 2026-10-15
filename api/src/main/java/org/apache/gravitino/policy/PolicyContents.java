@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
@@ -54,6 +55,8 @@ public class PolicyContents {
         IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
         IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS);
   }
 
@@ -73,6 +76,8 @@ public class PolicyContents {
         IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
         IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
         rewriteOptions);
   }
 
@@ -94,13 +99,123 @@ public class PolicyContents {
       long deleteFileNumberWeight,
       long maxPartitionNum,
       Map<String, String> rewriteOptions) {
+    return icebergDataCompaction(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+        rewriteOptions);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content with rewrite strategy and sort order.
+   *
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
+   * @param maxPartitionNum maximum partition number selected for compaction
+   * @param rewriteStrategy Iceberg rewrite_data_files top-level strategy ({@code binpack} or {@code
+   *     sort})
+   * @param sortOrder Iceberg rewrite_data_files top-level sort_order (required when strategy is
+   *     {@code sort})
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergDataCompaction(
+      long minDataFileMse,
+      long minDeleteFileNumber,
+      long dataFileMseWeight,
+      long deleteFileNumberWeight,
+      long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions) {
     return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
         dataFileMseWeight,
         deleteFileNumberWeight,
         maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
         rewriteOptions);
+  }
+
+  /**
+   * @return orphan cleanup policy content with the default retention and execution mode
+   */
+  public static PolicyContent icebergOrphanFileRemoval() {
+    return icebergOrphanFileRemoval(
+        IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
+        null,
+        IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN);
+  }
+
+  /**
+   * Creates orphan cleanup policy content.
+   *
+   * @param olderThanDays minimum file age in days, from 1 to 36500 inclusive
+   * @param location optional scan location within the table
+   * @param dryRun whether to list candidates without deleting them
+   * @return orphan cleanup policy content
+   */
+  public static PolicyContent icebergOrphanFileRemoval(
+      long olderThanDays, @Nullable String location, boolean dryRun) {
+    return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
+  }
+
+  /**
+   * Creates placeholder Iceberg rewrite-manifests policy content.
+   *
+   * @return rewrite-manifests policy content
+   */
+  public static PolicyContent icebergRewriteManifests() {
+    return new IcebergRewriteManifestsContent();
+  }
+
+  /**
+   * Creates placeholder Iceberg snapshot-expiration policy content.
+   *
+   * @return snapshot-expiration policy content
+   */
+  public static PolicyContent icebergSnapshotExpiration() {
+    return new IcebergSnapshotExpirationContent();
+  }
+
+  /**
+   * Creates a row-filter policy for tagged tables.
+   *
+   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
+   * filter :=}. The server performs grammar and semantic validation when the policy is created or
+   * updated.
+   *
+   * @param expression complete row-filter program
+   * @return structurally validated read-restriction policy content
+   * @throws IllegalArgumentException if the expression is blank or exceeds {@link
+   *     ReadRestrictionContent#MAX_SOURCE_LENGTH_BYTES}
+   */
+  public static RowFilterContent rowFilter(String expression) {
+    return new RowFilterContent(expression);
+  }
+
+  /**
+   * Creates a column-mask policy for tagged tables or columns.
+   *
+   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
+   * mask := action(...)}. The server performs grammar and semantic validation when the policy is
+   * created or updated.
+   *
+   * @param expression complete column-mask program
+   * @return structurally validated read-restriction policy content
+   * @throws IllegalArgumentException if the expression is blank or exceeds {@link
+   *     ReadRestrictionContent#MAX_SOURCE_LENGTH_BYTES}
+   */
+  public static ColumnMaskContent columnMask(String expression) {
+    return new ColumnMaskContent(expression);
   }
 
   private PolicyContents() {}

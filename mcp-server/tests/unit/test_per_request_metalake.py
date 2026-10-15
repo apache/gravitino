@@ -708,7 +708,7 @@ class TestDeprecatedMetalakeNameAlias(unittest.TestCase):
         return asyncio.run(_run())
 
     def _base(self):
-        return {"metadata_type": "table", "metadata_fullname": "c.s.t"}
+        return {"metadata_type": "table", "metadata_full_name": "c.s.t"}
 
     def test_legacy_argument_still_selects_the_metalake(self):
         self._call({**self._base(), "metalake_name": "legacy_ml"})

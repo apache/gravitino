@@ -23,9 +23,14 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Implementation of an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(HiveCatalog.class);
 
   static final HiveCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
       new HiveCatalogPropertiesMetadata();
@@ -54,13 +59,13 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    HiveCatalogOperations ops = new HiveCatalogOperations();
-    return ops;
+    return new HiveCatalogOperations();
   }
 
   @Override
   public Capability newCapability() {
-    return new HiveCatalogCapability();
+    ClassLoader catalogClassLoader = Thread.currentThread().getContextClassLoader();
+    return new HiveCatalogCapability(() -> hiveVersion(catalogClassLoader));
   }
 
   @Override
@@ -76,5 +81,33 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return TABLE_PROPERTIES_METADATA;
+  }
+
+  /**
+   * Resolves the Hive Metastore version through the catalog operations. Custom catalog operations
+   * (ops-impl) do not expose the metastore version, so only what every supported Hive version
+   * accepts is allowed.
+   */
+  private HiveVersion hiveVersion() {
+    CatalogOperations ops = ops();
+    if (!(ops instanceof HiveCatalogOperations)) {
+      LOG.warn(
+          "Catalog operations {} do not expose a Hive Metastore version; using the conservative "
+              + "{} capability fallback",
+          ops.getClass(),
+          HiveVersion.HIVE2);
+      return HiveVersion.HIVE2;
+    }
+    return ((HiveCatalogOperations) ops).hiveVersion();
+  }
+
+  private HiveVersion hiveVersion(ClassLoader catalogClassLoader) {
+    ClassLoader original = Thread.currentThread().getContextClassLoader();
+    Thread.currentThread().setContextClassLoader(catalogClassLoader);
+    try {
+      return hiveVersion();
+    } finally {
+      Thread.currentThread().setContextClassLoader(original);
+    }
   }
 }

@@ -50,12 +50,14 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -67,6 +69,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
@@ -123,6 +126,98 @@ public class TestLanceTableOperations {
                 null,
                 new SortOrder[0],
                 new Index[0]));
+  }
+
+  /** Verifies EXIST_OK does not return a non-Lance entity as a Lance table. */
+  @Test
+  public void testExistOkRejectsNonLanceTable() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("delta-exist-ok").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, location));
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            LANCE_CREATION_MODE,
+            "EXIST_OK",
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies both overwrite paths reject a non-Lance entity before mutation. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testOverwriteRejectsNonLanceTableBeforeMutation(boolean register) throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location =
+        tempDir.resolve(register ? "delta-register-overwrite" : "delta-overwrite").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, location));
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(LANCE_CREATION_MODE, "OVERWRITE");
+    if (register) {
+      properties.put(LANCE_TABLE_REGISTER, "true");
+    }
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies the purge guard preserves the original IllegalArgumentException. */
+  @Test
+  public void testPurgeTablePropagatesNonLanceGuard() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, tempDir.resolve("delta-purge").toString()));
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.purgeTable(ident));
+    verify(store, never()).delete(any(), any());
+  }
+
+  /** Verifies the drop guard preserves the original IllegalArgumentException. */
+  @Test
+  public void testDropTablePropagatesNonLanceGuard() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(nonLanceTableEntity(ident, tempDir.resolve("delta-drop").toString()));
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> lanceTableOps.dropTable(ident));
+    verify(store, never()).delete(any(), any());
   }
 
   @Test
@@ -385,6 +480,78 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testVersionCheckRefreshKeepsExistingColumnIdsAndComments() throws Exception {
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("version-check-keep-ids").toString();
+    AuditInfo columnAudit =
+        AuditInfo.builder().withCreator("column_creator").withCreateTime(Instant.EPOCH).build();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("id")
+                    .withComment("the id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(columnAudit)
+                    .build(),
+                ColumnEntity.builder()
+                    .withId(11L)
+                    .withName("dropped")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(1)
+                    .withAuditInfo(columnAudit)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(idGenerator.nextId()).thenReturn(12L);
+    AtomicReference<TableEntity> updated = new AtomicReference<>();
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              updated.set(updater.apply(tableEntity));
+              return updated.get();
+            });
+
+    // The dataset moved to a new version: "id" is still there, "dropped" is gone and "name" is new.
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("name", new ArrowType.Utf8()),
+                    Field.nullable("id", new ArrowType.Int(32, true)))));
+    when(dataset.version()).thenReturn(9L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loadedTable =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals("9", loadedTable.properties().get(LANCE_TABLE_VERSION));
+    List<ColumnEntity> columns = updated.get().columns();
+    Assertions.assertEquals(2, columns.size());
+
+    ColumnEntity name = columns.get(0);
+    Assertions.assertEquals("name", name.name());
+    Assertions.assertEquals(12L, name.id());
+    Assertions.assertEquals(0, name.position());
+
+    ColumnEntity id = columns.get(1);
+    Assertions.assertEquals("id", id.name());
+    Assertions.assertEquals(10L, id.id());
+    Assertions.assertEquals(1, id.position());
+    Assertions.assertEquals("the id", id.comment());
+    Assertions.assertEquals(columnAudit, id.auditInfo());
+    Assertions.assertEquals("the id", loadedTable.columns()[1].comment());
+  }
+
+  @Test
   public void testVersionCheckSkipsRefreshWhenVersionIsCurrent() throws Exception {
     lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
@@ -635,6 +802,34 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testAddColumnRejectsUnsupportedOptions() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+
+    List<TableChange> unsupportedChanges =
+        List.of(
+            TableChange.addColumn(new String[] {"parent", "nested"}, Types.StringType.get()),
+            TableChange.addColumn(new String[] {"required"}, Types.StringType.get(), false),
+            TableChange.addColumn(
+                new String[] {"first"}, Types.StringType.get(), TableChange.ColumnPosition.first()),
+            TableChange.addColumn(
+                new String[] {"sequence"}, Types.LongType.get(), null, null, true, true),
+            TableChange.addColumn(
+                new String[] {"with_default"},
+                Types.IntegerType.get(),
+                Literals.integerLiteral(1)));
+
+    for (TableChange change : unsupportedChanges) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> lanceTableOps.handleLanceTableChange(table, new TableChange[] {change}));
+    }
+    verify(dataset, never()).addColumns(anyList());
+  }
+
+  @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
@@ -647,6 +842,7 @@ public class TestLanceTableOperations {
 
     TableChange[] changes =
         new TableChange[] {
+          TableChange.addColumn(new String[] {"added"}, Types.StringType.get()),
           TableChange.renameColumn(new String[] {"old"}, "renamed"),
           TableChange.addIndex(Index.IndexType.SCALAR, "idx_renamed", new String[][] {{"renamed"}}),
           TableChange.deleteColumn(new String[] {"renamed"}, false)
@@ -656,6 +852,7 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(7L, returnedVersion);
 
     InOrder inOrder = Mockito.inOrder(dataset);
+    inOrder.verify(dataset).addColumns(List.of(Field.nullable("added", new ArrowType.Utf8())));
     inOrder.verify(dataset).alterColumns(anyList());
     inOrder.verify(dataset).createIndex(any(IndexOptions.class));
     inOrder.verify(dataset).dropColumns(anyList());
@@ -701,6 +898,78 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(9L, returnedVersion);
     Mockito.verify(dataset).dropColumns(anyList());
     Mockito.verify(dataset).getVersion();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"lance.blob, 2.2", "lance.blob.legacy, 2.1"})
+  public void testCreateDatasetWithBlobColumnRoundTrips(String blobType, String fileFormatVersion) {
+    String location = tempDir.resolve("blob-" + fileFormatVersion).toString();
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get()),
+          Column.of("image", Types.ExternalType.of(blobType))
+        };
+
+    try (Dataset dataset = lanceTableOps.createDataset(location, columns, Map.of())) {
+      Assertions.assertEquals(fileFormatVersion, dataset.getLanceFileFormatVersion());
+    }
+    try (Dataset dataset = lanceTableOps.openDataset(location, Map.of())) {
+      Assertions.assertEquals(
+          Types.ExternalType.of(blobType),
+          LanceDataTypeConverter.CONVERTER.toGravitino(dataset.getSchema().findField("image")));
+    }
+  }
+
+  @Test
+  public void testCreateDatasetRejectsMixedBlobColumns() {
+    Column[] columns =
+        new Column[] {
+          Column.of("image", Types.ExternalType.of("lance.blob")),
+          Column.of("legacy_image", Types.ExternalType.of("lance.blob.legacy"))
+        };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.createDataset(
+                tempDir.resolve("mixed-blob").toString(), columns, Map.of()));
+  }
+
+  @Test
+  public void testAddBlobColumnChecksFileFormatVersion() {
+    String location = tempDir.resolve("add-blob").toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      // A dataset without blob columns uses Lance's default file format version.
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.handleLanceTableChange(
+                    table,
+                    new TableChange[] {
+                      TableChange.addColumn(
+                          new String[] {"image"}, Types.ExternalType.of("lance.blob"))
+                    }));
+    Assertions.assertTrue(exception.getMessage().contains("2.2"), exception.getMessage());
+
+    lanceTableOps.handleLanceTableChange(
+        table,
+        new TableChange[] {
+          TableChange.addColumn(
+              new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
+        });
+    try (Dataset dataset = lanceTableOps.openDataset(location, Map.of())) {
+      Assertions.assertEquals(
+          Types.ExternalType.of("lance.blob.legacy"),
+          LanceDataTypeConverter.CONVERTER.toGravitino(
+              dataset.getSchema().findField("legacy_image")));
+    }
   }
 
   @Test
@@ -1114,6 +1383,19 @@ public class TestLanceTableOperations {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
+  }
+
+  private static TableEntity nonLanceTableEntity(NameIdentifier ident, String location) {
+    return tableEntity(
+        ident,
+        List.of(),
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_TABLE_FORMAT,
+            "delta",
+            Table.PROPERTY_EXTERNAL,
+            "true"));
   }
 
   private void stubMutableTable(NameIdentifier ident, AtomicReference<TableEntity> storedTable)

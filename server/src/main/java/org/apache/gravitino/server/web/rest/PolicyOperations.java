@@ -39,7 +39,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
@@ -47,14 +48,17 @@ import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
-import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
+import org.apache.gravitino.dto.tag.TagForPolicyAssociationDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -318,41 +322,55 @@ public class PolicyOperations {
   }
 
   @GET
-  @Path("{policy}/objects")
+  @Path("{policy}/tags")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "list-objects-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-objects-for-policy", absolute = true)
+  @Timed(name = "list-tags-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-tags-for-policy", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
-  public Response listMetadataObjectsForPolicy(
+  public Response listTagsForPolicy(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
-          String policyName) {
-    LOG.info("Received list objects for policy: {} under metalake: {}", policyName, metalake);
-
+          String policyName,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    LOG.info(
+        "Received list tag associations for policy: {} under metalake: {}", policyName, metalake);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject[] objects =
-                policyDispatcher.listMetadataObjectsForPolicy(metalake, policyName);
-            objects = objects == null ? new MetadataObject[0] : objects;
-            objects = MetadataAuthzHelper.filterMetadataObject(metalake, objects);
-            LOG.info(
-                "List {} objects for policy: {} under metalake: {}",
-                objects.length,
-                policyName,
-                metalake);
+            RelationalEntity<?>[] associations =
+                policyDispatcher.listTagAssociationsForPolicy(metalake, policyName);
+            associations =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.TAG,
+                    associations,
+                    association ->
+                        NameIdentifierUtil.ofTag(metalake, association.targetEntity().name()));
+            if (!verbose) {
+              String[] names =
+                  Arrays.stream(associations)
+                      .map(association -> association.targetEntity().name())
+                      .toArray(String[]::new);
+              return Utils.ok(new NameListResponse(names));
+            }
 
-            MetadataObjectDTO[] objectDTOs =
-                Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
-
-            return Utils.ok(new MetadataObjectListResponse(objectDTOs));
+            TagForPolicyAssociationDTO[] associationDTOs =
+                Arrays.stream(associations)
+                    .map(
+                        association ->
+                            new TagForPolicyAssociationDTO(
+                                DTOConverters.toDTO(
+                                    (TagEntity) association.targetEntity(), Optional.empty()),
+                                toSelectorDTO(association)))
+                    .toArray(TagForPolicyAssociationDTO[]::new);
+            return Utils.ok(new TagForPolicyAssociationListResponse(associationDTOs));
           });
-
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", metalake, e);
+      return ExceptionHandlers.handlePolicyException(OperationType.LIST, policyName, metalake, e);
     }
   }
 
@@ -369,6 +387,14 @@ public class PolicyOperations {
             .withAudit(DTOConverters.toDTO(policy.auditInfo()));
 
     return builder.build();
+  }
+
+  static PolicyAssociationSelectorDTO toSelectorDTO(RelationalEntity<?> association) {
+    return PolicyAssociationSelectorDTO.fromSelector(
+        association
+            .relationValue()
+            .map(PolicyAssociationSelectorSerde::deserialize)
+            .orElseGet(AllValuesSelector::get));
   }
 
   private static void validateCreatePolicyType(String policyType) {

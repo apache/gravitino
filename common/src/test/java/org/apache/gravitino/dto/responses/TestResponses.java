@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -232,6 +233,33 @@ public class TestResponses {
   void testIllegalArgumentsErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.illegalArguments("illegal arguments error");
     error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testThrowableErrorResponsesRetainStackTrace() throws IllegalArgumentException {
+    Throwable throwable = new RuntimeException("private error details");
+    String message = "public error message";
+    ErrorResponse[] responses = {
+      ErrorResponse.illegalArguments(message, throwable),
+      ErrorResponse.connectionFailed(message, throwable),
+      ErrorResponse.notFound("error type", message, throwable),
+      ErrorResponse.internalError(message, throwable),
+      ErrorResponse.alreadyExists("error type", message, throwable),
+      ErrorResponse.notInUse("error type", message, throwable),
+      ErrorResponse.inUse("error type", message, throwable),
+      ErrorResponse.nonEmpty("error type", message, throwable),
+      ErrorResponse.unsupportedOperation(message, throwable),
+      ErrorResponse.forbidden(message, throwable),
+      ErrorResponse.unauthorized("error type", message, throwable)
+    };
+
+    for (ErrorResponse response : responses) {
+      response.validate();
+      assertEquals(message, response.getMessage());
+      assertNotNull(response.getStack());
+      assertTrue(
+          response.getStack().stream().anyMatch(line -> line.contains("private error details")));
+    }
   }
 
   @Test

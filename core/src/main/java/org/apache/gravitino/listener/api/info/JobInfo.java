@@ -160,7 +160,11 @@ public final class JobInfo {
   /**
    * Returns the time when the job started execution.
    *
-   * @return the started time of the job, or null if the job has not started execution yet
+   * <p>A finished job may also have no started time, if the job executor doesn't report when the
+   * job started and Gravitino didn't observe the job running.
+   *
+   * @return the started time of the job, or null if the job has not started execution yet, or the
+   *     started time is unknown
    */
   @Nullable
   public Instant startedAt() {
@@ -179,7 +183,7 @@ public final class JobInfo {
 
   /**
    * Returns the resolved job template that was actually submitted for execution, with placeholders
-   * replaced and referenced files downloaded.
+   * replaced. Its executable, scripts, jars, files and archives are the URIs from the template.
    *
    * @return the runtime job template, or null for jobs run before this field was introduced
    */

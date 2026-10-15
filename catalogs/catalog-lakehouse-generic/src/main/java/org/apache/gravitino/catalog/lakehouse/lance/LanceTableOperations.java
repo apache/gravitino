@@ -24,9 +24,11 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +72,7 @@ import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
+import org.lance.WriteDatasetBuilder;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
@@ -172,8 +175,14 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @param catalogProperties the catalog properties
    */
   public void setCatalogProperties(Map<String, String> catalogProperties) {
+    // A copy that tolerates a null value, not ImmutableMap.copyOf, which throws on one. Nothing
+    // upstream rejects a catalog property whose value is null, and the generic catalog hands this
+    // map on unchanged, so copying it strictly here would fail every table operation on such a
+    // catalog rather than the one property that is null.
     this.catalogProperties =
-        catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
+        catalogProperties == null
+            ? Map.of()
+            : Collections.unmodifiableMap(Maps.newHashMap(catalogProperties));
   }
 
   @Override
@@ -213,7 +222,9 @@ public class LanceTableOperations extends ManagedTableOperations {
           !register, "EXIST_OK mode is not supported for register operation");
 
       try {
-        return super.loadTable(ident);
+        Table table = super.loadTable(ident);
+        validateLanceTable(ident, table);
+        return table;
       } catch (NoSuchTableException e) {
         // Table doesn't exist, proceed with creation
       }
@@ -277,6 +288,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Use super.loadTable to avoid triggering an unnecessary schema-refresh (which may open the
       // dataset) for a table that is about to be deleted anyway.
       Table table = super.loadTable(ident);
+      validateLanceTable(ident, table);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -303,6 +315,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
@@ -313,6 +327,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     try {
       // Use super.loadTable to skip schema-refresh overhead when dropping.
       Table table = super.loadTable(ident);
+      validateLanceTable(ident, table);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -337,6 +352,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
     }
@@ -358,6 +375,13 @@ public class LanceTableOperations extends ManagedTableOperations {
       } else {
         throw ExceptionMessages.wrap("Failed to delete Lance dataset at " + location, e);
       }
+    }
+  }
+
+  private static void validateLanceTable(NameIdentifier ident, Table table) {
+    if (!LancePropertiesUtils.isLanceTableFormat(
+        table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
+      throw new IllegalArgumentException("Table is not a Lance table: " + ident);
     }
   }
 
@@ -396,13 +420,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     Map<String, String> storageProps =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
-    try (Dataset ignored =
-        Dataset.write()
-            .schema(convertColumnsToArrowSchema(columns))
-            .uri(location)
-            .mode(WriteParams.WriteMode.CREATE)
-            .storageOptions(storageProps)
-            .execute()) {
+    try (Dataset ignored = createDataset(location, columns, storageProps)) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
       long datasetVersion = ignored.version();
@@ -436,6 +454,23 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
+  }
+
+  /**
+   * Creates an empty Lance dataset for the columns. The Lance file format version is chosen from
+   * the blob columns, because blob v2 and legacy blob each require a different version.
+   */
+  Dataset createDataset(String location, Column[] columns, Map<String, String> storageOptions) {
+    Schema schema = convertColumnsToArrowSchema(columns);
+    WriteDatasetBuilder builder =
+        Dataset.write()
+            .schema(schema)
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .storageOptions(storageOptions);
+    LanceDataTypeConverter.requiredFileFormatVersion(schema.getFields())
+        .ifPresent(builder::dataStorageVersion);
+    return builder.execute();
   }
 
   private Schema convertColumnsToArrowSchema(Column[] columns) {
@@ -707,12 +742,36 @@ public class LanceTableOperations extends ManagedTableOperations {
             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
             .withCreateTime(Instant.now())
             .build();
+    // Tags, owners and privileges are attached to a column by id, so a column that is still in the
+    // dataset keeps its id. It also keeps its comment and audit info, which the dataset doesn't
+    // carry.
+    Map<String, ColumnEntity> existingColumns =
+        tableEntity.columns().stream()
+            .collect(
+                Collectors.toMap(
+                    ColumnEntity::name, Function.identity(), (first, second) -> first));
     List<ColumnEntity> columnEntities =
         IntStream.range(0, columns.length)
             .mapToObj(
-                i ->
-                    ColumnEntity.toColumnEntity(
-                        columns[i], i, idGenerator.nextId(), columnAuditInfo))
+                i -> {
+                  ColumnEntity existing = existingColumns.get(columns[i].name());
+                  if (existing == null) {
+                    return ColumnEntity.toColumnEntity(
+                        columns[i], i, idGenerator.nextId(), columnAuditInfo);
+                  }
+                  return ColumnEntity.builder()
+                      .withId(existing.id())
+                      .withName(columns[i].name())
+                      .withPosition(i)
+                      .withDataType(columns[i].dataType())
+                      .withComment(
+                          columns[i].comment() != null ? columns[i].comment() : existing.comment())
+                      .withNullable(columns[i].nullable())
+                      .withAutoIncrement(columns[i].autoIncrement())
+                      .withDefaultValue(columns[i].defaultValue())
+                      .withAuditInfo((AuditInfo) existing.auditInfo())
+                      .build();
+                })
             .collect(Collectors.toList());
 
     return TableEntity.builder()
@@ -778,7 +837,38 @@ public class LanceTableOperations extends ManagedTableOperations {
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
-        if (change instanceof TableChange.DeleteColumn deleteColumn) {
+        if (change instanceof TableChange.AddColumn addColumn) {
+          String[] fieldName = addColumn.fieldName();
+          Preconditions.checkArgument(
+              fieldName.length == 1,
+              "Lance only supports adding top-level columns: %s",
+              String.join(".", fieldName));
+          String columnName = fieldName[0];
+          Preconditions.checkArgument(
+              addColumn.isNullable(),
+              "Lance only supports adding nullable columns because existing rows are backfilled "
+                  + "with null: %s",
+              columnName);
+          Preconditions.checkArgument(
+              TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+              "Lance only supports appending new columns: %s",
+              columnName);
+          Preconditions.checkArgument(
+              !addColumn.isAutoIncrement(),
+              "Lance does not support adding auto-increment columns: %s",
+              columnName);
+          Preconditions.checkArgument(
+              addColumn.getDefaultValue() == null
+                  || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+              "Lance does not support default values when adding columns: %s",
+              columnName);
+
+          Field field =
+              LanceDataTypeConverter.CONVERTER.toArrowField(
+                  columnName, addColumn.getDataType(), true);
+          LanceDataTypeConverter.checkFileFormatVersion(field, dataset.getLanceFileFormatVersion());
+          dataset.addColumns(List.of(field));
+        } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
         } else if (change instanceof TableChange.AddIndex addIndex) {
           IndexType indexType = IndexType.valueOf(addIndex.getType().name());
@@ -800,7 +890,7 @@ public class LanceTableOperations extends ManagedTableOperations {
                   .build();
           dataset.alterColumns(List.of(lanceColumnAlter));
         } else {
-          // Currently, only column drop/rename and index addition are supported.
+          // Currently, only column add/drop/rename and index addition are supported.
           // TODO: Support change column type once we have a clear knowledge about the means of
           // castTo in Lance.
           throw new UnsupportedOperationException(

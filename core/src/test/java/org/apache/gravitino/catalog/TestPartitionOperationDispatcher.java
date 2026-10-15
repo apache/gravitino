@@ -33,6 +33,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -159,6 +160,50 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(
         partitionOperationDispatcher.partitionExists(TABLE_IDENT, testDrop.name()));
+  }
+
+  @Test
+  public void testPartitionOperationsDoNotWaitForTableTreeLock() throws Exception {
+    Partition partition =
+        Partitions.identity(
+            "p_lock",
+            new String[][] {{"col1"}},
+            new Literal[] {Literals.stringLiteral("v_lock")},
+            Maps.newHashMap());
+
+    // Partition operations never write the entity store, so they must not contend with an
+    // in-flight table operation that holds the table tree lock.
+    try (TreeLockTestSupport.HeldLock tableWrite =
+        TreeLockTestSupport.HeldLock.acquire(TABLE_IDENT, LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite, () -> partitionOperationDispatcher.addPartition(TABLE_IDENT, partition));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () -> partitionOperationDispatcher.getPartition(TABLE_IDENT, partition.name()));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite, () -> partitionOperationDispatcher.listPartitionNames(TABLE_IDENT));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () ->
+              Assertions.assertTrue(
+                  Arrays.stream(partitionOperationDispatcher.listPartitions(TABLE_IDENT))
+                      .anyMatch(p -> p.name().equals(partition.name()))));
+      // The test catalog does not support purge; reaching its exception proves that this entry
+      // point also proceeds while another thread holds the table lock.
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () ->
+              Assertions.assertThrows(
+                  UnsupportedOperationException.class,
+                  () ->
+                      partitionOperationDispatcher.purgePartition(TABLE_IDENT, partition.name())));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () -> partitionOperationDispatcher.dropPartition(TABLE_IDENT, partition.name()));
+    }
+
+    Assertions.assertFalse(
+        partitionOperationDispatcher.partitionExists(TABLE_IDENT, partition.name()));
   }
 
   @Test

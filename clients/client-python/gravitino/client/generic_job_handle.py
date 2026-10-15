@@ -14,6 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from typing import List
+
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.job.job_dto import JobDTO
@@ -48,3 +50,11 @@ class GenericJobHandle(JobHandle):
         if runtime_job_template_dto is None:
             return None
         return DTOConverters.from_job_template_dto(runtime_job_template_dto)
+
+    def stdout(self) -> List[str]:
+        stdout = self._job_dto.stdout()
+        return [] if stdout is None else stdout
+
+    def stderr(self) -> List[str]:
+        stderr = self._job_dto.stderr()
+        return [] if stderr is None else stderr
