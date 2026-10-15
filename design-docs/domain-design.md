@@ -21,7 +21,7 @@
 
 | Version | Author | Date | Status |
 | :---- | :---- | :---- | :---- |
-| 1.19 | Jerry Shao | 2026-10-15 | Draft |
+| 1.20 | Jerry Shao | 2026-10-15 | Draft |
 
 ## Goals
 
@@ -59,6 +59,7 @@ DomainRel { parentId, childId, audit_info }      // one edge per subdomain
 
 - A unique index on `DomainRel (child_id, deleted_at)` keeps one parent per domain. `parent` is not stored on `Domain`; the API derives it. Dropping the index and checks would allow multiple parents later without a schema change.
 - Domains live under a metalake. A subdomain and its parent are in the same metalake.
+- Domain names are unique within a metalake across both levels: top-level domains and subdomains share one namespace, so a domain is addressed by its name alone.
 
 ### Backing tag
 
@@ -68,10 +69,11 @@ Each domain has **at most one** backing tag: a tag, optionally with a value (tag
 - **Name clashes**: default tag names can clash even without `/` in domain names, because tags are never renamed on move or rename. For example, rename subdomain Tax under Finance to VAT (its tag stays `Finance/Tax`), then create a new Tax under Finance: both want `Finance/Tax`. Banning `/` would not prevent this, so domain names may contain `/`, and the adoption rule above resolves clashes.
 - **Explicit**: any existing (tag, value), such as `dept=finance`, bound by that tag's owner (or the metalake owner). A (tag, value) may be bound explicitly to several domains, which then have the same members.
 - **Storage**: the backing tag is the `DOMAIN` object's own row in `tag_relation_meta`; there is no extra field to keep in sync. Reverse lookup uses `idx_tid_value` filtered to `DOMAIN` objects. Domains never inherit tags (`METALAKE` is not taggable).
-- **Changing it**: through the existing tag association API on the domain (`tagsToRemove=[old]`, `tagsToAdd=[new]` in one request; the v2 request when a value is involved, see REST API). For `DOMAIN` targets that API also enforces at most one backing tag, under the domain's row lock. Assets carrying only the old tag drop out; nothing is migrated.
+- **Changing it**: `PUT /domains/{domain}/backingTag` replaces or removes it on the server, under the domain's row lock. A missing tag fails with 404, a value the tag does not allow with 400, and a tag the caller does not own (nor the metalake) with 403; setting the current tag is a no-op. Assets carrying only the old tag drop out; nothing is migrated.
+- **Not through the generic tag association API**: it rejects `DOMAIN` targets, so the endpoint above is the only way to change a backing tag. Through the generic API a missing tag is silently ignored, so replacing the tag with a misspelled one would strip the backing tag and all members without an error; the call returns tag names instead of the domain; and `tagsToRemove` would come from a possibly stale snapshot.
 - **Never renamed**: moving or renaming a domain does not rename its tag; the hierarchy lives in `DomainRel`.
 - **Deleting the tag** is allowed, as for any tag; its domains are left with no backing tag and no members until a new one is set. There is no domain-side audit of this.
-- **`/` in tag names** must be URL-encoded in REST paths (`%2F`). The Java, Python and MCP clients already do this, and Gravitino's Jetty 9.4 / Jersey stack decodes it into the `{tag}` parameter.
+- **Tag object listings**: a backing tag is a tag association of a `DOMAIN` object, so `GET /tags/{tag}/objects` and `Tag#associatedObjects` include the domains the tag backs, filtered by the domain visibility rule (see Status). A tag owner can then see which domains the tag backs.
 
 ### Subdomains
 
@@ -97,7 +99,7 @@ C1–C3 keep the hierarchy one level deep and acyclic, so no cycle detection is 
 ### Status
 
 - New domains are `DRAFT`. The owner or a `MANAGE_DOMAIN` holder publishes or unpublishes, at any time and without approval.
-- **Visibility is the same on every surface** (REST, MCP, UI). A `DRAFT` domain is visible only to its owner and `MANAGE_DOMAIN` holders, including those on its parent. For anyone else it does not exist: lists omit it, get returns 404, and it is not in `list_domains`, member listings, an object's domains or a parent's roll-up. Responses carry `status`, so a caller that sees drafts can filter them out.
+- **Visibility is the same on every surface** (REST, MCP, UI). A `DRAFT` domain is visible only to its owner and `MANAGE_DOMAIN` holders, including those on its parent. For anyone else it does not exist: lists omit it, get returns 404, and it is not in `list_domains`, member listings, an object's domains, a tag's objects or a parent's roll-up. Responses carry `status`, so a caller that sees drafts can filter them out.
 - **Consistency**: publishing a subdomain needs a published parent; unpublishing needs no published subdomains (C6 covers attach and move).
 - Assets can be tagged into a `DRAFT` domain to prepare it; anyone with `APPLY_TAG` on its tag can do so, as in Unity Catalog.
 - Roll-ups depend on the caller: someone who can see a `DRAFT` subdomain sees its members under the parent; others do not.
@@ -141,7 +143,7 @@ Only directly tagged objects are listed; a catalog or schema stands for the chil
 | Set or replace the backing tag | `MANAGE_DOMAIN` and ownership of the new tag |
 | Remove the backing tag | `MANAGE_DOMAIN` |
 | Attach / move | `MANAGE_DOMAIN` on both the domain and the new parent |
-| Detach | `MANAGE_DOMAIN` on either |
+| Detach | `MANAGE_DOMAIN` on the domain (holding it on the current parent is enough, since parent privileges apply to subdomains) |
 | Publish, unpublish, edit, delete | `MANAGE_DOMAIN` |
 
 - Browsing without `VIEW_TAG` is safe because only a tag's owner can bind it to a domain: exposing that one (tag, value) to the domain's viewers is the owner's decision, and viewers still see only objects they can access.
@@ -150,8 +152,8 @@ Only directly tagged objects are listed; a catalog or schema stands for the chil
 **Implementation**
 
 - `CAN_ACCESS_METADATA` gets a `DOMAIN` branch, `ANY(OWNER, METALAKE) || MANAGE_DOMAIN || USE_DOMAIN`, for reading a domain's own tags, subject to the status rule.
-- The tag-association executor (for both the v1 and v2 association requests) special-cases `DOMAIN` targets: `MANAGE_DOMAIN` on the domain (never `USE_DOMAIN`), ownership of each added tag, at most one backing tag. Tagging other objects is unchanged.
-- Subdomain endpoints have two `DOMAIN` path parameters, which collide in `ParameterUtil#extractEntitiesFromAnnotations` (a map keyed by entity type). A new `AuthorizationRequest.RequestType` (e.g. `DOMAIN_HIERARCHY`), like `ASSOCIATE_TAG`, checks both sides. `parent` and `backingTag` in a create request are checked imperatively.
+- The generic tag association endpoints (v1 and v2) reject `DOMAIN` targets; tagging other objects is unchanged. `PUT /domains/{domain}/backingTag` requires `MANAGE_DOMAIN` on the domain (never `USE_DOMAIN`).
+- Every domain endpoint has a single `{domain}` path parameter, so the declarative check covers the domain itself. A parent or backing tag named in a request body (`parent` on create and attach, `backingTag` on create and on `PUT .../backingTag`) is checked imperatively: `MANAGE_DOMAIN` on the new parent, and ownership of the tag (or the metalake).
 
 ### Grants and policies
 
@@ -170,13 +172,13 @@ Under `/api/metalakes/{metalake}`, following Gravitino conventions: `?details=` 
 | Alter | `PUT /domains/{domain}` | `DomainUpdatesRequest{updates: [rename, updateComment, setProperty, removeProperty]}` → `DomainResponse` |
 | Publish / unpublish | `PATCH /domains/{domain}` | `DomainSetRequest{status}` → `DomainResponse` |
 | Drop | `DELETE /domains/{domain}` | → `DropResponse` (`false` if absent) |
-| Attach / move | `POST /domains/{parent}/subdomains/{domain}` | → `DomainResponse` |
-| Detach | `DELETE /domains/{parent}/subdomains/{domain}` | → `DomainResponse` |
+| Attach / move | `PUT /domains/{domain}/parent` | `DomainParentSetRequest{parent}` → `DomainResponse` |
+| Detach | `DELETE /domains/{domain}/parent` | → `DomainResponse` (no-op for a top-level domain) |
+| Set / remove backing tag | `PUT /domains/{domain}/backingTag` | `DomainBackingTagSetRequest{backingTag{name, value}}` (null `backingTag` removes it) → `DomainResponse` |
 | List subdomains | `GET /domains/{domain}/subdomains?details=false` | → `NameListResponse` / `DomainListResponse` |
 | List members | `GET /domains/{domain}/objects` | → `DomainMemberListResponse` |
 | Domains of an object | `GET /objects/{type}/{fullName}/domains?details=false` | → `NameListResponse` / `DomainListResponse` |
 | Add / remove members | Existing `POST /objects/{type}/{fullName}/tags` with the domain's backing tag | `TagValuesAssociateRequest` (v2) |
-| Replace backing tag | Existing `POST /objects/domain/{domain}/tags` | `TagValuesAssociateRequest` (v2) |
 
 ```
 DomainDTO       { name, comment, properties, status, parent, backingTag{name, value}, audit,
@@ -185,18 +187,20 @@ DomainMemberDTO { object: MetadataObjectDTO, subdomain? }
 ```
 
 - **Membership requests** use `TagValuesAssociateRequest` with `Content-Type: application/vnd.gravitino.v2+json`, which carries (name, value) pairs. The v1 `TagsAssociateRequest` carries names only, so it works only for domains backed by a tag without a value. The Java and Python clients already send v2 requests (`SupportsTags#associateTags(TagValue[], TagValue[])`).
+- **Parent endpoints** address the child only, matching `Domain#attachToParent` and `Domain#detachFromParent`. Detaching needs no parent name, so a client acting on a stale snapshot cannot detach from the wrong parent.
 - **Create** happens in one transaction: domain, default tag, tag association and parent edge. On any failure nothing is created, and no default tag is left behind.
-- **State changes return the domain**: publish, unpublish, attach, move and detach return the updated domain, because the Java API returns a new `Domain` snapshot from them.
+- **State changes return the domain**: publish, unpublish, attach, move, detach and backing-tag changes return the updated domain, because the Java API returns a new `Domain` snapshot from them.
 - **Member listing parameters**:
-  - `domains` (comma-separated): the domains members come from, the listed domain itself and/or its subdomains. Not set means the domain and all its visible subdomains. On Finance with subdomains Tax and Trading, `domains=Finance` lists Finance's own members, `domains=Finance,Tax` adds Tax's, and `domains=Tax` lists only Tax's. Names that are neither the domain nor a subdomain visible to the caller are ignored.
+  - `domains` (repeatable, `?domains=Finance&domains=Tax`; not comma-separated, since domain names may contain `,`): the domains members come from, the listed domain itself and/or its subdomains. Not set means the domain and all its visible subdomains. On Finance with subdomains Tax and Trading, `domains=Finance` lists Finance's own members, `domains=Finance&domains=Tax` adds Tax's, and `domains=Tax` lists only Tax's. Names that are neither the domain nor a subdomain visible to the caller are ignored; if all given names are ignored, the result is empty rather than everything, so a typo cannot widen it.
   - `types` (comma-separated, each a supported member type) and `nameContains` (case-insensitive, on the full name).
   - No paging, like the other core list APIs. Filters see only the listed members, so they reach a catalog's tables only if catalogs are expanded.
-- **`DomainMemberDTO.subdomain`**: among the selected domains, an object that is a member of the listed domain itself has no `subdomain`, even if it is also reached through a subdomain; otherwise it carries one of the subdomains it comes from.
-- **Errors**: 404 `NoSuchDomainException` (missing, or a `DRAFT` domain the caller cannot see); 404 `NoSuchTagException` (an explicit backing tag that does not exist); 409 `DomainAlreadyExistsException` (create, or rename to an existing name); 409 `NonEmptyDomainException` (drop with subdomains); 400 `IllegalArgumentException` (C1–C6, status consistency, invalid tag value, more than one backing tag, a default tag name that already backs another domain); 403 `ForbiddenException` (a default tag name the caller may not adopt, or binding a tag the caller does not own).
+- **`DomainMemberDTO.subdomain`**: an object that carries the listed domain's backing tag itself has no `subdomain`, even if it also carries a selected subdomain's backing tag; otherwise it carries one of the selected subdomains whose backing tag it carries. For example, with schema `cat.db` tagged `Finance` and table `cat.db.trades` tagged `Finance/Trading`, listing Finance returns the schema with no `subdomain` and the table with `subdomain` Trading.
+- **Errors**: 404 `NoSuchDomainException` (missing, or a `DRAFT` domain the caller cannot see); 404 `NoSuchTagException` (an explicit backing tag that does not exist); 409 `DomainAlreadyExistsException` (create, or rename to an existing name); 409 `NonEmptyDomainException` (drop with subdomains); 400 `IllegalArgumentException` (C1–C6, status consistency, invalid tag value, a default tag name that already backs another domain, a `DOMAIN` target on the generic tag association API); 403 `ForbiddenException` (a default tag name the caller may not adopt, or binding a tag the caller does not own).
+- **Encoding**: tag and domain names may contain `/`, which must be URL-encoded (`%2F`) in every path segment: `{tag}`, and `{domain}` in `/domains/{domain}`, `/objects/domain/{domain}/...` and `/owners/domain/{domain}`. The Java, Python and MCP clients already encode path segments, and Gravitino's Jetty 9.4 / Jersey stack decodes them into the path parameters.
 - **Reused**: owners at `/owners/domain/{domain}`; privileges through the role and permission APIs, with `DOMAIN` as a securable type; policies through the policy-tag association APIs.
 - **Clients** (Java, Python) mirror the tag clients:
   - `DomainOperations` on `GravitinoMetalake`: list, get, `createDomain` (top-level domains only), alter and delete.
-  - On a `Domain`, each returning a new `Domain` snapshot: `publish()`, `unpublish()`, `attachToParent(parent)` (attach or move), `detachFromParent()`, and `updateBackingTag(TagValue)` (`null` removes it; over REST it is the tag association call on the domain object). Also on a `Domain`: `createSubdomain(...)`, `listSubdomains()` / `listSubdomainsInfo()` and `listMembers(DomainMemberFilter)`.
+  - On a `Domain`, each returning a new `Domain` snapshot: `publish()`, `unpublish()`, `attachToParent(parent)` (attach or move), `detachFromParent()`, and `updateBackingTag(TagValue)` (`null` removes it; maps to `PUT /domains/{domain}/backingTag`). Also on a `Domain`: `createSubdomain(...)`, `listSubdomains()` / `listSubdomainsInfo()` and `listMembers(DomainMemberFilter)`.
   - `SupportsDomains` (`listDomains()`, `listDomainsInfo()`) on catalogs, schemas, tables, views, filesets, topics, models and semantic models; not on columns or functions.
 - **Not included**: a batch lookup of the domains of many objects.
 
@@ -208,7 +212,7 @@ A new read-only `domain` tool category in `mcp-server/`, added to `SUPPORTED_TOO
 | :---- | :---- |
 | `list_domains` | `GET /domains?details=true`; returns name, comment, parent, status and backing tag, so an agent can pick a domain |
 | `get_domain_by_name` | `GET /domains/{domain}` |
-| `list_metadata_by_domain` | `GET /domains/{domain}/objects`, with `domains`, `types`, `name_contains`; lets an agent look within a domain by type and name |
+| `list_metadata_by_domain` | `GET /domains/{domain}/objects`, with `domains` (a list), `types`, `name_contains`; lets an agent look within a domain by type and name |
 | `list_domains_for_metadata` | `GET /objects/{type}/{fullName}/domains` |
 
 Adding members uses the existing `associate_tag_with_metadata` tool, which today sends the v1 name-only request; it is extended to accept (name, value) pairs and send the v2 request, so value-backed domains work. The MCP server forwards the caller's `Authorization` header, so the server's visibility rules apply; with OAuth client-credentials, the agent sees what that service identity sees.
@@ -216,7 +220,7 @@ Adding members uses the existing `associate_tag_with_metadata` tool, which today
 ### Events and audit
 
 - Every domain operation emits pre, success and failure events through a `DomainEventDispatcher`, and reaches the audit log through the existing pipeline. `Domain` and `DomainRel` carry `audit_info`.
-- Membership changes are tag association changes, audited by the existing `AssociateTagsForMetadataObjectEvent`. To audit a domain's membership, query the events of its backing tag (and earlier ones if it was replaced). Tagging a catalog, or deleting a backing tag, is one tag-level event.
+- Membership changes are tag association changes, audited by the existing `AssociateTagsForMetadataObjectEvent`. To audit a domain's membership, query the events of its backing tag (and earlier ones if it was replaced; replacements are domain events). Tagging a catalog, or deleting a backing tag, is one tag-level event.
 
 ## Open Questions
 
@@ -234,10 +238,10 @@ Adding members uses the existing `associate_tag_with_metadata` tool, which today
 
 - [ ] `Domain` API in `api/`; `MetadataObject.Type.DOMAIN`, registered as taggable in `TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS`
 - [ ] Storage and manager in `core/`: `Domain` and `DomainRel` tables (H2, MySQL, PostgreSQL, upgrade scripts), constraints C1–C6, row locking, status and its consistency checks, status-based visibility on every path
-- [ ] Default backing tag: create it with the domain (checking `CREATE_TAG`), bind an existing one only for its owner; at-most-one backing tag on the association API
+- [ ] Default backing tag: create it with the domain (checking `CREATE_TAG`), bind an existing one only for its owner; `PUT /domains/{domain}/backingTag`; reject `DOMAIN` targets on the generic tag association API; include domains, filtered by visibility, in tag object listings
 - [ ] Membership: shared effective-tag resolution without tag-privilege filtering; member listing with filters and subdomain roll-up; domains of an object with `inheritedFrom`
-- [ ] Authorization: `MANAGE_DOMAIN` and `USE_DOMAIN` with parent-to-subdomain inheritance; the `DOMAIN` branch of `CAN_ACCESS_METADATA`; the `DOMAIN`-target tag-association executor; the `DOMAIN_HIERARCHY` executor
-- [ ] REST endpoints in `server/` as in REST API
+- [ ] Authorization: `MANAGE_DOMAIN` and `USE_DOMAIN` with parent-to-subdomain inheritance; the `DOMAIN` branch of `CAN_ACCESS_METADATA`; imperative checks for a parent or backing tag in a request body
+- [ ] REST endpoints in `server/` as in REST API, including `PUT` / `DELETE /domains/{domain}/parent`, `PUT /domains/{domain}/backingTag` and the repeatable `domains` parameter
 - [ ] Java and Python clients
 - [ ] MCP tools, and (name, value) support in `associate_tag_with_metadata`
 - [ ] Events (`DomainEventDispatcher`) and audit
@@ -245,4 +249,4 @@ Adding members uses the existing `associate_tag_with_metadata` tool, which today
 
 ### Phase 2: Documentation
 
-- [ ] OpenAPI spec (`docs/open-api/*.yaml`, validated with `./gradlew :docs:build`) and user docs: default and explicit backing tags, adding members by tagging, privileges, `/` encoding, tags not renamed on move or rename
+- [ ] OpenAPI spec (`docs/open-api/*.yaml`, validated with `./gradlew :docs:build`) and user docs: default and explicit backing tags, adding members by tagging, privileges, `/` encoding in tag and domain names, tags not renamed on move or rename
