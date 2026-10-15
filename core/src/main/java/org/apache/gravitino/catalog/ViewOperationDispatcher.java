@@ -37,6 +37,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
@@ -147,8 +148,20 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      entityCombinedView =
-          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
+      try {
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
+        LOG.info("View {} import conflicted with existing metadata; reloading from store.", ident);
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+        if (!entityCombinedView.imported()) {
+          throw retainedExternalIdentifierConflictException(ident, VIEW);
+        }
+      }
     }
 
     return entityCombinedView;
@@ -537,13 +550,17 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
+      // An external identifier may already be stored under another Gravitino path because the
+      // view was renamed outside Gravitino or because multiple catalogs expose one metastore.
+      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
+      // stored identity because doing so can silently move the view between paths. The create-only
+      // write below reports the conflict for manual identifier cleanup.
       LOG.warn(
-          "The View uid {} existed but still need to be imported, this could happen "
-              + "when View is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
-          stringId);
+          "View uid {} exists externally but is not imported at {}. Gravitino will use a "
+              + "create-only import; if this uid is already stored under another identifier, "
+              + "manual identifier cleanup is required.",
+          stringId,
+          ident);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -575,12 +592,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(viewEntity, true /* overwrite */);
+      // Never overwrite imported view metadata. In particular, an overwrite by stable ID can
+      // silently change schema or catalog ownership and make existing privileges refer to the
+      // wrong path.
+      store.put(viewEntity, false);
+    } catch (SoftDeletedEntityIdentifierException e) {
+      throw softDeletedExternalIdentifierException(ident, uid, VIEW);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
-      throw new UnsupportedOperationException(
-          "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       throw new RuntimeException("Failed to import the view entity to the store", e);

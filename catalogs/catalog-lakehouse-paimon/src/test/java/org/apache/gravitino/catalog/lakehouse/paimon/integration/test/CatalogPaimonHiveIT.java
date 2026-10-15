@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -31,6 +32,7 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.types.Types;
@@ -142,6 +144,19 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
         schemaName,
         Collections.emptyMap());
 
+    View loadedView =
+        viewCatalog.loadView(NameIdentifier.of(schemaName, viewName.toUpperCase(Locale.ROOT)));
+    Assertions.assertEquals(viewName, loadedView.name());
+
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(
+                NameIdentifier.of(
+                    schemaName.toUpperCase(Locale.ROOT),
+                    baseTableIdentifier.name().toUpperCase(Locale.ROOT)));
+    Assertions.assertEquals(baseTableIdentifier.name(), loadedTable.name());
+
     Dataset<Row> rows =
         spark.sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName));
     List<Row> results = rows.collectAsList();
@@ -166,7 +181,7 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
     Assertions.assertEquals(createdSchema.properties().get("key"), "hive");
 
     // load schema check.
-    Schema schema = schemas.loadSchema(schemaIdent.name());
+    Schema schema = schemas.loadSchema(schemaIdent.name().toUpperCase(Locale.ROOT));
     Assertions.assertEquals(schema.properties().get("key"), "hive");
     Map<String, String> loadedProps = paimonCatalog.getDatabase(schemaIdent.name()).options();
     Assertions.assertEquals(loadedProps.get("key"), "hive");

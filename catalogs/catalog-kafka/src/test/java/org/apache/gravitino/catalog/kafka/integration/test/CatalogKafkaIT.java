@@ -193,6 +193,70 @@ public class CatalogKafkaIT extends BaseIT {
   }
 
   @Test
+  public void testCatalogReregistrationLoadsExistingTopic()
+      throws ExecutionException, InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog_reregistration");
+    String topicName = GravitinoITUtils.genRandomName("test_topic_reregistration");
+    NameIdentifier topicIdent = NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName);
+    Map<String, String> properties = ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+
+    adminClient.createTopics(ImmutableList.of(new NewTopic(topicName, 1, (short) 1))).all().get();
+
+    Catalog originalCatalog = createCatalog(catalogName, "original catalog", properties);
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+    Assertions.assertTrue(topicExistsInKafka(topicName));
+
+    Catalog reregisteredCatalog = createCatalog(catalogName, "re-registered catalog", properties);
+    Topic restoredTopic =
+        Assertions.assertDoesNotThrow(
+            () -> reregisteredCatalog.asTopicCatalog().loadTopic(topicIdent));
+    Assertions.assertEquals(topicName, restoredTopic.name());
+    checkTopicReadWrite(topicName);
+
+    Assertions.assertTrue(reregisteredCatalog.asTopicCatalog().dropTopic(topicIdent));
+    awaitTopicDeletedInKafka(topicName);
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+  }
+
+  @Test
+  public void testActiveTopicRegistrationCannotBeRebound()
+      throws ExecutionException, InterruptedException {
+    String originalCatalogName =
+        GravitinoITUtils.genRandomName("test_active_topic_original_catalog");
+    String conflictingCatalogName =
+        GravitinoITUtils.genRandomName("test_active_topic_conflicting_catalog");
+    String topicName = GravitinoITUtils.genRandomName("test_active_topic_registration");
+    NameIdentifier topicIdent = NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName);
+    Map<String, String> properties = ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+
+    adminClient.createTopics(ImmutableList.of(new NewTopic(topicName, 1, (short) 1))).all().get();
+
+    Catalog originalCatalog = createCatalog(originalCatalogName, "original catalog", properties);
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Catalog conflictingCatalog =
+        createCatalog(conflictingCatalogName, "conflicting catalog", properties);
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> conflictingCatalog.asTopicCatalog().loadTopic(topicIdent));
+    Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
+
+    // The rejected import must not move the active entity away from its original path.
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Assertions.assertTrue(metalake.dropCatalog(conflictingCatalogName, true));
+    Assertions.assertTrue(originalCatalog.asTopicCatalog().dropTopic(topicIdent));
+    awaitTopicDeletedInKafka(topicName);
+    Assertions.assertTrue(metalake.dropCatalog(originalCatalogName, true));
+  }
+
+  @Test
   public void testCatalogException() {
     String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog1 =

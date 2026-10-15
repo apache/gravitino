@@ -227,6 +227,17 @@ public class RelationalEntityStore
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+      throws IOException, EntityAlreadyExistsException {
+    boolean restored = backend.restoreSoftDeletedEntity(e);
+    if (restored) {
+      // The database advances the retained row's version, so do not cache the incoming copy.
+      invalidateCache(e.nameIdentifier(), e.type());
+    }
+    return restored;
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {

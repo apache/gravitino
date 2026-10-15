@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
+import static org.apache.hc.core5.http.HttpStatus.SC_NOT_IMPLEMENTED;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
@@ -163,6 +164,14 @@ public class TestMessagingCatalog extends TestBase {
         Assertions.assertThrows(
             NoSuchSchemaException.class, () -> catalog.asTopicCatalog().loadTopic(topic));
     Assertions.assertEquals("schema not found", ex.getMessage());
+
+    // test UnsupportedOperationException
+    ErrorResponse unsupportedResp = ErrorResponse.unsupportedOperation("unsupported operation");
+    buildMockResource(Method.GET, topicPath, null, unsupportedResp, SC_NOT_IMPLEMENTED);
+    ex =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> catalog.asTopicCatalog().loadTopic(topic));
+    Assertions.assertEquals("unsupported operation", ex.getMessage());
   }
 
   @Test

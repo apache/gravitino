@@ -62,6 +62,7 @@ public class HiveCatalogCapability implements Capability {
     switch (scope) {
       case SCHEMA:
       case TABLE:
+      case VIEW:
       case COLUMN:
         // Hive is case insensitive, see
         // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?

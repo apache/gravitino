@@ -22,6 +22,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
+import static org.apache.gravitino.Entity.EntityType.TOPIC;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -42,6 +44,7 @@ import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -166,14 +169,65 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.TOPIC), any());
-    Topic loadedTopic4 = topicOperationDispatcher.loadTopic(topicIdent1);
-    // Succeed to import the topic entity
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> topicOperationDispatcher.loadTopic(topicIdent1));
+    Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
+    verify(entityStore).put(any(TopicEntity.class), eq(false));
+    verify(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
     reset(entityStore);
     TopicEntity topicEntity =
         entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
     Assertions.assertEquals("test", topicEntity.auditInfo().creator());
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", loadedTopic4.auditInfo().creator());
+  }
+
+  @Test
+  public void testConcurrentImportTopicReusesExistingEntity() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_topic_concurrent_import");
+    NameIdentifier schemaIdent = NameIdentifier.of(topicNs.levels());
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_concurrent_import");
+    createTopicForLockTest(topicIdent);
+    TopicEntity importedTopicEntity = entityStore.get(topicIdent, TOPIC, TopicEntity.class);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(importedTopicEntity)
+        .when(entityStore)
+        .get(any(), eq(TOPIC), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(TopicEntity.class), eq(false));
+
+    Topic loadedTopic =
+        Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(topicIdent.name(), loadedTopic.name());
+    verify(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
+  }
+
+  @Test
+  public void testImportTopicRestoresSoftDeletedEntity() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_soft_deleted_topic_identifier");
+    NameIdentifier schemaIdent = NameIdentifier.of(topicNs.levels());
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_soft_deleted_identifier");
+    createTopicForLockTest(topicIdent);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), eq(TOPIC), any());
+    doThrow(new EntityAlreadyExistsException("mock retained identifier"))
+        .when(entityStore)
+        .put(any(TopicEntity.class), eq(false));
+    doReturn(true).when(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
+
+    Topic loadedTopic =
+        Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(topicIdent.name(), loadedTopic.name());
+    verify(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
   }
 
   @Test

@@ -49,6 +49,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -108,6 +109,45 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(schema, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
+  }
+
+  @TestTemplate
+  public void testCatalogReregistrationRejectsSoftDeletedIdentifiers() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema = createAndInsertSchema(metalakeName, catalogName, "schema_reregister");
+    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schema.name());
+    TableEntity table = createAndInsertTableEntity(tableNamespace, "table_reregister");
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "view_reregister");
+    backend.insert(view, false);
+    backend.delete(
+        NameIdentifier.of(metalakeName, catalogName),
+        Entity.EntityType.CATALOG,
+        true /* cascade */);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SoftDeletedEntityIdentifierException schemaException =
+        assertThrows(
+            SoftDeletedEntityIdentifierException.class, () -> backend.insert(schema, false));
+    Assertions.assertTrue(schemaException.getMessage().contains(String.valueOf(schema.id())));
+
+    SchemaEntity replacementSchema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            schema.name(),
+            AUDIT_INFO);
+    backend.insert(replacementSchema, false);
+
+    SoftDeletedEntityIdentifierException tableException =
+        assertThrows(
+            SoftDeletedEntityIdentifierException.class, () -> backend.insert(table, false));
+    Assertions.assertTrue(tableException.getMessage().contains(String.valueOf(table.id())));
+
+    SoftDeletedEntityIdentifierException viewException =
+        assertThrows(SoftDeletedEntityIdentifierException.class, () -> backend.insert(view, false));
+    Assertions.assertTrue(viewException.getMessage().contains(String.valueOf(view.id())));
   }
 
   @TestTemplate

@@ -127,6 +127,26 @@ public interface EntityStore extends Closeable {
       throws IOException, EntityAlreadyExistsException;
 
   /**
+   * Atomically restores a soft-deleted entity with the supplied metadata.
+   *
+   * <p>This operation does not change the semantics of {@link #put(Entity, boolean)}: create-only
+   * puts still reject every duplicate, and overwrite puts still replace duplicates unconditionally.
+   * Implementations that support retained soft-deleted rows may override this method to replace a
+   * row only while it remains soft-deleted.
+   *
+   * @param e the entity metadata to restore
+   * @param <E> the type of the entity
+   * @return true if a soft-deleted row was restored, false if no matching soft-deleted row exists
+   * @throws IOException if the restore operation fails
+   * @throws EntityAlreadyExistsException if restoring the entity conflicts with another active
+   *     entity
+   */
+  default <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+      throws IOException, EntityAlreadyExistsException {
+    return false;
+  }
+
+  /**
    * Update the entity into the underlying storage.
    *
    * <p>Note: the {@link org.apache.gravitino.NameIdentifier} of the updated entity may be changed.

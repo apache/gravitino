@@ -46,6 +46,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
@@ -194,7 +195,14 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
     if (!overwritten || !BaseEntityCache.isCacheable(e.type())) {
-      insertEntity(e, overwritten);
+      try {
+        insertEntity(e, overwritten);
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (!overwritten && isSoftDeleted(e)) {
+          throw new SoftDeletedEntityIdentifierException(duplicate, e.type(), e.id());
+        }
+        throw duplicate;
+      }
       return;
     }
 
@@ -210,6 +218,40 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         SessionUtils.commitTransaction();
       }
       committed = true;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> boolean restoreSoftDeletedEntity(E e)
+      throws EntityAlreadyExistsException, IOException {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+
+    boolean committed = false;
+    try {
+      boolean restored;
+      switch (e.type()) {
+        case TOPIC:
+          restored = TopicMetaService.getInstance().restoreSoftDeletedTopic((TopicEntity) e);
+          break;
+        default:
+          restored = false;
+      }
+
+      if (restored) {
+        EntityChangeLogWriter.append(e.nameIdentifier(), e.type(), OperateType.ALTER);
+      }
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return restored;
     } finally {
       if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();
@@ -1023,6 +1065,19 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> boolean isSoftDeleted(E entity) {
+    switch (entity.type()) {
+      case SCHEMA:
+        return SchemaMetaService.getInstance().isSoftDeleted(entity.id());
+      case TABLE:
+        return TableMetaService.getInstance().isSoftDeleted(entity.id());
+      case VIEW:
+        return ViewMetaService.getInstance().isSoftDeleted(entity.id());
+      default:
+        return false;
     }
   }
 

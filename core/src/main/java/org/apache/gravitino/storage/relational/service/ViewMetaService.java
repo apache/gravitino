@@ -99,6 +99,18 @@ public class ViewMetaService {
     return fromViewPO(viewPO, identifier.namespace());
   }
 
+  /**
+   * Checks whether a view ID is retained by a soft-deleted row.
+   *
+   * @param viewId the view ID
+   * @return true if a soft-deleted row retains the ID, false otherwise
+   */
+  public boolean isSoftDeleted(long viewId) {
+    return SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class, mapper -> mapper.countDeletedViewMetasById(viewId))
+        > 0;
+  }
+
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertView")
   public void insertView(ViewEntity viewEntity, boolean overwrite) throws IOException {
     NameIdentifierUtil.checkView(viewEntity.nameIdentifier());

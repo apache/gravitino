@@ -26,11 +26,13 @@ import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -49,9 +51,11 @@ import java.util.function.Supplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -335,6 +339,115 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertNotNull(retrievedEntity);
     Assertions.assertEquals(initialId, retrievedEntity.id(), "Entity ID should not change");
     Assertions.assertEquals(1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
+  }
+
+  @Test
+  public void testConcurrentImportViewReusesExistingEntity() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_concurrent_import");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_concurrent_import");
+    View createdView = createViewForLockTest(viewIdent);
+    ViewEntity importedViewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    ViewEntity concurrentViewEntity =
+        ViewEntity.builder()
+            .withId(importedViewEntity.id())
+            .withName(viewIdent.name())
+            .withNamespace(viewIdent.namespace())
+            .withComment(createdView.comment())
+            .withColumns(createdView.columns())
+            .withRepresentations(createdView.representations())
+            .withProperties(createdView.properties())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    // Simulate an HA race: the pre-import checks miss, the create-only write conflicts, and the
+    // reload observes the entity imported by the winning node.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(concurrentViewEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    View loadedView =
+        Assertions.assertDoesNotThrow(() -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertEquals(viewIdent.name(), loadedView.name());
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
+  public void testConcurrentImportViewFailsOnMismatchedIdentifier() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_import_conflict");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_import_conflict");
+    View createdView = createViewForLockTest(viewIdent);
+    ViewEntity importedViewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    ViewEntity mismatchedViewEntity =
+        ViewEntity.builder()
+            .withId(importedViewEntity.id() + 1)
+            .withName(viewIdent.name())
+            .withNamespace(viewIdent.namespace())
+            .withComment(createdView.comment())
+            .withColumns(createdView.columns())
+            .withRepresentations(createdView.representations())
+            .withProperties(createdView.properties())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    // Simulate an external rename or multi-path conflict: the create-only write fails, and the
+    // entity found during reload has a different stable ID.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(mismatchedViewEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not automatically reconcile external view renames"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("metadata-only unregister of an individual external view"));
+    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
+  public void testImportViewWithSoftDeletedIdentifierRequiresManualCleanup() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_soft_deleted_view_identifier");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_soft_deleted_identifier");
+    createViewForLockTest(viewIdent);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    entityStore.delete(viewIdent, VIEW);
+
+    reset(entityStore);
+    doThrow(new SoftDeletedEntityIdentifierException(VIEW, viewEntity.id()))
+        .when(entityStore)
+        .put(any(ViewEntity.class), eq(false));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
+    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+    Assertions.assertTrue(exception.getMessage().contains("external view"));
   }
 
   @Test

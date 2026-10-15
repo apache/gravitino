@@ -24,6 +24,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -81,6 +82,10 @@ public interface TableMetaMapper {
    */
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaByIdForUpdate")
   TablePO selectTableMetaByIdForUpdate(@Param("tableId") Long tableId);
+
+  /** Checks whether a soft-deleted table still owns the requested primary key. */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE table_id = #{tableId} AND deleted_at > 0")
+  int countDeletedTableMetasById(@Param("tableId") Long tableId);
 
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);

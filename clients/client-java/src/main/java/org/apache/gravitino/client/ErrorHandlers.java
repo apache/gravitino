@@ -812,6 +812,9 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 

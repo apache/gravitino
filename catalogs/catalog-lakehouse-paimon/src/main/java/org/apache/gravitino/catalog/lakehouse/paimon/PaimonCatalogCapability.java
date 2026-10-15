@@ -23,10 +23,30 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 
 public class PaimonCatalogCapability implements Capability {
 
+  private final boolean hiveBackend;
+
+  /** Creates a Paimon catalog capability with the default case-sensitive name behavior. */
+  public PaimonCatalogCapability() {
+    this(false);
+  }
+
+  PaimonCatalogCapability(boolean hiveBackend) {
+    this.hiveBackend = hiveBackend;
+  }
+
   @Override
   public CapabilityResult columnDefaultValue() {
     // See https://github.com/apache/paimon/pull/1425/files
     return CapabilityResult.unsupported(
         "Paimon set column default value through table properties instead of column info.");
+  }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    if (hiveBackend && (scope == Scope.SCHEMA || scope == Scope.TABLE || scope == Scope.VIEW)) {
+      return CapabilityResult.unsupported(
+          "The Paimon Hive backend is case insensitive for schemas, tables, and views.");
+    }
+    return Capability.super.caseSensitiveOnName(scope);
   }
 }
