@@ -236,6 +236,82 @@ public class TestIcebergViewCatalogOperations {
   }
 
   @Test
+  public void testCreateViewWidensVarcharColumnToIcebergString() throws Exception {
+    // A view's output column may carry Gravitino's VarCharType (e.g. SELECT 'x' AS c produces
+    // varchar(1)), since the connector layer does not apply physical-table type restrictions to
+    // view columns. Iceberg has no length-bound string type, so this must be widened before
+    // reaching ConvertUtil.toIcebergSchema(), which otherwise rejects it as unsupported.
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    Column[] columns = {Column.of("c", Types.VarCharType.of(1), null)};
+    SQLRepresentation representation =
+        SQLRepresentation.builder().withDialect("trino").withSql("SELECT 'x' AS c").build();
+
+    doAnswer(
+            invocation -> {
+              ImmutableCreateViewRequest request = invocation.getArgument(1);
+              Assertions.assertEquals(
+                  org.apache.iceberg.types.Types.StringType.get(),
+                  request.schema().findField("c").type());
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .createView(
+            any(org.apache.iceberg.catalog.Namespace.class), any(ImmutableCreateViewRequest.class));
+
+    operations.createView(
+        ident,
+        null,
+        columns,
+        new Representation[] {representation},
+        null,
+        null,
+        Collections.emptyMap());
+  }
+
+  @Test
+  public void testAlterViewReplaceWidensVarcharColumnToIcebergString() throws Exception {
+    // Fixing createView() alone would leave replace broken: a view initially created with only
+    // StringType columns, then replaced with a query that now produces a varchar(n) output
+    // column, must still succeed at the server boundary.
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+
+    ViewMetadata metadata = Mockito.mock(ViewMetadata.class);
+    when(metadata.uuid()).thenReturn("view-uuid");
+    when(metadata.schemas()).thenReturn(Collections.emptyList());
+
+    LoadViewResponse loaded = Mockito.mock(LoadViewResponse.class);
+    when(loaded.metadata()).thenReturn(metadata);
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(loaded);
+
+    Column[] columns = {Column.of("c", Types.VarCharType.of(1), null)};
+    SQLRepresentation representation =
+        SQLRepresentation.builder().withDialect("trino").withSql("SELECT 'x' AS c").build();
+
+    doAnswer(
+            invocation -> {
+              UpdateTableRequest request = invocation.getArgument(1);
+              Assertions.assertEquals(
+                  org.apache.iceberg.types.Types.StringType.get(),
+                  extractAddedSchema(request.updates()).findField("c").type());
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+
+    operations.alterView(
+        ident,
+        ViewChange.replaceView(columns, new Representation[] {representation}, null, null, null));
+
+    verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+  }
+
+  @Test
   public void testAlterViewSetAfterRemoveKeepsProperty() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
@@ -392,5 +468,13 @@ public class TestIcebergViewCatalogOperations {
         .map(update -> ((MetadataUpdate.RemoveProperties) update).removed())
         .findFirst()
         .orElse(java.util.Collections.emptySet());
+  }
+
+  private static org.apache.iceberg.Schema extractAddedSchema(List<MetadataUpdate> updates) {
+    return updates.stream()
+        .filter(update -> update instanceof MetadataUpdate.AddSchema)
+        .map(update -> ((MetadataUpdate.AddSchema) update).schema())
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("No AddSchema update found"));
   }
 }

@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
@@ -127,7 +128,7 @@ class IcebergViewCatalogOperations {
     org.apache.iceberg.catalog.Namespace icebergNamespace =
         IcebergCatalogWrapperHelper.getIcebergNamespace(ident.namespace());
 
-    Schema schema = ConvertUtil.toIcebergSchema(columns);
+    Schema schema = ConvertUtil.toIcebergSchema(widenVarcharColumns(columns));
     List<ViewRepresentation> viewRepresentations = new ArrayList<>();
     for (Representation representation : representations) {
       viewRepresentations.add(toSqlViewRepresentation(representation));
@@ -372,7 +373,8 @@ class IcebergViewCatalogOperations {
     int newVersionId =
         currentVersion != null ? currentVersion.versionId() + 1 : INITIAL_VIEW_VERSION_ID;
 
-    Schema replacementSchema = ConvertUtil.toIcebergSchema(replace.getColumns());
+    Schema replacementSchema =
+        ConvertUtil.toIcebergSchema(widenVarcharColumns(replace.getColumns()));
     Optional<Schema> existingSchema =
         metadata.schemas().stream()
             .filter(schema -> schema.sameSchema(replacementSchema))
@@ -447,5 +449,29 @@ class IcebergViewCatalogOperations {
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
+  }
+
+  /**
+   * Iceberg has no length-bound string type, only its single unbounded {@code string}. A view's
+   * output column, unlike a physical table column, may legitimately carry Gravitino's {@link
+   * Types.VarCharType} (e.g. {@code SELECT 'x' AS c} produces varchar(1)), since the connector
+   * layer does not apply physical-storage type restrictions to view columns. Widen it to Iceberg's
+   * string type before building the schema, or {@link ConvertUtil#toIcebergSchema} rejects it as an
+   * unsupported type.
+   */
+  private static Column[] widenVarcharColumns(Column[] columns) {
+    return Arrays.stream(columns)
+        .map(
+            col ->
+                col.dataType() instanceof Types.VarCharType
+                    ? Column.of(
+                        col.name(),
+                        Types.StringType.get(),
+                        col.comment(),
+                        col.nullable(),
+                        col.autoIncrement(),
+                        col.defaultValue())
+                    : col)
+        .toArray(Column[]::new);
   }
 }
