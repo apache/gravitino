@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.policy;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -29,7 +31,8 @@ import org.apache.commons.lang3.StringUtils;
  *
  * <p>JSON property names remain the flat peer keys on policy content ({@code timeTrigger}, {@code
  * commitTrigger}, {@code minIntervalMs}, {@code jobOptions}, {@code updateOptions}). This type is
- * the in-memory composition for {@link ExecutablePolicyContent}.
+ * the in-memory composition for {@link ExecutablePolicyContent}; persistence uses
+ * {@code @JsonUnwrapped} so those keys stay flat in stored policy content JSON.
  */
 public final class PolicyExecutionSpec {
 
@@ -59,6 +62,10 @@ public final class PolicyExecutionSpec {
   /**
    * Creates an immutable execution spec.
    *
+   * <p>Annotated for Jackson so {@code POConverters} can rebuild executable policy content from
+   * stored JSON (including {@code @JsonUnwrapped} peers on {@link
+   * AbstractExecutablePolicyContent}).
+   *
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
    * @param minIntervalMs optional cooldown ms
@@ -66,12 +73,13 @@ public final class PolicyExecutionSpec {
    * @param updateOptions optional update options
    * @return immutable spec
    */
+  @JsonCreator
   public static PolicyExecutionSpec of(
-      @Nullable String timeTrigger,
-      @Nullable Boolean commitTrigger,
-      @Nullable Long minIntervalMs,
-      @Nullable Map<String, String> jobOptions,
-      @Nullable Map<String, String> updateOptions) {
+      @JsonProperty("timeTrigger") @Nullable String timeTrigger,
+      @JsonProperty("commitTrigger") @Nullable Boolean commitTrigger,
+      @JsonProperty("minIntervalMs") @Nullable Long minIntervalMs,
+      @JsonProperty("jobOptions") @Nullable Map<String, String> jobOptions,
+      @JsonProperty("updateOptions") @Nullable Map<String, String> updateOptions) {
     if (!PolicyExecutionFields.hasAny(
         timeTrigger, commitTrigger, minIntervalMs, jobOptions, updateOptions)) {
       return EMPTY;

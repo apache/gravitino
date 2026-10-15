@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.commons.collections4)
   implementation(libs.guava)
+  implementation(libs.jackson.annotations)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

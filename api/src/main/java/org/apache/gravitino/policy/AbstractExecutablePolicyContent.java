@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.policy;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -26,11 +27,12 @@ import javax.annotation.Nullable;
  *
  * <p>Peers are supplied at construction as an immutable {@link PolicyExecutionSpec}. Subclasses
  * keep strategy fields separate and pass the spec through {@link
- * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}.
+ * #AbstractExecutablePolicyContent(PolicyExecutionSpec)}. Persisted JSON keeps peer keys flat via
+ * {@link JsonUnwrapped}.
  */
 public abstract class AbstractExecutablePolicyContent implements ExecutablePolicyContent {
 
-  private final PolicyExecutionSpec executionSpec;
+  @JsonUnwrapped private final PolicyExecutionSpec executionSpec;
 
   /**
    * Creates content with the given execution peers.
