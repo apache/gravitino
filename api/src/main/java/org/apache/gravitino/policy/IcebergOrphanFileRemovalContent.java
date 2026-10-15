@@ -147,7 +147,7 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
   public void validate() {
     super.validate();
     Preconditions.checkArgument(
-        !Boolean.TRUE.equals(commitTrigger()),
+        !Boolean.TRUE.equals(executionSpec().commitTrigger()),
         "commitTrigger is not allowed for orphan file removal");
     validateOlderThanDays(olderThanDays);
     Preconditions.checkArgument(

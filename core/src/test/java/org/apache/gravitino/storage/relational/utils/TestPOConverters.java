@@ -72,6 +72,7 @@ import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -1073,11 +1074,12 @@ public class TestPOConverters {
     assertEquals(content, convertedPolicy.content());
 
     IcebergDataCompactionContent loaded = (IcebergDataCompactionContent) convertedPolicy.content();
-    assertEquals("0 0 2 * * ?", loaded.timeTrigger());
-    assertEquals(Boolean.TRUE, loaded.commitTrigger());
-    assertEquals(3_600_000L, loaded.minIntervalMs());
-    assertEquals("4g", loaded.jobOptions().get("spark.executor.memory"));
-    assertEquals("ml", loaded.updaterOptions().get("metalake"));
+    PolicyExecutionSpec peers = loaded.executionSpec();
+    assertEquals("0 0 2 * * ?", peers.timeTrigger());
+    assertEquals(Boolean.TRUE, peers.commitTrigger());
+    assertEquals(3_600_000L, peers.minIntervalMs());
+    assertEquals("4g", peers.jobOptions().get("spark.executor.memory"));
+    assertEquals("ml", peers.updaterOptions().get("metalake"));
     assertEquals("134217728", loaded.rewriteOptions().get("target-file-size-bytes"));
   }
 

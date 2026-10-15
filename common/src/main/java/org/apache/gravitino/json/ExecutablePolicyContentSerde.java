@@ -37,7 +37,6 @@ import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.policy.PolicyExecutionFields;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
 
 /**
@@ -90,19 +89,19 @@ public final class ExecutablePolicyContentSerde {
       return;
     }
     if (spec.timeTrigger() != null) {
-      gen.writeStringField(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY, spec.timeTrigger());
+      gen.writeStringField(PolicyExecutionSpec.TIME_TRIGGER_JSON_KEY, spec.timeTrigger());
     }
     if (spec.commitTrigger() != null) {
-      gen.writeBooleanField(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY, spec.commitTrigger());
+      gen.writeBooleanField(PolicyExecutionSpec.COMMIT_TRIGGER_JSON_KEY, spec.commitTrigger());
     }
     if (spec.minIntervalMs() != null) {
-      gen.writeNumberField(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY, spec.minIntervalMs());
+      gen.writeNumberField(PolicyExecutionSpec.MIN_INTERVAL_MS_JSON_KEY, spec.minIntervalMs());
     }
     if (!spec.jobOptions().isEmpty()) {
-      gen.writeObjectField(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY, spec.jobOptions());
+      gen.writeObjectField(PolicyExecutionSpec.JOB_OPTIONS_JSON_KEY, spec.jobOptions());
     }
     if (!spec.updaterOptions().isEmpty()) {
-      gen.writeObjectField(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY, spec.updaterOptions());
+      gen.writeObjectField(PolicyExecutionSpec.UPDATER_OPTIONS_JSON_KEY, spec.updaterOptions());
     }
   }
 
@@ -117,13 +116,13 @@ public final class ExecutablePolicyContentSerde {
         node != null && node.isObject(),
         "Cannot parse execution peers from invalid JSON: %s",
         node);
-    String timeTrigger = textOrNull(node, PolicyExecutionFields.TIME_TRIGGER_JSON_KEY);
-    Boolean commitTrigger = booleanOrNull(node, PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY);
-    Long minIntervalMs = longOrNull(node, PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY);
+    String timeTrigger = textOrNull(node, PolicyExecutionSpec.TIME_TRIGGER_JSON_KEY);
+    Boolean commitTrigger = booleanOrNull(node, PolicyExecutionSpec.COMMIT_TRIGGER_JSON_KEY);
+    Long minIntervalMs = longOrNull(node, PolicyExecutionSpec.MIN_INTERVAL_MS_JSON_KEY);
     Map<String, String> jobOptions =
-        stringMapOrNull(node, PolicyExecutionFields.JOB_OPTIONS_JSON_KEY);
+        stringMapOrNull(node, PolicyExecutionSpec.JOB_OPTIONS_JSON_KEY);
     Map<String, String> updaterOptions =
-        stringMapOrNull(node, PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY);
+        stringMapOrNull(node, PolicyExecutionSpec.UPDATER_OPTIONS_JSON_KEY);
     return PolicyExecutionSpec.of(
         timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
@@ -204,11 +203,11 @@ public final class ExecutablePolicyContentSerde {
               textOrNull(node, "rewriteStrategy"),
               textOrNull(node, "sortOrder"),
               stringMapOrNull(node, "rewriteOptions"),
-              textOrNull(node, PolicyExecutionFields.TIME_TRIGGER_JSON_KEY),
-              booleanOrNull(node, PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY),
-              longOrNull(node, PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.JOB_OPTIONS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY));
+              textOrNull(node, PolicyExecutionSpec.TIME_TRIGGER_JSON_KEY),
+              booleanOrNull(node, PolicyExecutionSpec.COMMIT_TRIGGER_JSON_KEY),
+              longOrNull(node, PolicyExecutionSpec.MIN_INTERVAL_MS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.JOB_OPTIONS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.UPDATER_OPTIONS_JSON_KEY));
     }
   }
 
@@ -254,11 +253,11 @@ public final class ExecutablePolicyContentSerde {
               olderThanDays,
               textOrNull(node, "location"),
               dryRun,
-              textOrNull(node, PolicyExecutionFields.TIME_TRIGGER_JSON_KEY),
-              booleanOrNull(node, PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY),
-              longOrNull(node, PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.JOB_OPTIONS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY));
+              textOrNull(node, PolicyExecutionSpec.TIME_TRIGGER_JSON_KEY),
+              booleanOrNull(node, PolicyExecutionSpec.COMMIT_TRIGGER_JSON_KEY),
+              longOrNull(node, PolicyExecutionSpec.MIN_INTERVAL_MS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.JOB_OPTIONS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.UPDATER_OPTIONS_JSON_KEY));
     }
   }
 
@@ -288,11 +287,11 @@ public final class ExecutablePolicyContentSerde {
           node);
       return (IcebergRewriteManifestsContent)
           PolicyContents.icebergRewriteManifests(
-              textOrNull(node, PolicyExecutionFields.TIME_TRIGGER_JSON_KEY),
-              booleanOrNull(node, PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY),
-              longOrNull(node, PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.JOB_OPTIONS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY));
+              textOrNull(node, PolicyExecutionSpec.TIME_TRIGGER_JSON_KEY),
+              booleanOrNull(node, PolicyExecutionSpec.COMMIT_TRIGGER_JSON_KEY),
+              longOrNull(node, PolicyExecutionSpec.MIN_INTERVAL_MS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.JOB_OPTIONS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.UPDATER_OPTIONS_JSON_KEY));
     }
   }
 
@@ -322,11 +321,11 @@ public final class ExecutablePolicyContentSerde {
           node);
       return (IcebergSnapshotExpirationContent)
           PolicyContents.icebergSnapshotExpiration(
-              textOrNull(node, PolicyExecutionFields.TIME_TRIGGER_JSON_KEY),
-              booleanOrNull(node, PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY),
-              longOrNull(node, PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.JOB_OPTIONS_JSON_KEY),
-              stringMapOrNull(node, PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY));
+              textOrNull(node, PolicyExecutionSpec.TIME_TRIGGER_JSON_KEY),
+              booleanOrNull(node, PolicyExecutionSpec.COMMIT_TRIGGER_JSON_KEY),
+              longOrNull(node, PolicyExecutionSpec.MIN_INTERVAL_MS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.JOB_OPTIONS_JSON_KEY),
+              stringMapOrNull(node, PolicyExecutionSpec.UPDATER_OPTIONS_JSON_KEY));
     }
   }
 

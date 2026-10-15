@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -32,8 +35,32 @@ import org.apache.commons.lang3.StringUtils;
  * {@code minIntervalMs}, {@code jobOptions}, {@code updaterOptions}); {@code common} maps those
  * keys to and from this value object via custom Jackson serdes (same idea as {@code
  * DistributionSerializer}).
+ *
+ * <p>Invoked from {@link AbstractExecutablePolicyContent}, not from universal {@link
+ * PolicyContent#validate()}. Type-specific rules (for example rejecting {@code commitTrigger} for
+ * orphan cleanup) belong on the concrete content or the server create/alter path.
+ *
+ * <p>{@code timeTrigger} cron syntax is <strong>not</strong> validated here. The scheduler
+ * registration path (db-scheduler / runtime cron parser) is the source of truth; validating with a
+ * regex or a second library in {@code api} would drift from that runtime and pull scheduler
+ * dependencies into the public API module.
  */
 public final class PolicyExecutionSpec {
+
+  /** JSON property for the cron string passed to the scheduler. */
+  public static final String TIME_TRIGGER_JSON_KEY = "timeTrigger";
+
+  /** JSON property for the commit-trigger boolean. */
+  public static final String COMMIT_TRIGGER_JSON_KEY = "commitTrigger";
+
+  /** JSON property for minimum interval between finished runs. */
+  public static final String MIN_INTERVAL_MS_JSON_KEY = "minIntervalMs";
+
+  /** JSON property for job / client options. */
+  public static final String JOB_OPTIONS_JSON_KEY = "jobOptions";
+
+  /** JSON property for updater / control-plane options. */
+  public static final String UPDATER_OPTIONS_JSON_KEY = "updaterOptions";
 
   /** Spec with every peer unset. */
   public static final PolicyExecutionSpec EMPTY =
@@ -54,8 +81,8 @@ public final class PolicyExecutionSpec {
     this.timeTrigger = StringUtils.isBlank(timeTrigger) ? null : timeTrigger;
     this.commitTrigger = commitTrigger;
     this.minIntervalMs = minIntervalMs;
-    this.jobOptions = PolicyExecutionFields.copyOptions(jobOptions);
-    this.updaterOptions = PolicyExecutionFields.copyOptions(updaterOptions);
+    this.jobOptions = copyOptions(jobOptions);
+    this.updaterOptions = copyOptions(updaterOptions);
   }
 
   /**
@@ -75,8 +102,7 @@ public final class PolicyExecutionSpec {
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updaterOptions) {
-    if (!PolicyExecutionFields.hasAny(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions)) {
+    if (!hasAny(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions)) {
       return EMPTY;
     }
     return new PolicyExecutionSpec(
@@ -133,8 +159,7 @@ public final class PolicyExecutionSpec {
    * @return {@code true} when any peer is set
    */
   public boolean hasAny() {
-    return PolicyExecutionFields.hasAny(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+    return hasAny(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
   /**
@@ -177,10 +202,21 @@ public final class PolicyExecutionSpec {
     return of(timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
   }
 
-  /** Validates shared peer constraints (cooldown and option maps). */
+  /**
+   * Validates shared peer constraints (cooldown and option maps).
+   *
+   * <p>Does not parse {@code timeTrigger}; cron validity is checked when the expression is
+   * registered with the scheduler.
+   */
   public void validate() {
-    PolicyExecutionFields.validate(
-        timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+    if (!hasAny()) {
+      return;
+    }
+    if (minIntervalMs != null) {
+      Preconditions.checkArgument(minIntervalMs >= 0, "minIntervalMs must be >= 0");
+    }
+    validateOptionMap(jobOptions, "jobOptions");
+    validateOptionMap(updaterOptions, "updaterOptions");
   }
 
   @Override
@@ -220,5 +256,43 @@ public final class PolicyExecutionSpec {
         + ", updaterOptionsKeys="
         + updaterOptions.keySet()
         + '}';
+  }
+
+  /**
+   * Whether any execution peer field is set.
+   *
+   * <p>Every non-null {@code commitTrigger} (including {@code false}) counts as explicitly
+   * supplied, so JSON round-trips and {@code equals}/{@code hashCode} do not depend on other peers.
+   */
+  private static boolean hasAny(
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return StringUtils.isNotBlank(timeTrigger)
+        || commitTrigger != null
+        || minIntervalMs != null
+        || (jobOptions != null && !jobOptions.isEmpty())
+        || (updaterOptions != null && !updaterOptions.isEmpty());
+  }
+
+  private static Map<String, String> copyOptions(@Nullable Map<String, String> options) {
+    if (options == null || options.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    return Collections.unmodifiableMap(new LinkedHashMap<>(options));
+  }
+
+  private static void validateOptionMap(Map<String, String> options, String mapName) {
+    if (options == null || options.isEmpty()) {
+      return;
+    }
+    options.forEach(
+        (key, value) -> {
+          Preconditions.checkArgument(StringUtils.isNotBlank(key), "%s key is blank", mapName);
+          Preconditions.checkArgument(
+              StringUtils.isNotBlank(value), "%s '%s' must have non-empty value", mapName, key);
+        });
   }
 }

@@ -18,15 +18,13 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Map;
-import javax.annotation.Nullable;
-
 /**
  * Policy content that carries immutable execution peers for automated maintenance.
  *
  * <p>Row-filter, column-mask, and custom contents are not executable in this sense. Callers that
  * need peers should use {@code instanceof ExecutablePolicyContent} (or a concrete maintenance
- * content type) rather than assuming every {@link PolicyContent} exposes them.
+ * content type) and read {@link #executionSpec()} rather than assuming every {@link PolicyContent}
+ * exposes triggers or option bags.
  */
 public interface ExecutablePolicyContent extends PolicyContent {
 
@@ -34,43 +32,4 @@ public interface ExecutablePolicyContent extends PolicyContent {
    * @return immutable execution peers; never {@code null}
    */
   PolicyExecutionSpec executionSpec();
-
-  /**
-   * @return cron expression, or {@code null} when unset
-   */
-  @Nullable
-  default String timeTrigger() {
-    return executionSpec().timeTrigger();
-  }
-
-  /**
-   * @return commit-trigger flag when explicitly supplied (including {@code false}), or {@code null}
-   *     when unset
-   */
-  @Nullable
-  default Boolean commitTrigger() {
-    return executionSpec().commitTrigger();
-  }
-
-  /**
-   * @return minimum interval in milliseconds, or {@code null} when unset
-   */
-  @Nullable
-  default Long minIntervalMs() {
-    return executionSpec().minIntervalMs();
-  }
-
-  /**
-   * @return job options; never {@code null}
-   */
-  default Map<String, String> jobOptions() {
-    return executionSpec().jobOptions();
-  }
-
-  /**
-   * @return updater options; never {@code null}
-   */
-  default Map<String, String> updaterOptions() {
-    return executionSpec().updaterOptions();
-  }
 }

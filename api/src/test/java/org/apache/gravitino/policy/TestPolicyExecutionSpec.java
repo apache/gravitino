@@ -19,6 +19,7 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +55,42 @@ public class TestPolicyExecutionSpec {
     Assertions.assertTrue(text.contains("updaterOptionsKeys=[oauth_credential]"));
     Assertions.assertFalse(text.contains("secret"));
     Assertions.assertFalse(text.contains("id:secret"));
+  }
+
+  @Test
+  void validateAcceptsScalarTriggers() {
+    PolicyExecutionSpec spec =
+        PolicyExecutionSpec.of(
+            "0 0 2 * * ?",
+            true,
+            100L,
+            ImmutableMap.of("uri", "http://irc"),
+            ImmutableMap.of("metalake", "ml"));
+    Assertions.assertDoesNotThrow(spec::validate);
+  }
+
+  @Test
+  void validateAcceptsCommitTriggerTrueAlone() {
+    PolicyExecutionSpec spec =
+        PolicyExecutionSpec.of(null, true, null, Collections.emptyMap(), Collections.emptyMap());
+    Assertions.assertDoesNotThrow(spec::validate);
+  }
+
+  @Test
+  void doesNotParseTimeTriggerCron() {
+    // Cron syntax is owned by the scheduler registration path, not this API type.
+    PolicyExecutionSpec spec =
+        PolicyExecutionSpec.of(
+            "0 2 * *", null, null, Collections.emptyMap(), Collections.emptyMap());
+    Assertions.assertDoesNotThrow(spec::validate);
+  }
+
+  @Test
+  void blankTimeTriggerTreatedAsUnset() {
+    Assertions.assertSame(
+        PolicyExecutionSpec.EMPTY,
+        PolicyExecutionSpec.of("   ", null, null, Collections.emptyMap(), Collections.emptyMap()));
+    Assertions.assertDoesNotThrow(PolicyExecutionSpec.EMPTY::validate);
   }
 
   @Test
