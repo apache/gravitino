@@ -199,6 +199,10 @@ public class TestJobRuntimeTemplateMaskUtils {
                     "ice",
                     "--conf",
                     "jdbc.password=jdbc-pw",
+                    "--conf=spark.hadoop.fs.s3a.access.key=AKIAX",
+                    "-c=jdbc.password=short-c",
+                    "--conf",
+                    "spark.executor.memory=1g",
                     "-Dapi.token=tok-secret",
                     "-Dspark.executor.memory=1g"))
             .withClassName("org.example.App")
@@ -214,8 +218,43 @@ public class TestJobRuntimeTemplateMaskUtils {
     Assertions.assertEquals("ice", args.get(4));
     Assertions.assertEquals("--conf", args.get(5));
     Assertions.assertEquals("jdbc.password=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(6));
-    Assertions.assertEquals("-Dapi.token=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(7));
-    Assertions.assertEquals("-Dspark.executor.memory=1g", args.get(8));
+    Assertions.assertEquals(
+        "--conf=spark.hadoop.fs.s3a.access.key=" + HiddenPropertyMaskUtils.MASKED_VALUE,
+        args.get(7));
+    Assertions.assertEquals(
+        "-c=jdbc.password=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(8));
+    Assertions.assertEquals("--conf", args.get(9));
+    Assertions.assertEquals("spark.executor.memory=1g", args.get(10));
+    Assertions.assertEquals("-Dapi.token=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(11));
+    Assertions.assertEquals("-Dspark.executor.memory=1g", args.get(12));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsLeavesWherePredicateUnchanged() {
+    String where = "account_id = 5 and dt = '2024-01-01'";
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of(
+                    "--catalog",
+                    "iceberg_prod",
+                    "--table",
+                    "db.events",
+                    "--where",
+                    where,
+                    "--options",
+                    "{\"min-input-files\":\"2\"}"))
+            .withClassName("org.example.App")
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) masked;
+    List<String> args = spark.arguments();
+    Assertions.assertEquals("--where", args.get(4));
+    Assertions.assertEquals(where, args.get(5));
   }
 
   @Test

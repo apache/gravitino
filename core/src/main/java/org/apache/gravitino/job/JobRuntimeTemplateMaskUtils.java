@@ -41,15 +41,18 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  *       jobConf}: sensitive-named keys, plus nested JSON under {@link #NESTED_JSON_MAP_KEYS}
  *   <li>{@code arguments}: Iceberg nest flags in {@link #NESTED_JSON_ARGUMENT_FLAGS}; long options
  *       {@code --name} / {@code --name=value} whose name matches {@link
- *       SecretPropertyUtils#isSensitivePropertyKey}; bare {@code key=value} tokens and {@code
- *       -Dkey=value} when {@code key} is sensitive (for example a value after {@code --conf})
+ *       SecretPropertyUtils#isSensitivePropertyKey} (the following token after {@code --name} is
+ *       always replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}, including non-secret
+ *       values such as identifiers after {@code --use-credential-file}); conf-style payloads after
+ *       {@link #CONF_ARGUMENT_FLAGS} in either {@code --conf key=value} or {@code --conf=key=value}
+ *       form when {@code key} is sensitive; {@code -Dkey=value} when {@code key} is sensitive
  * </ul>
  *
  * <p>Not masked (out of scope): resource URI fields ({@code executable}, {@code className}, {@code
  * jars}, {@code files}, {@code archives}, Shell {@code scripts}), including credential-bearing
  * query parameters or userinfo in those URIs. Free-form argument tokens that are not nest flags,
- * sensitive long options, or sensitive {@code key=value} / {@code -Dkey=value} forms are left
- * unchanged.
+ * sensitive long options, conf payloads, or {@code -Dkey=value} forms are left unchanged (for
+ * example a {@code --where} SQL predicate).
  *
  * <p>Null map entries are preserved in the masked DTO / {@code jobConf} maps used on the REST and
  * event {@code jobConf} paths. When {@code JobInfo} rebuilds a {@code JobTemplate} via {@code
@@ -78,6 +81,14 @@ public final class JobRuntimeTemplateMaskUtils {
    */
   static final Set<String> NESTED_JSON_ARGUMENT_FLAGS =
       ImmutableSet.of("--updater-options", "--spark-conf", "--options");
+
+  /**
+   * Spark / JVM style flags whose payload is a {@code key=value} config entry. Both the two-token
+   * form ({@code --conf key=value}) and the equals form ({@code --conf=key=value}) use {@link
+   * #maskConfKeyValuePayload}.
+   */
+  static final Set<String> CONF_ARGUMENT_FLAGS =
+      ImmutableSet.of("--conf", "-c", "--driver-java-options");
 
   private JobRuntimeTemplateMaskUtils() {}
 
@@ -155,7 +166,7 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks nest-flag JSON values, sensitive-named long options, and sensitive {@code key=value} /
+   * Masks nest-flag JSON values, sensitive-named long options, conf {@code key=value} payloads, and
    * {@code -Dkey=value} tokens. Other tokens are left unchanged.
    */
   @Nullable
@@ -169,6 +180,7 @@ public final class JobRuntimeTemplateMaskUtils {
     List<String> result = new ArrayList<>(arguments.size());
     boolean maskNextAsNestedJson = false;
     boolean maskNextAsSecret = false;
+    boolean maskNextAsConfPayload = false;
     for (String arg : arguments) {
       if (maskNextAsNestedJson) {
         maskNextAsNestedJson = false;
@@ -186,10 +198,23 @@ public final class JobRuntimeTemplateMaskUtils {
         }
         // Missing value for the previous sensitive flag; this token may itself be a flag.
       }
+      if (maskNextAsConfPayload) {
+        maskNextAsConfPayload = false;
+        if (arg != null && !arg.startsWith("-")) {
+          result.add(maskConfKeyValuePayload(arg));
+          continue;
+        }
+        // Missing conf value or next token is another flag; fall through.
+      }
 
       String nestEquals = maskEqualsNestFlagArgument(arg);
       if (nestEquals != null) {
         result.add(nestEquals);
+        continue;
+      }
+      String confEquals = maskEqualsConfFlagArgument(arg);
+      if (confEquals != null) {
+        result.add(confEquals);
         continue;
       }
       String sensitiveEquals = maskEqualsSensitiveFlagArgument(arg);
@@ -202,15 +227,12 @@ public final class JobRuntimeTemplateMaskUtils {
         result.add(dashD);
         continue;
       }
-      String bareKv = maskSensitiveBareKeyValueArgument(arg);
-      if (bareKv != null) {
-        result.add(bareKv);
-        continue;
-      }
 
       result.add(arg);
       if (arg != null && NESTED_JSON_ARGUMENT_FLAGS.contains(arg)) {
         maskNextAsNestedJson = true;
+      } else if (arg != null && CONF_ARGUMENT_FLAGS.contains(arg)) {
+        maskNextAsConfPayload = true;
       } else if (isSensitiveLongOptionFlag(arg)) {
         maskNextAsSecret = true;
       }
@@ -234,6 +256,44 @@ public final class JobRuntimeTemplateMaskUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * @return masked {@code --conf=key=value} (or {@code -c=} / {@code --driver-java-options=})
+   *     token, or {@code null} when {@code arg} is not that form
+   */
+  @Nullable
+  private static String maskEqualsConfFlagArgument(@Nullable String arg) {
+    if (arg == null) {
+      return null;
+    }
+    for (String flag : CONF_ARGUMENT_FLAGS) {
+      String prefix = flag + "=";
+      if (arg.startsWith(prefix)) {
+        String payload = arg.substring(prefix.length());
+        return prefix + maskConfKeyValuePayload(payload);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Masks a conf-style {@code key=value} payload when {@code key} is sensitive. Shared by the
+   * two-token ({@code --conf key=value}) and equals ({@code --conf=key=value}) forms.
+   *
+   * @param payload the config entry after the conf flag
+   * @return masked payload, or {@code payload} unchanged when not a sensitive {@code key=value}
+   */
+  private static String maskConfKeyValuePayload(String payload) {
+    int eq = payload.indexOf('=');
+    if (eq <= 0) {
+      return payload;
+    }
+    String key = payload.substring(0, eq);
+    if (!SecretPropertyUtils.isSensitivePropertyKey(key)) {
+      return payload;
+    }
+    return key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
   }
 
   /**
@@ -283,26 +343,5 @@ public final class JobRuntimeTemplateMaskUtils {
       return null;
     }
     return "-D" + key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
-  }
-
-  /**
-   * Masks a bare {@code sensitiveKey=value} token (for example the value after {@code --conf}).
-   *
-   * @return masked token, or {@code null} when not that form
-   */
-  @Nullable
-  private static String maskSensitiveBareKeyValueArgument(@Nullable String arg) {
-    if (arg == null || arg.startsWith("-")) {
-      return null;
-    }
-    int eq = arg.indexOf('=');
-    if (eq <= 0) {
-      return null;
-    }
-    String key = arg.substring(0, eq);
-    if (!SecretPropertyUtils.isSensitivePropertyKey(key)) {
-      return null;
-    }
-    return key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
   }
 }
