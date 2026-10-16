@@ -21,7 +21,7 @@
 
 | Version | Author | Date | Status |
 | :---- | :---- | :---- | :---- |
-| 1.25 | Jerry Shao | 2026-10-16 | Draft |
+| 1.26 | Jerry Shao | 2026-10-16 | Draft |
 
 ## Goals
 
@@ -46,7 +46,7 @@
 1. A steward with `MANAGE_DOMAIN` and `CREATE_TAG` on the metalake creates domain Finance with a new backing tag `finance`. The steward owns both.
 2. The steward creates subdomain Trading under Finance with a new backing tag `trading`, and grants `APPLY_TAG` on tag `trading` to the trading table owners.
 3. A table owner tags `cat.db.trades` with `trading`. The table is a member of Trading, and is listed under Finance as "via subdomain Trading". Tagging schema `cat.db` with `finance` would make every leaf object in it a member of Finance.
-4. A user or agent with `USE_DOMAIN` on Finance (which also covers Trading) or on Trading browses it and gets the tables they can access.
+4. A user or agent with `USE_DOMAIN` on Finance (which also covers Trading, unless denied there) or on Trading browses it and gets the tables they can access.
 5. Trading is moved under Markets. Its members are now listed under Markets; nothing is retagged.
 
 ## Design
@@ -127,7 +127,7 @@ Domain operations use the store's existing locking primitives, in one global ord
 ### Status
 
 - New domains are `DRAFT`. The owner or a `MANAGE_DOMAIN` holder publishes or unpublishes, at any time and without approval.
-- **Visibility is the same on every surface** (REST, MCP, UI). A `DRAFT` domain is returned only to its owner and to `MANAGE_DOMAIN` holders on it, on its parent or on the metalake. Domain APIs do not return it to anyone else: lists omit it, get returns 404, and it is not in `list_domains`, member listings, an object's domains or a parent's roll-up. Responses carry `status`, so a caller that sees drafts can filter them out.
+- **Visibility is the same on every surface** (REST, MCP, UI). A `DRAFT` domain is returned only to the users who can manage it, including through its parent or the metalake (see Access control). Domain APIs do not return it to anyone else: lists omit it, get returns 404, and it is not in `list_domains`, member listings, an object's domains or a parent's roll-up. Responses carry `status`, so a caller that sees drafts can filter them out.
 - **Known channels**: hiding a draft is not confidentiality. Its existence can still show through:
   - creating a domain with the same name fails with 409;
   - its backing tag is an ordinary tag, visible to tag readers and on tagged assets (use a non-descriptive tag name if that matters);
@@ -194,7 +194,7 @@ Domain operations use the store's existing locking primitives, in one global ord
 | Set or replace the backing tag | `MANAGE_DOMAIN` and ownership of the new tag (or the metalake) |
 | Remove the backing tag | `MANAGE_DOMAIN` |
 | Attach / move | `MANAGE_DOMAIN` on both the domain and the new parent |
-| Detach | `MANAGE_DOMAIN` on the domain (holding it on the current parent is enough) |
+| Detach | `MANAGE_DOMAIN` on the domain, including through its current parent or the metalake |
 | Publish, unpublish, edit, delete | `MANAGE_DOMAIN` |
 
 - **Membership is controlled by tag privileges only**: anyone with read access to an asset and `APPLY_TAG` on a backing tag can add the asset, without the asset owner's consent. This is the existing tag behavior; a steward controls membership by controlling `APPLY_TAG` on the backing tag.
