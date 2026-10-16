@@ -17,7 +17,7 @@ For creating the catalog and schema a model lives in, see
 
 ## Before You Start
 
-The examples use the `2.0.0-SNAPSHOT` server and clients. They assume:
+The examples use the `2.0.0` server and clients. They assume:
 
 * A server at `http://localhost:8090` and an existing metalake named `example`.
 * A relational catalog named `sales`, with a schema named `mart`.
