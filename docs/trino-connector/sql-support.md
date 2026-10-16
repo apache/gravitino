@@ -58,8 +58,13 @@ View management is only supported for catalogs backed by Hive or Iceberg; other 
 representations for multiple engines (Hive, Spark, Flink, Trino); the Trino connector only reads and
 writes the Trino dialect representation. A view that has no Trino SQL representation is silently
 invisible to Trino (it does not appear in `SHOW TABLES`/`information_schema` and cannot be loaded),
-rather than causing an error. View owner is not supported; views are always shown with `SECURITY
-INVOKER` (Gravitino does not track an owner, so `SECURITY DEFINER` cannot be represented).
+rather than causing an error. View owner (`SECURITY DEFINER`/`SECURITY INVOKER`) is persisted and
+reloaded via a reserved internal property; for Hive-backed catalogs this round-trips through
+Trino's native "Presto View" Hive Metastore format, with the live Hive Metastore table owner taking
+precedence over a possibly-stale owner encoded in that payload. The SQL path (`SET PATH`) and
+view-level `WITH (...)` properties are not supported: a view with a non-empty path is rejected
+rather than silently discarding it, and a `WITH (...)` clause on `CREATE VIEW` is rejected because
+no view property is registered.
 
 Some catalogs (e.g. Iceberg) can store a view with a default schema but no default catalog. In
 single-metalake mode this is resolved against the current Trino catalog. In multi-metalake mode it
