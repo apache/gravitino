@@ -34,6 +34,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -186,12 +187,13 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
       }
       // Other core tests overwrite these globals, so point them back before every test.
       current.bindGravitinoEnv();
+      // Runs before the test's own @BeforeEach, so its setup always starts from empty tables.
+      current.reset(resetStrategy(context));
 
       Object testInstance = context.getRequiredTestInstance();
       if (testInstance instanceof TestJDBCBackend) {
         ((TestJDBCBackend) testInstance).setBackend(current.backend);
         ((TestJDBCBackend) testInstance).setBackendType(backendType);
-        ((TestJDBCBackend) testInstance).setResetStrategy(resetStrategy(context));
       }
     }
 
@@ -261,6 +263,13 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
       EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    }
+
+    void reset(ResetStrategy resetStrategy) throws SQLException {
+      // A fresh database has nothing to reset; a backend without config is a unit-test fake.
+      if (resetStrategy != ResetStrategy.FRESH_DATABASE && config != null) {
+        DatabaseResetter.reset(backendType, resetStrategy);
+      }
     }
 
     @Override

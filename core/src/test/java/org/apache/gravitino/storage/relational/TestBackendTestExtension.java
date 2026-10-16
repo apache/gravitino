@@ -43,12 +43,18 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 class TestBackendTestExtension {
 
   private final List<RelationalBackend> backends = new ArrayList<>();
+  private final List<ResetStrategy> resets = new ArrayList<>();
   private final BackendTestExtension extension =
       new BackendTestExtension(
           (backendType, testClass) -> {
             RelationalBackend backend = mock(RelationalBackend.class);
             backends.add(backend);
-            return new BackendTestExtension.Backend(backendType, testClass, backend, null, null);
+            return new BackendTestExtension.Backend(backendType, testClass, backend, null, null) {
+              @Override
+              void reset(ResetStrategy resetStrategy) {
+                resets.add(resetStrategy);
+              }
+            };
           });
   private final ExtensionContext root = rootWithStore();
 
@@ -125,13 +131,15 @@ class TestBackendTestExtension {
   }
 
   @Test
-  void testResetModeReachesTheTest() throws Exception {
-    TestJDBCBackend test = mock(TestJDBCBackend.class);
-    run(SharedTests.class, "first", "h2", test);
-    run(TruncateTests.class, "first", "h2", test);
+  void testResetStrategyReachesTheBackend() throws Exception {
+    run(SharedTests.class, "first", "h2");
+    run(TruncateTests.class, "first", "h2");
+    run(FreshTests.class, "first", "h2");
 
-    verify(test).setResetStrategy(ResetStrategy.DELETE_ROWS);
-    verify(test).setResetStrategy(ResetStrategy.TRUNCATE_TABLES);
+    assertEquals(
+        List.of(
+            ResetStrategy.DELETE_ROWS, ResetStrategy.TRUNCATE_TABLES, ResetStrategy.FRESH_DATABASE),
+        resets);
   }
 
   @Test
