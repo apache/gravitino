@@ -237,7 +237,7 @@ public class TestNearestMaintenancePolicyResolver {
     Assertions.assertEquals(120_000L, effective.minIntervalMs());
     Assertions.assertEquals(ImmutableMap.of("spark.executor.memory", "4g"), effective.jobOptions());
     Assertions.assertEquals(
-        ImmutableMap.of("gravitino_uri", "http://g"), effective.updateOptions());
+        ImmutableMap.of("gravitino_uri", "http://g"), effective.updaterOptions());
   }
 
   @Test
@@ -262,7 +262,7 @@ public class TestNearestMaintenancePolicyResolver {
                 ImmutableMap.of("spark.executor.memory", "2g"),
                 Collections.emptyMap())
             .copyWithInherited(false);
-    // Table has no jobOptions / updateOptions — schema + catalog fill the union; triggers still
+    // Table has no jobOptions / updaterOptions — schema + catalog fill the union; triggers still
     // come from the nearest (table) policy.
     PolicyEntity tablePolicy =
         compactionPolicy("table-policy", 11L, "0 0 * * * ?", true, 60_000L, null, null)
@@ -293,7 +293,8 @@ public class TestNearestMaintenancePolicyResolver {
     Assertions.assertEquals(
         ImmutableMap.of("uri", "http://catalog-irc", "type", "rest", "spark.executor.memory", "2g"),
         effective.jobOptions());
-    Assertions.assertEquals(ImmutableMap.of("metalake", "from-catalog"), effective.updateOptions());
+    Assertions.assertEquals(
+        ImmutableMap.of("metalake", "from-catalog"), effective.updaterOptions());
   }
 
   @Test
@@ -334,14 +335,14 @@ public class TestNearestMaintenancePolicyResolver {
         ImmutableMap.of("uri", "http://table-irc", "type", "rest"), effective.jobOptions());
     Assertions.assertEquals(
         ImmutableMap.of("metalake", "from-table", "gravitino_uri", "http://g"),
-        effective.updateOptions());
+        effective.updaterOptions());
   }
 
   @Test
   void testEffectivePolicyConstructorKeepsExecutionFields() {
     PolicyEntity policy = compactionPolicy("p", 7L).copyWithInherited(false);
     Map<String, String> jobOptions = ImmutableMap.of("type", "rest");
-    Map<String, String> updateOptions = ImmutableMap.of("metalake", "ml");
+    Map<String, String> updaterOptions = ImmutableMap.of("metalake", "ml");
     EffectiveTableMaintenancePolicy effective =
         new EffectiveTableMaintenancePolicy(
             policy,
@@ -350,13 +351,13 @@ public class TestNearestMaintenancePolicyResolver {
             true,
             42_000L,
             jobOptions,
-            updateOptions);
+            updaterOptions);
     Assertions.assertEquals("0 0 2 * * ?", effective.timeTrigger());
     Assertions.assertEquals(Boolean.TRUE, effective.commitTrigger());
     Assertions.assertEquals(42_000L, effective.minIntervalMs());
     Assertions.assertEquals(Policy.BuiltInType.ICEBERG_COMPACTION, effective.builtInType());
     Assertions.assertEquals(jobOptions, effective.jobOptions());
-    Assertions.assertEquals(updateOptions, effective.updateOptions());
+    Assertions.assertEquals(updaterOptions, effective.updaterOptions());
   }
 
   private static PolicyEntity compactionPolicy(String name, long id) {
@@ -370,7 +371,7 @@ public class TestNearestMaintenancePolicyResolver {
       Boolean commitTrigger,
       Long minIntervalMs,
       Map<String, String> jobOptions,
-      Map<String, String> updateOptions) {
+      Map<String, String> updaterOptions) {
     PolicyContent content =
         PolicyContents.icebergDataCompaction(
             IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
@@ -385,7 +386,7 @@ public class TestNearestMaintenancePolicyResolver {
             commitTrigger,
             minIntervalMs,
             jobOptions,
-            updateOptions);
+            updaterOptions);
     return PolicyEntity.builder()
         .withId(id)
         .withName(name)

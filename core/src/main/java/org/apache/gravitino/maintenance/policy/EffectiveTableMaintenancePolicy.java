@@ -29,14 +29,16 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 
 /**
  * Effective scheduling / submit view for a table and built-in maintenance policy type.
  *
  * <p>Carries the nearest policy for triggers and resolved {@code minIntervalMs}, plus {@code
- * jobOptions} / {@code updateOptions} merged across the metadata hierarchy (catalog → schema →
+ * jobOptions} / {@code updaterOptions} merged across the metadata hierarchy (catalog → schema →
  * table). Missing keys on a nearer attachment are filled from outer levels; the same key on a
  * nearer policy overrides an outer value.
  */
@@ -48,7 +50,7 @@ public final class EffectiveTableMaintenancePolicy {
   @Nullable private final Boolean commitTrigger;
   private final long minIntervalMs;
   private final Map<String, String> jobOptions;
-  private final Map<String, String> updateOptions;
+  private final Map<String, String> updaterOptions;
 
   /**
    * Creates an effective policy view.
@@ -59,7 +61,7 @@ public final class EffectiveTableMaintenancePolicy {
    * @param commitTrigger commit-trigger flag from the nearest policy content, or null when unset
    * @param minIntervalMs resolved minimum interval
    * @param jobOptions hierarchy-merged job options
-   * @param updateOptions hierarchy-merged update options
+   * @param updaterOptions hierarchy-merged updater options
    */
   public EffectiveTableMaintenancePolicy(
       PolicyEntity policy,
@@ -68,14 +70,14 @@ public final class EffectiveTableMaintenancePolicy {
       @Nullable Boolean commitTrigger,
       long minIntervalMs,
       Map<String, String> jobOptions,
-      Map<String, String> updateOptions) {
+      Map<String, String> updaterOptions) {
     this.policy = Preconditions.checkNotNull(policy, "policy");
     this.builtInType = Preconditions.checkNotNull(builtInType, "builtInType");
     this.timeTrigger = timeTrigger;
     this.commitTrigger = commitTrigger;
     this.minIntervalMs = minIntervalMs;
     this.jobOptions = copyOptions(jobOptions);
-    this.updateOptions = copyOptions(updateOptions);
+    this.updaterOptions = copyOptions(updaterOptions);
   }
 
   /**
@@ -123,17 +125,17 @@ public final class EffectiveTableMaintenancePolicy {
   }
 
   /**
-   * @return hierarchy-merged update options; never {@code null}
+   * @return hierarchy-merged updater options; never {@code null}
    */
-  public Map<String, String> updateOptions() {
-    return updateOptions;
+  public Map<String, String> updaterOptions() {
+    return updaterOptions;
   }
 
   /**
    * Resolves effective TMS policy for a metadata object.
    *
    * <p>{@code timeTrigger}, {@code commitTrigger}, and {@code minIntervalMs} come from the nearest
-   * matching policy. {@code jobOptions} / {@code updateOptions} are the union of direct matches
+   * matching policy. {@code jobOptions} / {@code updaterOptions} are the union of direct matches
    * along catalog → schema → table (nearer keys win).
    *
    * @param resolver nearest-policy resolver
@@ -155,20 +157,20 @@ public final class EffectiveTableMaintenancePolicy {
     }
 
     PolicyEntity nearest = chain.get(0);
-    PolicyContent nearestContent = nearest.content();
+    PolicyExecutionSpec nearestSpec = executionSpec(nearest.content());
     long interval =
-        MaintenanceMinIntervalConfigs.resolve(config, builtInType, nearestContent.minIntervalMs());
+        MaintenanceMinIntervalConfigs.resolve(config, builtInType, nearestSpec.minIntervalMs());
     Map<String, String> mergedJobOptions = mergeOptions(chain, true);
-    Map<String, String> mergedUpdateOptions = mergeOptions(chain, false);
+    Map<String, String> mergedUpdaterOptions = mergeOptions(chain, false);
     return Optional.of(
         new EffectiveTableMaintenancePolicy(
             nearest,
             builtInType,
-            nearestContent.timeTrigger(),
-            nearestContent.commitTrigger(),
+            nearestSpec.timeTrigger(),
+            nearestSpec.commitTrigger(),
             interval,
             mergedJobOptions,
-            mergedUpdateOptions));
+            mergedUpdaterOptions));
   }
 
   /**
@@ -179,13 +181,20 @@ public final class EffectiveTableMaintenancePolicy {
       List<PolicyEntity> nearestFirstChain, boolean job) {
     Map<String, String> merged = new LinkedHashMap<>();
     for (int i = nearestFirstChain.size() - 1; i >= 0; i--) {
-      PolicyContent content = nearestFirstChain.get(i).content();
-      Map<String, String> level = job ? content.jobOptions() : content.updateOptions();
-      if (level != null && !level.isEmpty()) {
+      PolicyExecutionSpec spec = executionSpec(nearestFirstChain.get(i).content());
+      Map<String, String> level = job ? spec.jobOptions() : spec.updaterOptions();
+      if (!level.isEmpty()) {
         merged.putAll(level);
       }
     }
     return merged.isEmpty() ? Collections.emptyMap() : ImmutableMap.copyOf(merged);
+  }
+
+  private static PolicyExecutionSpec executionSpec(PolicyContent content) {
+    if (content instanceof ExecutablePolicyContent) {
+      return ((ExecutablePolicyContent) content).executionSpec();
+    }
+    return PolicyExecutionSpec.empty();
   }
 
   private static Map<String, String> copyOptions(@Nullable Map<String, String> options) {

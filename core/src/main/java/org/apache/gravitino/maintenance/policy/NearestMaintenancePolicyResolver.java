@@ -39,7 +39,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  *
  * <p>{@link #resolveNearest} returns the first match in that walk. {@link #resolveDirectChain}
  * returns every level that has a direct match so callers can merge {@code jobOptions} / {@code
- * updateOptions} across the hierarchy.
+ * updaterOptions} across the hierarchy.
  */
 public class NearestMaintenancePolicyResolver {
 
@@ -71,7 +71,7 @@ public class NearestMaintenancePolicyResolver {
   /**
    * Returns direct matching policies from nearest to outermost (at most one per level).
    *
-   * <p>Used when merging {@code jobOptions} / {@code updateOptions} across the hierarchy while
+   * <p>Used when merging {@code jobOptions} / {@code updaterOptions} across the hierarchy while
    * triggers and {@code minIntervalMs} still come from the nearest policy only.
    *
    * @param metalake metalake name
