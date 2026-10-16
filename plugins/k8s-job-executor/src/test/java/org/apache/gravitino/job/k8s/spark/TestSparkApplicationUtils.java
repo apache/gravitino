@@ -39,6 +39,35 @@ public class TestSparkApplicationUtils {
   private final K8sJobExecutorConfigs configs = newConfigs(ImmutableMap.of());
 
   @Test
+  public void testRejectClientDeployMode() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("s3a://bucket/app.jar")
+            .withClassName("org.example.App")
+            .withConfigs(ImmutableMap.of("spark.submit.deployMode", " Client "))
+            .build();
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+    Assertions.assertTrue(e.getMessage().contains("Client"), e.getMessage());
+
+    // Nor set by the executor configurations.
+    K8sJobExecutorConfigs clientMode =
+        newConfigs(ImmutableMap.of("spark.conf.spark.submit.deployMode", "client"));
+    SparkJobTemplate noMode =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("s3a://bucket/app.jar")
+            .withClassName("org.example.App")
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, noMode, clientMode));
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   public void testBuildSparkApplication() {
     SparkJobTemplate template =
@@ -53,7 +82,7 @@ public class TestSparkApplicationUtils {
             .withConfigs(
                 ImmutableMap.of(
                     "spark.master", "local[*]",
-                    "spark.submit.deployMode", "client",
+                    "spark.submit.deployMode", "cluster",
                     "spark.executor.instances", "2",
                     "spark.jars", "https://repo/other.jar"))
             .build();
