@@ -56,6 +56,15 @@ When you add or move a core test, check that it runs in the lane you expect:
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
+In a database lane, each test class shares one database per backend, and `TestJDBCBackend` empties its tables before each test. A test that changes the schema, closes the backend itself, or leaves writers running after it ends needs its own database instead:
+
+```java
+@DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+public class TestSQLScripts extends TestJDBCBackend { ... }
+```
+
+`RESET_TABLES` is the default. A method-level `@DatabaseFixture` overrides the class-level one.
+
 In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
 
 ## Run the Integration Tests
