@@ -43,8 +43,10 @@ import io.trino.spi.type.TypeOperators;
 import io.trino.spi.type.UuidType;
 import io.trino.spi.type.VarcharType;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.BooleanType;
@@ -177,14 +179,29 @@ public class GeneralDataTypeTransformer {
   }
 
   private StructType trinoRowTypeToGravitinoRowType(RowType rowType) {
-    StructType.Field[] fields =
-        rowType.getFields().stream()
-            .map(
-                field ->
-                    StructType.Field.nullableField(
-                        field.getName().get(), getGravitinoType(field.getType())))
-            .toArray(StructType.Field[]::new);
-
+    List<Field> trinoFields = rowType.getFields();
+    Set<String> usedNames = new HashSet<>();
+    for (Field trinoField : trinoFields) {
+      trinoField.getName().ifPresent(usedNames::add);
+    }
+    StructType.Field[] fields = new StructType.Field[trinoFields.size()];
+    int anonymousSeq = 0;
+    for (int i = 0; i < trinoFields.size(); i++) {
+      Field trinoField = trinoFields.get(i);
+      String name;
+      if (trinoField.getName().isPresent()) {
+        name = trinoField.getName().get();
+      } else {
+        // Trino allows anonymous row fields (e.g. ROW(1, 'x') with no AS), but Gravitino's
+        // StructType.Field requires a name, so synthesize one that cannot collide with an
+        // explicitly-named sibling field (e.g. ROW(1, 'x' AS field0)).
+        do {
+          name = "field" + anonymousSeq++;
+        } while (usedNames.contains(name));
+        usedNames.add(name);
+      }
+      fields[i] = StructType.Field.nullableField(name, getGravitinoType(trinoField.getType()));
+    }
     return StructType.of(fields);
   }
 
