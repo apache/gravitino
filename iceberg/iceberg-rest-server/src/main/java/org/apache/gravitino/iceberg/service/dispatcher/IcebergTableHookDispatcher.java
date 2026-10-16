@@ -42,6 +42,7 @@ import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -214,6 +215,18 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       TableIdentifier tableIdentifier,
       FetchScanTasksRequest request) {
     return dispatcher.fetchScanTasks(context, tableIdentifier, request);
+  }
+
+  @Override
+  public FetchPlanningResultResponse fetchPlanningResult(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    return dispatcher.fetchPlanningResult(context, tableIdentifier, planId);
+  }
+
+  @Override
+  public void cancelPlanning(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    dispatcher.cancelPlanning(context, tableIdentifier, planId);
   }
 
   @Override
