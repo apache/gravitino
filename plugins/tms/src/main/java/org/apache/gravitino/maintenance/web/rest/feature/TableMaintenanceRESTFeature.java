@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.web.rest.feature;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import javax.ws.rs.core.Feature;
@@ -26,8 +28,13 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.scheduler.PolicyExpandScheduler;
+import org.apache.gravitino.maintenance.scheduler.PolicyTimeTriggerEventListener;
+import org.apache.gravitino.maintenance.scheduler.PolicyTimeTriggerEventListener.PolicySnapshot;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
@@ -41,7 +48,9 @@ import org.slf4j.LoggerFactory;
  * enabled (§7.1).
  *
  * <p>TMS does not register public REST resources in this change; the feature only owns server
- * lifecycle for in-process scheduling. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs
+ * lifecycle for in-process scheduling. While the pools are running, create, alter, enable, disable,
+ * and delete of a maintenance policy that carries {@code timeTrigger} insert, move, or delete the
+ * matching {@code policy-expand} row. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs
  * during Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
  *
  * <p>After {@link #stopSchedulers()}, a later {@link #configure} may start pools again and
@@ -57,6 +66,11 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
       new AtomicReference<>();
+
+  private static final AtomicReference<PolicyExpandScheduler> EXPAND_SCHEDULER =
+      new AtomicReference<>();
+
+  private static final AtomicBoolean TIME_TRIGGER_LISTENER_REGISTERED = new AtomicBoolean();
 
   @Override
   public boolean configure(FeatureContext context) {
@@ -80,6 +94,16 @@ public class TableMaintenanceRESTFeature implements Feature {
       return true;
     }
 
+    try {
+      EXPAND_SCHEDULER.set(PolicyExpandScheduler.create(dataSource));
+      registerTimeTriggerListener();
+    } catch (RuntimeException e) {
+      EXPAND_SCHEDULER.set(null);
+      SCHEDULER_POOLS.set(null);
+      pools.stop();
+      throw e;
+    }
+
     // Register only after a successful CAS so a later configure-after-stop can attach a listener
     // again on the new FeatureContext (listener is scoped to the Jersey Application).
     context.register(new SchedulerShutdownListener());
@@ -89,10 +113,40 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   /** Stops scheduler pools. Invoked from Jersey destroy and tests. */
   public static void stopSchedulers() {
+    EXPAND_SCHEDULER.set(null);
     TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
     if (pools != null) {
       pools.stop();
       LOG.info("Table maintenance scheduler pools stopped");
+    }
+  }
+
+  private static void registerTimeTriggerListener() {
+    if (!TIME_TRIGGER_LISTENER_REGISTERED.compareAndSet(false, true)) {
+      return;
+    }
+    if (GravitinoEnv.getInstance().eventListenerManager() == null) {
+      TIME_TRIGGER_LISTENER_REGISTERED.set(false);
+      throw new IllegalStateException("Event listener manager is not initialized");
+    }
+    GravitinoEnv.getInstance()
+        .eventListenerManager()
+        .addEventListener(
+            "tms-policy-time-trigger",
+            new PolicyTimeTriggerEventListener(
+                EXPAND_SCHEDULER::get, TableMaintenanceRESTFeature::loadPolicy));
+  }
+
+  private static Optional<PolicySnapshot> loadPolicy(String metalake, String policyName) {
+    if (GravitinoEnv.getInstance().policyDispatcher() == null) {
+      return Optional.empty();
+    }
+    try {
+      PolicyEntity policy =
+          GravitinoEnv.getInstance().policyDispatcher().getPolicy(metalake, policyName);
+      return Optional.of(new PolicySnapshot(policy.id(), policy.enabled(), policy.content()));
+    } catch (NoSuchPolicyException e) {
+      return Optional.empty();
     }
   }
 
