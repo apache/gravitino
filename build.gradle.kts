@@ -1026,12 +1026,7 @@ subprojects {
       useJUnitPlatform()
       val isCoreSuiteTask =
         project.path == ":core" &&
-          name in setOf(
-          "coreUnitTest",
-          "coreH2Test",
-          "coreMySQLTest",
-          "corePostgreSQLTest"
-        )
+          name in setOf("coreMySQLTest", "corePostgreSQLTest")
       if (!isCoreSuiteTask) {
         finalizedBy(tasks.getByName("jacocoTestReport"))
       }
