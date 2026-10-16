@@ -33,16 +33,13 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -51,9 +48,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.AfterEachCallback;
-import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -63,15 +58,26 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BackendTestExtension
-    implements TestTemplateInvocationContextProvider, BeforeAllCallback, AfterAllCallback {
+/**
+ * Runs each {@code @TestTemplate} against a relational backend and injects it into {@link
+ * TestJDBCBackend} tests.
+ *
+ * <p>The backend is the one {@link BackendTestSelector} names, which each core database lane sets.
+ * With none selected, tests run on H2, plus MySQL and PostgreSQL when {@code dockerTest=true}.
+ *
+ * <p>{@code SqlSessionFactoryHelper} is process-global, so only one backend can be live in a JVM.
+ * The extension keeps it in a single slot and reuses it for the tests of one class; {@link
+ * TestJDBCBackend} truncates every table before each test. It builds a new backend when the test
+ * class or backend type changes, and for every {@link DatabaseIsolation#FRESH_DATABASE} test.
+ */
+public class BackendTestExtension implements TestTemplateInvocationContextProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(BackendTestExtension.class);
   private static final String DOCKER_TEST_FLAG = "dockerTest";
 
   private static final ExtensionContext.Namespace NAMESPACE =
       ExtensionContext.Namespace.create(BackendTestExtension.class);
-  private static final String STORE_KEY = "BACKEND_MAP";
+  private static final String CURRENT_BACKEND = "CURRENT_BACKEND";
 
   private final BackendFactory backendFactory;
 
@@ -82,21 +88,6 @@ public class BackendTestExtension
 
   BackendTestExtension(BackendFactory backendFactory) {
     this.backendFactory = backendFactory;
-  }
-
-  @Override
-  public void beforeAll(ExtensionContext context) {
-    context.getStore(NAMESPACE).put(STORE_KEY, new ConcurrentHashMap<String, BackendResource>());
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public void afterAll(ExtensionContext context) {
-    ConcurrentHashMap<String, BackendResource> map =
-        (ConcurrentHashMap<String, BackendResource>) context.getStore(NAMESPACE).remove(STORE_KEY);
-    if (map != null) {
-      map.values().forEach(BackendResource::closeQuietly);
-    }
   }
 
   @Override
@@ -112,7 +103,7 @@ public class BackendTestExtension
     if (selectedBackend.isPresent()) {
       LOG.info("Running tests with the selected {} backend.", selectedBackend.get());
       return createInvocationContexts(
-          testMethodName, Collections.singletonList(selectedBackend.get()), true);
+          testMethodName, Collections.singletonList(selectedBackend.get()));
     }
 
     List<String> backendsToTest = new ArrayList<>();
@@ -128,33 +119,22 @@ public class BackendTestExtension
           "Running tests with H2 backend only. Set env var 'dockerTest=true' to include all backends.");
     }
 
-    return createInvocationContexts(testMethodName, backendsToTest, false);
+    return createInvocationContexts(testMethodName, backendsToTest);
   }
 
   Stream<TestTemplateInvocationContext> createInvocationContexts(
-      String testMethodName, List<String> backends, boolean reuseBackend) {
+      String testMethodName, List<String> backends) {
     return backends.stream()
-        .map(
-            backendType ->
-                new BackendInvocationContext(
-                    testMethodName, backendType, reuseBackend, backendFactory));
+        .map(backendType -> new BackendInvocationContext(testMethodName, backendType));
   }
 
-  private static class BackendInvocationContext implements TestTemplateInvocationContext {
+  private class BackendInvocationContext implements TestTemplateInvocationContext {
     private final String testMethodName;
     private final String backendType;
-    private final boolean reuseBackend;
-    private final BackendFactory backendFactory;
 
-    private BackendInvocationContext(
-        String testMethodName,
-        String backendType,
-        boolean reuseBackend,
-        BackendFactory backendFactory) {
+    private BackendInvocationContext(String testMethodName, String backendType) {
       this.testMethodName = testMethodName;
       this.backendType = backendType;
-      this.reuseBackend = reuseBackend;
-      this.backendFactory = backendFactory;
     }
 
     @Override
@@ -167,24 +147,122 @@ public class BackendTestExtension
 
     @Override
     public List<Extension> getAdditionalExtensions() {
-      return Collections.singletonList(
-          new BackendSetupCallback(backendType, reuseBackend, backendFactory));
+      return Collections.singletonList(new BackendSetupCallback(backendType));
     }
   }
 
   @FunctionalInterface
   interface BackendFactory {
-    BackendResource create(String backendType) throws Exception;
+    Backend create(String backendType) throws Exception;
   }
 
-  @FunctionalInterface
-  interface BackendActivator {
-    void activate() throws Exception;
+  private class BackendSetupCallback implements BeforeEachCallback, AfterEachCallback {
+    private final String backendType;
+
+    private BackendSetupCallback(String backendType) {
+      this.backendType = backendType;
+    }
+
+    @Override
+    public void beforeEach(ExtensionContext context) throws Exception {
+      ExtensionContext.Store store = context.getRoot().getStore(NAMESPACE);
+      Class<?> testClass = context.getRequiredTestClass();
+      Backend current = store.get(CURRENT_BACKEND, Backend.class);
+      if (current != null
+          && (freshDatabase(context)
+              || current.testClass != testClass
+              || !current.backendType.equals(backendType))) {
+        // Only one backend can own the global SQL session, so the old one goes first.
+        store.remove(CURRENT_BACKEND, Backend.class).close();
+        current = null;
+      }
+      if (current == null) {
+        current = backendFactory.create(backendType);
+        current.testClass = testClass;
+        store.put(CURRENT_BACKEND, current);
+      }
+      // Other core tests overwrite these globals, so point them back before every test.
+      current.bindGravitinoEnv();
+
+      Object testInstance = context.getRequiredTestInstance();
+      if (testInstance instanceof TestJDBCBackend) {
+        ((TestJDBCBackend) testInstance).setBackend(current.backend);
+        ((TestJDBCBackend) testInstance).setBackendType(backendType);
+      }
+    }
+
+    @Override
+    public void afterEach(ExtensionContext context) throws Exception {
+      if (freshDatabase(context)) {
+        Backend fresh =
+            context.getRoot().getStore(NAMESPACE).remove(CURRENT_BACKEND, Backend.class);
+        if (fresh != null) {
+          fresh.close();
+        }
+      }
+    }
+
+    private boolean freshDatabase(ExtensionContext context) {
+      return isolation(context) == DatabaseIsolation.FRESH_DATABASE;
+    }
+
+    private DatabaseIsolation isolation(ExtensionContext context) {
+      DatabaseFixture methodFixture =
+          context.getRequiredTestMethod().getAnnotation(DatabaseFixture.class);
+      if (methodFixture != null) {
+        return methodFixture.isolation();
+      }
+      DatabaseFixture classFixture =
+          context.getRequiredTestClass().getAnnotation(DatabaseFixture.class);
+      return classFixture == null ? DatabaseIsolation.RESET_TABLES : classFixture.isolation();
+    }
+  }
+
+  /** The live backend; JUnit closes whatever is left in the root store when the run ends. */
+  static class Backend implements ExtensionContext.Store.CloseableResource {
+    private final String backendType;
+    private final RelationalBackend backend;
+    @Nullable private final Config config;
+    @Nullable private final File h2Directory;
+    private Class<?> testClass;
+
+    Backend(
+        String backendType,
+        RelationalBackend backend,
+        @Nullable Config config,
+        @Nullable File h2Directory) {
+      this.backendType = backendType;
+      this.backend = backend;
+      this.config = config;
+      this.h2Directory = h2Directory;
+    }
+
+    private void bindGravitinoEnv() throws IllegalAccessException {
+      if (config == null) {
+        return;
+      }
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
+      EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    }
+
+    @Override
+    public void close() throws IOException {
+      LOG.info("Tearing down backend: {}", backendType);
+      try {
+        backend.close();
+      } finally {
+        if (h2Directory != null) {
+          FileUtils.deleteDirectory(h2Directory);
+        }
+      }
+    }
   }
 
   private static class DefaultBackendFactory implements BackendFactory {
     @Override
-    public BackendResource create(String backendType) throws Exception {
+    public Backend create(String backendType) throws Exception {
       BaseIT baseIT = new BaseIT();
       LOG.info("Initializing backend resource: {}", backendType);
       Config config = Mockito.mock(Config.class);
@@ -198,7 +276,7 @@ public class BackendTestExtension
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
 
       Mockito.when(config.get(CACHE_ENABLED)).thenReturn(true);
-      RelationalBackend backend = new JDBCBackend();
+      File h2Directory = null;
       if ("mysql".equals(backendType)) {
         String url = baseIT.startAndInitMySQLBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(url);
@@ -214,187 +292,35 @@ public class BackendTestExtension
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("org.postgresql.Driver");
       } else {
-        // H2 Logic
         String uuid = UUID.randomUUID().toString().replace("-", "");
-        String jdbcPath = "/tmp/gravitino_jdbc_test_h2_" + uuid;
-        File dir = new File(jdbcPath);
-        if (!dir.exists() && !dir.mkdirs()) throw new IOException("Create dir failed");
-
+        h2Directory = new File("/tmp/gravitino_jdbc_test_h2_" + uuid);
+        if (!h2Directory.exists() && !h2Directory.mkdirs()) {
+          throw new IOException("Create dir failed");
+        }
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-            .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", jdbcPath));
+            .thenReturn(
+                String.format(
+                    "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", h2Directory.getPath()));
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123456");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
-
-        // Wrap it with a Wrapper so that files can be deleted during the clean process
-        backend = new H2BackendWrapper(jdbcPath);
       }
 
-      BackendResource resource =
-          new BackendResource(
-              backendType,
-              backend,
-              () -> {
-                FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
-                FieldUtils.writeField(
-                    GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
-                EntityIdService.initialize(new RelationalEntityStoreIdResolver());
-              });
+      RelationalBackend backend = new JDBCBackend();
+      Backend created = new Backend(backendType, backend, config, h2Directory);
       try {
-        resource.activate();
+        created.bindGravitinoEnv();
         // Close the backend before initializing to make sure the singleton sqlSession is cleared.
         backend.close();
         backend.initialize(config);
-        return resource;
+        return created;
       } catch (Exception e) {
-        resource.closeQuietly();
+        try {
+          created.close();
+        } catch (IOException closeFailure) {
+          e.addSuppressed(closeFailure);
+        }
         throw e;
-      }
-    }
-  }
-
-  private static class BackendSetupCallback implements BeforeEachCallback, AfterEachCallback {
-    private final String backendType;
-    private final boolean reuseBackend;
-    private final BackendFactory backendFactory;
-    private BackendResource perTestBackend;
-
-    private BackendSetupCallback(
-        String backendType, boolean reuseBackend, BackendFactory backendFactory) {
-      this.backendType = backendType;
-      this.reuseBackend = reuseBackend;
-      this.backendFactory = backendFactory;
-    }
-
-    @Override
-    public void beforeEach(ExtensionContext context) throws Exception {
-      BackendResource resource;
-      if (reuseBackend && isolation(context) == DatabaseIsolation.RESET_TABLES) {
-        resource = getOrCreateClassBackend(context);
-      } else {
-        if (reuseBackend) {
-          // Only one backend can own the global SQL session, so the class backend must go first.
-          closeClassBackend(context);
-        }
-        perTestBackend = backendFactory.create(backendType);
-        resource = perTestBackend;
-      }
-      resource.activate();
-
-      Object testInstance = context.getRequiredTestInstance();
-      if (testInstance instanceof TestJDBCBackend) {
-        LOG.info("Injecting {} backend into test instance", backendType);
-        ((TestJDBCBackend) testInstance).setBackend(resource.backend);
-        ((TestJDBCBackend) testInstance).setBackendType(backendType);
-      }
-    }
-
-    @Override
-    public void afterEach(ExtensionContext context) throws Exception {
-      if (perTestBackend != null) {
-        BackendResource resource = perTestBackend;
-        perTestBackend = null;
-        resource.close();
-      }
-    }
-
-    private BackendResource getOrCreateClassBackend(ExtensionContext context) throws Exception {
-      Map<String, BackendResource> backendMap = backendMap(context);
-      synchronized (backendMap) {
-        BackendResource resource = backendMap.get(backendType);
-        if (resource == null) {
-          resource = backendFactory.create(backendType);
-          backendMap.put(backendType, resource);
-        }
-        return resource;
-      }
-    }
-
-    private void closeClassBackend(ExtensionContext context) throws Exception {
-      Map<String, BackendResource> backendMap = backendMap(context);
-      synchronized (backendMap) {
-        BackendResource resource = backendMap.remove(backendType);
-        if (resource != null) {
-          resource.close();
-        }
-      }
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, BackendResource> backendMap(ExtensionContext context) {
-      ExtensionContext classContext = context;
-      while (classContext.getTestMethod().isPresent()) {
-        classContext =
-            classContext
-                .getParent()
-                .orElseThrow(() -> new IllegalStateException("Test class context is unavailable"));
-      }
-      Map<String, BackendResource> backendMap =
-          (Map<String, BackendResource>) classContext.getStore(NAMESPACE).get(STORE_KEY);
-      if (backendMap == null) {
-        throw new IllegalStateException("Backend fixture store is unavailable");
-      }
-      return backendMap;
-    }
-
-    private static DatabaseIsolation isolation(ExtensionContext context) {
-      DatabaseFixture methodFixture =
-          context.getRequiredTestMethod().getAnnotation(DatabaseFixture.class);
-      if (methodFixture != null) {
-        return methodFixture.isolation();
-      }
-      DatabaseFixture classFixture =
-          context.getRequiredTestClass().getAnnotation(DatabaseFixture.class);
-      return classFixture == null ? DatabaseIsolation.RESET_TABLES : classFixture.isolation();
-    }
-  }
-
-  static class BackendResource {
-    private final String backendType;
-    private final RelationalBackend backend;
-    private final BackendActivator activator;
-
-    BackendResource(String backendType, RelationalBackend backend, BackendActivator activator) {
-      this.backendType = backendType;
-      this.backend = backend;
-      this.activator = activator;
-    }
-
-    private void activate() throws Exception {
-      activator.activate();
-    }
-
-    private void close() throws Exception {
-      LOG.info("Tearing down backend: {}", backendType);
-      try {
-        backend.close();
-      } finally {
-        if (backend instanceof H2BackendWrapper) {
-          ((H2BackendWrapper) backend).cleanFile();
-        }
-      }
-    }
-
-    private void closeQuietly() {
-      try {
-        close();
-      } catch (Exception e) {
-        LOG.error("Failed to close backend {}", backendType, e);
-      }
-    }
-  }
-
-  // A simple Wrapper solves the H2 file cleanup issue.
-  public static class H2BackendWrapper extends JDBCBackend {
-    private final String path;
-
-    public H2BackendWrapper(String path) {
-      this.path = path;
-    }
-
-    public void cleanFile() throws IOException {
-      if (Files.exists(Paths.get(path))) {
-        FileUtils.deleteDirectory(new File(path));
       }
     }
   }

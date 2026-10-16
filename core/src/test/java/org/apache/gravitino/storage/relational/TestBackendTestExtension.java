@@ -33,7 +33,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -43,218 +42,158 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 
 class TestBackendTestExtension {
 
+  private final List<RelationalBackend> backends = new ArrayList<>();
+  private final BackendTestExtension extension =
+      new BackendTestExtension(
+          backendType -> {
+            RelationalBackend backend = mock(RelationalBackend.class);
+            backends.add(backend);
+            return new BackendTestExtension.Backend(backendType, backend, null, null);
+          });
+  private final ExtensionContext root = rootWithStore();
+
   @Test
-  void testSelectedBackendReusesClassFixture() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
+  void testClassReusesOneBackend() throws Exception {
+    run(SharedTests.class, "first", "h2");
+    run(SharedTests.class, "second", "h2");
 
-    runInvocation(extension, true, contexts.methodContext("first"));
-    runInvocation(extension, true, contexts.methodContext("second"));
-
-    assertEquals(1, factory.backends.size());
-    assertEquals(2, factory.activationCount);
-    verify(factory.backends.get(0), never()).close();
-
-    extension.afterAll(contexts.classContext);
-    verify(factory.backends.get(0), times(1)).close();
+    assertEquals(1, backends.size());
+    verify(backends.get(0), never()).close();
   }
 
   @Test
-  void testLegacyH2DoesNotReuseFixture() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(DefaultIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
+  void testNextClassGetsANewBackend() throws Exception {
+    run(SharedTests.class, "first", "h2");
+    run(OtherSharedTests.class, "first", "h2");
 
-    runInvocation(extension, false, contexts.methodContext("first"));
-    runInvocation(extension, false, contexts.methodContext("second"));
-
-    assertEquals(2, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), times(1)).close();
-
-    extension.afterAll(contexts.classContext);
+    assertEquals(2, backends.size());
+    verify(backends.get(0), times(1)).close();
+    verify(backends.get(1), never()).close();
   }
 
   @Test
-  void testFreshClassCreatesAndClosesEachInvocation() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(FreshIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
+  void testBackendTypeChangeGetsANewBackend() throws Exception {
+    run(SharedTests.class, "first", "h2");
+    run(SharedTests.class, "first", "mysql");
 
-    runInvocation(extension, true, contexts.methodContext("first"));
-    runInvocation(extension, true, contexts.methodContext("second"));
-
-    assertEquals(2, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), times(1)).close();
-
-    extension.afterAll(contexts.classContext);
+    assertEquals(2, backends.size());
+    verify(backends.get(0), times(1)).close();
   }
 
   @Test
-  void testFreshMethodEvictsSharedFixture() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(MixedIsolationTests.class);
-    extension.beforeAll(contexts.classContext);
+  void testFreshClassGetsABackendPerTest() throws Exception {
+    run(FreshTests.class, "first", "h2");
+    run(FreshTests.class, "second", "h2");
 
-    runInvocation(extension, true, contexts.methodContext("resettable"));
-    runInvocation(extension, true, contexts.methodContext("fresh"));
-    runInvocation(extension, true, contexts.methodContext("resettable"));
+    assertEquals(2, backends.size());
+    verify(backends.get(0), times(1)).close();
+    verify(backends.get(1), times(1)).close();
+  }
 
-    assertEquals(3, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), times(1)).close();
-    verify(factory.backends.get(2), never()).close();
+  @Test
+  void testFreshMethodReplacesTheSharedBackend() throws Exception {
+    run(MixedTests.class, "shared", "h2");
+    run(MixedTests.class, "fresh", "h2");
+    run(MixedTests.class, "shared", "h2");
 
-    extension.afterAll(contexts.classContext);
-    verify(factory.backends.get(2), times(1)).close();
+    assertEquals(3, backends.size());
+    verify(backends.get(0), times(1)).close();
+    verify(backends.get(1), times(1)).close();
+    verify(backends.get(2), never()).close();
   }
 
   @Test
   void testResetTablesMethodSharesInsideFreshClass() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(FreshClassWithSharedMethodTests.class);
-    extension.beforeAll(contexts.classContext);
+    run(FreshClassWithSharedMethodTests.class, "shared", "h2");
+    run(FreshClassWithSharedMethodTests.class, "shared", "h2");
+    assertEquals(1, backends.size());
 
-    runInvocation(extension, true, contexts.methodContext("shared"));
-    runInvocation(extension, true, contexts.methodContext("shared"));
-    assertEquals(1, factory.backends.size());
-    verify(factory.backends.get(0), never()).close();
-
-    runInvocation(extension, true, contexts.methodContext("fresh"));
-    assertEquals(2, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), times(1)).close();
-
-    extension.afterAll(contexts.classContext);
+    run(FreshClassWithSharedMethodTests.class, "fresh", "h2");
+    assertEquals(2, backends.size());
+    verify(backends.get(0), times(1)).close();
+    verify(backends.get(1), times(1)).close();
   }
 
   @Test
   void testSubclassInheritsFreshDatabase() throws Exception {
-    CountingBackendFactory factory = new CountingBackendFactory();
-    BackendTestExtension extension = new BackendTestExtension(factory);
-    TestContexts contexts = new TestContexts(InheritedFreshTests.class);
-    extension.beforeAll(contexts.classContext);
+    run(InheritedFreshTests.class, "third", "h2");
+    run(InheritedFreshTests.class, "fourth", "h2");
 
-    runInvocation(extension, true, contexts.methodContext("third"));
-    runInvocation(extension, true, contexts.methodContext("fourth"));
-
-    assertEquals(2, factory.backends.size());
-    verify(factory.backends.get(0), times(1)).close();
-    verify(factory.backends.get(1), times(1)).close();
-
-    extension.afterAll(contexts.classContext);
+    assertEquals(2, backends.size());
+    verify(backends.get(0), times(1)).close();
+    verify(backends.get(1), times(1)).close();
   }
 
   @Test
   void testDisplayNamePreservesMethodAndBackend() {
-    BackendTestExtension extension =
-        new BackendTestExtension(
-            backendType ->
-                new BackendTestExtension.BackendResource(
-                    backendType, mock(RelationalBackend.class), () -> {}));
-
     TestTemplateInvocationContext context =
-        extension
-            .createInvocationContexts("testMethod", List.of("h2"), true)
-            .findFirst()
-            .orElseThrow();
+        extension.createInvocationContexts("testMethod", List.of("h2")).findFirst().orElseThrow();
 
     assertEquals("testMethod[H2 Backend]", context.getDisplayName(1));
   }
 
-  private static void runInvocation(
-      BackendTestExtension extension, boolean reuseBackend, ExtensionContext context)
-      throws Exception {
-    TestTemplateInvocationContext invocation =
+  private void run(Class<?> testClass, String methodName, String backendType) throws Exception {
+    Method method = testClass.getDeclaredMethod(methodName);
+    ExtensionContext context = mock(ExtensionContext.class);
+    when(context.getRoot()).thenReturn(root);
+    when(context.getRequiredTestMethod()).thenReturn(method);
+    when(context.getRequiredTestClass()).thenAnswer(invocation -> testClass);
+    when(context.getRequiredTestInstance()).thenReturn(this);
+
+    Extension callback =
         extension
-            .createInvocationContexts("testMethod", List.of("h2"), reuseBackend)
+            .createInvocationContexts(methodName, List.of(backendType))
             .findFirst()
-            .orElseThrow();
-    Extension callback = invocation.getAdditionalExtensions().get(0);
+            .orElseThrow()
+            .getAdditionalExtensions()
+            .get(0);
     ((BeforeEachCallback) callback).beforeEach(context);
     ((AfterEachCallback) callback).afterEach(context);
   }
 
-  private static class CountingBackendFactory implements BackendTestExtension.BackendFactory {
-    private final List<RelationalBackend> backends = new ArrayList<>();
-    private int activationCount;
-
-    @Override
-    public BackendTestExtension.BackendResource create(String backendType) {
-      RelationalBackend backend = mock(RelationalBackend.class);
-      backends.add(backend);
-      return new BackendTestExtension.BackendResource(
-          backendType, backend, () -> activationCount++);
-    }
+  private static ExtensionContext rootWithStore() {
+    Map<Object, Object> entries = new HashMap<>();
+    ExtensionContext.Store store = mock(ExtensionContext.Store.class);
+    doAnswer(invocation -> entries.put(invocation.getArgument(0), invocation.getArgument(1)))
+        .when(store)
+        .put(any(), any());
+    when(store.get(any(), any(Class.class)))
+        .thenAnswer(invocation -> entries.get(invocation.getArgument(0)));
+    when(store.remove(any(), any(Class.class)))
+        .thenAnswer(invocation -> entries.remove(invocation.getArgument(0)));
+    ExtensionContext root = mock(ExtensionContext.class);
+    when(root.getStore(any(ExtensionContext.Namespace.class))).thenReturn(store);
+    return root;
   }
 
-  private static class TestContexts {
-    private final Class<?> testClass;
-    private final ExtensionContext classContext;
-
-    private TestContexts(Class<?> testClass) {
-      this.testClass = testClass;
-      classContext = mock(ExtensionContext.class);
-      ExtensionContext.Store store = mock(ExtensionContext.Store.class);
-      Map<Object, Object> entries = new HashMap<>();
-
-      doAnswer(
-              invocation -> {
-                entries.put(invocation.getArgument(0), invocation.getArgument(1));
-                return null;
-              })
-          .when(store)
-          .put(any(), any());
-      when(store.get(any())).thenAnswer(invocation -> entries.get(invocation.getArgument(0)));
-      when(store.remove(any())).thenAnswer(invocation -> entries.remove(invocation.getArgument(0)));
-      when(classContext.getStore(any(ExtensionContext.Namespace.class))).thenReturn(store);
-      when(classContext.getTestMethod()).thenReturn(Optional.empty());
-      when(classContext.getRequiredTestClass()).thenAnswer(invocation -> testClass);
-    }
-
-    private ExtensionContext methodContext(String methodName) throws NoSuchMethodException {
-      Method method = testClass.getDeclaredMethod(methodName);
-      ExtensionContext methodContext = mock(ExtensionContext.class);
-      when(methodContext.getTestMethod()).thenReturn(Optional.of(method));
-      when(methodContext.getRequiredTestMethod()).thenReturn(method);
-      when(methodContext.getRequiredTestClass()).thenAnswer(invocation -> testClass);
-      when(methodContext.getRequiredTestInstance()).thenReturn(this);
-      when(methodContext.getParent()).thenReturn(Optional.of(classContext));
-      return methodContext;
-    }
-  }
-
-  private static class DefaultIsolationTests {
+  private static class SharedTests {
     void first() {}
 
     void second() {}
+  }
+
+  private static class OtherSharedTests {
+    void first() {}
   }
 
   @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
-  private static class FreshIsolationTests {
+  private static class FreshTests {
     void first() {}
 
     void second() {}
   }
 
-  private static class MixedIsolationTests {
-    void resettable() {}
-
-    @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
-    void fresh() {}
-  }
-
-  private static class InheritedFreshTests extends FreshIsolationTests {
+  private static class InheritedFreshTests extends FreshTests {
     void third() {}
 
     void fourth() {}
+  }
+
+  private static class MixedTests {
+    void shared() {}
+
+    @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+    void fresh() {}
   }
 
   @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
