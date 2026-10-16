@@ -42,6 +42,7 @@ import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableLayout;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableVersion;
+import io.trino.spi.connector.ConnectorViewDefinition;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.ConstraintApplicationResult;
 import io.trino.spi.connector.JoinApplicationResult;
@@ -71,6 +72,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -90,6 +92,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.apache.gravitino.trino.connector.util.SchemaFunctionNames;
 import org.apache.gravitino.trino.connector.util.TrinoRoutineSpecification;
 
@@ -207,9 +210,10 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
     ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
     for (String schemaName : schemaNames) {
-      List<String> tableNames = catalogConnectorMetadata.listTables(schemaName);
-      for (String tableName : tableNames) {
-        builder.add(new SchemaTableName(schemaName, tableName));
+      Set<String> names = new LinkedHashSet<>(catalogConnectorMetadata.listTables(schemaName));
+      names.addAll(catalogConnectorMetadata.listViews(schemaName));
+      for (String name : names) {
+        builder.add(new SchemaTableName(schemaName, name));
       }
     }
     return builder.build();
@@ -834,6 +838,81 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         new GravitinoTableExecuteHandle(result.getTableExecuteHandle()),
         new GravitinoTableHandle(
             tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
+  }
+
+  @Override
+  public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName) {
+    Set<String> schemaNames =
+        schemaName
+            .map(ImmutableSet::of)
+            .orElseGet(() -> ImmutableSet.copyOf(listSchemaNames(session)));
+
+    ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
+    for (String schema : schemaNames) {
+      List<String> viewNames = catalogConnectorMetadata.listViews(schema);
+      for (String viewName : viewNames) {
+        builder.add(new SchemaTableName(schema, viewName));
+      }
+    }
+    return builder.build();
+  }
+
+  @Override
+  public Optional<ConnectorViewDefinition> getView(
+      ConnectorSession session, SchemaTableName viewName) {
+    return catalogConnectorMetadata
+        .getViewIfPresent(viewName.getSchemaName(), viewName.getTableName())
+        .map(
+            view ->
+                metadataAdapter.getViewDefinition(
+                    view,
+                    catalogConnectorMetadata.getCatalogName(),
+                    catalogConnectorMetadata.isSingleMetalakeMode()));
+  }
+
+  @Override
+  public void dropView(ConnectorSession session, SchemaTableName viewName) {
+    catalogConnectorMetadata.dropView(viewName.getSchemaName(), viewName.getTableName());
+  }
+
+  @Override
+  public void renameView(ConnectorSession session, SchemaTableName source, SchemaTableName target) {
+    catalogConnectorMetadata.renameView(source, target);
+  }
+
+  @Override
+  public void createView(
+      ConnectorSession session,
+      SchemaTableName viewName,
+      ConnectorViewDefinition definition,
+      Map<String, Object> viewProperties,
+      boolean replace) {
+    createViewInternal(viewName, definition, viewProperties, replace);
+  }
+
+  @Override
+  public boolean isView(ConnectorSession session, SchemaTableName viewName) {
+    return catalogConnectorMetadata
+        .getViewIfPresent(viewName.getSchemaName(), viewName.getTableName())
+        .isPresent();
+  }
+
+  /**
+   * Creates or replaces a Gravitino view from a Trino view definition.
+   *
+   * @param viewName the schema-qualified view name
+   * @param definition the Trino view definition
+   * @param viewProperties the Trino view properties, merged as-is into the Gravitino view's generic
+   *     properties
+   * @param replace whether to replace the view if it already exists
+   */
+  protected void createViewInternal(
+      SchemaTableName viewName,
+      ConnectorViewDefinition definition,
+      Map<String, Object> viewProperties,
+      boolean replace) {
+    GravitinoView view = metadataAdapter.createView(viewName, definition, viewProperties);
+    catalogConnectorMetadata.createView(view, replace);
   }
 
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {

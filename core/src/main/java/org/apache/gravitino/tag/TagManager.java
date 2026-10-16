@@ -179,7 +179,7 @@ public class TagManager implements TagDispatcher {
       // and the REST layer maps it to a conflict. Log it here so the operator-facing record
       // still names the tag and the metalake.
       LOG.warn(
-          "Failed to alter tag {} under metalake {} because it changed concurrently",
+          "Failed to alter tag {} under metalake {} because of a concurrent operation",
           name,
           metalake,
           ole);
@@ -196,7 +196,7 @@ public class TagManager implements TagDispatcher {
       return entityStore.delete(NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
     } catch (OptimisticLockException ole) {
       LOG.warn(
-          "Failed to delete tag {} under metalake {} because it changed concurrently",
+          "Failed to delete tag {} under metalake {} because of a concurrent operation",
           name,
           metalake,
           ole);

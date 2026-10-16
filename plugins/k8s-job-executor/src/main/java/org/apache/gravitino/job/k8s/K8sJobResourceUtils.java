@@ -20,8 +20,10 @@ package org.apache.gravitino.job.k8s;
 
 import com.google.common.collect.ImmutableMap;
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 
 /** The naming and labeling of the Kubernetes resources created for the jobs. */
 public final class K8sJobResourceUtils {
@@ -90,6 +92,27 @@ public final class K8sJobResourceUtils {
     Map<String, String> labels =
         resource.getMetadata() == null ? null : resource.getMetadata().getLabels();
     return labels != null && String.valueOf(jobId).equals(labels.get(LABEL_JOB_ID));
+  }
+
+  /**
+   * Returns whether the Kubernetes resource is the one Gravitino created for the job its name was
+   * made for: it is managed by Gravitino, and its job id label is the job id its name ends with.
+   * The name alone may be used by another system, or by another Gravitino deployment with the same
+   * name prefix in the namespace, for another of its jobs.
+   *
+   * @param resource the resource
+   * @return true if the resource is a job resource of Gravitino matching its name
+   */
+  public static boolean isJobResource(HasMetadata resource) {
+    ObjectMeta metadata = resource.getMetadata();
+    Map<String, String> labels = metadata == null ? null : metadata.getLabels();
+    if (labels == null || !MANAGED_BY_GRAVITINO.equals(labels.get(LABEL_MANAGED_BY))) {
+      return false;
+    }
+    String jobId = labels.get(LABEL_JOB_ID);
+    return StringUtils.isNotBlank(jobId)
+        && metadata.getName() != null
+        && metadata.getName().endsWith("-" + jobId);
   }
 
   /**

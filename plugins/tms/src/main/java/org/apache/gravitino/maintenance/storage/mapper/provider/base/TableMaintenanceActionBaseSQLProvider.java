@@ -146,7 +146,8 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Sets {@code before_snapshot_id} once when {@code S0} is sampled.
+   * Sets {@code before_snapshot_id} when {@code S0} is sampled ({@code IS NULL} first write).
+   * Callers treat an already-matching value as an idempotent no-op in Java.
    *
    * @param jobId Gravitino job run id
    * @param beforeSnapshotId sampled snapshot id
