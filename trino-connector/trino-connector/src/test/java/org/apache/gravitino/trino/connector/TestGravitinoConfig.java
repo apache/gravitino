@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
+import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,17 +57,92 @@ public class TestGravitinoConfig {
   }
 
   @Test
-  public void testMissingConfig() {
+  public void testMetalakeIsOptional() {
     String gravitinoUrl = "http://127.0.0.1:8000";
-    ImmutableMap<String, String> configMap = ImmutableMap.of("gravitino.uri", gravitinoUrl);
-    try {
-      GravitinoConfig config = new GravitinoConfig(configMap);
-      assertEquals(gravitinoUrl, config.getURI());
-    } catch (TrinoException e) {
-      if (!GRAVITINO_MISSING_CONFIG.toErrorCode().equals(e.getErrorCode())) {
-        throw e;
-      }
-    }
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.uri", gravitinoUrl));
+
+    assertEquals(gravitinoUrl, config.getURI());
+    assertFalse(config.hasMetalake());
+    assertEquals("", config.getMetalake());
+    // A blank value is the same as an unset one.
+    assertFalse(new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "  ")).hasMetalake());
+    assertTrue(new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "test")).hasMetalake());
+  }
+
+  @Test
+  public void testLoadAllMetalakes() {
+    // Without a metalake every metalake is loaded, whatever the naming mode says.
+    assertTrue(new GravitinoConfig(ImmutableMap.of()).loadAllMetalakes());
+    assertTrue(
+        new GravitinoConfig(ImmutableMap.of("gravitino.catalog-name-with-metalake", "true"))
+            .loadAllMetalakes());
+    // With a metalake only the qualified naming mode loads every metalake.
+    assertFalse(
+        new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "test")).loadAllMetalakes());
+    assertTrue(
+        new GravitinoConfig(
+                ImmutableMap.of(
+                    "gravitino.metalake", "test", "gravitino.catalog-name-with-metalake", "true"))
+            .loadAllMetalakes());
+  }
+
+  @Test
+  public void testCatalogNameWithMetalake() {
+    assertFalse(new GravitinoConfig(ImmutableMap.of()).catalogNameWithMetalake());
+    assertTrue(
+        new GravitinoConfig(ImmutableMap.of("gravitino.catalog-name-with-metalake", "true"))
+            .catalogNameWithMetalake());
+    // The deprecated key still works when the new one is unset ...
+    assertTrue(
+        new GravitinoConfig(ImmutableMap.of("gravitino.use-single-metalake", "false"))
+            .catalogNameWithMetalake());
+    assertFalse(
+        new GravitinoConfig(ImmutableMap.of("gravitino.use-single-metalake", "true"))
+            .catalogNameWithMetalake());
+    // ... and is ignored once the new one is set.
+    assertFalse(
+        new GravitinoConfig(
+                ImmutableMap.of(
+                    "gravitino.use-single-metalake", "false",
+                    "gravitino.catalog-name-with-metalake", "false"))
+            .catalogNameWithMetalake());
+
+    assertTrue(
+        new GravitinoConfig(
+                ImmutableMap.of(
+                    "gravitino.use-single-metalake", "true",
+                    "gravitino.catalog-name-with-metalake", "true"))
+            .catalogNameWithMetalake());
+
+    TrinoException error =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                new GravitinoConfig(ImmutableMap.of("gravitino.catalog-name-with-metalake", "yes"))
+                    .catalogNameWithMetalake());
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), error.getErrorCode());
+    // The deprecated key is parsed just as strictly: a typo must not flip the naming mode.
+    error =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                new GravitinoConfig(ImmutableMap.of("gravitino.use-single-metalake", "yes"))
+                    .catalogNameWithMetalake());
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), error.getErrorCode());
+  }
+
+  @Test
+  public void testUsesDeprecatedSingleMetalakeKey() {
+    assertFalse(new GravitinoConfig(ImmutableMap.of()).usesDeprecatedSingleMetalakeKey());
+    assertTrue(
+        new GravitinoConfig(ImmutableMap.of("gravitino.use-single-metalake", "true"))
+            .usesDeprecatedSingleMetalakeKey());
+    assertFalse(
+        new GravitinoConfig(
+                ImmutableMap.of(
+                    "gravitino.use-single-metalake", "false",
+                    "gravitino.catalog-name-with-metalake", "true"))
+            .usesDeprecatedSingleMetalakeKey());
   }
 
   @Test
@@ -177,6 +252,28 @@ public class TestGravitinoConfig {
     String catalogConfig = config.toCatalogConfig();
     assertTrue(catalogConfig.contains("\"gravitino.client.authType\"='simple'"));
     assertTrue(catalogConfig.contains("\"gravitino.user\"='admin'"));
+  }
+
+  @Test
+  public void testToCatalogConfigIncludesScopedIcebergRestUris() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.iceberg.rest-uri",
+                "http://default-irc:9001/iceberg",
+                "gravitino.iceberg.rest-uri.prod",
+                "http://prod-irc:9001/iceberg",
+                "gravitino.iceberg.rest-uri.dev",
+                "http://dev-irc:9001/iceberg"));
+
+    String catalogConfig = config.toCatalogConfig();
+    assertTrue(
+        catalogConfig.contains("\"gravitino.iceberg.rest-uri\"='http://default-irc:9001/iceberg'"));
+    assertTrue(
+        catalogConfig.contains(
+            "\"gravitino.iceberg.rest-uri.prod\"='http://prod-irc:9001/iceberg'"));
+    assertTrue(
+        catalogConfig.contains("\"gravitino.iceberg.rest-uri.dev\"='http://dev-irc:9001/iceberg'"));
   }
 
   @Test
@@ -355,14 +452,64 @@ public class TestGravitinoConfig {
                 "gravitino.iceberg.rest-catalog.security", "OAUTH2",
                 "gravitino.iceberg.rest-catalog.oauth2.credential", "client_id:client_secret"));
 
-    // The unscoped URI is honored as-is in single-metalake mode.
+    // The unscoped URI is the default for every metalake.
     assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri("user_001"));
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri("user_002"));
 
     Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
     assertEquals(2, restCatalogConfig.size());
     assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
     assertEquals(
         "client_id:client_secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+  }
+
+  @Test
+  public void testIcebergRestConfigRejectsBasicAuthWithoutExplicitSecurity() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "basic",
+                "gravitino.client.basic.username", "admin",
+                "gravitino.client.basic.password", "admin-pass"));
+
+    TrinoException e = assertThrows(TrinoException.class, config::getIcebergRestCatalogConfig);
+    assertTrue(e.getMessage().contains("gravitino.client.authType=basic"));
+    assertTrue(e.getMessage().contains("gravitino.iceberg.rest-catalog.security"));
+  }
+
+  @Test
+  public void testIcebergRestConfigMapsSimpleAuthToNone() {
+    GravitinoConfig simpleConfig =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "simple"));
+    assertEquals(
+        "NONE", simpleConfig.getIcebergRestCatalogConfig().get("iceberg.rest-catalog.security"));
+  }
+
+  @Test
+  public void testIcebergRestConfigRejectsKerberosAuthWithoutExplicitSecurity() {
+    GravitinoConfig kerberosConfig =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "KERBEROS"));
+    assertThrows(TrinoException.class, kerberosConfig::getIcebergRestCatalogConfig);
+  }
+
+  @Test
+  public void testIcebergRestConfigAllowsBasicAuthWithExplicitSecurityOverride() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.authType", "basic",
+                "gravitino.iceberg.rest-catalog.security", "NONE"));
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals("NONE", restCatalogConfig.get("iceberg.rest-catalog.security"));
   }
 
   @Test
@@ -387,6 +534,31 @@ public class TestGravitinoConfig {
     assertEquals(
         "https://oauth.example.com/realms/gravitino/token",
         restCatalogConfig.get("iceberg.rest-catalog.oauth2.server-uri"));
+  }
+
+  /** Verifies non-OAuth2 REST modes do not inherit Gravitino service credentials. */
+  @Test
+  public void testIcebergRestPassthroughDoesNotInheritServiceCredentials() {
+    for (String security : new String[] {"OAUTH2_PASSTHROUGH", "NONE"}) {
+      GravitinoConfig config =
+          new GravitinoConfig(
+              ImmutableMap.<String, String>builder()
+                  .put("gravitino.metalake", "test")
+                  .put("gravitino.client.authType", "oauth2")
+                  .put("gravitino.client.oauth2.serverUri", "https://idp.example.com")
+                  .put("gravitino.client.oauth2.path", "token")
+                  .put("gravitino.client.oauth2.credential", "service:secret")
+                  .put("gravitino.client.oauth2.scope", "openid")
+                  .put("gravitino.iceberg.rest-catalog.security", security)
+                  .put("gravitino.iceberg.rest-catalog.session", "NONE")
+                  .build());
+      assertEquals(
+          ImmutableMap.of(
+              "iceberg.rest-catalog.security", security, "iceberg.rest-catalog.session", "NONE"),
+          config.getIcebergRestCatalogConfig());
+      assertEquals(
+          "service:secret", config.getClientConfig().get("gravitino.client.oauth2.credential"));
+    }
   }
 
   @Test
@@ -414,24 +586,25 @@ public class TestGravitinoConfig {
   }
 
   @Test
-  public void testIcebergRestConfigScopedToMetalakeInMultiMetalakeMode() {
-    ImmutableMap<String, String> configMap =
-        ImmutableMap.of(
-            "gravitino.metalake",
-            "metalake_a",
-            "gravitino.use-single-metalake",
-            "false",
-            "gravitino.iceberg.rest-uri",
-            "http://unscoped:9001/iceberg",
-            "gravitino.iceberg.rest-uri.metalake_a",
-            "http://metalake-a:9001/iceberg");
-    GravitinoConfig config = new GravitinoConfig(configMap);
+  public void testScopedIcebergRestUriOverridesUnscopedPerMetalake() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.catalog-name-with-metalake",
+                "true",
+                "gravitino.iceberg.rest-uri",
+                "http://unscoped:9001/iceberg",
+                "gravitino.iceberg.rest-uri.metalake_a",
+                "http://metalake-a:9001/iceberg"));
 
-    // The scoped key wins for the metalake it names.
+    // The scoped key wins for the metalake it names, the others fall back to the unscoped one,
+    // whether or not gravitino.metalake is configured.
     assertEquals("http://metalake-a:9001/iceberg", config.getManualIcebergRestUri("metalake_a"));
-    // The unscoped key is ignored in multi-metalake mode, since it would otherwise misroute every
-    // metalake other than the one the Iceberg REST server actually serves.
-    assertEquals("", config.getManualIcebergRestUri("metalake_b"));
+    assertEquals("http://unscoped:9001/iceberg", config.getManualIcebergRestUri("metalake_b"));
+    assertEquals(
+        "",
+        new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "metalake_a"))
+            .getManualIcebergRestUri("metalake_a"));
   }
 
   @Test

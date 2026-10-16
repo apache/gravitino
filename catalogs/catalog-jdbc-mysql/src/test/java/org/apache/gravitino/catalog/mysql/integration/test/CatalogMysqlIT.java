@@ -216,6 +216,10 @@ public class CatalogMysqlIT extends BaseIT {
         JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
+    // This test registers a catalog pointing at an unreachable endpoint on purpose, so it can then
+    // assert testConnection fails on the EXISTING catalog. It must opt out of create-time
+    // verification; the rejection by the default create-time verification is covered separately.
+    catalogProperties.put(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false");
 
     metalake.createCatalog(
         unreachableCatalogName,
@@ -536,6 +540,75 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testColumnDefaultValueWithDatetimePrecision() {
+    // MySQL rejects `DATETIME(6) DEFAULT CURRENT_TIMESTAMP`: once a column declares a fractional
+    // seconds precision, CURRENT_TIMESTAMP has to carry the same one.
+    Column col1 =
+        Column.of(
+            "col_1",
+            Types.TimestampType.withoutTimeZone(6),
+            "col_1_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column col2 =
+        Column.of(
+            "col_2",
+            Types.TimestampType.withTimeZone(3),
+            "col_2_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column col3 =
+        Column.of(
+            "col_3",
+            Types.TimestampType.withoutTimeZone(),
+            "col_3_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(tableIdent, new Column[] {col1, col2, col3}, null, ImmutableMap.of());
+
+    // An added column is rendered the same way as the ones above.
+    Column col4 =
+        Column.of(
+            "col_4",
+            Types.TimestampType.withoutTimeZone(6),
+            "col_4_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    tableCatalog.alterTable(
+        tableIdent,
+        TableChange.addColumn(
+            new String[] {col4.name()},
+            col4.dataType(),
+            col4.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col4.nullable(),
+            col4.autoIncrement(),
+            col4.defaultValue()));
+
+    Table createdTable = tableCatalog.loadTable(tableIdent);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), createdTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(3), createdTable.columns()[1].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(0), createdTable.columns()[2].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), createdTable.columns()[3].dataType());
+    for (Column column : createdTable.columns()) {
+      Assertions.assertEquals(
+          DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue(), column.name());
+    }
+  }
+
+  @Test
   // MySQL support column default value expression after 8.0.13
   // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("SupportColumnDefaultValueExpression")
@@ -677,6 +750,35 @@ public class CatalogMysqlIT extends BaseIT {
                   + column.defaultValue());
       }
     }
+  }
+
+  @Test
+  void testLoadHighPrecisionDecimalTable() {
+    mysqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "decimal_38 DECIMAL(38,30), "
+                + "decimal_39 DECIMAL(39,30), "
+                + "decimal_65 DECIMAL(65,30), "
+                + "decimal_65_unsigned DECIMAL(65,30) UNSIGNED, "
+                + "decimal_10_unsigned DECIMAL(10,2) UNSIGNED, "
+                + "decimal_38_unsigned DECIMAL(38,30) UNSIGNED, "
+                + "decimal_39_unsigned DECIMAL(39,30) UNSIGNED)",
+            schemaName, tableName));
+
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Column[] columns = loadedTable.columns();
+    Assertions.assertEquals(7, columns.length);
+    Assertions.assertEquals(Types.DecimalType.of(38, 30), columns[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("decimal(39,30)"), columns[1].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("decimal(65,30)"), columns[2].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("decimal(65,30) unsigned"), columns[3].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), columns[4].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(38, 30), columns[5].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("decimal(39,30) unsigned"), columns[6].dataType());
   }
 
   @Test
@@ -1487,7 +1589,9 @@ public class CatalogMysqlIT extends BaseIT {
             UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
     Assertions.assertTrue(
-        exception.getMessage().contains("Doesn't support setting schema comment: comment"));
+        exception
+            .getMessage()
+            .contains("Schema " + testSchemaName + ": catalog does not support schema comments"));
 
     // test null comment
     String testSchemaName2 = "test2";
@@ -2333,6 +2437,10 @@ public class CatalogMysqlIT extends BaseIT {
     String password = MYSQL_CONTAINER.getPassword();
     String wrongPassword = password + "wrong";
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
+    // This test deliberately creates the catalog with a wrong password and then fixes it via
+    // alterCatalog, so it must opt out of create-time backend verification; otherwise the create
+    // itself would be rejected for the unreachable backend (the behavior added in #13767).
+    catalogProperties.put(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false");
 
     metalake.createCatalog(
         testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);

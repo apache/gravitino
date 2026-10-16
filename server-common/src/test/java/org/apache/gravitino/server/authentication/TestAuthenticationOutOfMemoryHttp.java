@@ -79,7 +79,7 @@ class TestAuthenticationOutOfMemoryHttp {
         new JettyServer() {
           /** {@inheritDoc} */
           @Override
-          protected Filter createAuthenticationFilter() {
+          protected Filter createAuthenticationFilter(boolean includeErrorStackTrace) {
             return new AuthenticationFilter(Collections.singletonList(authenticator)) {
               /** {@inheritDoc} */
               @Override

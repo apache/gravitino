@@ -18,16 +18,26 @@
  */
 package org.apache.gravitino.secret;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestSecretPropertyUtils {
+
+  @AfterEach
+  void resetAdditionalMatcher() {
+    SensitivePropertyKeyMatcher.resetToDefaults();
+  }
 
   @Test
   void testAssembleAndWrite() {
@@ -131,11 +141,23 @@ public class TestSecretPropertyUtils {
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-key"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("azure-storage-account-name"));
     Assertions.assertTrue(SecretPropertyUtils.isSensitivePropertyKey("gcs-service-account-file"));
+    Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-passwrod"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("jdbc-user"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("warehouse"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-region"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(null));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(""));
+  }
+
+  @Test
+  void testBuildSecretsIncludesAdditionalSensitiveKey() {
+    SensitivePropertyKeyMatcher.configure(List.of("passwrod"));
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = Map.of("jdbc-passwrod", "typo-secret", "jdbc-user", "root");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+      Assertions.assertEquals("typo-secret", secrets.get("jdbc-passwrod"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-user"));
+    }
   }
 
   @Test
@@ -160,10 +182,75 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
+  void testBuildSecretsNullMetadataIsUrnOnly() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = new HashMap<>();
+      entityProps.put("s3-access-key-id", "AKIA");
+      entityProps.put("jdbc-password", "inline-secret");
+      Map<String, SecretBinding> bindings =
+          Map.of("custom-secret", new SecretBinding("memory", "custom-value"));
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(Map.of(), entityProps, "catalog", 42L, bindings, Map.of());
+      sm.writeSecrets(writes);
+
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
+      Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
+      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-password"));
+    }
+  }
+
+  @Test
   void testBuildSecretsNullAndEmpty() {
     try (SecretManager sm = memorySecretManager()) {
       Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null).isEmpty());
       Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of()).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null, null).isEmpty());
+    }
+  }
+
+  @Test
+  void testBuildSecretsRecoversDeclaredHiddenWithoutKeywordGate() {
+    Config config = new Config(false) {};
+    // Drop "access" / "password" / "secret" so keyword fuzzy recovery cannot rescue these keys.
+    config.set(Configs.SENSITIVE_KEY_KEYWORDS, List.of("token"));
+    SecretPropertyUtils.configureSensitiveKeyKeywords(config);
+    try (SecretManager sm = memorySecretManager()) {
+      PropertiesMetadata metadata =
+          new PropertiesMetadata() {
+            @Override
+            public Map<String, PropertyEntry<?>> propertyEntries() {
+              return ImmutableMap.of(
+                  "s3-access-key-id",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "s3-access-key-id", "ak", false, null, true),
+                  "auth-file",
+                  PropertyEntry.stringOptionalPropertyEntry("auth-file", "path", false, null, true),
+                  "credential-providers",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "credential-providers", "providers", false, null, false));
+            }
+          };
+      Map<String, String> entityProps =
+          Map.of(
+              "s3-access-key-id",
+              "AKIA",
+              "auth-file",
+              "/path/to/key",
+              "credential-providers",
+              "s3-token",
+              "custom-token",
+              "tok",
+              "undeclared-access-key",
+              "should-not-recover");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
+      Assertions.assertEquals("AKIA", secrets.get("s3-access-key-id"));
+      Assertions.assertEquals("/path/to/key", secrets.get("auth-file"));
+      Assertions.assertEquals("tok", secrets.get("custom-token"));
+      Assertions.assertFalse(secrets.containsKey("credential-providers"));
+      Assertions.assertFalse(
+          secrets.containsKey("undeclared-access-key"),
+          "undeclared keys still require a sensitive keyword match");
     }
   }
 

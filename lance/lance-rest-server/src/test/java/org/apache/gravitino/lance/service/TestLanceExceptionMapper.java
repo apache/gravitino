@@ -135,4 +135,32 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals("catalog", error.getInstance());
     }
   }
+
+  /** Verifies that the error detail omits the stack trace when disabled. */
+  @Test
+  public void testErrorDetailFollowsSetting() {
+    IllegalArgumentException failure = new IllegalArgumentException("failure");
+    try {
+      Assertions.assertTrue(
+          LanceExceptionMapper.errorDetail(failure)
+              .contains("java.lang.IllegalArgumentException: failure"));
+
+      LanceExceptionMapper.setIncludeErrorStackTrace(false);
+      Assertions.assertEquals("", LanceExceptionMapper.errorDetail(failure));
+      Response response = LanceExceptionMapper.toRESTResponse("", failure);
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("failure", entity.getError());
+      Assertions.assertEquals("", entity.getDetail());
+
+      // Lance exceptions that already carry a detail keep it; only generated stacks are omitted.
+      Response nativeResponse =
+          LanceExceptionMapper.toRESTResponse(
+              "instance", new InvalidInputException("bad input", "native detail", "instance"));
+      Assertions.assertEquals(
+          "native detail", ((ErrorResponse) nativeResponse.getEntity()).getDetail());
+    } finally {
+      LanceExceptionMapper.setIncludeErrorStackTrace(true);
+    }
+  }
 }

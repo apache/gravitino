@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -188,8 +189,10 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the view node, not the schema, so views in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        schemaIdent,
+        ident,
         LockType.WRITE,
         () ->
             internalCreateView(
@@ -340,6 +343,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
               store.delete(ident, VIEW);
             } catch (NoSuchEntityException e) {
               LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -579,6 +584,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       throw new UnsupportedOperationException(
           "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
               + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       throw new RuntimeException("Failed to import the view entity to the store", e);

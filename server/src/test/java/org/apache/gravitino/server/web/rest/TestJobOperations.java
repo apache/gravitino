@@ -22,10 +22,13 @@ import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.codahale.metrics.annotation.ResponseMetered;
@@ -48,10 +51,12 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
+import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
@@ -248,6 +253,22 @@ public class TestJobOperations extends JerseyTest {
   public void testRegisterJobTemplateWithNullRequest() {
     Response resp =
         target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
+  }
+
+  @Test
+  public void testRunJobWithNullRequest() {
+    Response resp =
+        target(jobRunPath())
             .request(APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(new byte[0], APPLICATION_JSON_TYPE));
@@ -652,6 +673,23 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp4 = resp5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
     Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp4.getType());
+
+    // Test throw UnsupportedOperationException
+    doThrow(new UnsupportedOperationException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp5b =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp5b.getStatus());
+    ErrorResponse errorResp4b = resp5b.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResp4b.getType());
 
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
@@ -1095,6 +1133,126 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testGetJob() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+
+    when(jobOperationDispatcher.getJob(metalake, job.name(), false, null, null)).thenReturn(job);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(JobOperations.toDTO(job), jobResp.getJob());
+    // includeOutput defaults to false, so no output is fetched or returned.
+    Assertions.assertNull(jobResp.getJob().stdout());
+    Assertions.assertNull(jobResp.getJob().stderr());
+
+    verify(jobOperationDispatcher, never()).getJob(any(), any(), eq(true), any(), any());
+  }
+
+  @Test
+  public void testGetJobWithOutput() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+    List<String> stdout = Lists.newArrayList("line1", "line2");
+    List<String> stderr = Lists.newArrayList("err1");
+    JobEntity jobWithOutput = job.withOutput(stdout, stderr);
+
+    when(jobOperationDispatcher.getJob(metalake, job.name(), true, null, null))
+        .thenReturn(jobWithOutput);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(stdout, jobResp.getJob().stdout());
+    Assertions.assertEquals(stderr, jobResp.getJob().stderr());
+  }
+
+  @Test
+  public void testGetJobWithOutputCustomLimits() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+    List<String> stdout = Lists.newArrayList("line1");
+    List<String> stderr = Lists.newArrayList();
+    JobEntity jobWithOutput = job.withOutput(stdout, stderr);
+
+    // The outputMaxLines/outputMaxBytes query parameters are passed straight through to the
+    // dispatcher as-is; clamping against the global configuration happens downstream in
+    // JobManager, not in the REST layer.
+    when(jobOperationDispatcher.getJob(metalake, job.name(), true, 10, 1024))
+        .thenReturn(jobWithOutput);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .queryParam("outputMaxLines", "10")
+            .queryParam("outputMaxBytes", "1024")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(stdout, jobResp.getJob().stdout());
+    Assertions.assertEquals(stderr, jobResp.getJob().stderr());
+  }
+
+  @Test
+  public void testGetJobWithOutputUnsupportedOperation() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+
+    doThrow(new UnsupportedOperationException("output retrieval not supported"))
+        .when(jobOperationDispatcher)
+        .getJob(metalake, job.name(), true, null, null);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testGetJobWithInvalidOutputMaxLines() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED);
+
+    doThrow(new IllegalArgumentException("maxLines must be positive if specified"))
+        .when(jobOperationDispatcher)
+        .getJob(metalake, job.name(), true, 0, null);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .queryParam("includeOutput", "true")
+            .queryParam("outputMaxLines", "0")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
   public void testRunJob() {
     String templateName = "shell_template_1";
     Map<String, String> jobConf = ImmutableMap.of("key1", "value1", "key2", "value2");
@@ -1307,6 +1465,57 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals("resolved", runtimeJobTemplateDTO.comment());
     Assertions.assertEquals("/bin/echo", runtimeJobTemplateDTO.executable());
     Assertions.assertEquals(Lists.newArrayList("resolved-arg"), runtimeJobTemplateDTO.arguments());
+  }
+
+  @Test
+  public void testToDTORuntimeJobTemplateMasksSensitiveFields() {
+    String runtimeJobTemplateJson =
+        "{"
+            + "\"jobType\":\"spark\","
+            + "\"name\":\"spark_template_1\","
+            + "\"comment\":\"resolved\","
+            + "\"executable\":\"local:///app.jar\","
+            + "\"arguments\":["
+            + "\"--updater-options\","
+            + "\"{\\\"gravitino_uri\\\":\\\"http://localhost\\\",\\\"password\\\":\\\"nested-pw\\\"}\","
+            + "\"--spark-conf\","
+            + "\"{\\\"spark.executor.memory\\\":\\\"1g\\\",\\\"jdbc.password\\\":\\\"jdbc-pw\\\"}\""
+            + "],"
+            + "\"environments\":{\"AUTH_PASSWORD\":\"env-secret\",\"CATALOG\":\"ice\"},"
+            + "\"className\":\"org.example.App\","
+            + "\"configs\":{\"spark.hadoop.fs.s3a.secret.key\":\"s3-secret\"}"
+            + "}";
+    JobEntity jobWithSecrets =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-with-secrets")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("spark_template_1")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobDTO jobDTO = JobOperations.toDTO(jobWithSecrets);
+    Assertions.assertInstanceOf(SparkJobTemplateDTO.class, jobDTO.runtimeJobTemplate());
+    SparkJobTemplateDTO spark = (SparkJobTemplateDTO) jobDTO.runtimeJobTemplate();
+
+    Assertions.assertEquals("env-secret", spark.environments().get("AUTH_PASSWORD"));
+    Assertions.assertEquals("s3-secret", spark.configs().get("spark.hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals("--updater-options", spark.arguments().get(0));
+    Assertions.assertFalse(spark.arguments().get(1).contains("nested-pw"));
+    Assertions.assertTrue(spark.arguments().get(1).contains("http://localhost"));
+    Assertions.assertTrue(spark.arguments().get(1).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("--spark-conf", spark.arguments().get(2));
+    Assertions.assertFalse(spark.arguments().get(3).contains("jdbc-pw"));
+    Assertions.assertTrue(spark.arguments().get(3).contains("1g"));
+
+    // Stored entity JSON must remain unmasked (masking is response-only).
+    Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("nested-pw"));
+    Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("jdbc-pw"));
   }
 
   @Test

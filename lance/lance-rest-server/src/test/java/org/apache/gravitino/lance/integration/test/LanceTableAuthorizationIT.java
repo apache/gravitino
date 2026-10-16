@@ -28,12 +28,15 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
@@ -43,6 +46,9 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -85,6 +91,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String DROP_TABLE = "g_drop_table";
   private static final String OWNED_SCHEMA_TABLE = "h_owned_schema_table";
   private static final String LONE_SCHEMA_TABLE = "i_lone_schema_table";
+  private static final String NON_LANCE_TABLE = "j_non_lance_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -117,6 +124,20 @@ public class LanceTableAuthorizationIT extends BaseIT {
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
     createTable(WRITE_SCHEMA, MUTABLE_TABLE);
+    Catalog catalog = metalake.loadCatalog(CATALOG);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(WRITE_SCHEMA, NON_LANCE_TABLE),
+            new Column[] {Column.of("id", Types.IntegerType.get(), "id")},
+            null,
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "delta",
+                Table.PROPERTY_LOCATION,
+                location(NON_LANCE_TABLE),
+                Table.PROPERTY_EXTERNAL,
+                "true"));
     // Registered by the admin, so neither owner below owns the table itself.
     assertStatus(
         200, register(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, null, location(OWNED_SCHEMA_TABLE)));
@@ -228,6 +249,16 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, table(READER, HIDDEN_TABLE, "exists"));
 
     assertStatus(200, table(ADMIN, HIDDEN_TABLE, "describe"));
+  }
+
+  /** Verifies authorization rejects an inaccessible non-Lance table before format validation. */
+  @Test
+  public void testAuthorizationRunsBeforeFormatValidation() throws Exception {
+    HttpResponse<String> denied = table(READER, WRITE_SCHEMA, NON_LANCE_TABLE, "describe");
+    assertStatus(403, denied);
+    Assertions.assertFalse(denied.body().contains(location(NON_LANCE_TABLE)), denied.body());
+
+    assertStatus(400, table(ADMIN, WRITE_SCHEMA, NON_LANCE_TABLE, "describe"));
   }
 
   @Test

@@ -19,12 +19,19 @@
 
 package org.apache.gravitino.storage;
 
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
@@ -49,6 +56,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +100,8 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.storage.relational.BackendTestSelector;
+import org.apache.gravitino.storage.relational.CoreBackend;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
@@ -107,6 +117,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@CoreBackend.All
 abstract class AbstractEntityStorageTest {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractEntityStorageTest.class);
 
@@ -116,14 +127,18 @@ abstract class AbstractEntityStorageTest {
   protected static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[][] storageProvider() {
-    return new Object[][] {
-      {"h2", true},
-      {"h2", false},
-      {"mysql", true},
-      {"mysql", false},
-      {"postgresql", true},
-      {"postgresql", false}
-    };
+    Object[][] backends =
+        new Object[][] {
+          {"h2", true},
+          {"h2", false},
+          {"mysql", true},
+          {"mysql", false},
+          {"postgresql", true},
+          {"postgresql", false}
+        };
+    return Arrays.stream(backends)
+        .filter(arguments -> BackendTestSelector.isSelected((String) arguments[0]))
+        .toArray(Object[][]::new);
   }
 
   @AfterEach
@@ -144,9 +159,16 @@ abstract class AbstractEntityStorageTest {
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);

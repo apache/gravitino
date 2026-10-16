@@ -52,11 +52,9 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
@@ -65,6 +63,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -99,6 +98,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -123,6 +123,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
 import org.apache.gravitino.utils.ClassLoaderPool;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PooledClassLoaderEntry;
@@ -524,8 +525,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   // Copy-on-write: listeners may be registered while the cache's removal listener (running on a
   // cache executor thread) is iterating this list.
   private final List<Consumer<NameIdentifier>> removalListeners = new CopyOnWriteArrayList<>();
-  private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
-      new ConcurrentHashMap<>();
 
   // Cache loads and publications take the read lock; close() takes the write lock. Operations do
   // not hold this lock after acquiring a CatalogLease because the lease itself keeps the wrapper
@@ -534,11 +533,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /** Guarded by {@link #lifecycleLock}. */
   private boolean closed;
-
-  // Set to true when a CatalogChangeLogListener is active. markLocalMutation() is a no-op
-  // unless this flag is set, preventing unbounded growth of localMutationCounts in deployments
-  // that do not use a relational entity store (where the poller never runs).
-  private volatile boolean trackLocalMutations = false;
 
   /**
    * Constructs a CatalogManager instance.
@@ -587,15 +581,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             .build())))
             .build();
 
-    // If the entity store maintains a change log, register a listener that invalidates this
-    // manager's local catalog cache from cross-node changes, and enable local-mutation tracking so
-    // changes made by this node are not redundantly re-invalidated. Registration is the last step
-    // of
-    // the constructor so the listener never sees a half-initialized manager (catalogCache and
-    // localMutationCounts are already set). CatalogChangeLogListener stays an implementation detail
-    // of this class rather than being wired externally.
+    // Register last so the listener cannot observe a half-initialized manager. All consumed
+    // catalog events invalidate the cache: name-based markers cannot identify the originating
+    // transaction reliably, particularly when polling races the caller or replays recent rows.
     if (store instanceof SupportsEntityChangeLog) {
-      this.trackLocalMutations = true;
       this.catalogChangeLogListener = new CatalogChangeLogListener(this);
       ((SupportsEntityChangeLog) store).registerEntityChangeLogListener(catalogChangeLogListener);
     } else {
@@ -635,9 +624,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .unregisterEntityChangeLogListener(catalogChangeLogListener);
       } catch (RuntimeException e) {
         LOG.warn("Failed to unregister the catalog change-log listener", e);
-      } finally {
-        trackLocalMutations = false;
-        localMutationCounts.clear();
       }
     }
   }
@@ -676,50 +662,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
     removalListeners.add(listener);
-  }
-
-  /**
-   * Records that this process has just mutated the given catalog locally. The entity change log
-   * poller will see the corresponding change log row and should skip cache invalidation for it
-   * because this process already updated the cache.
-   *
-   * @param ident the catalog identifier (pre-mutation name for renames)
-   */
-  void markLocalMutation(NameIdentifier ident) {
-    if (!trackLocalMutations) {
-      return;
-    }
-    int pending =
-        localMutationCounts.computeIfAbsent(ident, k -> new AtomicInteger()).incrementAndGet();
-    LOG.debug("Marked a local mutation for catalog {}, {} pending marker(s)", ident, pending);
-  }
-
-  /**
-   * Attempts to consume one local mutation marker for the given identifier.
-   *
-   * <p>Thread-safety note: {@link ConcurrentHashMap#computeIfPresent} executes the remapping
-   * function atomically under a per-bucket lock, so {@code consumed[0]} is set and the counter is
-   * decremented as a single atomic step. {@code consumed[0]} is a single-element array (the
-   * standard Java pattern for a mutable capture in a lambda) that is only read by this thread after
-   * {@code computeIfPresent} returns, so no additional synchronization is needed.
-   *
-   * @return true if a local mutation was pending and has been consumed (caller should skip
-   *     invalidation), false if the change originated from a remote node
-   */
-  boolean consumeLocalMutation(NameIdentifier ident) {
-    boolean[] consumed = {false};
-    localMutationCounts.computeIfPresent(
-        ident,
-        (k, count) -> {
-          consumed[0] = true;
-          return count.decrementAndGet() <= 0 ? null : count;
-        });
-    return consumed[0];
-  }
-
-  @VisibleForTesting
-  void setTrackLocalMutations(boolean trackLocalMutations) {
-    this.trackLocalMutations = trackLocalMutations;
   }
 
   /**
@@ -996,7 +938,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
+      // Validate the properties (reserved/required/hidden-mask checks) but do NOT run the
+      // create-time backend probe here: this standalone path performs its own explicit probe
+      // below, and letting the wrapper validate as well would probe the backend twice.
+      CatalogWrapper wrapper =
+          createCatalogWrapper(dummyEntity, mergedConfig, false /* validateBackend */);
       try {
         wrapper.doWithCatalogOps(
             c -> {
@@ -1157,7 +1103,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
-            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return null;
           } catch (IOException e) {
@@ -1198,7 +1143,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
-            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return null;
           } catch (IOException e) {
@@ -1276,7 +1220,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
             // a window where the background thread repopulates the cache with the old entity.
-            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
             // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
@@ -1376,9 +1319,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
             List<SchemaEntity> schemaEntities =
                 store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
-            if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
-              throw new NonEmptyCatalogException(
-                  "Catalog %s has schemas, please drop them first or use force option", ident);
+            if (!force) {
+              checkCatalogSchemasBeforeDrop(ident, schemaEntities, catalogWrapper);
             }
 
             // Child write-through secrets: capture properties (URNs) from the entity, then
@@ -1398,6 +1340,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   if (dropped) {
                     secretManager.deleteSecretsFromProperties(schemaProps);
                   }
+                } catch (OptimisticLockException e) {
+                  // A conflict with a concurrent writer, such as a lock wait timeout.
+                  throw e;
                 } catch (Exception e) {
                   LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
                   throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
@@ -1416,7 +1361,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 copyProperties(catalogWrapper.catalog().entity().getProperties());
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
-              markLocalMutation(ident);
               try {
                 catalogWrapper.doWithCatalogOps(
                     operations -> {
@@ -1460,6 +1404,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return properties == null || properties.isEmpty()
         ? Collections.emptyMap()
         : new HashMap<>(properties);
+  }
+
+  private void checkCatalogSchemasBeforeDrop(
+      NameIdentifier ident, List<SchemaEntity> schemaEntities, CatalogWrapper catalogWrapper)
+      throws Exception {
+    try {
+      if (containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
+        throw new NonEmptyCatalogException(
+            "Catalog %s has schemas, please drop them first or use force option", ident);
+      }
+    } catch (Exception e) {
+      // Some catalogs wrap connection failures, so inspect the cause chain as well.
+      if (ExceptionUtils.indexOfType(e, ConnectionFailedException.class) >= 0) {
+        throw new ConnectionFailedException(
+            e,
+            "%s. Use force=true to skip this check.",
+            ExceptionMessages.withCause(
+                "Failed to check schemas in the underlying catalog " + ident, e));
+      }
+      throw e;
+    }
   }
 
   /**
@@ -1772,11 +1737,33 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   CatalogWrapper createCatalogWrapper(
       CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
+    // Default: when properties are validated at create, also verify the backend. The standalone
+    // testConnection path uses the overload below to keep property validation but skip the probe.
+    return createCatalogWrapper(entity, propsToValidate, true /* validateBackend */);
+  }
+
+  /**
+   * Create a catalog wrapper, optionally running the create-time backend probe. {@code
+   * propsToValidate} always drives property validation when non-null; {@code validateBackend}
+   * additionally controls whether {@link BaseCatalog#validateOnCreate()} runs. The standalone
+   * {@code testConnection} path passes {@code validateBackend = false} so it still rejects invalid
+   * properties while performing its own single explicit probe.
+   *
+   * @param entity The catalog entity.
+   * @param propsToValidate The properties to validate; may be null to skip property validation.
+   * @param validateBackend Whether to run the create-time backend probe.
+   * @return The created catalog wrapper.
+   */
+  CatalogWrapper createCatalogWrapper(
+      CatalogEntity entity,
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
     if (!classLoaderSharingEnabled) {
-      return createNonPooledCatalogWrapper(provider, conf, entity, propsToValidate);
+      return createNonPooledCatalogWrapper(
+          provider, conf, entity, propsToValidate, validateBackend);
     }
 
     ClassLoaderKey key = buildClassLoaderKey(provider, conf);
@@ -1787,7 +1774,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           initCatalogWrapper(
               new CatalogWrapper(poolEntry.classLoader(), classLoaderPool, poolEntry),
               entity,
-              propsToValidate);
+              propsToValidate,
+              validateBackend);
       return wrapper;
     } catch (Exception e) {
       classLoaderPool.release(poolEntry);
@@ -1799,10 +1787,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String provider,
       Map<String, String> conf,
       CatalogEntity entity,
-      @Nullable Map<String, String> propsToValidate) {
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     try {
-      return initCatalogWrapper(new CatalogWrapper(classLoader), entity, propsToValidate);
+      return initCatalogWrapper(
+          new CatalogWrapper(classLoader), entity, propsToValidate, validateBackend);
     } catch (Exception e) {
       ClassLoaderPool.cleanupClassLoader(classLoader);
       throw e;
@@ -1814,7 +1804,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * into the given wrapper.
    */
   private CatalogWrapper initCatalogWrapper(
-      CatalogWrapper wrapper, CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
+      CatalogWrapper wrapper,
+      CatalogEntity entity,
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
     wrapper.catalog = catalog;
     try {
@@ -1826,11 +1819,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             catalog.properties();
             catalog.capability();
 
-            // Eagerly initialize opted-in catalogs so a misconfiguration fails at create rather
-            // than on first use. The backend translates failures into the caller-error vs
+            // Validate opted-in catalogs so a misconfiguration fails at create rather than on
+            // first use. The default validation eagerly initializes ops(); JDBC overrides it to
+            // run a real backend probe. The backend translates failures into the caller-error vs
             // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
-            if (propsToValidate != null && catalog.shouldValidateOnCreate()) {
-              catalog.ops();
+            // The backend probe is gated by validateBackend so the standalone testConnection path
+            // can keep property validation while running its own explicit probe instead.
+            if (validateBackend && propsToValidate != null && catalog.shouldValidateOnCreate()) {
+              catalog.validateOnCreate();
             }
             return null;
           },
@@ -2191,7 +2187,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
             return newCatalogBuilder.build();
           });
-      markLocalMutation(nameIdentifier);
       catalogCache.invalidate(nameIdentifier);
 
     } catch (NoSuchCatalogException e) {
@@ -2222,14 +2217,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
     catalogCache.invalidate(ident);
     try {
-      if (store.delete(ident, EntityType.CATALOG, true)) {
-        // This cleanup deletion writes a DROP record to the entity change log. Mark it as a local
-        // mutation so the change-log poller consumes that record's token instead of one meant for
-        // a later mutation of the same identifier. Without this, the poller could treat a
-        // subsequent local change as remote and spuriously invalidate (and asynchronously close) a
-        // cached catalog wrapper that is still in use, causing a NullPointerException.
-        markLocalMutation(ident);
-      }
+      store.delete(ident, EntityType.CATALOG, true);
     } catch (IOException e) {
       LOG.error("Failed to clean up catalog {}", ident, e);
     }

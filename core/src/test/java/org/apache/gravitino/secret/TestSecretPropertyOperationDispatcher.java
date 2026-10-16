@@ -20,6 +20,7 @@ package org.apache.gravitino.secret;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
@@ -39,6 +41,7 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
+import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -61,7 +64,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
 
   private static final String SCHEMA = "secret_schema";
   private static final Map<String, String> SECRET_PROPS =
-      ImmutableMap.of("k1", "v1", "jdbc-password", "s3cr3t", "visible", "ok");
+      ImmutableMap.of("k1", "v1", "custom-token", "s3cr3t", "visible", "ok");
 
   private static SecretPropertyOperationDispatcher secretDispatcher;
   private static SchemaOperationDispatcher schemaOperationDispatcher;
@@ -119,7 +122,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
 
     Map<String, String> secrets =
         secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -131,7 +134,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         tableIdent, columns, "comment", SECRET_PROPS, new Transform[0]);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -141,7 +144,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, SECRET_PROPS);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -156,7 +159,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         viewIdent, "comment", new Column[0], representations, null, null, SECRET_PROPS);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
 
@@ -167,7 +170,42 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     modelOperationDispatcher.registerModel(modelIdent, "comment", SECRET_PROPS);
 
     Map<String, String> secrets = secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL);
-    Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+    Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
+  }
+
+  @Test
+  public void testResolvePropertiesMetadataFallsBackOnUnsupportedOperation() {
+    CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
+    try {
+      when(wrapper.doWithPropertiesMeta(org.mockito.ArgumentMatchers.any()))
+          .thenThrow(new UnsupportedOperationException("no metadata"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    org.apache.gravitino.connector.PropertiesMetadata metadata =
+        SecretPropertyOperationDispatcher.resolvePropertiesMetadata(
+            wrapper, HasPropertyMetadata::catalogPropertiesMetadata);
+    Assertions.assertSame(FallbackPropertiesMetadata.INSTANCE, metadata);
+    // Official non-hidden keys stay out of getSecrets.
+    Assertions.assertFalse(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("credential-providers", metadata));
+    // Declared hidden cloud credentials fuzzy-recover into getSecrets (USE_SECRETS / owner).
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-access-key-id", metadata));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("s3-secret-access-key", metadata));
+    // Undeclared sensitive names still fuzzy-recover.
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("custom-token", metadata));
+    // AWS access-key pair is catalog-only (BaseCatalogPropertiesMetadata), not in this entity
+    // fallback — same exclusion as fileset/schema STORAGE_PROPERTY_ENTRIES. Undeclared sensitive
+    // names still fuzzy-recover.
+    Assertions.assertFalse(metadata.containsProperty("aws-access-key-id"));
+    Assertions.assertFalse(metadata.containsProperty("aws-secret-access-key"));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("aws-access-key-id", metadata));
+    Assertions.assertTrue(
+        SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("aws-secret-access-key", metadata));
   }
 }

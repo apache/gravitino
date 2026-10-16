@@ -61,7 +61,7 @@ class PageUtil {
         pageToken,
         sortedItems.size());
 
-    int endIndex = Math.min(startIndex + pageSize, sortedItems.size());
+    int endIndex = (int) Math.min((long) startIndex + pageSize, sortedItems.size());
     List<String> pageItems =
         startIndex == endIndex
             ? Collections.emptyList()

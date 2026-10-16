@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -55,8 +56,9 @@ public final class GlueClientProvider {
    * @param config Catalog configuration properties.
    * @return A configured and ready-to-use {@link GlueClient}.
    * @throws IllegalArgumentException if {@code aws-region} is missing or blank, if only one of the
-   *     credential keys is provided, if {@code aws-glue-endpoint} is not a valid URI, or if no
-   *     usable AWS credential source can be resolved.
+   *     credential keys is provided, or if {@code aws-glue-endpoint} is not a valid URI
+   * @throws ConnectionFailedException if the configured credential provider cannot resolve
+   *     credentials
    */
   public static GlueClient buildClient(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
@@ -97,31 +99,19 @@ public final class GlueClientProvider {
   }
 
   /**
-   * Eagerly resolves {@code credentialsProvider} to confirm a usable credential source exists,
-   * instead of leaving resolution to the first real Glue API call. Without this check, a catalog
-   * created with no static credentials and no usable default-chain source (env vars, instance
-   * profile, etc.) is stored successfully and then fails on every operation with a raw AWS SDK
-   * error that never mentions this connector's own credential properties.
+   * Eagerly resolves {@code credentialsProvider} when Glue operations are initialized, instead of
+   * leaving resolution to the first real Glue API call. This makes an explicit connection test or
+   * the first operation fail with an actionable connection error when no credential source is
+   * available. It does not authenticate static credentials; only an AWS API request can do that.
    *
-   * @throws IllegalArgumentException if no credentials can be resolved
+   * @throws ConnectionFailedException if no credentials can be resolved
    */
   @VisibleForTesting
   static void validateCredentials(AwsCredentialsProvider credentialsProvider) {
     try {
       credentialsProvider.resolveCredentials();
     } catch (SdkClientException e) {
-      if (!GlueExceptionConverter.isCredentialFailure(e)) {
-        throw new IllegalArgumentException(
-            "Failed to resolve AWS credentials for the Glue catalog: " + e.getMessage(), e);
-      }
-      throw new IllegalArgumentException(
-          String.format(
-              "No usable AWS credentials found for the Glue catalog. Set both '%s' and '%s' "
-                  + "catalog properties for static authentication, or ensure the default AWS "
-                  + "credential chain (environment variables, instance profile, web identity "
-                  + "token, etc.) can resolve credentials.",
-              GlueConstants.AWS_ACCESS_KEY_ID, GlueConstants.AWS_SECRET_ACCESS_KEY),
-          e);
+      throw GlueExceptionConverter.toConnectionException(e);
     }
   }
 

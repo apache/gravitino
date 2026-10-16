@@ -45,4 +45,20 @@ public class TestPostgreSQLExceptionConverter {
         IOException.class,
         () -> converter.toGravitinoException(sqlException, Entity.EntityType.METALAKE, "test"));
   }
+
+  @Test
+  public void testConvertValueTooLongException() {
+    SQLException sqlException =
+        new SQLException("value too long for type character varying(128)", "22001");
+    PostgreSQLExceptionConverter converter = new PostgreSQLExceptionConverter();
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.toGravitinoException(sqlException, Entity.EntityType.TAG, "test"));
+    Assertions.assertEquals(
+        "The tag entity has a value that exceeds the maximum length of its column.",
+        exception.getMessage());
+    // The database error must not be exposed to the client through the cause.
+    Assertions.assertNull(exception.getCause());
+  }
 }

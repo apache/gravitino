@@ -31,6 +31,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   @Override
+  public String selectGroupMetaByIdForShare(Long groupId) {
+    return selectGroupMetaById(groupId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteGroupMetaByGroupId(Long groupId, Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME

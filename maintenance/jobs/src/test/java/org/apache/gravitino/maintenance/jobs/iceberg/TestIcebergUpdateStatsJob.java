@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,7 +42,7 @@ public class TestIcebergUpdateStatsJob {
     assertNotNull(template);
     assertEquals("builtin-iceberg-update-stats", template.name());
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
-    assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+    assertEquals("v2", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test
@@ -49,18 +50,19 @@ public class TestIcebergUpdateStatsJob {
     IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(10, template.arguments().size());
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--update-mode"));
-    assertTrue(template.arguments().contains("{{update_mode}}"));
-    assertTrue(template.arguments().contains("--updater-options"));
-    assertTrue(template.arguments().contains("{{updater_options}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--update-mode",
+            "{{update_mode:-all}}",
+            "--updater-options",
+            "{{updater_options:-}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
@@ -148,20 +150,43 @@ public class TestIcebergUpdateStatsJob {
   public void testParseJsonOptions() {
     Map<String, String> parsed =
         IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
-            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}");
+            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}", "updater-options");
     assertEquals("b", parsed.get("a"));
     assertEquals("1", parsed.get("x"));
     assertEquals("true", parsed.get("flag"));
     assertEquals("", parsed.get("nil"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"nested\":{\"a\":1}}"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"array\":[1,2,3]}"));
+
+    IllegalArgumentException invalidJson =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}", "updater-options"));
+    assertTrue(invalidJson.getMessage().contains("--updater-options"));
+
+    IllegalArgumentException nested =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
+                    "{\"nested\":{\"a\":1}}", "updater-options"));
+    assertTrue(nested.getMessage().contains("--updater-options"));
+
+    IllegalArgumentException array =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
+                    "{\"array\":[1,2,3]}", "spark-conf"));
+    assertTrue(array.getMessage().contains("--spark-conf"));
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsUsesSparkConfFlagName() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergUpdateStatsAndMetricsJob.parseCustomSparkConfigs("{not_json}"));
+    assertTrue(ex.getMessage().contains("--spark-conf"));
   }
 
   @Test
@@ -178,6 +203,22 @@ public class TestIcebergUpdateStatsJob {
     assertEquals(
         "jdbc:mysql://localhost:3306/metrics",
         optimizerProperties.get("gravitino.optimizer.jdbcMetrics.jdbcUrl"));
+  }
+
+  @Test
+  public void testBuildOptimizerPropertiesCopiesAuthAliases() {
+    Map<String, String> options = new HashMap<>();
+    options.put("gravitino_uri", "http://localhost:8090");
+    options.put("metalake", "ml");
+    options.put("auth_type", "basic");
+    options.put("username", "admin");
+    options.put("password", "YourSecureGravitinoPassword");
+    Map<String, String> optimizerProperties =
+        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
+    assertEquals("basic", optimizerProperties.get(OptimizerConfig.AUTH_TYPE));
+    assertEquals("admin", optimizerProperties.get(OptimizerConfig.AUTH_USERNAME));
+    assertEquals(
+        "YourSecureGravitinoPassword", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
   }
 
   @Test

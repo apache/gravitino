@@ -48,6 +48,7 @@ import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -448,5 +449,25 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         rewritten.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testErrorResponseStackTraceFollowsSetting() throws Exception {
+    RuntimeException failure = new RuntimeException("failure");
+    try {
+      ErrorResponse withStack =
+          (ErrorResponse) IcebergRESTUtils.errorResponse(failure, 500).getEntity();
+      Assertions.assertTrue(
+          IcebergObjectMapper.getInstance().writeValueAsString(withStack).contains("\"stack\""));
+
+      IcebergRESTUtils.setIncludeErrorStackTrace(false);
+      ErrorResponse withoutStack =
+          (ErrorResponse) IcebergRESTUtils.errorResponse(failure, 500).getEntity();
+      String json = IcebergObjectMapper.getInstance().writeValueAsString(withoutStack);
+      Assertions.assertFalse(json.contains("\"stack\""), json);
+      Assertions.assertEquals("failure", withoutStack.message());
+    } finally {
+      IcebergRESTUtils.setIncludeErrorStackTrace(true);
+    }
   }
 }

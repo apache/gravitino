@@ -146,7 +146,7 @@ dependency model explicitly:
 For example, `password_hash` should store a PHC-style string such as:
 
 ```text
-$sha3-512$i=100000$<salt>$<hash>
+$sha3-512$i=5000$<salt>$<hash>
 ```
 
 This keeps verification logic simple and allows future upgrades of SHA3-512 cost parameters without

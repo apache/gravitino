@@ -109,8 +109,7 @@ public class TestFilesetCatalogCredential {
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
     Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE,
-        masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+        "abs-account", masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));

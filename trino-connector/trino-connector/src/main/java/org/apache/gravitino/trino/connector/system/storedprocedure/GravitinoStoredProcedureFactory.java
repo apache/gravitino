@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
@@ -31,7 +32,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 public class GravitinoStoredProcedureFactory {
 
   private final CatalogConnectorManager catalogConnectorManager;
-  private final String metalake;
+  @Nullable private final String configuredMetalake;
 
   /** List of all registered Gravitino stored procedures */
   public final List<GravitinoStoredProcedure> procedures = new ArrayList<>();
@@ -40,21 +41,22 @@ public class GravitinoStoredProcedureFactory {
    * Constructs a new GravitinoStoredProcedureFactory.
    *
    * @param catalogConnectorManager the catalog connector manager
-   * @param metalake the metalake name
+   * @param configuredMetalake the metalake name, or null when the connector is not configured with
+   *     one
    */
   public GravitinoStoredProcedureFactory(
-      CatalogConnectorManager catalogConnectorManager, String metalake) {
+      CatalogConnectorManager catalogConnectorManager, @Nullable String configuredMetalake) {
     this.catalogConnectorManager = catalogConnectorManager;
-    this.metalake = metalake;
+    this.configuredMetalake = configuredMetalake;
 
     registerStoredProcedure();
   }
 
   /** Register all the stored procedures * */
   private void registerStoredProcedure() {
-    procedures.add(new CreateCatalogStoredProcedure(catalogConnectorManager, metalake));
-    procedures.add(new DropCatalogStoredProcedure(catalogConnectorManager, metalake));
-    procedures.add(new AlterCatalogStoredProcedure(catalogConnectorManager, metalake));
+    procedures.add(new CreateCatalogStoredProcedure(catalogConnectorManager, configuredMetalake));
+    procedures.add(new DropCatalogStoredProcedure(catalogConnectorManager, configuredMetalake));
+    procedures.add(new AlterCatalogStoredProcedure(catalogConnectorManager, configuredMetalake));
   }
 
   /**

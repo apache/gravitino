@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
@@ -73,5 +74,15 @@ public class TestLanceRESTService {
     } finally {
       server.stop();
     }
+  }
+
+  /** The documented Lance REST key reaches the value the service passes to its error builder. */
+  @Test
+  public void testIncludeErrorStackTraceReadFromServiceConfig() {
+    assertTrue(JettyServerConfig.fromConfig(new LanceConfig()).isIncludeErrorStackTrace());
+    assertFalse(
+        JettyServerConfig.fromConfig(
+                new LanceConfig(Collections.singletonMap("includeErrorStackTrace", "false")))
+            .isIncludeErrorStackTrace());
   }
 }
