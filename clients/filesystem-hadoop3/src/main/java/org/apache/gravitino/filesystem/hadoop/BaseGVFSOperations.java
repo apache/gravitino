@@ -574,11 +574,12 @@ public abstract class BaseGVFSOperations implements Closeable {
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such
     // case the operations like create, open, list files under this directory will fail. So we
     // need to check the existence of the fileset directory beforehand.
+    Map<String, String> catalogProperties = getCatalog(catalogIdent).properties();
     boolean fsOpsDisabled =
-        ((Catalog) getFilesetCatalog(catalogIdent))
-            .properties()
-            .getOrDefault("disable-filesystem-ops", "false")
-            .equalsIgnoreCase("true");
+        catalogProperties != null
+            && catalogProperties
+                .getOrDefault("disable-filesystem-ops", "false")
+                .equalsIgnoreCase("true");
     if (fsOpsDisabled) {
       try {
         if (!fs.exists(filesetPath)) {
@@ -655,6 +656,19 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   /**
+   * Get the catalog by the catalog identifier from the cache or load it from the server if the
+   * cache is disabled.
+   *
+   * @param catalogIdent the catalog identifier.
+   * @return the catalog.
+   */
+  protected Catalog getCatalog(NameIdentifier catalogIdent) {
+    return getFilesetMetadataCache()
+        .map(cache -> cache.getCatalog(catalogIdent))
+        .orElseGet(() -> getGravitinoClient().loadCatalog(catalogIdent.name()));
+  }
+
+  /**
    * Get the fileset catalog by the catalog identifier from the cache or load it from the server if
    * the cache is disabled.
    *
@@ -664,7 +678,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
     return getFilesetMetadataCache()
         .map(cache -> cache.getFilesetCatalog(catalogIdent))
-        .orElseGet(() -> getGravitinoClient().loadCatalog(catalogIdent.name()).asFilesetCatalog());
+        .orElseGet(() -> getCatalog(catalogIdent).asFilesetCatalog());
   }
 
   /**
@@ -694,15 +708,14 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the schema.
    */
   protected Schema getSchema(NameIdentifier schemaIdent) {
-    return filesetMetadataCache
+    return getFilesetMetadataCache()
         .map(cache -> cache.getSchema(schemaIdent))
         .orElseGet(
             () -> {
               NameIdentifier catalogIdent =
                   NameIdentifier.of(
                       schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
-              Catalog c = gravitinoClient.loadCatalog(catalogIdent.name());
-              return c.asSchemas().loadSchema(schemaIdent.name());
+              return getCatalog(catalogIdent).asSchemas().loadSchema(schemaIdent.name());
             });
   }
 
@@ -732,7 +745,7 @@ public abstract class BaseGVFSOperations implements Closeable {
           filesetIdent);
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-      Map<String, String> allProperties = getAllProperties(filesetIdent);
+      Map<String, String> allProperties = getAllProperties(filesetIdent, fileset);
       allProperties.putAll(
           FilesetUtil.getUserDefinedFileSystemConfigs(
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
@@ -969,18 +982,27 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   @VisibleForTesting
   Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
-    String catalogName = filesetIdent.namespace().level(1);
-    String schemaName = filesetIdent.namespace().level(2);
-    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
-    Schema schema = catalog.asSchemas().loadSchema(schemaName);
-    Fileset fileset =
-        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
+    return getAllProperties(filesetIdent, null);
+  }
+
+  @VisibleForTesting
+  Map<String, String> getAllProperties(NameIdentifier filesetIdent, @Nullable Fileset fileset) {
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(
+            filesetIdent.namespace().level(0),
+            filesetIdent.namespace().level(1),
+            filesetIdent.namespace().level(2));
+    Catalog catalog = getCatalog(catalogIdent);
+    Schema schema = getSchema(schemaIdent);
+    Fileset resolvedFileset = fileset != null ? fileset : getFileset(filesetIdent);
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
     putStaticCatalogCredentialInfo(all, catalog);
     putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
-    putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
+    putPropsAndSecrets(all, resolvedFileset.properties(), resolvedFileset.supportsSecrets());
     all.putAll(extractNonDefaultConfig(conf));
     return all;
   }

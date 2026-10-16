@@ -20,7 +20,11 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -296,6 +300,142 @@ public class TestBaseGVFSOperationsSecrets {
     assertFalse(all.containsKey("s3-session-token"));
   }
 
+  @Test
+  public void testGetAllPropertiesUsesFilesetMetadataCacheWhenEnabled() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+    conf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE, true);
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
+    SupportsSecrets schemaSecrets = mock(SupportsSecrets.class);
+    SupportsSecrets filesetSecrets = mock(SupportsSecrets.class);
+
+    when(catalog.properties()).thenReturn(Map.of("c-prop", "1"));
+    when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
+    when(catalogSecrets.getSecrets()).thenReturn(Map.of("c-secret", "cs"));
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of("s-prop", "2"));
+    when(schema.supportsSecrets()).thenReturn(schemaSecrets);
+    when(schemaSecrets.getSecrets()).thenReturn(Map.of("s-secret", "ss"));
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of("f-prop", "3"));
+    when(fileset.supportsSecrets()).thenReturn(filesetSecrets);
+    when(filesetSecrets.getSecrets()).thenReturn(Map.of("f-secret", "fs"));
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    try (TestOps ops = new TestOps(conf, client)) {
+      NameIdentifier ident = NameIdentifier.of("ml", "catalog", "schema", "fs");
+      Map<String, String> first = ops.getAllProperties(ident);
+      Map<String, String> second = ops.getAllProperties(ident);
+
+      assertEquals("1", first.get("c-prop"));
+      assertEquals("cs", first.get("c-secret"));
+      assertEquals("2", first.get("s-prop"));
+      assertEquals("ss", first.get("s-secret"));
+      assertEquals("3", first.get("f-prop"));
+      assertEquals("fs", first.get("f-secret"));
+      assertEquals(first, second);
+
+      verify(client, times(1)).loadCatalog("catalog");
+      verify(schemas, times(1)).loadSchema("schema");
+      verify(filesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
+    }
+  }
+
+  @Test
+  public void testGetAllPropertiesReusesPreloadedFileset() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsSecrets filesetSecrets = mock(SupportsSecrets.class);
+
+    when(catalog.properties()).thenReturn(Map.of("c-prop", "1"));
+    when(catalog.supportsSecrets()).thenReturn(null);
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of("s-prop", "2"));
+    when(schema.supportsSecrets()).thenReturn(null);
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(fileset.properties()).thenReturn(Map.of("f-prop", "3"));
+    when(fileset.supportsSecrets()).thenReturn(filesetSecrets);
+    when(filesetSecrets.getSecrets()).thenReturn(Map.of("f-secret", "fs"));
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    try (TestOps ops = new TestOps(conf, client)) {
+      NameIdentifier ident = NameIdentifier.of("ml", "catalog", "schema", "fs");
+      Map<String, String> all = ops.getAllProperties(ident, fileset);
+
+      assertEquals("1", all.get("c-prop"));
+      assertEquals("2", all.get("s-prop"));
+      assertEquals("3", all.get("f-prop"));
+      assertEquals("fs", all.get("f-secret"));
+      verify(filesetCatalog, never()).loadFileset(NameIdentifier.of("schema", "fs"));
+    }
+  }
+
+  @Test
+  public void testGetSchemaLazyInitializesMetadataCache() throws Exception {
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    Configuration cachedConf = new Configuration();
+    cachedConf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    cachedConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+    cachedConf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE, true);
+
+    NameIdentifier schemaIdent = NameIdentifier.of("ml", "catalog", "schema");
+    try (TestOps cachedOps = new TestOps(cachedConf, client)) {
+      assertSame(schema, cachedOps.getSchema(schemaIdent));
+      assertSame(schema, cachedOps.getSchema(schemaIdent));
+      verify(client, times(1)).loadCatalog("catalog");
+      verify(schemas, times(1)).loadSchema("schema");
+    }
+
+    Configuration uncachedConf = new Configuration();
+    uncachedConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    uncachedConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+    try (TestOps uncachedOps = new TestOps(uncachedConf, client)) {
+      assertSame(schema, uncachedOps.getSchema(schemaIdent));
+      verify(client, times(2)).loadCatalog("catalog");
+      verify(schemas, times(2)).loadSchema("schema");
+    }
+  }
+
   private static Map<String, String> getAllProperties(Catalog catalog) throws Exception {
     return opsFor(catalog).getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
   }
@@ -413,8 +553,5 @@ public class TestBaseGVFSOperationsSecrets {
     public Token<?>[] addDelegationTokens(String renewer, Credentials credentials) {
       return new Token<?>[0];
     }
-
-    @Override
-    public void close() {}
   }
 }

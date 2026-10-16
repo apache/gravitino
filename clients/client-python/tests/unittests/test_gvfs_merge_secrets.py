@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 from gravitino.exceptions.base import NotFoundException, RESTException
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_default_operations import DefaultGVFSOperations
 from gravitino.name_identifier import NameIdentifier
 
@@ -283,6 +284,76 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["s3_access_key_id"], "AKIATEST")
         self.assertEqual(merged["s3-secret-access-key"], "static-secret")
         self.assertNotIn("s3-session-token", merged)
+
+    def test_merge_properties_uses_fileset_metadata_cache_when_enabled(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: True},
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {"c-prop": "1"}
+        catalog.get_secrets.return_value = {"c-secret": "cs"}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {"s-prop": "2"}
+        schema.get_secrets.return_value = {"s-secret": "ss"}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        fileset.properties.return_value = {"f-prop": "3"}
+        fileset.get_secrets.return_value = {"f-secret": "fs"}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+
+        ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                first = operations._merge_fileset_properties(ident, "file:///tmp/data")
+                second = operations._merge_fileset_properties(ident, "file:///tmp/data")
+
+        self.assertEqual(first["c-prop"], "1")
+        self.assertEqual(first["c-secret"], "cs")
+        self.assertEqual(first["s-prop"], "2")
+        self.assertEqual(first["s-secret"], "ss")
+        self.assertEqual(first["f-prop"], "3")
+        self.assertEqual(first["f-secret"], "fs")
+        self.assertEqual(first, second)
+        client.load_catalog.assert_called_once_with("catalog")
+        catalog.as_schemas.return_value.load_schema.assert_called_once_with("schema")
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_called_once_with(
+            NameIdentifier.of("schema", "fs")
+        )
+
+    def test_merge_properties_reuses_preloaded_fileset(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090", metalake_name="ml", options={}
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {"c-prop": "1"}
+        catalog.get_secrets.return_value = {}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {"s-prop": "2"}
+        schema.get_secrets.return_value = {}
+        fileset.properties.return_value = {"f-prop": "3"}
+        fileset.get_secrets.return_value = {}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+
+        ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                merged = operations._merge_fileset_properties(
+                    ident, "file:///tmp/data", fileset
+                )
+
+        self.assertEqual(merged["f-prop"], "3")
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_not_called()
 
 
 if __name__ == "__main__":
