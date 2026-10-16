@@ -487,6 +487,27 @@ public class TestSparkApplicationStatusUtils {
   }
 
   @Test
+  public void testStoppedStateWithoutTime() {
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "ResourceReleased");
+    history(app)
+        .put(
+            "2",
+            ImmutableMap.of(
+                "currentStateSummary", "ResourceReleased", "lastTransitionTime", "soon"));
+    status(app).put("currentState", history(app).get("2"));
+    app.getMetadata().setDeletionTimestamp(NOW.toString());
+
+    // Deleted after it stopped at an unknown time, it finished when it was deleted at the latest.
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.FAILED, info.status());
+    Assertions.assertEquals(NOW, info.finishedAt());
+
+    // Nor is it cancelled.
+    cancel(app);
+    Assertions.assertEquals(JobHandle.Status.FAILED, executionInfoOf(app).status());
+  }
+
+  @Test
   public void testDeletionNotBeforeStart() {
     // The deletion time is in whole seconds, the started time of the same second isn't.
     GenericKubernetesResource app = app("Submitted", "DriverReady");
@@ -669,6 +690,14 @@ public class TestSparkApplicationStatusUtils {
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, info.status());
     Assertions.assertEquals(timeOf(1), info.startedAt());
     Assertions.assertNull(info.finishedAt());
+
+    // Marked and deleted, it had still stopped before, as its outcome time is unknown. It finished
+    // when it was deleted at the latest.
+    cancel(app);
+    app.getMetadata().setDeletionTimestamp(NOW.toString());
+    info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, info.status());
+    Assertions.assertEquals(NOW, info.finishedAt());
 
     // Without a creation time, an application without status never times out.
     GenericKubernetesResource noCreationTime = app();
