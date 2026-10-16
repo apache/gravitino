@@ -65,6 +65,8 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyPreCommitHook;
+import org.apache.gravitino.policy.PolicyPreCommitHooks;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -92,6 +94,46 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           MetadataObject.Type.TOPIC);
   private final PolicyContent content =
       PolicyContents.custom(ImmutableMap.of("filed1", 123), supportedObjectTypes, null);
+
+  @TestTemplate
+  public void testPreCommitHookFailureRollsBackInsert() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    PolicyPreCommitHook hook =
+        new PolicyPreCommitHook() {
+          @Override
+          public void afterWrite(PolicyEntity policy) {
+            throw new IllegalArgumentException("bad cron");
+          }
+
+          @Override
+          public void beforeDelete(long policyId) {}
+        };
+    PolicyPreCommitHooks.register(hook);
+    try {
+      PolicyEntity policyEntity =
+          PolicyEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("hook-rollback")
+              .withNamespace(NamespaceUtil.ofPolicy(metalake.name()))
+              .withComment("comment")
+              .withPolicyType(Policy.BuiltInType.CUSTOM)
+              .withContent(content)
+              .withEnabled(true)
+              .withAuditInfo(AUDIT_INFO)
+              .build();
+      PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> policyMetaService.insertPolicy(policyEntity, false));
+      assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              policyMetaService.getPolicyByIdentifier(
+                  NameIdentifierUtil.ofPolicy(metalake.name(), "hook-rollback")));
+    } finally {
+      PolicyPreCommitHooks.unregister(hook);
+    }
+  }
 
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {

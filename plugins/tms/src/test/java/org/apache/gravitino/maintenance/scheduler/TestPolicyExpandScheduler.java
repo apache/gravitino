@@ -22,6 +22,7 @@ import java.time.Instant;
 import javax.sql.DataSource;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -32,30 +33,65 @@ class TestPolicyExpandScheduler extends TestJDBCBackend {
 
   @TestTemplate
   void testSyncInsertsReschedulesAndRemovesTheExpandRow() {
-    DataSource dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    PolicyExpandScheduler scheduler = PolicyExpandScheduler.create(dataSource);
+    DataSource dataSource = entityStoreDataSource();
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(dataSource);
 
-    scheduler.sync(42L, true, CRON);
-    Instant firstDue = executionTime(scheduler, 42L);
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, CRON));
+    Instant firstDue = executionTime(reader, 42L);
     Assertions.assertTrue(firstDue.isAfter(Instant.now()));
 
-    scheduler.sync(42L, true, LATER_CRON);
-    Instant secondDue = executionTime(scheduler, 42L);
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, LATER_CRON));
+    Instant secondDue = executionTime(reader, 42L);
     Assertions.assertNotEquals(firstDue, secondDue);
 
-    scheduler.sync(42L, false, LATER_CRON);
-    Assertions.assertTrue(scheduler.scheduledExecutionTime(42L).isEmpty());
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, false, LATER_CRON));
+    Assertions.assertTrue(reader.scheduledExecutionTime(42L).isEmpty());
 
-    scheduler.sync(42L, true, CRON);
-    Assertions.assertTrue(scheduler.scheduledExecutionTime(42L).isPresent());
-    scheduler.remove(42L);
-    Assertions.assertTrue(scheduler.scheduledExecutionTime(42L).isEmpty());
-    scheduler.remove(42L);
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, CRON));
+    Assertions.assertTrue(reader.scheduledExecutionTime(42L).isPresent());
+    SessionUtils.doMultipleWithCommit(() -> writer.remove(42L));
+    Assertions.assertTrue(reader.scheduledExecutionTime(42L).isEmpty());
+    SessionUtils.doMultipleWithCommit(() -> writer.remove(42L));
+  }
+
+  @TestTemplate
+  void testFailedTransactionRollsBackTheExpandRow() {
+    DataSource dataSource = entityStoreDataSource();
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(dataSource);
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () -> writer.sync(99L, true, CRON),
+                () -> {
+                  throw new IllegalStateException("boom");
+                }));
+
+    Assertions.assertTrue(reader.scheduledExecutionTime(99L).isEmpty());
+  }
+
+  @TestTemplate
+  void testInvalidCronFailsBeforeAnExpandRowIsWritten() {
+    DataSource dataSource = entityStoreDataSource();
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(dataSource);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SessionUtils.doMultipleWithCommit(() -> writer.sync(100L, true, "not a cron")));
+
+    Assertions.assertTrue(reader.scheduledExecutionTime(100L).isEmpty());
+  }
+
+  private static DataSource entityStoreDataSource() {
+    return SqlSessionFactoryHelper.getInstance()
+        .getSqlSessionFactory()
+        .getConfiguration()
+        .getEnvironment()
+        .getDataSource();
   }
 
   private static Instant executionTime(PolicyExpandScheduler scheduler, long policyId) {

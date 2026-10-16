@@ -1,0 +1,81 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.maintenance.scheduler;
+
+import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyPreCommitHook;
+
+/**
+ * Keeps the expand-pool row aligned with a maintenance policy inside the policy transaction.
+ *
+ * <p>An enabled maintenance policy with a non-blank {@code timeTrigger} is scheduled. Disable, a
+ * blank trigger, and a non-maintenance write remove the row. Delete removes the row by policy id.
+ * An invalid cron throws, so the policy write rolls back with the expand change.
+ */
+public final class PolicyExpandPreCommitHook implements PolicyPreCommitHook {
+
+  private final PolicyExpandSchedule schedule;
+
+  /**
+   * @param schedule expand-row writer bound to the current SQL session
+   */
+  public PolicyExpandPreCommitHook(PolicyExpandSchedule schedule) {
+    this.schedule = schedule;
+  }
+
+  @Override
+  public void afterWrite(PolicyEntity policy) {
+    if (!isMaintenance(policy.content())) {
+      schedule.remove(policy.id());
+      return;
+    }
+    schedule.sync(policy.id(), policy.enabled(), timeTrigger(policy.content()));
+  }
+
+  @Override
+  public void beforeDelete(long policyId) {
+    schedule.remove(policyId);
+  }
+
+  private static boolean isMaintenance(@Nullable PolicyContent content) {
+    if (content == null) {
+      return false;
+    }
+    for (Policy.BuiltInType type : Policy.BuiltInType.values()) {
+      if (MaintenancePolicyDefinitions.isMaintenance(type)
+          && type.contentClass().isInstance(content)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Nullable
+  private static String timeTrigger(@Nullable PolicyContent content) {
+    if (!(content instanceof ExecutablePolicyContent)) {
+      return null;
+    }
+    return ((ExecutablePolicyContent) content).executionSpec().timeTrigger();
+  }
+}

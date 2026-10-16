@@ -26,6 +26,9 @@ import com.github.kagkarlsson.scheduler.task.schedule.CronSchedule;
 import com.github.kagkarlsson.scheduler.task.schedule.CronStyle;
 import com.github.kagkarlsson.scheduler.task.schedule.Schedule;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
@@ -34,6 +37,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 
 /**
  * Writes {@code policy-expand} rows into {@link TableMaintenanceSchedulerPools#EXPAND_TASKS_TABLE}
@@ -41,31 +45,47 @@ import javax.sql.DataSource;
  *
  * <p>{@code timeTrigger} is a six-field Quartz cron. This class is the runtime that decides whether
  * the expression has a next fire time; policy content does not parse cron itself.
+ *
+ * <p>{@link #joiningCurrentTransaction()} writes through the open MyBatis session. The client must
+ * not commit or close that connection, so the policy transaction and the expand row commit
+ * together.
  */
 public final class PolicyExpandScheduler implements PolicyExpandSchedule {
 
-  private final SchedulerClient client;
+  private final DataSource dataSource;
 
-  private PolicyExpandScheduler(SchedulerClient client) {
-    this.client = client;
+  private PolicyExpandScheduler(DataSource dataSource) {
+    this.dataSource = dataSource;
   }
 
   /**
-   * Opens a client against the expand-task table.
+   * Opens a client that writes on the current thread's open SQL session.
+   *
+   * <p>The db-scheduler client is created on each call, because building it borrows a connection.
+   * That connection is the open session, so this scheduler must be used inside a policy
+   * transaction.
+   *
+   * @return scheduler that inserts, moves, and deletes expand rows in the caller's transaction
+   */
+  public static PolicyExpandScheduler joiningCurrentTransaction() {
+    return new PolicyExpandScheduler(new SessionDataSource());
+  }
+
+  /**
+   * Opens a client that reads committed rows from the entity-store pool.
    *
    * @param dataSource relational JDBC pool shared with the entity store
-   * @return scheduler that inserts, moves, and deletes expand rows
+   * @return scheduler that can read expand rows after the policy transaction commits
    */
-  public static PolicyExpandScheduler create(DataSource dataSource) {
-    // SchedulerClient never commits when auto-commit is off, and the entity-store pool leaves
-    // auto-commit off. Forcing auto-commit makes the insert survive connection close.
-    SchedulerClient client =
-        SchedulerClient.Builder.create(
-                new AutoCommitDataSource(dataSource),
-                TableMaintenanceSchedulerPools.policyExpandTask())
-            .tableName(TableMaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
-            .build();
-    return new PolicyExpandScheduler(client);
+  public static PolicyExpandScheduler forReads(DataSource dataSource) {
+    return new PolicyExpandScheduler(dataSource);
+  }
+
+  private SchedulerClient client() {
+    return SchedulerClient.Builder.create(
+            dataSource, TableMaintenanceSchedulerPools.policyExpandTask())
+        .tableName(TableMaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
+        .build();
   }
 
   @Override
@@ -76,6 +96,7 @@ public final class PolicyExpandScheduler implements PolicyExpandSchedule {
       return;
     }
     Instant due = nextExecution(timeTrigger);
+    SchedulerClient client = client();
     boolean scheduled =
         client.schedule(
             new TaskInstance<>(TableMaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
@@ -97,7 +118,7 @@ public final class PolicyExpandScheduler implements PolicyExpandSchedule {
    * @return next execution time of the expand row, or empty when the row is absent
    */
   Optional<Instant> scheduledExecutionTime(long policyId) {
-    return client
+    return client()
         .getScheduledExecution(instanceId(policyId))
         .map(execution -> execution.getExecutionTime());
   }
@@ -122,67 +143,84 @@ public final class PolicyExpandScheduler implements PolicyExpandSchedule {
   }
 
   private void cancelIfPresent(TaskInstanceId instanceId) {
+    SchedulerClient client = client();
     if (client.getScheduledExecution(instanceId).isPresent()) {
       client.cancel(instanceId);
     }
   }
 
-  /** Enables auto-commit so db-scheduler client writes are not rolled back on close. */
-  private static final class AutoCommitDataSource implements DataSource {
-    private final DataSource delegate;
-
-    private AutoCommitDataSource(DataSource delegate) {
-      this.delegate = delegate;
-    }
+  /**
+   * Hands db-scheduler the connection of the open SQL session. {@code close}, {@code commit}, and
+   * {@code rollback} are ignored so the session owner commits the expand row with the policy.
+   */
+  private static final class SessionDataSource implements DataSource {
 
     @Override
     public Connection getConnection() throws SQLException {
-      return enableAutoCommit(delegate.getConnection());
+      return nonClosing(SqlSessions.currentConnection());
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-      return enableAutoCommit(delegate.getConnection(username, password));
+      return getConnection();
     }
 
     @Override
-    public PrintWriter getLogWriter() throws SQLException {
-      return delegate.getLogWriter();
+    public PrintWriter getLogWriter() {
+      return null;
     }
 
     @Override
-    public void setLogWriter(PrintWriter out) throws SQLException {
-      delegate.setLogWriter(out);
-    }
+    public void setLogWriter(PrintWriter out) {}
 
     @Override
-    public void setLoginTimeout(int seconds) throws SQLException {
-      delegate.setLoginTimeout(seconds);
-    }
+    public void setLoginTimeout(int seconds) {}
 
     @Override
-    public int getLoginTimeout() throws SQLException {
-      return delegate.getLoginTimeout();
+    public int getLoginTimeout() {
+      return 0;
     }
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-      return delegate.getParentLogger();
+      throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
-      return delegate.unwrap(iface);
+      if (iface.isInstance(this)) {
+        return iface.cast(this);
+      }
+      throw new SQLException("Not a wrapper of " + iface.getName());
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-      return delegate.isWrapperFor(iface);
+    public boolean isWrapperFor(Class<?> iface) {
+      return iface.isInstance(this);
     }
 
-    private static Connection enableAutoCommit(Connection connection) throws SQLException {
-      connection.setAutoCommit(true);
-      return connection;
+    private static Connection nonClosing(Connection connection) {
+      InvocationHandler handler =
+          (proxy, method, args) -> {
+            String name = method.getName();
+            if ("close".equals(name) || "commit".equals(name) || "rollback".equals(name)) {
+              return null;
+            }
+            if ("setAutoCommit".equals(name)) {
+              return null;
+            }
+            if ("getAutoCommit".equals(name)) {
+              return false;
+            }
+            try {
+              return method.invoke(connection, args);
+            } catch (InvocationTargetException e) {
+              throw e.getCause();
+            }
+          };
+      return (Connection)
+          Proxy.newProxyInstance(
+              Connection.class.getClassLoader(), new Class<?>[] {Connection.class}, handler);
     }
   }
 }

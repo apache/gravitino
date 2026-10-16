@@ -39,6 +39,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.policy.PolicyPreCommitHook;
+import org.apache.gravitino.policy.PolicyPreCommitHooks;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -110,7 +112,8 @@ public class PolicyMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForPolicyCreate(metalakePO),
-          () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
+          () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten),
+          () -> afterWrite(policyEntity));
     } catch (RuntimeException e) {
       try {
         ExceptionUtils.checkSQLException(
@@ -149,7 +152,8 @@ public class PolicyMetaService {
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
-          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO));
+          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
+          () -> afterWrite(updatedPolicyEntity));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -213,7 +217,8 @@ public class PolicyMetaService {
                   SecurableObjectMapper.class,
                   mapper ->
                       mapper.softDeleteObjectRelsByMetadataObject(
-                          policyId, MetadataObject.Type.POLICY.name())));
+                          policyId, MetadataObject.Type.POLICY.name())),
+          () -> beforeDelete(policyId));
       return true;
     } catch (NoSuchEntityException e) {
       return false;
@@ -545,5 +550,19 @@ public class PolicyMetaService {
           policyName);
     }
     return policyPO;
+  }
+
+  private static void afterWrite(PolicyEntity policy) {
+    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    if (hook != null) {
+      hook.afterWrite(policy);
+    }
+  }
+
+  private static void beforeDelete(long policyId) {
+    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    if (hook != null) {
+      hook.beforeDelete(policyId);
+    }
   }
 }
