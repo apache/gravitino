@@ -281,6 +281,7 @@ service:
   portName: http
   nodePort: ""
 
+## Keep "exec" on the start command so the JVM runs as PID 1 and receives SIGTERM on pod termination.
 initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
