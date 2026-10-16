@@ -109,7 +109,7 @@ describe('focused metadata updates', () => {
     )
     expect(
       updateSemanticMetadata(definition, targets[0], { ...values, contextFormat: 'structured' }).aiContext
-    ).toEqual({ instructions: 'Text guidance', synonyms: [], examples: [] })
+    ).toEqual({ instructions: 'Text guidance' })
   })
 
   it.each([targets[2], targets[4]])('clears an optional $kind data type without changing other metadata', target => {
@@ -150,5 +150,78 @@ describe('focused metadata updates', () => {
     expect(() => updateSemanticMetadata(makeDefinition(), { kind: 'metric', name: 'missing' }, {})).toThrow(
       'no longer exists'
     )
+  })
+
+  it.each([true, false, undefined])('edits or clears the time dimension without losing other metadata: %s', value => {
+    const definition = makeDefinition()
+    const target = targets[2]
+    const field = getSemanticMetadataEntity(definition, target)
+    field.dimension = { isTime: !value, extra: 'preserve' }
+    const initial = semanticMetadataFormValues(field)
+
+    const updated = getSemanticMetadataEntity(
+      updateSemanticMetadata(definition, target, { ...initial, timeDimension: value }),
+      target
+    )
+    expect(updated.dimension).toEqual(value == null ? { extra: 'preserve' } : { isTime: value, extra: 'preserve' })
+    expect(updated.expression).toEqual(field.expression)
+  })
+
+  it('leaves an absent dimension alone and removes an explicitly cleared dimension', () => {
+    const definition = makeDefinition()
+    const target = targets[2]
+    const field = getSemanticMetadataEntity(definition, target)
+    expect(updateSemanticMetadata(definition, target, semanticMetadataFormValues(field))).toEqual(definition)
+    field.dimension = { isTime: true }
+
+    const updated = updateSemanticMetadata(definition, target, {
+      ...semanticMetadataFormValues(field),
+      timeDimension: undefined
+    })
+    expect(getSemanticMetadataEntity(updated, target)).not.toHaveProperty('dimension')
+  })
+
+  it.each(['', '   '])('removes cleared optional text metadata: %j', blank => {
+    const definition = makeDefinition()
+    const target = targets[2]
+    const field = getSemanticMetadataEntity(definition, target)
+    field.description = 'Description'
+    field.aiContext = 'Guidance'
+    const values = { ...semanticMetadataFormValues(field), label: blank, description: blank, contextText: blank }
+    const updated = getSemanticMetadataEntity(updateSemanticMetadata(definition, target, values), target)
+    expect(updated).not.toHaveProperty('label')
+    expect(updated).not.toHaveProperty('description')
+    expect(updated).not.toHaveProperty('aiContext')
+    expect(updated.customExtensions).toEqual(field.customExtensions)
+  })
+
+  it.each([true, false])('clears structured guidance while preserving additional keys: %s', extra => {
+    const definition = makeDefinition()
+    definition.aiContext = {
+      instructions: 'Guidance',
+      synonyms: ['a'],
+      examples: ['b'],
+      ...(extra ? { vendor: { keep: true } } : {})
+    }
+
+    const updated = updateSemanticMetadata(definition, targets[0], {
+      ...semanticMetadataFormValues(definition),
+      instructions: '',
+      synonyms: [],
+      examples: []
+    })
+    if (extra) expect(updated.aiContext).toEqual({ vendor: { keep: true } })
+    else expect(updated).not.toHaveProperty('aiContext')
+  })
+
+  it('removes structured context when only unchanged empty lists remain after clearing instructions', () => {
+    const definition = makeDefinition()
+    definition.aiContext = { instructions: 'Guidance', synonyms: [], examples: [] }
+
+    const updated = updateSemanticMetadata(definition, targets[0], {
+      ...semanticMetadataFormValues(definition),
+      instructions: ''
+    })
+    expect(updated).not.toHaveProperty('aiContext')
   })
 })

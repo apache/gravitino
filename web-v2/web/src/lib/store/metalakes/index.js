@@ -2012,14 +2012,14 @@ export const registerModel = createAsyncThunk(
 
 export const updateModel = createAsyncThunk(
   'appMetalakes/updateModel',
-  async ({ init, metalake, catalog, catalogType, schema, model, data }, { getState, dispatch }) => {
+  async ({ init, metalake, catalog, catalogType, schema, model, version, data }, { getState, dispatch }) => {
     const [err, res] = await to(updateModelApi({ metalake, catalog, schema, model, data }))
     if (err || !res) {
       return { err: true }
     }
 
     if (init) {
-      await dispatch(getModelDetails({ init, metalake, catalog, schema, model }))
+      await dispatch(getModelDetails({ init, metalake, catalog, schema, model, version }))
     } else {
       dispatch(updateModelInStore({ metalake, catalog, catalogType, schema, model, newModel: res.model }))
 
@@ -2443,9 +2443,34 @@ export const createSemanticModel = createAsyncThunk(
 
 export const updateSemanticModel = createAsyncThunk(
   'appMetalakes/updateSemanticModel',
-  async ({ metalake, catalog, schema, semanticModel, data }, { dispatch, getState }) => {
+  async ({ metalake, catalog, schema, semanticModel, data, expectedDefinition }, { dispatch, getState }) => {
     const activeEntity = getState().metalakes.activeCatalogEntity
-    await dispatch(setTableLoading(true))
+    if (data.updates.some(update => update['@type'] === 'replaceDefinition')) {
+      // Detect intervening edits; atomic protection still requires a server-side version token.
+      const [err, current] = await to(
+        getSemanticModelDetailsApi(
+          { metalake, catalog, schema, semanticModel },
+          { errorMessageMode: 'none', ignoreCancelToken: true }
+        )
+      )
+      if (err || !current?.semanticModel?.definition || !expectedDefinition) {
+        return {
+          err: true,
+          message: semanticModelErrorMessage(
+            err,
+            'Unable to verify the current definition. Reload the model and try again.'
+          )
+        }
+      }
+      if (!_.isEqual(current.semanticModel.definition, expectedDefinition)) {
+        return {
+          err: true,
+          message:
+            'The definition has changed since this editor was opened. Copy your edits, then refresh the page and reapply them to the latest definition.'
+        }
+      }
+    }
+    if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(true))
     const [err, res] = await to(updateSemanticModelApi({ metalake, catalog, schema, semanticModel, data }))
     if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(false))
 

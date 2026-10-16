@@ -24,7 +24,12 @@ import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
-import reducer, { getSemanticModelDetails, getTableDetails, resetActivatedDetails } from '@/lib/store/metalakes'
+import reducer, {
+  getSemanticModelDetails,
+  getTableDetails,
+  resetActivatedDetails,
+  getCurrentEntityPolicies
+} from '@/lib/store/metalakes'
 import SemanticModelDetailsPage from './SemanticModelDetailsPage'
 import SemanticMetadataEditor from '../SemanticMetadataEditor'
 
@@ -83,6 +88,12 @@ beforeEach(() => {
     downloads.push({ href: this.href, filename: this.download })
   })
   store = configureStore({ reducer: { metalakes: reducer, auth: () => ({ anthEnable: false }) } })
+  defHttp.get
+    .mockReset()
+    .mockImplementation(() =>
+      Promise.resolve({ semanticModel: store.getState().metalakes.activatedDetails, identifiers: [] })
+    )
+  defHttp.put.mockReset()
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -457,7 +468,9 @@ describe('focused semantic metadata editing', () => {
     updatedEntity.datatype = null
     const model = { name: navigation.name, definition: expected, properties: {} }
     defHttp.put.mockResolvedValue({ semanticModel: model })
-    defHttp.get.mockResolvedValue({ semanticModel: model, identifiers: [] })
+    defHttp.get
+      .mockResolvedValue({ semanticModel: model, identifiers: [] })
+      .mockResolvedValueOnce({ semanticModel: { ...model, definition } })
     await click(findText('.ant-modal button', 'Save'))
     expect(defHttp.put.mock.lastCall[0].data).toEqual({
       updates: [{ '@type': 'replaceDefinition', definition: expected }]
@@ -498,11 +511,13 @@ describe('focused semantic metadata editing', () => {
 
     const expected = {
       ...definition,
-      aiContext: { instructions: 'Edited structured instructions', synonyms: [], examples: ['Keep my example'] }
+      aiContext: { instructions: 'Edited structured instructions', examples: ['Keep my example'] }
     }
     const model = { name: navigation.name, definition: expected, properties: {} }
     defHttp.put.mockResolvedValue({ semanticModel: model })
-    defHttp.get.mockResolvedValue({ semanticModel: model, identifiers: [] })
+    defHttp.get
+      .mockResolvedValue({ semanticModel: model, identifiers: [] })
+      .mockResolvedValueOnce({ semanticModel: { ...model, definition } })
     await click(findText('.ant-modal button', 'Save'))
     expect(defHttp.put.mock.lastCall[0].data).toEqual({
       updates: [{ '@type': 'replaceDefinition', definition: expected }]
@@ -1005,4 +1020,80 @@ it.each(['rename', 'remove'])('clears duplicate dialect errors immediately after
   await act(async () => new Promise(resolve => setTimeout(resolve, 400)))
   expect(document.body.textContent).not.toContain('Dialect names must be unique')
   expect(defHttp.put).not.toHaveBeenCalled()
+})
+
+it.each(['focused', 'JSON'])(
+  'retains the %s draft without overwriting a concurrently edited definition',
+  async editor => {
+    navigation.name = 'orders'
+    const definition = definitionWith(() => null)
+    let serverModel = { name: navigation.name, definition, properties: {} }
+    defHttp.get.mockImplementation(() => Promise.resolve({ semanticModel: serverModel }))
+    await renderDetails(definition)
+    let input
+    if (editor === 'focused') {
+      await click(document.querySelector('[aria-label="Edit dataset orders"]'))
+      input = document.querySelector('#semanticMetadata_description')
+      await act(async () => Simulate.change(input, { target: { value: 'My draft' } }))
+    } else {
+      await click(document.querySelector('[aria-label="Edit Semantic Model"]'))
+      input = document.querySelector('[data-refer="semantic-model-definition-field"]')
+      await act(async () =>
+        Simulate.change(input, { target: { value: JSON.stringify({ ...definition, aiContext: 'My draft' }) } })
+      )
+    }
+    serverModel = { ...serverModel, definition: { ...definition, aiContext: 'Concurrent edit' } }
+    await click(findText('.ant-modal button', editor === 'focused' ? 'Save' : 'Submit'))
+    expect(defHttp.put).not.toHaveBeenCalled()
+    expect(document.querySelector('.ant-modal .ant-alert').textContent).toContain('changed since')
+    expect(input.value).toContain('My draft')
+    expect(store.getState().metalakes.activatedDetails.definition).toEqual(definition)
+  }
+)
+
+it('edits the time dimension through the field form', async () => {
+  let model = { name: navigation.name, definition: definitionWith(() => null), properties: {} }
+  model.definition.datasets[0].fields[0].dimension = { isTime: true }
+  defHttp.get.mockImplementation(() => Promise.resolve({ semanticModel: model, identifiers: [] }))
+  defHttp.put.mockImplementation(({ data }) => {
+    model = { ...model, definition: data.updates[0].definition }
+
+    return Promise.resolve({ semanticModel: model })
+  })
+  await renderDetails(model.definition)
+  await click(document.querySelector('button.ant-table-row-expand-icon'))
+  await click(document.querySelector('[aria-label="Edit field amount"]'))
+  const input = document.querySelector('#semanticMetadata_timeDimension')
+  expect(input.closest('.ant-select').textContent).toContain('Yes')
+  await act(async () => Simulate.mouseDown(input.closest('.ant-select').querySelector('.ant-select-selector')))
+  await click(findText('.ant-select-item-option-content', 'No'))
+  await click(findText('.ant-modal button', 'Save'))
+  expect(model.definition.datasets[0].fields[0].dimension).toEqual({ isTime: false })
+  expect(document.querySelector('.ant-modal')).toBeNull()
+})
+
+it('shows the associated policies with the Semantic Model metadata identity', async () => {
+  await renderDetails(definitionWith(() => null))
+  await selectTab('Overview')
+  const policies = [{ name: 'retention', enabled: true, inherited: true }]
+  defHttp.get.mockResolvedValue({ policies })
+  await act(async () =>
+    store.dispatch(
+      getCurrentEntityPolicies({
+        init: true,
+        metalake: 'demo',
+        metadataObjectType: 'semantic_model',
+        metadataObjectFullName: `sales.mart.${navigation.name}`,
+        details: true
+      })
+    )
+  )
+  const link = document.querySelector('[aria-label="View Semantic Model policies"]')
+  expect(link.textContent).toBe('1')
+  await act(async () => {
+    Simulate.mouseEnter(link)
+    await new Promise(resolve => setTimeout(resolve, 200))
+  })
+  expect(document.querySelector('.ant-popover').textContent).toContain('retention')
+  expect(defHttp.get.mock.lastCall[0].url).toContain('/semantic_model/')
 })

@@ -129,6 +129,7 @@ function SemanticMetadataForm({ definition, target, metalake, catalog, schema, s
           catalog,
           schema,
           semanticModel,
+          expectedDefinition: original,
           data: { updates: [{ '@type': 'replaceDefinition', definition: updated }] }
         })
       )
@@ -147,9 +148,21 @@ function SemanticMetadataForm({ definition, target, metalake, catalog, schema, s
   const basic = (
     <>
       {target.kind === 'field' && (
-        <Form.Item name='label' label='Label'>
-          <Input />
-        </Form.Item>
+        <>
+          <Form.Item name='label' label='Label'>
+            <Input />
+          </Form.Item>
+          <Form.Item name='timeDimension' label='Time dimension'>
+            <Select
+              allowClear
+              placeholder='Not specified'
+              options={[
+                { value: true, label: 'Yes' },
+                { value: false, label: 'No' }
+              ]}
+            />
+          </Form.Item>
+        </>
       )}
       {['dataset', 'field', 'metric'].includes(target.kind) && (
         <Form.Item name='description' label='Description'>

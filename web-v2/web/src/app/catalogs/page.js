@@ -391,6 +391,15 @@ const CatalogsListPage = () => {
                 details: true
               })
             )
+            load(
+              getCurrentEntityPolicies({
+                init: true,
+                metalake,
+                metadataObjectType: 'semantic_model',
+                metadataObjectFullName: `${catalog}.${schema}.${semanticModel}`,
+                details: true
+              })
+            )
           }
         }
       }

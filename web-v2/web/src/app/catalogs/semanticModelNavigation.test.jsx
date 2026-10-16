@@ -213,3 +213,20 @@ it('ignores a version route header response after navigating to a Semantic Model
   expect(store.getState().metalakes).toEqual(before)
   expect(defHttp.get.mock.calls).toHaveLength(calls)
 })
+
+it('loads policies for the active Semantic Model', async () => {
+  const policies = [{ name: 'retention', enabled: true, inherited: true }]
+  defHttp.get.mockResolvedValue({
+    semanticModel: { name: 'orders', definition: { datasets: [] } },
+    identifiers: [],
+    tags: [],
+    policies
+  })
+  await navigate('orders')
+  expect(store.getState().metalakes.currentEntityPolicies).toEqual(policies)
+  expect(
+    defHttp.get.mock.calls.some(
+      ([request]) => request.url.includes('/semantic_model/') && request.url.endsWith('/policies')
+    )
+  ).toBe(true)
+})

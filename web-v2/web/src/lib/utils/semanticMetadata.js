@@ -50,6 +50,7 @@ export const semanticMetadataFormValues = entity => {
 
   return {
     ...cloneDeep(entity),
+    timeDimension: entity.dimension?.isTime ?? undefined,
     dialects: cloneDeep(entity.expression?.dialects || []),
     contextFormat: typeof entity.aiContext === 'string' ? 'text' : 'structured',
     contextText: typeof entity.aiContext === 'string' ? entity.aiContext : '',
@@ -66,7 +67,17 @@ export const updateSemanticMetadata = (definition, target, values) => {
   const initial = semanticMetadataFormValues(entity)
   for (const key of editableProperties[target.kind]) {
     const value = key === 'datatype' && values[key] === '' ? null : values[key]
-    if (!isEqual(initial[key], value)) entity[key] = value ?? null
+    if (!isEqual(initial[key], value)) {
+      if (['label', 'description'].includes(key) && (value == null || !value.trim())) delete entity[key]
+      else entity[key] = value ?? null
+    }
+  }
+  if (target.kind === 'field' && initial.timeDimension !== values.timeDimension) {
+    const dimension = { ...entity.dimension }
+    if (values.timeDimension == null) delete dimension.isTime
+    else dimension.isTime = values.timeDimension
+    if (Object.keys(dimension).length) entity.dimension = dimension
+    else delete entity.dimension
   }
   if (['field', 'metric'].includes(target.kind) && !isEqual(initial.dialects, values.dialects)) {
     entity.expression = { ...entity.expression, dialects: cloneDeep(values.dialects) }
@@ -76,9 +87,12 @@ export const updateSemanticMetadata = (definition, target, values) => {
     if (initial.contextFormat !== 'text' || initial.contextText !== values.contextText) {
       // Existing structured guidance stays structured so its extra keys cannot be discarded.
       if (entity.aiContext && typeof entity.aiContext === 'object') {
-        entity.aiContext.instructions = values.contextText
+        if (values.contextText?.trim()) entity.aiContext.instructions = values.contextText
+        else delete entity.aiContext.instructions
+        if (!Object.keys(entity.aiContext).length) delete entity.aiContext
       } else {
-        entity.aiContext = values.contextText
+        if (values.contextText?.trim()) entity.aiContext = values.contextText
+        else delete entity.aiContext
       }
     }
   } else {
@@ -90,6 +104,12 @@ export const updateSemanticMetadata = (definition, target, values) => {
     if (changedKeys.length) {
       entity.aiContext = typeof entity.aiContext === 'object' && entity.aiContext ? entity.aiContext : {}
       for (const key of changedKeys) entity.aiContext[key] = cloneDeep(values[key])
+      for (const key of ['instructions', 'synonyms', 'examples']) {
+        const value = entity.aiContext[key]
+        if (value == null || (typeof value === 'string' ? !value.trim() : value.length === 0))
+          delete entity.aiContext[key]
+      }
+      if (!Object.keys(entity.aiContext).length) delete entity.aiContext
     }
   }
 

@@ -109,6 +109,10 @@ export default function SchemaDetailsPage() {
   const catalog = searchParams.get('catalog')
   const schema = searchParams.get('schema')
   const store = useAppSelector(state => state.metalakes)
+
+  const semanticModelRequest =
+    store.semanticModelRequests[`{{${currentMetalake}}}{{${catalog}}}{{relational}}{{${schema}}}`]
+  const semanticModelListLoading = !!semanticModelRequest?.inFlight.includes(store.semanticModelListRequestId)
   const dispatch = useAppDispatch()
   const [search, setSearch] = useState('')
   const [tabOptions, setTabOptions] = useState([])
@@ -938,7 +942,7 @@ export default function SchemaDetailsPage() {
               </Button>
             </Space>
           </Flex>
-          <Spin spinning={store.tableLoading}>
+          <Spin spinning={store.tableLoading || semanticModelListLoading}>
             <Table
               data-refer='semantic-model-list-grid'
               size='small'

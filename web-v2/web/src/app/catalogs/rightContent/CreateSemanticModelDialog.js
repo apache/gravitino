@@ -20,7 +20,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Form, Input, Modal, Spin, Typography } from 'antd'
+import { Alert, Form, Input, Modal, Spin, Typography } from 'antd'
 import { useScrolling } from 'react-use'
 import RenderPropertiesFormItem from '@/components/EntityPropertiesFormItem'
 import { validateMessages, dialogContentMaxHeigth, mismatchName } from '@/config'
@@ -60,6 +60,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [cacheData, setCacheData] = useState()
+  const [saveError, setSaveError] = useState('')
   const scrollRef = useRef(null)
   const loadedRef = useRef(false)
   const scrolling = useScrolling(scrollRef)
@@ -147,6 +148,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
         const { definition } = parseSemanticModelDefinition(values.definition)
 
         setConfirmLoading(true)
+        setSaveError('')
 
         const submitData = {
           name: values.name.trim(),
@@ -165,6 +167,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
                 catalog,
                 schema,
                 semanticModel: editSemanticModel,
+                expectedDefinition: cacheData.definition,
                 data: { updates }
               })
             )
@@ -173,7 +176,9 @@ export default function CreateSemanticModelDialog({ ...props }) {
           result = await dispatch(createSemanticModel({ data: submitData, metalake, catalog, schema }))
         }
 
-        if (!result?.payload?.err && !result?.error) {
+        if (result?.payload?.err || result?.error) {
+          setSaveError(result.payload?.message || result.error?.message || 'Unable to save the Semantic Model.')
+        } else {
           setOpen(false)
           if (result) await onSaved?.(result.payload)
         }
@@ -214,6 +219,9 @@ export default function CreateSemanticModelDialog({ ...props }) {
             ? 'Create a new semantic model.'
             : `Edit the semantic model ${editSemanticModel}. The definition is replaced as a whole.`}
         </Paragraph>
+        {saveError && (
+          <Alert className='mb-3' type='error' showIcon message={saveError} description='Your edits are retained.' />
+        )}
         <div
           className={cn('relative', {
             'after:absolute after:-bottom-10 after:left-0 after:right-0 after:h-10 after:shadow-[0px_-10px_8px_-8px_rgba(5,5,5,0.1)]':
