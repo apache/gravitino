@@ -21,6 +21,7 @@ package org.apache.gravitino.listener;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -100,9 +101,20 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
 
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    return listCatalogsInfo(namespace, () -> dispatcher.listCatalogsInfo(namespace));
+  }
+
+  @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, boolean includeProperties)
+      throws NoSuchMetalakeException {
+    return listCatalogsInfo(
+        namespace, () -> dispatcher.listCatalogsInfo(namespace, includeProperties));
+  }
+
+  private Catalog[] listCatalogsInfo(Namespace namespace, Supplier<Catalog[]> listOperation) {
     eventBus.dispatchEvent(new ListCatalogPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
-      Catalog[] catalogs = dispatcher.listCatalogsInfo(namespace);
+      Catalog[] catalogs = listOperation.get();
       eventBus.dispatchEvent(
           new ListCatalogEvent(
               PrincipalUtils.getCurrentUserName(),

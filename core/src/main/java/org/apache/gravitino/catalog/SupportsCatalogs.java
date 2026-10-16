@@ -61,6 +61,28 @@ public interface SupportsCatalogs {
   Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException;
 
   /**
+   * List all catalogs with their information in the metalake under the namespace {@link Namespace}.
+   *
+   * <p>When {@code includeProperties} is {@code false}, catalog properties are omitted and {@link
+   * Catalog#properties()} contains only {@code in-use}, read directly from stored metadata and
+   * defaulting to {@code "true"} when absent. Other properties are omitted, and catalog wrappers
+   * are not initialized. Name, type, provider, comment, and audit information are still populated.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param namespace The namespace to list the catalogs under it.
+   * @param includeProperties whether to include resolved catalog properties
+   * @return The list of catalog's information.
+   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
+   * @throws UnsupportedOperationException If the implementation does not support this overload.
+   */
+  default Catalog[] listCatalogsInfo(Namespace namespace, boolean includeProperties)
+      throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException(
+        "Listing catalogs with includeProperties is unsupported");
+  }
+
+  /**
    * Load a catalog by its identifier.
    *
    * @param ident the identifier of the catalog.
