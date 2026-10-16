@@ -21,7 +21,9 @@ package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -30,7 +32,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
@@ -400,34 +401,6 @@ public class TestJobEventDispatcher {
   }
 
   @Test
-  void testRunJobEventMasksSensitiveJobConf() {
-    Map<String, String> sensitiveJobConf =
-        ImmutableMap.of(
-            "password",
-            "plain-pw",
-            "spark_conf",
-            "{\"jdbc.password\":\"jdbc-pw\",\"spark.executor.memory\":\"1g\"}",
-            "plain",
-            "ok");
-
-    dispatcher.runJob("metalake", jobTemplateEntity.name(), sensitiveJobConf);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertInstanceOf(RunJobPreEvent.class, preEvent);
-    Map<String, String> preEventJobConf = ((RunJobPreEvent) preEvent).jobConf();
-    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, preEventJobConf.get("password"));
-    Assertions.assertEquals("ok", preEventJobConf.get("plain"));
-    Assertions.assertFalse(preEventJobConf.get("spark_conf").contains("jdbc-pw"));
-    Assertions.assertTrue(preEventJobConf.get("spark_conf").contains("1g"));
-
-    Event postEvent = dummyEventListener.popPostEvent();
-    Assertions.assertInstanceOf(RunJobEvent.class, postEvent);
-    Map<String, String> postEventJobConf = ((RunJobEvent) postEvent).jobConf();
-    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, postEventJobConf.get("password"));
-    Assertions.assertFalse(postEventJobConf.get("spark_conf").contains("jdbc-pw"));
-  }
-
-  @Test
   void testCancelJobEvent() {
     dispatcher.cancelJob("metalake", jobInfo.jobId());
     PreEvent preEvent = dummyEventListener.popPreEvent();
@@ -497,16 +470,54 @@ public class TestJobEventDispatcher {
   }
 
   @Test
+  void testRunJobEventMasksSensitiveJobConf() throws NoSuchJobTemplateException {
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Collections.singletonList(listener));
+    JobOperationDispatcher delegate = mock(JobOperationDispatcher.class);
+    when(delegate.runJob(any(String.class), any(String.class), any(Map.class)))
+        .thenReturn(jobEntity);
+    JobEventDispatcher maskingDispatcher = new JobEventDispatcher(eventBus, delegate);
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "catalog_name",
+            "ice",
+            "updater_options",
+            "{\"password\":\"arg-pw\",\"gravitino_uri\":\"http://localhost\"}",
+            "spark_conf",
+            "{\"spark.sql.catalog.ice.rest.auth.basic.password\":\"jdbc-pw\"}");
+
+    String templateName = jobTemplateEntity.name();
+    maskingDispatcher.runJob("metalake", templateName, conf);
+
+    verify(delegate).runJob(eq("metalake"), eq(templateName), eq(conf));
+    Map<String, String> preJobConf = ((RunJobPreEvent) listener.popPreEvent()).jobConf();
+    Map<String, String> postJobConf = ((RunJobEvent) listener.popPostEvent()).jobConf();
+    Assertions.assertEquals("ice", preJobConf.get("catalog_name"));
+    Assertions.assertFalse(preJobConf.get("updater_options").contains("arg-pw"));
+    Assertions.assertFalse(preJobConf.get("spark_conf").contains("jdbc-pw"));
+    Assertions.assertFalse(postJobConf.get("updater_options").contains("arg-pw"));
+    Assertions.assertTrue(conf.get("updater_options").contains("arg-pw"));
+  }
+
+  @Test
   void testRunJobFailureEventMasksSensitiveJobConf() {
-    Map<String, String> sensitiveJobConf = ImmutableMap.of("password", "plain-pw", "plain", "ok");
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Collections.singletonList(listener));
+    JobOperationDispatcher delegate = mock(JobOperationDispatcher.class);
+    when(delegate.runJob(any(String.class), any(String.class), any(Map.class)))
+        .thenThrow(new GravitinoRuntimeException("failed"));
+    JobEventDispatcher maskingDispatcher = new JobEventDispatcher(eventBus, delegate);
+    Map<String, String> conf =
+        ImmutableMap.of("updater_options", "{\"password\":\"arg-pw\"}", "catalog_name", "ice");
+
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
-        () -> failureDispatcher.runJob("metalake", jobTemplateEntity.name(), sensitiveJobConf));
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertInstanceOf(RunJobFailureEvent.class, event);
-    Map<String, String> eventJobConf = ((RunJobFailureEvent) event).jobConf();
-    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, eventJobConf.get("password"));
-    Assertions.assertEquals("ok", eventJobConf.get("plain"));
+        () -> maskingDispatcher.runJob("metalake", jobTemplateEntity.name(), conf));
+
+    Map<String, String> eventJobConf = ((RunJobFailureEvent) listener.popPostEvent()).jobConf();
+    Assertions.assertEquals("ice", eventJobConf.get("catalog_name"));
+    Assertions.assertFalse(eventJobConf.get("updater_options").contains("arg-pw"));
+    Assertions.assertTrue(conf.get("updater_options").contains("arg-pw"));
   }
 
   @Test

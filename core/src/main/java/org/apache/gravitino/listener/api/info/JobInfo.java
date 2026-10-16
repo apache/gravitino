@@ -90,8 +90,10 @@ public final class JobInfo {
 
   /**
    * Deserializes the job entity's stored runtime job template JSON, if any, back into a {@link
-   * JobTemplate}. Sensitive-named map values are masked via {@link JobRuntimeTemplateMaskUtils}
-   * before the template is exposed on the event path. This is called from inside the event
+   * JobTemplate}. For a Spark runtime template, sensitive-named keys inside {@code
+   * --updater-options} and {@code --spark-conf} JSON arguments are masked via {@link
+   * JobRuntimeTemplateMaskUtils} before the template is exposed on the event path. This does not
+   * mask the separate {@code jobConf} map on run-job events. This is called from inside the event
    * dispatcher's try block for getJob/runJob/cancelJob, after the underlying operation has already
    * succeeded (or, for cancelJob, after the external cancel call and entity update have already
    * happened) - a malformed or forward-incompatible stored value (e.g. a job type unknown to this
@@ -186,9 +188,8 @@ public final class JobInfo {
 
   /**
    * Returns the resolved job template that was actually submitted for execution, with placeholders
-   * replaced. Sensitive-named map / argument values are masked for the event path; resource URI
-   * fields ({@code executable}, {@code jars}, {@code files}, {@code archives}, {@code scripts},
-   * {@code className}) are not masked.
+   * replaced. For a Spark template, sensitive-named keys inside {@code --updater-options} and
+   * {@code --spark-conf} JSON arguments are masked for the event path.
    *
    * @return the runtime job template, or null for jobs run before this field was introduced
    */

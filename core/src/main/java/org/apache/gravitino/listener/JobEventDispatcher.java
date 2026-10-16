@@ -225,7 +225,8 @@ public class JobEventDispatcher implements JobOperationDispatcher {
   @Override
   public JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
       throws NoSuchJobTemplateException {
-    // Mask only for listeners; keep the caller's jobConf plaintext for execution.
+    // Events carry a masked copy of the Spark updater_options / spark_conf JSON. Execution below
+    // still uses the caller's plaintext jobConf.
     Map<String, String> maskedJobConf = JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(jobConf);
     eventBus.dispatchEvent(
         new RunJobPreEvent(

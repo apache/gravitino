@@ -1475,20 +1475,15 @@ public class TestJobOperations extends JerseyTest {
             + "\"name\":\"spark_template_1\","
             + "\"comment\":\"resolved\","
             + "\"executable\":\"local:///app.jar\","
-            + "\"arguments\":[\"--table\",\"db.t\"],"
+            + "\"arguments\":["
+            + "\"--updater-options\","
+            + "\"{\\\"gravitino_uri\\\":\\\"http://localhost\\\",\\\"password\\\":\\\"nested-pw\\\"}\","
+            + "\"--spark-conf\","
+            + "\"{\\\"spark.executor.memory\\\":\\\"1g\\\",\\\"jdbc.password\\\":\\\"jdbc-pw\\\"}\""
+            + "],"
             + "\"environments\":{\"AUTH_PASSWORD\":\"env-secret\",\"CATALOG\":\"ice\"},"
-            + "\"customFields\":{"
-            + "\"updater_options\":\"{\\\"gravitino_uri\\\":\\\"http://localhost\\\","
-            + "\\\"password\\\":\\\"nested-pw\\\",\\\"oauth_token\\\":\\\"oauth-secret\\\"}\","
-            + "\"update_mode\":\"stats\""
-            + "},"
             + "\"className\":\"org.example.App\","
-            + "\"configs\":{"
-            + "\"spark.master\":\"local[*]\","
-            + "\"spark.hadoop.fs.s3a.secret.key\":\"s3-secret\","
-            + "\"spark_conf\":\"{\\\"spark.executor.memory\\\":\\\"1g\\\","
-            + "\\\"jdbc.password\\\":\\\"jdbc-pw\\\"}\""
-            + "}"
+            + "\"configs\":{\"spark.hadoop.fs.s3a.secret.key\":\"s3-secret\"}"
             + "}";
     JobEntity jobWithSecrets =
         JobEntity.builder()
@@ -1508,24 +1503,19 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertInstanceOf(SparkJobTemplateDTO.class, jobDTO.runtimeJobTemplate());
     SparkJobTemplateDTO spark = (SparkJobTemplateDTO) jobDTO.runtimeJobTemplate();
 
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE, spark.environments().get("AUTH_PASSWORD"));
-    Assertions.assertEquals("ice", spark.environments().get("CATALOG"));
-    Assertions.assertEquals("stats", spark.customFields().get("update_mode"));
-    Assertions.assertFalse(spark.customFields().get("updater_options").contains("nested-pw"));
-    Assertions.assertFalse(spark.customFields().get("updater_options").contains("oauth-secret"));
-    Assertions.assertTrue(
-        spark.customFields().get("updater_options").contains(HiddenPropertyMaskUtils.MASKED_VALUE));
-    Assertions.assertEquals("local[*]", spark.configs().get("spark.master"));
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE,
-        spark.configs().get("spark.hadoop.fs.s3a.secret.key"));
-    Assertions.assertFalse(spark.configs().get("spark_conf").contains("jdbc-pw"));
-    Assertions.assertTrue(spark.configs().get("spark_conf").contains("1g"));
+    Assertions.assertEquals("env-secret", spark.environments().get("AUTH_PASSWORD"));
+    Assertions.assertEquals("s3-secret", spark.configs().get("spark.hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals("--updater-options", spark.arguments().get(0));
+    Assertions.assertFalse(spark.arguments().get(1).contains("nested-pw"));
+    Assertions.assertTrue(spark.arguments().get(1).contains("http://localhost"));
+    Assertions.assertTrue(spark.arguments().get(1).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("--spark-conf", spark.arguments().get(2));
+    Assertions.assertFalse(spark.arguments().get(3).contains("jdbc-pw"));
+    Assertions.assertTrue(spark.arguments().get(3).contains("1g"));
 
     // Stored entity JSON must remain unmasked (masking is response-only).
-    Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("env-secret"));
     Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("nested-pw"));
+    Assertions.assertTrue(jobWithSecrets.runtimeJobTemplate().contains("jdbc-pw"));
   }
 
   @Test
