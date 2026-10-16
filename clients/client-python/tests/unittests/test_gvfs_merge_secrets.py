@@ -353,6 +353,7 @@ class TestGVFSMergeSecrets(unittest.TestCase):
                 )
 
         self.assertEqual(merged["f-prop"], "3")
+        client.load_catalog.assert_called_once_with("catalog")
         catalog.as_fileset_catalog.return_value.load_fileset.assert_not_called()
 
 

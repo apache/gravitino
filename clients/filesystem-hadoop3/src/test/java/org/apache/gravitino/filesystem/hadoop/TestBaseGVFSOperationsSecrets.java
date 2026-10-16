@@ -101,6 +101,7 @@ public class TestBaseGVFSOperationsSecrets {
     assertEquals("ss", all.get("s-secret"));
     assertEquals("3", all.get("f-vis"));
     assertEquals("fs", all.get("f-secret"));
+    verify(client, times(1)).loadCatalog("catalog");
   }
 
   @Test
@@ -392,6 +393,7 @@ public class TestBaseGVFSOperationsSecrets {
       assertEquals("2", all.get("s-prop"));
       assertEquals("3", all.get("f-prop"));
       assertEquals("fs", all.get("f-secret"));
+      verify(client, times(1)).loadCatalog("catalog");
       verify(filesetCatalog, never()).loadFileset(NameIdentifier.of("schema", "fs"));
     }
   }

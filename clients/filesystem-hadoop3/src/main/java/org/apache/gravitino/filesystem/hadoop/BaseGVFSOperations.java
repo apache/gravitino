@@ -995,8 +995,18 @@ public abstract class BaseGVFSOperations implements Closeable {
             filesetIdent.namespace().level(1),
             filesetIdent.namespace().level(2));
     Catalog catalog = getCatalog(catalogIdent);
-    Schema schema = getSchema(schemaIdent);
-    Fileset resolvedFileset = fileset != null ? fileset : getFileset(filesetIdent);
+    Schema schema =
+        enableFilesetMetadataCache
+            ? getSchema(schemaIdent)
+            : catalog.asSchemas().loadSchema(schemaIdent.name());
+    Fileset resolvedFileset =
+        fileset != null
+            ? fileset
+            : (enableFilesetMetadataCache
+                ? getFileset(filesetIdent)
+                : catalog
+                    .asFilesetCatalog()
+                    .loadFileset(NameIdentifier.of(schemaIdent.name(), filesetIdent.name())));
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());

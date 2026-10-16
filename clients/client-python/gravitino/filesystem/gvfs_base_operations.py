@@ -535,9 +535,21 @@ class BaseGVFSOperations(ABC):
             fileset_ident.namespace().level(2),
         )
         catalog = self._get_fileset_catalog(catalog_ident)
-        schema = self._get_fileset_schema(schema_ident)
+        schema = (
+            self._get_fileset_schema(schema_ident)
+            if self._enable_fileset_metadata_cache
+            else catalog.as_schemas().load_schema(schema_ident.name())
+        )
         resolved_fileset = (
-            fileset if fileset is not None else self._get_fileset(fileset_ident)
+            fileset
+            if fileset is not None
+            else (
+                self._get_fileset(fileset_ident)
+                if self._enable_fileset_metadata_cache
+                else catalog.as_fileset_catalog().load_fileset(
+                    NameIdentifier.of(schema_ident.name(), fileset_ident.name())
+                )
+            )
         )
         fileset_props = dict(catalog.properties() or {})
         fileset_props.update(catalog.get_secrets())
