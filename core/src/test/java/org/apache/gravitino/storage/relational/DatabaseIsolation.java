@@ -28,8 +28,9 @@ public enum DatabaseIsolation {
   RESET_TABLES,
 
   /**
-   * A new database and backend for each test, closed afterwards. Use it when a test changes the
-   * schema, closes the backend itself, or leaves writers running after it ends.
+   * A new database (a new schema on PostgreSQL) and backend for each test, closed afterwards. Use
+   * it when a test changes the schema, closes the backend itself, or leaves writers running after
+   * it ends.
    */
   FRESH_DATABASE
 }

@@ -30,8 +30,8 @@ import java.lang.annotation.Target;
  * Declares how a database-backed test class or method is isolated from the other tests in its
  * class. A method-level fixture overrides the class-level one.
  *
- * <p>It only takes effect in the core database lanes, which reuse one database per test class. A
- * run with no lane selected gives every test its own database anyway.
+ * <p>By default a test class reuses one database. A run that switches backends between tests (no
+ * lane selected and {@code dockerTest=true}) gives every test its own database anyway.
  */
 @Documented
 @Inherited
