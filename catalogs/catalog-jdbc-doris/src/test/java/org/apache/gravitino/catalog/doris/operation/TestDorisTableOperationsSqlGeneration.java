@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.LIGHT_SCHEMA_CHANGE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -1450,6 +1451,249 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         "Properties 'replication_num' and 'replication_allocation' cannot be set at the same time",
         exception.getMessage());
+  }
+
+  /** Verifies renaming an existing column generates Doris SQL. */
+  @Test
+  public void testRenameExistingColumn() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("old_col").withType(Types.IntegerType.get()).build();
+
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {column})
+            .withProperties(Collections.singletonMap(LIGHT_SCHEMA_CHANGE, "true"))
+            .build());
+
+    String sql =
+        ops.alterTableSql(
+            "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col"));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nRENAME COLUMN `old_col` `new_col`;", sql);
+  }
+
+  /** Verifies renaming a missing column identifies the missing name. */
+  @Test
+  public void testRenameNonExistingColumn() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("other_column").withType(Types.IntegerType.get()).build();
+
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {column})
+            .withProperties(Collections.singletonMap(LIGHT_SCHEMA_CHANGE, "true"))
+            .build());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col")));
+    Assertions.assertEquals("Original column does not exist: old_col", exception.getMessage());
+  }
+
+  /** Verifies nested fields cannot be renamed on native Doris tables. */
+  @Test
+  public void testRenameNestedColumn() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn parent =
+        JdbcColumn.builder()
+            .withName("parent")
+            .withType(
+                Types.StructType.of(
+                    Types.StructType.Field.of("child", Types.IntegerType.get(), true, null)))
+            .build();
+
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {parent})
+            .withProperties(Collections.singletonMap(LIGHT_SCHEMA_CHANGE, "true"))
+            .build());
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.renameColumn(new String[] {"parent", "child"}, "new_col")));
+    Assertions.assertEquals("Doris does not support nested column names.", exception.getMessage());
+  }
+
+  /** Verifies a rename cannot reuse an existing column name. */
+  @Test
+  public void testRenameToExistingColumn() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+
+    JdbcColumn column =
+        JdbcColumn.builder().withName("old_col").withType(Types.IntegerType.get()).build();
+    JdbcColumn otherColumn =
+        JdbcColumn.builder().withName("other_column").withType(Types.IntegerType.get()).build();
+
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {column, otherColumn})
+            .withProperties(Collections.singletonMap(LIGHT_SCHEMA_CHANGE, "true"))
+            .build());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.renameColumn(new String[] {"old_col"}, "other_column")));
+    Assertions.assertEquals("Column already exists: other_column", exception.getMessage());
+  }
+
+  /** Verifies reserved words are quoted when used as the new column name. */
+  @Test
+  public void testRenameColumnToReservedWord() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("old_col").withType(Types.IntegerType.get()).build();
+
+    ops.setTableForAlter(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {column})
+            .withProperties(Collections.singletonMap(LIGHT_SCHEMA_CHANGE, "true"))
+            .build());
+
+    String sql =
+        ops.alterTableSql(
+            "test_table", TableChange.renameColumn(new String[] {"old_col"}, "order"));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nRENAME COLUMN `old_col` `order`;", sql);
+  }
+
+  /** Verifies column lookup uses Doris's case-insensitive name matching. */
+  @Test
+  public void testRenameColumnMatchesOriginalNameIgnoringCase() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setTableForAlter(renameTableWithColumns("old_col"));
+
+    String sql =
+        ops.alterTableSql(
+            "test_table", TableChange.renameColumn(new String[] {"OLD_COL"}, "new_col"));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nRENAME COLUMN `OLD_COL` `new_col`;", sql);
+  }
+
+  /** Verifies a new name cannot conflict with another column differing only in case. */
+  @Test
+  public void testRenameColumnRejectsExistingNameIgnoringCase() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setTableForAlter(renameTableWithColumns("old_col", "other_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table", TableChange.renameColumn(new String[] {"old_col"}, "OTHER_COL")));
+
+    Assertions.assertEquals("Column already exists: OTHER_COL", exception.getMessage());
+  }
+
+  /**
+   * Verifies renaming is supported at the minimum version and on later Doris releases.
+   *
+   * @param version the Doris server version to simulate
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"doris-1.2.0", "doris-1.2.2", "doris-2.1.0", "doris-3.0.6.2-rc01", "doris-4.0.6"})
+  public void testRenameColumnSupportedVersions(String version) {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations(version);
+    ops.setTableForAlter(renameTableWithColumns("old_col"));
+
+    String sql =
+        ops.alterTableSql(
+            "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col"));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nRENAME COLUMN `old_col` `new_col`;", sql);
+  }
+
+  /** Verifies older servers fail with a version-specific error before SQL is executed. */
+  @Test
+  public void testRenameColumnRejectsUnsupportedVersion() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations("doris-1.1.3");
+    ops.setTableForAlter(renameTableWithColumns("old_col"));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col")));
+
+    Assertions.assertEquals(
+        "RENAME COLUMN requires Doris 1.2.0 or later. Current server version: 1.1.3",
+        exception.getMessage());
+  }
+
+  /**
+   * Verifies renaming is rejected when light schema change is disabled or missing.
+   *
+   * @param value the property value, or empty to omit the property
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"false", "FALSE", ""})
+  public void testRenameColumnRequiresLightSchemaChange(String value) {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcTable table = renameTableWithColumns("old_col");
+    table.properties().clear();
+    if (!value.isEmpty()) {
+      table.properties().put(LIGHT_SCHEMA_CHANGE, value);
+    }
+    ops.setTableForAlter(table);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col")));
+
+    Assertions.assertEquals(
+        "RENAME COLUMN requires light_schema_change=true for table test_table",
+        exception.getMessage());
+  }
+
+  /** Verifies the enabled light-schema-change property is parsed without case sensitivity. */
+  @Test
+  public void testRenameColumnAcceptsUppercaseLightSchemaChangeValue() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcTable table = renameTableWithColumns("old_col");
+    table.properties().put(LIGHT_SCHEMA_CHANGE, "TRUE");
+    ops.setTableForAlter(table);
+
+    String sql =
+        ops.alterTableSql(
+            "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col"));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nRENAME COLUMN `old_col` `new_col`;", sql);
+  }
+
+  private static JdbcTable renameTableWithColumns(String... names) {
+    JdbcColumn[] columns = new JdbcColumn[names.length];
+    for (int i = 0; i < names.length; i++) {
+      columns[i] =
+          JdbcColumn.builder().withName(names[i]).withType(Types.IntegerType.get()).build();
+    }
+    return JdbcTable.builder()
+        .withName("test_table")
+        .withColumns(columns)
+        .withProperties(Collections.singletonMap(LIGHT_SCHEMA_CHANGE, "true"))
+        .build();
   }
 
   private static void assertIndexChangeConflict(
