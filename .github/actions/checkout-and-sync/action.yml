@@ -159,17 +159,22 @@ runs:
       if: steps.base.outputs.should_sync == 'true'
       shell: bash
       env:
+        BASE_REF: ${{ steps.base.outputs.base_ref }}
         HEAD_REPOSITORY: ${{ github.repository }}
-        HEAD_BRANCH: ${{ github.ref_name }}
+        HEAD_SHA: ${{ github.sha }}
       run: |
         set -euo pipefail
 
-        git fetch "https://github.com/${HEAD_REPOSITORY}.git" \
-          "+refs/heads/${HEAD_BRANCH}:refs/remotes/contributor/${HEAD_BRANCH}"
-        git \
+        # Fetch the pushed commit rather than the branch tip, which may have moved since.
+        git fetch "https://github.com/${HEAD_REPOSITORY}.git" "${HEAD_SHA}"
+        if ! git \
           -c user.name='Apache Gravitino CI' \
           -c user.email='dev@gravitino.apache.org' \
-          merge --no-commit --no-ff "refs/remotes/contributor/${HEAD_BRANCH}"
+          merge --no-commit --no-ff "${HEAD_SHA}"; then
+          git diff --name-only --diff-filter=U | sed 's/^/Conflict: /'
+          echo "::error::${HEAD_SHA} does not merge cleanly into ${BASE_REF}. Merge or rebase onto the latest ${BASE_REF} and push again."
+          exit 1
+        fi
         git \
           -c user.name='Apache Gravitino CI' \
           -c user.email='dev@gravitino.apache.org' \
