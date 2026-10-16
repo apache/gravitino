@@ -49,10 +49,11 @@ public interface DomainMember {
   MetadataObject object();
 
   /**
-   * Returns how the member relates to the listed domain, within the domains selected by the {@link
-   * DomainMemberFilter}. Every relation that applies is listed, with no precedence among them: when
-   * schema {@code cat.db} carries the backing tag of "Finance" and table {@code cat.db.trades}
-   * carries that of its sub-domain "Trading", listing Finance reports the table as {@link
+   * Returns how the member relates to the listed domain. The {@link DomainMemberFilter} selects the
+   * members only: every relation of a listed member to the listed domain is reported, with no
+   * precedence among them, whatever domains the filter selects. For example, when schema {@code
+   * cat.db} carries the backing tag of "Finance" and table {@code cat.db.trades} carries that of
+   * its sub-domain "Trading", listing Finance reports the table as {@link
    * DomainRelation.Type#INHERITED} from {@code cat.db} and {@link
    * DomainRelation.Type#VIA_SUBDOMAIN} Trading. The member belongs to the listed domain itself when
    * its relations include {@link DomainRelation.Type#DIRECT} or {@link

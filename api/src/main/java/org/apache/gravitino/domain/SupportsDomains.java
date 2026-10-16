@@ -27,11 +27,12 @@ import org.apache.gravitino.annotation.Evolving;
  *
  * <p>The domains listed are all the domains visible to the caller whose scope contains the object:
  * the domains whose backing tag the object's effective tags match, and the parents of those that
- * are sub-domains. The effective tags are the object's own tags plus those inherited from its
- * schema and catalog; for the same tag, the assignment nearest to the object wins. Each domain
- * comes with its {@link Domain#relations() relations} to the object; an object tagged only with the
- * backing tag of sub-domain "Trading" lists Trading as {@link DomainRelation.Type#DIRECT} and its
- * parent "Finance" as {@link DomainRelation.Type#VIA_SUBDOMAIN} Trading.
+ * are sub-domains visible to the caller. The effective tags are the object's own tags plus those
+ * inherited from its schema and catalog; for the same tag, the assignment nearest to the object
+ * wins. Each domain comes with its {@link Domain#relations() relations} to the object; an object
+ * tagged only with the backing tag of sub-domain "Trading" lists Trading as {@link
+ * DomainRelation.Type#DIRECT} and its parent "Finance" as {@link DomainRelation.Type#VIA_SUBDOMAIN}
+ * Trading.
  *
  * <p>To add an object to a domain or remove it, associate the domain's backing tag with the object
  * or remove it, through {@link org.apache.gravitino.tag.SupportsTags}.

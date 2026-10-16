@@ -51,7 +51,8 @@ import org.apache.gravitino.tag.TagValue;
  * <p>A {@code Domain} is a snapshot. The operations on it that change the domain itself, such as
  * {@link #publish()} and {@link #attachToParent(String)}, return a new snapshot and leave this one
  * unchanged. They apply to the current state of the domain, not to the state this snapshot shows,
- * and the last write wins.
+ * and the last write wins. They address the domain by the name this snapshot shows: if the domain
+ * is renamed and a new domain takes its old name, they act on the new domain.
  */
 @Evolving
 public interface Domain extends Auditable {
@@ -240,7 +241,7 @@ public interface Domain extends Auditable {
           IllegalArgumentException;
 
   /**
-   * Lists the names of the sub-domains of this domain.
+   * Lists the names of the sub-domains of this domain that are visible to the caller.
    *
    * @return The names of the sub-domains.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
@@ -248,7 +249,7 @@ public interface Domain extends Auditable {
   String[] listSubdomains() throws NoSuchDomainException;
 
   /**
-   * Lists the sub-domains of this domain with details.
+   * Lists the sub-domains of this domain that are visible to the caller, with details.
    *
    * @return The sub-domains.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.

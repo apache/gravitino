@@ -53,6 +53,34 @@ public class TestDomainRelation {
   }
 
   @Test
+  public void testInheritedNormalizesSource() {
+    // A source from another MetadataObject implementation, such as a DTO, keeps only its name and
+    // type, so relations built from it compare equal to those built from MetadataObjects.
+    MetadataObject other =
+        new MetadataObject() {
+          @Override
+          public String parent() {
+            return "cat";
+          }
+
+          @Override
+          public String name() {
+            return "db";
+          }
+
+          @Override
+          public MetadataObject.Type type() {
+            return MetadataObject.Type.SCHEMA;
+          }
+        };
+    MetadataObject schema = MetadataObjects.of("cat", "db", MetadataObject.Type.SCHEMA);
+    DomainRelation relation = DomainRelation.inherited(other);
+    Assertions.assertEquals(schema, relation.source().get());
+    Assertions.assertEquals(DomainRelation.inherited(schema), relation);
+    Assertions.assertEquals(DomainRelation.inherited(schema).hashCode(), relation.hashCode());
+  }
+
+  @Test
   public void testInheritedNeedsCatalogOrSchema() {
     Assertions.assertThrows(IllegalArgumentException.class, () -> DomainRelation.inherited(null));
     MetadataObject table = MetadataObjects.of("cat.db", "trades", MetadataObject.Type.TABLE);

@@ -67,7 +67,8 @@ public final class DomainRelation {
   /**
    * Creates a relation for an object that inherits the domain's backing tag.
    *
-   * @param source The nearest catalog or schema that carries the backing tag.
+   * @param source The nearest catalog or schema that carries the backing tag. Only its name and
+   *     type are kept.
    * @return The relation.
    * @throws IllegalArgumentException If the source is null, or is neither a catalog nor a schema.
    */
@@ -77,7 +78,8 @@ public final class DomainRelation {
         source.type() == MetadataObject.Type.CATALOG || source.type() == MetadataObject.Type.SCHEMA,
         "An inherited relation must come from a catalog or schema, but got %s",
         source.type());
-    return new DomainRelation(Type.INHERITED, source);
+    return new DomainRelation(
+        Type.INHERITED, MetadataObjects.parse(source.fullName(), source.type()));
   }
 
   /**
