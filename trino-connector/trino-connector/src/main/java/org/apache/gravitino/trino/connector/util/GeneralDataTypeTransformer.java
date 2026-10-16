@@ -45,6 +45,7 @@ import io.trino.spi.type.VarcharType;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -180,9 +181,9 @@ public class GeneralDataTypeTransformer {
 
   private StructType trinoRowTypeToGravitinoRowType(RowType rowType) {
     List<Field> trinoFields = rowType.getFields();
-    Set<String> usedNames = new HashSet<>();
+    Set<String> usedNamesLower = new HashSet<>();
     for (Field trinoField : trinoFields) {
-      trinoField.getName().ifPresent(usedNames::add);
+      trinoField.getName().ifPresent(n -> usedNamesLower.add(n.toLowerCase(Locale.ROOT)));
     }
     StructType.Field[] fields = new StructType.Field[trinoFields.size()];
     int anonymousSeq = 0;
@@ -192,13 +193,13 @@ public class GeneralDataTypeTransformer {
       if (trinoField.getName().isPresent()) {
         name = trinoField.getName().get();
       } else {
-        // Trino allows anonymous row fields (e.g. ROW(1, 'x') with no AS), but Gravitino's
-        // StructType.Field requires a name, so synthesize one that cannot collide with an
-        // explicitly-named sibling field (e.g. ROW(1, 'x' AS field0)).
+        // Trino resolves row fields case-insensitively and allows anonymous ones (e.g.
+        // ROW(1, 'x') with no AS), so synthesize a name that cannot collide, case-insensitively,
+        // with an explicitly-named sibling field (e.g. ROW(1, 'x' AS "FIELD0")).
         do {
           name = "field" + anonymousSeq++;
-        } while (usedNames.contains(name));
-        usedNames.add(name);
+        } while (usedNamesLower.contains(name));
+        usedNamesLower.add(name);
       }
       fields[i] = StructType.Field.nullableField(name, getGravitinoType(trinoField.getType()));
     }

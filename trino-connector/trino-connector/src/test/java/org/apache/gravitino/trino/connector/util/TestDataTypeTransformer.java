@@ -138,6 +138,18 @@ public class TestDataTypeTransformer {
             Types.StructType.Field.nullableField("field1", Types.IntegerType.get()),
             Types.StructType.Field.nullableField("field0", Types.VarCharType.of(10))));
 
+    // Trino resolves row fields case-insensitively, so the collision check against an
+    // explicitly-named sibling must also be case-insensitive (e.g. a sibling named "FIELD0").
+    Assertions.assertEquals(
+        dataTypeTransformer.getGravitinoType(
+            RowType.from(
+                ImmutableList.of(
+                    new Field(Optional.empty(), IntegerType.INTEGER),
+                    new Field(Optional.of("FIELD0"), VarcharType.createVarcharType(10))))),
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("field1", Types.IntegerType.get()),
+            Types.StructType.Field.nullableField("FIELD0", Types.VarCharType.of(10))));
+
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(UuidType.UUID), Types.UUIDType.get());
 
