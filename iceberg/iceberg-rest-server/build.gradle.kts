@@ -29,14 +29,18 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val experimentalSparkVersion: String = libs.versions.spark35.get()
+val experimentalScalaVersion = "2.13"
+val experimentalSparkVersion: String = libs.versions.spark41.get()
 val experimentalSparkMajorVersion: String = experimentalSparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg.get()
 val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
 val datastratoIcebergGitCommit: String = libs.versions.experimental.iceberg.git.commit.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val caffeineVersion: String = libs.versions.caffeine.get()
-val jacksonVersion: String = libs.versions.jackson.get()
+val jerseyVersion: String = libs.versions.jersey.get()
+val javaxWsRsVersion: String = libs.versions.javax.ws.rs.api.get()
+val hk2Version = "2.6.1"
+val jakartaValidationVersion = "2.0.2"
 
 val testRuntimeClasspath = configurations.testRuntimeClasspath.get()
 val experimentalTestRuntimeClasspath by configurations.creating {
@@ -53,21 +57,35 @@ val experimentalTestRuntimeClasspath by configurations.creating {
   resolutionStrategy {
     force(
       "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
-      "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion",
-      "com.fasterxml.jackson.core:jackson-core:$jacksonVersion",
-      "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
-      "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
-      "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+      "javax.ws.rs:javax.ws.rs-api:$javaxWsRsVersion",
+      "org.glassfish.jersey.core:jersey-server:$jerseyVersion",
+      "org.glassfish.jersey.core:jersey-common:$jerseyVersion",
+      "org.glassfish.jersey.core:jersey-client:$jerseyVersion",
+      "org.glassfish.jersey.containers:jersey-container-servlet:$jerseyVersion",
+      "org.glassfish.jersey.containers:jersey-container-servlet-core:$jerseyVersion",
+      "org.glassfish.jersey.containers:jersey-container-jetty-http:$jerseyVersion",
+      "org.glassfish.jersey.inject:jersey-hk2:$jerseyVersion",
+      "org.glassfish.hk2:hk2-api:$hk2Version",
+      "org.glassfish.hk2:hk2-locator:$hk2Version",
+      "org.glassfish.hk2:hk2-utils:$hk2Version",
+      "org.glassfish.hk2.external:aopalliance-repackaged:$hk2Version",
+      "org.glassfish.hk2.external:jakarta.inject:$hk2Version",
+      "jakarta.validation:jakarta.validation-api:$jakartaValidationVersion"
     )
     eachDependency {
       if (requested.group == "org.apache.spark") {
-        // The Datastrato runtime is not published for Spark 3.4, so the experimental suite must
-        // use Spark 3.5 even though the regular suite uses Spark 3.4.
-        useVersion(experimentalSparkVersion)
-        because("The experimental Iceberg Spark runtime is published for Spark 3.5")
+        val experimentalSparkModule = requested.name.replace("_$scalaVersion", "_$experimentalScalaVersion")
+        useTarget("${requested.group}:$experimentalSparkModule:$experimentalSparkVersion")
+        because("The experimental Iceberg Spark runtime requires Spark 4.1 with Scala 2.13")
+      } else if (
+        requested.group == "org.scala-lang.modules" && requested.name.endsWith("_$scalaVersion")
+      ) {
+        val experimentalScalaModule = requested.name.replace("_$scalaVersion", "_$experimentalScalaVersion")
+        useTarget("${requested.group}:$experimentalScalaModule:${requested.version}")
+        because("Spark 4.1 uses Scala 2.13")
       } else if (requested.name.startsWith("iceberg-spark-runtime-")) {
         useTarget(
-          "com.datastrato:experimental-iceberg-spark-runtime-${experimentalSparkMajorVersion}_$scalaVersion:$datastratoIcebergVersion"
+          "com.datastrato:experimental-iceberg-spark-runtime-${experimentalSparkMajorVersion}_$experimentalScalaVersion:$datastratoIcebergVersion"
         )
         because("Run experimental Iceberg integration tests with the matching Spark runtime")
       } else if (
@@ -149,6 +167,7 @@ dependencies {
   }
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.javax.ws.rs.api)
   // At runtime use the SDK supplied by iceberg-aws-bundle, keeping its S3 and STS versions aligned.
   testCompileOnly(libs.aws.s3)
   testImplementation(libs.h2db)
@@ -259,6 +278,7 @@ val experimentalTest by tasks.registering(Test::class) {
     sourceSets.test.get().output +
     experimentalTestRuntimeClasspath
   systemProperty("datastratoIcebergGitCommit", datastratoIcebergGitCommit)
+  systemProperty("spark.ui.enabled", "false")
   setIncludes(
     setOf(
       "**/IcebergExperimentalAuthorizationIT.class"

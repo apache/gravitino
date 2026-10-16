@@ -81,6 +81,7 @@ spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
 spark40 = "4.0.3"
+spark41 = "4.1.3"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'

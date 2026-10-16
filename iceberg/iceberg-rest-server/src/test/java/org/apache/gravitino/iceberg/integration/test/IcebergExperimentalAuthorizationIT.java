@@ -83,7 +83,7 @@ public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizatio
   }
 
   /**
-   * Spark 3.5 wraps a missing table in a subclass of {@link AnalysisException}, unlike Spark 3.4.
+   * Spark 4.1 wraps a missing table in a subclass of {@link AnalysisException}, unlike Spark 3.4.
    *
    * @param executable the table load operation
    */
