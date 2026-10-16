@@ -100,6 +100,8 @@ final class DatabaseResetter {
     if (tables.isEmpty()) {
       return nonEmpty;
     }
+    // Table names come from the database's own catalog, not from input, so formatting them in is
+    // safe.
     String query =
         tables.stream()
             .map(table -> String.format("(SELECT '%s' FROM %s LIMIT 1)", table, table))

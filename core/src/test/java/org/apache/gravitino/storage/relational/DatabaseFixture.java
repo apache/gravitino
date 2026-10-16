@@ -30,9 +30,6 @@ import java.lang.annotation.Target;
  * Declares how much of the database is rebuilt before each test of a class or method. A
  * method-level fixture replaces the class-level one. Without the annotation, a test class shares
  * one database and {@link ResetStrategy#DELETE_ROWS} empties it before each test.
- *
- * <p>A run that switches backends between tests (no lane selected and {@code dockerTest=true})
- * gives every test a fresh database regardless of this annotation.
  */
 @Documented
 @Inherited

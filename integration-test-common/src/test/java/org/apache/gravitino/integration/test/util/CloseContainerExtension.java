@@ -32,12 +32,11 @@ import org.slf4j.LoggerFactory;
 public class CloseContainerExtension implements BeforeAllCallback {
   @Override
   public void beforeAll(ExtensionContext extensionContext) {
-    synchronized (CloseContainerExtension.class) {
-      extensionContext
-          .getRoot()
-          .getStore(ExtensionContext.Namespace.GLOBAL)
-          .getOrComputeIfAbsent(CloseableContainer.class);
-    }
+    // Store.getOrComputeIfAbsent is atomic, so concurrent classes register the closer once.
+    extensionContext
+        .getRoot()
+        .getStore(ExtensionContext.Namespace.GLOBAL)
+        .getOrComputeIfAbsent(CloseableContainer.class);
   }
 
   private static class CloseableContainer implements ExtensionContext.Store.CloseableResource {

@@ -192,7 +192,9 @@ public class BackendTestExtension
           && (freshDatabase(context)
               || current.testClass != testClass
               || !current.backendType.equals(backendType))) {
-        // Only one backend can own the global SQL session, so the old one goes first.
+        // SqlSessionFactoryHelper holds one global session, so close the old backend before
+        // building the next; this also clears a session another test left open, such as
+        // TestEntityStorage's.
         store.remove(CURRENT_BACKEND, Backend.class).close();
         current = null;
       }
@@ -301,9 +303,10 @@ public class BackendTestExtension
   }
 
   private static class DefaultBackendFactory implements BackendFactory {
+    private final BaseIT baseIT = new BaseIT();
+
     @Override
     public Backend create(String backendType, Class<?> testClass) throws Exception {
-      BaseIT baseIT = new BaseIT();
       LOG.info("Initializing backend resource: {}", backendType);
       Config config = Mockito.mock(Config.class);
       Mockito.when(config.get(Configs.ENTITY_STORE)).thenReturn(Configs.RELATIONAL_ENTITY_STORE);

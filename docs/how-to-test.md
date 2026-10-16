@@ -67,7 +67,7 @@ In a database lane, each test class shares one database per backend. `@DatabaseF
 public class TestSQLScripts extends TestJDBCBackend { ... }
 ```
 
-A method-level `@DatabaseFixture` replaces the class-level one.
+A method-level `@DatabaseFixture` replaces the class-level one. A run with no lane selected and `dockerTest=true` switches between H2, MySQL and PostgreSQL for every test, so each test gets a fresh database regardless of the annotation.
 
 In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
 
