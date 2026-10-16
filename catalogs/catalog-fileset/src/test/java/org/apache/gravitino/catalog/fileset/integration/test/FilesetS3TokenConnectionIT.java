@@ -29,7 +29,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
-import org.apache.gravitino.integration.test.container.MinIOContainer;
+import org.apache.gravitino.integration.test.container.RustFSContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.S3Properties;
@@ -38,12 +38,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** Tests an existing Fileset catalog connection with S3 temporary credentials against MinIO. */
+/** Tests an existing Fileset catalog connection with S3 temporary credentials against RustFS. */
 @Tag("gravitino-docker-test")
 public class FilesetS3TokenConnectionIT extends BaseIT {
-
-  private static final String ROLE_ARN = "arn:minio:iam:::role/test";
-  private static final String REGION = "us-east-1";
 
   private final String bucketName =
       "fileset-connection-" + UUID.randomUUID().toString().replace("-", "");
@@ -57,25 +54,25 @@ public class FilesetS3TokenConnectionIT extends BaseIT {
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     copyBundleJarsToHadoop("aws-bundle");
-    containerSuite.startMinIOContainer();
-    MinIOContainer minIOContainer = containerSuite.getMinIOContainer();
-    minIOContainer.createBucket(bucketName);
+    containerSuite.startRustFSContainer();
+    RustFSContainer rustFSContainer = containerSuite.getRustFSContainer();
+    rustFSContainer.createBucket(bucketName);
 
     super.startIntegrationTest();
 
     client.createMetalake(metalakeName, "comment", new HashMap<>());
     metalake = client.loadMetalake(metalakeName);
 
-    String endpoint = minIOContainer.getS3Endpoint();
+    String endpoint = rustFSContainer.getS3Endpoint();
     Map<String, String> properties = new HashMap<>();
     properties.put(LOCATION, String.format("s3a://%s", bucketName));
     properties.put(FILESYSTEM_PROVIDERS, "s3");
     properties.put(
         CredentialConstants.CREDENTIAL_PROVIDERS, S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
-    properties.put(S3Properties.GRAVITINO_S3_REGION, REGION);
-    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, MinIOContainer.ACCESS_KEY);
-    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, MinIOContainer.SECRET_KEY);
-    properties.put(S3Properties.GRAVITINO_S3_ROLE_ARN, ROLE_ARN);
+    properties.put(S3Properties.GRAVITINO_S3_REGION, RustFSContainer.REGION);
+    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, RustFSContainer.ACCESS_KEY);
+    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, RustFSContainer.SECRET_KEY);
+    properties.put(S3Properties.GRAVITINO_S3_ROLE_ARN, RustFSContainer.ROLE_ARN);
     properties.put(S3Properties.GRAVITINO_S3_ENDPOINT, endpoint);
     properties.put(S3Properties.GRAVITINO_S3_STS_ENDPOINT, endpoint);
     properties.put(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");

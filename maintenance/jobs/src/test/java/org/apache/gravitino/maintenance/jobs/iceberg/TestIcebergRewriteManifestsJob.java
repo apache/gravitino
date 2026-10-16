@@ -26,12 +26,83 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteManifestsJob {
+
+  @Test
+  public void testInvalidEntryArgumentsFailBeforeSparkStarts() {
+    String[][] invalid = {
+      {},
+      {"--catalog", "cat", "--table"},
+      {"--catalog", "{{catalog_name}}", "--table", "db.t"},
+      {"--catalog", " ", "--table", "db.t"},
+      {"--catalog", "cat", "--table", "db.t", "--use-caching", "yes"},
+      {"--catalog", "cat", "--table", "db.t", "--spec-id", "-1"},
+      {"--catalog", "cat", "--table", "db.t", "--spark-conf", "not-json"},
+      {"--catalog", "cat", "--table", "db.t", "--unknown", "value"},
+      {"--catalog", "cat", "--table", "db.t", "--catalog", "other"}
+    };
+    for (String[] args : invalid) {
+      PrintStream originalErr = System.err;
+      ByteArrayOutputStream errors = new ByteArrayOutputStream();
+      try (PrintStream captured = new PrintStream(errors, true, StandardCharsets.UTF_8)) {
+        System.setErr(captured);
+        assertEquals(1, IcebergRewriteManifestsJob.run(args));
+      } finally {
+        System.setErr(originalErr);
+      }
+      String message = errors.toString(StandardCharsets.UTF_8);
+      assertTrue(message.startsWith("Error rewriting manifests:"));
+      assertTrue(message.contains("Usage: IcebergRewriteManifestsJob"));
+      assertFalse(message.contains("\tat "));
+    }
+  }
+
+  @Test
+  public void testParseArgumentsRejectsInvalidNamesAndMissingValues() {
+    String[][] invalid = {
+      {"--catalog", "cat", "--table", "db.t", "--unknown", "value"},
+      {"--catalog", "cat", "--table", "db.t", "--spec-id", "", "--spec-id", "0"},
+      {"--catalog", "cat", "--table", "{{table_identifier}}"},
+      {"--catalog", "cat", "--table", "db.t", "--use-caching"},
+      {"--catalog", "cat", "--table", "db.t", "--spec-id", "--use-caching", "true"},
+      {"--catalog", "cat", "--table", null},
+      {null, "cat", "--table", "db.t"}
+    };
+    for (String[] args : invalid) {
+      assertThrows(
+          IllegalArgumentException.class, () -> IcebergRewriteManifestsJob.parseArguments(args));
+    }
+  }
+
+  @Test
+  public void testEntryArgumentsOmitEmptyAndUnresolvedOptionals() {
+    Map<String, String> args =
+        IcebergRewriteManifestsJob.parseArguments(
+            new String[] {
+              "--catalog",
+              "cat",
+              "--table",
+              "db.t",
+              "--use-caching",
+              "{{use_caching}}",
+              "--spec-id",
+              "",
+              "--spark-conf",
+              " "
+            });
+    assertNull(args.get("use-caching"));
+    assertNull(args.get("spec-id"));
+    assertNull(args.get("spark-conf"));
+  }
 
   @Test
   public void testJobTemplateHasCorrectName() {
@@ -76,20 +147,21 @@ public class TestIcebergRewriteManifestsJob {
     IcebergRewriteManifestsJob job = new IcebergRewriteManifestsJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(10, template.arguments().size()); // 5 flags * 2 (flag + value)
-
-    // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--use-caching"));
-    assertTrue(template.arguments().contains("{{use_caching}}"));
-    assertTrue(template.arguments().contains("--spec-id"));
-    assertTrue(template.arguments().contains("{{spec_id}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    // Only the catalog and the table are required; the other options default to empty values,
+    // which the job treats as unset.
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--use-caching",
+            "{{use_caching:-}}",
+            "--spec-id",
+            "{{spec_id:-}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
@@ -125,7 +197,7 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v1", version);
+    assertEquals("v2", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -143,7 +215,7 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testParseArgumentsWithAllRequired() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
     assertEquals(2, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -157,7 +229,7 @@ public class TestIcebergRewriteManifestsJob {
       "--table", "db.sample",
       "--use-caching", "false"
     };
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
     assertEquals(3, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -168,13 +240,13 @@ public class TestIcebergRewriteManifestsJob {
   @Test
   public void testParseArgumentsWithEmptyValues() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--use-caching", ""};
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
-    // Empty values should be ignored
-    assertEquals(2, result.size());
+    // Empty optional values are normalized to null.
+    assertEquals(3, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
     assertEquals("db.sample", result.get("table"));
-    assertFalse(result.containsKey("use-caching"));
+    assertNull(result.get("use-caching"));
   }
 
   @Test
@@ -182,8 +254,8 @@ public class TestIcebergRewriteManifestsJob {
     String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--use-caching", "true"};
     String[] args2 = {"--use-caching", "true", "--table", "tbl1", "--catalog", "cat1"};
 
-    Map<String, String> result1 = IcebergJobUtils.parseArguments(args1);
-    Map<String, String> result2 = IcebergJobUtils.parseArguments(args2);
+    Map<String, String> result1 = IcebergRewriteManifestsJob.parseArguments(args1);
+    Map<String, String> result2 = IcebergRewriteManifestsJob.parseArguments(args2);
 
     assertEquals(result1, result2);
   }
@@ -200,9 +272,9 @@ public class TestIcebergRewriteManifestsJob {
       "--use-caching", "{{use_caching}}",
       "--spark-conf", "{{spark_conf}}"
     };
-    Map<String, String> result = IcebergJobUtils.parseArguments(args);
+    Map<String, String> result = IcebergRewriteManifestsJob.parseArguments(args);
 
-    assertEquals("{{use_caching}}", result.get("use-caching"));
+    assertNull(result.get("use-caching"));
     assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("use-caching")));
     assertNull(IcebergJobUtils.nullIfUnresolvedPlaceholder(result.get("spark-conf")));
   }

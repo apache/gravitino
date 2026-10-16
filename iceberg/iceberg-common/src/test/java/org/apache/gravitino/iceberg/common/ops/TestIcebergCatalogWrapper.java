@@ -20,6 +20,8 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,11 +33,15 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -102,6 +108,26 @@ public class TestIcebergCatalogWrapper {
 
     Assertions.assertEquals(1, TrackingTableMetadataCache.INITIALIZE_COUNT.get());
     Assertions.assertTrue(TrackingTableMetadataCache.CLOSED.get());
+  }
+
+  @Test
+  public void testLoadTableMetadataFromLocation(@TempDir Path tempDir) throws Exception {
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
+    TableMetadata expected =
+        TableMetadata.newTableMetadata(
+            schema,
+            PartitionSpec.unpartitioned(),
+            tempDir.resolve("table").toUri().toString(),
+            Map.of());
+    Path metadataFile = tempDir.resolve("v1.metadata.json");
+    Files.writeString(metadataFile, TableMetadataParser.toJson(expected), StandardCharsets.UTF_8);
+    IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(
+            new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory")));
+
+    TableMetadata actual = wrapper.loadTableMetadataFromLocation(metadataFile.toUri().toString());
+
+    Assertions.assertEquals(schema.asStruct(), actual.schema().asStruct());
   }
 
   private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)

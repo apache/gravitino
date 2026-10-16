@@ -64,6 +64,11 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByIdForUpdate(groupId);
   }
 
+  /** Returns SQL that selects an active group by ID and locks it for shared access. */
+  public static String selectGroupMetaByIdForShare(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForShare(groupId);
+  }
+
   public static String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);

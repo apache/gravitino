@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.catalog.glue.GravitinoGlueCredentialsProvider;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.aws.glue.GlueCatalog;
@@ -71,7 +72,7 @@ public class GluePropertiesConverter implements PropertiesConverter {
    * AwsClientProperties} can instantiate it dynamically via {@code client.credentials-provider}.
    */
   public static final String GRAVITINO_GLUE_CREDENTIALS_PROVIDER =
-      "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider";
+      GravitinoGlueCredentialsProvider.class.getName();
 
   /** Gravitino catalog property key for the AWS access key ID. */
   public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";

@@ -27,10 +27,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.AuditDTO;
@@ -41,12 +43,11 @@ import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
-import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
-import org.apache.gravitino.dto.responses.PolicyResponse;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
+import org.apache.gravitino.dto.semantic.SemanticModelDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
@@ -54,6 +55,9 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -76,6 +80,8 @@ public class TestSupportPolicies extends TestBase {
   private static Fileset genericFileset;
 
   private static Topic genericTopic;
+
+  private static SemanticModel genericSemanticModel;
 
   private final Set<MetadataObject.Type> supportedObjectTypes =
       Collections.singleton(MetadataObject.Type.FILESET);
@@ -175,6 +181,27 @@ public class TestSupportPolicies extends TestBase {
                 .build(),
             client.restClient(),
             Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericSemanticModel =
+        new GenericSemanticModel(
+            SemanticModelDTO.builder()
+                .withName("semantic_model1")
+                .withDefinition(
+                    SemanticModelDefinitionDTO.fromDefinition(
+                        SemanticModelDefinition.builder()
+                            .withDatasets(
+                                new Dataset[] {
+                                  Dataset.builder()
+                                      .withName("orders")
+                                      .withSource(
+                                          NameIdentifier.of("catalog1", "schema1", "orders"))
+                                      .build()
+                                })
+                            .build()))
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
   }
 
   @Test
@@ -220,6 +247,15 @@ public class TestSupportPolicies extends TestBase {
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
   }
 
+  /** Verifies policy name lookup and error mapping for Semantic Models. */
+  @Test
+  public void testListPoliciesForSemanticModel() throws JsonProcessingException {
+    testListPolicies(
+        genericSemanticModel.supportsPolicies(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericSemanticModel.name(), MetadataObject.Type.SEMANTIC_MODEL));
+  }
+
   @Test
   public void testListPoliciesInfoForCatalog() throws JsonProcessingException {
     testListPoliciesInfo(
@@ -263,90 +299,13 @@ public class TestSupportPolicies extends TestBase {
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
   }
 
+  /** Verifies policy details, inheritance flags, and error mapping for Semantic Models. */
   @Test
-  public void testGetPolicyForCatalog() throws JsonProcessingException {
-    testGetPolicy(
-        relationalCatalog.supportsPolicies(),
-        MetadataObjects.of(null, relationalCatalog.name(), MetadataObject.Type.CATALOG));
-
-    testGetPolicy(
-        filesetCatalog.supportsPolicies(),
-        MetadataObjects.of(null, filesetCatalog.name(), MetadataObject.Type.CATALOG));
-
-    testGetPolicy(
-        messagingCatalog.supportsPolicies(),
-        MetadataObjects.of(null, messagingCatalog.name(), MetadataObject.Type.CATALOG));
-  }
-
-  @Test
-  public void testGetPolicyForSchema() throws JsonProcessingException {
-    testGetPolicy(
-        genericSchema.supportsPolicies(),
-        MetadataObjects.of("catalog1", genericSchema.name(), MetadataObject.Type.SCHEMA));
-  }
-
-  @Test
-  public void testGetPolicyForTable() throws JsonProcessingException {
-    testGetPolicy(
-        relationalTable.supportsPolicies(),
-        MetadataObjects.of("catalog1.schema1", relationalTable.name(), MetadataObject.Type.TABLE));
-  }
-
-  @Test
-  public void testGetPolicyForFileset() throws JsonProcessingException {
-    testGetPolicy(
-        genericFileset.supportsPolicies(),
-        MetadataObjects.of("catalog1.schema1", genericFileset.name(), MetadataObject.Type.FILESET));
-  }
-
-  @Test
-  public void testGetPolicyForTopic() throws JsonProcessingException {
-    testGetPolicy(
-        genericTopic.supportsPolicies(),
-        MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
-  }
-
-  @Test
-  public void testAssociatePoliciesForCatalog() throws JsonProcessingException {
-    testAssociatePolicies(
-        relationalCatalog.supportsPolicies(),
-        MetadataObjects.of(null, relationalCatalog.name(), MetadataObject.Type.CATALOG));
-
-    testAssociatePolicies(
-        filesetCatalog.supportsPolicies(),
-        MetadataObjects.of(null, filesetCatalog.name(), MetadataObject.Type.CATALOG));
-
-    testAssociatePolicies(
-        messagingCatalog.supportsPolicies(),
-        MetadataObjects.of(null, messagingCatalog.name(), MetadataObject.Type.CATALOG));
-  }
-
-  @Test
-  public void testAssociatePoliciesForSchema() throws JsonProcessingException {
-    testAssociatePolicies(
-        genericSchema.supportsPolicies(),
-        MetadataObjects.of("catalog1", genericSchema.name(), MetadataObject.Type.SCHEMA));
-  }
-
-  @Test
-  public void testAssociatePoliciesForTable() throws JsonProcessingException {
-    testAssociatePolicies(
-        relationalTable.supportsPolicies(),
-        MetadataObjects.of("catalog1.schema1", relationalTable.name(), MetadataObject.Type.TABLE));
-  }
-
-  @Test
-  public void testAssociatePoliciesForFileset() throws JsonProcessingException {
-    testAssociatePolicies(
-        genericFileset.supportsPolicies(),
-        MetadataObjects.of("catalog1.schema1", genericFileset.name(), MetadataObject.Type.FILESET));
-  }
-
-  @Test
-  public void testAssociatePoliciesForTopic() throws JsonProcessingException {
-    testAssociatePolicies(
-        genericTopic.supportsPolicies(),
-        MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
+  public void testListPoliciesInfoForSemanticModel() throws JsonProcessingException {
+    testListPoliciesInfo(
+        genericSemanticModel.supportsPolicies(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericSemanticModel.name(), MetadataObject.Type.SEMANTIC_MODEL));
   }
 
   private void testListPolicies(SupportsPolicies supportsPolicies, MetadataObject metadataObject)
@@ -407,6 +366,7 @@ public class TestSupportPolicies extends TestBase {
             .withName("policy1")
             .withPolicyType("custom")
             .withContent(contentDTO)
+            .withInherited(Optional.of(false))
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     PolicyDTO policy2 =
@@ -414,20 +374,25 @@ public class TestSupportPolicies extends TestBase {
             .withName("policy2")
             .withPolicyType("custom")
             .withContent(contentDTO)
+            .withInherited(Optional.of(true))
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     PolicyDTO[] policies = new PolicyDTO[] {policy1, policy2};
     PolicyListResponse resp = new PolicyListResponse(policies);
-    buildMockResource(Method.GET, path, null, resp, SC_OK);
+    buildMockResource(
+        Method.GET, path, Collections.singletonMap("details", "true"), null, resp, SC_OK);
 
     Policy[] actualPolicies = supportsPolicies.listPolicyInfos();
     Assertions.assertEquals(2, actualPolicies.length);
     Assertions.assertEquals("policy1", actualPolicies[0].name());
     Assertions.assertEquals("policy2", actualPolicies[1].name());
+    Assertions.assertFalse(actualPolicies[0].inherited().orElseThrow());
+    Assertions.assertTrue(actualPolicies[1].inherited().orElseThrow());
 
     // Return empty list
     PolicyListResponse resp1 = new PolicyListResponse(new PolicyDTO[0]);
-    buildMockResource(Method.GET, path, null, resp1, SC_OK);
+    buildMockResource(
+        Method.GET, path, Collections.singletonMap("details", "true"), null, resp1, SC_OK);
 
     Policy[] actualPolicies1 = supportsPolicies.listPolicyInfos();
     Assertions.assertArrayEquals(new Policy[0], actualPolicies1);
@@ -435,95 +400,30 @@ public class TestSupportPolicies extends TestBase {
     // Test throw NotFoundException
     ErrorResponse errorResp =
         ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "mock error");
-    buildMockResource(Method.GET, path, null, errorResp, SC_NOT_FOUND);
-
-    Throwable ex = Assertions.assertThrows(NotFoundException.class, supportsPolicies::listPolicies);
-    Assertions.assertTrue(ex.getMessage().contains("mock error"));
-
-    // Test throw internal error
-    ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");
-    buildMockResource(Method.GET, path, null, errorResp1, SC_INTERNAL_SERVER_ERROR);
-
-    Throwable ex1 = Assertions.assertThrows(RuntimeException.class, supportsPolicies::listPolicies);
-    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
-  }
-
-  private void testGetPolicy(SupportsPolicies supportsPolicies, MetadataObject metadataObject)
-      throws JsonProcessingException {
-    String path =
-        "/api/metalakes/"
-            + METALAKE_NAME
-            + "/objects/"
-            + metadataObject.type().name().toLowerCase(Locale.ROOT)
-            + "/"
-            + metadataObject.fullName()
-            + "/policies/policy1";
-
-    PolicyDTO policy1 =
-        PolicyDTO.builder()
-            .withName("policy1")
-            .withPolicyType("test")
-            .withContent(contentDTO)
-            .withAudit(AuditDTO.builder().withCreator("test").build())
-            .build();
-
-    PolicyResponse resp = new PolicyResponse(policy1);
-    buildMockResource(Method.GET, path, null, resp, SC_OK);
-
-    Policy actualPolicy = supportsPolicies.getPolicy("policy1");
-    Assertions.assertEquals("policy1", actualPolicy.name());
-
-    // Test throw NoSuchPolicyException
-    ErrorResponse errorResp =
-        ErrorResponse.notFound(NoSuchPolicyException.class.getSimpleName(), "mock error");
-    buildMockResource(Method.GET, path, null, errorResp, SC_NOT_FOUND);
+    buildMockResource(
+        Method.GET,
+        path,
+        Collections.singletonMap("details", "true"),
+        null,
+        errorResp,
+        SC_NOT_FOUND);
 
     Throwable ex =
-        Assertions.assertThrows(
-            NoSuchPolicyException.class, () -> supportsPolicies.getPolicy("policy1"));
+        Assertions.assertThrows(NotFoundException.class, supportsPolicies::listPolicyInfos);
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test throw internal error
     ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");
-    buildMockResource(Method.GET, path, null, errorResp1, SC_INTERNAL_SERVER_ERROR);
+    buildMockResource(
+        Method.GET,
+        path,
+        Collections.singletonMap("details", "true"),
+        null,
+        errorResp1,
+        SC_INTERNAL_SERVER_ERROR);
 
     Throwable ex1 =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> supportsPolicies.getPolicy("policy1"));
-    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
-  }
-
-  private void testAssociatePolicies(
-      SupportsPolicies supportsPolicies, MetadataObject metadataObject)
-      throws JsonProcessingException {
-    String path =
-        "/api/metalakes/"
-            + METALAKE_NAME
-            + "/objects/"
-            + metadataObject.type().name().toLowerCase(Locale.ROOT)
-            + "/"
-            + metadataObject.fullName()
-            + "/policies";
-
-    String[] policiesToAdd = new String[] {"policy1", "policy2"};
-    String[] policiesToRemove = new String[] {"policy3", "policy4"};
-    PoliciesAssociateRequest request =
-        new PoliciesAssociateRequest(policiesToAdd, policiesToRemove);
-
-    NameListResponse resp = new NameListResponse(policiesToAdd);
-    buildMockResource(Method.POST, path, request, resp, SC_OK);
-
-    String[] actualPolicies = supportsPolicies.associatePolicies(policiesToAdd, policiesToRemove);
-    Assertions.assertArrayEquals(policiesToAdd, actualPolicies);
-
-    // Test throw internal error
-    ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");
-    buildMockResource(Method.POST, path, request, errorResp1, SC_INTERNAL_SERVER_ERROR);
-
-    Throwable ex1 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> supportsPolicies.associatePolicies(policiesToAdd, policiesToRemove));
+        Assertions.assertThrows(RuntimeException.class, supportsPolicies::listPolicyInfos);
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
   }
 }

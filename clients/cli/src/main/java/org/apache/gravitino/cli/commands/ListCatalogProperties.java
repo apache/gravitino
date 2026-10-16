@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -63,7 +62,6 @@ public class ListCatalogProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    Map<String, String> properties = gCatalog.properties();
-    printProperties(properties);
+    printProperties(propertiesWithSecrets(gCatalog.properties(), gCatalog.supportsSecrets()));
   }
 }

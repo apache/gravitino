@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.core.PathSegment;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.web.IdpManagement;
@@ -32,9 +33,13 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /**
  * Enforces built-in IdP management API access rules without server interception.
  *
- * <p>Caller must be listed in {@link Configs#SERVICE_ADMINS}. This filter runs as a Jersey request
- * filter after the servlet {@code AuthenticationFilter} has authenticated the caller and populated
- * the current user principal.
+ * <p>Callers listed in {@link Configs#SERVICE_ADMINS} may perform all IdP management operations.
+ * Authenticated non-admin users may {@code GET} or {@code PUT} {@code /idp/users/{user}} only for
+ * their own username (read profile / change password). Other IdP management APIs remain
+ * service-admin only.
+ *
+ * <p>This filter runs as a Jersey request filter after the servlet {@code AuthenticationFilter} has
+ * authenticated the caller and populated the current user principal.
  *
  * <p>Registered only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}. Scoped to
  * resources annotated with {@link IdpManagement} via Jersey name binding.
@@ -42,7 +47,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 @IdpManagement
 public class IdpAuthorizationFilter implements ContainerRequestFilter {
 
-  /** Error message when the caller is not a service admin. */
+  /** Error message when the caller is not allowed to perform the IdP management operation. */
   public static final String SERVICE_ADMIN_REQUIRED_MESSAGE =
       "Only service admins can manage built-in IdP users and groups.";
 
@@ -64,12 +69,35 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
-    if (!isServiceAdmin(serviceAdminsSupplier.get(), currentUserSupplier.get())) {
-      requestContext.abortWith(IdpRESTUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
+    String currentUser = currentUserSupplier.get();
+    if (isServiceAdmin(serviceAdminsSupplier.get(), currentUser)
+        || isSelfUserAccess(requestContext, currentUser)) {
+      return;
     }
+    requestContext.abortWith(IdpRESTUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
   }
 
   static boolean isServiceAdmin(List<String> serviceAdmins, String currentUser) {
     return currentUser != null && serviceAdmins != null && serviceAdmins.contains(currentUser);
+  }
+
+  /**
+   * Returns whether the request is a GET or PUT to {@code /idp/users/{currentUser}}.
+   *
+   * <p>The resource method still rejects non-admin updates that change {@code enabled}.
+   */
+  static boolean isSelfUserAccess(ContainerRequestContext requestContext, String currentUser) {
+    if (currentUser == null) {
+      return false;
+    }
+    String method = requestContext.getMethod();
+    if (!"GET".equalsIgnoreCase(method) && !"PUT".equalsIgnoreCase(method)) {
+      return false;
+    }
+    List<PathSegment> segments = requestContext.getUriInfo().getPathSegments();
+    return segments.size() == 3
+        && "idp".equals(segments.get(0).getPath())
+        && "users".equals(segments.get(1).getPath())
+        && currentUser.equals(segments.get(2).getPath());
   }
 }

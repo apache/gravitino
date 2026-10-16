@@ -60,7 +60,9 @@ public class TestGravitinoMetadataFunction {
     assertEquals(1, functions.size());
 
     LanguageFunction langFunc = functions.iterator().next();
-    assertEquals("RETURN x + 1", langFunc.sql());
+    assertEquals(
+        "FUNCTION \"my_func\"(\"x\" integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN x + 1",
+        langFunc.sql());
     assertEquals("my_func(integer)", langFunc.signatureToken());
   }
 
@@ -80,7 +82,9 @@ public class TestGravitinoMetadataFunction {
     assertEquals(1, functions.size());
 
     LanguageFunction langFunc = functions.iterator().next();
-    assertEquals("RETURN x + 1", langFunc.sql());
+    assertEquals(
+        "FUNCTION \"my_func\"(\"x\" integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN x + 1",
+        langFunc.sql());
   }
 
   @Test
@@ -100,7 +104,9 @@ public class TestGravitinoMetadataFunction {
 
     Collection<LanguageFunction> functions = metadata.listLanguageFunctions(session, "test_schema");
     assertEquals(1, functions.size());
-    assertEquals("RETURN 2", functions.iterator().next().sql());
+    assertEquals(
+        "FUNCTION \"trino_func\"(\"x\" integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN 2",
+        functions.iterator().next().sql());
   }
 
   @Test
@@ -173,8 +179,12 @@ public class TestGravitinoMetadataFunction {
     assertEquals(2, functions.size());
 
     List<String> sqlBodies = functions.stream().map(LanguageFunction::sql).sorted().toList();
-    assertEquals("RETURN length(x)", sqlBodies.get(0));
-    assertEquals("RETURN x + 1", sqlBodies.get(1));
+    assertEquals(
+        "FUNCTION \"multi_func\"(\"x\" integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN x + 1",
+        sqlBodies.get(0));
+    assertEquals(
+        "FUNCTION \"multi_func\"(\"x\" varchar) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN length(x)",
+        sqlBodies.get(1));
   }
 
   @Test
@@ -217,7 +227,53 @@ public class TestGravitinoMetadataFunction {
     assertEquals(1, functions.size());
     LanguageFunction lf = functions.iterator().next();
     assertEquals("const_func()", lf.signatureToken());
-    assertEquals("RETURN 42", lf.sql());
+    assertEquals(
+        "FUNCTION \"const_func\"() RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN 42",
+        lf.sql());
+  }
+
+  @Test
+  public void testBareExpressionBodyIsWrappedIntoSpecification() {
+    FunctionParam param = createMockParam("n", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "n * 2");
+    FunctionDefinition def = createMockDefinition(new FunctionParam[] {param}, impl);
+    Function function = createMockFunctionWithDefinitions("fn_sql_double", def);
+
+    Collection<LanguageFunction> functions = listFunctions(function);
+    assertEquals(1, functions.size());
+    assertEquals(
+        "FUNCTION \"fn_sql_double\"(\"n\" integer) RETURNS integer DETERMINISTIC SECURITY INVOKER RETURN n * 2",
+        functions.iterator().next().sql());
+  }
+
+  @Test
+  public void testNonScalarFunctionIsSkipped() {
+    FunctionParam param = createMockParam("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "sum(x)");
+    FunctionDefinition def = createMockDefinition(new FunctionParam[] {param}, impl);
+    Function function = createMockFunctionWithDefinitions("agg_func", def);
+    when(function.functionType()).thenReturn(FunctionType.AGGREGATE);
+
+    assertTrue(listFunctions(function).isEmpty());
+  }
+
+  @Test
+  public void testUnsupportedBodyIsSkipped() {
+    FunctionParam param = createMockParam("x", Types.IntegerType.get());
+    String spec = "FUNCTION \"my_func\"(\"x\" integer) RETURNS bigint BEGIN RETURN x; END";
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, spec);
+    FunctionDefinition def = createMockDefinition(new FunctionParam[] {param}, impl);
+    Function function = createMockFunctionWithDefinitions("my_func", def);
+
+    assertTrue(listFunctions(function).isEmpty());
+  }
+
+  private Collection<LanguageFunction> listFunctions(Function... functions) {
+    CatalogConnectorMetadata catalogMetadata = mock(CatalogConnectorMetadata.class);
+    when(catalogMetadata.supportsFunctions()).thenReturn(true);
+    when(catalogMetadata.listFunctionInfos("s")).thenReturn(functions);
+    return createTestMetadata(catalogMetadata)
+        .listLanguageFunctions(mock(ConnectorSession.class), "s");
   }
 
   private GravitinoMetadata createTestMetadata(CatalogConnectorMetadata catalogMetadata) {
@@ -252,6 +308,7 @@ public class TestGravitinoMetadataFunction {
   private FunctionDefinition createMockDefinition(FunctionParam[] params, FunctionImpl... impls) {
     FunctionDefinition definition = mock(FunctionDefinition.class);
     when(definition.parameters()).thenReturn(params);
+    when(definition.returnType()).thenReturn(Types.IntegerType.get());
     when(definition.impls()).thenReturn(impls);
     return definition;
   }

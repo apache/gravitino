@@ -80,7 +80,10 @@ paths:
       tags:
         - IDP
       summary: Get local user store user
-      description: Returns the specified local user store user, including group membership (empty if none; the example shows a user who already belongs to groups).
+      description: >
+        Returns the specified local user store user, including group membership (empty if none; the
+        example shows a user who already belongs to groups). Service admins may get any user.
+        Authenticated non-admin users may get only their own user.
       operationId: getIdpUser
       responses:
         "200":
@@ -114,6 +117,8 @@ paths:
         Updates the password and/or enabled flag of the specified local user store user and returns
         the user object. At least one of `password` or `enabled` is required. Disabled users cannot
         authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
+        Service admins may update any user. Authenticated non-admin users may update only their own
+        password and cannot change `enabled` or another user's account.
       operationId: updateIdpUser
       requestBody:
         required: true
@@ -356,6 +361,8 @@ components:
             type: string
             maxLength: 128
           description: The local user store groups the user belongs to
+        audit:
+          $ref: "../openapi.yaml#/components/schemas/Audit"
 
     IdpGroup:
       type: object
@@ -376,6 +383,8 @@ components:
             type: string
             maxLength: 128
           description: The usernames of members in the local user store group
+        audit:
+          $ref: "../openapi.yaml#/components/schemas/Audit"
 
     AddUserRequest:
       type: object
@@ -487,9 +496,10 @@ components:
   responses:
     IdpForbiddenErrorResponse:
       description:
-        Forbidden - Only callers listed in `gravitino.authorization.serviceAdmins` may
-        manage local user store users and groups. Unauthenticated requests and authenticated
-        non-service-admin users receive this response.
+        Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
+        user store users and groups. Authenticated non-admin users may only `GET` or `PUT`
+        `/idp/users/{user}` for their own username (password-only on update). Unauthenticated
+        requests and other non-admin IdP management calls receive this response.
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -533,7 +543,11 @@ components:
         "user": {
           "name": "alice",
           "enabled": true,
-          "groups": []
+          "groups": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -543,7 +557,11 @@ components:
         "user": {
           "name": "alice",
           "enabled": true,
-          "groups": ["engineers"]
+          "groups": ["engineers"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -553,7 +571,13 @@ components:
         "user": {
           "name": "alice",
           "enabled": true,
-          "groups": ["engineers"]
+          "groups": ["engineers"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z",
+            "lastModifier": "gravitino",
+            "lastModifiedTime": "2023-12-08T07:10:11.123Z"
+          }
         }
       }
 
@@ -563,7 +587,11 @@ components:
         "group": {
           "name": "engineers",
           "comment": "Platform engineering",
-          "users": []
+          "users": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -573,7 +601,11 @@ components:
         "group": {
           "name": "engineers",
           "comment": "Platform engineering",
-          "users": ["alice", "bob"]
+          "users": ["alice", "bob"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 
@@ -583,7 +615,11 @@ components:
         "group": {
           "name": "engineers",
           "comment": "Platform engineering",
-          "users": ["alice", "bob"]
+          "users": ["alice", "bob"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
         }
       }
 

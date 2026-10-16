@@ -20,7 +20,9 @@
 package org.apache.gravitino.lance.common.utils;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 
+import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,10 +35,21 @@ public final class LancePropertiesUtils {
   }
 
   /**
+   * Returns whether the supplied table format identifies a Lance table.
+   *
+   * @param tableFormat the table format, which may be null
+   * @return true when the format is Lance, ignoring case
+   */
+  public static boolean isLanceTableFormat(String tableFormat) {
+    return LANCE_TABLE_FORMAT.equalsIgnoreCase(tableFormat);
+  }
+
+  /**
    * Extracts Lance storage options from a property map.
    *
    * @param tableProperties the source properties
    * @return the Lance storage options without the `lance.storage.` prefix
+   * @throws IllegalArgumentException if a property key is exactly `lance.storage.`
    */
   public static Map<String, String> getLanceStorageOptions(Map<String, String> tableProperties) {
     if (tableProperties == null || tableProperties.isEmpty()) {
@@ -47,7 +60,14 @@ public final class LancePropertiesUtils {
         .filter(entry -> entry.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
         .collect(
             Collectors.toMap(
-                entry -> entry.getKey().substring(LANCE_STORAGE_OPTIONS_PREFIX.length()),
+                entry -> {
+                  String propertyKey = entry.getKey();
+                  Preconditions.checkArgument(
+                      !LANCE_STORAGE_OPTIONS_PREFIX.equals(propertyKey),
+                      "Lance storage option key cannot be empty: %s",
+                      propertyKey);
+                  return propertyKey.substring(LANCE_STORAGE_OPTIONS_PREFIX.length());
+                },
                 Map.Entry::getValue,
                 (left, right) -> right,
                 LinkedHashMap::new));

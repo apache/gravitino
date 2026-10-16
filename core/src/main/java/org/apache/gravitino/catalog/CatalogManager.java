@@ -65,6 +65,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -99,6 +100,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -123,6 +125,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
 import org.apache.gravitino.utils.ClassLoaderPool;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PooledClassLoaderEntry;
@@ -996,7 +999,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
+      // Validate the properties (reserved/required/hidden-mask checks) but do NOT run the
+      // create-time backend probe here: this standalone path performs its own explicit probe
+      // below, and letting the wrapper validate as well would probe the backend twice.
+      CatalogWrapper wrapper =
+          createCatalogWrapper(dummyEntity, mergedConfig, false /* validateBackend */);
       try {
         wrapper.doWithCatalogOps(
             c -> {
@@ -1376,9 +1383,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
             List<SchemaEntity> schemaEntities =
                 store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
-            if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
-              throw new NonEmptyCatalogException(
-                  "Catalog %s has schemas, please drop them first or use force option", ident);
+            if (!force) {
+              checkCatalogSchemasBeforeDrop(ident, schemaEntities, catalogWrapper);
             }
 
             // Child write-through secrets: capture properties (URNs) from the entity, then
@@ -1398,6 +1404,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   if (dropped) {
                     secretManager.deleteSecretsFromProperties(schemaProps);
                   }
+                } catch (OptimisticLockException e) {
+                  // A conflict with a concurrent writer, such as a lock wait timeout.
+                  throw e;
                 } catch (Exception e) {
                   LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
                   throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
@@ -1460,6 +1469,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return properties == null || properties.isEmpty()
         ? Collections.emptyMap()
         : new HashMap<>(properties);
+  }
+
+  private void checkCatalogSchemasBeforeDrop(
+      NameIdentifier ident, List<SchemaEntity> schemaEntities, CatalogWrapper catalogWrapper)
+      throws Exception {
+    try {
+      if (containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
+        throw new NonEmptyCatalogException(
+            "Catalog %s has schemas, please drop them first or use force option", ident);
+      }
+    } catch (Exception e) {
+      // Some catalogs wrap connection failures, so inspect the cause chain as well.
+      if (ExceptionUtils.indexOfType(e, ConnectionFailedException.class) >= 0) {
+        throw new ConnectionFailedException(
+            e,
+            "%s. Use force=true to skip this check.",
+            ExceptionMessages.withCause(
+                "Failed to check schemas in the underlying catalog " + ident, e));
+      }
+      throw e;
+    }
   }
 
   /**
@@ -1772,11 +1802,33 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   CatalogWrapper createCatalogWrapper(
       CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
+    // Default: when properties are validated at create, also verify the backend. The standalone
+    // testConnection path uses the overload below to keep property validation but skip the probe.
+    return createCatalogWrapper(entity, propsToValidate, true /* validateBackend */);
+  }
+
+  /**
+   * Create a catalog wrapper, optionally running the create-time backend probe. {@code
+   * propsToValidate} always drives property validation when non-null; {@code validateBackend}
+   * additionally controls whether {@link BaseCatalog#validateOnCreate()} runs. The standalone
+   * {@code testConnection} path passes {@code validateBackend = false} so it still rejects invalid
+   * properties while performing its own single explicit probe.
+   *
+   * @param entity The catalog entity.
+   * @param propsToValidate The properties to validate; may be null to skip property validation.
+   * @param validateBackend Whether to run the create-time backend probe.
+   * @return The created catalog wrapper.
+   */
+  CatalogWrapper createCatalogWrapper(
+      CatalogEntity entity,
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
     if (!classLoaderSharingEnabled) {
-      return createNonPooledCatalogWrapper(provider, conf, entity, propsToValidate);
+      return createNonPooledCatalogWrapper(
+          provider, conf, entity, propsToValidate, validateBackend);
     }
 
     ClassLoaderKey key = buildClassLoaderKey(provider, conf);
@@ -1787,7 +1839,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           initCatalogWrapper(
               new CatalogWrapper(poolEntry.classLoader(), classLoaderPool, poolEntry),
               entity,
-              propsToValidate);
+              propsToValidate,
+              validateBackend);
       return wrapper;
     } catch (Exception e) {
       classLoaderPool.release(poolEntry);
@@ -1799,10 +1852,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String provider,
       Map<String, String> conf,
       CatalogEntity entity,
-      @Nullable Map<String, String> propsToValidate) {
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     try {
-      return initCatalogWrapper(new CatalogWrapper(classLoader), entity, propsToValidate);
+      return initCatalogWrapper(
+          new CatalogWrapper(classLoader), entity, propsToValidate, validateBackend);
     } catch (Exception e) {
       ClassLoaderPool.cleanupClassLoader(classLoader);
       throw e;
@@ -1814,7 +1869,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * into the given wrapper.
    */
   private CatalogWrapper initCatalogWrapper(
-      CatalogWrapper wrapper, CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
+      CatalogWrapper wrapper,
+      CatalogEntity entity,
+      @Nullable Map<String, String> propsToValidate,
+      boolean validateBackend) {
     BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
     wrapper.catalog = catalog;
     try {
@@ -1826,11 +1884,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             catalog.properties();
             catalog.capability();
 
-            // Eagerly initialize opted-in catalogs so a misconfiguration fails at create rather
-            // than on first use. The backend translates failures into the caller-error vs
+            // Validate opted-in catalogs so a misconfiguration fails at create rather than on
+            // first use. The default validation eagerly initializes ops(); JDBC overrides it to
+            // run a real backend probe. The backend translates failures into the caller-error vs
             // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
-            if (propsToValidate != null && catalog.shouldValidateOnCreate()) {
-              catalog.ops();
+            // The backend probe is gated by validateBackend so the standalone testConnection path
+            // can keep property validation while running its own explicit probe instead.
+            if (validateBackend && propsToValidate != null && catalog.shouldValidateOnCreate()) {
+              catalog.validateOnCreate();
             }
             return null;
           },

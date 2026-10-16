@@ -19,13 +19,36 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.flink.connector.jdbc.mysql.MysqlPropertiesConverter;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestMysqlPropertiesConverter extends AbstractJdbcPropertiesConverterTestSuite {
 
   @Override
   protected JdbcPropertiesConverter getConverter(Map<String, String> catalogOptions) {
     return MysqlPropertiesConverter.INSTANCE;
+  }
+
+  @Test
+  public void testToFlinkTableProperties() {
+    String schema = "myDatabase";
+    String tableName = "myTable";
+    Map<String, String> flinkCatalogProperties =
+        getConverter(catalogProperties).toFlinkCatalogProperties(catalogProperties);
+    Map<String, String> tableProperties =
+        getConverter(catalogProperties)
+            .toFlinkTableProperties(
+                flinkCatalogProperties, ImmutableMap.of(), new ObjectPath(schema, tableName));
+
+    // For MySQL, the Flink "database" (schema) is itself the connection database.
+    Assertions.assertEquals(
+        flinkUrl + schema,
+        tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+    Assertions.assertEquals(
+        tableName, tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME));
   }
 }

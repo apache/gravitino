@@ -139,7 +139,8 @@ public abstract class IcebergRESTServerManager {
     Properties properties = serverConfig.loadPropertiesFromFile(configFile.toFile());
     serverConfig.loadFromProperties(properties);
 
-    LOG.info("Server config:{}.", serverConfig.getAllConfig());
+    // Configuration values may contain credentials. Log only keys for test diagnostics.
+    LOG.info("Server config keys: {}.", serverConfig.getAllConfig().keySet());
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);

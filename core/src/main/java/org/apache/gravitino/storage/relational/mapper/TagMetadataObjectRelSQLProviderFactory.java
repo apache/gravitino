@@ -107,6 +107,11 @@ public class TagMetadataObjectRelSQLProviderFactory {
     return getProvider().softDeleteTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName);
   }
 
+  /** Delegates cleanup of metadata-object assignments by tag ID. */
+  public static String softDeleteTagMetadataObjectRelsByTagId(@Param("tagId") Long tagId) {
+    return getProvider().softDeleteTagMetadataObjectRelsByTagId(tagId);
+  }
+
   public static String softDeleteTagMetadataObjectRelsByMetalakeId(
       @Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId);
@@ -117,6 +122,13 @@ public class TagMetadataObjectRelSQLProviderFactory {
       @Param("metadataObjectType") String metadataObjectType) {
     return getProvider()
         .softDeleteTagMetadataObjectRelsByMetadataObject(metadataObjectId, metadataObjectType);
+  }
+
+  public static String softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .softDeleteTagMetadataObjectRelsByMetadataObjects(metadataObjectIds, metadataObjectType);
   }
 
   public static String softDeleteTagMetadataObjectRelsByCatalogId(

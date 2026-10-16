@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -572,15 +573,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // A false result is ambiguous: the external schema may have been renamed or dropped out
-          // of band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
+          // A non-cascading drop preserves a missing registration because the source schema
+          // may have been renamed. An explicit cascading drop also removes stale metadata.
+          boolean droppedFromStore = false;
+          if (droppedFromCatalog || cascade) {
             try {
-              store.delete(ident, SCHEMA, true);
+              droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -595,10 +597,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
-          if (droppedFromCatalog) {
+          if (droppedFromCatalog || droppedFromStore) {
             secretManager.deleteSecretsFromProperties(schemaProperties);
           }
-          return droppedFromCatalog;
+          return droppedFromCatalog || droppedFromStore;
         });
   }
 
@@ -668,6 +670,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     try {
       store.put(schemaEntity, true);
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);

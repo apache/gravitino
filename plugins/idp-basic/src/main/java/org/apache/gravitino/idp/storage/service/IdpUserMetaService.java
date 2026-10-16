@@ -134,7 +134,10 @@ public class IdpUserMetaService {
           if (userPO == null) {
             throw new NotFoundException("IdP user not found: %s", username);
           }
-          mapper.updateIdpUserPassword(username, passwordHash);
+          mapper.updateIdpUserPassword(
+              username,
+              passwordHash,
+              IdpPOConverters.withLastModifiedAuditInfoJson(userPO.getAuditInfo()));
           return true;
         });
   }
@@ -159,7 +162,10 @@ public class IdpUserMetaService {
           if (userPO == null) {
             throw new NotFoundException("IdP user not found: %s", username);
           }
-          mapper.updateIdpUserEnabled(username, enabled);
+          mapper.updateIdpUserEnabled(
+              username,
+              enabled,
+              IdpPOConverters.withLastModifiedAuditInfoJson(userPO.getAuditInfo()));
           return true;
         });
   }

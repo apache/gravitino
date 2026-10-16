@@ -51,7 +51,12 @@ public class JobTemplateMetaSQLProviderFactory {
 
   static class JobTemplateMetaMySQLProvider extends JobTemplateMetaBaseSQLProvider {}
 
-  static class JobTemplateMetaH2Provider extends JobTemplateMetaBaseSQLProvider {}
+  static class JobTemplateMetaH2Provider extends JobTemplateMetaBaseSQLProvider {
+    @Override
+    public String selectJobTemplateByIdForShare(Long jobTemplateId) {
+      return selectJobTemplateByIdForUpdate(jobTemplateId);
+    }
+  }
 
   public static String insertJobTemplateMeta(
       @Param("jobTemplateMeta") JobTemplatePO jobTemplatePO) {
@@ -71,12 +76,6 @@ public class JobTemplateMetaSQLProviderFactory {
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
     return getProvider().selectJobTemplatePOByMetalakeAndName(metalakeName, jobTemplateName);
-  }
-
-  public static String softDeleteJobTemplateMetaByMetalakeAndName(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return getProvider().softDeleteJobTemplateMetaByMetalakeAndName(metalakeName, jobTemplateName);
   }
 
   public static String softDeleteJobTemplateMetasByMetalakeId(
@@ -113,5 +112,36 @@ public class JobTemplateMetaSQLProviderFactory {
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateNames") List<String> jobTemplateNames) {
     return getProvider().batchSelectJobTemplateByIdentifier(metalakeName, jobTemplateNames);
+  }
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public static String selectJobTemplateByIdForUpdate(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().selectJobTemplateByIdForUpdate(jobTemplateId);
+  }
+
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public static String selectJobTemplateByIdForShare(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().selectJobTemplateByIdForShare(jobTemplateId);
+  }
+
+  /**
+   * Deletes active metadata using a stable identity and expected version.
+   *
+   * @param jobTemplateId the stable template ID
+   * @param currentVersion the expected OCC version
+   * @return the SQL statement
+   */
+  public static String softDeleteJobTemplateById(
+      @Param("jobTemplateId") Long jobTemplateId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteJobTemplateById(jobTemplateId, currentVersion);
   }
 }

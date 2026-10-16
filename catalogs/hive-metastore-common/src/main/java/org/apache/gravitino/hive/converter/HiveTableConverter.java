@@ -68,6 +68,21 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 public class HiveTableConverter {
 
   public static HiveTable fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
+    return fromHiveTable(table, Collections.emptySet(), Collections.emptyMap());
+  }
+
+  /**
+   * Converts a Hive metastore table together with its column constraints.
+   *
+   * @param table The Hive metastore table.
+   * @param notNullColumns Names of the columns that carry a NOT NULL constraint.
+   * @param defaultValues Column name to Hive SQL default value expression.
+   * @return The converted {@link HiveTable}.
+   */
+  public static HiveTable fromHiveTable(
+      org.apache.hadoop.hive.metastore.api.Table table,
+      Set<String> notNullColumns,
+      Map<String, String> defaultValues) {
     Preconditions.checkArgument(table != null, "Table cannot be null");
     AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
 
@@ -75,7 +90,7 @@ public class HiveTableConverter {
 
     SortOrder[] sortOrders = HiveTableConverter.getSortOrders(table);
 
-    Column[] columns = HiveTableConverter.getColumns(table);
+    Column[] columns = HiveTableConverter.getColumns(table, notNullColumns, defaultValues);
 
     Transform[] partitioning = HiveTableConverter.getPartitioning(table);
 
@@ -240,7 +255,7 @@ public class HiveTableConverter {
       }
     }
 
-    if (table.distribution() != null && !Distributions.NONE.equals(table.distribution())) {
+    if (table.distribution() != null && !Distributions.isNone(table.distribution())) {
       strgDesc.setBucketCols(
           Arrays.stream(table.distribution().expressions())
               .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
@@ -343,6 +358,22 @@ public class HiveTableConverter {
   }
 
   public static Column[] getColumns(org.apache.hadoop.hive.metastore.api.Table table) {
+    return getColumns(table, Collections.emptySet(), Collections.emptyMap());
+  }
+
+  /**
+   * Converts the storage and partition columns of a Hive metastore table, applying the given column
+   * constraints.
+   *
+   * @param table The Hive metastore table.
+   * @param notNullColumns Names of the columns that carry a NOT NULL constraint.
+   * @param defaultValues Column name to Hive SQL default value expression.
+   * @return The converted columns, storage columns first followed by partition columns.
+   */
+  public static Column[] getColumns(
+      org.apache.hadoop.hive.metastore.api.Table table,
+      Set<String> notNullColumns,
+      Map<String, String> defaultValues) {
     StorageDescriptor sd = table.getSd();
     List<FieldSchema> storageColumns =
         sd == null || sd.getCols() == null ? Collections.emptyList() : sd.getCols();
@@ -359,7 +390,9 @@ public class HiveTableConverter {
                         buildColumn(
                             f.getName(),
                             HiveDataTypeConverter.CONVERTER.toGravitino(f.getType()),
-                            f.getComment())),
+                            f.getComment(),
+                            notNullColumns,
+                            defaultValues)),
             partitionKeys.stream()
                 // Filter out partition keys that already exist in sd.getCols()
                 .filter(p -> !columnNames.contains(p.getName()))
@@ -368,13 +401,25 @@ public class HiveTableConverter {
                         buildColumn(
                             p.getName(),
                             HiveDataTypeConverter.CONVERTER.toGravitino(p.getType()),
-                            p.getComment())))
+                            p.getComment(),
+                            notNullColumns,
+                            defaultValues)))
         .toArray(Column[]::new);
   }
 
-  private static Column buildColumn(String name, Type type, String comment) {
+  private static Column buildColumn(
+      String name,
+      Type type,
+      String comment,
+      Set<String> notNullColumns,
+      Map<String, String> defaultValues) {
     HiveColumn.Builder builder =
-        HiveColumn.builder().withName(name).withType(type).withNullable(true);
+        HiveColumn.builder()
+            .withName(name)
+            .withType(type)
+            .withNullable(!notNullColumns.contains(name))
+            .withDefaultValue(
+                HiveColumnDefaultValueConverter.toGravitino(type, defaultValues.get(name), name));
     if (comment != null) {
       builder.withComment(comment);
     }

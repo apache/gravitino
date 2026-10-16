@@ -28,10 +28,10 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         self.rest_client = rest_client
 
     async def list_of_statistics(
-        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+        self, metadata_type: str, metadata_fullname: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_fullname)}/statistics"
         )
@@ -40,7 +40,6 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
     # pylint: disable=R0917
     async def list_statistic_for_partition(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -49,7 +48,7 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         to_inclusive: bool = False,
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_fullname)}/statistics/partitions",
             params={

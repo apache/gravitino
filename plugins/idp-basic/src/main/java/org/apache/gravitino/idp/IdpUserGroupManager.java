@@ -40,6 +40,7 @@ import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.storage.relational.IdpRelationalStorage;
+import org.apache.gravitino.idp.storage.relational.utils.IdpPOConverters;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.IdGenerator;
@@ -144,7 +145,7 @@ public class IdpUserGroupManager implements Closeable {
     checkCanDisableUser(username, enabled);
     String passwordHash = passwordHasher.hash(password);
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash, enabled));
-    return new IdpUser(username, Collections.emptyList(), enabled);
+    return USER_SERVICE.getIdpUser(username);
   }
 
   /**
@@ -231,7 +232,7 @@ public class IdpUserGroupManager implements Closeable {
     IdpCredentialValidator.validateGroupComment(comment);
     String normalizedComment = comment == null ? "" : comment;
     GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName, normalizedComment));
-    return new IdpGroup(groupName, Collections.emptyList(), normalizedComment);
+    return GROUP_SERVICE.getIdpGroup(groupName);
   }
 
   /**
@@ -304,6 +305,7 @@ public class IdpUserGroupManager implements Closeable {
         .withUsername(username)
         .withPasswordHash(passwordHash)
         .withEnabled(enabled)
+        .withAuditInfo(IdpPOConverters.newCreateAuditInfoJson())
         .withCurrentVersion(POConverters.INIT_VERSION)
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
@@ -324,6 +326,7 @@ public class IdpUserGroupManager implements Closeable {
         .withGroupId(idGenerator.nextId())
         .withGroupName(groupName)
         .withGroupComment(comment == null ? "" : comment)
+        .withAuditInfo(IdpPOConverters.newCreateAuditInfoJson())
         .withCurrentVersion(POConverters.INIT_VERSION)
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)

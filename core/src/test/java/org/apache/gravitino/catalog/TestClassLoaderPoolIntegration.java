@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -352,7 +353,18 @@ public class TestClassLoaderPoolIntegration {
 
     catalogManager.close();
 
-    // After close, the pool should be empty
+    // close() retires cached wrappers synchronously, but Caffeine's asMap() is only weakly
+    // consistent: invalidateAll may still deliver an asynchronous removal/retire for an entry
+    // the snapshot missed, which keeps the pooled ClassLoader alive until that listener runs.
+    long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    while (pool.size() > 0 && System.nanoTime() < deadlineNs) {
+      try {
+        Thread.sleep(10L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
     Assertions.assertEquals(0, pool.size());
     catalogManager = null;
   }

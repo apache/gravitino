@@ -216,7 +216,11 @@ public class TrinoQueryITBase {
     gravitinoClient.dropMetalake(metalakeName, true);
   }
 
-  private static void createCatalog(
+  /**
+   * Creates the catalog in Gravitino if needed and waits until Trino has loaded it. The IT
+   * connector runs in single-metalake mode, so the catalog is exposed under its bare name.
+   */
+  protected static void createCatalog(
       String catalogName, String provider, Map<String, String> properties) throws Exception {
     boolean exists = metalake.catalogExists(catalogName);
     if (!exists) {
@@ -231,14 +235,14 @@ public class TrinoQueryITBase {
     while (!catalogCreated && tries-- >= 0) {
       try {
         String result = trinoQueryRunner.runQuery("show catalogs");
-        if (result.contains(metalakeName + "." + catalogName)) {
+        if (result.contains("\"" + catalogName + "\"")) {
           catalogCreated = true;
           break;
         }
         LOG.info("Waiting for catalog {} to be created", catalogName);
         // connection exception need retry.
-      } catch (Exception ConnectionException) {
-        LOG.info("Waiting for connecting to Trino");
+      } catch (Exception e) {
+        LOG.info("Waiting for connecting to Trino: {}", e.getMessage());
       }
       sleep(1000);
     }

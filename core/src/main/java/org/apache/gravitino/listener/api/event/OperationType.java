@@ -27,6 +27,7 @@ public enum OperationType {
   LOAD_TABLE,
   LOAD_TABLE_CREDENTIAL,
   PLAN_TABLE_SCAN,
+  FETCH_SCAN_TASKS,
   LIST_TABLE,
   ALTER_TABLE,
   RENAME_TABLE,
@@ -45,6 +46,8 @@ public enum OperationType {
   LIST_TAGS_INFO_FOR_METADATA_OBJECT,
   LIST_METADATA_OBJECTS_FOR_TAG,
   LIST_TAGS_INFO,
+  ADD_POLICY_FOR_TAG,
+  REMOVE_POLICY_FROM_TAG,
 
   // Schema operations
   CREATE_SCHEMA,
@@ -205,6 +208,17 @@ public enum OperationType {
   LIST_POLICY_INFOS_FOR_METADATA_OBJECT,
   ASSOCIATE_POLICIES_FOR_METADATA_OBJECT,
   GET_POLICY_FOR_METADATA_OBJECT,
+
+  // Semantic Model operations
+  CREATE_SEMANTIC_MODEL,
+  ALTER_SEMANTIC_MODEL,
+  DROP_SEMANTIC_MODEL,
+  LOAD_SEMANTIC_MODEL,
+  LIST_SEMANTIC_MODEL,
+  /** Import a Semantic Model from an Ossie document. */
+  IMPORT_SEMANTIC_MODEL,
+  /** Export a Semantic Model as an Ossie document. */
+  EXPORT_SEMANTIC_MODEL,
 
   // Function operations
   REGISTER_FUNCTION,

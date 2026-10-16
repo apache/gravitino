@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Unstable;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -131,5 +132,13 @@ public interface View extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("View does not support tag operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the view supports secret property operations.
+   * @throws UnsupportedOperationException if the view does not support secret property operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("View does not support secret property operations.");
   }
 }

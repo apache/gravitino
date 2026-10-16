@@ -49,8 +49,8 @@ public abstract class BaseEntityCache implements EntityCache {
    * (an old comment, property, or job status), never a wrong pointer, and each can be invalidated
    * with a single one-to-one key drop. Every other type is read straight from the store.
    * User/group/role embed relation-derived data that a per-node cache cannot invalidate;
-   * model/model version and function carry a load-bearing pointer that would be silently wrong if
-   * served stale.
+   * model/model version, Semantic Model, and function carry load-bearing content that would be
+   * silently wrong if served stale.
    */
   private static final Set<Entity.EntityType> CACHEABLE_TYPES =
       Sets.immutableEnumSet(
@@ -182,9 +182,28 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Removes an expired entity from the data cache.
+   * Removes a key from the implementation's bookkeeping only if it is absent from the underlying
+   * cache. This includes eviction, expiration, and explicit invalidation. This may be called while
+   * the underlying cache holds an internal lock. Implementations must not acquire locks held across
+   * underlying cache operations, and must tolerate the key having been added back before the call.
    *
-   * @param key The expired entity key to remove.
+   * <p>The default implementation delegates to the legacy hook so existing subclass overrides
+   * remain effective.
+   *
+   * @param key The cache key to remove from bookkeeping if absent.
    */
+  protected void removeIndexEntryIfAbsent(EntityCacheKey key) {
+    invalidateExpiredItem(key);
+  }
+
+  /**
+   * Legacy hook for removing an absent key from the implementation's bookkeeping.
+   *
+   * @param key The evicted, expired, or explicitly invalidated entity key.
+   * @deprecated Use {@link #removeIndexEntryIfAbsent(EntityCacheKey)}. Existing overrides continue
+   *     to receive calls through its default implementation and must obey its locking and
+   *     reinsertion contract.
+   */
+  @Deprecated
   protected abstract void invalidateExpiredItem(EntityCacheKey key);
 }

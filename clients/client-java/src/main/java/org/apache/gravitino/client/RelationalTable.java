@@ -43,10 +43,8 @@ import org.apache.gravitino.dto.responses.PartitionNameListResponse;
 import org.apache.gravitino.dto.responses.PartitionResponse;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -59,6 +57,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
@@ -79,7 +78,8 @@ class RelationalTable
         SupportsRoles,
         SupportsPolicies,
         SupportsStatistics,
-        SupportsPartitionStatistics {
+        SupportsPartitionStatistics,
+        SupportsSecrets {
 
   private final Table table;
 
@@ -92,6 +92,7 @@ class RelationalTable
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectStatisticsOperations objectStatisticsOperations;
   private final MetadataObjectPartitionStatisticsOperations objectPartitionStatisticsOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -131,6 +132,8 @@ class RelationalTable
     this.objectPartitionStatisticsOperations =
         new MetadataObjectPartitionStatisticsOperations(
             namespace.level(0), tableObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(namespace.level(0), tableObject, restClient);
   }
 
   /**
@@ -364,6 +367,16 @@ class RelationalTable
   }
 
   @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
+  }
+
+  @Override
   public SupportsStatistics supportsStatistics() {
     return this;
   }
@@ -406,17 +419,6 @@ class RelationalTable
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
   }
 
   @Override

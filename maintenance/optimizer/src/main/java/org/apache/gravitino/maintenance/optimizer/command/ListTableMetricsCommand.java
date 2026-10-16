@@ -38,9 +38,10 @@ public class ListTableMetricsCommand implements OptimizerCommandExecutor {
     Preconditions.checkArgument(
         partitionPath.isEmpty() || context.identifiers().length == 1,
         "--partition-path requires exactly one identifier");
+    List<NameIdentifier> identifiers = context.parsedTableIdentifiers();
     try (MetricsProvider metricsProvider =
         OptimizerCommandUtils.createMetricsProvider(context.optimizerEnv())) {
-      for (NameIdentifier identifier : context.parsedIdentifiers()) {
+      for (NameIdentifier identifier : identifiers) {
         List<MetricPoint> metrics =
             partitionPath
                 .map(

@@ -619,6 +619,25 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check whether the metadata object name can be represented in a qualified metadata object name.
+   *
+   * @param ident The metadata object identifier to check
+   * @param entityType The metadata object entity type
+   * @throws IllegalNameIdentifierException If the object name contains the qualified-name separator
+   */
+  public static void checkMetadataObjectName(NameIdentifier ident, Entity.EntityType entityType) {
+    Preconditions.checkArgument(
+        ident != null && entityType != null, "The identifier and entity type must not be null");
+
+    if (ident.name().contains(".")) {
+      throw new IllegalNameIdentifierException(
+          "The %s name '%s' is unsupported because '.' is reserved as the qualified-name "
+              + "separator.",
+          entityType, ident.name());
+    }
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
@@ -630,6 +649,7 @@ public class NameIdentifierUtil {
       NameIdentifier ident, Entity.EntityType entityType) {
     Preconditions.checkArgument(
         ident != null && entityType != null, "The identifier and entity type must not be null");
+    checkMetadataObjectName(ident, entityType);
 
     Joiner dot = Joiner.on(".");
 

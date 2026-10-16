@@ -21,19 +21,34 @@ package org.apache.gravitino.secret;
 import java.util.Map;
 
 /**
- * Interface to retrieve secret-manager plaintext properties for a metadata object.
+ * Interface to retrieve plaintext secret properties for a metadata object.
  *
- * <p>Every secret-URN property value is resolved and returned, including keys that may also be
- * delivered via {@link org.apache.gravitino.credential.SupportsCredentials} (for example {@code
- * jdbc-password}). Normal non-secret properties are not included; combine with {@code
- * load*().properties()} on the client.
+ * <p>Returns:
+ *
+ * <ul>
+ *   <li>Every secret-URN property value, resolved via the secret manager (including keys that may
+ *       also be delivered via {@link org.apache.gravitino.credential.SupportsCredentials}).
+ *   <li>Stored plaintext for every property declared {@code hidden} in entity metadata (no
+ *       sensitive-name keyword gate), so shortening the server sensitive-key keyword list cannot
+ *       leave a masked property without a recovery path.
+ *   <li>Stored plaintext for undeclared keys whose names look sensitive (contain {@code secret},
+ *       {@code password}, {@code token}, {@code credential}, {@code access}, or {@code account},
+ *       case-insensitive), so mistyped / undeclared credential properties remain usable after API
+ *       responses mask them as {@code ******}.
+ * </ul>
+ *
+ * <p>Declared non-hidden configuration keys are not returned even when the name looks sensitive
+ * (for example {@code credential-providers}). Normal non-sensitive properties are not included;
+ * combine with {@code load*().properties()} on the client.
  */
 public interface SupportsSecrets {
 
   /**
-   * Returns secret-manager plaintext properties for this metadata object.
+   * Returns plaintext secret properties for this metadata object.
    *
-   * @return a map of property key to resolved plaintext value; never null, may be empty
+   * <p>See the interface javadoc for which keys are recovered.
+   *
+   * @return a map of property key to plaintext value; never null, may be empty
    */
   Map<String, String> getSecrets();
 }

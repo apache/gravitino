@@ -1,16 +1,12 @@
 name: Multi-Instance Consistency Test
 
-# Verifies that entity and authorization caches propagate changes correctly
-# between two Gravitino instances backed by the same MySQL entity store. The
-# entity test warms one instance, mutates the other, and then re-reads the
-# target until it converges or the convergence deadline expires.
+# Verifies that authorization state (owners, roles, role privileges, user-role
+# grants) propagates correctly between two Gravitino instances backed by the
+# same MySQL entity store. Both instances run with the entity cache disabled
+# and authorization enabled, so the only consistency contracts under test are
+# the JcasbinAuthorizer caches and the JcasbinChangePoller invalidation paths.
 #
-# The entity test opens with a stale-read control that requires the target to
-# serve a cached value before the poller runs. If that control fails, the cache
-# is not actually caching and the remaining assertions prove nothing, so treat
-# a failure there as a configuration problem rather than a propagation bug.
-#
-# The test plans and assertions live in the two test scripts under dev/ci/.
+# The test plan and assertions live in dev/ci/test_multi_instance_consistency.sh.
 
 on:
   workflow_dispatch:
@@ -21,104 +17,4 @@ concurrency:
 
 jobs:
   multi-instance-consistency:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    services:
-      mysql:
-        image: mysql:8.0.33
-        env:
-          MYSQL_ROOT_PASSWORD: gravitino
-          MYSQL_DATABASE: gravitino
-          MYSQL_USER: gravitino
-          MYSQL_PASSWORD: gravitino
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -uroot -pgravitino --silent"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-retries=20
-      kafka:
-        image: apache/kafka:3.9.1
-        env:
-          KAFKA_PROCESS_ROLES: broker,controller
-          KAFKA_NODE_ID: 1
-          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-          KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-        ports:
-          - 9092:9092
-        options: >-
-          --health-cmd="/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
-          --health-interval=5s
-          --health-timeout=10s
-          --health-retries=20
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Free disk space
-        run: dev/ci/util_free_space.sh
-
-      - name: Apply Gravitino MySQL schema
-        run: |
-          # Keep in sync with the latest schema file under scripts/mysql/ when the version bumps.
-          mysql -h 127.0.0.1 -P 3306 -ugravitino -pgravitino gravitino \
-            < scripts/mysql/schema-2.0.0-mysql.sql
-
-      - name: Build Gravitino distribution
-        run: ./gradlew compileDistribution -PskipWeb=true -x test
-
-      - name: Stage and start two instances (A=8090, B=8190)
-        run: bash dev/ci/setup_multi_instance.sh
-
-      - name: Run multi-instance entity cache consistency tests
-        id: entity-cache-consistency
-        env:
-          INSTANCE_A: http://localhost:8090
-          INSTANCE_B: http://localhost:8190
-          INSTANCE_B_HOME: distribution/package-b
-          ADMIN_USER: admin
-          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
-          # Convergence budget for every other case. A healthy node converges in
-          # about a second and never spends this, so a generous value buys
-          # resilience to CI scheduling hiccups at no cost on green runs.
-          AWAIT_TIMEOUT_SECS: 30
-          # Every cacheable entity type must expose a warm stale value in at
-          # least one round before its target converges through the change log.
-          PER_TYPE_STALE_CONTROL_ROUNDS: 3
-          RUN_RESTART_TEST: true
-        run: bash dev/ci/test_multi_instance_entity_cache_consistency.sh
-
-      - name: Run multi-instance authorization consistency tests
-        id: authorization-consistency
-        env:
-          INSTANCE_A: http://localhost:8090
-          INSTANCE_B: http://localhost:8190
-          ADMIN_USER: admin
-          POLL_WAIT_SECS: 6
-        run: bash dev/ci/test_multi_instance_consistency.sh
-
-      - name: Stop Gravitino servers
-        if: always()
-        run: |
-          distribution/package/bin/gravitino.sh   stop || true
-          distribution/package-b/bin/gravitino.sh stop || true
-
-      - name: Upload logs on failure
-        if: ${{ failure() || cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: multi-instance-consistency-logs
-          path: |
-            distribution/package/logs/
-            distribution/package-b/logs/
-            distribution/package/conf/gravitino.conf
-            distribution/package-b/conf/gravitino.conf
+    uses: ./.github/workflows/multi-instance-consistency-test-action.yml

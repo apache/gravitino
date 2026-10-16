@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -102,6 +103,10 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   protected static HiveCatalog initHiveCatalog() {
+    return initHiveCatalog(Collections.emptyMap());
+  }
+
+  protected static HiveCatalog initHiveCatalog(Map<String, String> extraConf) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
 
@@ -131,6 +136,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.HIVE_IN_TEST.varname,
         hiveConf.get(HiveConf.ConfVars.HIVE_IN_TEST.varname));
 
+    conf.putAll(extraConf);
     return new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 

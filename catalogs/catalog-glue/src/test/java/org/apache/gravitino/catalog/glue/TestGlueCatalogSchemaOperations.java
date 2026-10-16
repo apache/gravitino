@@ -42,6 +42,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
@@ -55,6 +56,7 @@ import software.amazon.awssdk.services.glue.model.GetDatabasesRequest;
 import software.amazon.awssdk.services.glue.model.GetDatabasesResponse;
 import software.amazon.awssdk.services.glue.model.GetTablesRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesResponse;
+import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.UpdateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.UpdateDatabaseResponse;
@@ -84,6 +86,38 @@ class TestGlueCatalogSchemaOperations {
 
     assertEquals(cause, exception.getCause());
     assertTrue(exception.getMessage().contains("connection refused"));
+  }
+
+  @Test
+  void testConnectionMapsMissingCredentialsToActionableMessage() {
+    SdkClientException cause =
+        SdkClientException.create("Unable to load credentials from any of the providers");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    ConnectionFailedException exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () -> ops.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+    assertEquals(cause, exception.getCause());
+    assertTrue(exception.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertTrue(exception.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testConnectionMapsRejectedCredentialsToActionableMessage() {
+    GlueException cause = invalidCredentialsException();
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    ConnectionFailedException exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () -> ops.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+    assertEquals(cause, exception.getCause());
+    assertTrue(exception.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertTrue(exception.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+    assertTrue(exception.getMessage().contains("UnrecognizedClientException"));
   }
 
   // -------------------------------------------------------------------------
@@ -123,6 +157,45 @@ class TestGlueCatalogSchemaOperations {
     NameIdentifier[] result = ops.listSchemas(ns);
 
     assertEquals(0, result.length);
+  }
+
+  @Test
+  void testListSchemasMapsCredentialFailureToActionableMessage() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    SdkClientException cause =
+        SdkClientException.create("Unable to load credentials from any of the providers");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    RuntimeException ex = assertThrows(RuntimeException.class, () -> ops.listSchemas(ns));
+
+    assertEquals(cause, ex.getCause());
+    assertTrue(ex.getMessage().contains("aws-access-key-id"));
+    assertTrue(ex.getMessage().contains("aws-secret-access-key"));
+  }
+
+  @Test
+  void testListSchemasMapsRejectedCredentialsToActionableMessage() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    GlueException cause = invalidCredentialsException();
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    RuntimeException ex = assertThrows(RuntimeException.class, () -> ops.listSchemas(ns));
+
+    assertEquals(cause, ex.getCause());
+    assertTrue(ex.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertTrue(ex.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+    assertTrue(ex.getMessage().contains("UnrecognizedClientException"));
+  }
+
+  @Test
+  void testListSchemasRethrowsNonCredentialSdkClientException() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    SdkClientException cause = SdkClientException.create("connection refused");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    SdkClientException ex = assertThrows(SdkClientException.class, () -> ops.listSchemas(ns));
+
+    assertEquals(cause, ex);
   }
 
   // -------------------------------------------------------------------------
@@ -326,5 +399,17 @@ class TestGlueCatalogSchemaOperations {
 
     verify(mockClient).deleteDatabase(captor.capture());
     assertEquals("123456789012", captor.getValue().catalogId());
+  }
+
+  private static GlueException invalidCredentialsException() {
+    return (GlueException)
+        GlueException.builder()
+            .message("The security token included in the request is invalid")
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("UnrecognizedClientException")
+                    .errorMessage("The security token included in the request is invalid")
+                    .build())
+            .build();
   }
 }

@@ -22,6 +22,7 @@ import httpx
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
+    MetalakeOperation,
     ModelOperation,
     PolicyOperation,
     SchemaOperation,
@@ -38,6 +39,9 @@ from mcp_server.client.plain.plain_rest_client_fileset_operation import (
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
 )
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
+)
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
@@ -49,6 +53,9 @@ from mcp_server.client.plain.plain_rest_client_policy_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
+)
+from mcp_server.client.plain.plain_rest_client_semantic_model_operation import (
+    PlainRESTClientSemanticModelOperation,
 )
 from mcp_server.client.plain.plain_rest_client_statistic_operation import (
     PlainRESTClientStatisticOperation,
@@ -65,6 +72,7 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.plain.plain_rest_client_view_operation import (
     PlainRESTClientViewOperation,
 )
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.topic_operation import TopicOperation
 
 
@@ -134,10 +142,20 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._view_operation = PlainRESTClientViewOperation(
             metalake_name, _rest_client
         )
+        self._semantic_model_operation = PlainRESTClientSemanticModelOperation(
+            metalake_name, _rest_client
+        )
+        # Not metalake-scoped: addresses the server's top-level endpoint.
+        self._metalake_operation = PlainRESTClientMetalakeOperation(
+            _rest_client
+        )
 
     async def close(self) -> None:
         """Close the shared httpx client and release its connection pool."""
         await self._rest_client.aclose()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return self._metalake_operation
 
     def as_catalog_operation(self) -> CatalogOperation:
         return self._catalog_operation
@@ -174,3 +192,6 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_view_operation(self):
         return self._view_operation
+
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        return self._semantic_model_operation

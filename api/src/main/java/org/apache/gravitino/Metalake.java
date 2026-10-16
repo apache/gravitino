@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
  * The interface of a metalake. The metalake is the top level entity in the Apache Gravitino system,
@@ -61,5 +62,15 @@ public interface Metalake extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Metalake does not support role operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the metalake supports secret property operations.
+   * @throws UnsupportedOperationException if the metalake does not support secret property
+   *     operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException(
+        "Metalake does not support secret property operations.");
   }
 }

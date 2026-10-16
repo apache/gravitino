@@ -19,12 +19,15 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -41,7 +44,9 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -58,11 +63,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -71,6 +78,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -107,13 +115,18 @@ public class TestOwnerManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -289,5 +302,110 @@ public class TestOwnerManager {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
     }
+  }
+
+  @Test
+  @Order(5)
+  public void testInitialOwnerSetByBatchNotifiesAuthorizer()
+      throws IllegalAccessException, IOException {
+    String catalogName = "catalog_initial_owner_notify_batch";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(catalog, false);
+
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer originalAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+    try {
+      MetadataObject catalogObject =
+          MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
+
+      ownerManager.setOwners(
+          METALAKE, Collections.singletonList(catalogObject), USER, Owner.Type.USER);
+
+      Mockito.verify(authorizer)
+          .handleMetadataOwnerChange(
+              Mockito.eq(METALAKE),
+              Mockito.isNull(),
+              Mockito.eq(NameIdentifier.of(METALAKE, catalogName)),
+              Mockito.eq(Entity.EntityType.CATALOG));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+    }
+  }
+
+  @Test
+  @Order(6)
+  public void testConcurrentSetOwnerKeepsOneOwner() throws Exception {
+    MetadataObject catalogObject = createCatalog("catalog_owner_race");
+
+    for (int i = 0; i < 10; i++) {
+      List<Object> outcomes =
+          RaceTestUtils.runTogether(
+              Arrays.asList(
+                  () -> {
+                    ownerManager.setOwner(METALAKE, catalogObject, USER, Owner.Type.USER);
+                    return null;
+                  },
+                  () -> {
+                    ownerManager.setOwner(METALAKE, catalogObject, GROUP, Owner.Type.GROUP);
+                    return null;
+                  }));
+
+      outcomes.forEach(Assertions::assertNull);
+      // getOwner fails if more than one live owner row exists for the object.
+      Owner owner = ownerManager.getOwner(METALAKE, catalogObject).get();
+      Assertions.assertTrue(
+          (USER.equals(owner.name()) && owner.type() == Owner.Type.USER)
+              || (GROUP.equals(owner.name()) && owner.type() == Owner.Type.GROUP),
+          "Unexpected owner " + owner.name());
+    }
+  }
+
+  @Test
+  @Order(7)
+  public void testOwnerOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
+    // Use a catalog of its own so the test does not depend on running after another one.
+    MetadataObject catalogObject = createCatalog("catalog_owner_lock_free");
+
+    // A metalake WRITE lock covers every principal and metadata object below it. Owner writes are
+    // fenced by the entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock metalakeWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> ownerManager.setOwner(METALAKE, catalogObject, USER, Owner.Type.USER));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              ownerManager.setOwners(
+                  METALAKE, Collections.singletonList(catalogObject), GROUP, Owner.Type.GROUP));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> ownerManager.getOwner(METALAKE, catalogObject));
+    }
+  }
+
+  private static MetadataObject createCatalog(String catalogName) throws IOException {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    entityStore.put(
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    return MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
   }
 }

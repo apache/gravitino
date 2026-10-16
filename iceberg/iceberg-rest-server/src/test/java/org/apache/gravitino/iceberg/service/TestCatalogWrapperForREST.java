@@ -20,15 +20,12 @@
 package org.apache.gravitino.iceberg.service;
 
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.HttpServer;
@@ -50,7 +47,6 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -59,8 +55,8 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
-import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -70,10 +66,7 @@ import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
-import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
-import org.apache.iceberg.io.StorageCredential;
-import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -88,6 +81,7 @@ import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.apache.iceberg.rest.responses.ConfigResponseParser;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponseParser;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
@@ -628,6 +622,508 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
+  void testFederatedLoadTableDelegatesToRemote() throws Exception {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    String expectedPath = "/v1/upstream/namespaces/db/tables/tbl";
+
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    org.apache.iceberg.rest.credentials.Credential cred =
+        IcebergRESTUtils.toRESTCredential(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.access-key-id", "upstream-key",
+                "s3.secret-access-key", "upstream-secret",
+                "s3.session-token", "upstream-token",
+                "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(ImmutableMap.of("io-impl", "org.apache.iceberg.aws.s3.S3FileIO"))
+            .addCredential(cred)
+            .build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> requestQuery = new AtomicReference<>();
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          requestQuery.set(exchange.getRequestURI().getQuery());
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      LoadTableResponse response = wrapper.loadTable(table, true, CredentialPrivilege.READ);
+
+      Assertions.assertEquals(expectedPath, requestPath.get());
+      Assertions.assertEquals("GET", requestMethod.get());
+      Assertions.assertEquals("snapshots=all", requestQuery.get());
+      Assertions.assertEquals("vended-credentials", accessDelegationHeader.get());
+      verify(restCatalog, never()).loadTable(table);
+      Assertions.assertEquals(1, response.credentials().size());
+      Credential credential = response.credentials().get(0);
+      Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+      Assertions.assertEquals("upstream-key", credential.config().get("s3.access-key-id"));
+      Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+      Assertions.assertEquals(
+          "v1/local/namespaces/db/tables/tbl/credentials",
+          credential.config().get("client.refresh-credentials-endpoint"));
+      Assertions.assertEquals(
+          "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testFederatedLoadTableNoCredentials() throws Exception {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(ImmutableMap.of("io-impl", "org.apache.iceberg.aws.s3.S3FileIO"))
+            .build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      LoadTableResponse response = wrapper.loadTable(table, false, CredentialPrivilege.READ);
+
+      Assertions.assertNull(
+          accessDelegationHeader.get(),
+          "X-Iceberg-Access-Delegation header should not be sent without credential vending");
+      verify(restCatalog, never()).loadTable(table);
+      Assertions.assertTrue(
+          response.credentials() == null || response.credentials().isEmpty(),
+          "Non-vended request should not return remote storage-credentials");
+      Assertions.assertEquals(
+          "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testFederatedCreateTableWithCredentials() throws Exception {
+    Namespace namespace = Namespace.of("db");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    Credential cred =
+        IcebergRESTUtils.toRESTCredential(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.session-token",
+                "upstream-token",
+                "client.refresh-credentials-endpoint",
+                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder().withTableMetadata(metadata).addCredential(cred).build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("tbl")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
+              .build();
+
+      LoadTableResponse response = wrapper.createTable(namespace, request, true);
+
+      Assertions.assertEquals("/v1/upstream/namespaces/db/tables", requestPath.get());
+      Assertions.assertEquals("POST", requestMethod.get());
+      Assertions.assertEquals("vended-credentials", accessDelegationHeader.get());
+      Assertions.assertEquals(1, response.credentials().size());
+      Assertions.assertEquals(
+          "v1/local/namespaces/db/tables/tbl/credentials",
+          response.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testFederatedCreateTableNoCredentials() throws Exception {
+    Namespace namespace = Namespace.of("db");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(ImmutableMap.of("io-impl", "org.apache.iceberg.aws.s3.S3FileIO"))
+            .build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("tbl")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
+              .build();
+
+      LoadTableResponse response = wrapper.createTable(namespace, request, false);
+
+      Assertions.assertEquals("/v1/upstream/namespaces/db/tables", requestPath.get());
+      Assertions.assertEquals("POST", requestMethod.get());
+      Assertions.assertNull(
+          accessDelegationHeader.get(),
+          "X-Iceberg-Access-Delegation header should not be sent without credential vending");
+      Assertions.assertTrue(
+          response.credentials() == null || response.credentials().isEmpty(),
+          "Non-vended request should not return remote storage-credentials");
+      Assertions.assertEquals(
+          "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testFederatedCreateTableForwardsStageCreate() throws Exception {
+    Namespace namespace = Namespace.of("db");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder().withTableMetadata(metadata).build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+      Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("tbl")
+              .withSchema(schema)
+              .withLocation("s3://bucket/warehouse/table")
+              .stageCreate()
+              .build();
+
+      wrapper.createTable(namespace, request, false);
+
+      CreateTableRequest forwarded =
+          IcebergObjectMapper.getInstance().readValue(requestBody.get(), CreateTableRequest.class);
+      Assertions.assertTrue(forwarded.stageCreate());
+      Assertions.assertEquals("s3://bucket/warehouse/table", forwarded.location());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testFederatedRegisterTableWithCredentials() throws Exception {
+    Namespace namespace = Namespace.of("db");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    Credential cred =
+        IcebergRESTUtils.toRESTCredential(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.session-token",
+                "upstream-token",
+                "client.refresh-credentials-endpoint",
+                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder().withTableMetadata(metadata).addCredential(cred).build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+      RegisterTableRequest request =
+          ImmutableRegisterTableRequest.builder()
+              .name("tbl")
+              .metadataLocation("s3://bucket/db/tbl/metadata/v1.metadata.json")
+              .build();
+
+      LoadTableResponse response = wrapper.registerTable(namespace, request, true);
+
+      Assertions.assertEquals("/v1/upstream/namespaces/db/register", requestPath.get());
+      Assertions.assertEquals("POST", requestMethod.get());
+      Assertions.assertEquals("vended-credentials", accessDelegationHeader.get());
+      Assertions.assertEquals(1, response.credentials().size());
+      Assertions.assertEquals(
+          "v1/local/namespaces/db/tables/tbl/credentials",
+          response.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
   void testFederatedPlanTableScanOnFailure() throws Exception {
     TableIdentifier tableId = TableIdentifier.of(Namespace.of("db"), "tbl");
     HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
@@ -741,70 +1237,93 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testLoadTableRefreshEndpoint() {
+  void testLoadTableRefreshEndpoint() throws Exception {
     TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tbl");
-    RESTCatalog catalog = mock(RESTCatalog.class);
-    BaseTable baseTable = mock(BaseTable.class);
-    TableOperations ops = mock(TableOperations.class);
-    FileIO fileIO = mock(FileIO.class);
     TableMetadata metadata =
-        TableMetadata.newTableMetadata(
-            new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
-            PartitionSpec.unpartitioned(),
-            SortOrder.unsorted(),
-            "s3://bucket/db/tbl",
-            Collections.emptyMap());
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    "s3.session-token",
+                    "token",
+                    "s3.session-token-expires-at-ms",
+                    "123",
+                    "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"))
+            .build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
 
-    when(catalog.loadTable(ident)).thenReturn(baseTable);
-    when(baseTable.operations()).thenReturn(ops);
-    when(ops.current()).thenReturn(metadata);
-    when(baseTable.io()).thenReturn(fileIO);
-    when(fileIO.properties())
-        .thenReturn(
-            ImmutableMap.of(
-                "s3.session-token",
-                "token",
-                "s3.session-token-expires-at-ms",
-                "123",
-                "client.refresh-credentials-endpoint",
-                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog catalog = mock(RESTCatalog.class);
+      when(catalog.name()).thenReturn("upstream");
+      when(catalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
 
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
 
-    LoadTableResponse response = wrapper.loadTable(ident, false, CredentialPrivilege.READ);
+      LoadTableResponse response = wrapper.loadTable(ident, true, CredentialPrivilege.READ);
 
-    Assertions.assertEquals(
-        "v1/irc1/namespaces/db/tables/tbl/credentials",
-        response.config().get("client.refresh-credentials-endpoint"));
-    Assertions.assertEquals("token", response.config().get("s3.session-token"));
+      Assertions.assertEquals(
+          "v1/irc1/namespaces/db/tables/tbl/credentials",
+          response.config().get("client.refresh-credentials-endpoint"));
+      Assertions.assertEquals("token", response.config().get("s3.session-token"));
+    } finally {
+      server.stop(0);
+    }
   }
 
   @Test
-  void testLoadTableStorageCreds() {
+  void testLoadTableStorageCreds() throws Exception {
     TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tbl");
-    RESTCatalog catalog = mock(RESTCatalog.class);
-    BaseTable baseTable = mock(BaseTable.class);
-    TableOperations ops = mock(TableOperations.class);
-    FileIO fileIO =
-        mock(FileIO.class, withSettings().extraInterfaces(SupportsStorageCredentials.class));
-    SupportsStorageCredentials storageCredentialsFileIO = (SupportsStorageCredentials) fileIO;
     TableMetadata metadata =
-        TableMetadata.newTableMetadata(
-            new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
-            PartitionSpec.unpartitioned(),
-            SortOrder.unsorted(),
-            "s3://bucket/db/tbl",
-            Collections.emptyMap());
-
-    StorageCredential upstreamCredential =
-        StorageCredential.create(
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    Credential upstreamCredential =
+        IcebergRESTUtils.toRESTCredential(
             "s3://bucket/db/tbl/",
             ImmutableMap.of(
                 "s3.access-key-id",
@@ -817,33 +1336,61 @@ public class TestCatalogWrapperForREST {
                 "123",
                 "client.refresh-credentials-endpoint",
                 "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addCredential(upstreamCredential)
+            .build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
 
-    when(catalog.loadTable(ident)).thenReturn(baseTable);
-    when(baseTable.operations()).thenReturn(ops);
-    when(ops.current()).thenReturn(metadata);
-    when(baseTable.io()).thenReturn(fileIO);
-    when(fileIO.properties()).thenReturn(Collections.emptyMap());
-    when(storageCredentialsFileIO.credentials()).thenReturn(List.of(upstreamCredential));
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog catalog = mock(RESTCatalog.class);
+      when(catalog.name()).thenReturn("upstream");
+      when(catalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
 
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
 
-    LoadTableResponse response = wrapper.loadTable(ident, false, CredentialPrivilege.READ);
+      LoadTableResponse response = wrapper.loadTable(ident, true, CredentialPrivilege.READ);
 
-    Assertions.assertEquals(1, response.credentials().size());
-    Credential credential = response.credentials().get(0);
-    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
-    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
-    Assertions.assertEquals(
-        "v1/irc1/namespaces/db/tables/tbl/credentials",
-        credential.config().get("client.refresh-credentials-endpoint"));
-    Assertions.assertFalse(response.config().containsKey("client.refresh-credentials-endpoint"));
+      Assertions.assertEquals(1, response.credentials().size());
+      Credential credential = response.credentials().get(0);
+      Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+      Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+      Assertions.assertEquals(
+          "v1/irc1/namespaces/db/tables/tbl/credentials",
+          credential.config().get("client.refresh-credentials-endpoint"));
+      Assertions.assertFalse(response.config().containsKey("client.refresh-credentials-endpoint"));
+    } finally {
+      server.stop(0);
+    }
   }
 
   @Test
@@ -932,86 +1479,165 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testFederatedRegisterTableIncludesFileIo() {
-    RESTCatalog catalog = mock(RESTCatalog.class);
-    BaseTable table = mock(BaseTable.class);
-    TableOperations ops = mock(TableOperations.class);
-    FileIO fileIO = mock(FileIO.class);
-    TableIdentifier ident = TableIdentifier.of("db", "tbl");
-    when(catalog.registerTable(any(TableIdentifier.class), anyString(), anyBoolean()))
-        .thenReturn(table);
-    when(catalog.loadTable(ident)).thenReturn(table);
-    when(table.operations()).thenReturn(ops);
-    when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
-    when(table.io()).thenReturn(fileIO);
-    when(fileIO.properties())
-        .thenReturn(
-            ImmutableMap.of(
-                IcebergConstants.IO_IMPL,
-                "org.apache.iceberg.aws.s3.S3FileIO",
-                IcebergConstants.ICEBERG_S3_ENDPOINT,
-                "http://localhost:9000"));
-
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
-
-    RegisterTableRequest request =
-        ImmutableRegisterTableRequest.builder()
-            .name("tbl")
-            .metadataLocation("s3://bucket/warehouse/tbl/metadata/v1.metadata.json")
+  void testFederatedRegisterTableIncludesRemoteConfig() throws Exception {
+    Namespace namespace = Namespace.of("db");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    IcebergConstants.IO_IMPL,
+                    "org.apache.iceberg.aws.s3.S3FileIO",
+                    IcebergConstants.ICEBERG_S3_ENDPOINT,
+                    "http://localhost:9000"))
             .build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
 
-    LoadTableResponse response = wrapper.registerTable(Namespace.of("db"), request, false);
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog catalog = mock(RESTCatalog.class);
+      when(catalog.name()).thenReturn("upstream");
+      when(catalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
 
-    verify(catalog).registerTable(ident, request.metadataLocation(), false);
-    verify(catalog).loadTable(ident);
-    Assertions.assertEquals(
-        "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
-    Assertions.assertEquals(
-        "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+      RegisterTableRequest request =
+          ImmutableRegisterTableRequest.builder()
+              .name("tbl")
+              .metadataLocation("s3://bucket/warehouse/tbl/metadata/v1.metadata.json")
+              .build();
+
+      LoadTableResponse response = wrapper.registerTable(namespace, request, false);
+
+      Assertions.assertEquals("/v1/upstream/namespaces/db/register", requestPath.get());
+      Assertions.assertEquals("POST", requestMethod.get());
+      Assertions.assertNull(accessDelegationHeader.get());
+      Assertions.assertEquals(
+          "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
+      Assertions.assertEquals(
+          "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+    } finally {
+      server.stop(0);
+    }
   }
 
   @Test
-  void testFederatedRegisterTableOverwrite() {
-    RESTCatalog catalog = mock(RESTCatalog.class);
-    BaseTable table = mock(BaseTable.class);
-    TableOperations ops = mock(TableOperations.class);
-    FileIO fileIO = mock(FileIO.class);
-    TableIdentifier ident = TableIdentifier.of("db", "tbl");
-    when(catalog.registerTable(any(TableIdentifier.class), anyString(), anyBoolean()))
-        .thenReturn(table);
-    when(catalog.loadTable(ident)).thenReturn(table);
-    when(table.operations()).thenReturn(ops);
-    when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
-    when(table.io()).thenReturn(fileIO);
-    when(fileIO.properties()).thenReturn(ImmutableMap.of());
+  void testFederatedRegisterTableOverwrite() throws Exception {
+    Namespace namespace = Namespace.of("db");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    LoadTableResponse upstreamResponse =
+        LoadTableResponse.builder().withTableMetadata(metadata).build();
+    String upstreamJson = LoadTableResponseParser.toJson(upstreamResponse);
 
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog catalog = mock(RESTCatalog.class);
+      when(catalog.name()).thenReturn("upstream");
+      when(catalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
 
-    RegisterTableRequest request =
-        ImmutableRegisterTableRequest.builder()
-            .name("tbl")
-            .metadataLocation("s3://bucket/warehouse/tbl/metadata/v2.metadata.json")
-            .overwrite(true)
-            .build();
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
 
-    wrapper.registerTable(Namespace.of("db"), request, false);
+      RegisterTableRequest request =
+          ImmutableRegisterTableRequest.builder()
+              .name("tbl")
+              .metadataLocation("s3://bucket/warehouse/tbl/metadata/v2.metadata.json")
+              .overwrite(true)
+              .build();
 
-    verify(catalog).registerTable(ident, request.metadataLocation(), true);
-    verify(catalog).loadTable(ident);
+      wrapper.registerTable(namespace, request, false);
+
+      RegisterTableRequest forwarded =
+          IcebergObjectMapper.getInstance()
+              .readValue(requestBody.get(), RegisterTableRequest.class);
+      Assertions.assertTrue(forwarded.overwrite());
+      Assertions.assertEquals(
+          "s3://bucket/warehouse/tbl/metadata/v2.metadata.json", forwarded.metadataLocation());
+    } finally {
+      server.stop(0);
+    }
   }
 
   @Test
@@ -1030,102 +1656,6 @@ public class TestCatalogWrapperForREST {
     } finally {
       CONSTRUCTION_IN_PROGRESS.set(false);
     }
-  }
-
-  @Test
-  void testStageCreateWithLocationIncludesFileIo() throws Exception {
-    RESTCatalog catalog = mock(RESTCatalog.class);
-    Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
-    Transaction transaction = mock(Transaction.class);
-    Table table = mock(Table.class);
-    FileIO fileIO = mock(FileIO.class);
-    when(catalog.buildTable(any(TableIdentifier.class), any())).thenReturn(tableBuilder);
-    when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
-    when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
-    when(tableBuilder.withProperties(anyMap())).thenReturn(tableBuilder);
-    when(tableBuilder.withLocation("s3://bucket/warehouse/table")).thenReturn(tableBuilder);
-    when(tableBuilder.createTransaction()).thenReturn(transaction);
-    when(transaction.table()).thenReturn(table);
-    when(table.io()).thenReturn(fileIO);
-    when(table.location()).thenReturn("s3://bucket/warehouse/table");
-    when(fileIO.properties())
-        .thenReturn(
-            ImmutableMap.of(
-                IcebergConstants.IO_IMPL,
-                "org.apache.iceberg.aws.s3.S3FileIO",
-                IcebergConstants.ICEBERG_S3_ENDPOINT,
-                "http://localhost:9000"));
-
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
-
-    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
-    CreateTableRequest request =
-        CreateTableRequest.builder()
-            .withName("tbl")
-            .withSchema(schema)
-            .withLocation("s3://bucket/warehouse/table")
-            .stageCreate()
-            .build();
-
-    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false);
-
-    Assertions.assertEquals(
-        "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
-    Assertions.assertEquals(
-        "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
-    verify(tableBuilder).withLocation("s3://bucket/warehouse/table");
-  }
-
-  @Test
-  void testStageCreateNullLocationSkipsWithLocation() {
-    RESTCatalog catalog = mock(RESTCatalog.class);
-    Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
-    Transaction transaction = mock(Transaction.class);
-    Table table = mock(Table.class);
-    FileIO fileIO = mock(FileIO.class);
-    when(catalog.buildTable(any(TableIdentifier.class), any())).thenReturn(tableBuilder);
-    when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
-    when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
-    when(tableBuilder.withProperties(anyMap())).thenReturn(tableBuilder);
-    when(tableBuilder.createTransaction()).thenReturn(transaction);
-    when(transaction.table()).thenReturn(table);
-    when(table.io()).thenReturn(fileIO);
-    when(table.location()).thenReturn("s3://bucket/warehouse/default-location");
-    when(fileIO.properties())
-        .thenReturn(
-            ImmutableMap.of(
-                IcebergConstants.IO_IMPL,
-                "org.apache.iceberg.aws.s3.S3FileIO",
-                IcebergConstants.ICEBERG_S3_ENDPOINT,
-                "http://localhost:9000"));
-
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
-
-    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
-    CreateTableRequest request =
-        CreateTableRequest.builder().withName("tbl").withSchema(schema).stageCreate().build();
-
-    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false);
-
-    Assertions.assertEquals(
-        "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
-    Assertions.assertEquals(
-        "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
-    verify(tableBuilder, never()).withLocation(any());
   }
 
   @Test
@@ -1555,8 +2085,8 @@ public class TestCatalogWrapperForREST {
     }
   }
 
-  // Extends FederatedCatalogWrapper so table operations route through the federation-aware
-  // *Internal paths (FileIO extraction) against the injected catalog.
+  // Extends FederatedCatalogWrapper so table operations use the federation REST path against
+  // the injected catalog's URI and properties.
   private static class StaticCatalogWrapperForREST extends FederatedCatalogWrapper {
     private final Catalog catalog;
 

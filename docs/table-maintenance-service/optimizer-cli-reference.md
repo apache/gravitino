@@ -31,7 +31,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 
 | Option | Meaning | Used by |
 | --- | --- | --- |
-| `--identifiers` | Comma-separated identifiers. Table format supports `catalog.schema.table` (or `schema.table` when default catalog is configured). | Most commands |
+| `--identifiers` | Comma-separated identifiers. See [Identifier Rules](#identifier-rules) for command-specific formats. | All commands |
 | `--strategy-name` | Policy name to evaluate, for example `iceberg_compaction_default`. | `submit-strategy-jobs` |
 | `--dry-run` | Preview mode. Prints recommendations or job configs without submitting jobs. | `submit-strategy-jobs`, `submit-update-stats-job` |
 | `--limit` | Maximum number of strategy jobs to process. Must be `> 0`. | `submit-strategy-jobs` |
@@ -79,7 +79,10 @@ job scopes with multiple metric/statistic fields:
 ## Identifier Rules
 
 - Table and partition records: `catalog.schema.table`
-- If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted
+- If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted by
+  `submit-strategy-jobs`, `update-statistics`, `monitor-metrics`, `list-table-metrics`, and
+  `submit-update-stats-job`
+- `append-metrics` accepts both table and job identifiers, so it does not apply the default catalog
 - Job records: parsed as a regular Gravitino `NameIdentifier`
 
 ## CLI Workflow Examples
@@ -234,22 +237,156 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Four job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, and consolidates the manifests left behind.
+The following Iceberg job templates ship with the service. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
 | Job template                          | What it does                             |
 |---------------------------------------|-------------------------------------------|
 | `builtin-iceberg-update-stats`        | Collects file statistics and metrics      |
 | `builtin-iceberg-rewrite-data-files`  | Compacts small data files                 |
 | `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
+| `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
 | `builtin-iceberg-rewrite-manifests`   | Consolidates small manifest files         |
+| `builtin-iceberg-update-manifest-stats` | Collects complete per-spec manifest maps |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
+
+These templates set Iceberg Spark session and catalog classes, but they do not list an Iceberg Spark
+runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded JAR, so the version
+that runs with your Spark cluster is yours to supply. Provide a matching
+`iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
+commonly through `spark.jars` in `spark_conf`, or by installing it into `SPARK_HOME`. Align the
+artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used
+in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`.
+Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
+Iceberg support.
+
+`jobConf` only needs the required keys below. Optional keys fall back to the template default when
+left out, and a submission that misses a required key is rejected with an error that lists the
+missing keys. An empty string is a value, not an omission: it overrides the default and means
+"not set" to these jobs.
+
+| Job template                         | Required keys                                                                           | Optional keys and defaults                                                                                         |
+|--------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (`local[*]`), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
+| `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
+| `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
+| `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
+| `builtin-iceberg-remove-orphan-files` | —                                                                                       | `older_than` (empty), `location` (empty), `dry_run` (`false`)                                                      |
+| `builtin-iceberg-rewrite-manifests`   | —                                                                                       | `use_caching` (empty), `spec_id` (empty)                                                                           |
+
+`where_clause` has no default on purpose: an empty where clause compacts every data file in the
+table, so it must be asked for explicitly.
 
 ## Update Statistics
 
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
 
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
+
+## Update Manifest Statistics
+
+`builtin-iceberg-update-manifest-stats` is a separate Spark job that collects two table-level
+statistics, including for partitioned tables:
+
+| Statistic | Object entry for each decimal spec ID |
+| --- | --- |
+| `custom-manifest-number-by-spec` | Long manifest count |
+| `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
+
+The job reads manifest metadata without scanning file statistics. It works after partition
+evolution, including for specs whose partition fields are absent from older files.
+`builtin-iceberg-update-stats` and the `submit-update-stats-job` CLI retain their existing behavior;
+they do not collect manifest statistics. Submit the new template directly through the jobs API.
+
+Each table cycle pins one current snapshot, calls `allManifests` once, and groups data and
+delete manifests by `partitionSpecId`. Every defined spec is included. A spec with no manifests,
+including a table without a snapshot, produces count `0` and average `0.0`.
+The job also publishes `custom-manifest-snapshot-id` in the same update (`-1` without a snapshot).
+Snapshot IDs identify measurements; they are not monotonically increasing version numbers.
+
+The template accepts `catalog_name`, `table_identifier`, `updater_options`, and optional
+`coordination_directory` and `spark_conf`, alongside the standard Spark template settings. There is no `spec_id` filter:
+collection always replaces the complete maps for the table.
+`updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
+a `statistics_updater` implementing the existing table statistics update operation.
+For example:
+
+```bash
+curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jobTemplateName": "builtin-iceberg-update-manifest-stats",
+    "jobConf": {
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
+      "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+      "spark_master": "local[2]",
+      "spark_executor_instances": "1",
+      "spark_executor_cores": "1",
+      "spark_executor_memory": "1g",
+      "spark_driver_memory": "1g",
+      "catalog_type": "rest",
+      "catalog_uri": "http://localhost:9001/iceberg",
+      "warehouse_location": ""
+    }
+  }'
+```
+
+For example, one collection can produce complete maps `{"0": 620, "1": 120}` and
+`{"0": 10485760.0, "1": 4194304.0}`. The collector owns both statistic names and publishes
+them together with the snapshot ID in one existing PUT/update call. Old map entries are
+replaced, not merged. Other statistic names are unchanged. No PATCH or merge API is needed.
+
+By default, `coordination_directory` is omitted or blank and publications use last-write-wins
+semantics. Each update contains the complete maps and snapshot ID; a concurrent older collection
+may overwrite newer measurements. Failed jobs can simply be rerun, with no lock files or recovery.
+Consumers requiring fresh statistics must compare `custom-manifest-snapshot-id` with the table's
+current snapshot ID (`-1` if none) and skip/recollect on a mismatch. This is a consumer requirement,
+not a freshness check enforced by this collector. Snapshot IDs must be compared for equality,
+not numerical ordering.
+
+### Optional shared coordination and recovery
+
+For stricter serialization, provision `coordination_directory` (`--coordination-dir` for direct Spark invocation) as an
+existing absolute directory on a shared filesystem that supports durable files and cross-host
+Java/POSIX file locks. Every runner for a destination table must use the same shared directory,
+metalake, and canonical catalog/schema/table names. A host-local directory, object-store mount,
+or filesystem without reliable cross-host locking does not satisfy this requirement.
+All writers of these statistic names must opt into this mode and use the same directory;
+mixing coordinated and uncoordinated writers does not provide serialization.
+
+The job locks a persistent file keyed by metalake and table before refreshing the Iceberg table
+or choosing a snapshot, and holds it through the PUT. Concurrent runs for that table fail;
+other tables can proceed. Snapshot IDs are recorded for provenance, not compared numerically.
+The job forces `gravitino.client.retryTimes=0` for its Gravitino client.
+Custom statistics updaters and any intervening proxies must likewise avoid retrying PUT requests;
+an automatic resend could hide an original request that is still executing. There are no expiring
+leases, automatic retries, scheduling, or cooldowns.
+
+Collection failures can be rerun normally: the lock is released without leaving a recovery marker.
+After collection and immediately before calling the updater, the job durably writes an in-progress
+marker. It clears the marker only after a successful update. A crash after the marker is written or
+an update failure leaves the marker in place, even after the operating system releases the lock.
+The updater interface cannot distinguish a failed request from a request still executing on the
+server, so these failures require recovery. The error reports the recovery file path.
+
+For example, run A sends a PUT and loses its connection while the server is still processing it.
+An immediate rerun B could publish newer measurements before A's delayed PUT overwrites them.
+The file lock prevents concurrent collection across hosts; the marker prevents this overlap after
+an ambiguous failure. Snapshot IDs provide provenance, but the existing PUT does not enforce
+snapshot ordering or fencing. Automatic reruns after ambiguous writes would require server-side
+conditional publication or an equivalent guarantee that the earlier request has ended.
+
+For recovery, stop all runners for that table and verify the previous process has terminated
+and any outstanding Gravitino PUT has completed or been definitively cancelled. While holding
+an exclusive lock on the reported file, truncate it to zero bytes and flush it to durable storage,
+then resume collection. Never delete or replace the file: a new inode can permit two independent
+locks. If the previous PUT outcome cannot be established, leave the marker intact.
+
+Consumers must read both objects from one table-statistics response and use the same chosen
+spec key in each. A missing object or key means collection is required, not zero manifests.
+`IcebergManifestStatistics.fromStatistics` returns an empty result for an incomplete pair.
+Automatic manifest policy triggering is separate follow-up work.
 
 ## Rewrite Data Files
 
@@ -329,7 +466,7 @@ CALL `rest_catalog`.system.expire_snapshots(
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/{job_id}" | jq '.job.state'
-cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-expire-snapshots/{job_id}/stdout.log
+cat /tmp/gravitino/jobs/staging/job-runs/{job_id}/output.log
 ```
 
 A successful run reports its state as `SUCCEEDED` and logs the counts it removed:
@@ -358,7 +495,7 @@ The job calls Iceberg's `rewrite_manifests` stored procedure through Spark SQL.
 
 ### Parameters
 
-`catalog_name` and `table_identifier` are required. The rest are optional.
+`catalog_name` and `table_identifier` are required. For this job, omitted or blank optional argument values use the defaults below; unresolved optional template placeholders are also treated as absent.
 
 | Key                  | Description                                                              | Default                             |
 | -------------------- | ------------------------------------------------------------------------ | ----------------------------------- |
@@ -410,7 +547,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/jobs/runs
 ```
 
-The job builds this statement, including `use_caching` and `spec_id` only when you supply them:
+The request above uses Iceberg defaults. Adding `"use_caching": "false"` and `"spec_id": "2"` to `jobConf` produces:
 
 ```sql
 CALL `rest_catalog`.system.rewrite_manifests(
@@ -430,13 +567,10 @@ cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-manifests/{job_id}/
 A successful run reports its state as `SUCCEEDED` and logs how many manifests it replaced:
 
 ```text
-Rewrite Manifests Results:
-  Rewritten manifests: 24
-  Added manifests: 2
+Rewrite Manifests Results: Rewritten manifests: 24, Added manifests: 2
 ```
 
 Both counts at zero indicate a successful no-op, for example when no manifests for the selected spec need rewriting. Other specs remain unchanged.
-
 
 ## Related
 
@@ -444,3 +578,66 @@ Both counts at zero indicate a successful no-op, for example when no manifests f
 - [Configuration](./optimizer-configuration.md) for the three configuration layers
 - [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in strategy
 - [Manage Jobs](../manage-jobs-in-gravitino.md) for job status and templates
+
+## Remove Orphan Files
+
+`builtin-iceberg-remove-orphan-files` runs Iceberg's `remove_orphan_files` Spark
+procedure. It removes files in the scan location that are no longer referenced
+by table metadata. This job is available for direct submission; policy-driven
+scheduling is a separate feature.
+
+| Key                | Description                                                                                    | Default                          |
+| ------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                            | Required                         |
+| `table_identifier` | Table identifier within that catalog, such as `db.sample`                                      | Required                         |
+| `older_than`       | Cutoff timestamp in the Spark session time zone; explicit values must be at least 24 hours old | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                                   | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                                  | `false`                          |
+| `spark_conf`       | JSON map of custom Spark configuration                                                         | None                             |
+
+The template uses the same Spark and catalog connection settings as the other
+Iceberg jobs. Supply every template placeholder in `jobConf`: use empty strings
+for `older_than` and `location` to keep their defaults, an explicit boolean string
+for `dry_run`, and `{}` for `spark_conf` when no overrides are needed.
+For example, submit a preview using:
+
+```json
+{
+  "jobTemplateName": "builtin-iceberg-remove-orphan-files",
+  "jobConf": {
+    "catalog_name": "rest_catalog",
+    "table_identifier": "db.t1",
+    "older_than": "",
+    "location": "",
+    "dry_run": "true",
+    "spark_conf": "{}",
+    "spark_master": "local[2]",
+    "spark_executor_instances": "1",
+    "spark_executor_cores": "1",
+    "spark_executor_memory": "1g",
+    "spark_driver_memory": "1g",
+    "catalog_type": "rest",
+    "catalog_uri": "http://localhost:9001/iceberg",
+    "warehouse_location": ""
+  }
+}
+```
+
+POST this body to `/api/metalakes/{metalake}/jobs`. Review the candidate paths in
+the job logs before resubmitting with `dry_run: "false"`. A successful run also
+logs the candidate count. CLI equivalents are `--catalog`, `--table`,
+`--older-than`, `--location`, `--dry-run true|false`, and `--spark-conf`.
+
+The job validates the location before executing the procedure. A custom
+location must be the table's own location or a descendant, on the same storage
+scheme and authority. Relative paths, ambiguous percent-encoded paths, query
+strings, fragments, and symlinks in the scan directory are rejected. Filesystem
+validation errors fail the job before deletion. Keep the scan directory free of
+concurrent location or symlink changes during cleanup.
+
+Retain the three-day default unless a longer interval is needed for your writers.
+Files staged by active writers can appear to be orphaned. Iceberg 1.11's SQL
+procedure rejects explicit cutoffs less than 24 hours old, including a cutoff of
+"now", even for dry runs. This job preserves that safeguard and does not enable
+Iceberg's testing override. Spark's `spark.sql.parser.escapedStringLiterals` must
+remain `false` for procedure arguments to be interpreted correctly.

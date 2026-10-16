@@ -66,6 +66,11 @@ public class UserMetaSQLProviderFactory {
     return getProvider().selectUserMetaByIdForUpdate(userId);
   }
 
+  /** Returns SQL that selects an active user by ID and locks it for shared access. */
+  public static String selectUserMetaByIdForShare(@Param("userId") Long userId) {
+    return getProvider().selectUserMetaByIdForShare(userId);
+  }
+
   public static String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return getProvider().insertUserMeta(userPO);
   }

@@ -123,10 +123,17 @@ Do not add them to the standalone server configuration.
 | `gravitino.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                        | `30000`                                                                      | No       |
 | `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                          | `131072`                                                                     | No       |
 | `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                         | `131072`                                                                     | No       |
+| `gravitino.iceberg-rest.includeErrorStackTrace`  | Whether error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. | `true`                                                                       | No       |
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                              | (none)                                                                       | No       |
+| `gravitino.iceberg-rest.advertised-uri`          | The public endpoint reported to clients that discover the service through the Gravitino server. Must be an absolute `http`/`https` URI with a host and no query or fragment.                  | (none)                                                                       | No       |
 
 The filter in `customFilters` should be a standard javax servlet filter.
 Specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
+
+Set `gravitino.iceberg-rest.advertised-uri` when clients such as the Trino connector reach the service through a reverse proxy whose scheme, host, port or path differs from the listener's, for example `https://iceberg.example.com/iceberg/`.
+An explicit port must be in the range 1-65535; an invalid value makes discovery requests fail instead of advertising an unreachable endpoint.
+It only affects the advertised endpoint, not the listener; when unset, the endpoint is derived from `host`, `httpPort`/`httpsPort` and `enableHttps`.
+This setting applies only to the auxiliary service.
 
 #### Asynchronous Table Purge
 
@@ -577,16 +584,17 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_na
 
 Supports using static GCS credential file or generating GCS token to access GCS data.
 
-| Configuration item               | Description                                                                                                                  | Default value                           | Required |
-|----------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
-| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| Configuration item                                | Description                                                                                                                  | Default value                           | Required |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `gravitino.iceberg-rest.gcs-service-account-file` | Path of the GCS service account JSON file. Used for server-side FileIO and for `gcs-token` credential vending.               | GCS Application default credential.     | No       |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
 Refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 :::note
-Ensure that the credential file is accessible by the Gravitino server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
+When `gcs-service-account-file` is set, Gravitino loads it at catalog initialization and injects Iceberg `gcs.oauth2.token` for FileIO. The IRC catalog cache evicts that catalog before the token expires so the next request recreates the catalog and mints a fresh token. If unset, use Application Default Credentials (for example GCE metadata or `GOOGLE_APPLICATION_CREDENTIALS`).
 :::
 
 :::info
@@ -721,11 +729,11 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 
 The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized. It performs no I/O and has no configurable timeout.
 
-| Endpoint                    | Description                                                                                                                | HTTP status |
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /iceberg/health/live`  | Liveness probe. Returns 200 as long as the HTTP server thread can respond.                                                 | 200         |
-| `GET /iceberg/health/ready` | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
-| `GET /iceberg/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
+| Endpoint                    | Description                                                                                                               | HTTP status |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /iceberg/health/live`  | Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed; 503 after an observed OOM.     | 200 / 503   |
+| `GET /iceberg/health/ready` | Readiness probe. Returns 200 when the catalog wrapper manager is initialized and no OOM has been observed; 503 otherwise. | 200 / 503   |
+| `GET /iceberg/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                             | 200 / 503   |
 
 Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
 
@@ -737,6 +745,8 @@ Root-level aliases are also available for global traffic managers that require p
 | `GET /health.html`  | `GET /iceberg/health`       |
 
 **Response format:**
+
+After an observed `OutOfMemoryError`, all health endpoints and root aliases return 503 with a `jvm` failure until restart. See [out-of-memory failures](health-and-readiness.md#out-of-memory-failures) for detection scope.
 
 All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. `status` is `UP` or `DOWN`. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
 

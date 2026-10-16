@@ -50,6 +50,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -147,7 +148,9 @@ public class TestSchemaHookDispatcher {
     Schema mockSchema = mock(Schema.class);
     when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
+    SchemaDispatcher normalizedDispatcher =
+        new SchemaNormalizeDispatcher(hookDispatcher, mockCatalogManager);
+    normalizedDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
     List<MetadataObject> owned = captureOwnedObjects();
     Assertions.assertEquals(1, owned.size(), "A flat schema only assigns ownership to the leaf");
@@ -211,6 +214,28 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
+  public void testDropSchemaKeepsPrivilegesWhenExternalDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      any(NameIdentifier.class), any(Entity.EntityType.class)))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hookDispatcher.dropSchema(ident, false));
+
+      // Nothing was dropped, so the schema that is still registered keeps its privileges.
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  @Test
   public void testDropSchemaRemovesPrivileges() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(true);
@@ -232,6 +257,23 @@ public class TestSchemaHookDispatcher {
           () ->
               AuthorizationUtils.authorizationPluginRemovePrivileges(
                   eq(ident), eq(Entity.EntityType.SCHEMA), eq(ImmutableList.of("/test"))));
+    }
+  }
+
+  @Test
+  public void testDropSchemaDoesNotRemovePrivilegesWhenSchemaDoesNotExist() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      boolean dropped = hookDispatcher.dropSchema(ident, false);
+
+      Assertions.assertFalse(dropped);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.SCHEMA, null),
+          Mockito.never());
     }
   }
 

@@ -53,11 +53,15 @@ public interface IdpUserMetaMapper {
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "updateIdpUserPassword")
   Integer updateIdpUserPassword(
-      @Param("username") String username, @Param("passwordHash") String passwordHash);
+      @Param("username") String username,
+      @Param("passwordHash") String passwordHash,
+      @Param("auditInfo") String auditInfo);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "updateIdpUserEnabled")
   Integer updateIdpUserEnabled(
-      @Param("username") String username, @Param("enabled") boolean enabled);
+      @Param("username") String username,
+      @Param("enabled") boolean enabled,
+      @Param("auditInfo") String auditInfo);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")
   Integer softDeleteIdpUser(@Param("username") String username);

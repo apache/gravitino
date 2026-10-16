@@ -284,6 +284,13 @@ public class MetadataObjectUtil {
         check(env.internalViewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
         break;
 
+      case SEMANTIC_MODEL:
+        NameIdentifierUtil.checkSemanticModel(identifier);
+        check(
+            env.internalSemanticModelDispatcher().semanticModelExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
       case ROLE:
         AuthorizationUtils.checkRole(identifier);
         try {
@@ -314,7 +321,7 @@ public class MetadataObjectUtil {
       case JOB:
         NameIdentifierUtil.checkJob(identifier);
         try {
-          env.internalJobOperationDispatcher().getJob(metalake, object.fullName());
+          env.internalJobOperationDispatcher().getJob(metalake, object.fullName(), false);
         } catch (NoSuchJobException e) {
           throw exceptionToThrowSupplier.get();
         }

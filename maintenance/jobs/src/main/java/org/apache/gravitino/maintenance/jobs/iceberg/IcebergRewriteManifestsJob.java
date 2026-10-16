@@ -20,8 +20,10 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
@@ -39,7 +41,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-manifests";
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -90,91 +92,37 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * jobConf.put("use_caching", "false");
    * metalake.runJob("builtin-iceberg-rewrite-manifests", jobConf);
    * }</pre>
+   *
+   * @param args named job arguments
    */
   public static void main(String[] args) {
-    if (args.length < 4) {
-      printUsage();
-      System.exit(1);
+    int exitCode = run(args);
+    if (exitCode != 0) {
+      System.exit(exitCode);
     }
+  }
 
-    // Parse named arguments
-    Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
-
-    // Validate required arguments
-    String catalogName = argMap.get("catalog");
-    String tableIdentifier = argMap.get("table");
-
-    if (catalogName == null || tableIdentifier == null) {
-      System.err.println("Error: --catalog and --table are required arguments");
-      printUsage();
-      System.exit(1);
-    }
-
-    // Optional arguments. Unresolved template placeholders mean the caller left the parameter out,
-    // so they are dropped rather than forwarded to Iceberg as literal values.
-    String useCaching = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("use-caching"));
-    String specId = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spec-id"));
-    String sparkConfJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spark-conf"));
-
-    // Validate optional arguments if provided
+  static int run(String[] args) {
     try {
-      validateUseCaching(useCaching);
-      validateSpecId(specId);
-    } catch (IllegalArgumentException e) {
-      System.err.println("Error: " + e.getMessage());
-      printUsage();
-      System.exit(1);
-    }
-
-    // Build Spark session with custom configs if provided
-    SparkSession.Builder sparkBuilder =
-        SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
-
-    // Apply custom Spark configurations if provided
-    if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
-      try {
-        Map<String, String> customConfigs = IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
-        for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
-          sparkBuilder.config(entry.getKey(), entry.getValue());
-        }
-        System.out.println("Applied custom Spark configurations: " + customConfigs);
-      } catch (IllegalArgumentException e) {
-        System.err.println("Error: " + e.getMessage());
-        printUsage();
-        System.exit(1);
-      }
-    }
-
-    SparkSession spark = sparkBuilder.getOrCreate();
-
-    try {
-      // Build the procedure call SQL
-      String sql = buildProcedureCall(catalogName, tableIdentifier, useCaching, specId);
-
-      System.out.println("Executing Iceberg rewrite_manifests procedure: " + sql);
-
-      // Execute the procedure
-      List<Row> results = spark.sql(sql).collectAsList();
-
-      // Print results. The procedure output columns are numeric, but their exact width is an
-      // Iceberg implementation detail, so read them as Number rather than a fixed primitive.
-      if (!results.isEmpty()) {
-        Row result = results.get(0);
-        System.out.printf(
-            "Rewrite Manifests Results:%n"
-                + "  Rewritten manifests: %d%n"
-                + "  Added manifests: %d%n",
-            ((Number) result.get(0)).longValue(), ((Number) result.get(1)).longValue());
-      }
-
-      System.out.println("Rewrite manifests job completed successfully");
+      execute(args);
+      return 0;
     } catch (Exception e) {
-      System.err.println("Error executing rewrite manifests job: " + e.getMessage());
-      e.printStackTrace();
-      System.exit(1);
-    } finally {
-      spark.stop();
+      System.err.println("Error rewriting manifests: " + e.getMessage());
+      printUsage();
+      return 1;
     }
+  }
+
+  static Map<String, String> parseArguments(String[] args) {
+    Map<String, String> parsed =
+        IcebergJobUtils.parseArguments(
+            args,
+            new HashSet<>(
+                Arrays.asList("catalog", "table", "use-caching", "spec-id", "spark-conf")),
+            new HashSet<>(Arrays.asList("catalog", "table")));
+    validateUseCaching(parsed.get("use-caching"));
+    validateSpecId(parsed.get("spec-id"));
+    return parsed;
   }
 
   /**
@@ -187,7 +135,10 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @return SQL CALL statement
    */
   static String buildProcedureCall(
-      String catalogName, String tableIdentifier, String useCaching, String specId) {
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String useCaching,
+      @Nullable String specId) {
     StringBuilder sql = new StringBuilder();
     sql.append("CALL ")
         .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
@@ -215,7 +166,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @param useCaching the use-caching value to validate
    * @throws IllegalArgumentException if the value is neither "true" nor "false"
    */
-  static void validateUseCaching(String useCaching) {
+  static void validateUseCaching(@Nullable String useCaching) {
     if (useCaching == null || useCaching.isEmpty()) {
       return; // use-caching is optional
     }
@@ -235,7 +186,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    * @param specId the spec-id value to validate
    * @throws IllegalArgumentException if the value is not a non-negative integer
    */
-  static void validateSpecId(String specId) {
+  static void validateSpecId(@Nullable String specId) {
     if (specId == null || specId.isEmpty()) {
       return; // spec-id is optional
     }
@@ -251,35 +202,38 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
     }
   }
 
-  /** Print usage information. */
+  private static void execute(String[] args) {
+    Map<String, String> argMap = parseArguments(args);
+    String sql =
+        buildProcedureCall(
+            argMap.get("catalog"),
+            argMap.get("table"),
+            argMap.get("use-caching"),
+            argMap.get("spec-id"));
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(argMap.get("spark-conf"));
+    SparkSession.Builder builder =
+        SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
+    configs.forEach(builder::config);
+
+    try (SparkSession spark = builder.getOrCreate()) {
+      IcebergJobUtils.requireIcebergSparkRuntime();
+      System.out.println("Executing Iceberg rewrite_manifests procedure: " + sql);
+      List<Row> results = spark.sql(sql).collectAsList();
+      if (!results.isEmpty()) {
+        Row result = results.get(0);
+        System.out.printf(
+            "Rewrite Manifests Results: Rewritten manifests: %d, Added manifests: %d%n",
+            ((Number) result.get(0)).longValue(), ((Number) result.get(1)).longValue());
+      }
+      System.out.println("Rewrite manifests job completed successfully");
+    }
+  }
+
   private static void printUsage() {
     System.err.println(
-        "Usage: IcebergRewriteManifestsJob [OPTIONS]\n"
-            + "\n"
-            + "Required Options:\n"
-            + "  --catalog <name>          Iceberg catalog name registered in Spark\n"
-            + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
-            + "\n"
-            + "Optional Options:\n"
-            + "  --use-caching <boolean>   Cache table metadata in Spark while rewriting\n"
-            + "                              Must be either 'true' or 'false'\n"
-            + "                              Default: installed Iceberg version's default\n"
-            + "  --spec-id <int>           Rewrite manifests belonging to this partition spec ID\n"
-            + "                              Must be a non-negative integer\n"
-            + "                              Default: the table's current partition spec\n"
-            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
-            + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
-            + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
-            + "\n"
-            + "Examples:\n"
-            + "  # Basic rewrite with Iceberg defaults\n"
-            + "  --catalog iceberg_prod --table db.sample\n"
-            + "\n"
-            + "  # Rewrite without caching table metadata\n"
-            + "  --catalog iceberg_prod --table db.sample --use-caching false\n"
-            + "\n"
-            + "  # Consolidate manifests belonging to existing partition spec 2\n"
-            + "  --catalog iceberg_prod --table db.sample --spec-id 2");
+        "Usage: IcebergRewriteManifestsJob --catalog <catalog_name> --table <table_identifier>"
+            + " [--use-caching <true|false>] [--spec-id <non-negative integer>]"
+            + " [--spark-conf <json>]");
   }
 
   /**
@@ -294,11 +248,11 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
         "--table",
         "{{table_identifier}}",
         "--use-caching",
-        "{{use_caching}}",
+        "{{use_caching:-}}",
         "--spec-id",
-        "{{spec_id}}",
+        "{{spec_id:-}}",
         "--spark-conf",
-        "{{spark_conf}}");
+        "{{spark_conf:-}}");
   }
 
   /**

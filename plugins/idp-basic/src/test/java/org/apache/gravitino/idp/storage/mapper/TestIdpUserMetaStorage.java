@@ -50,6 +50,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash-a")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -69,6 +70,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash-a")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -80,6 +82,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("dev")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -88,6 +91,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
         IdpGroupPO.builder()
             .withGroupId(2L)
             .withGroupName("ops")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -98,6 +102,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
                 .withId(100L)
                 .withUserId(1L)
                 .withGroupId(1L)
+                .withAuditInfo("{}")
                 .withCurrentVersion(1L)
                 .withLastVersion(0L)
                 .withDeletedAt(0L)
@@ -106,6 +111,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
                 .withId(101L)
                 .withUserId(1L)
                 .withGroupId(2L)
+                .withAuditInfo("{}")
                 .withCurrentVersion(1L)
                 .withLastVersion(0L)
                 .withDeletedAt(0L)
@@ -128,6 +134,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash-a")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -137,6 +144,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(2L)
             .withUsername("bob")
             .withPasswordHash("hash-b")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -160,12 +168,13 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash-a")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
     idpUserMetaMapper.insertIdpUser(oldUserPO);
-    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2", "{}"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(1L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(0L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
@@ -180,16 +189,17 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash-a")
+            .withAuditInfo("{}")
             .withCurrentVersion(3L)
             .withLastVersion(2L)
             .withDeletedAt(0L)
             .build());
 
-    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2", "{}"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(3L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(2L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
-    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2", "{}"));
   }
 
   @ParameterizedTest
@@ -201,6 +211,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("alice")
             .withPasswordHash("hash-a")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -210,7 +221,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals(1, idpUserMetaMapper.softDeleteIdpUser("alice"));
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
     assertEquals(0, idpUserMetaMapper.softDeleteIdpUser("alice"));
-    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
+    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2", "{}"));
     assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
     assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
@@ -224,6 +235,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(1L)
             .withUsername("legacy-user")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(10L)
@@ -233,6 +245,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(2L)
             .withUsername("new-user")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(30L)
@@ -242,6 +255,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withUserId(3L)
             .withUsername("active-user")
             .withPasswordHash("hash")
+            .withAuditInfo("{}")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)

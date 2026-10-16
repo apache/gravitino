@@ -24,6 +24,7 @@ plugins {
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
   compileOnly(project(":common"))
+  compileOnly("software.amazon.awssdk:auth:${libs.versions.awssdk.get()}")
 
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -31,6 +32,7 @@ dependencies {
   implementation(libs.slf4j.api)
 
   testImplementation(project(":common"))
+  testImplementation("software.amazon.awssdk:auth:${libs.versions.awssdk.get()}")
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

@@ -27,8 +27,6 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BOOL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BPCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BYTEA;
-import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.DEFAULT_NUMERIC_PRECISION;
-import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.DEFAULT_NUMERIC_SCALE;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.FLOAT_4;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.FLOAT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_2;
@@ -71,16 +69,10 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(3), TIMESTAMP, 23, null, 3);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(6), TIMESTAMP, 26, null, 6);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), NUMERIC, 10, 2, 0);
-    // Unconstrained NUMERIC (no precision) returns columnSize=0 from JDBC metadata;
-    // mapped to Gravitino's maximum supported decimal as a compatibility tradeoff.
-    checkJdbcTypeToGravitinoType(
-        Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE), NUMERIC, 0, 0, 0);
-    checkJdbcTypeToGravitinoType(
-        Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE),
-        NUMERIC,
-        null,
-        null,
-        0);
+    // Unconstrained NUMERIC (no precision) returns columnSize=0 from JDBC metadata; its precision
+    // and scale vary per row, so it is reported as an external type instead of a decimal.
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of(NUMERIC), NUMERIC, 0, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of(NUMERIC), NUMERIC, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(9, 0), NUMERIC, 9, 0, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(18, 0), NUMERIC, 18, 0, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(20, 0), NUMERIC, 20, 0, 0);
@@ -96,22 +88,35 @@ public class TestPostgreSqlTypeConverter {
   @Test
   public void testArrayType() {
     Type elmentType = Types.IntegerType.get();
-    Type list1 = Types.ListType.of(elmentType, false);
+    Type list1 = Types.ListType.of(elmentType, true);
 
     checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list1);
+    // PostgreSQL array elements are always nullable
     checkJdbcTypeToGravitinoType(list1, JDBC_ARRAY_PREFIX + INT_4, null, null, 0);
 
-    // not support element nullable
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () ->
-            checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, Types.ListType.of(elmentType, true)));
+    // element nullability is not enforced, PostgreSQL cannot declare it either way
+    checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, Types.ListType.of(elmentType, false));
 
     // not support multidimensional
-    Type list2 = Types.ListType.of(list1, false);
+    Type list2 = Types.ListType.of(list1, true);
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list2));
+  }
+
+  @Test
+  public void testConstrainedNumericOutsideDecimalLimits() {
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(39,0)"), NUMERIC, 39, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(1000,0)"), NUMERIC, 1000, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(2,-3)"), NUMERIC, 2, -3, 0);
+    // PostgreSQL JDBC metadata can expose a negative scale as an unsigned 11-bit value.
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(2,-3)"), NUMERIC, 2, 2045, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(3,5)"), NUMERIC, 3, 5, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 38), NUMERIC, 38, 38, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 0), NUMERIC, 38, null, 0);
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      checkGravitinoTypeToJdbcType(declaration, Types.ExternalType.of(declaration));
+    }
   }
 
   @Test

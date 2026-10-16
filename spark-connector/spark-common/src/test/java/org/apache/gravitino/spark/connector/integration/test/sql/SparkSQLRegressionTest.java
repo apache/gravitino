@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The entrypoint to run SparkSQL regression test, you could run it with specific Spark version:
- * ./gradlew :spark-connector:spark-3.4:test --tests
- * "org.apache.gravitino.spark.connector.integration.test.sql.SparkSQLRegressionTest34"
+ * ./gradlew :spark-connector:spark-3.5:test --tests
+ * "org.apache.gravitino.spark.connector.integration.test.sql.SparkSQLRegressionTest35"
  * -PenableSparkSQLITs
  */
 @Tag("gravitino-docker-test")

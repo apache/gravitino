@@ -16,6 +16,9 @@
 # under the License.
 
 import unittest
+from io import BytesIO
+from unittest.mock import patch
+from urllib.error import HTTPError
 
 from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.base import (
@@ -26,8 +29,10 @@ from gravitino.exceptions.base import (
     ForbiddenException,
     IllegalArgumentException,
     IllegalMetadataObjectException,
+    IllegalSemanticModelException,
     IllegalPrivilegeException,
     IllegalRoleException,
+    IllegalStatisticNameException,
     InternalError,
     MetalakeAlreadyExistsException,
     MetalakeNotInUseException,
@@ -41,17 +46,21 @@ from gravitino.exceptions.base import (
     NoSuchRoleException,
     NoSuchGroupException,
     NoSuchSchemaException,
+    NoSuchSemanticModelException,
     NoSuchTableException,
     NoSuchUserException,
     NoSuchViewException,
     NotEmptyException,
     NotFoundException,
     NotInUseException,
+    OptimisticLockException,
     PartitionAlreadyExistsException,
     RESTException,
     RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
+    SemanticModelAlreadyExistsException,
     TableAlreadyExistsException,
+    UnauthorizedException,
     UnsupportedOperationException,
     UserAlreadyExistsException,
     ViewAlreadyExistsException,
@@ -68,6 +77,12 @@ from gravitino.exceptions.handlers.partition_error_handler import (
     PARTITION_ERROR_HANDLER,
 )
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
+from gravitino.exceptions.handlers.statistics_error_handler import (
+    STATISTICS_ERROR_HANDLER,
+)
+from gravitino.exceptions.handlers.semantic_model_error_handler import (
+    SEMANTIC_MODEL_ERROR_HANDLER,
+)
 from gravitino.exceptions.handlers.permission_error_handler import (
     PERMISSION_ERROR_HANDLER,
 )
@@ -76,9 +91,118 @@ from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HAND
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
 from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
+from gravitino.utils.http_client import HTTPClient
 
 
 class TestErrorHandler(unittest.TestCase):
+    def test_http_unauthorized_response(self):
+        body = (
+            b'{"code":1011,"type":"UnauthorizedException",'
+            b'"message":"Authentication failed","stack":null}'
+        )
+        with patch("gravitino.utils.http_client.build_opener") as build_opener:
+            build_opener.return_value.open.side_effect = HTTPError(
+                "http://localhost:8090/api/test",
+                401,
+                "Unauthorized",
+                None,
+                BytesIO(body),
+            )
+            with self.assertRaisesRegex(UnauthorizedException, "Authentication failed"):
+                HTTPClient("http://localhost:8090").get(
+                    "/api/test", error_handler=TABLE_ERROR_HANDLER
+                )
+
+    def test_unauthorized_error_code_across_handlers(self):
+        response = ErrorResponse.from_json(
+            '{"code":1011,"type":"UnauthorizedException",'
+            '"message":"Authentication failed","stack":null}'
+        )
+        generated = ErrorResponse.generate_error_response(
+            UnauthorizedException, "Authentication failed"
+        )
+        self.assertEqual(1011, generated.code())
+
+        for handler in (
+            REST_ERROR_HANDLER,
+            TABLE_ERROR_HANDLER,
+            VIEW_ERROR_HANDLER,
+            PARTITION_ERROR_HANDLER,
+            STATISTICS_ERROR_HANDLER,
+            CATALOG_ERROR_HANDLER,
+        ):
+            with self.subTest(handler=type(handler).__name__):
+                with self.assertRaisesRegex(
+                    UnauthorizedException, "Authentication failed"
+                ):
+                    handler.handle(response)
+
+    def test_unrecognized_error_code_across_specialized_handlers(self):
+        response = ErrorResponse.from_json(
+            '{"code":1999,"type":"FutureServerException",'
+            '"message":"Future server error","stack":null}'
+        )
+        for handler in (
+            TABLE_ERROR_HANDLER,
+            VIEW_ERROR_HANDLER,
+            PARTITION_ERROR_HANDLER,
+            STATISTICS_ERROR_HANDLER,
+        ):
+            with self.subTest(handler=type(handler).__name__):
+                with self.assertRaisesRegex(RESTException, "Future server error"):
+                    handler.handle(response)
+
+    def test_statistics_handler_keeps_specific_errors(self):
+        response = ErrorResponse.from_json(
+            '{"code":1001,"type":"IllegalArgumentException",'
+            '"message":"Invalid statistic","stack":null}'
+        )
+        with self.assertRaisesRegex(IllegalArgumentException, "Invalid statistic"):
+            STATISTICS_ERROR_HANDLER.handle(response)
+
+        specific_response = ErrorResponse.from_json(
+            '{"code":1001,"type":"IllegalStatisticNameException",'
+            '"message":"Invalid statistic name","stack":null}'
+        )
+        with self.assertRaisesRegex(
+            IllegalStatisticNameException, "Invalid statistic name"
+        ):
+            STATISTICS_ERROR_HANDLER.handle(specific_response)
+
+    def test_statistics_handler_forwards_unrecognized_codes(self):
+        for code, exception in ((1011, UnauthorizedException), (1999, RESTException)):
+            with self.subTest(code=code):
+                response = ErrorResponse.from_json(
+                    f'{{"code":{code},"type":"UnexpectedError",'
+                    '"message":"Server error","stack":null}'
+                )
+                with self.assertRaisesRegex(exception, "Server error"):
+                    STATISTICS_ERROR_HANDLER.handle(response)
+
+    def test_optimistic_lock_conflict(self):
+        response = ErrorResponse.from_json(
+            '{"code":1012,"type":"OptimisticLockException",'
+            '"message":"Concurrent update","stack":null}'
+        )
+        generated = ErrorResponse.generate_error_response(
+            OptimisticLockException, "Concurrent update"
+        )
+        self.assertEqual(1012, generated.code())
+
+        for handler in (
+            REST_ERROR_HANDLER,
+            TABLE_ERROR_HANDLER,
+            VIEW_ERROR_HANDLER,
+            PARTITION_ERROR_HANDLER,
+            STATISTICS_ERROR_HANDLER,
+            CATALOG_ERROR_HANDLER,
+        ):
+            with self.subTest(handler=type(handler).__name__):
+                with self.assertRaisesRegex(
+                    OptimisticLockException, "Concurrent update"
+                ):
+                    handler.handle(response)
+
     def test_rest_error_handler(self):
         with self.assertRaises(RESTException):
             REST_ERROR_HANDLER.handle(
@@ -228,6 +352,11 @@ class TestErrorHandler(unittest.TestCase):
                 ErrorResponse.generate_error_response(
                     CatalogAlreadyExistsException, "mock error"
                 )
+            )
+
+        with self.assertRaises(ForbiddenException):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
             )
 
         with self.assertRaises(InternalError):
@@ -785,4 +914,102 @@ class TestErrorHandler(unittest.TestCase):
         with self.assertRaises(NotFoundException):
             PERMISSION_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+    def test_semantic_model_error_handler(self):
+        with self.assertRaises(IllegalSemanticModelException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalSemanticModelException, "mock error"
+                )
+            )
+
+        with self.assertRaises(IllegalArgumentException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchMetalakeException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetalakeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchCatalogException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchCatalogException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSchemaException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSchemaException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSemanticModelException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSemanticModelException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotFoundException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+        with self.assertRaises(SemanticModelAlreadyExistsException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    SemanticModelAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(AlreadyExistsException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    AlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(UnsupportedOperationException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    UnsupportedOperationException, "mock error"
+                )
+            )
+
+        with self.assertRaises(ForbiddenException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
+            )
+
+        with self.assertRaises(CatalogNotInUseException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    CatalogNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotInUseException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotInUseException, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
             )

@@ -54,11 +54,11 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ## Configuration
 
-| Configuration Item                        | Description                                                       | Example                                     |
-|-------------------------------------------|-------------------------------------------------------------------|---------------------------------------------|
-| `gravitino.authenticators`                | Must be `basic`, and must not include `simple`                    | `basic`                                     |
-| `gravitino.server.rest.extensionPackages` | Registers the user and group management endpoints                 | `org.apache.gravitino.idp.web.rest.feature` |
-| `gravitino.authorization.serviceAdmins`   | Comma-separated usernames allowed to manage users and groups      | `admin`                                     |
+| Configuration Item                        | Description                                                          | Example                                     |
+|-------------------------------------------|----------------------------------------------------------------------|---------------------------------------------|
+| `gravitino.authenticators`                | Must be `basic`, and must not include `simple`                       | `basic`                                     |
+| `gravitino.server.rest.extensionPackages` | Registers the user and group management endpoints                    | `org.apache.gravitino.idp.web.rest.feature` |
+| `gravitino.authorization.serviceAdmins`   | Comma-separated usernames allowed to manage all IdP users and groups | `admin`                                     |
 
 The local user store is incompatible with the `simple` authenticator, which is the server default and accepts the username a client supplies without checking a password. Both authenticators claim the same `Basic` authorization header, and the server uses the first one listed that claims it, so listing `simple` ahead of `basic` means passwords are never checked. Replace `simple` rather than adding to it.
 
@@ -68,27 +68,41 @@ The Web UI reads `gravitino.authenticators` from the server and presents a usern
 
 These rules apply to user creation, password changes, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` alike.
 
-| Rule            | Value                                     |
-|-----------------|-------------------------------------------|
-| Username        | Required, and must not contain a colon    |
-| Password length | 12 to 64 characters inclusive             |
+| Rule            | Value                                  |
+|-----------------|----------------------------------------|
+| Username        | Required, and must not contain a colon |
+| Password length | 12 to 64 characters inclusive          |
 
-Passwords are reset by an administrator rather than changed by the user, so a password change request carries the new password only and no current password.
+Passwords may be reset by a service admin or changed by the user for their own account.
+The request carries the new password only and no current password; callers authenticate with
+HTTP Basic using their current credentials.
 
 ## Managing Users and Groups
 
-All management endpoints are under `http://{host}:{port}/api/idp` and require Basic authentication as a service admin. Send `Accept: application/vnd.gravitino.v1+json` on every request, and `Content-Type: application/json` on requests with a body.
+All management endpoints are under `http://{host}:{port}/api/idp` and require Basic authentication.
+Most operations require a service admin. Authenticated users may also `GET` or `PUT`
+`/api/idp/users/{user}` for their own username (read profile / change password only).
+Send `Accept: application/vnd.gravitino.v1+json` on every request, and
+`Content-Type: application/json` on requests with a body.
 
 ### User Operations
 
-| Operation                | Method | Path                                | Body                                       |
-|--------------------------|--------|-------------------------------------|--------------------------------------------|
-| Get a user               | GET    | `/api/idp/users/{user}`             | None                                       |
-| Add a user               | POST   | `/api/idp/users`                    | `{"user":"alice","password":"{password}"}` |
-| Update a user            | PUT    | `/api/idp/users/{user}`             | `{"password":"{new_password}"}` and/or `{"enabled":false}` |
-| Remove a user            | DELETE | `/api/idp/users/{user}`             | None                                       |
+| Operation     | Method | Path                    | Body                                                       |
+|---------------|--------|-------------------------|------------------------------------------------------------|
+| Get a user    | GET    | `/api/idp/users/{user}` | None                                                       |
+| Add a user    | POST   | `/api/idp/users`        | `{"user":"alice","password":"{password}"}`                 |
+| Update a user | PUT    | `/api/idp/users/{user}` | `{"password":"{new_password}"}` and/or `{"enabled":false}` |
+| Remove a user | DELETE | `/api/idp/users/{user}` | None                                                       |
 
-The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
+The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may get or update only their own user, and on update may change only their password (not `enabled` or another user).
+
+```shell
+curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'alice:{user_password}' | base64)" \
+  -d '{"password":"{new_password}"}' \
+  http://localhost:8090/api/idp/users/alice
+```
 
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -100,12 +114,12 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Group Operations
 
-| Operation                | Method | Path                                        | Body                                                       |
-|--------------------------|--------|---------------------------------------------|------------------------------------------------------------|
-| Get a group              | GET    | `/api/idp/groups/{group}`                   | None                                                       |
-| Add a group              | POST   | `/api/idp/groups`                           | `{"group":"engineering","comment":"Platform engineering"}` |
-| Remove a group           | DELETE | `/api/idp/groups/{group}?force={true false}`| None                                                       |
-| Change group membership  | PUT    | `/api/idp/groups/{group}/users`             | `{"usersToAdd":["alice"],"usersToRemove":["carol"]}`       |
+| Operation               | Method | Path                                         | Body                                                       |
+|-------------------------|--------|----------------------------------------------|------------------------------------------------------------|
+| Get a group             | GET    | `/api/idp/groups/{group}`                    | None                                                       |
+| Add a group             | POST   | `/api/idp/groups`                            | `{"group":"engineering","comment":"Platform engineering"}` |
+| Remove a group          | DELETE | `/api/idp/groups/{group}?force={true false}` | None                                                       |
+| Change group membership | PUT    | `/api/idp/groups/{group}/users`              | `{"usersToAdd":["alice"],"usersToRemove":["carol"]}`       |
 
 The add-group body uses the field name `group` rather than `name`. `comment` is optional on create (max 1024 characters, utf8mb4) and stored as the group description. Removing a group that still has members fails unless `force=true`. A membership change requires at least one of `usersToAdd` or `usersToRemove`, and accepts both in a single request.
 

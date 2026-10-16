@@ -23,8 +23,21 @@ Copyright 2006-2023 Google, Inc.
 Jackson JSON processor
 Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
 
-Apache log4j
-Copyright 2010 The Apache Software Foundation
+## FastDoubleParser
 
-Apache Log4j
-Copyright 1999-2024 Apache Software Foundation
+jackson-core bundles a shaded copy of FastDoubleParser <https://github.com/wrandelshofer/FastDoubleParser>.
+That code is available under an MIT license <https://github.com/wrandelshofer/FastDoubleParser/blob/main/LICENSE>
+under the following copyright.
+
+Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+
+FastDoubleParser includes code derived from the following projects:
+
+  fast_double_parser, Copyright (c) 2022 Daniel Lemire. Apache 2.0 License.
+  <https://github.com/lemire/fast_double_parser>
+
+  fast_float, Copyright (c) 2021 The fast_float authors. Apache 2.0 License.
+  <https://github.com/fastfloat/fast_float>
+
+  bigint, Copyright 2020 Tim Buktu. 2-clause BSD License.
+  <https://github.com/tbuktu/bigint>

@@ -39,5 +39,6 @@ import lombok.ToString;
 public class IdpGroupWithUsersPO {
   private String name;
   private String comment;
+  private String auditInfo;
   private String usernames;
 }

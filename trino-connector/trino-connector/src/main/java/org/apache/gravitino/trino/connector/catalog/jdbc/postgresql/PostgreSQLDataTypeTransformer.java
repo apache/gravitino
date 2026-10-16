@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.CharType;
 import io.trino.spi.type.TimeType;
@@ -32,6 +33,8 @@ import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 
 /** Type transformer between PostgreSQL and Trino */
 public class PostgreSQLDataTypeTransformer extends GeneralDataTypeTransformer {
+  private static final Logger LOG = Logger.get(PostgreSQLDataTypeTransformer.class);
+
   @SuppressWarnings("UnusedVariable")
   private static final int POSTGRESQL_CHAR_LENGTH_LIMIT = 10485760;
   // 1 GB, please refer to
@@ -82,6 +85,15 @@ public class PostgreSQLDataTypeTransformer extends GeneralDataTypeTransformer {
       }
       // When precision is not set, the default precision is 3 (milliseconds precision)
       return TimeType.TIME_MILLIS;
+    } else if (Name.EXTERNAL == type.name()) {
+      // An external type carries a PostgreSQL type that Gravitino cannot represent, such as an
+      // unconstrained numeric or money. Reading it as varchar is equivalent to configuring
+      // unsupported_type_handling=CONVERT_TO_VARCHAR, whose Trino default is IGNORE, and keeps an
+      // unmapped type from failing the type conversion of the whole table.
+      LOG.warn(
+          "Reading PostgreSQL type %s as varchar, Gravitino cannot represent it",
+          ((Types.ExternalType) type).catalogString());
+      return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     }
 
     return super.getTrinoType(type);
@@ -113,9 +125,6 @@ public class PostgreSQLDataTypeTransformer extends GeneralDataTypeTransformer {
       }
 
       return Types.VarCharType.of(varcharType.getLength().get());
-    } else if (typeClass == io.trino.spi.type.ArrayType.class) {
-      return Types.ListType.of(
-          getGravitinoType(((io.trino.spi.type.ArrayType) type).getElementType()), false);
     }
 
     return super.getGravitinoType(type);

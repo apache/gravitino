@@ -19,6 +19,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -30,9 +31,20 @@ import java.util.HashMap;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.client.ErrorHandlers;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.RESTClient;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.requests.BulkRemoveRequest;
+import org.apache.gravitino.dto.requests.BulkRoleAddRequest;
+import org.apache.gravitino.dto.requests.RoleCreateRequest;
+import org.apache.gravitino.dto.responses.BulkRemoveResponse;
+import org.apache.gravitino.dto.responses.BulkRoleResponse;
+import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.rest.RESTUtils;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -158,6 +170,66 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(5)
+  public void testBulkRoleInterfaces() throws Exception {
+    String bulkRoleManager = "bulk_role_manager";
+    String bulkRole1 = "bulk_role_it_1";
+    String bulkRole2 = "bulk_role_it_2";
+    String adminRole = "bulk_role_admin";
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.addUser(bulkRoleManager);
+    gravitinoMetalake.createRole(adminRole, new HashMap<>(), Collections.emptyList());
+
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            bulkAddRoles(
+                restClient(normalUserClient),
+                new BulkRoleAddRequest(
+                    new RoleCreateRequest[] {
+                      new RoleCreateRequest(bulkRole1, new HashMap<>(), new SecurableObjectDTO[] {})
+                    })));
+
+    BulkRemoveResponse unauthorizedRemoveResponse =
+        bulkRemoveRoles(
+            restClient(normalUserClient), new BulkRemoveRequest(new String[] {adminRole}));
+    assertEquals(0, unauthorizedRemoveResponse.getNames().length);
+    assertEquals(1, unauthorizedRemoveResponse.getErrors().length);
+    assertEquals(
+        ErrorConstants.FORBIDDEN_CODE, unauthorizedRemoveResponse.getErrors()[0].getCode());
+
+    gravitinoMetalake.createRole(
+        "bulk_role_create_grant", new HashMap<>(), Collections.emptyList());
+    gravitinoMetalake.grantPrivilegesToRole(
+        "bulk_role_create_grant",
+        MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+        ImmutableList.of(Privileges.CreateRole.allow()));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of("bulk_role_create_grant"), bulkRoleManager);
+
+    GravitinoAdminClient bulkRoleManagerClient = getClientByUser(bulkRoleManager);
+    BulkRoleResponse addResponse =
+        bulkAddRoles(
+            restClient(bulkRoleManagerClient),
+            new BulkRoleAddRequest(
+                new RoleCreateRequest[] {
+                  new RoleCreateRequest(bulkRole1, new HashMap<>(), new SecurableObjectDTO[] {}),
+                  new RoleCreateRequest(bulkRole2, new HashMap<>(), new SecurableObjectDTO[] {})
+                }));
+    assertEquals(2, addResponse.getRoles().length);
+    assertEquals(0, addResponse.getErrors().length);
+
+    BulkRemoveResponse removeResponse =
+        bulkRemoveRoles(
+            restClient(bulkRoleManagerClient),
+            new BulkRemoveRequest(new String[] {bulkRole1, bulkRole2}));
+    assertArrayEquals(new String[] {bulkRole1, bulkRole2}, removeResponse.getNames());
+    assertEquals(0, removeResponse.getErrors().length);
+
+    gravitinoMetalake.deleteRole(adminRole);
+    gravitinoMetalake.removeUser(bulkRoleManager);
+  }
+
+  @Test
+  @Order(6)
   public void testListRolesWithNonExistentMetalake() throws Exception {
     // Test that listRoles with @AuthorizationExpression returns 403 Forbidden
     // when the metalake doesn't exist, instead of 404 response
@@ -195,5 +267,36 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // Test listRoleNames - should return 403 ForbiddenException
     assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listRoleNames);
+  }
+
+  private GravitinoAdminClient getClientByUser(String username) {
+    GravitinoAdminClient client =
+        GravitinoAdminClient.builder(serverUri).withSimpleAuth(username).build();
+    closer.register(client);
+    return client;
+  }
+
+  private BulkRoleResponse bulkAddRoles(RESTClient restClient, BulkRoleAddRequest request) {
+    BulkRoleResponse response =
+        restClient.post(
+            String.format("api/bulk/metalakes/%s/roles/add", RESTUtils.encodeString(METALAKE)),
+            request,
+            BulkRoleResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    response.validate();
+    return response;
+  }
+
+  private BulkRemoveResponse bulkRemoveRoles(RESTClient restClient, BulkRemoveRequest request) {
+    BulkRemoveResponse response =
+        restClient.post(
+            String.format("api/bulk/metalakes/%s/roles/remove", RESTUtils.encodeString(METALAKE)),
+            request,
+            BulkRemoveResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    response.validate();
+    return response;
   }
 }

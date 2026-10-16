@@ -30,7 +30,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.client.RESTClient;
@@ -40,6 +42,28 @@ import org.junit.jupiter.api.io.TempDir;
 class TestMiniGravitino {
 
   @TempDir private Path mockConfDir;
+
+  @Test
+  void testContextLaunchesTheOpenSourceServerByDefault() {
+    // Existing callers pass no launcher and must keep getting the open source server.
+    MiniGravitinoContext context = new MiniGravitinoContext(Collections.emptyMap(), false, false);
+
+    assertSame(MiniGravitinoContext.DEFAULT_SERVER_LAUNCHER, context.serverLauncher());
+  }
+
+  @Test
+  void testContextCarriesACustomServerLauncher() throws Exception {
+    // A distribution that ships its own entry point initializes components the open source server
+    // knows nothing about, so embedded mode has to be able to start that server instead.
+    List<String[]> launched = new ArrayList<>();
+    MiniGravitinoContext context =
+        new MiniGravitinoContext(Collections.emptyMap(), false, false, launched::add);
+
+    context.serverLauncher().launch(new String[] {"gravitino.conf"});
+
+    assertEquals(1, launched.size());
+    assertEquals("gravitino.conf", launched.get(0)[0]);
+  }
 
   @Test
   void testStopCleansResourcesWhenServerTaskDoesNotTerminate() throws Exception {

@@ -25,6 +25,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionCo
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +36,14 @@ public class TestGravitinoJobSubmitter {
     GravitinoJobAdapter adapter =
         submitter.loadJobAdapter(IcebergDataCompactionContent.JOB_TEMPLATE_NAME_VALUE);
     Assertions.assertTrue(adapter instanceof GravitinoCompactionJobAdapter);
+  }
+
+  @Test
+  void loadJobAdapterReturnsOrphanAdapterForBuiltInTemplateName() {
+    GravitinoJobSubmitter submitter = new GravitinoJobSubmitter();
+    GravitinoJobAdapter adapter =
+        submitter.loadJobAdapter(IcebergOrphanFileRemovalContent.JOB_TEMPLATE_NAME_VALUE);
+    Assertions.assertTrue(adapter instanceof GravitinoOrphanFileRemovalJobAdapter);
   }
 
   @Test

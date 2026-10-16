@@ -19,14 +19,19 @@ This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
 The typed content for `system_iceberg_compaction` supports the following fields:
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `minDataFileMse` | No | `405323966463344` | Minimum threshold for metric `custom-data-file-mse`. Must be `>= 0`. |
-| `minDeleteFileNumber` | No | `1` | Minimum threshold for metric `custom-delete-file-number`. Must be `>= 0`. |
-| `dataFileMseWeight` | No | `1` | Score weight of `custom-data-file-mse`. Must be `>= 0`. |
-| `deleteFileNumberWeight` | No | `100` | Score weight of `custom-delete-file-number`. Must be `>= 0`. |
-| `maxPartitionNum` | No | `50` | Maximum number of partitions selected by optimizer. Must be `> 0`. |
-| `rewriteOptions` | No | `{}` | Additional rewrite options, expanded as `job.options.*` rules. |
+| Field                    | Required | Default             | Description                                                                                                   |
+| ------------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `minDataFileMse`         | No       | `405323966463344`   | Minimum threshold for metric `custom-data-file-mse`. Must be `>= 0`.                                          |
+| `minDeleteFileNumber`    | No       | `1`                 | Minimum threshold for metric `custom-delete-file-number`. Must be `>= 0`.                                     |
+| `dataFileMseWeight`      | No       | `1`                 | Score weight of `custom-data-file-mse`. Must be `>= 0`.                                                       |
+| `deleteFileNumberWeight` | No       | `100`               | Score weight of `custom-delete-file-number`. Must be `>= 0`.                                                  |
+| `maxPartitionNum`        | No       | `50`                | Maximum number of partitions selected by optimizer. Must be `> 0`.                                            |
+| `rewriteStrategy`        | No       | `binpack`           | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                       |
+| `sortOrder`              | No       | `""`                | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`.        |
+| `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                        |
+
+`rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
+parameters separate from the `options` map.
 
 ## Generated Rules and Properties
 
@@ -39,6 +44,8 @@ The policy content is converted to:
   - `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`
   - `score-expr=custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
   - `max-partition-num=<maxPartitionNum>`
+  - `rewriteStrategy=<rewriteStrategy>`
+  - `sortOrder=<sortOrder>`
   - `job.options.<key>=<value>` for each rewrite option
 
 ## Parameter Tuning Guide
@@ -90,6 +97,17 @@ Recommended `rewriteOptions`:
 - `min-input-files = 5`
 - `delete-file-threshold = 1`
 
+### Rewrite Strategy and Sort Order
+
+Use `rewriteStrategy = sort` with a non-empty `sortOrder` when compaction should rewrite files with
+Iceberg sort or z-order, for example:
+
+- `rewriteStrategy = sort`
+- `sortOrder = zorder(c1,c2)`
+- `sortOrder = id DESC NULLS LAST`
+
+Keep the defaults (`binpack` and empty `sortOrder`) for size-based binpack compaction.
+
 ## Policy Examples
 
 <Tabs groupId='language' queryString>
@@ -128,7 +146,11 @@ Policy policy =
 </TabItem>
 </Tabs>
 
-## Attach Policy to Metadata Objects
+## Apply the Policy Through a Tag
 
-After the policy is created, associate it with a catalog, schema, or table through standard policy association APIs.
-The optimizer will read the generated rules and properties to evaluate strategy triggering and job submission context.
+After creating the policy, create or reuse a tag, associate the policy with that tag using the
+`ALL_VALUES` selector, and assign the tag to a table or one of its ancestors. The optimizer reads
+the table's derived policies to evaluate strategy triggering and job submission context. See
+[Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations) for association
+operations and the [Table maintenance service walkthrough](./table-maintenance-service/optimizer.md#step-4-configure-a-compaction-policy-through-a-tag)
+for a complete REST example.

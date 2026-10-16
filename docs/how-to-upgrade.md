@@ -14,6 +14,9 @@ Gravitino 0.7.0 schema. Before attempting this project we
 strongly recommend that you read through all of the steps in this
 document and familiarize yourself with the required tools.
 
+For version-specific behavior and API changes, see the
+[Migration Guide](./migration-guide.md) before upgrading.
+
 ## Upgrade Steps
 
 ### Step 1: Shut Down the Gravitino Instance
@@ -157,6 +160,11 @@ These scripts should run to completion without any errors. If you
 do encounter errors you need to analyze the cause and attempt to
 trace it back to one of the preceding steps.
 
+For the MySQL, PostgreSQL, and H2 1.3.0-to-2.0.0 upgrade scripts, you can rerun the
+script after fixing the cause of a partial failure; earlier upgrade scripts are unchanged.
+Unexpected schema differences, such as a missing MySQL index during a rename, require
+manual schema repair before retrying.
+
 ### Step 6: Verify the Upgrade
 
 The final step of the upgrade process is validating your freshly
@@ -171,7 +179,7 @@ you will want to compare your schema dump against the contents of
 
 :::note
 The Gravitino Helm chart does not currently support automatic schema migration. Before running
-`helm upgrade`, you must manually back up your database (see [Step 2](#step-2-backup-your-gravitino-instance))
+`helm upgrade`, you must manually back up your database (see [Step 2](#step-2-back-up-the-gravitino-instance))
 and apply the appropriate SQL upgrade scripts (see [Step 5](#step-5-apply-the-upgrade-scripts)).
 :::
 

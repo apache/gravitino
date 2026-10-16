@@ -22,15 +22,20 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Auditable;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.idp.dto.IdpUserDTO;
+import org.apache.gravitino.meta.AuditInfo;
 
 /** Built-in IdP user. */
-public class IdpUser {
+public class IdpUser implements Auditable {
 
   private final String name;
   private final String passwordHash;
   private final boolean enabled;
   private final List<String> groupNames;
+  private final AuditInfo auditInfo;
 
   /**
    * Creates a built-in IdP user without a password hash.
@@ -39,7 +44,7 @@ public class IdpUser {
    * @param groupNames The group names the user belongs to.
    */
   public IdpUser(String name, List<String> groupNames) {
-    this(name, null, groupNames, true);
+    this(name, null, groupNames, true, AuditInfo.EMPTY);
   }
 
   /**
@@ -50,7 +55,19 @@ public class IdpUser {
    * @param enabled Whether the user is enabled.
    */
   public IdpUser(String name, List<String> groupNames, boolean enabled) {
-    this(name, null, groupNames, enabled);
+    this(name, null, groupNames, enabled, AuditInfo.EMPTY);
+  }
+
+  /**
+   * Creates a built-in IdP user without a password hash.
+   *
+   * @param name The username.
+   * @param groupNames The group names the user belongs to.
+   * @param enabled Whether the user is enabled.
+   * @param auditInfo Audit information.
+   */
+  public IdpUser(String name, List<String> groupNames, boolean enabled, AuditInfo auditInfo) {
+    this(name, null, groupNames, enabled, auditInfo);
   }
 
   /**
@@ -61,7 +78,7 @@ public class IdpUser {
    * @param groupNames The group names the user belongs to.
    */
   public IdpUser(String name, String passwordHash, List<String> groupNames) {
-    this(name, passwordHash, groupNames, true);
+    this(name, passwordHash, groupNames, true, AuditInfo.EMPTY);
   }
 
   /**
@@ -73,6 +90,24 @@ public class IdpUser {
    * @param enabled Whether the user is enabled.
    */
   public IdpUser(String name, String passwordHash, List<String> groupNames, boolean enabled) {
+    this(name, passwordHash, groupNames, enabled, AuditInfo.EMPTY);
+  }
+
+  /**
+   * Creates a built-in IdP user with a password hash loaded from storage.
+   *
+   * @param name The username.
+   * @param passwordHash The password hash, or null when the hash is not loaded.
+   * @param groupNames The group names the user belongs to.
+   * @param enabled Whether the user is enabled.
+   * @param auditInfo Audit information.
+   */
+  public IdpUser(
+      String name,
+      String passwordHash,
+      List<String> groupNames,
+      boolean enabled,
+      AuditInfo auditInfo) {
     if (passwordHash != null) {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(passwordHash), "passwordHash must not be blank");
@@ -81,6 +116,7 @@ public class IdpUser {
     this.passwordHash = passwordHash;
     this.enabled = enabled;
     this.groupNames = groupNames;
+    this.auditInfo = auditInfo == null ? AuditInfo.EMPTY : auditInfo;
   }
 
   /** Returns the username. */
@@ -111,13 +147,23 @@ public class IdpUser {
     return groupNames;
   }
 
+  @Override
+  public Audit auditInfo() {
+    return auditInfo;
+  }
+
   /**
    * Converts this user to a REST DTO.
    *
    * @return the user DTO
    */
   public IdpUserDTO toDTO() {
-    return IdpUserDTO.builder().withName(name).withEnabled(enabled).withGroups(groupNames).build();
+    return IdpUserDTO.builder()
+        .withName(name)
+        .withEnabled(enabled)
+        .withGroups(groupNames)
+        .withAudit(DTOConverters.toDTO(auditInfo))
+        .build();
   }
 
   @Override
@@ -132,16 +178,25 @@ public class IdpUser {
     return enabled == that.enabled
         && Objects.equals(name, that.name)
         && Objects.equals(passwordHash, that.passwordHash)
-        && Objects.equals(groupNames, that.groupNames);
+        && Objects.equals(groupNames, that.groupNames)
+        && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, passwordHash, enabled, groupNames);
+    return Objects.hash(name, passwordHash, enabled, groupNames, auditInfo);
   }
 
   @Override
   public String toString() {
-    return "IdpUser{name='" + name + "', enabled=" + enabled + ", groupNames=" + groupNames + '}';
+    return "IdpUser{name='"
+        + name
+        + "', enabled="
+        + enabled
+        + ", groupNames="
+        + groupNames
+        + ", auditInfo="
+        + auditInfo
+        + '}';
   }
 }

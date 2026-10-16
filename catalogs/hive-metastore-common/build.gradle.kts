@@ -43,6 +43,7 @@ dependencies {
   compileOnly(libs.caffeine)
   compileOnly(libs.guava)
   compileOnly(libs.slf4j.api)
+  compileOnly(libs.log4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
@@ -155,12 +156,15 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Ensure the shaded Hive metastore lib jars exist before compiling this module,
-// since compileOnly(project(":catalogs:hive-metastore{2,3}-libs")) puts those
-// jars on the compile classpath and they are produced by the copyDepends tasks.
-tasks.named<JavaCompile>("compileJava") {
+// Ensure the shaded Hive metastore lib jars (plus the HiveShimV2/HiveShimV3 classes compiled in
+// those modules) exist before running tests: HiveClientClassLoader loads every jar under
+// hive-metastore{2,3}-libs/build/libs at test time (GRAVITINO_TEST), so their own compiled-source
+// jars must be built too, not just their copyDepends-copied external dependency jars. This is on
+// "test" rather than "compileJava": those two modules compileOnly this module (for the shared
+// HiveShim base class), so depending on their "jar" task from "compileJava" would be circular.
+tasks.named<Test>("test") {
   dependsOn(
-    ":catalogs:hive-metastore2-libs:copyDepends",
-    ":catalogs:hive-metastore3-libs:copyDepends"
+    ":catalogs:hive-metastore2-libs:jar",
+    ":catalogs:hive-metastore3-libs:jar"
   )
 }

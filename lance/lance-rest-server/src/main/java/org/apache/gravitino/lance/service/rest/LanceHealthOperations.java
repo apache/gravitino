@@ -34,6 +34,7 @@ import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.Utils;
 
 /**
@@ -41,12 +42,13 @@ import org.apache.gravitino.server.web.Utils;
  * as the main Gravitino server.
  *
  * <ul>
- *   <li>{@code GET /lance/health/live} — liveness, 200 as long as the HTTP thread can respond
+ *   <li>{@code GET /lance/health/live} — liveness, 200 when the HTTP thread can respond and no OOM
+ *       has been observed
  *   <li>{@code GET /lance/health/ready} — readiness, 200 when the namespace wrapper is initialized
  *   <li>{@code GET /lance/health} — aggregate, 200 when both pass
  * </ul>
  *
- * All endpoints return 503 with a JSON body describing the failed check(s) when unhealthy.
+ * All endpoints return 503 after an observed OOM until process restart, or when their checks fail.
  */
 @Path("/health")
 @Produces(MediaType.APPLICATION_JSON)
@@ -55,21 +57,32 @@ public class LanceHealthOperations {
   private static final String CHECK_HTTP_SERVER = "httpServer";
   private static final String CHECK_NAMESPACE_WRAPPER = "namespaceWrapper";
 
+  private final ServerHealth serverHealth;
+
   @Inject private NamespaceWrapper namespaceWrapper;
 
   /** Default constructor for Jersey auto-discovery. */
-  public LanceHealthOperations() {}
+  public LanceHealthOperations() {
+    this(ServerHealth.getInstance());
+  }
+
+  LanceHealthOperations(ServerHealth serverHealth) {
+    this.serverHealth = serverHealth;
+  }
 
   /**
-   * Liveness probe. Returns 200 as long as the HTTP thread can respond.
+   * Liveness probe. Returns 200 when the HTTP thread can respond and no OOM has been observed.
    *
-   * @return 200 OK with an UP {@link HealthResponse}
+   * @return 200 OK when live, or 503 with a JVM failure after an observed OOM
    */
   @GET
   @Path("/live")
   @Timed(name = "lance.health.live." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "lance.health.live", absolute = true)
   public Response live() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
     HealthResponse healthResponse =
         new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check));
@@ -86,7 +99,13 @@ public class LanceHealthOperations {
   @Timed(name = "lance.health.ready." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "lance.health.ready", absolute = true)
   public Response ready() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     HealthCheckDTO namespaceCheck = checkNamespaceWrapper();
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     HealthCheckDTO.Status overall = namespaceCheck.getStatus();
     HealthResponse body = new HealthResponse(overall, Collections.singletonList(namespaceCheck));
     return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
@@ -101,9 +120,15 @@ public class LanceHealthOperations {
   @Timed(name = "lance.health." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "lance.health", absolute = true)
   public Response health() {
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
     List<HealthCheckDTO> checks = new ArrayList<>(2);
     checks.add(up(CHECK_HTTP_SERVER, Collections.emptyMap()));
     checks.add(checkNamespaceWrapper());
+    if (serverHealth.hasOutOfMemoryError()) {
+      return Utils.outOfMemoryResponse();
+    }
 
     HealthCheckDTO.Status overall =
         checks.stream().anyMatch(c -> c.getStatus() == HealthCheckDTO.Status.DOWN)

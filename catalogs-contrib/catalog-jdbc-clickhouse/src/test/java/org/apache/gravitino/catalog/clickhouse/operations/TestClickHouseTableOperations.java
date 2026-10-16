@@ -174,7 +174,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         StringUtils.contains(
             gravitinoRuntimeException.getMessage(),
-            "Alter table properties in ClickHouse is not supported"));
+            "Only ClickHouse table properties with the 'settings.' prefix can be altered"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -637,7 +637,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("c_varchar")
-            .withType(Types.VarCharType.of(5))
+            .withType(Types.StringType.get())
             .withNullable(false)
             .build());
     columns.add(
@@ -1357,8 +1357,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     String[][] fields = ops.parseIndexFields("tuple(`c2`, `c3`)");
     Assertions.assertArrayEquals(new String[][] {{"c2"}, {"c3"}}, fields);
 
-    String[][] bloomFields = ops.parseIndexFields("bloom_filter(`c4`)");
-    Assertions.assertArrayEquals(new String[][] {{"c4"}}, bloomFields);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.parseIndexFields("bloom_filter(`c4`)"));
   }
 
   @Test
