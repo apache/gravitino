@@ -98,6 +98,7 @@ public abstract class TestJDBCBackend {
 
   protected String backendType;
   protected RelationalBackend backend;
+  private static final int RESET_TIMEOUT_SECONDS = 30;
   private DatabaseReset databaseReset = DatabaseReset.DELETE_ROWS;
 
   public void setBackend(RelationalBackend backend) {
@@ -122,6 +123,9 @@ public abstract class TestJDBCBackend {
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
         Statement statement = connection.createStatement()) {
+      // A lock left by an earlier test would block the reset forever (PostgreSQL has no default
+      // lock timeout); fail this test instead.
+      statement.setQueryTimeout(RESET_TIMEOUT_SECONDS);
       List<String> tables = nonEmptyTables(statement, tables(statement));
       if (tables.isEmpty()) {
         return;
@@ -134,6 +138,9 @@ public abstract class TestJDBCBackend {
             statement.execute("DELETE FROM " + table);
           }
           connection.commit();
+        } catch (SQLException e) {
+          connection.rollback();
+          throw e;
         } finally {
           connection.setAutoCommit(true);
         }
@@ -143,8 +150,10 @@ public abstract class TestJDBCBackend {
                 .map(table -> "TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE;")
                 .collect(Collectors.joining("\n", "DO $$ BEGIN\n", "\nEND $$;")));
       } else {
+        // H2 keeps identity counters on TRUNCATE unless asked; MySQL always restarts them.
+        String restart = "h2".equalsIgnoreCase(backendType) ? " RESTART IDENTITY" : "";
         for (String table : tables) {
-          statement.execute("TRUNCATE TABLE " + table);
+          statement.execute("TRUNCATE TABLE " + table + restart);
         }
       }
     }

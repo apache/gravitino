@@ -45,10 +45,10 @@ class TestBackendTestExtension {
   private final List<RelationalBackend> backends = new ArrayList<>();
   private final BackendTestExtension extension =
       new BackendTestExtension(
-          backendType -> {
+          (backendType, testClass) -> {
             RelationalBackend backend = mock(RelationalBackend.class);
             backends.add(backend);
-            return new BackendTestExtension.Backend(backendType, backend, null, null);
+            return new BackendTestExtension.Backend(backendType, testClass, backend, null, null);
           });
   private final ExtensionContext root = rootWithStore();
 

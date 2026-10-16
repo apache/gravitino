@@ -33,11 +33,11 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -54,6 +54,7 @@ import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
+import org.junit.platform.commons.support.AnnotationSupport;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,8 +68,11 @@ import org.slf4j.LoggerFactory;
  *
  * <p>{@code SqlSessionFactoryHelper} is process-global, so only one backend can be live in a JVM.
  * The extension keeps it in a single slot and reuses it for the tests of one class; {@link
- * TestJDBCBackend} truncates every table before each test. It builds a new backend when the test
- * class or backend type changes, and for every {@link DatabaseIsolation#FRESH_DATABASE} test.
+ * TestJDBCBackend} empties its tables before each test. It builds a new backend when the test class
+ * or backend type changes, and for every {@link DatabaseIsolation#FRESH_DATABASE} test.
+ *
+ * <p>The slot is read and replaced without locking, so tests must run one at a time: the core
+ * database tasks run in one JVM with JUnit parallel execution off.
  */
 public class BackendTestExtension implements TestTemplateInvocationContextProvider {
 
@@ -153,7 +157,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
 
   @FunctionalInterface
   interface BackendFactory {
-    Backend create(String backendType) throws Exception;
+    Backend create(String backendType, Class<?> testClass) throws Exception;
   }
 
   private class BackendSetupCallback implements BeforeEachCallback, AfterEachCallback {
@@ -177,8 +181,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
         current = null;
       }
       if (current == null) {
-        current = backendFactory.create(backendType);
-        current.testClass = testClass;
+        current = backendFactory.create(backendType, testClass);
         store.put(CURRENT_BACKEND, current);
       }
       // Other core tests overwrite these globals, so point them back before every test.
@@ -220,28 +223,36 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
     // A method-level fixture replaces the class-level one.
     @Nullable
     private DatabaseFixture fixture(ExtensionContext context) {
-      DatabaseFixture methodFixture =
-          context.getRequiredTestMethod().getAnnotation(DatabaseFixture.class);
-      return methodFixture != null
-          ? methodFixture
-          : context.getRequiredTestClass().getAnnotation(DatabaseFixture.class);
+      return AnnotationSupport.findAnnotation(
+              context.getRequiredTestMethod(), DatabaseFixture.class)
+          .or(
+              () ->
+                  AnnotationSupport.findAnnotation(
+                      context.getRequiredTestClass(), DatabaseFixture.class))
+          .orElse(null);
     }
   }
 
-  /** The live backend; JUnit closes whatever is left in the root store when the run ends. */
+  /**
+   * The live backend. JUnit closes whatever is left in the root store when the run ends, in the
+   * reverse order of insertion, so it closes before the containers that {@code
+   * CloseContainerExtension} registered earlier.
+   */
   static class Backend implements ExtensionContext.Store.CloseableResource {
     private final String backendType;
     private final RelationalBackend backend;
     @Nullable private final Config config;
     @Nullable private final File h2Directory;
-    private Class<?> testClass;
+    private final Class<?> testClass;
 
     Backend(
         String backendType,
+        Class<?> testClass,
         RelationalBackend backend,
         @Nullable Config config,
         @Nullable File h2Directory) {
       this.backendType = backendType;
+      this.testClass = testClass;
       this.backend = backend;
       this.config = config;
       this.h2Directory = h2Directory;
@@ -272,7 +283,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
 
   private static class DefaultBackendFactory implements BackendFactory {
     @Override
-    public Backend create(String backendType) throws Exception {
+    public Backend create(String backendType, Class<?> testClass) throws Exception {
       BaseIT baseIT = new BaseIT();
       LOG.info("Initializing backend resource: {}", backendType);
       Config config = Mockito.mock(Config.class);
@@ -302,11 +313,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
             .thenReturn("org.postgresql.Driver");
       } else {
-        String uuid = UUID.randomUUID().toString().replace("-", "");
-        h2Directory = new File("/tmp/gravitino_jdbc_test_h2_" + uuid);
-        if (!h2Directory.exists() && !h2Directory.mkdirs()) {
-          throw new IOException("Create dir failed");
-        }
+        h2Directory = Files.createTempDirectory("gravitino_jdbc_test_h2_").toFile();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
             .thenReturn(
                 String.format(
@@ -317,7 +324,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
       }
 
       RelationalBackend backend = new JDBCBackend();
-      Backend created = new Backend(backendType, backend, config, h2Directory);
+      Backend created = new Backend(backendType, testClass, backend, config, h2Directory);
       try {
         created.bindGravitinoEnv();
         // Close the backend before initializing to make sure the singleton sqlSession is cleared.
