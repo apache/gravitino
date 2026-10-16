@@ -132,10 +132,6 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public static boolean initialized() {
-    return initialized;
-  }
-
   public static ContainerSuite getInstance() {
     if (instance == null) {
       synchronized (ContainerSuite.class) {
@@ -386,10 +382,10 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLContainer(TestDatabaseName testDatabaseName) {
-    ITUtils.cleanDisk();
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
+          ITUtils.cleanDisk();
           initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
@@ -443,10 +439,10 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
-    ITUtils.cleanDisk();
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
+          ITUtils.cleanDisk();
           initIfNecessary();
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
