@@ -393,8 +393,9 @@ At startup, INFO logs report the window and dedup capacity. A WARN containing
 `Entity change log replay found` reports previously unseen rows behind the cursor, with cursor,
 startup cursor, window, approximate oldest recorded age, and up to 20 event summaries
 (`id:type:operation:name`). DEBUG logs include every replayed row's timestamp and age, and page/sweep
-progress. This is evidence of a **possible** late commit: cold-start history and dedup eviction can
-also produce unseen IDs. Ages compare JVM and database clocks and are not commit latency.
+progress. This is evidence of a **possible** late commit: dedup eviction can also produce unseen
+IDs. The first sweep after startup replays recent history into an empty dedup set, so it logs
+`Entity change log startup replay delivered` at INFO instead. Ages compare JVM and database clocks and are not commit latency.
 `replay failed` logs include page cursors and the exception; incremental delivery is preserved,
 and replay retries are limited to one attempt per polling interval during a failure.
 `replay dedup capacity reached` reports accumulated eviction and possible repeated invalidations,

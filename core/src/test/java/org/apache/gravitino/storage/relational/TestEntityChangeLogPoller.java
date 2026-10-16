@@ -425,6 +425,51 @@ public class TestEntityChangeLogPoller {
     Assertions.assertTrue(
         diagnostics.contains("dedup capacity reached cursor=3 evictedIds=1 maxEntries=1"),
         diagnostics);
+    // Startup history is expected after every restart, so it must not raise the late-commit WARN.
+    Assertions.assertTrue(
+        logs.stream()
+            .anyMatch(
+                e ->
+                    Level.INFO.equals(e.getLevel())
+                        && e.getMessage()
+                            .getFormattedMessage()
+                            .contains("startup replay delivered 2 recent record(s)")),
+        diagnostics);
+    Assertions.assertFalse(diagnostics.contains("replay found"), diagnostics);
+  }
+
+  @Test
+  void testUnseenRowAfterFirstSweepLogsLateCommitWarning() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(2, 2));
+    when(mapper.selectRecentEntityChanges(-1, 0, 2, 60000, 2))
+        .thenReturn(List.of())
+        .thenReturn(changes(1, 1));
+    AtomicLong clock = new AtomicLong();
+    List<LogEvent> logs =
+        captureReplayLogs(
+            () -> {
+              try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+                mockSessionUtils(sessions, mapper);
+                EntityChangeLogPoller poller =
+                    spy(new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource()));
+                doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+                poller.pollChanges();
+                clock.addAndGet(SWEEP_INTERVAL_NANOS);
+                poller.pollChanges();
+              }
+            });
+    Assertions.assertTrue(
+        logs.stream()
+            .anyMatch(
+                e ->
+                    Level.WARN.equals(e.getLevel())
+                        && e.getMessage()
+                            .getFormattedMessage()
+                            .contains("replay found 1 previously unseen record(s)")),
+        logs.stream()
+            .map(e -> e.getMessage().getFormattedMessage())
+            .collect(Collectors.joining("\n")));
   }
 
   @Test

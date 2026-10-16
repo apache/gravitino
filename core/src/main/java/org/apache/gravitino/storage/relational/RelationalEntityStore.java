@@ -297,15 +297,6 @@ public class RelationalEntityStore
     long epochBeforeRead = cacheInvalidationEpoch.get();
     List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
     for (E entity : fetchEntities) {
-      if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
-        // BaseEntityCache.put may invalidate a related entry even when it does not cache this
-        // entity. Keep that hook, but avoid taking a key lock for a value that cannot be cached.
-        if (cacheInvalidationEpoch.get() == epochBeforeRead) {
-          cache.put(entity);
-        }
-        allEntities.add(entity);
-        continue;
-      }
       cacheIfEpochUnchanged(entity, epochBeforeRead);
       allEntities.add(entity);
     }

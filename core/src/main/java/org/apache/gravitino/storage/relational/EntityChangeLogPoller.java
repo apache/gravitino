@@ -118,6 +118,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private long capacityWarningNanos;
   private long pendingDedupEvictions;
   private boolean replaySweepStarted;
+  // The dedup set is empty until the first sweep completes, so every row it finds is expected
+  // startup history rather than evidence of a late commit.
+  private boolean replaySweepCompleted;
   private long lastReplaySweepStartNanos;
 
   private ScheduledExecutorService scheduler;
@@ -445,18 +448,30 @@ public class EntityChangeLogPoller implements AutoCloseable {
     if (!unseen.isEmpty()) {
       metrics.replayRecordsFound(unseen.size());
       unseen.sort(Comparator.comparingLong(EntityChangeRecord::getId));
-      LOG.warn(
-          "Entity change log replay found {} previously unseen record(s) behind cursor={} "
-              + "startupCursor={} windowMs={} approximateOldestAgeMs={} records={}; "
-              + "possible late commit, startup history, or dedup eviction; record details at DEBUG; "
-              + "age uses JVM time, not transaction duration",
-          unseen.size(),
-          entityPollHighWaterId,
-          startupHighWaterId,
-          replayWindowMs,
-          System.currentTimeMillis()
-              - unseen.stream().mapToLong(EntityChangeRecord::getCreatedAt).min().orElse(0),
-          summarize(unseen));
+      if (!replaySweepCompleted) {
+        LOG.info(
+            "Entity change log startup replay delivered {} recent record(s) behind cursor={} "
+                + "startupCursor={} windowMs={} records={}; expected after a restart because "
+                + "deduplication starts empty",
+            unseen.size(),
+            entityPollHighWaterId,
+            startupHighWaterId,
+            replayWindowMs,
+            summarize(unseen));
+      } else {
+        LOG.warn(
+            "Entity change log replay found {} previously unseen record(s) behind cursor={} "
+                + "startupCursor={} windowMs={} approximateOldestAgeMs={} records={}; "
+                + "possible late commit or dedup eviction; record details at DEBUG; "
+                + "age uses JVM time, not transaction duration",
+            unseen.size(),
+            entityPollHighWaterId,
+            startupHighWaterId,
+            replayWindowMs,
+            System.currentTimeMillis()
+                - unseen.stream().mapToLong(EntityChangeRecord::getCreatedAt).min().orElse(0),
+            summarize(unseen));
+      }
       List<EntityChangeRecord> immutable = List.copyOf(unseen);
       notifyListeners(
           new BatchDelivery(
@@ -473,6 +488,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
           unseen.size(),
           page.size() - unseen.size(),
           replayWindowMs);
+      replaySweepCompleted = true;
       replayAfterCreatedAt = -1;
       replayAfterId = 0;
       replayUpperId = 0;
