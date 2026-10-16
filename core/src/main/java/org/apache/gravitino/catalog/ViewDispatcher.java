@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.ViewCatalog;
 
 /**
@@ -27,16 +26,4 @@ import org.apache.gravitino.rel.ViewCatalog;
  * dispatching or handling view-related events or actions that are not covered by the standard
  * {@code ViewCatalog} operations.
  */
-public interface ViewDispatcher extends ViewCatalog {
-  /**
-   * Checks connector view existence without importing the view or its parent schemas into
-   * Gravitino.
-   *
-   * @param ident The identifier of the view to check.
-   * @return Whether the connector reports that the view exists.
-   * @throws UnsupportedOperationException If non-importing probes are not supported.
-   */
-  default boolean viewExistsWithoutImport(NameIdentifier ident) {
-    throw new UnsupportedOperationException("Non-importing view probes are not supported");
-  }
-}
+public interface ViewDispatcher extends ViewCatalog {}

@@ -67,12 +67,6 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
     return dispatcher.viewExists(normalizeCaseSensitive(ident));
   }
 
-  /** {@inheritDoc} */
-  @Override
-  public boolean viewExistsWithoutImport(NameIdentifier ident) {
-    return dispatcher.viewExistsWithoutImport(normalizeCaseSensitive(ident));
-  }
-
   @Override
   public View createView(
       NameIdentifier ident,

@@ -129,25 +129,6 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   }
 
   /**
-   * Checks connector view existence without importing the view or its parent schemas into
-   * Gravitino.
-   *
-   * @param ident The identifier of the view to check.
-   * @return Whether the connector reports that the view exists.
-   */
-  @Override
-  public boolean viewExistsWithoutImport(NameIdentifier ident) {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                catalog -> catalog.doWithViewOps(views -> views.viewExists(ident)),
-                NoSuchViewException.class));
-  }
-
-  /**
    * Loads a view.
    *
    * @param ident The identifier of the view to load.

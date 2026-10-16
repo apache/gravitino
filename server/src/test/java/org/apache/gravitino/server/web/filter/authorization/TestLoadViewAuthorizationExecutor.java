@@ -40,6 +40,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
@@ -149,16 +151,18 @@ public class TestLoadViewAuthorizationExecutor {
     var dispatcher = mock(ViewDispatcher.class);
     when(env.internalViewDispatcher()).thenReturn(dispatcher);
     if (probeFailure != null) {
-      when(dispatcher.viewExistsWithoutImport(ident)).thenThrow(probeFailure);
+      when(dispatcher.loadView(ident)).thenThrow(probeFailure);
+    } else if (exists) {
+      when(dispatcher.loadView(ident)).thenReturn(mock(View.class));
     } else {
-      when(dispatcher.viewExistsWithoutImport(ident)).thenReturn(exists);
+      when(dispatcher.loadView(ident)).thenThrow(new NoSuchViewException("View is absent"));
     }
     try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
       mocked.when(GravitinoEnv::getInstance).thenReturn(env);
       assertEquals(expected, executor.execute(new AuthorizationRequestContext()));
     }
     if (shouldProbe) {
-      verify(dispatcher).viewExistsWithoutImport(ident);
+      verify(dispatcher).loadView(ident);
     } else {
       verifyNoInteractions(dispatcher);
     }

@@ -26,6 +26,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
@@ -87,8 +88,21 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
 
     NameIdentifier tableIdentifier = metadataContext.get(Entity.EntityType.TABLE);
-    return tableIdentifier != null
-        && !GravitinoEnv.getInstance().internalTableDispatcher().tableExists(tableIdentifier);
+    if (tableIdentifier != null) {
+      try {
+        GravitinoEnv.getInstance().internalTableDispatcher().loadTable(tableIdentifier);
+      } catch (NoSuchTableException e) {
+        throw new MissingTableProbeException(tableIdentifier);
+      }
+    }
+    return false;
+  }
+
+  /** Signals an authorized absence probe that must terminate without running the load handler. */
+  public static final class MissingTableProbeException extends NoSuchTableException {
+    private MissingTableProbeException(NameIdentifier ident) {
+      super("Table %s does not exist", ident);
+    }
   }
 
   private static boolean shouldCheckModifyTablePrivilege(

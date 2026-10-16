@@ -70,13 +70,11 @@ public class LoadViewAuthorizationExecutor extends CommonAuthorizerExecutor {
       return false;
     }
     try {
-      if (!GravitinoEnv.getInstance()
-          .internalViewDispatcher()
-          .viewExistsWithoutImport(viewIdentifier)) {
-        // Absence permits a terminal 404, never a subsequent load without read permission.
-        throw new MissingViewProbeException(viewIdentifier);
-      }
+      GravitinoEnv.getInstance().internalViewDispatcher().loadView(viewIdentifier);
       return false;
+    } catch (NoSuchViewException e) {
+      // Absence permits a terminal 404, never a subsequent load without read permission.
+      throw new MissingViewProbeException(viewIdentifier);
     } catch (UnsupportedOperationException e) {
       // Preserve the primary denial when the connector cannot perform the existence probe.
       return false;

@@ -49,6 +49,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
@@ -60,6 +61,7 @@ import org.apache.gravitino.server.authorization.annotations.ExpressionCondition
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.filter.authorization.LoadTableAuthorizationExecutor.MissingTableProbeException;
 import org.apache.gravitino.server.web.filter.authorization.LoadViewAuthorizationExecutor.MissingViewProbeException;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
@@ -247,6 +249,16 @@ public class GravitinoInterceptionService implements InterceptionService {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
+            } catch (MissingTableProbeException exception) {
+              NameIdentifier tableIdent = metadataContext.get(Entity.EntityType.TABLE);
+              if (tableIdent == null) {
+                throw exception;
+              }
+              return ExceptionHandlers.handleTableException(
+                  OperationType.LOAD,
+                  tableIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(tableIdent).name(),
+                  new NoSuchTableException("%s", exception.getMessage()));
             } catch (MissingViewProbeException exception) {
               NameIdentifier viewIdent = metadataContext.get(Entity.EntityType.VIEW);
               if (viewIdent == null) {
