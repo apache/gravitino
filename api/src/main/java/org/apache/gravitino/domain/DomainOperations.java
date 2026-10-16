@@ -35,9 +35,9 @@ import org.apache.gravitino.tag.TagValue;
  * Interface for the domain operations of a metalake. Operations on a single domain, such as
  * publishing it or managing its sub-domains, are on {@link Domain}.
  *
- * <p>A domain in {@link Domain.Status#DRAFT} status is returned only to its owner and to the users
- * who can manage it, its parent or the metalake. For other users it is omitted from lists, and
- * getting it throws {@link NoSuchDomainException}.
+ * <p>A domain in {@link Domain.Status#DRAFT} status is returned only to the users who can manage
+ * it, including through its parent or the metalake (see {@link Domain}). For other users it is
+ * omitted from lists, and getting it throws {@link NoSuchDomainException}.
  */
 @Evolving
 public interface DomainOperations {

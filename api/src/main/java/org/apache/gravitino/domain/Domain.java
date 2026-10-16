@@ -40,9 +40,13 @@ import org.apache.gravitino.tag.TagValue;
  * dept=finance} is a member of the domain backed by {@code dept=hr} only.
  *
  * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. Privileges on a
- * domain, and its ownership, also apply to its sub-domains. A new domain is in {@link Status#DRAFT}
- * status and, until it is published, is returned only to its owner and to the users who can manage
- * it, its parent or the metalake.
+ * domain, and its ownership, also apply to its sub-domains: the metalake, the current parent and
+ * the domain itself are checked together. An owner of any of them passes; otherwise a privilege
+ * holds when it is allowed on at least one of them and denied on none, so a deny on a sub-domain is
+ * not overridden by an allow on its parent.
+ *
+ * <p>A new domain is in {@link Status#DRAFT} status and, until it is published, is returned only to
+ * the users who can manage it.
  *
  * <p>A {@code Domain} is a snapshot. The operations on it that change the domain itself, such as
  * {@link #publish()} and {@link #attachToParent(String)}, return a new snapshot and leave this one
@@ -55,7 +59,7 @@ public interface Domain extends Auditable {
   /** The status of a domain. */
   enum Status {
     /**
-     * The domain is returned only to its owner and to the users who can manage it, its parent or
+     * The domain is returned only to the users who can manage it, including through its parent or
      * the metalake.
      */
     DRAFT,
@@ -136,9 +140,9 @@ public interface Domain extends Auditable {
   Domain publish() throws NoSuchDomainException, IllegalArgumentException;
 
   /**
-   * Unpublishes the domain, making it visible only to its owner and to the users who can manage it,
-   * its parent or the metalake. A domain can be unpublished only when it has no published
-   * sub-domains. Unpublishing a draft domain has no effect.
+   * Unpublishes the domain, making it visible only to the users who can manage it. A domain can be
+   * unpublished only when it has no published sub-domains. Unpublishing a draft domain has no
+   * effect.
    *
    * @return The unpublished domain.
    * @throws NoSuchDomainException If the domain does not exist or is not visible to the caller.
@@ -151,9 +155,10 @@ public interface Domain extends Auditable {
    * another domain, it is moved under the given parent. Attaching to the current parent has no
    * effect. The backing tag is not renamed.
    *
-   * <p>Since privileges on a parent apply to its sub-domains, attaching or moving changes who can
-   * see and manage this domain without any grant changing: the users with privileges on the old
-   * parent lose them on this domain, and those with privileges on the new parent gain them.
+   * <p>Since privileges on a parent, and its ownership, apply to its sub-domains, attaching or
+   * moving changes who can see and manage this domain without any grant changing: those of the old
+   * parent no longer apply to this domain, and those of the new parent do. A deny on this domain
+   * still applies.
    *
    * @param parent The name of the parent domain.
    * @return The attached domain.
@@ -170,9 +175,9 @@ public interface Domain extends Auditable {
    * this snapshot shows. Detaching a top-level domain has no effect. The backing tag is not
    * renamed.
    *
-   * <p>Since privileges on a parent apply to its sub-domains, detaching changes who can see and
-   * manage this domain without any grant changing: the users with privileges on the former parent
-   * lose them on this domain.
+   * <p>Since privileges on a parent, and its ownership, apply to its sub-domains, detaching changes
+   * who can see and manage this domain without any grant changing: those of the former parent no
+   * longer apply to this domain.
    *
    * @return The detached domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
