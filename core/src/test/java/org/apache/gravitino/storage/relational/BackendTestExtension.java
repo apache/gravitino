@@ -49,6 +49,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
@@ -68,14 +69,16 @@ import org.slf4j.LoggerFactory;
  * With none selected, tests run on H2, plus MySQL and PostgreSQL when {@code dockerTest=true}.
  *
  * <p>{@code SqlSessionFactoryHelper} is process-global, so only one backend can be live in a JVM.
- * The extension keeps it in a single slot and reuses it for the tests of one class; {@link
- * TestJDBCBackend} empties its tables before each test. It builds a new backend when the test class
- * or backend type changes, and for every {@link ResetStrategy#FRESH_DATABASE} test.
+ * The extension keeps it in a single slot and reuses it for the tests of one class, emptying it
+ * before each test per the class's {@link DatabaseFixture}. It builds a new backend when the test
+ * class or backend type changes and for every {@link ResetStrategy#FRESH_DATABASE} test, and closes
+ * the class's backend when the class finishes.
  *
  * <p>The slot is read and replaced without locking, so tests must run one at a time: the core
  * database tasks run in one JVM with JUnit parallel execution off.
  */
-public class BackendTestExtension implements TestTemplateInvocationContextProvider {
+public class BackendTestExtension
+    implements TestTemplateInvocationContextProvider, AfterAllCallback {
 
   private static final Logger LOG = LoggerFactory.getLogger(BackendTestExtension.class);
   private static final String DOCKER_TEST_FLAG = "dockerTest";
@@ -93,6 +96,15 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
 
   BackendTestExtension(BackendFactory backendFactory) {
     this.backendFactory = backendFactory;
+  }
+
+  @Override
+  public void afterAll(ExtensionContext context) throws Exception {
+    ExtensionContext.Store store = context.getRoot().getStore(NAMESPACE);
+    Backend current = store.get(CURRENT_BACKEND, Backend.class);
+    if (current != null && current.testClass == context.getRequiredTestClass()) {
+      store.remove(CURRENT_BACKEND, Backend.class).close();
+    }
   }
 
   @Override

@@ -143,6 +143,19 @@ class TestBackendTestExtension {
   }
 
   @Test
+  void testClassClosesItsBackendWhenItFinishes() throws Exception {
+    run(SharedTests.class, "first", "h2");
+    finishClass(OtherSharedTests.class);
+    verify(backends.get(0), never()).close();
+
+    finishClass(SharedTests.class);
+    verify(backends.get(0), times(1)).close();
+
+    run(SharedTests.class, "second", "h2");
+    assertEquals(2, backends.size());
+  }
+
+  @Test
   void testDisplayNamePreservesMethodAndBackend() {
     TestTemplateInvocationContext context =
         extension.createInvocationContexts("testMethod", List.of("h2")).findFirst().orElseThrow();
@@ -172,6 +185,13 @@ class TestBackendTestExtension {
             .get(0);
     ((BeforeEachCallback) callback).beforeEach(context);
     ((AfterEachCallback) callback).afterEach(context);
+  }
+
+  private void finishClass(Class<?> testClass) throws Exception {
+    ExtensionContext context = mock(ExtensionContext.class);
+    when(context.getRoot()).thenReturn(root);
+    when(context.getRequiredTestClass()).thenAnswer(invocation -> testClass);
+    extension.afterAll(context);
   }
 
   private static ExtensionContext rootWithStore() {
