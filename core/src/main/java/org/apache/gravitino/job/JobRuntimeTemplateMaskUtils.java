@@ -40,7 +40,7 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  *   <li>Nest JSON — {@link #NESTED_JSON_ARGUMENT_FLAGS} ({@code --updater-options} / {@code
  *       --spark-conf} / {@code --options})
  *   <li>Spark conf property — {@link #CONF_ARGUMENT_FLAGS} ({@code --conf} / {@code -c}): a single
- *       {@code key=value} in either two-token or {@code --conf=key=value} form
+ *       whitespace-free {@code key=value} in either two-token or {@code --conf=key=value} form
  *   <li>JVM options string — {@link #JVM_OPTIONS_ARGUMENT_FLAGS} ({@code --driver-java-options} /
  *       {@code --executor-java-options}): a space-separated JVM string that may start with {@code
  *       -}; sensitive {@code -Dkey=value} tokens inside are masked
@@ -57,7 +57,9 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  * <p>Not masked (out of scope): resource URI fields ({@code executable}, {@code className}, {@code
  * jars}, {@code files}, {@code archives}, Shell {@code scripts}); {@code --hiveconf}; conf property
  * values that embed {@code -D} secrets under a non-sensitive conf key (for example {@code
- * spark.driver.extraJavaOptions}); free-form tokens such as a {@code --where} SQL predicate.
+ * spark.driver.extraJavaOptions}); free-form tokens such as a {@code --where} SQL predicate; Shell
+ * {@code /bin/sh -c} command strings that contain whitespace (so they are not treated as a Spark
+ * {@code -c key=value} conf entry).
  *
  * <p>Null map entries are preserved in the masked DTO / {@code jobConf} maps used on the REST and
  * event {@code jobConf} paths. When {@code JobInfo} rebuilds a {@code JobTemplate} via {@code
@@ -91,6 +93,10 @@ public final class JobRuntimeTemplateMaskUtils {
    * Spark flags whose payload is a single {@code key=value} config entry. Both the two-token form
    * ({@code --conf key=value}) and the equals form ({@code --conf=key=value}) use {@link
    * #maskConfKeyValuePayload}.
+   *
+   * <p>{@code -c} is also the shell {@code /bin/sh -c} flag. Conf masking only applies when the
+   * payload looks like one Spark conf entry (no whitespace); shell command strings are left
+   * unchanged.
    */
   static final Set<String> CONF_ARGUMENT_FLAGS = ImmutableSet.of("--conf", "-c");
 
@@ -345,10 +351,19 @@ public final class JobRuntimeTemplateMaskUtils {
    * Masks a conf-style {@code key=value} payload when {@code key} is sensitive. Shared by the
    * two-token ({@code --conf key=value}) and equals ({@code --conf=key=value}) forms.
    *
+   * <p>Payloads that contain whitespace are left unchanged. A Spark conf entry is a single token
+   * without spaces; a Shell {@code -c} command string almost always contains spaces, so this keeps
+   * {@code /bin/sh -c "export ACCOUNT_ID=5 && run.sh"} from being truncated as a conf entry.
+   *
    * @param payload the config entry after the conf flag
-   * @return masked payload, or {@code payload} unchanged when not a sensitive {@code key=value}
+   * @return masked payload, or {@code payload} unchanged when not a sensitive whitespace-free
+   *     {@code key=value}
    */
   private static String maskConfKeyValuePayload(String payload) {
+    // Spark --conf / -c values are a single key=value token; shell -c commands contain spaces.
+    if (payload.isEmpty() || payload.chars().anyMatch(Character::isWhitespace)) {
+      return payload;
+    }
     int eq = payload.indexOf('=');
     if (eq <= 0) {
       return payload;
