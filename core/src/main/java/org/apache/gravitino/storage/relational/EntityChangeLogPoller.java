@@ -346,8 +346,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
   /**
    * Polls an incremental batch and a bounded recent-history page, delivering unseen records.
    *
-   * @return true if the batch was full, so more rows may be waiting and the next poll should not
-   *     wait for the interval; false if the poller caught up or the poll failed
+   * @return true if the incremental batch or the replay page was full, so more rows may be waiting
+   *     and the next poll should not wait for the interval; false if both caught up or the poll
+   *     failed
    */
   @VisibleForTesting
   boolean pollChanges() {
