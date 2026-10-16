@@ -23,7 +23,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
 /** Authorizes view loads and permits authorized probes of absent views. */
@@ -71,23 +70,9 @@ public class LoadViewAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
     try {
       GravitinoEnv.getInstance().internalViewDispatcher().loadView(viewIdentifier);
-      return false;
-    } catch (NoSuchViewException e) {
-      // Absence permits a terminal 404, never a subsequent load without read permission.
-      throw new MissingViewProbeException(viewIdentifier);
     } catch (UnsupportedOperationException e) {
       // Preserve the primary denial when the connector cannot perform the existence probe.
-      return false;
     }
-  }
-
-  /**
-   * Signals an authorized absence probe that must terminate without running the load handler. This
-   * distinguishes a probe result from exceptions raised while evaluating authorization.
-   */
-  public static final class MissingViewProbeException extends NoSuchViewException {
-    private MissingViewProbeException(NameIdentifier ident) {
-      super("View %s does not exist", ident);
-    }
+    return false;
   }
 }

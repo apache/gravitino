@@ -47,7 +47,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.server.web.filter.authorization.LoadViewAuthorizationExecutor.MissingViewProbeException;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -55,7 +54,7 @@ import org.mockito.MockedStatic;
 public class TestLoadViewAuthorizationExecutor {
   @Test
   public void testAuthorizedMissingViewProbe() throws Exception {
-    assertThrows(MissingViewProbeException.class, () -> check(false, true, false, true, true));
+    assertThrows(NoSuchViewException.class, () -> check(false, true, false, true, true));
   }
 
   @Test

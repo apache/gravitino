@@ -61,8 +61,6 @@ import org.apache.gravitino.server.authorization.annotations.ExpressionCondition
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
-import org.apache.gravitino.server.web.filter.authorization.LoadTableAuthorizationExecutor.MissingTableProbeException;
-import org.apache.gravitino.server.web.filter.authorization.LoadViewAuthorizationExecutor.MissingViewProbeException;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.ExceptionHandlers;
@@ -249,7 +247,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
-            } catch (MissingTableProbeException exception) {
+            } catch (NoSuchTableException exception) {
               NameIdentifier tableIdent = metadataContext.get(Entity.EntityType.TABLE);
               if (tableIdent == null) {
                 throw exception;
@@ -258,8 +256,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                   OperationType.LOAD,
                   tableIdent.name(),
                   NameIdentifierUtil.getSchemaIdentifier(tableIdent).name(),
-                  new NoSuchTableException("%s", exception.getMessage()));
-            } catch (MissingViewProbeException exception) {
+                  exception);
+            } catch (NoSuchViewException exception) {
               NameIdentifier viewIdent = metadataContext.get(Entity.EntityType.VIEW);
               if (viewIdent == null) {
                 throw exception;
@@ -269,7 +267,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                   OperationType.LOAD,
                   viewIdent.name(),
                   NameIdentifierUtil.getSchemaIdentifier(viewIdent).name(),
-                  new NoSuchViewException("%s", exception.getMessage()));
+                  exception);
             } catch (BadRequestException exception) {
               LOG.warn("Invalid authorization request", exception);
               return Utils.illegalArguments(exception.getMessage(), exception);

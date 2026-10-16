@@ -53,7 +53,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.server.web.filter.authorization.LoadTableAuthorizationExecutor.MissingTableProbeException;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -126,8 +125,7 @@ public class TestLoadTableAuthorizationExecutor {
     try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
       mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
       assertThrows(
-          MissingTableProbeException.class,
-          () -> executor.execute(new AuthorizationRequestContext()));
+          NoSuchTableException.class, () -> executor.execute(new AuthorizationRequestContext()));
       doReturn(mock(Table.class)).when(internalTableDispatcher).loadTable(tableIdentifier);
       assertFalse(executor.execute(new AuthorizationRequestContext()));
       IllegalStateException failure = new IllegalStateException("Table backend unavailable");
