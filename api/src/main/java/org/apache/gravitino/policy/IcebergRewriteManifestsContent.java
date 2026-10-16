@@ -30,7 +30,15 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /** Typed thresholds and target options for Iceberg manifest rewriting. */
-public final class IcebergRewriteManifestsContent implements PolicyContent {
+public class IcebergRewriteManifestsContent implements PolicyContent {
+  /** Property key for strategy type. */
+  public static final String STRATEGY_TYPE_KEY = "strategy.type";
+  /** Property key for the job template. */
+  public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
+  /** Rule key for the trigger expression. */
+  public static final String TRIGGER_EXPR_KEY = "trigger-expr";
+  /** Rule key for the score expression. */
+  public static final String SCORE_EXPR_KEY = "score-expr";
   /** Strategy type for manifest rewriting. */
   public static final String STRATEGY_TYPE_VALUE = "iceberg-rewrite-manifests";
   /** Built-in rewrite job template. */
@@ -59,7 +67,8 @@ public final class IcebergRewriteManifestsContent implements PolicyContent {
   private final Integer specId;
   private final Boolean useCaching;
 
-  private IcebergRewriteManifestsContent() {
+  /** Creates manifest rewrite policy content with default thresholds. */
+  public IcebergRewriteManifestsContent() {
     this(null, null, null, null, null);
   }
 
@@ -137,7 +146,7 @@ public final class IcebergRewriteManifestsContent implements PolicyContent {
   @Override
   public Map<String, String> properties() {
     return ImmutableMap.of(
-        "strategy.type", STRATEGY_TYPE_VALUE, "job.template-name", JOB_TEMPLATE_NAME_VALUE);
+        STRATEGY_TYPE_KEY, STRATEGY_TYPE_VALUE, JOB_TEMPLATE_NAME_KEY, JOB_TEMPLATE_NAME_VALUE);
   }
 
   @Override

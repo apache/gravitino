@@ -42,14 +42,28 @@ public interface Policy extends Auditable {
     ICEBERG_COMPACTION(
         BUILT_IN_TYPE_PREFIX + "iceberg_compaction", IcebergDataCompactionContent.class),
 
-    /** Built-in policy type for rewriting Iceberg manifests within one partition spec. */
-    ICEBERG_REWRITE_MANIFESTS(
-        BUILT_IN_TYPE_PREFIX + "iceberg_rewrite_manifests", IcebergRewriteManifestsContent.class),
-
     /** Iceberg orphan file cleanup policy. */
     ICEBERG_ORPHAN_FILE_REMOVAL(
         BUILT_IN_TYPE_PREFIX + "iceberg_orphan_file_removal",
         IcebergOrphanFileRemovalContent.class),
+
+    /** Iceberg manifest rewrite policy. */
+    ICEBERG_REWRITE_MANIFESTS(
+        BUILT_IN_TYPE_PREFIX + "iceberg_rewrite_manifests", IcebergRewriteManifestsContent.class),
+
+    /** Iceberg snapshot expiration policy. */
+    ICEBERG_SNAPSHOT_EXPIRATION(
+        BUILT_IN_TYPE_PREFIX + "iceberg_snapshot_expiration",
+        IcebergSnapshotExpirationContent.class),
+
+    /** Built-in policy type for filtering rows of tagged tables. */
+    ROW_FILTER(BUILT_IN_TYPE_PREFIX + "row_filter", RowFilterContent.class),
+
+    /** Built-in policy type for masking columns of tagged tables or tagged columns. */
+    COLUMN_MASK(BUILT_IN_TYPE_PREFIX + "column_mask", ColumnMaskContent.class),
+
+    /** Built-in policy type for access conferred by a tag. */
+    ACCESS_CONTROL(BUILT_IN_TYPE_PREFIX + "access_control", AccessControlContent.class),
 
     /** Non-built-in policies use the fixed wire value {@code custom}. */
     CUSTOM("custom", PolicyContents.CustomContent.class);

@@ -118,7 +118,7 @@ public class TestJobExecutionInfo {
           public void initialize(Map<String, String> configs) {}
 
           @Override
-          public String submitJob(JobTemplate jobTemplate) {
+          public String submitJob(JobContext context, JobTemplate jobTemplate) {
             return "job-1";
           }
 

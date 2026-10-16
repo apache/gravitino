@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -26,6 +27,8 @@ import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class TestManifestRewritePolicyDTO {
   @Test
@@ -49,6 +52,62 @@ class TestManifestRewritePolicyDTO {
         JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class);
     request.validate();
     Assertions.assertEquals(content, DTOConverters.fromDTO(request.getPolicyContent()));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "spec_id,1.5",
+    "spec_id,2147483648",
+    "spec_id,true",
+    "spec_id,\"1\"",
+    "manifest_count_critical,500.5",
+    "manifest_count_critical,9223372036854775808",
+    "manifest_count_warning,100.5",
+    "manifest_count_warning,false",
+    "avg_manifest_size_threshold_bytes,4096.5",
+    "avg_manifest_size_threshold_bytes,\"4096\""
+  })
+  void testRejectInvalidNumericValuesInCreateAndUpdate(String field, String value) {
+    String content = "{\"" + field + "\":" + value + "}";
+    String create =
+        "{\"name\":\"rewrite\",\"policyType\":\"system_iceberg_rewrite_manifests\","
+            + "\"enabled\":true,\"content\":"
+            + content
+            + "}";
+    String update =
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_rewrite_manifests\","
+            + "\"newContent\":"
+            + content
+            + "}";
+    Assertions.assertThrows(
+        JsonProcessingException.class,
+        () -> JsonUtils.objectMapper().readValue(create, PolicyCreateRequest.class));
+    Assertions.assertThrows(
+        JsonProcessingException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(update, PolicyUpdateRequest.UpdatePolicyContentRequest.class));
+  }
+
+  @Test
+  void testNumericBoundsAndNullDefaults() throws Exception {
+    PolicyContentDTO.IcebergRewriteManifestsContentDTO bounds =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"spec_id\":2147483647,\"manifest_count_critical\":9223372036854775807}",
+                PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
+    bounds.validate();
+    Assertions.assertEquals(Integer.MAX_VALUE, bounds.specId());
+    Assertions.assertEquals(Long.MAX_VALUE, bounds.manifestCountCritical());
+    PolicyContentDTO.IcebergRewriteManifestsContentDTO defaults =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"spec_id\":null,\"manifest_count_critical\":null,\"manifest_count_warning\":null,"
+                    + "\"avg_manifest_size_threshold_bytes\":null}",
+                PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
+    defaults.validate();
+    Assertions.assertEquals(
+        PolicyContents.icebergRewriteManifests(), DTOConverters.fromDTO(defaults));
   }
 
   @Test

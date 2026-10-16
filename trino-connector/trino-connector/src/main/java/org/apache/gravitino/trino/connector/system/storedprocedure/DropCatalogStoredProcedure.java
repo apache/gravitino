@@ -28,7 +28,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -88,7 +87,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
    * @param catalogName the name of the catalog to drop
    * @param ignoreNotExist whether to ignore if the catalog does not exist
    * @param metalakeArgument the metalake to drop the catalog from, null to use the configured one
-   * @throws TrinoException if the catalog does not exist and ignoreNotExist is false
+   * @throws TrinoException if the catalog does not exist and ignoreNotExist is false, or the
+   *     operation fails
    */
   public void dropCatalog(
       String catalogName, boolean ignoreNotExist, @Nullable String metalakeArgument) {
@@ -144,10 +144,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
           GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS,
           "Metalake " + metalake + " not exists.");
     } catch (Exception e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "Drop catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
-          e);
+      throw GravitinoErrorCode.toTrinoException(
+          e, "Drop catalog " + NameIdentifier.of(metalake, catalogName) + " failed");
     }
   }
 }

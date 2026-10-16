@@ -34,7 +34,34 @@ public interface SupportsPolicies {
   String[] listPolicies();
 
   /**
+   * List the visible policy names and whether authorization filtering omitted other policies.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted policies. Implementations that support authorization filtering should override
+   * this method.
+   *
+   * @return The visible policy names and authorization-filtering status.
+   */
+  default PolicyList<String> listPoliciesWithVisibility() {
+    return new PolicyList<>(listPolicies(), false);
+  }
+
+  /**
    * @return The policies that apply to the metadata object.
    */
   Policy[] listPolicyInfos();
+
+  /**
+   * List the visible policies with details and whether authorization filtering omitted other
+   * policies.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted policies. Implementations that support authorization filtering should override
+   * this method.
+   *
+   * @return The visible policies and authorization-filtering status.
+   */
+  default PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return new PolicyList<>(listPolicyInfos(), false);
+  }
 }

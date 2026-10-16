@@ -30,14 +30,22 @@ At the defaults, 99 manifests never trigger; 100 manifests averaging 8 MiB do no
 
 ## Collect, evaluate, and submit
 
-Collect `custom-manifest-number-by-spec` and `custom-avg-manifest-size-by-spec` for the
-chosen spec before evaluating. Submit `builtin-iceberg-update-manifest-stats` to collect
-this pair without data-file statistics, including after partition evolution. Both values are objects keyed by the decimal spec ID.
-The handler reads the same key from one table-statistics response. A missing map or key
-means collection is required and produces no recommendation. An empty spec has count and
-average zero. Malformed measurements fail evaluation. Counts from other specs are ignored.
+Submit `builtin-iceberg-update-manifest-stats` to collect complete
+`custom-manifest-number-by-spec` and `custom-avg-manifest-size-by-spec` maps plus
+`custom-manifest-snapshot-id` from one table snapshot. The collector covers every defined
+spec in one traversal; it has no `spec_id` argument. Both maps are keyed by decimal spec ID.
 
-For CLI evaluation of persisted statistics, set `spec_id` to the ID used for collection.
+The handler compares the published snapshot ID with `current-snapshot-id` in the table
+metadata supplied by the optimizer's table metadata provider. Missing, malformed, or
+mismatched snapshot IDs produce no recommendation; recollect before evaluating again.
+For a table without a snapshot, the collector publishes `-1` and Iceberg table metadata
+reports `none`. The provider must expose this metadata property to verify freshness.
+
+The handler reads the chosen spec's count and average from the same statistics response.
+A missing map or key produces no recommendation. An empty spec has count and average zero.
+Malformed measurements fail evaluation. Counts from other specs are ignored.
+
+For CLI evaluation of persisted statistics, set `spec_id` to the existing spec to evaluate.
 The following example assumes that spec `1` exists and its statistics have been collected:
 
 ```shell
@@ -67,18 +75,19 @@ Recollect statistics after a successful rewrite before evaluating again.
 
 ## Keeping the collection target
 
-An application that collects and evaluates in one cycle may omit the requested spec.
-`IcebergUpdateManifestStatsJob.collectManifestStatistics(spark, catalog, table, null)`
-resolves the current default once and returns an `IcebergManifestStatistics` measurement.
-Pass its `statistics()` into `StrategyHandlerContext` and its `specId()` into
-`ManifestRewriteStrategyHandler.initialize(context, resolvedSpecId)`. Alternatively, publish
-both measurements atomically, read them in one response, and retain that same resolved ID.
-An explicitly configured policy spec must match the collection target.
+An application that collects and evaluates in one cycle may omit the policy's requested
+spec. Resolve the table's default spec once before collection and retain that ID.
+`IcebergUpdateManifestStatsJob.collectManifestStatistics(spark, catalog, table)` returns
+both complete maps and their snapshot ID. Pass that list and fresh Gravitino table metadata
+into `StrategyHandlerContext`, then call
+`ManifestRewriteStrategyHandler.initialize(context, resolvedSpecId)`. An explicitly configured
+policy spec must match the retained target. If the snapshot changed, recollect the complete
+maps and retry with the same target ID.
 
 The adapter always submits the resolved ID, even if the table's default changes after collection.
 It never infers the default from map keys or resolves it again during evaluation. The standalone
 CLI skips a policy without `spec_id` and logs a warning, because persisted per-spec maps do not
-identify the default from an earlier collection cycle. Empty policy content is valid for the
+identify which default an application selected before collection. Empty policy content is valid for the
 collection-cycle API but produces no standalone CLI recommendation until `spec_id` is set.
 
 Rewriting reorganizes manifests within the selected spec and does not migrate data files

@@ -20,21 +20,38 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.Hashing;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.StatisticValues;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
@@ -43,7 +60,7 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Built-in job for collecting and atomically merging Iceberg manifest statistics by spec. */
+/** Built-in job for collecting all Iceberg manifest statistics in one table cycle. */
 public class IcebergUpdateManifestStatsJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergUpdateManifestStatsJob.class);
   private static final String NAME =
@@ -54,7 +71,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
   public SparkJobTemplate jobTemplate() {
     return SparkJobTemplate.builder()
         .withName(NAME)
-        .withComment("Collect manifest count and average size for one Iceberg partition spec")
+        .withComment("Collect manifest count and average size for every Iceberg partition spec")
         .withExecutable(resolveExecutable(IcebergUpdateManifestStatsJob.class))
         .withClassName(IcebergUpdateManifestStatsJob.class.getName())
         .withArguments(
@@ -63,8 +80,8 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
                 "{{catalog_name}}",
                 "--table",
                 "{{table_identifier}}",
-                "--spec-id",
-                "{{spec_id:-}}",
+                "--coordination-dir",
+                "{{coordination_directory:-}}",
                 "--updater-options",
                 "{{updater_options}}",
                 "--spark-conf",
@@ -77,19 +94,25 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
   /**
    * Collects and persists manifest statistics using the configured Spark catalog and updater.
    *
-   * @param args catalog, table, optional spec ID, updater options, and Spark configuration
+   * @param args catalog, table, optional shared coordination directory, updater options, and Spark
+   *     configuration
    * @throws Exception if collection, persistence, or resource cleanup fails
    */
   public static void main(String[] args) throws Exception {
     Map<String, String> arguments =
         IcebergJobUtils.parseArguments(
             args,
-            ImmutableSet.of("catalog", "table", "spec-id", "updater-options", "spark-conf"),
+            ImmutableSet.of(
+                "catalog", "table", "updater-options", "spark-conf", "coordination-dir"),
             ImmutableSet.of("catalog", "table", "updater-options"));
+    String coordinationDirectory = arguments.get("coordination-dir");
+    Path coordinationPath =
+        coordinationDirectory == null || coordinationDirectory.trim().isEmpty()
+            ? null
+            : Paths.get(coordinationDirectory);
     String catalog = arguments.get("catalog");
     String table = arguments.get("table");
     tableIdentifier(catalog, table);
-    Integer specId = parseSpecId(arguments.get("spec-id"));
     Map<String, String> options =
         IcebergSparkConfigUtils.parseFlatJsonMap(
             arguments.get("updater-options"), "updater-options");
@@ -106,7 +129,13 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       SparkSession spark = builder.getOrCreate();
       try {
         IcebergJobUtils.requireIcebergSparkRuntime();
-        updateStatistics(spark, updater, catalog, table, specId);
+        updateStatistics(
+            spark,
+            updater,
+            catalog,
+            table,
+            properties.get(OptimizerConfig.GRAVITINO_METALAKE),
+            coordinationPath);
       } finally {
         spark.stop();
       }
@@ -114,19 +143,15 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
   }
 
   /**
-   * Collects a complete manifest measurement from one snapshot for one resolved partition spec.
+   * Collects complete per-spec measurements from one pinned table snapshot.
    *
    * @param spark Spark session with the Iceberg catalog configured
    * @param catalogName Spark catalog name
    * @param tableIdentifier schema.table identifier
-   * @param requestedSpecId requested spec, or null to resolve the current default once
-   * @return measurements carrying the resolved spec ID for evaluation and submission
+   * @return both complete maps and the snapshot ID (-1 for a table without a snapshot)
    */
-  public static IcebergManifestStatistics collectManifestStatistics(
-      SparkSession spark,
-      String catalogName,
-      String tableIdentifier,
-      @Nullable Integer requestedSpecId) {
+  public static List<StatisticEntry<?>> collectManifestStatistics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
     String identifier = buildTableIdentifier(catalogName, tableIdentifier);
     final Table table;
     try {
@@ -135,23 +160,40 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
     } catch (Exception e) {
       throw new IllegalArgumentException("Cannot load Iceberg table " + identifier, e);
     }
-    int specId = requestedSpecId == null ? table.spec().specId() : requestedSpecId;
-    if (specId < 0 || !table.specs().containsKey(specId)) {
-      throw new IllegalArgumentException("Unknown partition spec ID: " + specId);
-    }
-    // Pin one snapshot and the resolved spec even if the table evolves during collection.
+    return collectManifestStatistics(table);
+  }
+
+  @VisibleForTesting
+  static List<StatisticEntry<?>> collectManifestStatistics(Table table) {
     Snapshot snapshot = table.currentSnapshot();
-    long count = 0;
-    double totalBytes = 0;
+    Map<Integer, Long> counts = new HashMap<>();
+    Map<Integer, Double> sizes = new HashMap<>();
+    table.specs().keySet().forEach(spec -> counts.put(spec, 0L));
     if (snapshot != null) {
       for (ManifestFile manifest : snapshot.allManifests(table.io())) {
-        if (manifest.partitionSpecId() == specId) {
-          count++;
-          totalBytes += manifest.length();
-        }
+        int spec = manifest.partitionSpecId();
+        counts.merge(spec, 1L, Long::sum);
+        sizes.merge(spec, (double) manifest.length(), Double::sum);
       }
     }
-    return new IcebergManifestStatistics(specId, count, count == 0 ? 0D : totalBytes / count);
+    Map<String, StatisticValue<?>> countValues = new HashMap<>();
+    Map<String, StatisticValue<?>> averageValues = new HashMap<>();
+    counts.forEach(
+        (spec, count) -> {
+          String key = Integer.toString(spec);
+          countValues.put(key, StatisticValues.longValue(count));
+          averageValues.put(
+              key, StatisticValues.doubleValue(count == 0 ? 0D : sizes.get(spec) / count));
+        });
+    return Arrays.asList(
+        new StatisticEntryImpl<>(
+            IcebergManifestStatistics.MANIFEST_NUMBER, StatisticValues.objectValue(countValues)),
+        new StatisticEntryImpl<>(
+            IcebergManifestStatistics.AVG_MANIFEST_SIZE,
+            StatisticValues.objectValue(averageValues)),
+        new StatisticEntryImpl<>(
+            IcebergManifestStatistics.SNAPSHOT_ID,
+            StatisticValues.longValue(snapshot == null ? -1L : snapshot.snapshotId())));
   }
 
   @VisibleForTesting
@@ -160,29 +202,61 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       StatisticsUpdater updater,
       String catalogName,
       String tableIdentifier,
-      @Nullable Integer requestedSpecId) {
+      String metalake,
+      @Nullable Path coordinationDirectory)
+      throws IOException {
     NameIdentifier identifier = tableIdentifier(catalogName, tableIdentifier);
-    IcebergManifestStatistics measurements =
-        collectManifestStatistics(spark, catalogName, tableIdentifier, requestedSpecId);
-    updater.mergeTableStatistics(identifier, measurements.statistics());
-    LOG.info(
-        "Updated manifest statistics for {} spec {}: count={}, averageBytes={}",
-        identifier,
-        measurements.specId(),
-        measurements.count(),
-        measurements.averageSize());
-  }
-
-  @VisibleForTesting
-  @Nullable
-  static Integer parseSpecId(@Nullable String value) {
-    if (value == null || value.trim().isEmpty()) {
-      return null;
+    if (coordinationDirectory == null) {
+      updater.updateTableStatistics(
+          identifier, collectManifestStatistics(spark, catalogName, tableIdentifier));
+      LOG.info("Updated complete manifest statistics for {}", identifier);
+      return;
     }
-    if (!value.matches("[0-9]+")) {
-      throw new IllegalArgumentException("spec_id must be a non-negative 32-bit integer");
+    if (!coordinationDirectory.isAbsolute() || !Files.isDirectory(coordinationDirectory)) {
+      throw new IllegalArgumentException(
+          "coordination-dir must be an existing absolute shared directory");
     }
-    return Integer.valueOf(value);
+    String key =
+        Hashing.sha256()
+            .hashString(
+                metalake + "\0" + catalogName + "\0" + tableIdentifier, StandardCharsets.UTF_8)
+            .toString();
+    Path lockPath = coordinationDirectory.resolve(key + ".lock");
+    // Never delete lock files: replacing the inode lets two hosts lock different files.
+    try (FileChannel channel =
+            FileChannel.open(
+                lockPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE);
+        FileLock lock = channel.tryLock()) {
+      if (lock == null) {
+        throw new IllegalStateException("Manifest collection is already running for " + identifier);
+      }
+      if (channel.size() != 0) {
+        throw new IllegalStateException(
+            "Unfinished manifest collection requires recovery: " + lockPath);
+      }
+      List<StatisticEntry<?>> measurements =
+          collectManifestStatistics(spark, catalogName, tableIdentifier);
+      byte[] marker =
+          ("In-progress manifest collection for "
+                  + metalake
+                  + "."
+                  + identifier
+                  + "; verify the previous process and any outstanding PUT have finished before recovery.\n")
+              .getBytes(StandardCharsets.UTF_8);
+      ByteBuffer buffer = ByteBuffer.wrap(marker);
+      while (buffer.hasRemaining()) {
+        channel.write(buffer);
+      }
+      channel.force(true);
+      updater.updateTableStatistics(identifier, measurements);
+      // A failed or ambiguous PUT leaves the marker intact, preventing an unsafe automatic retry.
+      channel.truncate(0);
+      channel.force(true);
+      LOG.info("Updated complete manifest statistics for {}", identifier);
+    }
   }
 
   @VisibleForTesting
@@ -202,6 +276,9 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       }
       properties.put(key, value.trim());
     }
+    // A retried PUT can hide an older request that is still executing after a connection failure.
+    properties.put(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, "0");
+    GravitinoAuthSettings.copyAliases(properties);
     return properties;
   }
 

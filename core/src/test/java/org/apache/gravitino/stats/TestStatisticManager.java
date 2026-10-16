@@ -19,12 +19,19 @@
 
 package org.apache.gravitino.stats;
 
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -42,18 +49,10 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -64,9 +63,12 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -117,10 +119,17 @@ public class TestStatisticManager {
         .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -208,128 +217,6 @@ public class TestStatisticManager {
     }
 
     FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
-  }
-
-  @Test
-  public void testConcurrentObjectMergesAndAtomicReads() throws Exception {
-    MetadataObject object =
-        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
-    try (StatisticManager manager = new StatisticManager(entityStore, idGenerator, config)) {
-      List<String> names = Lists.newArrayList("custom-merge-count", "custom-merge-size");
-      manager.dropStatistics(METALAKE, object, names);
-      ExecutorService executor = Executors.newFixedThreadPool(5);
-      CountDownLatch start = new CountDownLatch(1);
-      try {
-        List<Future<?>> writers = new ArrayList<>();
-        for (int spec = 0; spec < 4; spec++) {
-          String key = Integer.toString(spec);
-          writers.add(
-              executor.submit(
-                  () -> {
-                    start.await();
-                    for (long value = 1; value <= 20; value++) {
-                      Map<String, StatisticValue<?>> update = new HashMap<>();
-                      update.put(
-                          names.get(0),
-                          StatisticValues.objectValue(
-                              Collections.singletonMap(key, StatisticValues.longValue(value))));
-                      update.put(
-                          names.get(1),
-                          StatisticValues.objectValue(
-                              Collections.singletonMap(
-                                  key, StatisticValues.doubleValue(value * 10D))));
-                      manager.mergeStatistics(METALAKE, object, update);
-                    }
-                    return null;
-                  }));
-        }
-        Future<?> reader =
-            executor.submit(
-                () -> {
-                  start.await();
-                  for (int i = 0; i < 80; i++) {
-                    Map<String, StatisticValue<?>> values = new HashMap<>();
-                    manager
-                        .listStatistics(METALAKE, object)
-                        .forEach(stat -> values.put(stat.name(), stat.value().get()));
-                    if (values.containsKey(names.get(0))) {
-                      Map<String, StatisticValue<?>> counts =
-                          ((StatisticValues.ObjectValue) values.get(names.get(0))).value();
-                      Map<String, StatisticValue<?>> sizes =
-                          ((StatisticValues.ObjectValue) values.get(names.get(1))).value();
-                      Assertions.assertEquals(counts.keySet(), sizes.keySet());
-                      counts.forEach(
-                          (key, count) ->
-                              Assertions.assertEquals(
-                                  ((Long) count.value()) * 10D, sizes.get(key).value()));
-                    }
-                  }
-                  return null;
-                });
-        start.countDown();
-        for (Future<?> writer : writers) {
-          writer.get(30, TimeUnit.SECONDS);
-        }
-        reader.get(30, TimeUnit.SECONDS);
-        Map<String, StatisticValue<?>> values = new HashMap<>();
-        manager
-            .listStatistics(METALAKE, object)
-            .forEach(stat -> values.put(stat.name(), stat.value().get()));
-        Map<String, StatisticValue<?>> counts =
-            ((StatisticValues.ObjectValue) values.get(names.get(0))).value();
-        Assertions.assertEquals(4, counts.size());
-        counts.values().forEach(count -> Assertions.assertEquals(20L, count.value()));
-
-        Map<String, StatisticValue<?>> invalid = new HashMap<>();
-        invalid.put(
-            names.get(0),
-            StatisticValues.objectValue(
-                Collections.singletonMap("0", StatisticValues.longValue(999L))));
-        invalid.put(names.get(1), StatisticValues.longValue(1L));
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.mergeStatistics(METALAKE, object, invalid));
-        Map<String, StatisticValue<?>> after = new HashMap<>();
-        manager
-            .listStatistics(METALAKE, object)
-            .forEach(stat -> after.put(stat.name(), stat.value().get()));
-        Assertions.assertEquals(values, after);
-      } finally {
-        executor.shutdownNow();
-        manager.dropStatistics(METALAKE, object, names);
-      }
-    }
-  }
-
-  @Test
-  public void testMergeRejectsExistingScalarWithoutPublishingOtherValues() throws IOException {
-    MetadataObject object =
-        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
-    List<String> names = Lists.newArrayList("custom-scalar", "custom-new-object");
-    try (StatisticManager manager = new StatisticManager(entityStore, idGenerator, config)) {
-      manager.updateStatistics(
-          METALAKE, object, Collections.singletonMap(names.get(0), StatisticValues.longValue(1L)));
-      try {
-        Map<String, StatisticValue<?>> updates = new HashMap<>();
-        for (String name : names) {
-          updates.put(
-              name,
-              StatisticValues.objectValue(
-                  Collections.singletonMap("0", StatisticValues.longValue(2L))));
-        }
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.mergeStatistics(METALAKE, object, updates));
-        Map<String, StatisticValue<?>> values = new HashMap<>();
-        manager
-            .listStatistics(METALAKE, object)
-            .forEach(stat -> values.put(stat.name(), stat.value().get()));
-        Assertions.assertEquals(StatisticValues.longValue(1L), values.get(names.get(0)));
-        Assertions.assertFalse(values.containsKey(names.get(1)));
-      } finally {
-        manager.dropStatistics(METALAKE, object, names);
-      }
-    }
   }
 
   @Test
@@ -526,6 +413,81 @@ public class TestStatisticManager {
       StatisticValue<?> value = expectStats.get(statistic.name());
       Assertions.assertEquals(
           value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
+    }
+  }
+
+  @Test
+  public void testTableStatisticsDoNotWaitForTableTreeLock() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put("lock_free", StatisticValues.longValue(1L));
+
+    // Table-level statistic writes are fenced on the table row and version-checked by the entity
+    // store, so they must not contend with an in-flight table operation that holds the table tree
+    // lock.
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter, () -> statisticManager.updateStatistics(METALAKE, tableObject, stats));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter, () -> statisticManager.listStatistics(METALAKE, tableObject));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter,
+          () ->
+              statisticManager.dropStatistics(
+                  METALAKE, tableObject, Lists.newArrayList("lock_free")));
+    }
+  }
+
+  @Test
+  public void testPartitionStatisticsStillWaitForTableTreeLock() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put("locked", StatisticValues.longValue(1L));
+    List<PartitionStatisticsUpdate> updates =
+        Lists.newArrayList(PartitionStatisticsModification.update("p_lock", stats));
+
+    // A pluggable partition statistic storage need not update atomically, so this path keeps the
+    // tree lock until the storages do.
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () -> statisticManager.updatePartitionStatistics(METALAKE, tableObject, updates));
+    }
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () ->
+              statisticManager.listPartitionStatistics(
+                  METALAKE,
+                  tableObject,
+                  PartitionRange.between(
+                      "p_lock",
+                      PartitionRange.BoundType.CLOSED,
+                      "p_lock",
+                      PartitionRange.BoundType.CLOSED)));
+    }
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () ->
+              statisticManager.dropPartitionStatistics(
+                  METALAKE,
+                  tableObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          "p_lock", Lists.newArrayList("locked")))));
     }
   }
 

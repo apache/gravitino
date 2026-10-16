@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.CURRENT_SNAPSHOT_ID;
+
 import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -33,6 +35,7 @@ import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatisti
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.StatisticValues;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +47,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
 
   @Override
   public Set<DataRequirement> dataRequirements() {
-    return Set.of(DataRequirement.TABLE_STATISTICS);
+    return Set.of(DataRequirement.TABLE_METADATA, DataRequirement.TABLE_STATISTICS);
   }
 
   @Override
@@ -59,7 +62,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     if (requestedSpec == null) {
       LOG.warn(
           "Skipping manifest rewrite policy {} for {}: set spec_id for persisted statistics "
-              + "or pass the collector's resolved spec ID when initializing a collection cycle",
+              + "or pass the spec ID resolved before collection when initializing a collection cycle",
           context.strategy().name(),
           context.nameIdentifier());
       return;
@@ -71,8 +74,8 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
    * Evaluates statistics using the spec resolved at collection start. The default is never resolved
    * again, even if partition evolution has occurred since collection.
    *
-   * @param context strategy and one consistent table-statistics response
-   * @param resolvedSpecId spec returned by the collector
+   * @param context strategy, fresh table metadata, and one consistent table-statistics response
+   * @param resolvedSpecId spec selected before collection
    */
   public void initialize(StrategyHandlerContext context, int resolvedSpecId) {
     evaluation = StrategyEvaluation.NO_EXECUTION;
@@ -106,6 +109,12 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
           "Duplicate statistic: %s",
           entry.name());
     }
+    if (!hasCurrentSnapshot(context, statistics.get(IcebergManifestStatistics.SNAPSHOT_ID))) {
+      LOG.info(
+          "Skipping manifest rewrite for {}: verify table snapshot metadata and recollect manifest statistics",
+          context.nameIdentifier());
+      return;
+    }
     Optional<IcebergManifestStatistics> measurement =
         IcebergManifestStatistics.fromStatistics(statistics, resolvedSpecId);
     if (measurement.isEmpty()) {
@@ -135,6 +144,22 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
   @Override
   public StrategyEvaluation evaluate() {
     return evaluation;
+  }
+
+  private static boolean hasCurrentSnapshot(
+      StrategyHandlerContext context, @Nullable StatisticValue<?> snapshot) {
+    if (!(snapshot instanceof StatisticValues.LongValue)) {
+      return false;
+    }
+    String currentSnapshot =
+        context
+            .tableMetadata()
+            .map(table -> table.properties().get(CURRENT_SNAPSHOT_ID))
+            .orElse(null);
+    long collectedSnapshot = ((StatisticValues.LongValue) snapshot).value();
+    return collectedSnapshot == -1L
+        ? "none".equals(currentSnapshot)
+        : collectedSnapshot >= 0 && Long.toString(collectedSnapshot).equals(currentSnapshot);
   }
 
   @Nullable

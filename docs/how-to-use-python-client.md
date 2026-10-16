@@ -31,6 +31,17 @@ pip install apache-gravitino
 
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
+3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+
+### Semantic Model Ossie Import and Export
+
+Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.
+The [Semantic Model guide](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+includes Python examples for native creation, list/load, alteration, deletion, and Apache Ossie
+YAML/JSON import and export, along with the source and permission requirements.
+
+The SDK transfers Ossie document text directly and requires no YAML parser. Import and export
+default to `document_format="yaml"`; use `"json"` for JSON documents.
 
 ### Fileset Example
 

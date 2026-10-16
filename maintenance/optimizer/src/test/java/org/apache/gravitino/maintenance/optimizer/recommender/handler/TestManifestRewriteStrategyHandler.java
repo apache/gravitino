@@ -30,6 +30,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.strategy.Gravitino
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -70,8 +71,8 @@ class TestManifestRewriteStrategyHandler {
     for (List<StatisticEntry<?>> stats :
         List.of(
             List.<StatisticEntry<?>>of(),
-            statistics(500, 1).subList(0, 1),
-            statistics(500, 1).subList(1, 2))) {
+            List.of(statistics(500, 1).get(0), statistics(500, 1).get(2)),
+            statistics(500, 1).subList(1, 3))) {
       handler.initialize(
           context(PolicyContents.icebergRewriteManifests(null, null, null, 1, null), stats));
       Assertions.assertFalse(handler.shouldTrigger());
@@ -160,13 +161,79 @@ class TestManifestRewriteStrategyHandler {
     }
   }
 
+  @Test
+  void testUnverifiedSnapshotsDoNotTriggerAndClearEarlierEvaluation() {
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    StrategyHandlerContext valid =
+        context(
+            PolicyContents.icebergRewriteManifests(null, null, null, 1, null), statistics(500, 1));
+    for (Map<String, String> properties :
+        List.of(
+            Map.<String, String>of(), Map.of("current-snapshot-id", "2"),
+            Map.of("current-snapshot-id", "none"), Map.of("current-snapshot-id", "invalid"))) {
+      handler.initialize(valid);
+      Assertions.assertTrue(handler.shouldTrigger());
+      Table metadata = Mockito.mock(Table.class);
+      Mockito.when(metadata.properties()).thenReturn(properties);
+      handler.initialize(
+          StrategyHandlerContext.builder(valid.nameIdentifier(), valid.strategy())
+              .withTableStatistics(valid.tableStatistics())
+              .withTableMetadata(metadata)
+              .build());
+      Assertions.assertFalse(handler.shouldTrigger());
+    }
+    handler.initialize(
+        StrategyHandlerContext.builder(valid.nameIdentifier(), valid.strategy())
+            .withTableStatistics(valid.tableStatistics())
+            .build());
+    Assertions.assertFalse(handler.shouldTrigger());
+    handler.initialize(
+        context(
+            PolicyContents.icebergRewriteManifests(null, null, null, 1, null),
+            statistics(500, 1).subList(0, 2)));
+    Assertions.assertFalse(handler.shouldTrigger());
+    handler.initialize(
+        context(
+            PolicyContents.icebergRewriteManifests(null, null, null, 1, null),
+            List.of(
+                statistics(500, 1).get(0),
+                statistics(500, 1).get(1),
+                new StatisticEntryImpl<>(
+                    IcebergManifestStatistics.SNAPSHOT_ID, StatisticValues.stringValue("1")))));
+    Assertions.assertFalse(handler.shouldTrigger());
+  }
+
+  @Test
+  void testEmptyTableSnapshotIsAccepted() {
+    StrategyHandlerContext valid =
+        context(
+            PolicyContents.icebergRewriteManifests(null, null, null, 1, null), statistics(0, 0));
+    Table metadata = Mockito.mock(Table.class);
+    Mockito.when(metadata.properties()).thenReturn(Map.of("current-snapshot-id", "none"));
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    handler.initialize(
+        StrategyHandlerContext.builder(valid.nameIdentifier(), valid.strategy())
+            .withTableMetadata(metadata)
+            .withTableStatistics(
+                List.of(
+                    statistics(0, 0).get(0),
+                    statistics(0, 0).get(1),
+                    new StatisticEntryImpl<>(
+                        IcebergManifestStatistics.SNAPSHOT_ID, StatisticValues.longValue(-1))))
+            .build());
+    Assertions.assertFalse(handler.shouldTrigger());
+  }
+
   private static StrategyHandlerContext context(
       PolicyContent content, List<StatisticEntry<?>> statistics) {
     Policy policy = Mockito.mock(Policy.class);
     Mockito.when(policy.content()).thenReturn(content);
     Mockito.when(policy.name()).thenReturn("rewrite");
+    Table metadata = Mockito.mock(Table.class);
+    Mockito.when(metadata.properties()).thenReturn(Map.of("current-snapshot-id", "1"));
     return StrategyHandlerContext.builder(
             NameIdentifier.of("iceberg", "db", "tbl"), new GravitinoStrategy(policy))
+        .withTableMetadata(metadata)
         .withTableStatistics(statistics)
         .build();
   }
@@ -185,6 +252,8 @@ class TestManifestRewriteStrategyHandler {
                     "0",
                     StatisticValues.doubleValue(1),
                     "1",
-                    StatisticValues.doubleValue(average)))));
+                    StatisticValues.doubleValue(average)))),
+        new StatisticEntryImpl<>(
+            IcebergManifestStatistics.SNAPSHOT_ID, StatisticValues.longValue(1)));
   }
 }

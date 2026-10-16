@@ -24,45 +24,22 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.gravitino.stats.SupportsStatistics;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 class TestGravitinoStatisticsUpdater {
-
-  @Test
-  @SuppressWarnings("unchecked")
-  void testManifestMeasurementsUseOneMergeRequest() {
-    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
-    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
-    updater.setGravitinoClientForTest(client);
-    updater.mergeTableStatistics(
-        NameIdentifier.of("catalog", "db", "table"),
-        new IcebergManifestStatistics(3, 12L, 1024D).statistics());
-    ArgumentCaptor<Map<String, StatisticValue<?>>> captor = ArgumentCaptor.forClass(Map.class);
-    Mockito.verify(
-            client
-                .loadCatalog("catalog")
-                .asTableCatalog()
-                .loadTable(NameIdentifier.of("db", "table"))
-                .supportsStatistics())
-        .mergeStatistics(captor.capture());
-    Assertions.assertEquals(2, captor.getValue().size());
-    IcebergManifestStatistics measured =
-        IcebergManifestStatistics.fromStatistics(captor.getValue(), 3).get();
-    Assertions.assertEquals(12L, measured.count());
-    Assertions.assertEquals(1024D, measured.averageSize());
-  }
 
   @Test
   void testUpdateTableStatisticsWithoutInitializeFails() {
@@ -147,6 +124,30 @@ class TestGravitinoStatisticsUpdater {
         PartitionUtils.encodePartitionPath(partitionPath), updates.get(0).partitionName());
     Assertions.assertEquals(2L, updates.get(0).statistics().get("s1").value());
     Assertions.assertEquals(3L, updates.get(0).statistics().get("s2").value());
+  }
+
+  @Test
+  void testTableStatisticConflictPropagatesWithoutRetry() {
+    GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
+    GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
+    updater.setGravitinoClientForTest(client);
+    SupportsStatistics statistics =
+        client
+            .loadCatalog("catalog")
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of("db", "table"))
+            .supportsStatistics();
+    OptimisticLockException conflict = new OptimisticLockException("concurrent statistic update");
+    Mockito.doThrow(conflict).when(statistics).updateStatistics(Mockito.anyMap());
+
+    Assertions.assertSame(
+        conflict,
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                updater.updateTableStatistics(
+                    NameIdentifier.of("catalog", "db", "table"), List.of(stat("row_count", 10L)))));
+    Mockito.verify(statistics).updateStatistics(Mockito.anyMap());
   }
 
   private StatisticEntry<?> stat(String name, long value) {

@@ -100,7 +100,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
         semanticModelRole(
             model,
             List.of(
-                Privileges.SelectSemanticModel.allow(),
+                Privileges.UseSemanticModel.allow(),
                 Privileges.ModifySemanticModel.allow(),
                 Privileges.ManageGrants.allow()));
     backend.insert(role, false);
@@ -125,7 +125,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
                     .withAuditInfo(AUDIT_INFO)
                     .withProperties(ImmutableMap.of())
                     .withSecurableObjects(
-                        semanticModelRole(renamed, List.of(Privileges.SelectSemanticModel.allow()))
+                        semanticModelRole(renamed, List.of(Privileges.UseSemanticModel.allow()))
                             .securableObjects())
                     .build());
     loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
@@ -173,7 +173,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
               .getOwner(entity.nameIdentifier(), entity.type())
               .orElseThrow());
       backend.insert(
-          semanticModelRole(entity, List.of(Privileges.SelectSemanticModel.allow())), false);
+          semanticModelRole(entity, List.of(Privileges.UseSemanticModel.allow())), false);
     }
     assertEquals(
         0,

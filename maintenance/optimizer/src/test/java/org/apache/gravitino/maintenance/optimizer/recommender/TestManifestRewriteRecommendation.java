@@ -28,12 +28,15 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.SupportTableSt
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -53,8 +56,21 @@ class TestManifestRewriteRecommendation {
     Mockito.when(strategies.strategy("rewrite")).thenReturn(strategy);
     SupportTableStatistics statistics = Mockito.mock(SupportTableStatistics.class);
     Mockito.when(statistics.tableStatistics(identifier))
-        .thenReturn(new IcebergManifestStatistics(7, 500, 16 * 1024 * 1024).statistics());
+        .thenReturn(
+            List.of(
+                new StatisticEntryImpl<>(
+                    IcebergManifestStatistics.MANIFEST_NUMBER,
+                    StatisticValues.objectValue(Map.of("7", StatisticValues.longValue(500)))),
+                new StatisticEntryImpl<>(
+                    IcebergManifestStatistics.AVG_MANIFEST_SIZE,
+                    StatisticValues.objectValue(
+                        Map.of("7", StatisticValues.doubleValue(16 * 1024 * 1024)))),
+                new StatisticEntryImpl<>(
+                    IcebergManifestStatistics.SNAPSHOT_ID, StatisticValues.longValue(1))));
     TableMetadataProvider metadata = Mockito.mock(TableMetadataProvider.class);
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(table.properties()).thenReturn(Map.of("current-snapshot-id", "1"));
+    Mockito.when(metadata.tableMetadata(identifier)).thenReturn(table);
     JobSubmitter submitter = Mockito.mock(JobSubmitter.class);
     Mockito.when(submitter.submitJob(Mockito.anyString(), Mockito.any())).thenReturn("job-1");
     try (Recommender recommender =
@@ -87,7 +103,11 @@ class TestManifestRewriteRecommendation {
               "use_caching",
               "false"),
           new GravitinoManifestRewriteJobAdapter().jobConfig(captured.getValue()));
-      Mockito.verifyNoInteractions(metadata);
+      Mockito.verify(metadata, Mockito.atLeastOnce()).tableMetadata(identifier);
+      Mockito.when(table.properties()).thenReturn(Map.of("current-snapshot-id", "2"));
+      Assertions.assertTrue(
+          recommender.submitForStrategyName(List.of(identifier), "rewrite").isEmpty());
+      Mockito.verifyNoMoreInteractions(submitter);
       Mockito.verify(statistics, Mockito.never()).partitionStatistics(Mockito.any());
       Mockito.when(statistics.tableStatistics(identifier)).thenReturn(List.of());
       Assertions.assertTrue(

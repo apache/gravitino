@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 class TestIcebergRewriteManifestsContent {
   @Test
   void testDefaultsAndRegistration() {
-    IcebergRewriteManifestsContent content = PolicyContents.icebergRewriteManifests();
+    IcebergRewriteManifestsContent content = new IcebergRewriteManifestsContent();
     content.validate();
     Assertions.assertEquals(500L, content.manifestCountCritical());
     Assertions.assertEquals(100L, content.manifestCountWarning());

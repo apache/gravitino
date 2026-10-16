@@ -19,21 +19,30 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.RowFilterContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
 public interface PolicyContentDTO extends PolicyContent {
@@ -104,6 +113,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("maxPartitionNum")
     private Long maxPartitionNum;
 
+    @JsonProperty("rewriteStrategy")
+    private String rewriteStrategy;
+
+    @JsonProperty("sortOrder")
+    private String sortOrder;
+
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
@@ -166,6 +181,26 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Returns the Iceberg rewrite_data_files top-level strategy.
+     *
+     * @return rewrite strategy
+     */
+    public String rewriteStrategy() {
+      return rewriteStrategy == null
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+          : rewriteStrategy;
+    }
+
+    /**
+     * Returns the Iceberg rewrite_data_files top-level sort_order.
+     *
+     * @return sort order expression
+     */
+    public String sortOrder() {
+      return sortOrder == null ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER : sortOrder;
+    }
+
+    /**
      * Returns rewrite options expanded to job.options.* during rule generation.
      *
      * @return rewrite options map
@@ -204,6 +239,8 @@ public interface PolicyContentDTO extends PolicyContent {
           dataFileMseWeight(),
           deleteFileNumberWeight(),
           maxPartitionNum(),
+          rewriteStrategy(),
+          sortOrder(),
           rewriteOptions());
     }
   }
@@ -279,24 +316,37 @@ public interface PolicyContentDTO extends PolicyContent {
   @EqualsAndHashCode
   @ToString
   @Builder(setterPrefix = "with")
-  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
     @JsonProperty("manifest_count_critical")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
     private Long manifestCountCritical;
 
     @JsonProperty("manifest_count_warning")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
     private Long manifestCountWarning;
 
     @JsonProperty("avg_manifest_size_threshold_bytes")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
     private Long avgManifestSizeThresholdBytes;
 
     @JsonProperty("spec_id")
+    @JsonDeserialize(using = ManifestSpecIdDeserializer.class)
     private Integer specId;
 
     @JsonProperty("use_caching")
     private Boolean useCaching;
 
     private IcebergRewriteManifestsContentDTO() {}
+
+    /**
+     * Returns manifest rewrite content with default thresholds.
+     *
+     * @return default rewrite-manifests content DTO
+     */
+    public static IcebergRewriteManifestsContentDTO instance() {
+      return new IcebergRewriteManifestsContentDTO();
+    }
 
     /**
      * Returns manifest_count_critical.
@@ -368,7 +418,33 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @Override
     public void validate() {
+      PolicyContentDTO.super.validate();
       toDomainContent().validate();
+    }
+
+    /** Reads a manifest threshold without silently coercing fractional values or strings. */
+    public static class ManifestThresholdDeserializer extends JsonDeserializer<Long> {
+      @Override
+      public Long deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(
+              Long.class, "Manifest thresholds must be 64-bit integers");
+        }
+        return parser.getLongValue();
+      }
+    }
+
+    /** Reads a partition spec ID without silently coercing fractional values or strings. */
+    public static class ManifestSpecIdDeserializer extends JsonDeserializer<Integer> {
+      @Override
+      public Integer deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(Integer.class, "spec_id must be a 32-bit integer");
+        }
+        return parser.getIntValue();
+      }
     }
 
     private PolicyContent toDomainContent() {
@@ -378,6 +454,145 @@ public interface PolicyContentDTO extends PolicyContent {
           avgManifestSizeThresholdBytes(),
           specId(),
           useCaching());
+    }
+  }
+
+  /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
+  @EqualsAndHashCode
+  @ToString
+  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    private IcebergSnapshotExpirationContentDTO() {}
+
+    /**
+     * @return empty snapshot-expiration content DTO
+     */
+    public static IcebergSnapshotExpirationContentDTO instance() {
+      return new IcebergSnapshotExpirationContentDTO();
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergSnapshotExpiration();
+    }
+  }
+
+  /** Represents typed row-filter policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class RowFilterContentDTO implements PolicyContentDTO {
+
+    @JsonProperty("expression")
+    @Nullable
+    private String expression;
+
+    // Default constructor for Jackson deserialization only.
+    private RowFilterContentDTO() {}
+
+    /**
+     * Returns the authored row-filter expression.
+     *
+     * @return row-filter expression
+     */
+    @Nullable
+    public String expression() {
+      return expression;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private RowFilterContent toDomainContent() {
+      return PolicyContents.rowFilter(expression);
+    }
+  }
+
+  /** Represents typed column-mask policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class ColumnMaskContentDTO implements PolicyContentDTO {
+
+    @JsonProperty("expression")
+    @Nullable
+    private String expression;
+
+    // Default constructor for Jackson deserialization only.
+    private ColumnMaskContentDTO() {}
+
+    /**
+     * Returns the authored column-mask expression.
+     *
+     * @return column-mask expression
+     */
+    @Nullable
+    public String expression() {
+      return expression;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private ColumnMaskContent toDomainContent() {
+      return PolicyContents.columnMask(expression);
     }
   }
 }

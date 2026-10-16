@@ -25,14 +25,12 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,6 +61,7 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -74,7 +73,6 @@ import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
-import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
@@ -329,28 +327,6 @@ public class TestStatisticOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testMergeTableStatistics() {
-    Map<String, StatisticValue<?>> values = Maps.newHashMap();
-    values.put(
-        "custom-count-by-spec",
-        StatisticValues.objectValue(Collections.singletonMap("1", StatisticValues.longValue(2L))));
-    MetadataObject object =
-        MetadataObjects.parse(catalog + "." + schema + "." + table, MetadataObject.Type.TABLE);
-    when(tableDispatcher.tableExists(any())).thenReturn(true);
-    try (Response response =
-        target("/metalakes/" + metalake + "/objects/table/" + object.fullName() + "/statistics")
-            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .method(
-                "PATCH",
-                entity(new StatisticsUpdateRequest(values), MediaType.APPLICATION_JSON_TYPE))) {
-      Assertions.assertEquals(200, response.getStatus());
-      verify(manager).mergeStatistics(metalake, object, values);
-    }
-  }
-
-  @Test
   public void testUpdateTableStatistics() {
     Map<String, StatisticValue<?>> statsMap = Maps.newHashMap();
     statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.stringValue("test"));
@@ -539,6 +515,52 @@ public class TestStatisticOperations extends BaseOperationsTest {
                 String.format(
                     "Statistic name must not exceed %d characters", Statistic.MAX_NAME_LENGTH)));
     Assertions.assertFalse(errorResponse.getMessage().contains(longName));
+  }
+
+  @Test
+  public void testUpdateAndDropTableStatisticsReportOptimisticLockConflict() {
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+    String path =
+        "/metalakes/"
+            + metalake
+            + "/objects/"
+            + tableObject.type()
+            + "/"
+            + tableObject.fullName()
+            + "/statistics";
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    OptimisticLockException conflict =
+        new OptimisticLockException("statistic was modified concurrently");
+
+    Map<String, StatisticValue<?>> statsMap = Maps.newHashMap();
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.longValue(1L));
+    doThrow(conflict).when(manager).updateStatistics(any(), any(), any());
+    Response updateResp =
+        target(path)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(new StatisticsUpdateRequest(statsMap), MediaType.APPLICATION_JSON_TYPE));
+    assertOptimisticLockConflict(updateResp);
+
+    doThrow(conflict).when(manager).dropStatistics(any(), any(), any());
+    Response dropResp =
+        target(path)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(
+                entity(
+                    new StatisticsDropRequest(new String[] {Statistic.CUSTOM_PREFIX + "test1"}),
+                    MediaType.APPLICATION_JSON_TYPE));
+    assertOptimisticLockConflict(dropResp);
+  }
+
+  private static void assertOptimisticLockConflict(Response resp) {
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, errorResp.getCode());
+    Assertions.assertEquals(OptimisticLockException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
