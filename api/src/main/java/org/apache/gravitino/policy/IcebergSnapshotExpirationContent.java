@@ -36,7 +36,7 @@ import org.apache.gravitino.MetadataObject;
  * from {@link #olderThanDays()} by the job adapter; {@code retain_last} and {@code stream_results}
  * are forwarded).
  */
-public class IcebergSnapshotExpirationContent implements PolicyContent {
+public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.policy;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Collections;
@@ -176,7 +177,71 @@ public class TestPolicyContents {
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
-    Assertions.assertTrue(exception.getMessage().contains("maxPartitionNum"));
+    Assertions.assertTrue(exception.g  @Test
+  void testValidateRejectsNegativeMinIntervalMsOnExecutableContent() {
+    PolicyContent content =
+        PolicyContents.icebergDataCompaction(
+            IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+            IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+            IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+            IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+            IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+            null,
+            null,
+            null,
+            -1L,
+            null,
+            null);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("minIntervalMs"));
+  }
+
+  @Test
+  void testExecutionPeersOnlyOnExecutablePolicyContent() {
+    Assertions.assertInstanceOf(
+        ExecutablePolicyContent.class, PolicyContents.icebergDataCompaction());
+    Assertions.assertInstanceOf(
+        ExecutablePolicyContent.class, PolicyContents.icebergOrphanFileRemoval());
+    Assertions.assertFalse(
+        PolicyContents.custom(
+                ImmutableMap.of("rule", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null)
+            instanceof ExecutablePolicyContent);
+  }
+
+  @Test
+  void testValidateAcceptsBuiltInContentsWithoutExecutionPeers() {
+    Assertions.assertDoesNotThrow(() -> PolicyContents.icebergDataCompaction().validate());
+    Assertions.assertDoesNotThrow(() -> PolicyContents.icebergOrphanFileRemoval().validate());
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyContents.custom(
+                    ImmutableMap.of("rule", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null)
+                .validate());
+  }
+
+  @Test
+  void testOrphanFileRemovalRejectsCommitTrigger() {
+    PolicyContent content =
+        PolicyContents.icebergOrphanFileRemoval(
+            IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
+            null,
+            IcebergOrphanFileRemovalContent.DEFAULT_DRY_RUN,
+            null,
+            true,
+            null,
+            null,
+            null);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("commitTrigger"));
+  }
+
+etMessage().contains("maxPartitionNum"));
   }
 
   @Test
