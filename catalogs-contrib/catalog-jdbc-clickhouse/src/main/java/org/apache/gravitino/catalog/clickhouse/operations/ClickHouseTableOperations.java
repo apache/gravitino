@@ -3029,9 +3029,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /**
    * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
    * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
-   * default). Also handles parameterized formats returned from
-   * {@code system.data_skipping_indices}, including text, legacy Annoy/USearch, and
-   * vector similarity indexes.
+   * default). Also handles parameterized formats returned from {@code
+   * system.data_skipping_indices}, including text, legacy Annoy/USearch, and vector similarity
+   * indexes.
    *
    * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "set(0)",
    *     "inverted(0)", "text(tokenizer = ngrams(3))", or "vector_similarity")
