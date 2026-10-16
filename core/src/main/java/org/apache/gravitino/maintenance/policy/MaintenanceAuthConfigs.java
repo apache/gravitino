@@ -19,10 +19,13 @@
 package org.apache.gravitino.maintenance.policy;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -35,7 +38,8 @@ import org.apache.gravitino.config.ConfigEntry;
  * <p>{@link #GRAVITINO_AUTH_PREFIX} is a <strong>fixed</strong> camelCase bag in {@code
  * gravitino.conf} ({@code authType}, {@code oauthServerUri}, …). {@link #loadGravitinoAuth} maps
  * those suffixes onto built-in updater short names ({@code auth_type}, {@code oauth_server_uri}, …)
- * before overlaying onto policy {@code updateOptions}.
+ * before overlaying onto policy {@code updaterOptions}. Unknown or blank suffixes are rejected, and
+ * {@code authType} plus mode-required fields are validated at load time.
  *
  * <p>{@link #IRC_AUTH_PREFIX} is an <strong>open</strong> passthrough for Spark / Iceberg REST
  * properties (for example {@code rest.auth.type}); any non-empty suffix under the prefix is loaded
@@ -44,7 +48,7 @@ import org.apache.gravitino.config.ConfigEntry;
  */
 public final class MaintenanceAuthConfigs {
 
-  /** Prefix for Gravitino control-plane client auth (overlaid onto {@code updateOptions}). */
+  /** Prefix for Gravitino control-plane client auth (overlaid onto {@code updaterOptions}). */
   public static final String GRAVITINO_AUTH_PREFIX = "gravitino.maintenance.gravitinoAuth.";
 
   /**
@@ -75,11 +79,19 @@ public final class MaintenanceAuthConfigs {
   /** OAuth2 scope. */
   public static final String OAUTH_SCOPE_SUFFIX = "oauthScope";
 
+  private static final String AUTH_TYPE_NONE = "none";
+  private static final String AUTH_TYPE_SIMPLE = "simple";
+  private static final String AUTH_TYPE_BASIC = "basic";
+  private static final String AUTH_TYPE_OAUTH = "oauth";
+
+  private static final Set<String> SUPPORTED_AUTH_TYPES =
+      ImmutableSet.of(AUTH_TYPE_NONE, AUTH_TYPE_SIMPLE, AUTH_TYPE_BASIC, AUTH_TYPE_OAUTH);
+
   /**
-   * Maps camelCase {@code gravitino.conf} suffixes to {@code updateOptions} / updater-option short
+   * Maps camelCase {@code gravitino.conf} suffixes to {@code updaterOptions} / updater-option short
    * names consumed by {@code GravitinoAuthSettings}.
    */
-  private static final Map<String, String> GRAVITINO_AUTH_TO_UPDATE_OPTIONS =
+  private static final Map<String, String> GRAVITINO_AUTH_TO_UPDATER_OPTIONS =
       ImmutableMap.<String, String>builder()
           .put(AUTH_TYPE_SUFFIX, "auth_type")
           .put(USERNAME_SUFFIX, "username")
@@ -131,31 +143,26 @@ public final class MaintenanceAuthConfigs {
 
   /**
    * Loads fixed Gravitino auth entries from server config and remaps camelCase conf suffixes to
-   * updater short names for {@code updateOptions}.
+   * updater short names for {@code updaterOptions}.
    *
    * @param config gravitino server config
    * @return unmodifiable map keyed by updater short names; empty when unset
    */
   public static Map<String, String> loadGravitinoAuth(Config config) {
-    Map<String, String> loaded = loadAuthBag(config, GRAVITINO_AUTH_PREFIX);
+    Map<String, String> loaded = loadAuthBag(config, GRAVITINO_AUTH_PREFIX, /*fixedSchema=*/ true);
     if (loaded.isEmpty()) {
       return Collections.emptyMap();
     }
-    Map<String, String> updateOptions = new LinkedHashMap<>();
-    GRAVITINO_AUTH_TO_UPDATE_OPTIONS.forEach(
+    validateGravitinoAuth(loaded);
+    Map<String, String> updaterOptions = new LinkedHashMap<>();
+    GRAVITINO_AUTH_TO_UPDATER_OPTIONS.forEach(
         (suffix, updateKey) -> {
           String value = loaded.get(suffix);
           if (value != null) {
-            updateOptions.put(updateKey, value);
+            updaterOptions.put(updateKey, value);
           }
         });
-    loaded.forEach(
-        (suffix, value) -> {
-          if (!GRAVITINO_AUTH_TO_UPDATE_OPTIONS.containsKey(suffix)) {
-            updateOptions.put(suffix, value);
-          }
-        });
-    return ImmutableMap.copyOf(updateOptions);
+    return ImmutableMap.copyOf(updaterOptions);
   }
 
   /**
@@ -165,7 +172,7 @@ public final class MaintenanceAuthConfigs {
    * @return unmodifiable map; empty when unset
    */
   public static Map<String, String> loadIrcAuth(Config config) {
-    return loadAuthBag(config, IRC_AUTH_PREFIX);
+    return loadAuthBag(config, IRC_AUTH_PREFIX, /*fixedSchema=*/ false);
   }
 
   /**
@@ -181,16 +188,16 @@ public final class MaintenanceAuthConfigs {
   }
 
   /**
-   * Merges policy {@code updateOptions} with Gravitino auth; auth wins on duplicate keys.
+   * Merges policy {@code updaterOptions} with Gravitino auth; auth wins on duplicate keys.
    *
-   * @param policyUpdateOptions options from the effective policy (may be null)
-   * @param gravitinoAuth suffix-keyed Gravitino auth bag (may be null)
-   * @return merged update options for {@code runJob}
+   * @param policyUpdaterOptions options from the effective policy (may be null)
+   * @param gravitinoAuth updater-short-name Gravitino auth bag (may be null)
+   * @return merged updater options for {@code runJob}
    */
-  public static Map<String, String> overlayUpdateOptions(
-      @Nullable Map<String, String> policyUpdateOptions,
+  public static Map<String, String> overlayUpdaterOptions(
+      @Nullable Map<String, String> policyUpdaterOptions,
       @Nullable Map<String, String> gravitinoAuth) {
-    return overlay(policyUpdateOptions, gravitinoAuth);
+    return overlay(policyUpdaterOptions, gravitinoAuth);
   }
 
   /**
@@ -206,30 +213,86 @@ public final class MaintenanceAuthConfigs {
   }
 
   /**
-   * Loads Gravitino auth from {@code config} and overlays it onto policy {@code updateOptions}.
+   * Loads Gravitino auth from {@code config} and overlays it onto policy {@code updaterOptions}.
    *
    * @param config gravitino server config
-   * @param policyUpdateOptions options from the effective policy
-   * @return merged update options
+   * @param policyUpdaterOptions options from the effective policy
+   * @return merged updater options
    */
-  public static Map<String, String> overlayUpdateOptions(
-      Config config, @Nullable Map<String, String> policyUpdateOptions) {
-    return overlayUpdateOptions(policyUpdateOptions, loadGravitinoAuth(config));
+  public static Map<String, String> overlayUpdaterOptions(
+      Config config, @Nullable Map<String, String> policyUpdaterOptions) {
+    return overlayUpdaterOptions(policyUpdaterOptions, loadGravitinoAuth(config));
   }
 
-  private static Map<String, String> loadAuthBag(Config config, String prefix) {
+  private static Map<String, String> loadAuthBag(
+      Config config, String prefix, boolean fixedSchema) {
     Map<String, String> loaded = config.getConfigsWithPrefix(prefix);
     if (loaded.isEmpty()) {
       return Collections.emptyMap();
     }
+    Map<String, String> sanitized = new LinkedHashMap<>();
     loaded.forEach(
         (key, value) -> {
+          if (key == null || key.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                String.format("Configuration under %s must not use a blank suffix", prefix));
+          }
+          String suffix = key.trim();
+          if (fixedSchema && !GRAVITINO_AUTH_TO_UPDATER_OPTIONS.containsKey(suffix)) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Unknown Gravitino auth configuration %s%s; supported suffixes are: %s",
+                    prefix, suffix, String.join(", ", GRAVITINO_AUTH_TO_UPDATER_OPTIONS.keySet())));
+          }
           if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException(
-                String.format("Configuration %s%s must have a non-empty value", prefix, key));
+                String.format("Configuration %s%s must have a non-empty value", prefix, suffix));
           }
+          sanitized.put(suffix, value.trim());
         });
-    return ImmutableMap.copyOf(loaded);
+    return ImmutableMap.copyOf(sanitized);
+  }
+
+  private static void validateGravitinoAuth(Map<String, String> loaded) {
+    String authType = loaded.get(AUTH_TYPE_SUFFIX);
+    if (authType == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Configuration %s%s is required when any Gravitino auth setting is present",
+              GRAVITINO_AUTH_PREFIX, AUTH_TYPE_SUFFIX));
+    }
+    String normalized = authType.toLowerCase(Locale.ROOT);
+    if (!SUPPORTED_AUTH_TYPES.contains(normalized)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsupported %s%s value '%s'; supported values are: none, simple, basic, oauth",
+              GRAVITINO_AUTH_PREFIX, AUTH_TYPE_SUFFIX, authType));
+    }
+    switch (normalized) {
+      case AUTH_TYPE_BASIC:
+        requireSuffix(loaded, USERNAME_SUFFIX, AUTH_TYPE_BASIC);
+        requireSuffix(loaded, PASSWORD_SUFFIX, AUTH_TYPE_BASIC);
+        break;
+      case AUTH_TYPE_OAUTH:
+        requireSuffix(loaded, OAUTH_SERVER_URI_SUFFIX, AUTH_TYPE_OAUTH);
+        requireSuffix(loaded, OAUTH_PATH_SUFFIX, AUTH_TYPE_OAUTH);
+        requireSuffix(loaded, OAUTH_CREDENTIAL_SUFFIX, AUTH_TYPE_OAUTH);
+        requireSuffix(loaded, OAUTH_SCOPE_SUFFIX, AUTH_TYPE_OAUTH);
+        break;
+      case AUTH_TYPE_NONE:
+      case AUTH_TYPE_SIMPLE:
+      default:
+        break;
+    }
+  }
+
+  private static void requireSuffix(Map<String, String> loaded, String suffix, String authType) {
+    if (!loaded.containsKey(suffix)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Configuration %s%s is required when %s%s is '%s'",
+              GRAVITINO_AUTH_PREFIX, suffix, GRAVITINO_AUTH_PREFIX, AUTH_TYPE_SUFFIX, authType));
+    }
   }
 
   private static Map<String, String> overlay(

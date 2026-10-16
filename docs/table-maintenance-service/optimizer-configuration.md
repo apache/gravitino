@@ -33,27 +33,29 @@ For in-process Table Maintenance Service (TMS), client credentials are **cluster
 the prefixes below in `gravitino.conf`. Do not store passwords, OAuth secrets, or keytab paths in policy
 content. Values may be plaintext or secret-manager references when the deployment supports them.
 
-At `runJob`, `gravitino.maintenance.gravitinoAuth.*` overlays policy `updateOptions`, and
+At `runJob`, `gravitino.maintenance.gravitinoAuth.*` overlays policy `updaterOptions`, and
 `gravitino.maintenance.ircAuth.*` overlays policy `jobOptions`. Auth wins on duplicate keys. The
 live scheduler submit call site is wired in a follow-up; `MaintenanceAuthConfigs` exposes the load
-and overlay helpers for that path.
+and overlay helpers (`overlayUpdaterOptions` / `overlayJobOptions`) for that path.
 
 #### Gravitino client auth (`gravitino.maintenance.gravitinoAuth.`) — fixed schema
 
 `gravitino.conf` uses **camelCase** suffixes. At load time they are remapped to built-in
 `--updater-options` / `GravitinoAuthSettings` short names (`auth_type`, `oauth_server_uri`, …)
-before overlay onto policy `updateOptions`. Supported `authType` values are exactly four:
-**`none`**, **`simple`**, **`basic`**, **`oauth`**.
+before overlay onto policy `updaterOptions`. Only the suffixes in the table below are accepted;
+unknown or blank suffixes fail fast when the server loads config. Supported `authType` values are
+exactly four: **`none`**, **`simple`**, **`basic`**, **`oauth`**. When any Gravitino auth key is
+set, `authType` is required, and `basic` / `oauth` also require their mode-specific fields below.
 
-| Conf suffix       | `updateOptions` key | Used when `authType` is | Meaning                                     |
-| ----------------- | ------------------- | ----------------------- | ------------------------------------------- |
-| `authType`        | `auth_type`         | all modes               | `none`, `simple`, `basic`, or `oauth`       |
-| `username`        | `username`          | `simple` / `basic`      | User principal (`simple` optional)          |
-| `password`        | `password`          | `basic`                 | Password or secret reference                |
-| `oauthServerUri`  | `oauth_server_uri`  | `oauth`                 | OAuth2 token server base URI                |
-| `oauthPath`       | `oauth_path`        | `oauth`                 | Token path (for example `oauth2/token`)     |
-| `oauthCredential` | `oauth_credential`  | `oauth`                 | Client credential, often `client_id:secret` |
-| `oauthScope`      | `oauth_scope`       | `oauth`                 | Token scope (IdP-specific)                  |
+| Conf suffix       | `updaterOptions` key | Used when `authType` is | Meaning                                     |
+| ----------------- | -------------------- | ----------------------- | ------------------------------------------- |
+| `authType`        | `auth_type`          | all modes               | `none`, `simple`, `basic`, or `oauth`       |
+| `username`        | `username`           | `simple` / `basic`      | User principal (`simple` optional; `basic` required) |
+| `password`        | `password`           | `basic`                 | Password or secret reference (required)     |
+| `oauthServerUri`  | `oauth_server_uri`   | `oauth`                 | OAuth2 token server base URI (required)     |
+| `oauthPath`       | `oauth_path`         | `oauth`                 | Token path (for example `oauth2/token`) (required) |
+| `oauthCredential` | `oauth_credential`   | `oauth`                 | Client credential, often `client_id:secret` (required) |
+| `oauthScope`      | `oauth_scope`        | `oauth`                 | Token scope (IdP-specific) (required)       |
 
 **1. `none`** — Gravitino authorization disabled; omit the prefix or set:
 
@@ -336,7 +338,7 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
 ```
 
 Optional TMS peer fields on content (`timeTrigger`, `commitTrigger`, `minIntervalMs`, `jobOptions`,
-`updateOptions`) are shared with compaction and other maintenance policy types. `commitTrigger` is
+`updaterOptions`) are shared with compaction and other maintenance policy types. `commitTrigger` is
 not allowed for orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md) for
 peer-field semantics.
 

@@ -70,7 +70,7 @@ class TestMaintenanceAuthConfigs {
     config.loadFromMap(
         Map.of(
             MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "authType",
-            "basic",
+            "oauth",
             MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "username",
             "tms",
             MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "password",
@@ -87,7 +87,7 @@ class TestMaintenanceAuthConfigs {
 
     Assertions.assertEquals(
         ImmutableMap.<String, String>builder()
-            .put("auth_type", "basic")
+            .put("auth_type", "oauth")
             .put("username", "tms")
             .put("password", "secret")
             .put("oauth_server_uri", "https://idp.example.com")
@@ -125,20 +125,20 @@ class TestMaintenanceAuthConfigs {
   @Test
   void overlayAuthWinsOnDuplicateKeys() {
     Map<String, String> policyJob = ImmutableMap.of("uri", "http://irc", "rest.auth.type", "basic");
-    Map<String, String> policyUpdate = ImmutableMap.of("metalake", "ml", "auth_type", "none");
+    Map<String, String> policyUpdater = ImmutableMap.of("metalake", "ml", "auth_type", "none");
     Map<String, String> ircAuth =
         ImmutableMap.of("rest.auth.type", "oauth2", "rest.auth.oauth2.token", "tok");
     Map<String, String> gravitinoAuth = ImmutableMap.of("auth_type", "oauth");
 
     Map<String, String> job = MaintenanceAuthConfigs.overlayJobOptions(policyJob, ircAuth);
-    Map<String, String> update =
-        MaintenanceAuthConfigs.overlayUpdateOptions(policyUpdate, gravitinoAuth);
+    Map<String, String> updater =
+        MaintenanceAuthConfigs.overlayUpdaterOptions(policyUpdater, gravitinoAuth);
 
     Assertions.assertEquals("oauth2", job.get("rest.auth.type"));
     Assertions.assertEquals("tok", job.get("rest.auth.oauth2.token"));
     Assertions.assertEquals("http://irc", job.get("uri"));
-    Assertions.assertEquals("oauth", update.get("auth_type"));
-    Assertions.assertEquals("ml", update.get("metalake"));
+    Assertions.assertEquals("oauth", updater.get("auth_type"));
+    Assertions.assertEquals("ml", updater.get("metalake"));
   }
 
   @Test
@@ -149,7 +149,7 @@ class TestMaintenanceAuthConfigs {
             ImmutableMap.of("a", "1"), Collections.emptyMap()));
     Assertions.assertEquals(
         ImmutableMap.of("b", "2"),
-        MaintenanceAuthConfigs.overlayUpdateOptions(
+        MaintenanceAuthConfigs.overlayUpdaterOptions(
             ImmutableMap.of("b", "2"), Collections.emptyMap()));
   }
 
@@ -174,7 +174,7 @@ class TestMaintenanceAuthConfigs {
         MaintenanceAuthConfigs.overlayJobOptions(config, ImmutableMap.of("uri", "http://policy")));
     Assertions.assertEquals(
         ImmutableMap.of("metalake", "ml", "auth_type", "simple", "username", "tms"),
-        MaintenanceAuthConfigs.overlayUpdateOptions(config, ImmutableMap.of("metalake", "ml")));
+        MaintenanceAuthConfigs.overlayUpdaterOptions(config, ImmutableMap.of("metalake", "ml")));
   }
 
   @Test
@@ -185,5 +185,109 @@ class TestMaintenanceAuthConfigs {
         key -> key.startsWith("gravitino."));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> MaintenanceAuthConfigs.loadIrcAuth(config));
+  }
+
+  @Test
+  void unknownGravitinoAuthSuffixRejected() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "authTyp",
+            "basic",
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "username",
+            "tms"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MaintenanceAuthConfigs.loadGravitinoAuth(config));
+    Assertions.assertTrue(ex.getMessage().contains("Unknown Gravitino auth configuration"));
+    Assertions.assertTrue(ex.getMessage().contains("authTyp"));
+  }
+
+  @Test
+  void blankGravitinoAuthSuffixRejected() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX, "none"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MaintenanceAuthConfigs.loadGravitinoAuth(config));
+    Assertions.assertTrue(ex.getMessage().contains("blank suffix"));
+  }
+
+  @Test
+  void blankIrcAuthSuffixRejected() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(MaintenanceAuthConfigs.IRC_AUTH_PREFIX, "none"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MaintenanceAuthConfigs.loadIrcAuth(config));
+    Assertions.assertTrue(ex.getMessage().contains("blank suffix"));
+  }
+
+  @Test
+  void missingAuthTypeRejectedWhenOtherKeysPresent() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "username", "tms"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MaintenanceAuthConfigs.loadGravitinoAuth(config));
+    Assertions.assertTrue(ex.getMessage().contains("authType is required"));
+  }
+
+  @Test
+  void unsupportedAuthTypeRejected() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "authType", "kerberos"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MaintenanceAuthConfigs.loadGravitinoAuth(config));
+    Assertions.assertTrue(ex.getMessage().contains("Unsupported"));
+    Assertions.assertTrue(ex.getMessage().contains("kerberos"));
+  }
+
+  @Test
+  void basicAuthRequiresUsernameAndPassword() {
+    Config missingPassword = new Config(false) {};
+    missingPassword.loadFromMap(
+        Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "authType",
+            "basic",
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "username",
+            "tms"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MaintenanceAuthConfigs.loadGravitinoAuth(missingPassword));
+    Assertions.assertTrue(ex.getMessage().contains("password is required"));
+  }
+
+  @Test
+  void oauthAuthRequiresTokenSettings() {
+    Config missingScope = new Config(false) {};
+    missingScope.loadFromMap(
+        Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "authType",
+            "oauth",
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "oauthServerUri",
+            "https://idp.example.com",
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "oauthPath",
+            "oauth2/token",
+            MaintenanceAuthConfigs.GRAVITINO_AUTH_PREFIX + "oauthCredential",
+            "id:secret"),
+        key -> key.startsWith("gravitino."));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MaintenanceAuthConfigs.loadGravitinoAuth(missingScope));
+    Assertions.assertTrue(ex.getMessage().contains("oauthScope is required"));
   }
 }
