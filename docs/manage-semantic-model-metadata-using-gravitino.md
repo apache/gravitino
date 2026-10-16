@@ -382,9 +382,9 @@ definition and its source access. Comment and property changes do not revalidate
 
 ## Apache Ossie Import and Export
 
-An Ossie document uses snake_case names, string source identifiers, and root-level datasets and
-metrics. See [Exchanging Definitions](./semantic-models.md#exchanging-definitions) for the mapping
-from the native REST format.
+An Ossie document uses snake_case names, string source identifiers, and root-level datasets,
+relationships, and metrics. See [Exchanging Definitions](./semantic-models.md#exchanging-definitions)
+for the mapping from the native REST format.
 
 ### Import a Document
 
@@ -594,19 +594,3 @@ The [Gravitino MCP server](./gravitino-mcp-server.md#semantic-models) provides
 and `drop_semantic_model`. Enable the `semantic_model` tool tag when filtering tools.
 Create and alter use the native REST definition format. Use REST or the SDKs for Ossie import and
 export. The current Web UI does not provide Semantic Model workflows.
-
-## Troubleshooting
-
-| HTTP status | What to check |
-|-------------|---------------|
-| `400` | Definition or document syntax, source identifiers, missing sources, key or relationship columns, and supported export formats. |
-| `403` | Parent, model, governance, and source metadata permissions for the caller. |
-| `404` | Whether the target metalake, catalog, schema, and model exist. |
-| `409` | An existing create/import/rename target, or a concurrent metadata update. Inspect the error before retrying. |
-| `415` | The import request's `Content-Type`. |
-| `501` | Whether the destination catalog is relational. |
-| `502` | Connectivity to the catalog providing a referenced source. |
-
-For concurrent updates, follow [Retrying Concurrent Metadata Changes](./how-to-use-gravitino-client.md#retrying-concurrent-metadata-changes).
-For complete request and response schemas, see the Semantic Model endpoints in
-[Gravitino Open API](./api/rest/gravitino-rest-api).

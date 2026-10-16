@@ -79,8 +79,8 @@ different forms:
 
 | Aspect | Native REST API | Ossie document |
 |--------|-----------------|----------------|
-| Definition location | Nested under `definition` in the model object | Datasets and metrics at the document root |
-| Field names | `primaryKey`, `datatype` | `primary_key`, `datatype` |
+| Definition location | Nested under `definition` in the model object | Datasets, relationships, and metrics at the document root |
+| Field names | `primaryKey`, `uniqueKeys`, `fromColumns`, `toColumns`, `datatype` | `primary_key`, `unique_keys`, `from_columns`, `to_columns`, `datatype` |
 | Dataset source | `{"namespace":["sales","mart"],"name":"orders"}` | `sales.mart.orders` |
 | Model description | `comment` | `description` |
 | Gravitino properties | `properties` on the model | A root `GRAVITINO_PROPERTIES` custom extension |
