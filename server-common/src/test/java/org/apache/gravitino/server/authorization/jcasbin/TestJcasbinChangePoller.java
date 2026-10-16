@@ -80,8 +80,7 @@ public class TestJcasbinChangePoller {
         JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1", MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        key("ml1", "METALAKE", ""),
-        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
+        key("ml1", ""), JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
   }
 
   @Test
@@ -116,6 +115,23 @@ public class TestJcasbinChangePoller {
             key("ml1", "CATALOG", "cat1", ""),
             key("ml1", "CATALOG", "cat2", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
         metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testMetalakeDropInvalidatesEveryKeyOfTheMetalake() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
+            change(2L, MetadataObject.Type.METALAKE, "ml1"),
+            change(3L, MetadataObject.Type.VIEW, "ml1.cat1.sch1.view1")));
+
+    // The metalake scope prefix subsumes the catalog prefix and the view key.
+    Assertions.assertEquals(List.of(key("ml1", "")), metadataIdCache.invalidatedPrefixes);
     Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
   }
 
