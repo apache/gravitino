@@ -39,15 +39,17 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  * <ul>
  *   <li>Nest JSON — {@link #NESTED_JSON_ARGUMENT_FLAGS} ({@code --updater-options} / {@code
  *       --spark-conf} / {@code --options})
- *   <li>Spark conf property — {@link #CONF_ARGUMENT_FLAGS} ({@code --conf} / {@code -c}): a single
- *       whitespace-free {@code key=value} in either two-token or {@code --conf=key=value} form
+ *   <li>Spark conf property — {@link #CONF_ARGUMENT_FLAGS} ({@code --conf} / {@code -c}): a {@code
+ *       key=value} in either two-token or {@code --conf=key=value} form. Inside a shell command,
+ *       only the sensitive assignment is masked; the rest of the command is kept
  *   <li>JVM options string — {@link #JVM_OPTIONS_ARGUMENT_FLAGS} ({@code --driver-java-options} /
  *       {@code --executor-java-options}): a space-separated JVM string that may start with {@code
  *       -}; sensitive {@code -Dkey=value} tokens inside are masked
  *   <li>Sensitive-named long options — {@code --name} / {@code --name=value} when the name matches
- *       {@link SecretPropertyUtils#isSensitivePropertyKey} (the following token after {@code
- *       --name} is always replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}, including
- *       non-secret values such as identifiers after {@code --use-credential-file})
+ *       {@link SecretPropertyUtils#isSensitivePropertyKey}. The value is replaced with {@link
+ *       HiddenPropertyMaskUtils#MASKED_VALUE} (including a non-secret such as {@code
+ *       --use-credential-file db.events}). When the value is followed by a space and more text,
+ *       only the value is masked and the rest is kept
  *   <li>Standalone {@code -Dkey=value} when {@code key} is sensitive
  * </ul>
  *
@@ -57,9 +59,7 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  * <p>Not masked (out of scope): resource URI fields ({@code executable}, {@code className}, {@code
  * jars}, {@code files}, {@code archives}, Shell {@code scripts}); {@code --hiveconf}; conf property
  * values that embed {@code -D} secrets under a non-sensitive conf key (for example {@code
- * spark.driver.extraJavaOptions}); free-form tokens such as a {@code --where} SQL predicate; Shell
- * {@code /bin/sh -c} command strings that contain whitespace (so they are not treated as a Spark
- * {@code -c key=value} conf entry).
+ * spark.driver.extraJavaOptions}); free-form tokens such as a {@code --where} SQL predicate.
  *
  * <p>Null map entries are preserved in the masked DTO / {@code jobConf} maps used on the REST and
  * event {@code jobConf} paths. When {@code JobInfo} rebuilds a {@code JobTemplate} via {@code
@@ -94,9 +94,9 @@ public final class JobRuntimeTemplateMaskUtils {
    * ({@code --conf key=value}) and the equals form ({@code --conf=key=value}) use {@link
    * #maskConfKeyValuePayload}.
    *
-   * <p>{@code -c} is also the shell {@code /bin/sh -c} flag. Conf masking only applies when the
-   * payload looks like one Spark conf entry (no whitespace); shell command strings are left
-   * unchanged.
+   * <p>{@code -c} is also the shell {@code /bin/sh -c} flag. A command string is not truncated at
+   * the first {@code =}. Each whitespace-separated sensitive {@code key=value} is masked on its
+   * own, and the rest of the command is kept.
    */
   static final Set<String> CONF_ARGUMENT_FLAGS = ImmutableSet.of("--conf", "-c");
 
@@ -211,7 +211,7 @@ public final class JobRuntimeTemplateMaskUtils {
       if (maskNextAsSecret) {
         maskNextAsSecret = false;
         if (arg != null && !arg.startsWith("--")) {
-          result.add(HiddenPropertyMaskUtils.MASKED_VALUE);
+          result.add(maskCommandValue(arg));
           continue;
         }
         // Missing value for the previous sensitive flag; this token may itself be a flag.
@@ -351,28 +351,90 @@ public final class JobRuntimeTemplateMaskUtils {
    * Masks a conf-style {@code key=value} payload when {@code key} is sensitive. Shared by the
    * two-token ({@code --conf key=value}) and equals ({@code --conf=key=value}) forms.
    *
-   * <p>Payloads that contain whitespace are left unchanged. A Spark conf entry is a single token
-   * without spaces; a Shell {@code -c} command string almost always contains spaces, so this keeps
-   * {@code /bin/sh -c "export ACCOUNT_ID=5 && run.sh"} from being truncated as a conf entry.
+   * <p>A Shell {@code -c} command is not cut at the first {@code =}. Whitespace-separated tokens
+   * are masked one by one, so {@code export db_password=pd && run.sh} becomes {@code export
+   * db_password=****** && run.sh}.
    *
    * @param payload the config entry after the conf flag
-   * @return masked payload, or {@code payload} unchanged when not a sensitive whitespace-free
-   *     {@code key=value}
+   * @return masked payload, or {@code payload} unchanged when it contains no sensitive {@code
+   *     key=value}
    */
   private static String maskConfKeyValuePayload(String payload) {
-    // Spark --conf / -c values are a single key=value token; shell -c commands contain spaces.
-    if (payload.isEmpty() || payload.chars().anyMatch(Character::isWhitespace)) {
+    if (payload.isEmpty()) {
       return payload;
     }
-    int eq = payload.indexOf('=');
+    if (payload.chars().anyMatch(Character::isWhitespace)) {
+      return maskSensitiveAssignments(payload);
+    }
+    return maskSensitiveAssignment(payload);
+  }
+
+  /**
+   * Masks each whitespace-separated sensitive {@code key=value} and keeps the surrounding command
+   * text, including the original whitespace.
+   */
+  private static String maskSensitiveAssignments(String payload) {
+    StringBuilder out = new StringBuilder(payload.length());
+    int index = 0;
+    boolean changed = false;
+    while (index < payload.length()) {
+      if (Character.isWhitespace(payload.charAt(index))) {
+        out.append(payload.charAt(index));
+        index++;
+        continue;
+      }
+      int start = index;
+      while (index < payload.length() && !Character.isWhitespace(payload.charAt(index))) {
+        index++;
+      }
+      String token = payload.substring(start, index);
+      String masked = maskSensitiveAssignment(token);
+      if (!masked.equals(token)) {
+        changed = true;
+      }
+      out.append(masked);
+    }
+    return changed ? out.toString() : payload;
+  }
+
+  /** Masks one {@code key=value} token when {@code key} is sensitive. */
+  private static String maskSensitiveAssignment(String token) {
+    int eq = token.indexOf('=');
     if (eq <= 0) {
-      return payload;
+      return token;
     }
-    String key = payload.substring(0, eq);
+    String key = token.substring(0, eq);
     if (!SecretPropertyUtils.isSensitivePropertyKey(key)) {
-      return payload;
+      return token;
     }
     return key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
+  }
+
+  /**
+   * Replaces the secret value up to the first whitespace and keeps the rest of the text.
+   *
+   * <p>{@code pd && run.sh} becomes {@code ****** && run.sh}. Text with no whitespace is entirely
+   * the value.
+   */
+  private static String maskCommandValue(String text) {
+    if (text.isEmpty()) {
+      return HiddenPropertyMaskUtils.MASKED_VALUE;
+    }
+    int end = 0;
+    while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+      end++;
+    }
+    if (end == 0) {
+      return maskFollowingText(text);
+    }
+    return HiddenPropertyMaskUtils.MASKED_VALUE + maskFollowingText(text.substring(end));
+  }
+
+  private static String maskFollowingText(String text) {
+    if (text.isEmpty() || text.chars().noneMatch(Character::isWhitespace)) {
+      return text;
+    }
+    return maskSensitiveAssignments(text);
   }
 
   /**
@@ -420,7 +482,7 @@ public final class JobRuntimeTemplateMaskUtils {
     if (!SecretPropertyUtils.isSensitivePropertyKey(name)) {
       return null;
     }
-    return arg.substring(0, eq + 1) + HiddenPropertyMaskUtils.MASKED_VALUE;
+    return arg.substring(0, eq + 1) + maskCommandValue(arg.substring(eq + 1));
   }
 
   /** {@code --password} / {@code --access-key} style flags (no {@code =}). */
@@ -450,6 +512,6 @@ public final class JobRuntimeTemplateMaskUtils {
     if (!SecretPropertyUtils.isSensitivePropertyKey(key)) {
       return null;
     }
-    return "-D" + key + "=" + HiddenPropertyMaskUtils.MASKED_VALUE;
+    return "-D" + key + "=" + maskCommandValue(rest.substring(eq + 1));
   }
 }

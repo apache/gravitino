@@ -344,9 +344,27 @@ public class TestJobRuntimeTemplateMaskUtils {
   }
 
   @Test
-  void testMaskSensitiveArgumentsLeavesShellDashCCommandUnchanged() {
-    // /bin/sh -c "<command>" must not be treated as Spark -c key=value.
-    String command = "export ACCOUNT_ID=5 && run.sh --flag";
+  void testMaskSensitiveArgumentsKeepsShellCommandAndMasksPassword() {
+    ShellJobTemplateDTO input =
+        ShellJobTemplateDTO.builder()
+            .withName("shell_job")
+            .withJobType(JobType.SHELL)
+            .withExecutable("/bin/sh")
+            .withArguments(ImmutableList.of("-c", "export db_password=pd && run.sh --flag"))
+            .build();
+
+    JobTemplateDTO masked = JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    ShellJobTemplateDTO shell = (ShellJobTemplateDTO) masked;
+    Assertions.assertEquals(
+        ImmutableList.of(
+            "-c",
+            "export db_password=" + HiddenPropertyMaskUtils.MASKED_VALUE + " && run.sh --flag"),
+        shell.arguments());
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsLeavesShellCommandWithoutSecretUnchanged() {
+    String command = "echo ready && run.sh --flag";
     ShellJobTemplateDTO input =
         ShellJobTemplateDTO.builder()
             .withName("shell_job")
@@ -379,6 +397,42 @@ public class TestJobRuntimeTemplateMaskUtils {
     Assertions.assertEquals("jdbc.password=" + HiddenPropertyMaskUtils.MASKED_VALUE, args.get(1));
     Assertions.assertEquals("-c", args.get(2));
     Assertions.assertEquals("spark.executor.memory=1g", args.get(3));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsKeepsCommandAfterEqualsFormPassword() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(ImmutableList.of("--password=pd && run.sh"))
+            .withClassName("org.example.App")
+            .build();
+
+    SparkJobTemplateDTO spark =
+        (SparkJobTemplateDTO) JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    Assertions.assertEquals(
+        ImmutableList.of("--password=" + HiddenPropertyMaskUtils.MASKED_VALUE + " && run.sh"),
+        spark.arguments());
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsKeepsCommandAfterPasswordFlag() {
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(ImmutableList.of("--password", "pd && run.sh"))
+            .withClassName("org.example.App")
+            .build();
+
+    SparkJobTemplateDTO spark =
+        (SparkJobTemplateDTO) JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+    Assertions.assertEquals(
+        ImmutableList.of("--password", HiddenPropertyMaskUtils.MASKED_VALUE + " && run.sh"),
+        spark.arguments());
   }
 
   @Test
