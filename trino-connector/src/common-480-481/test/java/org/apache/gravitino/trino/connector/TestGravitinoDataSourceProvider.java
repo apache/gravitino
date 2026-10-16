@@ -57,9 +57,9 @@ class TestGravitinoDataSourceProvider {
       new GravitinoDataSourceProvider(internalProvider);
 
   @Test
-  void testCredentialVariantDelegatesWithUnwrappedHandlesAndSameCredentials() {
-    Optional<ConnectorTableCredentials> credentials =
-        Optional.of(mock(ConnectorTableCredentials.class));
+  void testCredentialVariantDelegatesWithUnwrappedHandlesAndCredentials() {
+    ConnectorTableCredentials internalCredentials = mock(ConnectorTableCredentials.class);
+    Optional<ConnectorTableCredentials> credentials = Optional.of(internalCredentials);
     when(internalProvider.createPageSource(
             eq(transaction),
             eq(session),
@@ -76,7 +76,7 @@ class TestGravitinoDataSourceProvider {
             session,
             new GravitinoSplit(split) {},
             new GravitinoTableHandle("s", "t", table),
-            credentials,
+            Optional.of(new GravitinoTableCredentials(internalCredentials)),
             List.of(new GravitinoColumnHandle("c1", column)),
             dynamicFilter);
 

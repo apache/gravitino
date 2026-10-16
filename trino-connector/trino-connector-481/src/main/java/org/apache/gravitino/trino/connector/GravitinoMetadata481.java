@@ -29,8 +29,10 @@ import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableCredentials;
 import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
+import io.trino.spi.connector.ConnectorWritableTableHandle;
 import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.statistics.ComputedStatistics;
@@ -62,6 +64,29 @@ public class GravitinoMetadata481 extends GravitinoMetadata {
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+  }
+
+  @Override
+  public Optional<ConnectorTableCredentials> getTableCredentials(
+      ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return internalMetadata
+        .getTableCredentials(session, GravitinoHandle.unWrap(tableHandle))
+        .map(GravitinoTableCredentials::new);
+  }
+
+  @Override
+  public Optional<ConnectorTableCredentials> getTableCredentials(
+      ConnectorSession session, ConnectorWritableTableHandle tableHandle) {
+    // GravitinoOutputTableHandle wraps a ConnectorInsertTableHandle internally (see
+    // finishCreateTable), so it must be unwrapped via getInternalHandle() rather than
+    // GravitinoHandle.unWrap.
+    ConnectorWritableTableHandle internalHandle =
+        tableHandle instanceof GravitinoOutputTableHandle outputTableHandle
+            ? outputTableHandle.getInternalHandle()
+            : GravitinoHandle.unWrap(tableHandle);
+    return internalMetadata
+        .getTableCredentials(session, internalHandle)
+        .map(GravitinoTableCredentials::new);
   }
 
   @Override

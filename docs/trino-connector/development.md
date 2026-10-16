@@ -24,7 +24,9 @@ trino-connector/
 │   │   └── main/java/
 │   ├── common-480-481/           # Shared source for the 480/481 SPI shape
 │   │   └── main/java/
-│   └── common-480-483/           # Shared source for the 480+ SPI shape
+│   ├── common-480-483/           # Shared source for the 480+ SPI shape
+│   │   └── main/java/
+│   └── common-482-483/           # Shared source for the 482+ SPI shape
 │       └── main/java/
 ├── segment.gradle                # Shared build config for the version-segment modules
 ├── trino-connector-469-472/      # Version-specific adapters for Trino 469-472

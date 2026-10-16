@@ -83,7 +83,7 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
         session,
         GravitinoHandle.unWrap(split),
         GravitinoHandle.unWrap(table),
-        tableCredentials,
+        tableCredentials.map(GravitinoHandle::unWrap),
         GravitinoHandle.unWrap(columns),
         new GravitinoDynamicFilter(dynamicFilter));
   }

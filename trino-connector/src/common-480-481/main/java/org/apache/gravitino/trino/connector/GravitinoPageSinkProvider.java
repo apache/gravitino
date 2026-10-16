@@ -113,7 +113,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
     ConnectorInsertTableHandle insertHandle =
         ((GravitinoOutputTableHandle) outputTableHandle).getInternalHandle();
     return createInsertPageSink(
-        transactionHandle, session, insertHandle, tableCredentials, pageSinkId);
+        transactionHandle, session, insertHandle, unwrapCredentials(tableCredentials), pageSinkId);
   }
 
   @Override
@@ -127,7 +127,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         transactionHandle,
         session,
         GravitinoHandle.unWrap(insertTableHandle),
-        tableCredentials,
+        unwrapCredentials(tableCredentials),
         pageSinkId);
   }
 
@@ -142,7 +142,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(tableExecuteHandle),
-        tableCredentials,
+        unwrapCredentials(tableCredentials),
         pageSinkId);
   }
 
@@ -157,7 +157,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(mergeHandle),
-        tableCredentials,
+        unwrapCredentials(tableCredentials),
         pageSinkId);
   }
 
@@ -182,5 +182,10 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         insertTableHandle,
         tableCredentials,
         pageSinkId);
+  }
+
+  private static Optional<ConnectorTableCredentials> unwrapCredentials(
+      Optional<ConnectorTableCredentials> tableCredentials) {
+    return tableCredentials.map(GravitinoHandle::unWrap);
   }
 }

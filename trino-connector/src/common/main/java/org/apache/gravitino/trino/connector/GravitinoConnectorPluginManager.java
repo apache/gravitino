@@ -125,12 +125,6 @@ public class GravitinoConnectorPluginManager {
   }
 
   /**
-   * Returns the existing singleton instance of GravitinoConnectorPluginManager.
-   *
-   * @return the singleton instance of GravitinoConnectorPluginManager
-   * @throws IllegalStateException if instance(ClassLoader) has not been called first
-   */
-  /**
    * Reads the running Trino's own list of parent-first packages ({@code
    * io.trino.server.PluginManager.SPI_PACKAGES}), so a reloaded internal connector (e.g. Iceberg)
    * resolves its dependencies exactly as Trino's own plugin loading does. That list is not part of
@@ -156,6 +150,12 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
+  /**
+   * Returns the existing singleton instance of GravitinoConnectorPluginManager.
+   *
+   * @return the singleton instance of GravitinoConnectorPluginManager
+   * @throws IllegalStateException if instance(ClassLoader) has not been called first
+   */
   public static GravitinoConnectorPluginManager instance() {
     if (instance == null) {
       throw new IllegalStateException("Need to call the function instance(ClassLoader) first");

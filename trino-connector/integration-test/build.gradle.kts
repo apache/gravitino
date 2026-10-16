@@ -103,6 +103,10 @@ tasks.build {
 }
 
 tasks.test {
+  // Trino version for ITs that start their own upstream Trino image; keep the default in sync with
+  // the TRINO_VERSION default in integration-test-common/docker-script/docker-compose.yaml.
+  environment("TRINO_VERSION", System.getenv("TRINO_VERSION") ?: "483")
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
@@ -119,17 +123,15 @@ tasks.test {
       val version = project.version.toString()
       println("Current project version: $version")
 
-      // Check whether this module has already built
-      val trinoConnectorBuildDir = project(":trino-connector:trino-connector-469-472").buildDir
-      if (trinoConnectorBuildDir.exists()) {
-        // Check the version Gravitino related jars in build equal to the current project version
-        val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
-          val name = it.name
-          !name.endsWith(version + ".jar")
-        }
+      // Check the Gravitino jars of every built version-segment module match the project version
+      project(":trino-connector").subprojects.filter { it.name.startsWith("trino-connector-") }.forEach { module ->
+        val libsDir = module.buildDir.resolve("libs")
+        val invalidGravitinoJars = libsDir.listFiles { _, name -> name.startsWith("gravitino") }?.filter {
+          !it.name.endsWith(version + ".jar")
+        }.orEmpty()
 
-        if (invalidGravitinoJars!!.isNotEmpty()) {
-          val message = "Mismatched Gravitino JAR versions found in trino-connector-469-472/build/libs:\n" +
+        if (invalidGravitinoJars.isNotEmpty()) {
+          val message = "Mismatched Gravitino JAR versions found in ${module.name}/build/libs:\n" +
             "${invalidGravitinoJars.joinToString(", ") { it.name }}\n" +
             "The expected project version is $version. Please clean and rebuild the project."
           throw GradleException(message)
