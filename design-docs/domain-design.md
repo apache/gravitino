@@ -21,7 +21,7 @@
 
 | Version | Author | Date | Status |
 | :---- | :---- | :---- | :---- |
-| 1.24 | Jerry Shao | 2026-10-16 | Draft |
+| 1.25 | Jerry Shao | 2026-10-16 | Draft |
 
 ## Goals
 
@@ -119,6 +119,7 @@ Domain operations use the store's existing locking primitives, in one global ord
 | Rename, alter | domain (exclusive) | |
 
 - Every name-addressed operation resolves the name to an ID, locks the row, then re-checks that the row still has that name and is not deleted; otherwise it fails with 404.
+- The parent is read before locking, so it may change before the locks are held. After locking, the operation re-reads the parent edge from `DomainRel`; if it changed, it rolls back and retries with the new lock set (a bounded number of times). C6, the status checks and the inherited authorization are evaluated against this locked relation.
 - A tag named in a request is re-checked after locking; a missing tag fails with 404 instead of being skipped.
 - A new backing tag has no row to lock yet; its name is protected by the tag name's unique key, so a concurrent create with the same name fails with 409.
 - The unique index on `DomainRel` and the domain row's own version (optimistic locking, never exposed to callers) remain as backstops.
@@ -202,7 +203,8 @@ Domain operations use the store's existing locking primitives, in one global ord
 
 **Implementation**
 
-- Every domain endpoint has a single `{domain}` path parameter. Domain names carry no parent, so the generic authorization expressions cannot derive it; the parent part of the check is done in the domain code: a privilege on the domain, or else on its current parent read from `DomainRel` (one lookup, batched when filtering a list of domains). The generic authorization framework is unchanged.
+- **One parent resolver**: domain names carry no parent, so the name-based parent walk (`MetadataObjects.parent`) cannot find it. A single resolver returns a domain's current parent from `DomainRel` (one lookup, batched when filtering a list of domains). It is used by the domain endpoints and by the reused owner and grant checks, `JcasbinAuthorizer#hasSetOwnerPermission` and `#hasMetadataPrivilegePermission`, which consult it for `DOMAIN` objects where they walk to the parent. So inherited ownership also works through `/owners/domain/{domain}` and the role grant and revoke endpoints.
+- **Deny still wins**: the three levels, metalake, current parent and domain, are combined in one check, the same way catalog, schema and table are today, never as "the domain, else the parent". An owner of any of the three passes. Otherwise a privilege holds when it is allowed on at least one level and denied on none, so `DENY USE_DOMAIN` on Trading overrides `ALLOW USE_DOMAIN` on Finance, and a deny on Finance overrides an allow on Trading.
 - A parent or backing tag named in a request body (`parent` on create and attach, `backingTag` on create and on `PUT .../backingTag`) is checked imperatively: `MANAGE_DOMAIN` on the new parent; for an existing tag, ownership of the tag (or the metalake); for a new tag, `CREATE_TAG` on the metalake.
 
 ### Grants and policies
@@ -275,7 +277,12 @@ Adding members uses the existing `associate_tag_with_metadata` tool. It keeps re
 ### Events and audit
 
 - Every domain operation emits pre, success and failure events through a `DomainEventDispatcher`, and reaches the audit log through the existing pipeline. Backing-tag changes are domain events. `Domain` and `DomainRel` carry `audit_info`.
-- Membership changes are tag association changes, audited by the existing `AssociateTagsForMetadataObjectEvent`. To audit a domain's membership, query the events of its backing tag (and earlier ones if it was replaced). Tagging a catalog, or deleting a backing tag, is one tag-level event.
+- Membership is derived, so there is no membership event. It changes through operations that are already audited by existing events:
+  - tag association changes (`AssociateTagsForMetadataObjectEvent`) on the asset or on its catalog or schema, and tag deletion;
+  - asset lifecycle and hierarchy changes: creating or dropping an asset under a tagged catalog or schema, or moving it to another schema (for example `AlterTableEvent`);
+  - backing-tag changes and subdomain moves, which are domain events.
+
+  Reconstructing a domain's membership at a point in time needs all of these; no per-member event is emitted.
 
 ## Alternatives Considered
 
@@ -304,7 +311,7 @@ Unity Catalog domains ([Domains and subdomains](https://docs.databricks.com/aws/
 - [ ] `Domain` API in `api/`; `MetadataObject.Type.DOMAIN` (not taggable)
 - [ ] Storage: `domain_meta` with the backing tag columns and index, and `domain_rel` (H2, MySQL, PostgreSQL, upgrade scripts)
 - [ ] Manager: create with an explicit backing tag, the binding rules, constraints C1–C6, status and its consistency checks, locking as in Locking (with `DOMAIN` in `LiveEndpointSQLProvider`), status-based visibility
-- [ ] Authorization: `MANAGE_DOMAIN` and `USE_DOMAIN`, inherited from the current parent (checked in the domain code, batched for lists), imperative checks for a parent or backing tag in a request body
+- [ ] Authorization: `MANAGE_DOMAIN` and `USE_DOMAIN`, inherited from the current parent through one parent resolver (domain endpoints, plus the `DOMAIN` case in `JcasbinAuthorizer#hasSetOwnerPermission` and `#hasMetadataPrivilegePermission`), deny over allow across metalake, parent and domain, imperative checks for a parent or backing tag in a request body
 - [ ] REST endpoints for domains, status, parent and backing tag; events (`DomainEventDispatcher`)
 - [ ] Tests, including a multi-node test: move or change a backing tag on one server, then check visibility, inherited access, roll-ups and reverse lookups on another
 
