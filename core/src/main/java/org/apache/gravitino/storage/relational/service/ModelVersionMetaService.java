@@ -128,6 +128,8 @@ public class ModelVersionMetaService {
                 mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
           });
     } catch (RuntimeException re) {
+      ExceptionUtils.throwIfLockWaitTimeout(
+          re, "A version of the model " + modelVersionEntity.modelIdentifier());
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL_VERSION, modelVersionEntity.modelIdentifier().toString());
       throw re;

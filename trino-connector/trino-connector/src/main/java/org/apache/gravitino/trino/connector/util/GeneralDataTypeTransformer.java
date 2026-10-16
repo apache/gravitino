@@ -43,8 +43,11 @@ import io.trino.spi.type.TypeOperators;
 import io.trino.spi.type.UuidType;
 import io.trino.spi.type.VarcharType;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.BooleanType;
@@ -177,14 +180,29 @@ public class GeneralDataTypeTransformer {
   }
 
   private StructType trinoRowTypeToGravitinoRowType(RowType rowType) {
-    StructType.Field[] fields =
-        rowType.getFields().stream()
-            .map(
-                field ->
-                    StructType.Field.nullableField(
-                        field.getName().get(), getGravitinoType(field.getType())))
-            .toArray(StructType.Field[]::new);
-
+    List<Field> trinoFields = rowType.getFields();
+    Set<String> usedNamesLower = new HashSet<>();
+    for (Field trinoField : trinoFields) {
+      trinoField.getName().ifPresent(n -> usedNamesLower.add(n.toLowerCase(Locale.ROOT)));
+    }
+    StructType.Field[] fields = new StructType.Field[trinoFields.size()];
+    int anonymousSeq = 0;
+    for (int i = 0; i < trinoFields.size(); i++) {
+      Field trinoField = trinoFields.get(i);
+      String name;
+      if (trinoField.getName().isPresent()) {
+        name = trinoField.getName().get();
+      } else {
+        // Trino resolves row fields case-insensitively and allows anonymous ones (e.g.
+        // ROW(1, 'x') with no AS), so synthesize a name that cannot collide, case-insensitively,
+        // with an explicitly-named sibling field (e.g. ROW(1, 'x' AS "FIELD0")).
+        do {
+          name = "field" + anonymousSeq++;
+        } while (usedNamesLower.contains(name));
+        usedNamesLower.add(name);
+      }
+      fields[i] = StructType.Field.nullableField(name, getGravitinoType(trinoField.getType()));
+    }
     return StructType.of(fields);
   }
 
@@ -229,8 +247,11 @@ public class GeneralDataTypeTransformer {
     } else if (typeClass == io.trino.spi.type.CharType.class) {
       return Types.FixedCharType.of(((io.trino.spi.type.CharType) type).getLength());
     } else if (typeClass == io.trino.spi.type.VarcharType.class) {
-      return Types.VarCharType.of(
-          ((io.trino.spi.type.VarcharType) type).getLength().orElse(Integer.MAX_VALUE - 1));
+      io.trino.spi.type.VarcharType varcharType = (io.trino.spi.type.VarcharType) type;
+      if (varcharType.getLength().isEmpty()) {
+        return Types.StringType.get();
+      }
+      return Types.VarCharType.of(varcharType.getLength().get());
     } else if (typeClass == io.trino.spi.type.VarbinaryType.class) {
       return Types.BinaryType.get();
     } else if (typeClass == io.trino.spi.type.DateType.class) {

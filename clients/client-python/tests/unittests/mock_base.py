@@ -213,7 +213,9 @@ def mock_load_fileset(name: str, location: str):
         _audit=audit_dto,
     )
     return GenericFileset(
-        fileset, None, Namespace.of("metalake_demo", "fileset_catalog", "tmp")
+        fileset,
+        HTTPClient("http://localhost:9090", is_debug=True),
+        Namespace.of("metalake_demo", "fileset_catalog", "tmp"),
     )
 
 

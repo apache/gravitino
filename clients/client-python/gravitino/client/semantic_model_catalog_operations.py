@@ -94,7 +94,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             f"/{encode_string(identifier.name())}",
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def create_semantic_model(
         self,
@@ -121,7 +121,38 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             json=req,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
+
+    def import_ossie_document(
+        self, namespace: Namespace, document: str, document_format: str = "yaml"
+    ) -> SemanticModel:
+        self._check_semantic_model_namespace(namespace)
+        if not isinstance(document, str) or not document.strip():
+            raise IllegalArgumentException("Ossie document must be non-blank text")
+        media_type = self._ossie_media_type(document_format)
+        full_namespace = self._get_semantic_model_full_namespace(namespace)
+        resp = self._rest_client.post(
+            f"{self._format_semantic_model_request_path(full_namespace)}/ossie",
+            data=document,
+            headers={"Content-Type": media_type},
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        return self._to_semantic_model(resp, full_namespace)
+
+    def export_ossie_document(
+        self, identifier: NameIdentifier, document_format: str = "yaml"
+    ) -> str:
+        self._check_semantic_model_name_identifier(identifier)
+        media_type = self._ossie_media_type(document_format)
+        full_namespace = self._get_semantic_model_full_namespace(identifier.namespace())
+        resp = self._rest_client.get(
+            f"{self._format_semantic_model_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}/ossie",
+            params={"format": document_format},
+            headers={"Accept": media_type},
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        return resp.body.decode("utf-8")
 
     def alter_semantic_model(
         self, identifier: NameIdentifier, *changes: SemanticModelChange
@@ -141,7 +172,7 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             json=updates_request,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
-        return self._to_semantic_model(resp)
+        return self._to_semantic_model(resp, full_namespace)
 
     def drop_semantic_model(self, identifier: NameIdentifier) -> bool:
         self._check_semantic_model_name_identifier(identifier)
@@ -156,12 +187,21 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
         return drop_resp.dropped()
 
     @staticmethod
-    def _to_semantic_model(resp) -> SemanticModel:
+    def _ossie_media_type(document_format: str) -> str:
+        if document_format not in ("yaml", "json"):
+            raise IllegalArgumentException(
+                "Ossie document format must be 'yaml' or 'json'"
+            )
+        return f"application/{document_format}"
+
+    def _to_semantic_model(self, resp, namespace: Namespace) -> SemanticModel:
         semantic_model_resp = SemanticModelResponse.from_json(
             resp.body, infer_missing=True
         )
         semantic_model_resp.validate()
-        return GenericSemanticModel(semantic_model_resp.semantic_model())
+        return GenericSemanticModel(
+            semantic_model_resp.semantic_model(), self._rest_client, namespace
+        )
 
     @staticmethod
     def _to_semantic_model_update_request(

@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg;
 
 import com.google.common.collect.Lists;
+import java.security.CodeSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
+import org.apache.iceberg.IcebergBuild;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -268,6 +270,11 @@ public class RESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     this.auxMode = auxMode;
+    CodeSource icebergCodeSource = IcebergBuild.class.getProtectionDomain().getCodeSource();
+    LOG.info(
+        "Iceberg REST service runtime: {}, loaded from {}",
+        IcebergBuild.fullVersion(),
+        icebergCodeSource == null ? "unknown" : icebergCodeSource.getLocation());
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     initServer(icebergConfig);
     LOG.info("Iceberg REST service init. Running in {} mode", auxMode ? "auxiliary" : "standalone");

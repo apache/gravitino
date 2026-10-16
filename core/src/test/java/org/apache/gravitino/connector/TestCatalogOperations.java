@@ -130,6 +130,8 @@ public class TestCatalogOperations
 
   public final Map<NameIdentifier, View> views;
 
+  private final Map<String, String> config;
+
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
@@ -149,6 +151,7 @@ public class TestCatalogOperations
     modelVersions = Maps.newHashMap();
     modelAliasToVersion = Maps.newHashMap();
     views = Maps.newHashMap();
+    this.config = config == null ? ImmutableMap.of() : ImmutableMap.copyOf(config);
   }
 
   @Override
@@ -884,6 +887,22 @@ public class TestCatalogOperations
     } else {
       return false;
     }
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
+    // Mirror a JDBC-style backend probe: fail when the catalog was created with FAIL_TEST=true.
+    if ("true".equals(config.get(FAIL_TEST))) {
+      throw new ConnectionFailedException("Connection failed");
+    }
+    // A catalog that opts into create-time verification mirrors a reachable JDBC backend: the probe
+    // succeeds. Otherwise keep the interface default (unsupported) so the standalone testConnection
+    // REST path still reports that this test catalog does not support connection testing.
+    if ("true".equals(config.get(VALIDATE_ON_CREATE))) {
+      return;
+    }
+    throw new UnsupportedOperationException(
+        String.format("Catalog %s does not support connection testing", catalogIdent));
   }
 
   @Override

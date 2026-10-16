@@ -430,7 +430,9 @@ public class ExceptionHandlers {
     @Override
     public Response handle(OperationType op, String catalog, String metalake, Exception e) {
       String formatted = StringUtil.isBlank(catalog) ? "" : " [" + catalog + "]";
-      String errorMsg = getCatalogErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      // Keep schema-check context even when the backend message contains "Exception: ".
+      String reason = e instanceof ConnectionFailedException ? e.getMessage() : getErrorMsg(e);
+      String errorMsg = getCatalogErrorMsg(formatted, op.name(), metalake, reason);
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {

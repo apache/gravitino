@@ -224,13 +224,13 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
-                  - $ref: "#/components/schemas/PolicyListResponse"
+                  - $ref: "#/components/schemas/PolicyNameListResponse"
+                  - $ref: "#/components/schemas/MetadataObjectPolicyListResponse"
               examples:
-                NameListResponse:
-                  $ref: "#/components/examples/NameListResponse"
-                PolicyListResponse:
-                  $ref: "#/components/examples/PolicyListResponse"
+                PolicyNameListResponse:
+                  $ref: "#/components/examples/PolicyNameListResponse"
+                MetadataObjectPolicyListResponse:
+                  $ref: "#/components/examples/MetadataObjectPolicyListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
@@ -336,7 +336,7 @@ components:
 
     IcebergCompactionContent:
       type: object
-      description: Built-in Iceberg compaction thresholds, scoring weights, and job options.
+      description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
       properties:
         minDataFileMse:
           type: integer
@@ -363,6 +363,15 @@ components:
           format: int64
           minimum: 1
           default: 50
+        rewriteStrategy:
+          type: string
+          enum: [binpack, sort]
+          default: binpack
+          description: Iceberg rewrite_data_files top-level strategy.
+        sortOrder:
+          type: string
+          default: ""
+          description: Iceberg rewrite_data_files top-level sort_order. Required when rewriteStrategy is sort; must be empty for binpack.
         rewriteOptions:
           type: object
           default: {}
@@ -439,6 +448,64 @@ components:
             content:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
 
+    IcebergRewriteManifestsContent:
+      type: object
+      description: Placeholder content for system_iceberg_rewrite_manifests. Configurable thresholds land in a follow-up.
+      additionalProperties: false
+
+    IcebergRewriteManifestsPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_rewrite_manifests]
+            content:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
+    IcebergRewriteManifestsPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_rewrite_manifests]
+            content:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
+    IcebergSnapshotExpirationContent:
+      type: object
+      description: Placeholder content for system_iceberg_snapshot_expiration. Configurable thresholds land in a follow-up.
+      additionalProperties: false
+
+    IcebergSnapshotExpirationPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_snapshot_expiration]
+            content:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
+
+    IcebergSnapshotExpirationPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_snapshot_expiration]
+            content:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
+
     RowFilterContent:
       type: object
       description: Expression content for a built-in row-filter policy.
@@ -449,7 +516,12 @@ components:
           type: string
           minLength: 1
           pattern: '[\s\S]*\S[\s\S]*'
-          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+          description: >-
+            A complete restricted-rego-v1 row-filter program beginning with `filter :=`.
+            Results and conditions must be Boolean. The program may use col("name"),
+            session_user(), is_group_member("group"), literals, comparisons, in, and/or/not,
+            including ordered `else := ... if ...` branches with a final `else`. The UTF-8 source
+            must not exceed 16 KiB; see the Policies documentation for grammar, limits, and examples.
 
     ColumnMaskContent:
       type: object
@@ -461,7 +533,12 @@ components:
           type: string
           minLength: 1
           pattern: '[\s\S]*\S[\s\S]*'
-          description: A nonblank expression whose UTF-8 encoding must not exceed 16 KiB.
+          description: >-
+            A complete restricted-rego-v1 column-mask program beginning with
+            `mask := action("...")`. Conditions are optional, must use only trusted request
+            context, and require ordered `else := action(...) if ...` branches plus a final
+            `else`. The UTF-8 source must not exceed 16 KiB; see the Policies documentation for
+            allowlisted actions, grammar, limits, and examples.
 
     RowFilterPolicy:
       allOf:
@@ -527,7 +604,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "VIEW", "FUNCTION" ]
+            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "SEMANTIC_MODEL", "VIEW", "FUNCTION" ]
         properties:
           type: object
           description: A map of string-to-string properties for the policy content.
@@ -593,7 +670,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -604,6 +681,8 @@ components:
         - $ref: '#/components/schemas/CustomPolicy'
         - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
         - $ref: '#/components/schemas/IcebergCompactionPolicy'
+        - $ref: '#/components/schemas/IcebergRewriteManifestsPolicy'
+        - $ref: '#/components/schemas/IcebergSnapshotExpirationPolicy'
         - $ref: '#/components/schemas/RowFilterPolicy'
         - $ref: '#/components/schemas/ColumnMaskPolicy'
       discriminator:
@@ -612,6 +691,8 @@ components:
           custom: '#/components/schemas/CustomPolicy'
           system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicy'
           system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicy'
+          system_iceberg_rewrite_manifests: '#/components/schemas/IcebergRewriteManifestsPolicy'
+          system_iceberg_snapshot_expiration: '#/components/schemas/IcebergSnapshotExpirationPolicy'
           system_row_filter: '#/components/schemas/RowFilterPolicy'
           system_column_mask: '#/components/schemas/ColumnMaskPolicy'
 
@@ -629,6 +710,30 @@ components:
           description: A list of policy objects
           items:
             $ref: "#/components/schemas/Policy"
+
+    PolicyNameListResponse:
+      allOf:
+        - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+        - type: object
+          required:
+            - names
+            - hasInaccessiblePolicies
+          properties:
+            hasInaccessiblePolicies:
+              type: boolean
+              description: Whether one or more inaccessible policies were omitted from the response
+
+    MetadataObjectPolicyListResponse:
+      allOf:
+        - $ref: "#/components/schemas/PolicyListResponse"
+        - type: object
+          required:
+            - policies
+            - hasInaccessiblePolicies
+          properties:
+            hasInaccessiblePolicies:
+              type: boolean
+              description: Whether one or more inaccessible policies were omitted from the response
 
     MetadataObject:
       type: object
@@ -684,7 +789,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -694,6 +799,8 @@ components:
       oneOf:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
         - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergSnapshotExpirationPolicyCreateRequest'
         - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
         - $ref: '#/components/schemas/RowFilterPolicyCreateRequest'
         - $ref: '#/components/schemas/ColumnMaskPolicyCreateRequest'
@@ -702,6 +809,8 @@ components:
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
           system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+          system_iceberg_rewrite_manifests: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
+          system_iceberg_snapshot_expiration: '#/components/schemas/IcebergSnapshotExpirationPolicyCreateRequest'
           system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
           system_row_filter: '#/components/schemas/RowFilterPolicyCreateRequest'
           system_column_mask: '#/components/schemas/ColumnMaskPolicyCreateRequest'
@@ -794,7 +903,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_row_filter, system_column_mask]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask]
             newContent:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -819,6 +928,28 @@ components:
               enum: [system_iceberg_orphan_file_removal]
             newContent:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    UpdateIcebergRewriteManifestsPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_rewrite_manifests]
+            newContent:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
+    UpdateIcebergSnapshotExpirationPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_snapshot_expiration]
+            newContent:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
 
     UpdateRowFilterPolicyContentRequest:
       allOf:
@@ -848,6 +979,8 @@ components:
         - $ref: '#/components/schemas/UpdateCustomPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergRewriteManifestsPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
       discriminator:
@@ -856,6 +989,8 @@ components:
           custom: '#/components/schemas/UpdateCustomPolicyContentRequest'
           system_iceberg_compaction: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
           system_iceberg_orphan_file_removal: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+          system_iceberg_rewrite_manifests: '#/components/schemas/UpdateIcebergRewriteManifestsPolicyContentRequest'
+          system_iceberg_snapshot_expiration: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
           system_row_filter: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
           system_column_mask: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
       example: {
@@ -895,6 +1030,13 @@ components:
           $ref: "#/components/schemas/Policy"
 
   examples:
+    PolicyNameListResponse:
+      value: {
+        "code": 0,
+        "names": ["my_policy1"],
+        "hasInaccessiblePolicies": true
+      }
+
     NameListResponse:
       value: {
         "code": 0,
@@ -933,6 +1075,13 @@ components:
             }
           }
         ]
+      }
+
+    MetadataObjectPolicyListResponse:
+      value: {
+        "code": 0,
+        "policies": [],
+        "hasInaccessiblePolicies": true
       }
 
     PolicyCreate:

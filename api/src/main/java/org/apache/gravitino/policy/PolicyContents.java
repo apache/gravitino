@@ -19,11 +19,13 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -169,10 +171,34 @@ public class PolicyContents {
   }
 
   /**
+   * Creates placeholder Iceberg rewrite-manifests policy content.
+   *
+   * @return rewrite-manifests policy content
+   */
+  public static PolicyContent icebergRewriteManifests() {
+    return new IcebergRewriteManifestsContent();
+  }
+
+  /**
+   * Creates placeholder Iceberg snapshot-expiration policy content.
+   *
+   * @return snapshot-expiration policy content
+   */
+  public static PolicyContent icebergSnapshotExpiration() {
+    return new IcebergSnapshotExpirationContent();
+  }
+
+  /**
    * Creates a row-filter policy for tagged tables.
    *
-   * @param expression row-filter expression
-   * @return validated read-restriction policy content
+   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
+   * filter :=}. The server performs grammar and semantic validation when the policy is created or
+   * updated.
+   *
+   * @param expression complete row-filter program
+   * @return structurally validated read-restriction policy content
+   * @throws IllegalArgumentException if the expression is blank or exceeds {@link
+   *     ReadRestrictionContent#MAX_SOURCE_LENGTH_BYTES}
    */
   public static RowFilterContent rowFilter(String expression) {
     return new RowFilterContent(expression);
@@ -181,11 +207,30 @@ public class PolicyContents {
   /**
    * Creates a column-mask policy for tagged tables or columns.
    *
-   * @param expression column-mask expression
-   * @return validated read-restriction policy content
+   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
+   * mask := action(...)}. The server performs grammar and semantic validation when the policy is
+   * created or updated.
+   *
+   * @param expression complete column-mask program
+   * @return structurally validated read-restriction policy content
+   * @throws IllegalArgumentException if the expression is blank or exceeds {@link
+   *     ReadRestrictionContent#MAX_SOURCE_LENGTH_BYTES}
    */
   public static ColumnMaskContent columnMask(String expression) {
     return new ColumnMaskContent(expression);
+  }
+
+  /**
+   * Creates an access control policy content.
+   *
+   * @param privileges the privileges the rule confers on the tagged object, each of which must be
+   *     in {@link AccessControlContent#PERMITTED_PRIVILEGES}
+   * @param applicableRoles the roles that satisfy the rule's condition
+   * @return access control policy content
+   */
+  public static PolicyContent accessControl(
+      List<Privilege.Name> privileges, List<String> applicableRoles) {
+    return new AccessControlContent(privileges, applicableRoles);
   }
 
   private PolicyContents() {}

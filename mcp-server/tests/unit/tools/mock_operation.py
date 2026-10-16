@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Optional
+
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
@@ -29,6 +31,7 @@ from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.metalake_operation import MetalakeOperation
 from mcp_server.client.partition_operation import PartitionOperation
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.statistic_operation import StatisticOperation
 from mcp_server.client.view_operation import ViewOperation
 
@@ -72,6 +75,9 @@ class MockOperation(GravitinoOperation):
 
     def as_view_operation(self) -> ViewOperation:
         return MockViewOperation()
+
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        return MockSemanticModelOperation()
 
     def as_metalake_operation(self) -> MetalakeOperation:
         return MockMetalakeOperation()
@@ -483,3 +489,41 @@ class MockViewOperation(ViewOperation):
         self, catalog_name: str, schema_name: str, view_name: str
     ) -> str:
         return f"mock_view: {catalog_name}, {schema_name}, {view_name}"
+
+
+class MockSemanticModelOperation(SemanticModelOperation):
+    async def list_of_semantic_models(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        return "[]"
+
+    async def load_semantic_model(
+        self, catalog_name: str, schema_name: str, semantic_model_name: str
+    ) -> str:
+        return '{"name": "mock_semantic_model"}'
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_semantic_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        definition: dict,
+        comment: Optional[str] = None,
+        properties: Optional[dict[str, str]] = None,
+    ) -> str:
+        return '{"name": "mock_semantic_model"}'
+
+    async def alter_semantic_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        updates: list[dict],
+    ) -> str:
+        return '{"name": "mock_semantic_model"}'
+
+    async def drop_semantic_model(
+        self, catalog_name: str, schema_name: str, semantic_model_name: str
+    ) -> str:
+        return "true"

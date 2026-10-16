@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.rego.RestrictedRegoExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -115,6 +116,9 @@ public class PolicyManager implements PolicyDispatcher {
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
+    content.validate();
+    validateReadRestrictionContent(type, content);
+
     PolicyEntity policyEntity =
         PolicyEntity.builder()
             .withId(idGenerator.nextId())
@@ -333,10 +337,13 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
+
+    newContent.validate();
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);
@@ -344,5 +351,17 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withContent(newContent);
 
     return builder.build();
+  }
+
+  private static void validateReadRestrictionContent(
+      Policy.BuiltInType policyType, PolicyContent content) {
+    if (policyType == Policy.BuiltInType.ROW_FILTER && content instanceof RowFilterContent) {
+      RestrictedRegoExpressionParserFacade.validateRowFilter(
+          ((RowFilterContent) content).expression());
+    } else if (policyType == Policy.BuiltInType.COLUMN_MASK
+        && content instanceof ColumnMaskContent) {
+      RestrictedRegoExpressionParserFacade.validateColumnMask(
+          ((ColumnMaskContent) content).expression());
+    }
   }
 }
