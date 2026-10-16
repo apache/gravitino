@@ -247,7 +247,7 @@ client.delete_tag("pii")
 
 Both happen in one request, and either list can be omitted. The object type and full name go in the
 path, so the same call covers catalogs, schemas, tables, views, columns, filesets, topics, models,
-and functions.
+functions, and [Semantic Models](./manage-semantic-model-metadata-using-gravitino.md#tags-and-policies).
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
