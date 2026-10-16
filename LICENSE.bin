@@ -212,7 +212,6 @@
    Apache DataSketches Java
    Apache DataSketches Memory
    Apache Iceberg
-   Datastrato Experimental Iceberg (com.datastrato)
    Apache Kafka
    Apache Spark
    Apache Submarine
