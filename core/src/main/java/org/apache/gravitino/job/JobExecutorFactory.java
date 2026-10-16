@@ -32,8 +32,12 @@ import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JobExecutorFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobExecutorFactory.class);
 
   /** The name of the built-in k8s job executor. */
   public static final String K8S_JOB_EXECUTOR_NAME = "k8s";
@@ -66,11 +70,21 @@ public class JobExecutorFactory {
   public static JobExecutor create(Config config) {
     String jobExecutorName = config.get(Configs.JOB_EXECUTOR);
     String clzName;
+    String jobExecutorClassKey =
+        JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
     if (BUILTIN_EXECUTORS.containsKey(jobExecutorName)) {
       clzName = BUILTIN_EXECUTORS.get(jobExecutorName);
+      String configuredClzName = StringUtils.trimToNull(config.getRawString(jobExecutorClassKey));
+      if (configuredClzName != null && !configuredClzName.equals(clzName)) {
+        LOG.warn(
+            "Job executor {} is built in, so {} = {} is ignored and {} is used. Give a custom job"
+                + " executor another name.",
+            jobExecutorName,
+            jobExecutorClassKey,
+            configuredClzName,
+            clzName);
+      }
     } else {
-      String jobExecutorClassKey =
-          JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
       clzName = config.getRawString(jobExecutorClassKey);
     }
 

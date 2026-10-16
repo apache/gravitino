@@ -570,7 +570,7 @@ server, are documented with those services. See
 
 | Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
 |----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                                                                      | `local`                       |
+| `gravitino.job.executor`               | Executor that runs jobs: the built-in `local` or `k8s`, or the name of a custom executor whose class is set by `gravitino.jobExecutor.<name>.class`.            | `local`                       |
 | `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |

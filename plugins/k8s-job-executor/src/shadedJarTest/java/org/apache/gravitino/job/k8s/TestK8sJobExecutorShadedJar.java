@@ -99,7 +99,10 @@ public class TestK8sJobExecutorShadedJar {
   @Test
   public void testNoClassOfServerClasspathIsBundled() throws IOException {
     // A class that is both in the shaded jar and in another jar of the server is loaded from
-    // whichever comes first on the classpath, so the shaded jar must not bundle any.
+    // whichever comes first on the classpath, so the shaded jar must not bundle any. The classpath
+    // here is the runtime classpath of :server, the libs directory of the distribution also gets
+    // the jars of the other plugins (idp-basic, tms and its dependencies), which this doesn't
+    // cover.
     Set<String> serverClasses = new TreeSet<>();
     for (String path : System.getProperty("java.class.path").split(File.pathSeparator)) {
       File file = new File(path).getCanonicalFile();

@@ -36,6 +36,8 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.job.k8s.K8sJobExecutorConfigs;
 import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Builds the SparkApplication of a Spark job, a custom resource of <a
@@ -43,6 +45,8 @@ import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
  * 0.9.x.
  */
 public final class SparkApplicationUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(SparkApplicationUtils.class);
 
   /** The SparkApplication resource definition. */
   public static final ResourceDefinitionContext SPARK_APPLICATION =
@@ -111,7 +115,7 @@ public final class SparkApplicationUtils {
               template.name(), template.environments().keySet()));
     }
 
-    String executable = getExecutableUri(template, configs);
+    String executable = getExecutableUri(context, template, configs);
     checkClusterReachable(executable);
     template.jars().forEach(SparkApplicationUtils::checkClusterReachable);
     template.files().forEach(SparkApplicationUtils::checkClusterReachable);
@@ -198,12 +202,23 @@ public final class SparkApplicationUtils {
     return app;
   }
 
-  private static String getExecutableUri(SparkJobTemplate template, K8sJobExecutorConfigs configs) {
+  private static String getExecutableUri(
+      JobContext context, SparkJobTemplate template, K8sJobExecutorConfigs configs) {
     // The executable of a built-in job template is the path of the jobs jar on the Gravitino
     // server, which is what the local job executor runs. An executable that is already reachable
     // from the cluster is kept as it is.
     if (template.name().startsWith(JobTemplateProvider.BUILTIN_NAME_PREFIX)
         && !K8sJobResourceUtils.isClusterReachable(template.executable())) {
+      // The job records the executable of the template, so log the jar that actually runs. It must
+      // be the same version as the jobs jar of the server, which the template comes from.
+      LOG.info(
+          "Job {} of built-in job template {} runs the jobs jar {} set by {} instead of {} on the"
+              + " Gravitino server",
+          context.jobId(),
+          template.name(),
+          configs.sparkBuiltinJobsJar(),
+          K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR,
+          template.executable());
       return configs.sparkBuiltinJobsJar();
     }
     return template.executable();
