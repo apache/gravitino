@@ -219,3 +219,49 @@ describe('semantic metadata update errors', () => {
     expect(defHttp.get).not.toHaveBeenCalled()
   })
 })
+
+describe('Semantic Model lists before full schema tree loading', () => {
+  it.each([[[]], [['sales_model', 'other_model']]])('preserves an unloaded schema with models %j', async names => {
+    const catalogKey = '{{demo}}{{sales}}{{relational}}'
+    const schemaNode = { key: schemaKey, node: 'schema', children: [] }
+    store.dispatch(setMetalakeTree([{ key: catalogKey, node: 'catalog', children: [schemaNode] }]))
+    defHttp.get.mockImplementation(({ url }) =>
+      Promise.resolve({
+        identifiers: (url.endsWith('/semantic-models')
+          ? names
+          : url.endsWith('/tables')
+            ? ['orders', 'customers']
+            : url.endsWith('/views')
+              ? ['recent_orders']
+              : ['revenue']
+        ).map(name => ({ name }))
+      })
+    )
+
+    await store.dispatch(fetchSemanticModels({ ...namespace, init: true }))
+    const unloaded = store.getState().metalakes.metalakeTree[0].children[0]
+    expect(unloaded).toEqual(schemaNode)
+    expect(unloaded.isLeaf).toBeUndefined()
+    expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(names)
+
+    // TreeComponent marks the node loaded before starting the full children request.
+    store.dispatch(setLoadedNodes([schemaKey]))
+    await store.dispatch(setIntoTreeNodeWithFetch({ key: schemaKey }))
+    const loaded = store.getState().metalakes.metalakeTree[0].children[0]
+    expect(loaded.isLeaf).toBe(false)
+    expect(loaded.children.map(child => child.name).sort()).toEqual(
+      ['orders', 'customers', 'recent_orders', 'revenue', ...names].sort()
+    )
+    expect(store.getState().metalakes.semanticModelRequests).toEqual({})
+  })
+
+  it('keeps a list-only request from modifying an already loaded tree', async () => {
+    const schemaNode = { key: schemaKey, node: 'schema', children: [{ name: 'orders', node: 'table' }] }
+    store.dispatch(setMetalakeTree([schemaNode]))
+    store.dispatch(setLoadedNodes([schemaKey]))
+    defHttp.get.mockResolvedValue({ identifiers: [{ name: 'sales_model' }] })
+    await store.dispatch(fetchSemanticModels({ ...namespace, init: false }))
+    expect(store.getState().metalakes.metalakeTree).toEqual([schemaNode])
+    expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['sales_model'])
+  })
+})

@@ -3305,12 +3305,15 @@ export const appMetalakesSlice = createSlice({
       const key = semanticModelSchemaKey(action.meta.arg)
       const request = state.semanticModelRequests[key]
       if (!action.payload.stale && request?.requestId === action.meta.requestId) {
-        const data = mergeWithSemanticModelNodes({
-          tree: state.metalakeTree,
-          key,
-          entities: action.payload.semanticModels
-        })
-        state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
+        // A model list is only a partial set of schema children; leave unloaded nodes expandable.
+        if (action.meta.arg.init && state.loadedNodes.includes(key)) {
+          const data = mergeWithSemanticModelNodes({
+            tree: state.metalakeTree,
+            key,
+            entities: action.payload.semanticModels
+          })
+          state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
+        }
         if (
           (!state.activeCatalogEntity || state.activeSemanticModelSchema === key) &&
           state.semanticModelListRequestId === action.meta.requestId

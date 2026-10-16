@@ -53,7 +53,6 @@ import {
   getFilesetDetails,
   getTopicDetails,
   getModelDetails,
-  getVersionDetails,
   setSelectedNodes,
   setActiveCatalogEntity,
   getCurrentEntityTags,
@@ -242,7 +241,7 @@ const CatalogsListPage = () => {
           )
         }
 
-        if (paramsSize === 5 && catalog && catalogType && schema) {
+        if ((paramsSize === 5 || (paramsSize === 6 && model && version)) && catalog && catalogType && schema) {
           if (!store.catalogs.length) {
             await load(fetchCatalogs({ metalake }))
             await load(fetchSchemas({ metalake, catalog, catalogType }))
@@ -330,7 +329,9 @@ const CatalogsListPage = () => {
                   (await load(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema })))
                 await load(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
                 await load(setActivatedDetailsLoading(true))
-                await load(getModelDetails({ init: true, metalake, catalog, schema, model }))
+
+                // Version URLs render the parent model header and its version list.
+                await load(getModelDetails({ init: true, metalake, catalog, schema, model, version }))
                 await load(setActivatedDetailsLoading(false))
                 load(
                   getCurrentEntityTags({
@@ -391,16 +392,6 @@ const CatalogsListPage = () => {
               })
             )
           }
-        }
-        if (paramsSize === 6 && version) {
-          if (!store.catalogs.length) {
-            await load(fetchCatalogs({ metalake }))
-            await load(fetchSchemas({ metalake, catalog, catalogType }))
-            await load(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema }))
-          }
-          await load(setActivatedDetailsLoading(true))
-          await load(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
-          await load(setActivatedDetailsLoading(false))
         }
       }
     }

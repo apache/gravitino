@@ -25,6 +25,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
 import reducer from '@/lib/store/metalakes'
 import CatalogsListPage from './page'
+import { catalogEntityKey } from '@/lib/utils/catalogEntity'
 
 const navigation = vi.hoisted(() => ({ params: null }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => navigation.params }))
@@ -159,4 +160,56 @@ it('ignores a canceled table list and its loading writes after opening a model',
   const before = store.getState().metalakes
   await act(async () => resolveTables({ identifiers: [{ name: 'old_table' }] }))
   expect(store.getState().metalakes).toEqual(before)
+})
+
+it.each(['direct link', 'from model'])(
+  'loads the parent model header and versions on a version route: %s',
+  async entry => {
+    const model = { name: 'forecast', comment: 'Model header', properties: { framework: 'pytorch' } }
+    defHttp.get.mockResolvedValue({
+      model,
+      identifiers: [],
+      versions: [1, 2],
+      tags: [{ name: 'model_tag' }],
+      policies: []
+    })
+    const route = { catalogType: 'model', model: 'forecast' }
+    if (entry === 'from model') await navigate(route)
+    await navigate({ ...route, version: '1' })
+    const state = store.getState().metalakes
+    expect(state.activatedDetails).toEqual(model)
+    expect(state.activatedDetailsKey).toBe(
+      catalogEntityKey({ metalake: 'demo', catalog: 'sales', schema: 'mart', ...route, version: '1' })
+    )
+    expect(state.activatedDetailsLoading).toBe(false)
+    expect(state.tableData.map(item => item.name)).toEqual([1, 2])
+    expect(state.currentEntityTags).toEqual([{ name: 'model_tag' }])
+    expect(defHttp.get.mock.calls.some(([request]) => request.url.endsWith('/versions/1'))).toBe(false)
+  }
+)
+
+it('ignores a version route header response after navigating to a Semantic Model', async () => {
+  let finishModel
+  defHttp.get.mockImplementation(({ url }) => {
+    if (url.endsWith('/models/forecast'))
+      return new Promise(resolve => {
+        finishModel = resolve
+      })
+
+    return Promise.resolve({
+      identifiers: [],
+      versions: [1],
+      tags: [],
+      policies: [],
+      semanticModel: { name: 'orders', definition: { datasets: [] } }
+    })
+  })
+  await navigate({ catalogType: 'model', model: 'forecast', version: '1' })
+  expect(finishModel).toBeTypeOf('function')
+  await navigate('orders')
+  const before = store.getState().metalakes
+  const calls = defHttp.get.mock.calls.length
+  await act(async () => finishModel({ model: { name: 'forecast', comment: 'Old version route' } }))
+  expect(store.getState().metalakes).toEqual(before)
+  expect(defHttp.get.mock.calls).toHaveLength(calls)
 })
